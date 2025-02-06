@@ -631,6 +631,15 @@ object SpliceConfig {
                   .map(_.newParticipantIdentifier)} must match participant node identifier $participantIdentifier"
             ),
           )
+          _ <- Either.cond(
+            conf.participantPruningSchedule.forall(
+              _.retention.underlying > conf.deduplicationDuration.underlying
+            ),
+            (),
+            ConfigValidationFailed(
+              s"Pruning retention period ${conf.participantPruningSchedule.map(_.retention)} must be bigger than the deduplication duration ${conf.deduplicationDuration}"
+            ),
+          )
         } yield conf
       }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =

@@ -17,7 +17,7 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
   /v0/dso:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getDsoInfo"
       responses:
@@ -29,9 +29,11 @@ paths:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
   /v0/dso-party-id:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getDsoPartyId"
+      description: |
+        The party ID of the DSO for the Splice network connected by this Scan app.
       responses:
         "200":
           description: ok
@@ -41,9 +43,12 @@ paths:
                 "$ref": "#/components/schemas/GetDsoPartyIdResponse"
   /v0/closed-rounds:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getClosedRounds"
+      description: |
+        Every closed mining round on the ledger for the connected Splice network,
+        in round number order, earliest-first.
       responses:
         "200":
           description: ok
@@ -53,9 +58,13 @@ paths:
                 "$ref": "#/components/schemas/GetClosedRoundsResponse"
   /v0/open-and-issuing-mining-rounds:
     post:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getOpenAndIssuingMiningRounds"
+      description: |
+        All current open and issuing mining rounds, if the request is empty;
+        passing contract IDs in the request can reduce the response data for
+        polling/client-cache-update efficiency.
       requestBody:
         required: true
         content:
@@ -71,7 +80,7 @@ paths:
                 "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsResponse"
   /v0/amulet-rules:
     post:
-      tags: [scan]
+      tags: [scan, internal]
       x-jvm-package: scan
       operationId: "getAmuletRules"
       requestBody:
@@ -89,7 +98,7 @@ paths:
                 "$ref": "#/components/schemas/GetAmuletRulesResponse"
   /v0/external-party-amulet-rules:
     post:
-      tags: [scan]
+      tags: [scan, internal]
       x-jvm-package: scan
       operationId: "getExternalPartyAmuletRules"
       requestBody:
@@ -107,7 +116,7 @@ paths:
                 "$ref": "#/components/schemas/GetExternalPartyAmuletRulesResponse"
   /v0/ans-rules:
     post:
-      tags: [scan]
+      tags: [scan, internal]
       x-jvm-package: scan
       operationId: "getAnsRules"
       requestBody:
@@ -125,9 +134,11 @@ paths:
                 "$ref": "#/components/schemas/GetAnsRulesResponse"
   /v0/featured-apps:
     get:
-      tags: [scan]
+      tags: [scan, internal]
       x-jvm-package: scan
       operationId: "listFeaturedAppRights"
+      description: |
+        List every `FeaturedAppRight` registered with the DSO on the ledger.
       responses:
         "200":
           description: ok
@@ -137,9 +148,12 @@ paths:
                 "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
   /v0/featured-apps/{provider_party_id}:
     get:
-      tags: [scan]
+      tags: [scan, internal]
       x-jvm-package: scan
       operationId: "lookupFeaturedAppRight"
+      description: |
+        If `provider_party_id` has a `FeaturedAppRight` registered with the DSO,
+        return it; `featured_app_right` will be empty otherwise.
       parameters:
         - name: "provider_party_id"
           in: "path"
@@ -155,9 +169,10 @@ paths:
                 "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
   /v0/total-amulet-balance:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getTotalAmuletBalance"
+      description: Get the total balance of Amulet in the network
       parameters:
         - in: query
           name: asOfEndOfRound
@@ -177,9 +192,11 @@ paths:
 
   /v0/wallet-balance:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getWalletBalance"
+      description: |
+        Get the Amulet balance for a specific party at the end of a closed round
       parameters:
         - in: query
           name: party_id
@@ -204,9 +221,11 @@ paths:
 
   /v0/amulet-config-for-round:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getAmuletConfigForRound"
+      description: |
+        Retrieve some information from the `AmuletRules` selected for the given round
       parameters:
         - in: query
           name: round
@@ -225,9 +244,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/round-of-latest-data:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getRoundOfLatestData"
+      description: |
+        Get the latest round number for which aggregated data is available and
+        the ledger effective time at which the round was closed.
       responses:
         "200":
           description: ok
@@ -239,9 +261,10 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/rewards-collected:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getRewardsCollected"
+      description: Get the total rewards collected ever
       parameters:
         - in: query
           name: round
@@ -260,9 +283,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-providers-by-app-rewards:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getTopProvidersByAppRewards"
+      description: |
+        Get a list of top-earning app providers, and the total earned app
+        rewards for each
       parameters:
         - in: query
           name: round
@@ -289,9 +315,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-validators-by-validator-rewards:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getTopValidatorsByValidatorRewards"
+      description: |
+        Get a list of top-earning validators, and the total earned validator
+        rewards for each
       parameters:
         - in: query
           name: round
@@ -318,12 +347,18 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-validators-by-validator-faucets:
     get:
-      tags: [scan]
+      tags: [scan, internal]
       x-jvm-package: scan
       operationId: "getTopValidatorsByValidatorFaucets"
+      description: |
+        Get a list of top validators by number of rounds in which they collected
+        faucets, and basis statistics on their round collection history
       parameters:
         - in: query
           name: limit
+          description: |
+            Maximum number of validator records that may be returned in the
+            response
           required: true
           schema:
             type: integer
@@ -341,9 +376,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-validators-by-purchased-traffic:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getTopValidatorsByPurchasedTraffic"
+      description: |
+        Get a list of validators and their domain fees spends, sorted by the
+        amount of extra traffic purchased
       parameters:
         - in: query
           name: round
@@ -370,9 +408,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/dso-sequencers:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "listDsoSequencers"
+      description: |
+        Retrieve Canton sequencer configuration for all SVs, grouped by
+        connected synchronizer ID
       responses:
         "200":
           description: ok
@@ -1161,6 +1202,9 @@ components:
       required: ["rounds"]
       properties:
         rounds:
+          description: |
+            Contracts of the Daml template `Splice.Round.ClosedMiningRound`, one
+            for every closed round.
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
@@ -1173,14 +1217,29 @@ components:
         ]
       properties:
         cached_open_mining_round_contract_ids:
+          description: |
+            The contract IDs for `open_mining_rounds` in the response the caller
+            knows about. If unsure, an empty array is fine; only a performance
+            penalty is incurred.
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         cached_issuing_round_contract_ids:
+          description: |
+            The contract IDs for `issuing_mining_rounds` in the response the
+            caller knows about. If unsure, an empty array is fine; only a
+            performance penalty is incurred.
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
     GetOpenAndIssuingMiningRoundsResponse:
+      description: |
+        Daml contracts of the templates `Splice.Round.OpenMiningRound` and
+        `Splice.Round.IssuingMiningRound` representing rounds for which rewards
+        can be registered or are currently being computed, respectively.
+        Contract IDs in the input serve as input sets for the two
+        `MaybeCachedContractWithStateMap`s as described for that structure for
+        `open_mining_rounds` and `issuing_mining_rounds`.
       type: object
       required:
         [
@@ -1190,6 +1249,9 @@ components:
         ]
       properties:
         time_to_live_in_microseconds:
+          description: |
+            Suggested cache TTL for the response; this should expire before the
+            `opensAt` of any open rounds that may not be in this response yet.
           type: integer
         open_mining_rounds:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
@@ -1203,6 +1265,13 @@ components:
         cached_amulet_rules_domain_id:
           type: string
     GetAmuletRulesResponse:
+      description: |
+        Contract of the Daml template `Splice.AmuletRules.AmuletRules`,
+        including the full schedule of `AmuletConfig` changes approved by
+        the DSO. Callers should not assume that `initialValue` is up-to-date,
+        and should instead search `futureValues` for the latest configuration
+        valid as of now. `contract` will be absent if its ID matches the input
+        `cached_amulet_rules_contract_id`.
       type: object
       properties:
         amulet_rules_update:
@@ -1216,6 +1285,9 @@ components:
         cached_external_party_amulet_rules_domain_id:
           type: string
     GetExternalPartyAmuletRulesResponse:
+      description: |
+        A contract state update of Daml template
+        `Splice.ExternalPartyAmuletRules.ExternalPartyAmuletRules`
       type: object
       properties:
         external_party_amulet_rules_update:
@@ -1229,12 +1301,16 @@ components:
         cached_ans_rules_domain_id:
           type: string
     GetAnsRulesResponse:
+      description: |
+        A contract state update of Daml template `Splice.Ans.AnsRules`.
       type: object
       properties:
         ans_rules_update:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
       required: ["ans_rules_update"]
     ListFeaturedAppRightsResponse:
+      description: |
+        Contracts of Daml template `Splice.Amulet.FeaturedAppRight`.
       type: object
       required: ["featured_apps"]
       properties:
@@ -1243,6 +1319,8 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     LookupFeaturedAppRightResponse:
+      description: |
+        If defined, a contract of Daml template `Splice.Amulet.FeaturedAppRight`.
       type: object
       properties:
         featured_app_right:
@@ -1351,6 +1429,9 @@ components:
       required: ["validatorsByReceivedFaucets"]
       properties:
         validatorsByReceivedFaucets:
+          description: |
+            Up to `limit` validators, sorted greatest number of rounds
+            collected first
           type: array
           items:
             $ref: "./scan-external.yaml#/components/schemas/ValidatorReceivedFaucets"
@@ -1399,8 +1480,10 @@ components:
       required: ["domainId", "sequencers"]
       properties:
         domainId:
+          description: the synchronizer ID for the associated sequencers
           type: string
         sequencers:
+          description: the sequencers associated with the synchronizer
           type: array
           items:
             $ref: "#/components/schemas/DsoSequencer"
@@ -1409,15 +1492,22 @@ components:
       required: ["migrationId", "id", "url", "svName", "availableAfter"]
       properties:
         migrationId:
+          description: |
+            The synchronizer migration id corresponding to this sequencer.
           type: integer
           format: int64
         id:
+          description: The id of the sequencer.
           type: string
         url:
+          description: The public accessible url of the sequencer.
           type: string
         svName:
+          description: The sequencer's operating SV name.
           type: string
         availableAfter:
+          description: |
+            Any participant should subscribe to this sequencer after this time.
           type: string
           format: date-time
     ListDsoScansResponse:

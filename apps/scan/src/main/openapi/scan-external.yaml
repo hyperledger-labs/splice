@@ -9,16 +9,24 @@ servers:
 paths:
   /v0/domains/{domain_id}/members/{member_id}/traffic-status:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: external.scan
       operationId: "getMemberTrafficStatus"
+      description: |
+        Get a member's traffic status as reported by the sequencer, according to
+        ledger state at the time of the request.
       parameters:
         - name: "domain_id"
+          description: |
+            The synchronizer ID to look up traffic for.
           in: "path"
           required: true
           schema:
             type: string
         - name: "member_id"
+          description: |
+            The participant or mediator whose traffic to look up, in the format
+            `code::id::fingerprint` where `code` is `PAR` or `MED`.
           in: "path"
           required: true
           schema:
@@ -38,16 +46,24 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: external.scan
       operationId: "getPartyToParticipant"
+      description: |
+        Get the ID of the participant hosting a given party.  This will fail if
+        there are multiple party-to-participant mappings for the given
+        synchronizer and party, which is not currently supported.
       parameters:
         - name: "domain_id"
+          description: |
+            The synchronizer ID to look up a mapping for.
           in: "path"
           required: true
           schema:
             type: string
         - name: "party_id"
+          description: |
+            The party ID to lookup a participant ID for.
           in: "path"
           required: true
           schema:
@@ -65,14 +81,20 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/validators/validator-faucets:
     get:
-      tags: [ scan ]
+      tags: [ scan, external ]
       x-jvm-package: external.scan
       operationId: "getValidatorFaucetsByValidator"
+      description: |
+        For every argument that is a valid onboarded validator, return
+        statistics on its liveness activity, according to on-ledger state at the
+        time of the request.
       parameters:
         - name: validator_ids
           in: query
           required: true
-          description: A comma-separated list of validator party IDs
+          description: |
+            A comma-separated list of validator party IDs.  Any party IDs
+            not matching onboarded validators will be ignored
           schema:
             type: array
             items:
@@ -95,14 +117,21 @@ components:
       required: [ "traffic_status" ]
       properties:
         traffic_status:
+          description: |
+            The current traffic state for the member on the synchronizer under
+            `actual`, and the total purchased traffic under `target`.  The purchased
+            traffic may exceed the `actual` limit as purchases take time to be
+            incorporated into the limit.
           "$ref": "#/components/schemas/MemberTrafficStatus"
     MemberTrafficStatus:
       type: object
       required: [ "actual", "target" ]
       properties:
         actual:
+          description: The current traffic state for the member on the synchronizer
           "$ref": "#/components/schemas/ActualMemberTrafficState"
         target:
+          description: Total purchased traffic; may exceed limit in `actual`
           "$ref": "#/components/schemas/TargetMemberTrafficState"
     ActualMemberTrafficState:
       type: object
@@ -110,12 +139,12 @@ components:
       properties:
         total_consumed:
           description: |
-            Total extra traffic consumed by the member on the given domain
+            Total extra traffic consumed by the member on the given synchronizer
           type: integer
           format: int64
         total_limit:
           description: |
-            Current extra traffic limit set for the member on the given domain.
+            Current extra traffic limit set for the member on the given synchronizer.
             An extra traffic top-up is complete once total_limit matches total_purchased.
           type: integer
           format: int64
@@ -125,7 +154,8 @@ components:
       properties:
         total_purchased:
           description: |
-            Total extra traffic purchased for the member on the given domain in bytes.
+            Total extra traffic purchased for the member on the given
+            synchronizer in bytes.
           type: integer
           format: int64
     GetPartyToParticipantResponse:
@@ -134,13 +164,17 @@ components:
       properties:
         participant_id:
           description: |
-            ID of the participant hosting the provided party
+            ID of the participant hosting the provided party, in the form
+            `PAR::id::fingerprint`
           type: string
     GetValidatorFaucetsByValidatorResponse:
       type: object
       required: [ "validatorsReceivedFaucets" ]
       properties:
         validatorsReceivedFaucets:
+          description: |
+            Statistics for any party ID arguments found to have valid onboarding
+            licenses; the order in the response is unrelated to argument order.
           type: array
           items:
             $ref: "#/components/schemas/ValidatorReceivedFaucets"
@@ -156,16 +190,31 @@ components:
         ]
       properties:
         validator:
+          description: The party ID of the onboarded validator
           type: string
         numRoundsCollected:
+          description: |
+            how many rounds the validator has received a faucet for; guaranteed
+            that collected + missed = last - first + 1
           type: integer
           format: int64
         numRoundsMissed:
+          description: |
+            how many rounds between firstCollected and lastCollected in which
+            the validator failed to collect (i.e. was not active or available);
+            can at most be max(0, lastCollected - firstCollected - 1).
           type: integer
           format: int64
         firstCollectedInRound:
+          description: |
+            the round number when this validator started collecting faucets;
+            the validator definitely recorded liveness in this round
           type: integer
           format: int64
         lastCollectedInRound:
+          description: |
+            The most recent round number in which the validator collected a faucet;
+            the validator definitely recorded liveness in this round.  Will equal
+            `firstCollected` if the validator has collected in only one round
           type: integer
           format: int64

@@ -221,13 +221,18 @@ spec:
             }
         {{- end }}
         {{- with .Values.participantPruningSchedule }}
-        - name: ADDITIONAL_CONFIG_WALLET_SWEEP
+        - name: ADDITIONAL_CONFIG_PARTICIPANT_PRUNING
           value: |
             canton.validator-apps.validator_backend.participant-pruning-schedule {
                 cron = {{ .cron | quote }}
                 max-duration = {{ .maxDuration | quote }}
                 retention = {{ .retention | quote }}
             }
+        {{- end }}
+        {{- with .Values.deduplicationDuration }}
+        - name: ADDITIONAL_CONFIG_DEDUPLICATION_DURATION
+          value: |
+            canton.validator-apps.validator_backend.deduplication-duration = {{ . | quote }}
         {{- end }}
         {{- if .Values.autoAcceptTransfers }}
         - name: ADDITIONAL_CONFIG_AUTO_ACCEPT_TRANSFERS

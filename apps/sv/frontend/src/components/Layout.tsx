@@ -42,6 +42,9 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
           alignItems="center"
           justifyContent="center"
           sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 1100,
             backgroundColor: `${networkInstanceNameColor}`,
             color: 'black',
             height: '50px',

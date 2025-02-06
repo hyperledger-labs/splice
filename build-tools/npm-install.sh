@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 if [ -z "${CI}" ]; then
-    npm install
+    npm install --no-update-notifier
 else
   # shellcheck disable=SC2015
   for _ in {1..5}; do npm ci && break || sleep 15; done

@@ -56,6 +56,14 @@ components:
     # As with 'MaybeCachedContractMap', but include the current domain state for every
     # mining round that shouldn't be removed, whether cached or not.
     MaybeCachedContractWithStateMap:
+      description: |
+        Always created with respect to an input set of contract IDs. If an input
+        contract ID is absent from the keys of this map, that contract should be
+        considered removed by the caller; if present, `contract` may be empty,
+        reflecting that the caller should already have the full contract data
+        for that contract ID. Contracts not present in the input set will have
+        full contract data. `domain_id` is always up-to-date; if undefined the
+        contract is currently unassigned to a synchronizer, i.e. "in-flight".
       type: object
       additionalProperties:
         $ref: "#/components/schemas/MaybeCachedContractWithState"
@@ -132,26 +140,49 @@ components:
         - dso_rules
         - sv_node_states
       properties:
-        # User representing the SV
         sv_user:
+          description: User ID representing the SV
           type: string
-        # Party representing the SV
         sv_party_id:
+          description: Party representing the SV
           type: string
-        # Party representing the whole DSO
         dso_party_id:
+          description: |
+            Party representing the whole DSO; for Scan only, also returned by
+            `/v0/dso-party-id`
           type: string
-        # Threshold required to pass vote requests
         voting_threshold:
+          description: |
+            Threshold required to pass vote requests; also known as the
+            "governance threshold", it is always derived from the number of
+            `svs` in `dso_rules`
           type: integer
         latest_mining_round:
+          description: |
+            Contract of the Daml template `Splice.Round.OpenMiningRound`, the
+            one with the highest round number on the ledger that has been signed
+            by `dso_party_id`. The round may not be usable as it may not be
+            opened yet, in accordance with its `opensAt` template field
           $ref: "#/components/schemas/ContractWithState"
         amulet_rules:
+          description: |
+            Contract of the Daml template `Splice.AmuletRules.AmuletRules`,
+            including the full schedule of `AmuletConfig` changes approved by
+            the DSO. Callers should not assume that `initialValue` is up-to-date,
+            and should instead search `futureValues` for the latest configuration
+            valid as of now
           $ref: "#/components/schemas/ContractWithState"
         dso_rules:
+          description: |
+            Contract of the Daml template `Splice.DsoRules.DsoRules`, listing
+            the governance rules approved by the DSO governing this Splice network.
           $ref: "#/components/schemas/ContractWithState"
-        # States the SVs' nodes
         sv_node_states:
+          description: |
+            For every one of `svs` listed in `dso_rules`, a contract of the Daml
+            template `Splice.DSO.SvState.SvNodeState`. This does not include
+            states for offboarded SVs, though they may still have an on-ledger
+            state contract
           type: array
           items:
             $ref: "#/components/schemas/ContractWithState"

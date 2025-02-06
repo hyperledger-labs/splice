@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.wallet
 
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
@@ -53,6 +54,7 @@ class UserWalletService(
     walletSweep: Option[WalletSweepConfig],
     autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
     supportsSoftDomainMigrationPoc: Boolean,
+    dedupDuration: DedupDuration,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -107,6 +109,7 @@ class UserWalletService(
     validatorTopupConfigO,
     walletSweep,
     autoAcceptTransfers,
+    dedupDuration,
   )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.

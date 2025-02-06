@@ -30,6 +30,7 @@ class WalletPreapprovalSweepTrigger(
     config: WalletSweepConfig,
     scanConnection: ScanConnection,
     treasury: TreasuryService,
+    dedupDuration: DedupDuration,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -89,10 +90,7 @@ class WalletPreapprovalSweepTrigger(
               Seq(store.key.endUserParty),
               task.trackingId,
             ),
-            // Hardcoded to 24h
-            DedupDuration(
-              com.google.protobuf.Duration.newBuilder().setSeconds(60 * 60 * 24).build()
-            ),
+            dedupDuration,
           )
         ),
         extraDisclosedContracts = connection.disclosedContracts(

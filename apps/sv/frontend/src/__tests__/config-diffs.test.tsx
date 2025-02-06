@@ -214,8 +214,11 @@ async function goToGovernanceTabAndClickOnAction(
   expect(await screen.findByText('Vote Requests')).toBeDefined();
   expect(await screen.findByText('Governance')).toBeDefined();
 
-  expect(await screen.findByText(tableType)).toBeDefined();
+  const button = await screen.findByText(tableType);
+  expect(button).toBeDefined();
   await user.click(screen.getByText(tableType));
+
+  expect(button.getAttribute('aria-selected')).toBe('true');
 
   expect(await screen.findAllByText(action)).toBeDefined();
 

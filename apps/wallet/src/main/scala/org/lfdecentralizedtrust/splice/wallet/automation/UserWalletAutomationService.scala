@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -46,6 +47,7 @@ class UserWalletAutomationService(
     validatorTopupConfigO: Option[ValidatorTopupConfig],
     walletSweep: Option[WalletSweepConfig],
     autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
+    dedupDuration: DedupDuration,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -109,6 +111,7 @@ class UserWalletAutomationService(
           config,
           scanConnection,
           treasury,
+          dedupDuration,
         )
       )
     } else {
