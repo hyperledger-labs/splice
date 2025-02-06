@@ -13,9 +13,12 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
   /v0/validator-user:
     get:
+      description: |
+        Get public information about the validator operator.
       tags: [validator_public]
       x-jvm-package: validator_public
       operationId: "getValidatorUserInfo"
+      security: []
       responses:
         "200":
           description: ok
@@ -25,9 +28,21 @@ paths:
                 "$ref": "#/components/schemas/GetValidatorUserInfoResponse"
   /v0/register:
     post:
+      description: |
+        As an authenticated user, onboard yourself.
+        Onboarding includes allocating a ledger API user and daml party,
+        and setting up daml contracts required for the user to use a wallet on this validator.
+
+        The ledger API user name is taken from the subject claim of the JWT token.
+
+        Once this call returns a successful response, the user is fully onboarded.
+        Use [v0/wallet/user-status](../../../../wallet/src/main/openapi/wallet-internal.yaml#/paths/v0/wallet/user-status)
+        to check the status of the user onboarding.
       tags: [validator]
       x-jvm-package: validator
       operationId: "register"
+      security:
+        - userAuth: []
       requestBody:
         content:
           application/json:
@@ -43,9 +58,19 @@ paths:
 
   /v0/admin/users:
     post:
+      description: |
+        As the validator operator, onboard an arbitrary user specified in the request.
+        Onboarding includes allocating a ledger API user and daml party,
+        and setting up daml contracts required for the user to use a wallet on this validator.
+
+        Once this call returns a successful response, the user is fully onboarded.
+        Use [v0/wallet/user-status](../../../../wallet/src/main/openapi/wallet-internal.yaml#/paths/v0/wallet/user-status)
+        to check the status of the user onboarding.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "onboardUser"
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -61,9 +86,13 @@ paths:
                 "$ref": "#/components/schemas/OnboardUserResponse"
 
     get:
+      description: |
+        Lists all users onboarded onto this validator.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "listUsers"
+      security:
+        - adminAuth: []
       responses:
         "200":
           description: ok
@@ -74,9 +103,15 @@ paths:
 
   /v0/admin/users/offboard:
     post:
+      description: |
+        As the validator operator, offboard the user specified in the request.
+        Offboarding archives the daml contracts required for the user to use a wallet on this validator.
+        Offboarding does not delete the ledger API user, and does not archive any other daml contracts owned by the user.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "offboardUser"
+      security:
+        - adminAuth: []
       parameters:
         - in: query
           name: username
@@ -91,9 +126,15 @@ paths:
 
   /v0/admin/participant/identities:
     get:
+      description: |
+        Returns a dump of participant identities.
+
+        Use this endpoint if instructed to do so by an operational manual or support.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "dumpParticipantIdentities"
+      security:
+        - adminAuth: []
       responses:
         "200":
           description: ok
@@ -104,9 +145,15 @@ paths:
 
   /v0/admin/participant/global-domain-connection-config:
     get:
+      description: |
+        Returns the connection configuration for the global synchronizer.
+
+        Use this endpoint if instructed to do so by an operational manual or support.
       tags: [ validator ]
       x-jvm-package: validator_admin
       operationId: "getDecentralizedSynchronizerConnectionConfig"
+      security:
+        - adminAuth: []
       responses:
         "200":
           description: ok
@@ -117,26 +164,44 @@ paths:
 
   /v0/admin/domain/data-snapshot:
     get:
+      description: |
+        Returns a snapshot of the global synchronizer data for this validator.
+        The snapshot includes a list of parties, the active contract set (ACS), and node identities.
+
+        Use this endpoint if instructed to do so by an operational manual or support.
       tags: [ validator ]
       x-jvm-package: validator_admin
       operationId: "getValidatorDomainDataSnapshot"
+      security:
+        - adminAuth: []
       parameters:
         - in: query
           name: timestamp
           required: true
           schema:
             type: string
+          description: |
+            The timestamp as of which the dump (in particular, the ACS) is valid.
+
+            Must in the ISO-8601 format in UTC timezone, e.g.,
+            `yyyy-MM-dd'T'HH:mm:ss.SSS'Z'`.
         - name: migration_id
           in: query
           required: false
           schema:
             type: integer
             format: int64
+          description: |
+            The current migration id.
         - in: query
           name: force
           required: false
           schema:
             type: boolean
+          description: |
+            If true, do not check whether the provided timestamp is clean.
+            Not recommended for production,
+            see the `ExportAcs` endpoint of the `ParticipantRepairService` participant gRPC API.
       responses:
         "200":
           description: ok
@@ -149,9 +214,13 @@ paths:
 
   /v0/admin/transfer-preapprovals/by-party/{receiver-party}:
     get:
+      description: |
+        Lookup the `Splice.AmuletRules.TransferPreapproval` contract for the given receiver party.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "lookupTransferPreapprovalByParty"
+      security:
+        - adminAuth: []
       parameters:
         - in: path
           name: receiver-party
@@ -168,9 +237,13 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
     delete:
+      description: |
+        Remove the `Splice.AmuletRules.TransferPreapproval` contract for the given receiver party.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "cancelTransferPreapprovalByParty"
+      security:
+        - adminAuth: []
       parameters:
         - in: path
           name: receiver-party
@@ -185,9 +258,13 @@ paths:
 
   /v0/admin/transfer-preapprovals:
     get:
+      description: |
+        List all `Splice.AmuletRules.TransferPreapproval` contracts where the preapproval provider is the validator operator.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "listTransferPreapprovals"
+      security:
+        - adminAuth: []
       responses:
         "200":
           description: ok
@@ -206,6 +283,8 @@ paths:
         from the externally hosted sender.
         The transaction then needs to be signed and submitted through
         /v0/admin/external-party/transfer-preapproval/submit-send.
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -235,6 +314,8 @@ paths:
         Submit transaction generated by /v0/admin/transfer-preapproval/prepare-send
         together with its signature. Note that this only waits until the TransferCommand is created.
         The actual transfer will happen afterwards through automation run by the SVs.
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -267,6 +348,8 @@ paths:
         and a party to key mapping topology transaction, which sets the key to authorize daml transactions.
         The hash of each of these transactions will be signed along with the corresponding topology transaction (unchanged)
         in the /v0/admin/external-party/topology/submit endpoint
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -291,6 +374,8 @@ paths:
       description: |
         Constructs a SignedTopologyTransaction and writes the topology transactions to the authorized store.
         The input will consist of the unchanged topology transaction and the signed hash from the /v0/external-party-topology/generate endpoint
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -316,6 +401,8 @@ paths:
         Create the ExternalPartySetupProposal contract as the validator operator
         which then has to be accepted by the external party using /v0/admin/external-party/setup-proposal/prepare-accept
         and /v0/admin/external-party/setup-proposal/submit-accept
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -339,6 +426,10 @@ paths:
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "listExternalPartySetupProposals"
+      description: |
+        List all ExternalPartySetupProposal contracts.
+      security:
+        - adminAuth: []
       responses:
         "200":
           description: ok
@@ -358,6 +449,8 @@ paths:
         Given a contract id of an ExternalPartySetupProposal, prepare the transaction
         to accept it such that it can be signed externally and then submitted using
         /v0/admin/external-party/setup-proposal/submit-accept
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -386,6 +479,8 @@ paths:
       description: |
         Submit a transaction prepared using /v0/admin/external-party/setup-proposal/prepare-accept
         together with its signature.
+      security:
+        - adminAuth: []
       requestBody:
         required: true
         content:
@@ -409,6 +504,10 @@ paths:
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "getExternalPartyBalance"
+      description: |
+        Get the balance of an external party.
+      security:
+        - adminAuth: []
       parameters:
         - in: query
           name: party_id
@@ -428,6 +527,21 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
 
 components:
+  securitySchemes:
+    userAuth:
+      description: |
+        JWT token as described in [spliceAppBearerAuth](../../../../common/src/main/openapi/common-external.yaml#/components/securitySchemes/spliceAppBearerAuth).
+        The subject of the token must be ledger API user of the user affected by the endpoint.
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    adminAuth:
+      description: |
+          JWT token as described in [spliceAppBearerAuth](../../../../common/src/main/openapi/common-external.yaml#/components/securitySchemes/spliceAppBearerAuth).
+          The subject of the token must be ledger API user of the validator operator.
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     OnboardUserRequest:
       type: object
@@ -449,6 +563,8 @@ components:
       properties:
         party_id:
           type: string
+          description: |
+              The daml party id of the user that was onboarded.
 
     GenerateExternalPartyTopologyRequest:
       type: object
@@ -457,6 +573,8 @@ components:
         - public_key
       properties:
         party_hint:
+          description: |
+            The actual party id will be constructed from this hint and a fingerprint of the public key.
           type: string
         public_key:
           description: hex-encoded ed25519 public key
@@ -469,6 +587,8 @@ components:
       properties:
         party_id:
           type: string
+          description: |
+            The generated party id of the external user.
         topology_txs:
           type: array
           items:
@@ -536,6 +656,8 @@ components:
       properties:
         party_id:
           type: string
+          description: |
+            The party id of the user that was onboarded.
 
     GetValidatorUserInfoResponse:
       type: object
@@ -546,8 +668,12 @@ components:
       properties:
         party_id:
           type: string
+          description: |
+            The daml party id of the validator operator.
         user_name:
           type: string
+          description: |
+            The ledger API user of the validator operator.
         featured:
           type: boolean
 
