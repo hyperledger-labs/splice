@@ -30,7 +30,6 @@ Global Synchronizer for the Canton Network
    validator_operator/index.rst
    sv_operator/index.rst
    deployment/index.rst
-   troubleshooting.rst
 
 .. toctree::
    :maxdepth: 2

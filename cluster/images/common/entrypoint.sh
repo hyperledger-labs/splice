@@ -9,7 +9,14 @@ source /app/tools.sh
 
 EXE=$(readlink -f splice-image-bin)
 
-declare -a ARGS=( daemon --no-tty --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off )
+declare -a ARGS=()
+
+# support starting the image as a remote console
+if [[ ! " ${*} " =~ " --console " ]]; then
+    ARGS+=( daemon --no-tty )
+fi
+
+ARGS+=( --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off )
 
 if [ -f /app/logback.xml ]; then
    export JAVA_TOOL_OPTIONS="-Dlogback.configurationFile=/app/logback.xml ${JAVA_TOOL_OPTIONS:-}"

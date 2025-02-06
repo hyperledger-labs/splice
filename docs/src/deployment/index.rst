@@ -10,3 +10,4 @@ Operations
 
     observability/index.rst
     configuration.rst
+    troubleshooting.rst
