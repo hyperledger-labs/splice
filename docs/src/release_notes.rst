@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Validator
+
+  Add an option to enable :ref:`participant pruning <validator_participant_pruning>`.
+
 0.3.10
 ------
 

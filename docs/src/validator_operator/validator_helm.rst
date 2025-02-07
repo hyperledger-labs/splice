@@ -605,3 +605,35 @@ in the ``validator-values.yaml`` file:
 Whenever the validator receives a transfer offer from `<senderPartyID>` to `<receiverPartyId>`,
 it will automatically accept it. Similarly to sweeps, party IDs must be known in order to
 apply this configuration.
+
+.. _validator_participant_pruning:
+
+Participant Pruning
+-------------------
+
+By default, participants preserve all history (it is not preserved
+across :ref:`major upgrades <validator-upgrades>` though). However, this leads to
+gradually growing databases and can slow down certain queries, in
+particular, queries for the active contract set on the ledger API.
+
+To mitigate that it is possible to disable participant pruning which
+will remove all history beyond a specified retention point and only
+preserve the active contract set.
+
+Note that this only affects the participant stores. The CN apps
+(Validator, SV and Scan) are unaffected by enabling this, so e.g., the
+history in your wallet will never be pruned.
+
+Below you can see an example of the pruning config that you need to
+add to ``validator-values.yaml`` to retain only the history for the
+last 48h.
+
+Refer to the Canton documentation for more details on participant pruning:
+
+* https://docs.daml.com/ops/pruning.html
+* https://docs.daml.com/canton/usermanual/pruning.html
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: PARTICIPANT_PRUNING_SCHEDULE_START
+    :end-before: PARTICIPANT_PRUNING_SCHEDULE_END
