@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
 import { test, expect } from 'vitest';
 
 import App from '../App';
@@ -88,8 +89,6 @@ test('validator licenses are displayed and paginable', async () => {
   expect(await screen.findByDisplayValue('validator::1')).toBeDefined();
   expect(screen.queryByText('validator::15')).toBeNull();
 
-  expect(await screen.findByText('View More')).toBeDefined();
-  await user.click(screen.getByText('View More'));
-
+  mockAllIsIntersecting(true);
   expect(await screen.findByDisplayValue('validator::15')).toBeDefined();
 });
