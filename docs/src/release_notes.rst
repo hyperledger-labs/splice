@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.10
+------
 
 * Validator app
 
@@ -19,6 +19,22 @@ Upcoming
 
   Added ``splice_store_last_ingested_record_time_ms`` metric for the last ingested record time in each store and an
   associated dashboard. This can be used to track general activity of the node.
+
+* Docs
+
+  * Add :ref:`Troubleshooting <troubleshooting>` section.
+  * Add overview docs for the :ref:`Validator Onboarding Process <validator_onboarding_process>`.
+  * Add docs for :ref:`Getting console access to Canton nodes <console_access>`.
+  * Add docs for :ref:`Configuring deployed apps <configuration>`.
+  * Add docs for :ref:`Validator Ingress & Egress requirements <validator_network>`.
+  * Add overview docs about :ref:`Metrics <metrics>`.
+  * Add overview docs about :ref:`Application Development <app_dev_overview>`.
+  * Improve API docs.
+  * Various smaller documentation updates and improvements.
+
+* SV UI
+
+  Various improvements to the SV UI.
 
 0.3.9
 -----
