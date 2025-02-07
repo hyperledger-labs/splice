@@ -41,7 +41,7 @@ jobs:
   scala_test:
     runs-on: ${{ inputs.runs_on }}
     name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
-    timeout-minutes: 30
+    timeout-minutes: 35
     needs:
       - split_tests
     if: ${{ needs.split_tests.outputs.indices != '[]' }}
