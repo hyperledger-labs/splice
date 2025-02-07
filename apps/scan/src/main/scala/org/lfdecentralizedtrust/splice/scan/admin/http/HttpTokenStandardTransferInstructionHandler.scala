@@ -52,7 +52,7 @@ class HttpTokenStandardTransferInstructionHandler(
                 .asRuntimeException()
             )
         }
-        receiver = PartyId.tryFromProtoPrimitive(transfer.transfer.receiver)
+        receiver = PartyId.tryFromProtoPrimitive(transfer.transferSpecification.transfer.receiver)
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
         amuletRules <- store.getAmuletRules()
         transferPreapproval <- store
@@ -83,7 +83,7 @@ class HttpTokenStandardTransferInstructionHandler(
           definitions.FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
             definitions.ChoiceContext(
-              // TODO (#17402): this will be updated to have a ChoiceContextData data so it can be to/from json'd
+              // TODO (#17517): this will be updated to have a ChoiceContextData data so it can be to/from json'd
               choiceContextData = Some(
                 io.circe.Json.fromFields(
                   Seq(

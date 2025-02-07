@@ -421,7 +421,8 @@ object DamlPlugin extends AutoPlugin {
 
     val damlcCommand = damlc.getAbsolutePath :: "build" ::
       "--project-root" :: projectDirectory.toString ::
-      "--output" :: versionedDar.getAbsolutePath :: Nil
+      "--output" :: versionedDar.getAbsolutePath ::
+      "--enable-multi-package=no" :: Nil
     val command =
       // if the damlDarLfVersion is not set the daml.yaml is expected to contain the target lf-version in the build-options
       if (outputLfVersion.isEmpty) damlcCommand

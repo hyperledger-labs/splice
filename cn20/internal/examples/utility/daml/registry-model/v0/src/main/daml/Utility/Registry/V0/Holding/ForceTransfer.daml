@@ -1,0 +1,278 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- This module is available starting from version `0.1.0` of this package.
+module Utility.Registry.V0.Holding.ForceTransfer where
+
+import DA.Action (foldlA)
+import DA.List (head)
+import DA.Optional (fromSomeNote)
+import Utility.Credential.V0.Credential (Credential, assertFulfillsAllRequirements)
+import Utility.Registry.Holding.V0.Holding (Holding, Holding_Merge(..), Holding_Split(..), Holding_Transfer(..), Holding_Transfer_Result, assertHolding)
+import Utility.Registry.V0.Configuration.Instrument (InstrumentConfiguration(..))
+import Utility.Registry.V0.Holding.Transfer (Transfer(..))
+import Utility.Registry.V0.Util (fetchAndValidate)
+
+-- | Force transfer payload.
+data ForceTransfer = ForceTransfer
+  with
+    requestor : Party
+      -- ^ Party requesting the force transfer.
+    requestorRationale : Text
+      -- ^ Requestor rationale for the force transfer.
+    transfer : Transfer
+      -- ^ Transfer payload.
+    senderLabel : Text
+      -- ^ Label of the holding to transfer.
+    receiverLabel : Text
+      -- ^ Label of the holding to receive.
+  deriving (Eq, Show)
+
+-- | A request to force transfer.
+template ForceTransferRequest
+  with
+    forceTransfer : ForceTransfer
+      -- ^ The force transfer payload.
+  where
+    signatory forceTransfer.transfer.provider, forceTransfer.requestor
+    observer forceTransfer.transfer.operator, forceTransfer.transfer.registrar
+
+    choice ForceTransferRequest_Accept : ForceTransferRequest_Accept_Result
+      -- ^ Accepts request.
+      with
+        registrarRationale : Text
+          -- ^ Registrar's rationale for accepting the request.
+      controller forceTransfer.transfer.registrar, forceTransfer.transfer.sender,
+                   forceTransfer.transfer.receiver
+      do
+        acceptedForceTransferCid <- create AcceptedForceTransfer with
+          forceTransfer; registrarRationale
+        pure ForceTransferRequest_Accept_Result with acceptedForceTransferCid
+
+    choice ForceTransferRequest_Reject  : ForceTransferRequest_Reject_Result
+      -- ^ Rejects request.
+      with
+        reason : Text
+          -- ^ Rejection reason.
+      controller forceTransfer.transfer.registrar
+      do
+        rejectedForceTransferCid <- create RejectedForceTransfer with
+          forceTransfer; reason
+        pure ForceTransferRequest_Reject_Result with rejectedForceTransferCid
+
+    choice ForceTransferRequest_Cancel : ForceTransferRequest_Cancel_Result
+      -- ^ Cancels request.
+      controller forceTransfer.requestor
+      do
+        pure ForceTransferRequest_Cancel_Result
+
+-- | Result of `ForceTransferRequest_Accept`.
+data ForceTransferRequest_Accept_Result = ForceTransferRequest_Accept_Result
+  with
+    acceptedForceTransferCid : ContractId AcceptedForceTransfer
+      -- ^ Accepted force transfer.
+  deriving (Eq, Show)
+
+-- | Result of `ForceTransferRequest_Reject`.
+data ForceTransferRequest_Reject_Result = ForceTransferRequest_Reject_Result
+  with
+    rejectedForceTransferCid : ContractId RejectedForceTransfer
+      -- ^ Rejected force transfer request.
+  deriving (Eq, Show)
+
+-- | Result of `ForceTransferRequest_Cancel`.
+data ForceTransferRequest_Cancel_Result =
+  ForceTransferRequest_Cancel_Result {}
+  deriving (Eq, Show)
+
+template AcceptedForceTransfer with
+    forceTransfer : ForceTransfer
+      -- ^ The accepted force transfer payload.
+    registrarRationale : Text
+      -- ^ Registrar's rationale for accepting the request.
+  where
+    signatory forceTransfer.transfer.provider, forceTransfer.requestor,
+      forceTransfer.transfer.sender, forceTransfer.transfer.receiver
+    observer forceTransfer.transfer.operator, forceTransfer.transfer.registrar
+
+    choice AcceptedForceTransfer_Execute : AcceptedForceTransfer_Execute_Result
+      -- ^ Executes the accepted force transfer request.
+      with
+        instrumentConfigurationCid : ContractId InstrumentConfiguration
+          -- ^ Instrument configuration.
+        holdingCids : [ContractId Holding]
+          -- ^ Holdings to use for transfer.
+        requestorCredentialCids : [ContractId Credential]
+          -- ^ Credentials of requestor.
+      controller forceTransfer.transfer.registrar
+      do
+        let transfer = forceTransfer.transfer
+
+        -- Assert configuration
+        configuration <- fetchAndValidate instrumentConfigurationCid
+          [ ("Operator", .operator, transfer.operator)
+          , ("Provider", .provider, transfer.provider)
+          , ("Registrar", .registrar, transfer.registrar)
+          ]
+
+        -- Assert credentials
+        -- It is required that the requestor has credentials to fulfill the force transfer
+        -- requirements.
+        credentials <- mapA fetch requestorCredentialCids
+        let
+          requirements = fromSomeNote "Force transfer requirements must be set"
+            configuration.forceTransferRequirements
+        assertFulfillsAllRequirements forceTransfer.requestor requirements credentials
+
+        -- Assert holding
+        (holdingCid, remainingHoldingCids) <- prepareHoldingWithAmount transfer.amount holdingCids
+        holding <- fetch holdingCid
+        assertHolding holding transfer.operator transfer.provider transfer.registrar transfer.sender
+          configuration.defaultIdentifier transfer.amount forceTransfer.senderLabel None
+
+        -- Transfer holding
+        holdingTransferResult <- exercise holdingCid Holding_Transfer with
+          newOwner = transfer.receiver
+          newLabel = forceTransfer.receiverLabel
+
+        -- Create executed transfer
+        executedForceTransferCid <- create ExecutedForceTransfer with
+          forceTransfer; registrarRationale
+
+        pure AcceptedForceTransfer_Execute_Result with
+          holdingTransferResult
+          executedForceTransferCid
+          remainingHoldingCids
+
+    choice AcceptedForceTransfer_Fail : AcceptedForceTransfer_Fail_Result
+      -- ^ Fail an accepted lock.
+      with
+        reason : Text
+          -- ^ Reason for failure.
+      controller forceTransfer.transfer.registrar
+      do
+        failedForceTransferCid <- create FailedForceTransfer with forceTransfer; reason
+        pure AcceptedForceTransfer_Fail_Result with failedForceTransferCid
+
+-- | Result of `ForceTransferRequest_Execute`.
+data AcceptedForceTransfer_Execute_Result = AcceptedForceTransfer_Execute_Result
+  with
+    holdingTransferResult : Holding_Transfer_Result
+      -- ^ Result of transferring the holding.
+    executedForceTransferCid : ContractId ExecutedForceTransfer
+      -- ^ Executed force transfer.
+    remainingHoldingCids : [ContractId Holding]
+      -- ^ Remaining holdings.
+  deriving (Eq, Show)
+
+-- | Result of `AcceptedLock_Fail`.
+data AcceptedForceTransfer_Fail_Result = AcceptedForceTransfer_Fail_Result
+  with
+    failedForceTransferCid : ContractId FailedForceTransfer
+      -- ^ Failed force transfer.
+  deriving (Eq, Show)
+
+-- | A rejected force transfer.
+template RejectedForceTransfer
+  with
+    forceTransfer : ForceTransfer
+      -- ^ The rejected request payload.
+    reason : Text
+      -- ^ The rejection reason.
+  where
+    signatory forceTransfer.transfer.registrar
+    observer forceTransfer.transfer.operator, forceTransfer.transfer.provider,
+      forceTransfer.requestor
+
+    choice RejectedForceTransfer_Delete : RejectedForceTransfer_Delete_Result
+      -- ^ Deletes a rejected enforcement service request.
+      controller forceTransfer.transfer.registrar
+      do
+        pure RejectedForceTransfer_Delete_Result
+
+-- | Result of `RejectedForceTransfer_Delete`.
+data RejectedForceTransfer_Delete_Result =
+  RejectedForceTransfer_Delete_Result {}
+  deriving (Eq, Show)
+
+-- | A failed force transfer.
+template FailedForceTransfer
+  with
+    forceTransfer : ForceTransfer
+      -- ^ Rejected force transfer payload.
+    reason : Text
+      -- ^ Reason for failure.
+  where
+    signatory forceTransfer.transfer.registrar
+    observer forceTransfer.transfer.operator, forceTransfer.transfer.provider,
+      forceTransfer.requestor
+
+    choice FailedForceTransfer_Delete : FailedForceTransfer_Delete_Result
+      -- ^ Deletes a rejected force transfer.
+      controller forceTransfer.transfer.registrar
+      do
+        pure FailedForceTransfer_Delete_Result
+
+-- | Result of `FailedForceTransfer_Delete`.
+data FailedForceTransfer_Delete_Result = FailedForceTransfer_Delete_Result {}
+  deriving (Eq, Show)
+
+-- | An executed force transfer.
+template ExecutedForceTransfer
+  with
+    forceTransfer : ForceTransfer
+      -- ^ Force transfer payload.
+    registrarRationale : Text
+      -- ^ Registrar's rationale for accepting the request.
+  where
+    signatory forceTransfer.transfer.registrar
+    observer forceTransfer.transfer.operator, forceTransfer.transfer.provider,
+      forceTransfer.requestor
+
+    choice ExecutedForceTransfer_Delete : ExecutedForceTransfer_Delete_Result
+      -- ^ Deletes an executed transfer.
+      controller forceTransfer.transfer.registrar
+      do
+        pure ExecutedForceTransfer_Delete_Result
+
+-- | Result of `ExecutedForceTransfer_Delete`.
+data ExecutedForceTransfer_Delete_Result = ExecutedForceTransfer_Delete_Result {}
+  deriving (Eq, Show)
+
+-- Utility functions
+-- | Prepare holdings to meet the target amount.
+prepareHoldingWithAmount : Decimal -> [ContractId Holding]
+  -> Update (ContractId Holding, [ContractId Holding])
+prepareHoldingWithAmount targetAmount holdingCids = do
+  -- Determine holdings to merge for the target amount
+  (remainingAmount, mergeCids, remainingCids) <- foldlA
+    (\(amountLeft, toMerge, toSkip) holdingCid -> do
+      if amountLeft == 0.0 then
+        -- Target amount is met: add the current holding to the skip list
+        pure (amountLeft, toMerge, holdingCid :: toSkip)
+      else do
+        holding <- fetch holdingCid
+        if holding.amount == amountLeft then
+          -- Exact match: no further merging required
+          pure (0.0, holdingCid :: toMerge, toSkip)
+        else if holding.amount < amountLeft then
+          -- Partial match: reduce remaining amount and add to merge list
+          pure (amountLeft - holding.amount, holdingCid :: toMerge, toSkip)
+        else do
+          -- Holding exceeds amount: split the excess
+          splitResult <- exercise holdingCid Holding_Split with amounts = [amountLeft]
+          let
+            splitCid = head splitResult.splitCids
+            Some remainingCid = splitResult.remaining
+          pure (0.0, splitCid :: toMerge, remainingCid :: toSkip)
+    )
+    (targetAmount, [], [])
+    holdingCids
+  assertMsg "Holdings must be sufficient to meet target amount" $ remainingAmount == 0.0
+  -- Merge to a single holding.
+  mergedHoldingCid <- case mergeCids of
+    [] -> error "No holdings available for merging"
+    [singleCid] -> pure singleCid
+    firstCid :: otherCids -> (.holdingCid) <$>
+      exercise firstCid Holding_Merge with holdingCids = otherCids
+  pure (mergedHoldingCid, remainingCids)

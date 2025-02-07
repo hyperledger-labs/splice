@@ -26,8 +26,6 @@ import Splice.Wallet.TransferPreapproval
 import Prelude hiding (forA)
 import Splice.Util
 
-import Canton.Network.Token.Standard.Utils.AnyContractId (AnyContractId)
-
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
 catchAll: Update a -> Update (Either InvalidTransferReason a)
@@ -406,11 +404,11 @@ template WalletAppInstall
     interface instance TokenMetadata.RegistryAppInstall for WalletAppInstall where
       view = TokenMetadata.RegistryAppInstallView with
         appUser = endUserParty
-        appProvider = dsoParty
+        instrumentAdmin = dsoParty
         meta = TokenMetadata.Metadata with
           values = Map.fromList [
             -- For Amulet the registry URL needs to point to their local validator, so that the proper BFT reads are done.
-            -- TODO: store that URL as part of the `WalletAppInstall` contract, so that it can be updated.
+            -- TODO (#17541): store that URL as part of the `WalletAppInstall` contract, so that it can be updated.
             ("cnrc-1.global.sync/registryUrl", "https://user-validator-host/api/amulet-registry/")
             ]
 

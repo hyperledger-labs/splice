@@ -1,0 +1,18 @@
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+packages:
+  - cnrc-1-token-metadata
+  - cnrc-2-holdings
+  - cnrc-3-transfer-instruction
+  - cnrc-4-allocation
+  - cnrc-5-allocation-request
+  - cnrc-6-allocation-instruction
+  - examples/splice/daml/splice-amulet
+  - examples/splice/daml/splice-util
+  - examples/splice/daml/splice-amulet-name-service
+  - examples/splice/daml/splice-wallet
+  - examples/splice/daml/splice-wallet-payments
+  - examples/trading/daml/trading-app
+  - examples/cn-token-test-splice
+

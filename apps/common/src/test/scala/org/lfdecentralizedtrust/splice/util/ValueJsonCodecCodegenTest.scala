@@ -12,9 +12,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferi
 import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata.anyvalue
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata.{
+  AnyContract,
+  anyvalue,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc2.holding
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.token.standard.utils.anycontractid.PhantomTemplate
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules
 
@@ -140,17 +142,23 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       val sender = providerParty(1).toProtoPrimitive
       val receiver = providerParty(2).toProtoPrimitive
       val originalArgument: JavaApi.DamlRecord = new transferinstruction.TransferFactory_Transfer(
-        new transferinstruction.Transfer(
-          sender,
-          receiver,
-          numeric(6.12947561),
-          new holding.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-          Some(
-            new holding.Lock(java.util.List.of(sender, receiver), Optional.of(Instant.now()))
-          ).toJava,
-          someMetadata,
+        new transferinstruction.TransferSpecification(
+          new transferinstruction.Transfer(
+            sender,
+            receiver,
+            numeric(6.12947561),
+            new holding.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+            Some(
+              new holding.Lock(java.util.List.of(sender, receiver))
+            ).toJava,
+            someMetadata,
+          ),
+          /*executeBefore =*/ Instant.now().plusMillis(1000L),
+          /*holdingCids =*/ List(validContractId(1), validContractId(2))
+            .map(new holding.Holding.ContractId(_))
+            .asJava,
+          /*executionDelegate =*/ Optional.of(dsoParty.toProtoPrimitive),
         ),
-        List(validContractId(1), validContractId(2)).map(new holding.Holding.ContractId(_)).asJava,
         new tokenmetadata.ExtraArgs(
           allAnyValuesMap.asJava,
           someMetadata,
@@ -209,7 +217,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
     "av_date" -> new anyvalue.AV_Date(LocalDate.now()),
     "av_bool" -> new anyvalue.AV_Bool(scala.util.Random.nextBoolean()),
     "av_contractid" -> new anyvalue.AV_ContractId(
-      new PhantomTemplate.ContractId(validContractId(42))
+      new AnyContract.ContractId(validContractId(42))
     ),
     "av_int" -> new anyvalue.AV_Int(scala.util.Random.nextLong()),
     "av_time" -> new anyvalue.AV_Time(Instant.now()),

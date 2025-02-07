@@ -1,0 +1,15 @@
+sdk-version: 3.3.0-snapshot.20250117.13525.0.v9e9dcacc
+name: utility-credential-v0
+source: ./daml
+version: 0.0.2
+dependencies:
+  - daml-prim
+  - daml-stdlib
+data-dependencies:
+build-options:
+  - --include=./daml
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches
+  - --output=.daml/dist/credential.dar
+  - --target=2.1
+start-navigator: no

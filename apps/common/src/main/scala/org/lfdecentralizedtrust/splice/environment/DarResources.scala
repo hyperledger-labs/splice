@@ -14,10 +14,6 @@ import scala.util.Using
 // "DAR_NOT_VALID_UPGRADE [...] cannot be an upgrade of existing package P [...] Reason: Implementation of interface X
 object DarResources {
   object TokenStandard {
-    val utilsAnyContractId = PackageResource(
-      DarResource(s"canton-network-token-utils-current.dar"),
-      Seq(DarResource(s"canton-network-token-utils-0.0.1.dar")),
-    )
     val rc1TokenMetadata = PackageResource(
       DarResource(s"canton-network-token-rc1-current.dar"),
       Seq(DarResource(s"canton-network-token-rc1-0.0.1.dar")),
@@ -43,7 +39,6 @@ object DarResources {
       Seq(DarResource(s"canton-network-token-rc6-0.0.1.dar")),
     )
     val allPackageResources = Seq(
-      utilsAnyContractId,
       rc1TokenMetadata,
       rc2Holding,
       rc3TransferInstruction,

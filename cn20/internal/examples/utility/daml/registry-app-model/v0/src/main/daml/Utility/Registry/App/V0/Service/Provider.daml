@@ -1,0 +1,242 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Utility.Registry.App.V0.Service.Provider where
+
+import Utility.Credential.V0.Credential (Credential, PartyCredentialRequirement, assertFulfillsAllRequirements)
+import Utility.Registry.App.V0.Configuration.Operator (OperatorConfiguration)
+import Utility.Registry.App.V0.Configuration.Provider (ProviderConfiguration(..))
+import Utility.Registry.App.V0.Service.Holder (HolderServiceRequest, HolderServiceRequest_Accept(..), HolderServiceRequest_Accept_Result, HolderServiceRequest_Reject(..), HolderServiceRequest_Reject_Result)
+import Utility.Registry.App.V0.Service.Registrar (RegistrarServiceRequest, RegistrarServiceRequest_Accept(..), RegistrarServiceRequest_Accept_Result, RegistrarServiceRequest_Reject(..), RegistrarServiceRequest_Reject_Result)
+import Utility.Registry.V0.Util (fetchAndValidate)
+
+-- | Provider service.
+template ProviderService
+  with
+    operator : Party
+      -- ^ Service operator.
+    provider : Party
+      -- ^ Service provider.
+  where
+    signatory operator, provider
+
+    choice ProviderService_Terminate : ProviderService_Terminate_Result
+      -- ^ Terminates the service.
+      controller operator
+      do
+        pure ProviderService_Terminate_Result
+
+    nonconsuming choice ProviderService_CreateProviderConfiguration
+      : ProviderService_CreateProviderConfiguration_Result
+      -- ^ Creates a provider configuration.
+      with
+        registrarRequirements : [PartyCredentialRequirement]
+          -- ^ Credential requirements for the registrar role.
+        holderRequirements : [PartyCredentialRequirement]
+          -- ^ Credential requirements for the holder role.
+      controller provider
+      do
+        providerConfigurationCid <- create ProviderConfiguration with
+          operator; provider; registrarRequirements; holderRequirements
+        pure ProviderService_CreateProviderConfiguration_Result with providerConfigurationCid
+
+    nonconsuming choice ProviderService_ArchiveProviderConfiguration
+      : ProviderService_ArchiveProviderConfiguration_Result
+      -- ^ Creates a provider configuration.
+      with
+        cid : ContractId ProviderConfiguration
+          -- ^ Provider configuration to archive.
+      controller provider
+      do
+        fetchAndValidate cid [("Operator", .operator, operator), ("Provider", .provider, provider)]
+        archive cid
+        pure ProviderService_ArchiveProviderConfiguration_Result
+
+    nonconsuming choice ProviderService_ArchiveAndCreateProviderConfiguration
+      : ProviderService_ArchiveAndCreateProviderConfiguration_Result
+      -- ^ Modifies a provider configuration.
+      with
+        cid : ContractId ProviderConfiguration
+          -- ^ Provider configuration to modify.
+        payload : ProviderService_CreateProviderConfiguration
+          -- ^ Create payload.
+      controller provider
+      do
+        fetchAndValidate cid [("Operator", .operator, operator), ("Provider", .provider, provider)]
+        archiveResult <- exercise self ProviderService_ArchiveProviderConfiguration with cid
+        createResult <- exercise self payload
+        pure ProviderService_ArchiveAndCreateProviderConfiguration_Result with
+          archiveResult; createResult
+
+    nonconsuming choice ProviderService_AcceptRegistrarServiceRequest
+      : RegistrarServiceRequest_Accept_Result
+      -- ^ Accepts a registrar service request.
+      with
+        cid : ContractId RegistrarServiceRequest
+          -- ^ Registrar service request to accept.
+        payload : RegistrarServiceRequest_Accept
+          -- ^ Choice payload.
+      controller provider
+      do
+        fetchAndValidate cid [("Operator", .operator, operator), ("Provider", .provider, provider)]
+        exercise cid payload
+
+    nonconsuming choice ProviderService_RejectRegistrarServiceRequest
+      : RegistrarServiceRequest_Reject_Result
+      -- ^ Rejects a registrar service request.
+      with
+        cid : ContractId RegistrarServiceRequest
+          -- ^ Registrar service request to reject.
+        payload : RegistrarServiceRequest_Reject
+          -- ^ Choice payload.
+      controller provider
+      do
+        fetchAndValidate cid [("Operator", .operator, operator), ("Provider", .provider, provider)]
+        exercise cid payload
+
+    nonconsuming choice ProviderService_AcceptHolderServiceRequest
+      : HolderServiceRequest_Accept_Result
+      -- ^ Accepts a holder service request.
+      with
+        cid : ContractId HolderServiceRequest
+          -- ^ Holder service request to accept.
+        payload : HolderServiceRequest_Accept
+          -- ^ Choice payload.
+      controller provider
+      do
+        fetchAndValidate cid [("Operator", .operator, operator), ("Provider", .provider, provider)]
+        exercise cid payload
+
+    nonconsuming choice ProviderService_RejectHolderServiceRequest
+      : HolderServiceRequest_Reject_Result
+      -- ^ Rejects a holder service request.
+      with
+        cid : ContractId HolderServiceRequest
+          -- ^ Holder service request to reject.
+        payload : HolderServiceRequest_Reject
+          -- ^ Choice payload.
+      controller provider
+      do
+        fetchAndValidate cid [("Operator", .operator, operator), ("Provider", .provider, provider)]
+        exercise cid payload
+
+-- | Result of `ProviderService_Terminate`.
+data ProviderService_Terminate_Result = ProviderService_Terminate_Result {}
+  deriving (Eq, Show)
+
+-- | A provider service request.
+template ProviderServiceRequest
+  with
+    operator : Party
+      -- ^ Utility operator.
+    provider : Party
+      -- ^ Service provider.
+  where
+    signatory provider
+    observer operator
+
+    choice ProviderServiceRequest_Accept : ProviderServiceRequest_Accept_Result
+      -- ^ Accept the request.
+      with
+        operatorConfigurationCid : ContractId OperatorConfiguration
+          -- ^ Operator configuration.
+        credentialCids : [ContractId Credential]
+          -- ^ Provider credentials.
+      controller operator
+      do
+        -- Assert configuration
+        configuration <- fetchAndValidate operatorConfigurationCid
+          [("Operator", .operator, operator)]
+
+        -- Assert credentials
+        credentials <- mapA fetch credentialCids
+        assertFulfillsAllRequirements provider configuration.providerRequirements credentials
+
+        -- Create service
+        serviceCid <- create ProviderService with operator; provider
+        pure ProviderServiceRequest_Accept_Result with providerServiceCid = serviceCid
+
+    choice ProviderServiceRequest_Reject : ProviderServiceRequest_Reject_Result
+      -- ^ Reject request.
+      with
+        reason : Text
+          -- ^ The reason for rejection.
+      controller operator
+      do
+        rejectedProviderServiceRequestCid <- create RejectedProviderServiceRequest with
+          request = this; reason
+        pure ProviderServiceRequest_Reject_Result with rejectedProviderServiceRequestCid
+
+    choice ProviderServiceRequest_Cancel : ProviderServiceRequest_Cancel_Result
+      -- ^ Cancel request.
+      controller provider
+      do
+        pure ProviderServiceRequest_Cancel_Result
+
+-- | A rejected provider service request.
+template RejectedProviderServiceRequest
+  with
+    request : ProviderServiceRequest
+      -- ^ The rejected request payload.
+    reason : Text
+      -- ^ The rejection reason.
+  where
+    signatory request.operator, request.provider
+
+    choice RejectedProviderServiceRequest_Delete : RejectedProviderServiceRequest_Delete_Result
+      -- ^ Deletes a rejected provider service request.
+      controller request.operator
+      do
+        pure RejectedProviderServiceRequest_Delete_Result
+
+-- | Result of `ProviderService_Create`.
+data ProviderService_Create_Result = ProviderService_Create_Result
+  with
+    providerServiceCid : ContractId ProviderService
+      -- ^ Provider service.
+  deriving (Eq, Show)
+
+-- | Result of `ProviderService_CreateProviderConfiguration`.
+data ProviderService_CreateProviderConfiguration_Result =
+  ProviderService_CreateProviderConfiguration_Result
+  with
+    providerConfigurationCid : ContractId ProviderConfiguration
+      -- ^ Provider configuration.
+  deriving (Eq, Show)
+
+-- | Result of `ProviderService_ArchiveProviderConfiguration`.
+data ProviderService_ArchiveProviderConfiguration_Result =
+  ProviderService_ArchiveProviderConfiguration_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `ProviderService_ArchiveAndCreateProviderConfiguration`.
+data ProviderService_ArchiveAndCreateProviderConfiguration_Result =
+  ProviderService_ArchiveAndCreateProviderConfiguration_Result
+  with
+    archiveResult : ProviderService_ArchiveProviderConfiguration_Result
+      -- ^ Archive result.
+    createResult : ProviderService_CreateProviderConfiguration_Result
+      -- ^ Create result.
+  deriving (Eq, Show)
+
+-- | Result of `ProviderServiceRequest_Accept`.
+data ProviderServiceRequest_Accept_Result = ProviderServiceRequest_Accept_Result
+  with
+    providerServiceCid : ContractId ProviderService
+      -- ^ Provider service.
+  deriving (Eq, Show)
+
+-- | Result of `ProviderServiceRequest_Reject`.
+data ProviderServiceRequest_Reject_Result = ProviderServiceRequest_Reject_Result
+  with
+    rejectedProviderServiceRequestCid : ContractId RejectedProviderServiceRequest
+      -- ^ Rejected provider service request.
+  deriving (Eq, Show)
+
+-- | Result of `ProviderServiceRequest_Cancel`.
+data ProviderServiceRequest_Cancel_Result = ProviderServiceRequest_Cancel_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `RejectedProviderServiceRequest_Delete`.
+data RejectedProviderServiceRequest_Delete_Result = RejectedProviderServiceRequest_Delete_Result {}
+  deriving (Eq, Show)

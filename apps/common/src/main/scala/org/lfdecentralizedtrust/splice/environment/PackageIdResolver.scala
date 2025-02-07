@@ -117,8 +117,6 @@ object PackageIdResolver {
               case Package.SpliceValidatorLifecycle => DarResources.validatorLifecycle
               case Package.SpliceWallet => DarResources.wallet
               case Package.SpliceWalletPayments => DarResources.walletPayments
-              case Package.TokenStandard.UtilsAnyContractId =>
-                DarResources.TokenStandard.utilsAnyContractId
               case Package.TokenStandard.Rc1TokenMetadata =>
                 DarResources.TokenStandard.rc1TokenMetadata
               case Package.TokenStandard.Rc2Holding =>
@@ -203,8 +201,6 @@ object PackageIdResolver {
       case SpliceValidatorLifecycle => packageConfig.validatorLifecycle
       case SpliceWallet => packageConfig.wallet
       case SpliceWalletPayments => packageConfig.walletPayments
-      case TokenStandard.UtilsAnyContractId =>
-        DarResources.TokenStandard.utilsAnyContractId.bootstrap.metadata.version.toString()
       case TokenStandard.Rc1TokenMetadata =>
         DarResources.TokenStandard.rc1TokenMetadata.bootstrap.metadata.version.toString()
       case TokenStandard.Rc2Holding =>
@@ -250,7 +246,6 @@ object PackageIdResolver {
     "Canton.Network.RC4.Allocation" -> Package.TokenStandard.Rc4Allocation,
     "Canton.Network.RC5.AllocationRequest" -> Package.TokenStandard.Rc5AllocationRequest,
     "Canton.Network.RC6.AllocationInstruction" -> Package.TokenStandard.Rc6AllocationInstruction,
-    "Canton.Network.Token.Standard.Utils.AnyContractId" -> Package.TokenStandard.UtilsAnyContractId,
   )
 
   sealed abstract class Package extends Product with Serializable {
@@ -266,7 +261,6 @@ object PackageIdResolver {
 
   object Package {
     object TokenStandard {
-      final case object UtilsAnyContractId extends Package
       final case object Rc1TokenMetadata extends Package
       final case object Rc2Holding extends Package
       final case object Rc3TransferInstruction extends Package

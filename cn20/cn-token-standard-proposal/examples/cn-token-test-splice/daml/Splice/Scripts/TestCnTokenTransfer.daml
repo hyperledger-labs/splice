@@ -1,0 +1,366 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestCnTokenTransfer where
+
+import Canton.Network.RC1.TokenMetadata
+import Canton.Network.RC2.Holding
+import Canton.Network.RC3.TransferInstruction as RC3
+
+import Daml.Script
+
+import DA.Assert ((===))
+import DA.Optional (fromSomeNote)
+import qualified DA.Map as Map
+import DA.Time
+
+import Splice.Scripts.Util
+import Splice.Scripts.CnTokenTestUtils
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.ExternalPartyAmuletRules
+
+import Util.Disclosure
+
+data TestSetup = TestSetup with
+  defaultApp : DefaultAppWithUsers
+  bobAmuletCid : ContractId Amulet
+  bobHoldingCid : ContractId Holding
+  now : Time
+  defaultTransferSpec : RC3.TransferSpecification
+
+setupTest : Script TestSetup
+setupTest = do
+  defaultApp@DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- Alice creates a transfer pre-approval. This contract can be used to execute an instant transfer
+  -- from Bob to Alice (it needs to be disclosed as part of transfer initiation).
+  now <- getTime
+  let expiresAt = (now `addRelTime` days 30)
+  createTransferPreapproval alice.primaryParty aliceValidator.primaryParty app.dso expiresAt
+
+  -- feature the alice's validator party, to check that they get featured app rewards
+  featureApp app aliceValidator
+
+  -- Bob taps coin to send to Alice.
+  tap app bob 50.0
+
+  -- Check initial balance setup
+  checkBalance app alice 1.0
+  checkBalance app bob 51.0
+
+  -- Grab the contract-id of Bob's holding
+  [(bobAmuletCid, _)] <- query @Amulet bob.primaryParty
+  let bobHoldingCid = toInterfaceContractId @Holding bobAmuletCid
+
+  -- Define default transfer from Bob to Alice
+  let
+    transfer = RC3.Transfer with
+      sender = bob.primaryParty
+      receiver = alice.primaryParty
+      amount = 10.0
+      instrumentId = amuletInstrumentId app.dso
+      lock = None
+      metadata = Metadata with
+        values = Map.fromList [("cnrc-1.sync.global/correlation-id", "<test-UUID>")]
+  let
+    defaultTransferSpec = RC3.TransferSpecification with
+      transfer
+      executeBefore = now `addRelTime` days 1
+      holdingCids = [bobHoldingCid]
+      executionDelegate = None
+
+
+  return TestSetup with ..
+
+
+test_no_delegate_happy_path : Script ()
+test_no_delegate_happy_path = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- check that the default transfer can be executed
+  let transferSpecification = defaultTransferSpec
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+
+  -- validate our expectations on the transfer context
+  Map.size extraArgs.context === 4 -- amulet rules, open round, transfer pre-approval, featured app right
+  Map.size disclosedContracts.disclosures === 5  -- the above plus the referenced holding contract
+
+  -- Trigger an atomic, single-transaction transfer
+  submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+    with
+      extraArgs
+      transferSpecification
+
+  -- there is a featured app reward for aliceValidator that created Alice's transfer preapproval
+  [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
+  aliceValidatorCoupon.featured === True
+  aliceValidatorCoupon.amount === 1.13
+
+  -- check ledger state
+  checkBalance app alice 11.0
+  checkBalance app bob 41.0
+
+  -- no command left-over
+  [] <- query @StandardTransferCommand app.dso
+
+  pure ()
+
+
+test_no_delegate_no_holdings : Script ()
+test_no_delegate_no_holdings = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- Non-delegated transfer fails if no holdings are specified
+  let transferSpecification = defaultTransferSpec with
+        holdingCids = []
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+    with
+      extraArgs
+      transferSpecification
+
+  pure ()
+
+
+test_no_delegate_expired : Script ()
+test_no_delegate_expired = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- Transfer fails if expiry is in the past
+  let transferSpecification = defaultTransferSpec
+  setTime (transferSpecification.executeBefore `addRelTime` days 1)
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+    with
+      extraArgs
+      transferSpecification
+
+  pure ()
+
+
+
+test_delegate_with_fixed_holdings : Script ()
+test_delegate_with_fixed_holdings = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- setup delegated transfer with pre-specified holdings
+  let transferSpecification = defaultTransferSpec with
+        executionDelegate = Some bobValidator.primaryParty
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+
+  -- check that the context is empty, as the creation of the command requires no context
+  Map.size extraArgs.context === 0
+
+  -- the size of the disclosed contracts is 1: the reference to the factory contract
+  Map.size disclosedContracts.disclosures === 1
+
+  -- here we simulate that gathering the signatures requires 2 hours: in principle that time is passed after having prepared the
+  -- transaction using the fetched off-ledger context. Here, we can only simulate the gap between fetching the
+  -- context and submitting the transaction.
+  passTime (hours 2)
+
+  -- Initiate transfer, which create a registry-specific `TransferInstruction`
+  result <- submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+    with
+      extraArgs
+      transferSpecification
+
+  let instructionCid = fromSomeNote "expected an instruction to be created" result.optTransferInstructionCid
+
+  -- the interface implementation is as expected
+  Some instr <- queryInterfaceContractId @RC3.TransferInstruction app.dso instructionCid
+  let expectedInstruction = RC3.TransferInstructionView with
+        transferSpecification
+        meta = emptyMetadata
+        status = TIS_PendingExecution
+  instr === expectedInstruction
+
+  -- the created instruction is the one `StandardTransferCommand` that the `dso` can see
+  [(cmdId, _)] <- query @StandardTransferCommand app.dso
+  toInterfaceContractId @RC3.TransferInstruction cmdId === instructionCid
+
+  -- delegate fetches the transfer context
+  let choiceArg = RC3.TransferInstruction_ExecuteDelegatedTransfer with
+        extraArgs = emptyExtraArgs
+        extraHoldingCids = []
+
+  (disclosedContracts, extraArgs) <- getStandardTransferCommand_ExecuteTransferContext app instructionCid choiceArg
+
+  -- there should be four contracts in the context
+  Map.size extraArgs.context === 4
+
+  -- submission with extra holding ids fails
+  submitWithDisclosuresMustFail' bobValidator.primaryParty disclosedContracts $
+    exerciseCmd instructionCid RC3.TransferInstruction_ExecuteDelegatedTransfer
+      with
+        extraArgs
+        extraHoldingCids = [bobHoldingCid]
+
+  -- submission that is too far in the future fails
+  now <- getTime
+  setTime (transferSpecification.executeBefore `addRelTime` days 1)
+  submitWithDisclosuresMustFail' bobValidator.primaryParty disclosedContracts $ exerciseCmd instructionCid
+    choiceArg with extraArgs
+
+  -- reset time so the submission can succeed
+  setTime now
+
+  -- submission w/o extra holding ids succeeds
+  submitWithDisclosures' bobValidator.primaryParty disclosedContracts $ exerciseCmd instructionCid
+    choiceArg with extraArgs
+
+  -- there are no more `StandardTransferCommand`s left
+  [] <- query @StandardTransferCommand bob.primaryParty
+
+  -- balances are as expected
+  checkBalance app alice 11.0
+  checkBalance app bob 41.0
+
+  -- there is a featured app reward for aliceValidator that created Alice's transfer preapproval
+  [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
+  aliceValidatorCoupon.featured === True
+  aliceValidatorCoupon.amount === 1.13
+
+  pure ()
+
+
+
+test_delegate_with_unspecified_holdings : Script ()
+test_delegate_with_unspecified_holdings = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- setup delegated transfer with pre-specified holdings
+  let transferSpecification = defaultTransferSpec with
+        executionDelegate = Some bobValidator.primaryParty
+        holdingCids = []
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+
+  -- Initiate transfer, which create a registry-specific `TransferInstruction`
+  result <- submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+    with
+      extraArgs
+      transferSpecification
+
+  let instructionCid = fromSomeNote "expected an instruction to be created" result.optTransferInstructionCid
+
+  -- delegate picks the holdings and fetches the transfer context
+  let choiceArgs = RC3.TransferInstruction_ExecuteDelegatedTransfer with
+        extraHoldingCids = [bobHoldingCid]
+        extraArgs = emptyExtraArgs
+  (disclosedContracts, extraArgs) <- getStandardTransferCommand_ExecuteTransferContext app instructionCid choiceArgs
+
+  -- there should be four contracts in the context
+  Map.size extraArgs.context === 4
+
+  -- submission with extra holdings
+  submitWithDisclosures' bobValidator.primaryParty disclosedContracts $ exerciseCmd instructionCid
+    choiceArgs with extraArgs
+
+  -- there are no more `StandardTransferCommand`s left
+  [] <- query @StandardTransferCommand bob.primaryParty
+
+  -- balances are as expected
+  checkBalance app alice 11.0
+  checkBalance app bob 41.0
+
+  -- there is a featured app reward for aliceValidator that created Alice's transfer preapproval
+  [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
+  aliceValidatorCoupon.featured === True
+  aliceValidatorCoupon.amount === 1.13
+
+  pure ()
+
+
+test_delegate_abort : (DefaultAppWithUsers -> Party) -> Script ()
+test_delegate_abort mkActor = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+  let actor = mkActor defaultApp
+
+  -- setup delegated transfer with pre-specified holdings
+  let transferSpecification = defaultTransferSpec with
+        executionDelegate = Some bobValidator.primaryParty
+        holdingCids = []
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+
+  -- Initiate transfer, which create a registry-specific `TransferInstruction`
+  result <- submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+    with
+      extraArgs
+      transferSpecification
+
+  let instructionCid = fromSomeNote "expected an instruction to be created" result.optTransferInstructionCid
+
+  -- fetch extra args
+  let choiceArgs = RC3.TransferInstruction_Abort with
+        actor
+        extraArgs = emptyExtraArgs with
+          meta = Metadata with
+            values = Map.fromList
+              [("cnrc-1.sync.global/reason", "Cancel stuck transfer instruction.")]
+  (disclosedContracts, extraArgs) <- getStandardTransferCommand_AbortContext app instructionCid choiceArgs
+
+  -- no disclosed contracts, and no choice context required in this case
+  Map.size disclosedContracts.disclosures === 0
+  Map.size extraArgs.context === 0
+
+  -- submit abortion as Bob
+  submitWithDisclosures' actor disclosedContracts $ exerciseCmd instructionCid RC3.TransferInstruction_Abort with
+        actor
+        extraArgs = extraArgs with
+          meta = Metadata with
+            values = Map.fromList
+              -- TODO(#120): adjust to the actual CIP number once it is assigned
+              [("cnrc-1.sync.global/reason", "Cancel stuck transfer instruction.")]
+
+  -- there are no more `StandardTransferCommand`s left
+  [] <- query @StandardTransferCommand actor
+  [] <- query @StandardTransferCommand app.dso
+
+  -- balances are unchanged
+  checkBalance app alice 1.0
+  checkBalance app bob 51.0
+
+  pure ()
+
+test_delegate_abort_as_sender : Script ()
+test_delegate_abort_as_sender = test_delegate_abort (\app -> app.bob.primaryParty)
+
+test_delegate_abort_as_registry : Script ()
+test_delegate_abort_as_registry = test_delegate_abort (\app -> app.app.dso)
+
+test_delegate_abort_as_delegate : Script ()
+test_delegate_abort_as_delegate = test_delegate_abort (\app -> app.bobValidator.primaryParty)
+
+
+-- testing utilities
+--------------------
+
+createTransferPreapproval : Party -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
+createTransferPreapproval receiver provider dso expiresAt = do
+  now <- getTime
+  submitMulti [receiver, provider, dso] [] $ createCmd TransferPreapproval with
+      receiver
+      provider
+      dso
+      validFrom = now
+      lastRenewedAt = now
+      expiresAt

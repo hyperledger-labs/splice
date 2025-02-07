@@ -16,11 +16,13 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc2.holding
 import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.token.standard.utils.anycontractid.PhantomTemplate
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.jdk.CollectionConverters.*
 
@@ -82,24 +84,28 @@ class TokenStandardTransferIntegrationTest
           )
         )
       val choiceArgs = new transferinstruction.TransferFactory_Transfer(
-        new transferinstruction.Transfer(
-          sender.toProtoPrimitive,
-          receiver.toProtoPrimitive,
-          amount.bigDecimal,
-          new holding.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-          java.util.Optional.empty(),
-          new tokenmetadata.Metadata(java.util.Map.of()),
+        new transferinstruction.TransferSpecification(
+          new transferinstruction.Transfer(
+            sender.toProtoPrimitive,
+            receiver.toProtoPrimitive,
+            amount.bigDecimal,
+            new holding.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+            java.util.Optional.empty(),
+            new tokenmetadata.Metadata(java.util.Map.of()),
+          ),
+          Instant.now().plus(10, ChronoUnit.MINUTES),
+          senderHoldings
+            .map(senderHolding => new holding.Holding.ContractId(senderHolding.contractId))
+            .asJava,
+          java.util.Optional.of(aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive),
         ),
-        senderHoldings
-          .map(senderHolding => new holding.Holding.ContractId(senderHolding.contractId))
-          .asJava,
         new tokenmetadata.ExtraArgs(
           java.util.Map.of(),
           new tokenmetadata.Metadata(java.util.Map.of()),
         ),
       )
       val transferFactory = sv1ScanBackend.getTransferFactory(choiceArgs)
-      // TODO (#17402): replace with a better conversion
+      // TODO (#17517): replace with a better conversion
       val jsonChoiceContextData: Map[String, tokenmetadata.AnyValue] =
         transferFactory.choiceContext.choiceContextData
           .flatMap(_.asObject)
@@ -108,14 +114,13 @@ class TokenStandardTransferIntegrationTest
           .map { case (key, value) =>
             // only contract ids are specified
             key -> new tokenmetadata.anyvalue.AV_ContractId(
-              new PhantomTemplate.ContractId(value.asString.value)
+              new AnyContract.ContractId(value.asString.value)
             )
           }
       val commands = new transferinstruction.TransferFactory.ContractId(transferFactory.factoryId)
         .exerciseTransferFactory_Transfer(
           new transferinstruction.TransferFactory_Transfer(
-            choiceArgs.transfer,
-            choiceArgs.holdingCids,
+            choiceArgs.transferSpecification,
             new tokenmetadata.ExtraArgs(
               jsonChoiceContextData.asJava,
               new tokenmetadata.Metadata(java.util.Map.of()),

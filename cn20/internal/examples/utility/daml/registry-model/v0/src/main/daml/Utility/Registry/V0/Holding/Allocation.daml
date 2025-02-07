@@ -1,0 +1,103 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Utility.Registry.V0.Holding.Allocation where
+
+import Canton.Network.RC1.TokenMetadata as RC1
+import Canton.Network.RC4.Allocation as RC4
+
+import DA.Assert
+import DA.Map as Map
+import DA.Optional (fromSome)
+
+import Utility.Credential.V0.Credential (assertFulfillsAllRequirements)
+import Utility.Registry.Holding.V0.Holding
+import Utility.Registry.V0.Configuration.Instrument (InstrumentConfiguration)
+
+-- | An allocation settled via a third-party.
+template HoldingAllocation
+  with
+    lockedHoldingCid : ContractId Holding
+      -- ^ Holding locked to the Allocation.
+    receiverLabel : Text
+      -- ^ Label of the holding to receive.
+    allocation : AllocationView
+      -- ^ The `AllocationView` including transfer and settlement details.
+    operator : Party
+      -- ^ Utility operator.
+  where
+    signatory allocationAppProvider allocation, allocation.transfer.sender
+    observer operator, allocation.settlement.executor
+
+    interface instance RC4.Allocation for HoldingAllocation where
+      view = allocation
+
+      allocation_withdrawImpl self _extraArgs = do
+        archive self
+        exercise lockedHoldingCid Holding_Unlock
+        pure Allocation_WithdrawResult with meta = emptyMetadata
+
+      allocation_cancelImpl self _extraArgs = do
+        archive self
+        exercise lockedHoldingCid Holding_Unlock
+        pure Allocation_CancelResult with meta = emptyMetadata
+
+      allocation_executeTransferImpl self extraArgs = do
+        archive self
+
+        -- unpack choice context
+        instrumentConfigurationCid <- fromSome <$>
+          getContextItemAsCid extraArgs.context "da-utility/instrument-configuration"
+
+        senderCredentialCids <- fromSome <$>
+          getContextItemAsCids extraArgs.context "da-utility/sender-credentials"
+
+        receiverCredentialCids <- fromSome <$>
+          getContextItemAsCids extraArgs.context "da-utility/receiver-credentials"
+
+        -- validate instrument configuration
+        instrumentConfiguration <- fetch @InstrumentConfiguration instrumentConfigurationCid
+        instrumentConfiguration.defaultIdentifier.id === allocation.transfer.instrumentId.id
+        instrumentConfiguration.defaultIdentifier.source === allocation.transfer.instrumentId.admin
+
+        -- validate credentials
+        senderCredentials <- mapA fetch senderCredentialCids
+        assertFulfillsAllRequirements allocation.transfer.sender instrumentConfiguration.holderRequirements senderCredentials
+
+        receiverCredentials <- mapA fetch receiverCredentialCids
+        assertFulfillsAllRequirements allocation.transfer.receiver instrumentConfiguration.holderRequirements receiverCredentials
+
+        -- unlock holding and validate it
+        Holding_Unlock_Result holdingCid <- exercise lockedHoldingCid Holding_Unlock
+
+        holding <- fetch holdingCid
+        holding.operator === operator
+        holding.owner === allocation.transfer.sender
+        holding.registrar === allocationAppProvider allocation
+        holding.instrument.id === allocation.transfer.instrumentId.id
+        holding.instrument.source === allocation.transfer.instrumentId.admin
+
+        -- transfer holding
+        holdingTransferResult <- exercise holdingCid Holding_Transfer with
+          newOwner = allocation.transfer.receiver
+          newLabel = receiverLabel
+
+        pure Allocation_ExecuteTransferResult with meta = emptyMetadata
+
+allocationAppProvider : AllocationView -> Party
+allocationAppProvider AllocationView{..} = transfer.instrumentId.admin
+
+getContextItemAsCid : ChoiceContext -> Text -> Update (Optional (ContractId t))
+getContextItemAsCid context k = do
+  case Map.lookup k context of
+    None -> pure None
+    Some (AV_ContractId cid) -> pure . Some $ coerceContractId cid
+    Some value -> fail $ "Expected ContractId for: " <> k <> ", got: " <> show value
+
+getContextItemAsCids : ChoiceContext -> Text -> Update (Optional [ContractId t])
+getContextItemAsCids context k = do
+  case Map.lookup k context of
+    None -> pure None
+    Some (AV_List cidVals) ->
+      pure $ Some [coerceContractId cid | AV_ContractId cid <- cidVals]
+    Some value -> fail $ "Expected ContractIds for: " <> k <> ", got: " <> show value

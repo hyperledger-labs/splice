@@ -1,0 +1,162 @@
+module TestCnTokenUtilityVsAmuletDvP where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Foldable (foldMap)
+import DA.List (sortOn)
+import DA.Optional (mapOptional)
+import DA.Time
+
+import Canton.Network.RC1.TokenMetadata as RC1
+import Canton.Network.RC2.Holding qualified as RC2
+import Canton.Network.RC3.TransferInstruction as RC3
+import Canton.Network.RC4.Allocation qualified as RC4
+import Canton.Network.RC5.AllocationRequest
+import Canton.Network.RC6.AllocationInstruction
+
+import Splice.Scripts.CnTokenTestUtils (getAmuletAllocationFactory_AllocateContext, getAmuletAllocation_ExecuteTransferContext)
+import Splice.Scripts.Util
+import Splice.Amulet
+
+import Utility.Registry.Holding.V0.Holding
+import Utility.Scripts.CnTokenTestUtils
+
+import TradingApp
+import Util.Disclosure
+import Util.Setup
+
+testDvP : Script ()
+testDvP = script do
+
+  -- Setup Amulet
+  AmuletAppWithUsers{..} <- setupAmuletAppWithUsers
+
+  -- give Alice some Amulet
+  tap app alice 1000.0
+
+  -- Setup Utility
+  BootstrapUtilityServicesResult
+    { operator
+    ; holder2Label
+    ; defaultIdentifier
+    } <- bootstrapUtilityServices operator.primaryParty provider.primaryParty registrar.primaryParty bob.primaryParty alice.primaryParty
+
+  -- setup trading venue and agree on the following DvP:
+  -- Alice sends Bob 100 units of "Amulet"
+  -- Bob sends Alice 20 units of "INST"
+  agreementCid <- submitMulti [alice.primaryParty, tradingAppProvider.primaryParty] [] $ createCmd TradingAgreement with
+    venue = tradingAppProvider.primaryParty
+    user = alice.primaryParty
+
+  let mkTransfer sender receiver amount instrumentId  = RC3.Transfer with
+        sender
+        receiver
+        amount
+        instrumentId
+        metadata = emptyMetadata
+        lock = None
+
+  -- A --> B 100 Amulet
+  -- B --> A 20 INST
+  let leg1 = mkTransfer alice.primaryParty bob.primaryParty 100.0 $
+        RC2.InstrumentId app.dso "Amulet"
+  let leg2 = mkTransfer bob.primaryParty alice.primaryParty 20.0 $
+        RC2.InstrumentId defaultIdentifier.source defaultIdentifier.id
+
+  proposalCid <- submit alice.primaryParty $ exerciseCmd agreementCid TradingAgreement_ProposeTrade with
+    transfers = [leg1, leg2]
+
+  -- bob accepts
+  proposalCid <- submit bob.primaryParty $ exerciseCmd proposalCid OTCTradeProposal_Accept with
+    approver = bob.primaryParty
+
+  -- provider initiates settlement
+  now <- getTime
+
+  settlementCid <- submit tradingAppProvider.primaryParty $
+    exerciseCmd proposalCid OTCTradeProposal_InitiateSettlement with
+      prepareUntil = now `addRelTime` hours 1
+      settleBefore = now `addRelTime` hours 2
+
+  -- Allocation of Leg1 (Amulet transfer)
+
+  -- Alice sees the allocation request in her wallet
+  [aliceAlloc] <- getRequestedAllocations alice.primaryParty
+  aliceAlloc.transfer.amount === 100.0
+
+  -- build choice context that would be provided over the off-ledger API
+  (factoryCid, extraArgs, disclosures) <- getAmuletAllocationFactory_AllocateContext app alice
+
+  -- alice accepts allocation request directly via her wallet
+  amulets <- queryFilter @Amulet alice.primaryParty (\amulet -> amulet.owner == alice.primaryParty)
+  submitWithDisclosures' alice.primaryParty disclosures $ exerciseCmd factoryCid AllocationFactory_Allocate with
+    allocation = aliceAlloc
+    inputHoldings = map (toInterfaceContractId . fst) amulets
+    extraArgs
+
+  -- Bob sees the allocation request in his wallet as well
+  [bobAlloc] <- getRequestedAllocations bob.primaryParty
+  bobAlloc.transfer.amount === 20.0
+
+  -- TODO (#17541):  Add discovery of endpoints (implementation of RegistryAppInstall) for both Alice and Bob
+
+  -- build choice context that would be provided over the off-ledger API
+  (factoryCid, extraArgs, disclosures) <- getUtilityAllocationFactory_AllocateContext operator leg2 holder2Label
+
+  -- bob accepts allocation request directly via his wallet
+  holdings <- queryFilter @Holding bob.primaryParty (\h -> h.owner == bob.primaryParty)
+  submitWithDisclosures' bob.primaryParty disclosures $ exerciseCmd factoryCid AllocationFactory_Allocate with
+    allocation = bobAlloc
+    inputHoldings = map (toInterfaceContractId . fst) holdings
+    extraArgs
+
+  -- assume the time given to prepare has passed
+  passTime (hours 1)
+
+  -- trading app provider completes settlement
+  allocations0 <- queryInterface @RC4.Allocation tradingAppProvider.primaryParty
+  let [leg1Allocation, leg2Allocation] =
+        sortOn (\(_, alloc) -> (alloc.transferId)) $
+        mapOptional (\(x, y) -> (,) x <$> y) allocations0
+
+  -- and... *drumroll*... settle!
+  leg1Context <- getAmuletAllocation_ExecuteTransferContext app tradingAppProvider (fst leg1Allocation)
+  leg2Context <- getUtilityAllocation_ExecuteTransferContext operator (fst leg2Allocation)
+  let disclosures = foldMap fst [leg1Context, leg2Context]
+  submitWithDisclosures' tradingAppProvider.primaryParty disclosures $ exerciseCmd settlementCid OTCTrade_Settle with
+    allocationInstructions = fmap fst [leg1Allocation, leg2Allocation]
+    extraArgss = map snd [leg1Context, leg2Context]
+
+  -- TODO (#17541): early abortion of settlement, unwinding of expired settlements, etc.
+  let ensureAmuletExists amount owner = do
+        amulets <- queryFilter @Amulet owner (\amulet -> amulet.owner == owner)
+        require ("Amulet of amount " <> show amount <> " exists")
+          (any (\(_, amulet) -> amulet.amount.initialAmount == amount) amulets)
+
+  -- TODO (#17541): add an instrument filter
+  let ensureUtilityHoldingExists amount owner = do
+        amulets <- queryFilter @Holding owner (\h -> h.owner == owner)
+        require ("Holding of amount " <> show amount <> " exists")
+          (any (\(_, holding) -> holding.amount == amount) amulets)
+
+  -- check that they received the correct amount of Amulets
+  ensureUtilityHoldingExists 20.0 alice.primaryParty
+  ensureAmuletExists 100.0 bob.primaryParty
+
+  pure ()
+
+getRequestedAllocations : Party -> Script [RC4.AllocationView]
+getRequestedAllocations p = do
+  reqs <- queryInterface @AllocationRequest p
+  trace reqs $ pure ()
+  let allocs = do
+        (_reqCid, Some req) <- reqs
+        (tfId, tf) <- zip [0..length req.transfers] req.transfers
+        guard (p == tf.sender)
+        pure RC4.AllocationView with
+          settlement = req.settlement
+          transferId = tfId
+          transfer = tf
+  pure allocs
+

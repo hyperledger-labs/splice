@@ -9,6 +9,7 @@ import Canton.Network.RC2.Holding qualified as RC2
 import Canton.Network.RC3.TransferInstruction qualified as TransferInstruction
 import Canton.Network.RC4.Allocation
 import Canton.Network.RC6.AllocationInstruction
+import Splice.Amulet
 import Splice.AmuletAllocation
 import Splice.AmuletRules
 import Splice.Types
@@ -49,19 +50,19 @@ template ExternalPartyAmuletRules
 
     interface instance TransferInstruction.TransferFactory for ExternalPartyAmuletRules where
       view = TransferInstruction.TransferFactoryView with
-        appProvider = dso
+        admin = dso
 
       transferFactory_transferImpl = transferImpl
 
     interface instance AllocationFactory for ExternalPartyAmuletRules where
       view = AllocationFactoryView with
-        appProvider = dso
+        admin = dso
 
       allocationFactory_allocateImpl allocation = sharedAllocateImpl allocation.transfer.sender allocation
 
     interface instance AllocationDelegationFactory for ExternalPartyAmuletRules where
       view = AllocationFactoryView with
-        appProvider = dso
+        admin = dso
 
       allocationDelegationFactory_delegate = sharedAllocateViaDelegateImpl
 
@@ -226,6 +227,79 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
     nonce : Int -- Returned to simplify tx log parsing
   deriving (Show, Eq)
 
+
+-- Token standard support
+-------------------------
+
+-- | One-time delegation to execute a transfer to the given receiver
+-- for the given amount as part of a delegated transfer from the token standard interface.
+template StandardTransferCommand
+  with
+    dso : Party
+    sender : Party
+    receiver : Party
+    delegate : Party -- ^ The delegate that actually executes the transfer
+    amount : Decimal
+    transferMeta : Metadata
+    amuletCids : [ContractId Amulet]
+    expiresAt : Time -- ^ Expiry of the command until when TransferCommand_Send must be called
+  where
+    -- The DSO party is a signatory to make sure
+    -- that the external signature
+    -- is visible to the SVs.
+    signatory sender, dso
+    observer delegate
+
+    interface instance TransferInstruction.TransferInstruction for StandardTransferCommand where
+      view = TransferInstruction.TransferInstructionView with
+        status = TransferInstruction.TIS_PendingExecution
+        meta = emptyMetadata
+        transferSpecification = TransferInstruction.TransferSpecification with
+          holdingCids = map toInterfaceContractId amuletCids
+          executeBefore = expiresAt
+          executionDelegate = Some delegate
+          transfer = TransferInstruction.Transfer with
+            sender = sender
+            receiver = receiver
+            amount = amount
+            instrumentId = amuletInstrumentId dso
+            lock = None
+            metadata = transferMeta
+
+      transferInstruction_reportSuccessImpl _ =
+        fail "The amulet implementation of TransferInstruction does not make use of the reportSuccess choice"
+
+      transferInstruction_abortImpl actor _extraArgs = do
+        require "Actor is sender, DSO party, or delegate" (actor `elem` [sender, dso, delegate])
+        pure ChoiceExecutionMetadata with
+          meta = emptyMetadata
+
+      transferInstruction_executeDelegatedTransferImpl extraHoldings extraArgs = do
+        -- NOTE: we are not collecting extra rewards; and we are also not merging inputs
+        now <- getTime
+        require "Not expired" (now < expiresAt)
+        -- compute transfer inputs
+        transferInputs <-
+          if null amuletCids
+            then pure [ InputAmulet (fromInterfaceContractId holding) | holding <- extraHoldings ]
+            else do
+              require "No extra holdings amulet specified for a transfer with fixed holdings" (null extraHoldings)
+              pure [ InputAmulet amuletCid | amuletCid <- amuletCids ]
+        -- fetch payment context (incl. featured app right)
+        paymentContext <- paymentFromChoiceContext extraArgs.context
+        -- fetch the pre-approval
+        preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context "splice.lfdecentralizedtrust.org/transfer-preapproval"
+        _ <- fetchChecked (ForOwner with dso = dso; owner = receiver) preapprovalCid
+        -- and do the transfer
+        _ <- exercise preapprovalCid TransferPreapproval_Send
+          with
+            sender
+            context = paymentContext
+            inputs = transferInputs
+            amount
+        -- TODO (#17541):report the holding that was created
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
+
 sharedAllocateViaDelegateImpl : AllocationView -> Party -> ExtraArgs -> Update AllocationDelegationFactory_DelegateResult
 sharedAllocateViaDelegateImpl allocation delegate _extraArgs = do
   instrCid <- create AmuletAllocationDelegation with allocation, delegate
@@ -242,20 +316,22 @@ sharedAllocateImpl provider allocation holdings extraArgs = do
     allocationOrInstruction = AOI_Allocation with allocation = allocCid
     meta = emptyMetadata
 
-transferImpl : TransferInstruction.Transfer -> [ContractId RC2.Holding] -> ExtraArgs -> Update TransferInstruction.TransferFactory_TransferResult
-transferImpl transfer holdings extraArgs = do
-  paymentContext <- paymentFromChoiceContext extraArgs.context
-  let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
-  preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context "splice.lfdecentralizedtrust.org/transfer-preapproval"
-  preapproval <- fetchChecked (ForOwner with dso = transfer.instrumentId.appProvider; owner = transfer.receiver) preapprovalCid
-  require "Preapproval receiver matches transfer receiver" (preapproval.receiver == transfer.receiver)
-  _ <- exercise preapprovalCid TransferPreapproval_Send
-    with
-      sender = transfer.sender
-      context = paymentContext
-      inputs = transferInputs
-      amount = transfer.amount
-  pure TransferInstruction.TransferFactory_TransferResult with
-    optTransferInstructionCid = None
-    meta = emptyMetadata
+transferImpl : TransferInstruction.TransferSpecification -> ExtraArgs -> Update TransferInstruction.TransferFactory_TransferResult
+transferImpl transferSpec extraArgs = do
+      let transfer = transferSpec.transfer
+      let holdings = transferSpec.holdingCids
+      paymentContext <- paymentFromChoiceContext extraArgs.context
+      let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
+      preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context "splice.lfdecentralizedtrust.org/transfer-preapproval"
+      preapproval <- fetchChecked (ForOwner with dso = transfer.instrumentId.admin; owner = transfer.receiver) preapprovalCid
+      require "Preapproval receiver matches transfer receiver" (preapproval.receiver == transfer.receiver)
+      _ <- exercise preapprovalCid TransferPreapproval_Send
+        with
+          sender = transfer.sender
+          context = paymentContext
+          inputs = transferInputs
+          amount = transfer.amount
+      pure TransferInstruction.TransferFactory_TransferResult with
+        optTransferInstructionCid = None
+        meta = emptyMetadata
 

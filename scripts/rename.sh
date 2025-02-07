@@ -1183,8 +1183,8 @@ function subcmd_no_illegal_daml_references() {
     local illegal_patterns=(
       svc SVC Svc   # to avoid conflict with PerSvContracts
       '(?<![a-z])cc(?!(ept|essor|g[.]github))'
-      'cn(?!(rc))' # TODO: revisit, allows cnrc but not cn
-      '(?<!(cnrc-1\.))global' # TODO: revisit
+      'cn(?!(rc|\-token\-standard|20))' # TODO (#17137): revisit, allows cnrc but not cn
+      '(?<!(cnrc-1\.))global' # TODO (#17137): revisit
       CC
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
       # Allow only Dso as in DsoRules in comments

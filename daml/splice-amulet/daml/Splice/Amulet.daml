@@ -96,9 +96,7 @@ template Amulet
     interface instance Holding.Holding for Amulet where
       view = Holding.HoldingView with
         owner
-        instrumentId = Holding.InstrumentId with
-          appProvider = dso
-          id = "Amulet"
+        instrumentId = amuletInstrumentId dso
         amount = amount.initialAmount
         lock = None
         metadata = TokenMetadata.Metadata
@@ -118,13 +116,10 @@ template LockedAmulet
     interface instance Holding.Holding for LockedAmulet where
       view = Holding.HoldingView with
         owner = amulet.owner
-        instrumentId = Holding.InstrumentId with
-          appProvider = amulet.dso
-          id = "Amulet"
+        instrumentId = amuletInstrumentId amulet.dso
         amount = amulet.amount.initialAmount
         lock = Some Holding.Lock with
           holders = lock.holders
-          expiresAt = Some lock.expiresAt
         metadata = TokenMetadata.Metadata
           with
             values = Map.fromList [
@@ -331,6 +326,11 @@ requireAmuletExpiredForAllOpenRounds roundCid amulet = do
   -- point in time; and we ensure that a amulet can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
+
+-- | Shared definition of the instrument-id used for amulets.
+amuletInstrumentId : Party -> Holding.InstrumentId
+amuletInstrumentId dso =
+  Holding.InstrumentId with admin = dso; id = "Amulet"
 
 
 -- instances

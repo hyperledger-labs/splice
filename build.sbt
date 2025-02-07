@@ -103,13 +103,13 @@ lazy val root: Project = (project in file("."))
     `splice-dso-governance-test-daml`,
     `splice-validator-lifecycle-daml`,
     `splice-validator-lifecycle-test-daml`,
-    `cnrc-utils-daml`,
     `cnrc-1-token-metadata-daml`,
     `cnrc-2-holdings-daml`,
     `cnrc-3-transfer-instruction-daml`,
     `cnrc-4-allocation-daml`,
     `cnrc-5-allocation-request-daml`,
     `cnrc-6-allocation-instruction-daml`,
+    `cnrc-example-trading-app`,
     `cnrc-token-test-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
@@ -282,96 +282,88 @@ lazy val docs = project
   )
 
 // Shared token standard code
-lazy val `cnrc-utils-daml` =
-  project
-    .in(file("daml/token-standard/cnrc-utils"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings
-    )
-    .dependsOn(
-      `canton-bindings-java`
-    )
-
 lazy val `cnrc-1-token-metadata-daml` =
   project
-    .in(file("daml/token-standard/cnrc-1-token-metadata"))
+    .in(file("cn20/cn-token-standard-proposal/cnrc-1-token-metadata"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`cnrc-utils-daml` / Compile / damlBuild).value,
-    )
-    .dependsOn(
-      `canton-bindings-java`
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `cnrc-2-holdings-daml` =
   project
-    .in(file("daml/token-standard/cnrc-2-holdings"))
+    .in(file("cn20/cn-token-standard-proposal/cnrc-2-holdings"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Compile / damlEnableJavaCodegen := false,
       Compile / damlDependencies :=
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value,
-    )
-    .dependsOn(
-      `canton-bindings-java`
     )
 
 lazy val `cnrc-3-transfer-instruction-daml` =
   project
-    .in(file("daml/token-standard/cnrc-3-transfer-instruction"))
+    .in(file("cn20/cn-token-standard-proposal/cnrc-3-transfer-instruction"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Compile / damlEnableJavaCodegen := false,
       Compile / damlDependencies :=
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
           (`cnrc-2-holdings-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(
-      `canton-bindings-java`
-    )
 
 lazy val `cnrc-4-allocation-daml` =
   project
-    .in(file("daml/token-standard/cnrc-4-allocation"))
+    .in(file("cn20/cn-token-standard-proposal/cnrc-4-allocation"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Compile / damlEnableJavaCodegen := false,
       Compile / damlDependencies :=
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
           (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(
-      `canton-bindings-java`
-    )
 
 lazy val `cnrc-5-allocation-request-daml` =
   project
-    .in(file("daml/token-standard/cnrc-5-allocation-request"))
+    .in(file("cn20/cn-token-standard-proposal/cnrc-5-allocation-request"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Compile / damlEnableJavaCodegen := false,
       Compile / damlDependencies :=
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
           (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
           (`cnrc-4-allocation-daml` / Compile / damlBuild).value,
     )
-    .dependsOn(
-      `canton-bindings-java`
-    )
 
 lazy val `cnrc-6-allocation-instruction-daml` =
   project
-    .in(file("daml/token-standard/cnrc-6-allocation-instruction"))
+    .in(file("cn20/cn-token-standard-proposal/cnrc-6-allocation-instruction"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Compile / damlEnableJavaCodegen := false,
       Compile / damlDependencies :=
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
           (`cnrc-2-holdings-daml` / Compile / damlBuild).value ++
           (`cnrc-4-allocation-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `cnrc-example-trading-app` =
+  project
+    .in(file("cn20/cn-token-standard-proposal/examples/trading"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlEnableJavaCodegen := false,
+      Compile / damlDependencies :=
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
+          (`cnrc-4-allocation-daml` / Compile / damlBuild).value ++
+          (`cnrc-5-allocation-request-daml` / Compile / damlBuild).value,
     )
     .dependsOn(
       `canton-bindings-java`
@@ -379,13 +371,14 @@ lazy val `cnrc-6-allocation-instruction-daml` =
 
 lazy val `cnrc-token-test-daml` =
   project
-    .in(file("daml/token-standard/tests"))
+    .in(file("cn20/cn-token-standard-proposal/examples/cn-token-test-splice"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
+      Test / damlTest := Seq(), // TODO (#17537): re-enable
+      Compile / damlEnableJavaCodegen := false,
       Compile / damlDependencies :=
-        (`cnrc-utils-daml` / Compile / damlBuild).value ++
-          (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
           (`cnrc-2-holdings-daml` / Compile / damlBuild).value ++
           (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
           (`cnrc-4-allocation-daml` / Compile / damlBuild).value ++
@@ -393,7 +386,8 @@ lazy val `cnrc-token-test-daml` =
           (`cnrc-6-allocation-instruction-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value ++
-          (`splice-wallet-daml` / Compile / damlBuild).value,
+          (`splice-wallet-daml` / Compile / damlBuild).value ++
+          (`cnrc-example-trading-app` / Compile / damlBuild).value,
     )
     .dependsOn(
       `canton-bindings-java`
@@ -424,6 +418,7 @@ lazy val `splice-amulet-daml` =
           (`cnrc-2-holdings-daml` / Compile / damlBuild).value ++
           (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
           (`cnrc-4-allocation-daml` / Compile / damlBuild).value ++
+          (`cnrc-5-allocation-request-daml` / Compile / damlBuild).value ++
           (`cnrc-6-allocation-instruction-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
@@ -515,9 +510,9 @@ lazy val `splice-wallet-daml` =
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
           (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
-          (`cnrc-utils-daml` / Compile / damlBuild).value ++
           (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
-          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value,
+          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
+          (`cnrc-5-allocation-request-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -588,7 +583,6 @@ lazy val `apps-common` =
       `splice-validator-lifecycle-daml`,
       `splice-wallet-daml`,
       `splice-wallet-payments-daml`,
-      `cnrc-utils-daml`,
       `cnrc-1-token-metadata-daml`,
       `cnrc-2-holdings-daml`,
       `cnrc-3-transfer-instruction-daml`,
@@ -783,14 +777,14 @@ lazy val `apps-scan` =
           )
         } :+ ScalaServer(
           new File(
-            s"openapi-deps/token-standard/cnrc-3-transfer-instruction/openapi/transfer-instruction.yaml"
+            "cn20/cn-token-standard-proposal/cnrc-3-transfer-instruction/openapi/transfer-instruction.yaml"
           ),
           pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0",
           modules = List("pekko-http-v1.0.0", "circe"),
           customExtraction = true,
         ) :+ ScalaClient(
           new File(
-            s"openapi-deps/token-standard/cnrc-3-transfer-instruction/openapi/transfer-instruction.yaml"
+            "cn20/cn-token-standard-proposal/cnrc-3-transfer-instruction/openapi/transfer-instruction.yaml"
           ),
           modules = List("pekko-http-v1.0.0", "circe"),
           pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0",
@@ -1355,7 +1349,6 @@ lazy val bundleTask = {
       )
     val dars =
       Seq(
-        (`cnrc-utils-daml` / Compile / damlBuild).value,
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value,
         (`cnrc-2-holdings-daml` / Compile / damlBuild).value,
         (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value,

@@ -1,0 +1,14 @@
+sdk-version: 3.3.0-snapshot.20250117.13525.0.v9e9dcacc
+name: utility-credential-app-tests-v0
+source: ./daml
+version: 0.0.1
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../../../../../../../../cn-token-standard-proposal/examples/splice/daml/splice-amulet/.daml/dist/splice-amulet.dar
+  - ../../../../../../../../cn-token-standard-proposal/examples/splice/daml/splice-util/.daml/dist/splice-util.dar
+  - ../../../../credential-model/v0/src/main/.daml/dist/credential.dar
+  - ../../../../credential-app-model/v0/src/main/.daml/dist/credential-app.dar
+start-navigator: no

@@ -54,32 +54,32 @@ template AmuletAllocation
     allocation : AllocationView
   where
     signatory allocationAppProvider allocation, allocation.transfer.sender
-    observer allocation.settlement.appProvider
+    observer allocation.settlement.executor
 
     interface instance Allocation for AmuletAllocation where
       view = allocation
 
       allocation_withdrawImpl self extraArgs = do
-        potentiallyUnsafeArchive self -- TODO: revisit
+        potentiallyUnsafeArchive self -- TODO (#17541):revisit
         let context = extraArgs.context
-        openRoundCid <- getContextContractId @OpenMiningRound context "splice.lfdecentralizedtrust.org/open-round" -- TODO: define keys
+        openRoundCid <- getContextContractId @OpenMiningRound context "splice.lfdecentralizedtrust.org/open-round" -- TODO (#17541):define keys
         exercise lockedAmulet LockedAmulet_Unlock with openRoundCid
         pure Allocation_WithdrawResult with meta = emptyMetadata
 
       allocation_cancelImpl self extraArgs = do
-        potentiallyUnsafeArchive self -- TODO: revisit
-        -- TODO: share code with withdraw
+        potentiallyUnsafeArchive self -- TODO (#17541):revisit
+        -- TODO (#17541):share code with withdraw
         let context = extraArgs.context
-        openRoundCid <- getContextContractId @OpenMiningRound context "splice.lfdecentralizedtrust.org/open-round" -- TODO: define keys
+        openRoundCid <- getContextContractId @OpenMiningRound context "splice.lfdecentralizedtrust.org/open-round" -- TODO (#17541):define keys
         -- unfortunately we need a reference to a round to unlock the amulet,
         -- so even cancellation requires the settlement app to fetch a choice context
         exercise lockedAmulet LockedAmulet_Unlock with openRoundCid
         pure Allocation_CancelResult with meta = emptyMetadata
 
       allocation_executeTransferImpl self extraArgs = do
-        potentiallyUnsafeArchive self -- TODO: revisit
+        potentiallyUnsafeArchive self -- TODO (#17541):revisit
         let context = extraArgs.context
-        -- extract payment context (TODO: consider how much validation is required)
+        -- extract payment context (TODO (#17541):consider how much validation is required)
         paymentContext <- paymentFromChoiceContext context
         -- fetch open round
         let dso = allocationAppProvider allocation
@@ -91,7 +91,7 @@ template AmuletAllocation
         -- execute transfer
         let transfer = Splice.AmuletRules.Transfer with
               sender = allocation.transfer.sender
-              provider = allocation.settlement.appProvider
+              provider = allocation.settlement.executor
               inputs = [InputAmulet amuletCid]
               outputs =
                 [ TransferOutput with
@@ -104,7 +104,7 @@ template AmuletAllocation
         pure Allocation_ExecuteTransferResult with meta = emptyMetadata
 
 
--- | TODO: move to script support functions
+-- | TODO (#17541):move to script support functions
 paymentToChoiceContext : PaymentTransferContext -> ChoiceContext
 paymentToChoiceContext context = Map.fromList
   [ ("splice.lfdecentralizedtrust.org/amulet-rules", AV_ContractId $ coerceContractId context.amuletRules)
@@ -113,26 +113,34 @@ paymentToChoiceContext context = Map.fromList
 
 paymentFromChoiceContext : ChoiceContext -> Update PaymentTransferContext
 paymentFromChoiceContext context = do
+    -- TODO(#119): share "splice.lfdecentralizedtrust.org" as a constant
     amuletRulesCid <- getContextContractId @AmuletRules context "splice.lfdecentralizedtrust.org/amulet-rules"
     openRoundCid <- getContextContractId @OpenMiningRound context "splice.lfdecentralizedtrust.org/open-round"
-    -- TODO: featured app right extraction if it exists
+    optFeaturedAppRightCid <- lookupContextContractId @FeaturedAppRight context "splice.lfdecentralizedtrust.org/featured-app-right"
     pure PaymentTransferContext with
       amuletRules = amuletRulesCid
       context = TransferContext with
         openMiningRound = openRoundCid
         issuingMiningRounds = mempty
-        featuredAppRight = None
+        featuredAppRight = optFeaturedAppRightCid
         validatorRights = mempty
+
+lookupContextContractId : Template t => ChoiceContext -> Text -> Update (Optional (ContractId t))
+lookupContextContractId context k = do
+  case Map.lookup k context of
+    None -> pure None
+    Some (AV_ContractId anyCid) -> pure (Some (coerceContractId anyCid))
+    Some value -> fail $ "Expected contract id for: " <> k <> ", got: " <> show value
 
 getContextContractId : Template t => ChoiceContext -> Text -> Update (ContractId t)
 getContextContractId context k = do
-  case Map.lookup k context of
+  optCid <- lookupContextContractId context k
+  case optCid of
     None -> fail $ "Missing context entry for: " <> k
-    Some (AV_ContractId anyCid) -> pure (coerceContractId anyCid)
-    Some value -> fail $ "Expected contract id for: " <> k <> ", got: " <> show value
+    Some cid -> pure cid
 
 allocationAppProvider : AllocationView -> Party
-allocationAppProvider AllocationView{..} = transfer.instrumentId.appProvider
+allocationAppProvider AllocationView{..} = transfer.instrumentId.admin
 
 -- | The extra allocation that is made to guard against the transfer fees changing
 -- between the time of locking the amulet and the time of executing the actual transfer.
@@ -153,7 +161,7 @@ fundAllocation provider allocation context inputs = do
   let receiverOutput = allocationToAmuletOutput allocation
   [expectedTransferFees] <- exerciseComputeFees context allocation.transfer.sender [receiverOutput]
   -- approximate the holding fees for the locked amulet
-  let approximateHoldingFees = 0.0 -- TODO: implement
+  let approximateHoldingFees = 0.0 -- TODO (#17541):implement
   let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
   -- lock the amulet
   let transfer = Splice.AmuletRules.Transfer with
@@ -169,11 +177,12 @@ fundAllocation provider allocation context inputs = do
                 holders = [allocationAppProvider allocation]
           ]
         inputs
-  -- TODO: prudent engineering - check DSO party on amulet rules
+  -- TODO (#17541):prudent engineering - check DSO party on amulet rules
   result <- exercisePaymentTransfer context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   toInterfaceContractId <$> create AmuletAllocation with
     allocation
     lockedAmulet
+
 
 
