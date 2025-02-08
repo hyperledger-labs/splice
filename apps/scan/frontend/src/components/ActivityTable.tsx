@@ -11,13 +11,38 @@ import {
   TitledTable,
 } from 'common-frontend';
 import { useActivity } from 'common-frontend/scan-api';
+import { useInView } from 'react-intersection-observer';
 import { ListActivityResponseItem, SenderAmount, Transfer, AmuletAmount } from 'scan-openapi';
 
-import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import {
+  Box,
+  CircularProgress,
+  Stack,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 export const ActivityTable: React.FC = () => {
-  const activityQuery = useActivity();
+  const {
+    data: activityData,
+    isLoading,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useActivity();
+
+  const { ref } = useInView({
+    onChange: inView => {
+      if (inView && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+  });
+
   const hasNoActivities = (pagedActivities: ListActivityResponseItem[][]): boolean => {
     return (
       pagedActivities === undefined ||
@@ -25,10 +50,9 @@ export const ActivityTable: React.FC = () => {
       pagedActivities.every(p => p === undefined || p.length === 0)
     );
   };
-  const isLoading = activityQuery.isLoading;
-  const isError = activityQuery.isError;
 
-  const pagedActivities = activityQuery.data ? activityQuery.data.pages : [];
+  const pagedActivities = activityData ? activityData.pages : [];
+
   return (
     <Stack spacing={4} direction="column" data-testid="activity-table">
       {isLoading ? (
@@ -68,39 +92,17 @@ export const ActivityTable: React.FC = () => {
           </TableBody>
         </TitledTable>
       )}
-      <ViewMoreButton
-        label={
-          activityQuery.isFetchingNextPage
-            ? 'Loading more...'
-            : activityQuery.hasNextPage
-            ? 'Load More'
-            : 'Nothing more to load'
-        }
-        loadMore={() => activityQuery.fetchNextPage()}
-        disabled={!activityQuery.hasNextPage}
-      />
-    </Stack>
-  );
-};
 
-interface ViewMoreButtonProps {
-  loadMore: () => void;
-  label: string;
-  disabled: boolean;
-}
-// TODO(#7764) reuse between paged tables, wallet transaction history and here.
-const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore, label, disabled = false }) => {
-  return (
-    <Button
-      id="view-more-transactions"
-      variant="outlined"
-      size="small"
-      color="secondary"
-      onClick={loadMore}
-      disabled={disabled}
-    >
-      {label}
-    </Button>
+      <Box ref={ref} sx={{ alignSelf: 'center' }}>
+        {isFetchingNextPage ? (
+          <CircularProgress />
+        ) : hasNextPage ? (
+          <Typography>More activities available</Typography>
+        ) : (
+          <Typography>No more activities</Typography>
+        )}
+      </Box>
+    </Stack>
   );
 };
 

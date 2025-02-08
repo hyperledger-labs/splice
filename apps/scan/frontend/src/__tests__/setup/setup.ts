@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
+import {
+  setupIntersectionMocking,
+  resetIntersectionMocking,
+} from 'react-intersection-observer/test-utils';
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
 
 import { buildServer } from '../mocks/server';
@@ -18,10 +22,16 @@ window.splice_config = config;
 const server = buildServer(window.splice_config.services);
 
 // Start server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => {
+  setupIntersectionMocking(vi.fn);
+  server.listen({ onUnhandledRequest: 'error' });
+});
 
 //  Close server after all tests
-afterAll(() => server.close());
+afterAll(() => {
+  resetIntersectionMocking();
+  server.close();
+});
 
 // Reset handlers after each test `important for test isolation`
 afterEach(() => {
