@@ -495,7 +495,8 @@ function installK8sRunnerScaleSet(
                 // are merged upstream.
                 // Upstream PR: https://github.com/actions/runner-container-hooks/pull/200
                 image:
-                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.4',
+                  // TODO(#15988): use a snapshot after this is merged, and a release once 0.3.11 is out
+                  'digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.11-itai-dirty',
                 imagePullPolicy: 'Always',
                 command: ['/home/runner/run.sh'],
                 env: [
