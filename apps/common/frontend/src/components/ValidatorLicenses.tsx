@@ -1,11 +1,21 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
-import { DateDisplay, DsoInfo, Loading, PartyId, ViewMoreButton } from 'common-frontend';
+import { DateDisplay, DsoInfo, Loading, PartyId } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
 import React from 'react';
+import { useInView } from 'react-intersection-observer';
 
-import { Chip, Stack, Table, TableContainer, TableHead, Typography } from '@mui/material';
+import {
+  Box,
+  Chip,
+  CircularProgress,
+  Stack,
+  Table,
+  TableContainer,
+  TableHead,
+  Typography,
+} from '@mui/material';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
@@ -27,6 +37,20 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
   validatorLicensesQuery,
   dsoInfosQuery,
 }) => {
+  const {
+    fetchNextPage: fetchNextLicensesPage,
+    hasNextPage: hasNextLicensesPage,
+    isFetchingNextPage: isFetchingNextLicensesPage,
+  } = validatorLicensesQuery;
+
+  const { ref } = useInView({
+    onChange: inView => {
+      if (inView && hasNextLicensesPage && !isFetchingNextLicensesPage) {
+        fetchNextLicensesPage();
+      }
+    },
+  });
+
   if (validatorLicensesQuery.isLoading || dsoInfosQuery.isLoading) {
     return <Loading />;
   }
@@ -68,18 +92,16 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
           </TableBody>
         </Table>
       </TableContainer>
-      <ViewMoreButton
-        label={
-          validatorLicensesQuery.isFetchingNextPage
-            ? 'Loading more...'
-            : validatorLicensesQuery.hasNextPage
-            ? 'View More'
-            : 'Nothing more to load'
-        }
-        loadMore={() => validatorLicensesQuery.fetchNextPage()}
-        disabled={!validatorLicensesQuery.hasNextPage}
-        idSuffix="validator-licenses"
-      />
+
+      <Box ref={ref} sx={{ alignSelf: 'center' }}>
+        {isFetchingNextLicensesPage ? (
+          <CircularProgress />
+        ) : hasNextLicensesPage ? (
+          <Typography>More validator licenses available</Typography>
+        ) : (
+          <Typography>No more licenses</Typography>
+        )}
+      </Box>
     </Stack>
   );
 };
