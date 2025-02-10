@@ -33,29 +33,6 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/allocation-instruction/allocation-delegation-factory:
-    post:
-      operationId: "getAllocationDelegationFactory"
-      description: |
-        Get the factory and choice context for creating allocation delegations using the `AllocationDelegationFactory_Delegate` choice.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/GetFactoryRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FactoryWithChoiceContext"
-        "400":
-          $ref: "#/components/responses/400"
-        "404":
-          $ref: "#/components/responses/404"
-
 components:
   responses:
     "400":
@@ -201,4 +178,3 @@ components:
       properties:
         error:
           type: string
-

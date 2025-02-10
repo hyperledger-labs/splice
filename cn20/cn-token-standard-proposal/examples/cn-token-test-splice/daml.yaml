@@ -24,7 +24,7 @@ data-dependencies:
   - ../../../../daml/splice-util/.daml/dist/splice-util-current.dar
   - ../../../../daml/splice-amulet/.daml/dist/splice-amulet-current.dar
   - ../../../../daml/splice-wallet/.daml/dist/splice-wallet-current.dar
-  - ../trading/.daml/dist/trading-app-current.dar
+  - ../trading/daml/trading-app/.daml/dist/trading-app-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
@@ -32,4 +32,3 @@ build-options:
   - --enable-interfaces=yes
   # This is test-code only, so it is fine to ignore this warning
   - -Wno-upgrade-serialized-daml-script
-

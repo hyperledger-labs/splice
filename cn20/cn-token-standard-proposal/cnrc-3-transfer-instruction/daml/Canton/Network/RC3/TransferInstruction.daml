@@ -15,76 +15,8 @@ They are meant to be read jointly with the interface and data type declarations 
 They are ultimately meant to be moved into the .md files accompanying the Canton Network RCs or CIP.
 
 TODO(#93): move this into the CIP/RFC docs for an external audience.
-
-The transfer instruction below contains support for delegating the execution of
-transfers to enable external signing where there is a high latency between the
-preparation of the transaction and its submission.
-
-We assume that the wallet works against a participant node where the sender is present.
-
-  QUESTION: can we assume that? If yes, then we can get rid of fetching the disclosed amulet holdings
-  from the registry, as the wallet can always fetch them from the sender's participant node.
-
-  TODO (#17541): execute on conclusion from this question, once answered together with the reviewers.
-
-
-We expect the flow for submitting and completing a delegate transfer to be as follows:
-
-1. The wallet constructs the transfer specification for the intended transfer. It chooses a delegate that
-   is hosted on the wallet provider's participant node (WPN). It adds a correlation UUID to the transfer
-   metadata to be able to correlate the resulting transfer instruction with the submitted transfer.
-   The wallet chooses an `executeBefore` time that is far enough in the future to allow for the external
-   signing to complete, but close enough to avoid having to wait too long for the transfer to expire in
-   case the submission fails.
-2. The wallet calls the off-ledger endpoint of the registry to get the context for the transfer.
-3. The wallet calls its preparing participant node (PPN) to create the transaction exercising the `TransferFactory_Transfer` choice.
-4. The wallet instructs the off-ledger signing of the prepared transaction.
-5. Once the wallet receives the signed transaction, it submits it to the executing participant node (EPN).
-   In case the submission fails it retries submitting the signed transaction for a certain amount of time.
-   See "Failure handling below" for details on how to handle submissions that consistently fail.
-6. The wallet uses the transaction-tree stream with an interface filter for `TransferInstruction` to track the
-   status of successfully created transfer instructions.
-   It uses the sender party-id and the correlation UUID to find the resulting transfer instruction,
-   and track it over its lifecycle.
-   The wallet can rely on the guarantee by standard compliant registries that
-   the last consuming exercise of the transfer instruction will be one of the
-   choices on the `TransferInstruction` interface. Thereby enabling the wallet
-   to determine whether the transfer was successful or not.
-7. The wallet runs automation to track transfer instructions for `delegate` and `sender` parties that it hosts,
-   and submits the `TransferInstruction_ExecuteDelegatedTransfer` choice to the registry whenever it sees a
-   transfer instruction for its delegate with status `TIS_PendingExecution`.
-   It will select appropriate holdings for the transfer (if not done so by the sender), and execute the transfer.
-
-Failure handling:
-- Failure handling in Step 5 can be tricky, as the wallet must protect its user from constructing a second
-  transfer to replace the failed one, in case the first transfer failed only transiently.
-
-  For transfers that specify the holdings explicitly, wallets can use contention on the holdings to ensure
-  that the newly constructed transfer will fail if the previous one was successful. In order to do so
-  reliably, the wallet should store the signed transaction for resubmission in a way that survives restarts
-  (or browser page refreshes) of the wallet.
-
-  For transfers where the delegate or registry selects the holdings automatically, this is
-  not possible. For these, we recommend that the wallet retries submiting the signed
-  prepared transaction to the EPN for a certain amount of time; and otherwise
-  waits for the `executeBefore` time to pass before creating a replacement
-  transfer.
-
-  The problem is exacerbated in case the EPN is not trusted. In that case, the wallet will have
-  to submit to multiple EPNs and compare their responses to get BFT guarantees for determining
-  whether the submission really failed.
-
-Future options:
-- Wallets can implement their own nonce construction and add the consumption of the nonce as a second root
-  command to the transfer instruction once Canton supports multiple root commands for external parties.
-
-  Alternatively, we could evolve the standard to support the consumption of a nonce as part of creating
-  the transfer instruction itself. So far we refrained from that to avoid complicating the implementation
-  of the standard by registries.
-
 -}
 
-import DA.Action (unless)
 import qualified DA.Map as Map
 
 import Canton.Network.RC1.TokenMetadata
@@ -123,22 +55,12 @@ data TransferSpecification = TransferSpecification with
     holdingCids : [ContractId Holding]
       -- ^ The holding contracts that should be used to fund the transfer.
       --
-      -- MAY be empty if the registry supports automatic selection of holdings for transfers;
-      -- or if an execution delegate is specified, which is expected to select the holdings.
+      -- MAY be empty if the registry supports automatic selection of holdings for transfers.
       --
       -- If specified, then the transfer MUST not succeed if any of these
       -- holding contracts have already been archived. Thereby ensuring that the sender can
       -- use deliberate contention on holdings to prevent duplicate transfers.
 
-    executionDelegate : Optional Party
-      -- ^ A delegate that is expected to execute the actual transfer in case that requires
-      -- the evaluation of `getTime` constraints or referencing fast-changing reference data
-      -- contracts.
-      --
-      -- This is useful for cases where there is a latency larger than a few
-      -- seconds between the preparation of the transaction exercising the
-      -- `TransferFactory_Transfer` choice and the actual submission of the
-      -- signed prepared transaction to the ledger.
   deriving (Show, Eq)
 
 
@@ -156,10 +78,8 @@ interface TransferInstruction where
   viewtype TransferInstructionView
 
   transferInstruction_reportSuccessImpl : ExtraArgs -> Update ChoiceExecutionMetadata
-  transferInstruction_executeDelegatedTransferImpl : [ContractId Holding] -> ExtraArgs -> Update ChoiceExecutionMetadata
   transferInstruction_abortImpl : Party -> ExtraArgs -> Update ChoiceExecutionMetadata
 
-  -- TODO(#126): consider whether this is really required, or whether we let the registry report themselves as the delegate
   choice TransferInstruction_ReportSuccess : ChoiceExecutionMetadata
     -- ^ Report that the transfer instruction was successfully executed
     -- by a registry-internal workflow.
@@ -173,32 +93,6 @@ interface TransferInstruction where
     do
       transferInstruction_reportSuccessImpl this extraArgs
 
-  choice TransferInstruction_ExecuteDelegatedTransfer : ChoiceExecutionMetadata
-    -- ^ Choice for the execution delegate to execute the transfer provided an execution delegate is set
-    -- and the instruction is ready for execution.
-    --
-    -- Implementors MUST ensures that successfully exercising this choice implies that the
-    -- transfer was completed.
-    with
-      extraHoldingCids : [ContractId Holding]
-        -- ^ The holdings to use to fund the transfer in case the sender did not already specify
-        -- a specific set of holdings to use.
-        --
-        -- Setting an non-empty list for this argument is mutually exclusive with the sender setting
-        -- a non-empty list for the `holdingCids` field in the `TransferSpecification`.
-        --
-        -- Having the delegate choose the holdings is advanced functionality that can be used in
-        -- cases where external signing is used and the set of holding contracts
-        -- changes more quickly than the time between the preparation of the transaction and the submission
-        -- of the signed transaction to the ledger.
-      extraArgs : ExtraArgs
-        -- ^ The extra arguments to pass to the transfer execution implementation.
-    controller (view this).transferSpecification.executionDelegate
-    do
-      unless ((view this).status == TIS_PendingExecution) $
-        fail "The transfer instruction is not yet ready for exeuction"
-      transferInstruction_executeDelegatedTransferImpl this extraHoldingCids extraArgs
-
   choice TransferInstruction_Abort : ChoiceExecutionMetadata
     -- ^ Abort the transfer instruction for the reason given in the extra argument's metadata.
     --
@@ -206,7 +100,7 @@ interface TransferInstruction where
     -- Implementors SHOULD decide which actors are allowed to abort a transfer instruction,
     -- and add corresponding checks to the implemntation of this choice.
     --
-    -- At least the sender and the execution delegate SHOULD be allowed to abort
+    -- At least the sender SHOULD be allowed to abort
     -- a transfer instruction.
     with
       actor : Party
@@ -226,12 +120,6 @@ data TransferInstructionStatus
     -- registry-internal workflows. This status can be used to report on the
     -- status of registry specific worklows that are required to prepare the
     -- transfer (e.g., confirmation of OFAC checks).
-
-  | TIS_PendingExecution
-    -- ^ The transfer instruction is pending execution by the execution delegate.
-    --
-    -- This status is separate from `TIS_PendingPreparatoryAction` to unambiguousely signal
-    -- to the exeuction delegate when they should execute the transfer.
 
   -- TODO(#117): remove this status to avoid using the ACS for notifications.
   | TIS_Failed with
@@ -284,5 +172,3 @@ data TransferFactoryView = TransferFactoryView
     admin : Party
       -- ^ The party representing the registry app that administers the instruments for
       -- which this transfer factory can be used.
-
-

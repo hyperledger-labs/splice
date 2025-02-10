@@ -157,7 +157,6 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
           /*holdingCids =*/ List(validContractId(1), validContractId(2))
             .map(new holding.Holding.ContractId(_))
             .asJava,
-          /*executionDelegate =*/ Optional.of(dsoParty.toProtoPrimitive),
         ),
         new tokenmetadata.ExtraArgs(
           allAnyValuesMap.asJava,

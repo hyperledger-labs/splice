@@ -90,16 +90,15 @@ testDvP = script do
   bobAlloc.transfer.amount === 20.0
 
   -- build choice context that would be provided over the off-ledger API
-  (factoryCid, extraArgs, disclosures) <- getAmuletAllocationDelegationFactory_DelegateContext app alice
+  (factoryCid, extraArgs, disclosures) <- getAmuletAllocationFactory_AllocateContext app alice
 
-  -- bob accepts allocation request using their wallet and delegating to their validator
-  submitWithDisclosures' bob.primaryParty disclosures $ exerciseCmd factoryCid AllocationDelegationFactory_Delegate with
+  amulets <- queryFilter @Amulet bob.primaryParty (\amulet -> amulet.owner == bob.primaryParty)
+
+  -- bob accepts allocation request using their wallet
+  submitWithDisclosures' bob.primaryParty disclosures $ exerciseCmd factoryCid AllocationFactory_Allocate with
     allocation = bobAlloc
-    delegate = bobValidator.primaryParty
+    inputHoldings = map (toInterfaceContractId . fst) amulets
     extraArgs
-
-  -- bob's validator processes the allocation delegation
-  processAmuletAllocationDelegations app provider1 bobValidator
 
   -- assume the time given to prepare has passed
   passTime (hours 1)

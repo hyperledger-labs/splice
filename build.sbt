@@ -354,7 +354,7 @@ lazy val `cnrc-6-allocation-instruction-daml` =
 
 lazy val `cnrc-example-trading-app` =
   project
-    .in(file("cn20/cn-token-standard-proposal/examples/trading"))
+    .in(file("cn20/cn-token-standard-proposal/examples/trading/daml/trading-app"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -375,7 +375,6 @@ lazy val `cnrc-token-test-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Test / damlTest := Seq(), // TODO (#17537): re-enable
       Compile / damlEnableJavaCodegen := false,
       Compile / damlDependencies :=
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
@@ -1432,7 +1431,10 @@ cleanCnDars := {
   val log = streams.value.log
   runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)
   // daml/dars contains the versions of all dars that we want to keep committed, so we don't delete them
-  runCommand(Seq("find", "daml", "-name", "*.dar", "-not", "-path", "*daml/dars/*", "-delete"), log)
+  runCommand(
+    Seq("find", "cn20", "daml", "-name", "*.dar", "-not", "-path", "*daml/dars/*", "-delete"),
+    log,
+  )
 }
 
 lazy val checkErrors = taskKey[Unit](

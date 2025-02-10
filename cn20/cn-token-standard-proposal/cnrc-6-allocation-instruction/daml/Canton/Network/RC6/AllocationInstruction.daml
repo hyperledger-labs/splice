@@ -47,10 +47,10 @@ data AllocationInstructionView = AllocationInstructionView with
   deriving (Show, Eq)
 
 
--- AllocationFactory and AllocationDelegationFactory
-----------------------------------------------------
+-- AllocationFactory
+--------------------
 
--- | View for `AllocationFactory` and `AllocationDelegationFactory`.
+-- | View for `AllocationFactory`.
 data AllocationFactoryView = AllocationFactoryView with
     admin : Party
       -- ^ The party representing the registry app that administers the instruments
@@ -95,36 +95,3 @@ data AllocationFactory_AllocateResult = AllocationFactory_AllocateResult
     meta : Metadata
       -- ^ Additional metadata specific to the result of the allocation, used for extensibility.
   deriving (Show, Eq)
-
--- | Contracts implementing `AllocationDelegationFactory` are exposed by the registry and are
--- intended to be used by the sender's wallet to name a delegate that should allocate the assets to
--- the settlement leg.
---
--- Used for cases where the holdings or some context required to perform the actual allocation are
--- changing more quickly than the time taken for the sender to sign the transaction that allocates
--- the assets (e.g., for senders using an external CCSP).
-interface AllocationDelegationFactory where
-  viewtype AllocationFactoryView
-
-  allocationDelegationFactory_delegate : AllocationView -> Party -> ExtraArgs -> Update AllocationDelegationFactory_DelegateResult
-
-  nonconsuming choice AllocationDelegationFactory_Delegate : AllocationDelegationFactory_DelegateResult
-    -- ^ Generic choice for the wallet to name a delegate that should allocate the assets to the leg of the trade.
-    with
-      allocation : AllocationView
-        -- ^ The allocation that this instruction is for.
-      delegate : Party
-        -- ^ The chosen delegate party.
-      extraArgs : ExtraArgs
-        -- ^ Additional choice arguments.
-    controller allocation.transfer.sender
-    do allocationDelegationFactory_delegate this allocation delegate extraArgs
-
-data AllocationDelegationFactory_DelegateResult = AllocationDelegationFactory_DelegateResult
-  with
-    instruction : ContractId AllocationInstruction
-      -- ^ The instruction that was created to allocate the assets.
-    meta : Metadata
-      -- ^ Additional metadata specific to the result of the allocation, used for extensibility.
-  deriving (Show, Eq)
-

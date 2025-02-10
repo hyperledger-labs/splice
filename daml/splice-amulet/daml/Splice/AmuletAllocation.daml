@@ -5,7 +5,6 @@ module Splice.AmuletAllocation where
 
 import Canton.Network.RC1.TokenMetadata
 import Canton.Network.RC4.Allocation
-import Canton.Network.RC6.AllocationInstruction
 import DA.Map qualified as Map
 import Splice.Amulet
 import Splice.AmuletRules
@@ -13,39 +12,6 @@ import Splice.Expiry
 import Splice.Round
 import Splice.Types
 import Splice.Util
-
-data AmuletAllocationDelegation_AllocateResult = AmuletAllocationDelegation_AllocateResult
-  with
-    allocationCid : ContractId Allocation
-  deriving (Show, Eq)
-
--- | A delegation to select amulets for the sender and lock them for the allocation.
-template AmuletAllocationDelegation
-  with
-    allocation : AllocationView
-    delegate : Party
-  where
-    signatory allocationAppProvider allocation, allocation.transfer.sender
-    observer delegate
-
-    -- avoid negative amounts
-    ensure (allocation.transfer.amount > 0.0)
-
-    -- Choice for the delegate to allocate the funds for the sender.
-    choice AmuletAllocationDelegation_Allocate : AmuletAllocationDelegation_AllocateResult
-      with
-        transferContext : PaymentTransferContext
-        inputs : [TransferInput]
-      controller delegate
-      do
-        allocationCid <- fundAllocation delegate allocation transferContext inputs
-        pure AmuletAllocationDelegation_AllocateResult with allocationCid
-
-    interface instance AllocationInstruction for AmuletAllocationDelegation where
-      view = AllocationInstructionView with
-        allocation
-        status = AIS_PendingAction with actor = delegate, action = "Allocate the holdings for the sender"
-        meta = emptyMetadata
 
 -- | Amulet allocated in locked form to a trade.
 template AmuletAllocation
@@ -183,6 +149,3 @@ fundAllocation provider allocation context inputs = do
   toInterfaceContractId <$> create AmuletAllocation with
     allocation
     lockedAmulet
-
-
-

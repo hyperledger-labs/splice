@@ -97,7 +97,6 @@ class TokenStandardTransferIntegrationTest
           senderHoldings
             .map(senderHolding => new holding.Holding.ContractId(senderHolding.contractId))
             .asJava,
-          java.util.Optional.of(aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive),
         ),
         new tokenmetadata.ExtraArgs(
           java.util.Map.of(),

@@ -65,7 +65,6 @@ object ContractCompanions {
     allocationrequest.AllocationRequest.INTERFACE,
     allocationinstruction.AllocationInstruction.INTERFACE,
     allocationinstruction.AllocationFactory.INTERFACE,
-    allocationinstruction.AllocationDelegationFactory.INTERFACE,
   )
 
   private def templatesMatch(id: Identifier, qualifiedName: QualifiedName) =
