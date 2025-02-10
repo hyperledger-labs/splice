@@ -70,7 +70,7 @@ const router = createBrowserRouter(
 
 const App: React.FC = () => {
   const config = useScanConfig();
-  const pageTitle = `${config.spliceInstanceNames.networkName} Scan`;
+  const pageTitle = `${config.spliceInstanceNames.amuletName} Scan`;
   return (
     <ThemeProvider theme={theme}>
       <HelmetProvider>

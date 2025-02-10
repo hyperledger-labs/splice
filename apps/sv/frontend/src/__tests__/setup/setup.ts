@@ -3,6 +3,10 @@
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
 import { SetupServer } from 'msw/node';
+import {
+  setupIntersectionMocking,
+  resetIntersectionMocking,
+} from 'react-intersection-observer/test-utils';
 import { vi, afterAll, afterEach, beforeAll } from 'vitest';
 
 import { buildServer } from '../mocks/server';
@@ -22,10 +26,16 @@ declare global {
 export const server: SetupServer = buildServer(window.splice_config.services.sv.url);
 
 // Start server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => {
+  setupIntersectionMocking(vi.fn);
+  server.listen({ onUnhandledRequest: 'error' });
+});
 
 //  Close server after all tests
-afterAll(() => server.close());
+afterAll(() => {
+  resetIntersectionMocking();
+  server.close();
+});
 
 // Reset handlers & react renderers after each test `important for test isolation`
 afterEach(() => {
