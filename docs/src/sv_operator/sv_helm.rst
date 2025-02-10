@@ -76,6 +76,9 @@ You will be using them every time you want to deploy a new SV node, i.e., also w
 The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
 For `DevNet` and the current early version of `TestNet`, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
 
+.. todo:: adjust wording above to the fact the MainNet is live
+
+
 Preparing a Cluster for Installation
 ------------------------------------
 
@@ -153,13 +156,13 @@ Summing up, your OIDC provider setup must provide you with the following configu
 Name                    Value
 ----------------------- ---------------------------------------------------------------------------
 OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
-VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
-VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
-SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
-SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
-WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
-SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
-CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
+VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend
+VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend
+SV_CLIENT_ID            The client id of your OIDC provider for the SV app backend
+SV_CLIENT_SECRET        The client secret of your OIDC provider for the SV app backend
+WALLET_UI_CLIENT_ID     The client id of your OIDC provider for the wallet UI.
+SV_UI_CLIENT_ID         The client id of your OIDC provider for the SV UI.
+CNS_UI_CLIENT_ID        The client id of your OIDC provider for the CNS UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
@@ -167,7 +170,9 @@ We are going to use these values, exported to environment variables named as per
 When first starting out, it is suggested to configure all three JWT token audiences below to the same value: ``https://canton.network.global``.
 
 Once you can confirm that your setup is working correctly using this (simple) default,
-we recommend that you configure dedicated audience values that match your deployment and URLs.
+we strongly recommend that you configure dedicated audience values that match your deployment and URLs.
+This will help you to avoid potential security issues that might arise from using the same audience for all components.
+
 You can configure audiences of your choice for the participant ledger API, the validator backend API, and the SV backend API.
 We will refer to these using the following configuration values:
 
@@ -898,3 +903,5 @@ Note that as of now, each instance of the Scan app backend aggregates only Canto
 This will be changed in future updates, where the Scan app will guarantee correctness against all data since network start.
 At that point, data in different instances of the Scan app (hosted by different Super Validators) will always be consistent.
 This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
+
+.. todo:: update the above paragraph with an explanation of backfilling, and checking when it is complete

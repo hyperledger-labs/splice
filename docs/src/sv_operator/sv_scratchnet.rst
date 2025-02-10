@@ -9,6 +9,8 @@
 How to Bootstrap a Network
 ==========================
 
+.. todo:: adjust style of write-up below to the rest of docs
+
 cometbft helm values
 ~~~~~~~~~~~~~~~~~~~~
 

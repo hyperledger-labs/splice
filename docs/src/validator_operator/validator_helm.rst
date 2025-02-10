@@ -71,6 +71,8 @@ The PostgreSQL instance that the helm charts create, and all apps that depend on
 Currently, all apps use the Postgres user ``cnadmin``.
 The password can be setup with the following command, assuming you set the environment variable ``POSTGRES_PASSWORD`` to a secure value:
 
+.. todo:: call out the option of using a managed postgres instance
+
 .. code-block:: bash
 
     kubectl create secret generic postgres-secrets \
@@ -121,9 +123,9 @@ In this documentation, we assume that this document is available at ``OIDC_AUTHO
 
 For machine-to-machine (Validator node component to Validator node component) authentication,
 your OIDC provider must support the `OAuth 2.0 Client Credentials Grant <https://tools.ietf.org/html/rfc6749#section-4.4>`_ flow.
-This means that you must be able to configure (`CLIENT_ID`, `CLIENT_SECRET`) pairs for all Validator node components that need to authenticate to others.
+This means that you must be able to configure (`CLIENT_ID`, `CLIENT_SECRET`) pairs for all Validator node components that need to authenticate themselves to other components.
 Currently, this is the validator app backend - which needs to authenticate to the Validator node's Canton participant.
-The `sub` field of JWTs issued through this flow must match the user ID configured as `ledger-api-user` in :ref:`helm-validator-auth-secrets-config`.
+The `sub` field of JWTs issued through this flow must match the user ID configured as ``ledger-api-user`` in :ref:`helm-validator-auth-secrets-config`.
 In this documentation, we assume that the `sub` field of these JWTs is formed as ``CLIENT_ID@clients``.
 If this is not true for your OIDC provider, pay extra attention when configuring ``ledger-api-user`` values below.
 
@@ -156,10 +158,10 @@ Summing up, your OIDC provider setup must provide you with the following configu
 Name                    Value
 ----------------------- ---------------------------------------------------------------------------
 OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
-VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
-VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
-WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
-CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
+VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend
+VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend
+WALLET_UI_CLIENT_ID     The client id of your OIDC provider for the wallet UI.
+CNS_UI_CLIENT_ID        The client id of your OIDC provider for the CNS UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-validator-auth-secrets-config` and :ref:`helm-validator-install`.
@@ -168,6 +170,7 @@ When first starting out, it is suggested to configure both JWT token audiences b
 
 Once you can confirm that your setup is working correctly using this (simple) default,
 we recommend that you configure dedicated audience values that match your deployment and URLs.
+This is important for security to avoid tokens for your validators on one network be usable for your validators on another network.
 You can configure audiences of your choice for the participant ledger API and the validator backend API.
 We will refer to these using the following configuration values:
 
@@ -536,17 +539,27 @@ Once logged in one should see the transactions page.
   :width: 600
   :alt: After logged in into the wallet UI
 
+.. todo:: explain the config sections below in a way that makes them also accessible to the Docker compose users
 
 .. _helm_validator_testnet_cc_grant:
 
-(Testnet-only) Granting coin to the validator for traffic purchases
+(TestNet-only) Granting coin to the validator for traffic purchases
 -------------------------------------------------------------------
 
-On testnet, your validator party will need an initial coin grant to be able to purchase traffic.
+On TestNet, your validator party will need an initial coin grant to be able to purchase traffic.
 After logging into the wallet UI in the previous section, note that the party ID is displayed in
 the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b7369e027544927703efcdf0f03cb15bd26ac53c784c627b63bdf8f041``).
 
 An SV (say your sponsor) will need to transfer coin to this party. They can do this through their wallet UI.
+
+.. todo::
+    * applies both to TestNet and MainNet
+    * show error message that people will see while the traffic purchase fails due to insufficient funds;
+      it is currentlye here: :ref:`error-insufficient-funds`
+    * link to the option to disable automatic top-ups, and call out the option of using third-party traffic providers
+    * explain liveness rewards being an alternative
+
+
 
 .. _helm-validator-ans-web-ui:
 
@@ -563,15 +576,18 @@ Canton Name Service.
   :width: 600
   :alt: After logged in into the CNS UI
 
-Configuring top-ups
--------------------
-Optionally you may want to configure a validator's traffic top-up loop for non-production validators.
+
+Configuring automatic traffic purchases
+---------------------------------------
+Optionally you may want to configure your validator to automatically purchase traffic
+on a pay-as-you-go basis with rate limiting.
 To do so, uncomment and fill in the following section in the validator-values.yaml file:
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
     :start-after: CONFIGURING_TOPUP_START
     :end-before: CONFIGURING_TOPUP_END
+
 
 Configuring sweeps and auto-accepts of transfer offers
 ------------------------------------------------------

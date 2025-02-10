@@ -24,7 +24,7 @@ limitations.
 
 The :ref:`kubernetes based deployment <k8s_validator>` is great if you
 are already familiar with kubernetes and are looking to build a
-production-ready deployment but it can be challenging to setup if you
+production-ready deployment, but it can be challenging to setup if you
 never used kubernetes before.
 
 You can find hardware requirements for both options in a :ref:`dedicated section <validator_hardware_requirements>`.
@@ -43,4 +43,4 @@ You can find hardware requirements for both options in a :ref:`dedicated section
    validator_users.rst
    validator_networking.rst
 
-.. todo:: Add sections top-level sections on node onboarding, validator functionality
+.. todo:: Add top-level sections on node onboarding, validator functionality

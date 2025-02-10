@@ -10,9 +10,9 @@ Backups
 
 While all components in the system are designed to be crash-fault-tolerant,
 there is always a chance of failures from which the system cannot immediately
-recover, e.g. due to misconfiguration or bugs. In such cases, we will need to
-restore a component, a full validator node, or even the whole network, from
-backups or from dumps from components that are still operational.
+recover, e.g. due to misconfiguration or bugs. In such cases, you will need to
+restore a component or the a full validator node from
+backups or from dumps of the components that are still operational.
 
 Backup of Node Identities
 +++++++++++++++++++++++++
@@ -34,23 +34,23 @@ where `<token>` is an OAuth2 Bearer Token with enough claims to access the Valid
 as obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
 
 If you are using a docker-compose deployment, replace `https://wallet.validator.YOUR_HOSTNAME` with `http://wallet.localhost`.
-If you are running the docker-compose deployment with no auth, you can use the utility Python script `get-token.py`
-to generate a token for the `curl` command by running ``python get-token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
+If you are running the docker-compose deployment with no auth, you can use the utility Python script ``get-token.py``
+to generate a token for the ``curl`` command by running ``python get-token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
 
 Backups of postgres instances
 +++++++++++++++++++++++++++++
 
-To backup a validator node, please make sure that all Postgres instances are
-backed up at least every 4 hours. Note that there is a strict order requirement
-between the backups: **the backup of the apps postgres instance must be taken at
+To backup a validator node, we recommend to back up all Postgres instances
+at least every 4 hours. Note that there is a strict order requirement
+between the backups: **the backup of the validator app's postgres instance must be taken at
 a point in time strictly earlier than that of the participant**.
-Please make sure the apps instance backup is completed before starting the participant one.
+Please make sure the app's instance backup is completed before starting the participant one.
 We will provide guidelines on retention of older backups at a later point in time.
 
 If you are running your own Postgres instances in the cluster, backups can be
-taken either using tools like pgdump, or through snapshots of the underlying
+taken either using tools like ``pg_dump``, or through snapshots of the underlying
 Persistent Volume. Similarly, if you are using Cloud-hosted Postgres, you can
-either use tools like pgdump or backup tools provided by the Cloud provider.
+either use tools like ``pg_dump`` or backup tools provided by the Cloud provider.
 
 If you are running a docker-compose deployment, you can run the following commands to backup
 the Postgres databases. This will create two dump files, one for the participant and one for

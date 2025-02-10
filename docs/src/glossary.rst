@@ -90,6 +90,16 @@ Glossary
       * provides APIs for resolution in both directions that can be used by
         other apps (e.g., the wallet) to display and accept CNS names instead of party ids
 
+    Global Synchronizer Foundation
+      * Foundation charged with fostering the development and growth of the
+        Global Synchronizer in the Canton Network, and facilitate its
+        governance, see https://sync.global/.
+
+    GSF
+
+      * abbreviation for :term:`Global Synchronizer Foundation`
+
+
     Splice
 
       * The name of the HyperLedger lab project that will host the code for Amulet, DSO governance,

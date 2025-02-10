@@ -23,6 +23,8 @@ For a Super Validator, in addition, we have the following components:
 - The SV app
 - The scan app
 
+.. todo:: link to network or component diagram to improve understanding
+
 Scraping the metrics
 ++++++++++++++++++++
 

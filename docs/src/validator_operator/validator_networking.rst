@@ -16,4 +16,5 @@ The validators have no external ingress requirements and don't need to whitelist
 Egress
 ------
 
-The validators must be able to connect to all the SVs, thus whitelisting of egress on port 443 for the IPs of all the SVs is required (refer to :ref:`the network diagram <validator-network-diagram>` for a networking overview). Note that egress is often allowed by default so in many cases this requires no action.
+The validators must be able to connect to all the SVs, thus whitelisting of egress on port 443 for the IPs of all the SVs is required (refer to :ref:`the network diagram <validator-network-diagram>` for a networking overview).
+Note that egress is often allowed by default, so in many cases this requires no action.

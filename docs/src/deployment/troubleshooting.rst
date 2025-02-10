@@ -8,7 +8,7 @@
 Troubleshooting
 ===============
 
-This section provides an overview of which information can be collected to debug issues in a Canton Network Node.
+This section provides an overview of which information can be collected to debug issues in a Canton Network node.
 
 .. toctree::
 
@@ -84,6 +84,7 @@ the validator top-up config.
 
     ABORTED: Traffic balance below reserved traffic amount (0 < 200000)
 
+.. _error-insufficient-funds:
 
 Insufficient funds to buy configured traffic amount
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

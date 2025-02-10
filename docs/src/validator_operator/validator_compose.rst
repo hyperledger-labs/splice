@@ -12,18 +12,19 @@ Docker-Compose Based Deployment of a Validator Node
 ===================================================
 
 This section describes how to deploy a standalone validator node on a local machine
-using Docker-Compose. The deployment consists of the validator node along with associated
-wallet and CNS UIs, and onboards it to the target network.
+using `Docker Compose <https://docs.docker.com/compose/>`_. The deployment consists of the validator node along with associated
+wallet and CNS UIs, and onboards the validator node to the target network.
 
 This deployment is useful for:
 
-- Application development, where one needs an ephemeral validator that is easy to deploy
+- Application development, where one needs an ephemeral validator that is easy to deploy.
 
 - Production validators, with the following caveats:
 
   - The default deployment is highly insecure. Authentication should be enabled as described in :ref:`the authentication section <compose_validator_auth>`.
 
-  - There is no support for ingress from outside your machine, nor tls. The deployment should be kept local to your machine only and not exposed externally.
+  - There is no support for ingress from outside your machine, nor is there support for TLS.
+    The deployment should be kept local to your machine only and not exposed externally.
 
   - Reliability & scalability: docker-compose will restart containers that crash, and the deployment supports backup&restore as detailed below, but a
     docker-compose deployment is inherently more limited than a cloud-based Kubernetes one.
@@ -101,9 +102,9 @@ Deployment
   ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
      This must be of format `<organization>-<function>-<enumerator>`, e.g. `myCompany-myWallet-1`.
 
-Note that the validator may be stopped with the command `./stop.sh` and restarted again with the same `start`
+Note that the validator may be stopped with the command ``./stop.sh`` and restarted again with the same ``start.sh``
 command as above. Its data will be retained between invocations. In subseqent invocations, the secret itself may be
-left empty, but the `-o` is still mandatory, so a `-o ""` argument should be provided.
+left empty, but the ``-o`` is still mandatory, so a ``-o ""`` argument should be provided.
 
 Logging into the wallet UI
 ++++++++++++++++++++++++++
@@ -114,7 +115,10 @@ you should see the wallet of the administrator of your wallet.
 
 You can also logout of the administrator account and login as any other username. The first time a
 user logs in, they will be prompted with a message asking them to confirm whether they wish to be
-onboarded.
+onboarded to the validator node.
+
+.. todo:: link to section that explains what this onbarding means
+
 
 Logging into the CNS UI
 +++++++++++++++++++++++
@@ -139,8 +143,8 @@ Please refer to the :ref:`authentication section <helm-validator-auth-requiremen
 to set up an OAuth provider for your validator. The URLs to configure for callbacks are
 ``http://wallet.localhost`` and ``http://ans.localhost``.
 
-To configure the OAuth provider, you will need to set the following environment variables in the
-``.env`` file:
+Once you have set up your OAuth provider,
+you need to configure it by seting the following environment variables in the ``.env`` file:
 
 ============================= ===========================================================================
 Name                          Value
@@ -159,7 +163,7 @@ ANS_UI_CLIENT_ID              The client id of the OAuth app for the CNS UI.
 ============================= ===========================================================================
 
 If you have already deployed a validator on your machine, you will first need to irrecoverably destroy
-it and wipe its data, as that cannot be migrated to an authenticated validator.
+it and wipe its data, as that cannot be migrated to an authenticated validator on the same machine.
 To do that, first stop the validator with `./stop.sh` and wipe out all its data with
 `docker volume rm compose_postgres-splice`. You can now deploy a new validator with the
 new configuration. In order to enable auth in the deployment, add the `-a` flag to the `start.sh`
