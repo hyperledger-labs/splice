@@ -2540,7 +2540,9 @@ jobs:
           cmd_name: Wait for SV app to be responsive
           cmd: |
             succes=0
-            for i in {1..30}; do
+            # Wait up to 30 minutes for the sv app to be ready
+            # (we're starting this job in parallel with the initial deployment)
+            for i in {1..180}; do
               if curl -m 10 -sfL https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/version; then
                 success=1
                 break
@@ -6133,7 +6135,9 @@ workflows:
           cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
           requires:
-            - deploy_cluster_for_migration
+            - artifacts_push
+            - autoscaler_prevent_scaledown
+            - reset_before_deploy
       - prepare_cluster_for_migration:
           context:
             - artifactory

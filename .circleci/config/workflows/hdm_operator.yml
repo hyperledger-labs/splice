@@ -57,7 +57,9 @@ workflow:
           cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
           requires:
-            - deploy_cluster_for_migration
+            - artifacts_push
+            - autoscaler_prevent_scaledown
+            - reset_before_deploy
       - prepare_cluster_for_migration:
           context:
             - artifactory
