@@ -7,7 +7,7 @@ pulumiProjectConfig:
     allowedArtifactories:
       - "public"
       - "private"
-scratcvalidator1:
+validator1:
   participantPruningSchedule:
     cron: "0 /10 * * * ?" # Run every 10min
     maxDuration: "5m"

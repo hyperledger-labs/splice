@@ -575,9 +575,9 @@ function subcmd_pulumi_cancel_canton() {
   _pulumi_automation_run_cancel "sv-canton"
 }
 
-subcommand_whitelist[pulumi_refresh_canton]="Refresh stacks managed through automation"
+subcommand_whitelist[pulumi_refresh_automation]="Refresh stacks managed through automation"
 
-function subcmd_pulumi_refresh_canton() {
-  _info "Canceling sv-canton stacks"
+function subcmd_pulumi_refresh_automation() {
+  _info "Refreshing stacks"
   _pulumi_automation_run_refresh
 }
