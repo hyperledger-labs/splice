@@ -113,21 +113,17 @@ interface TransferInstruction where
 
 -- | The status of a transfer instruction.
 data TransferInstructionStatus
-  = TIS_PendingPreparatoryAction with
-      actions : Map.Map Party Text
-        -- ^ The actions that different actors can or should take to advance the preparation of the transfer.
-    -- ^ The transfer instruction is pending actions by some actors on
-    -- registry-internal workflows. This status can be used to report on the
-    -- status of registry specific worklows that are required to prepare the
-    -- transfer (e.g., confirmation of OFAC checks).
+  = TIS_PendingPreparatoryAction PendingPreparatoryAction
+  deriving (Show, Eq)
 
-  -- TODO(#117): remove this status to avoid using the ACS for notifications.
-  | TIS_Failed with
-      reason : Text
-        -- ^ Human-readable explanation of why the transfer instruction failed.
-    -- ^ The transfer instruction failed definitely with the specified reason.
-    -- This status can for example be used by registries to signal that the specific transfer
-    -- requested violates the rules of the registry.
+data PendingPreparatoryAction = PendingPreparatoryAction
+  with
+    actions : Map.Map Party Text
+      -- ^ The actions that different actors can or should take to advance the preparation of the transfer.
+      -- ^ The transfer instruction is pending actions by some actors on
+      -- registry-internal workflows. This status can be used to report on the
+      -- status of registry specific worklows that are required to prepare the
+      -- transfer (e.g., confirmation of OFAC checks).
   deriving (Show, Eq)
 
 -- | View for `TransferInstruction`.
