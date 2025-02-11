@@ -292,7 +292,7 @@ The following kubernetes secret will instruct the participant to create a servic
         "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
-        "--from-literal=client-secret=${SV_CLIENT_SECRET}"
+        "--from-literal=client-secret=${SV_CLIENT_SECRET}" \
         "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 The validator app backend requires the following secret.
@@ -303,7 +303,7 @@ The validator app backend requires the following secret.
         "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
-        "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
+        "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}" \
         "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 To setup the wallet, CNS and SV UI, create the following two secrets.

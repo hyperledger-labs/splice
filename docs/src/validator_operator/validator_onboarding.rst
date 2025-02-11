@@ -58,8 +58,8 @@ Onboarding a Validator involves the following steps (for each network you want t
    can do this yourself through an API call
    (refer to :ref:`Deployment instructions <validator_operator>` for details).
    On TestNet and MainNet your SV sponsor needs to provide you with this manually.
-   Note that onboarding secrets are only valid for 24h and are one-time use. If it expired,
-   you need to request a new one.
+   Note that onboarding secrets are only valid for 48 hours and are one-time use, and self-generated
+   DevNet secrets are only valid for 1 hour. If it expired, you need to request a new one.
 5. Deploy your node either using docker compose or Kubernetes. Refer
    to the :ref:`Deployment Options <validator_operator>` for
    information on how to choose between them and references to each of
