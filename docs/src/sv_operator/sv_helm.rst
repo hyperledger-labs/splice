@@ -496,13 +496,11 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Replace ``YOUR_NODE_NAME`` with the name you chose when creating the SV identity.
-- For the initial onboarding of your node, set ``disableAutoInit`` to ``false``.
 
 Please modify the file ``splice-node/examples/sv-helm/global-domain-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity.
-- For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
 Please modify the file ``splice-node/examples/sv-helm/scan-values.yaml`` as follows:
 

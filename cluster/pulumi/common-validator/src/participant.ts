@@ -3,7 +3,6 @@ import { Output } from '@pulumi/pulumi';
 import {
   Auth0Config,
   auth0UserNameEnvVarSource,
-  autoInitValues,
   ChartValues,
   DEFAULT_AUDIENCE,
   activeVersion,
@@ -88,7 +87,6 @@ export function installParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
-      ...autoInitValues('splice-participant', version, nodeIdentifier),
     },
     version,
     {
