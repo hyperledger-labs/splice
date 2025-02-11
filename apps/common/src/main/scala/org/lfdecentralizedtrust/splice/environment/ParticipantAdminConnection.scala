@@ -75,7 +75,7 @@ class ParticipantAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-)(implicit ec: ExecutionContextExecutor, tracer: Tracer)
+)(implicit protected val ec: ExecutionContextExecutor, tracer: Tracer)
     extends TopologyAdminConnection(
       config,
       apiLoggingConfig,
@@ -373,23 +373,29 @@ class ParticipantAdminConnection(
   def modifyDomainConnectionConfig(
       domain: DomainAlias,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
-  )(implicit traceContext: TraceContext): Future[Boolean] =
-    for {
-      oldConfig <- getDomainConnectionConfig(domain)
-      newConfig = f(oldConfig)
-      configModified <- newConfig match {
-        case None =>
-          logger.trace("No update to domain connection config required")
-          Future.successful(false)
-        case Some(config) =>
-          logger.info(
-            s"Updating to new domain connection config for domain $domain. Old config: $oldConfig, new config: $config"
-          )
-          for {
-            _ <- setDomainConnectionConfig(config)
-          } yield true
-      }
-    } yield configModified
+  )(implicit traceContext: TraceContext): Future[Boolean] = {
+    retryProvider.retryForClientCalls(
+      "modify_domain_connection",
+      "Set the new domain connection if required",
+      for {
+        oldConfig <- getDomainConnectionConfig(domain)
+        newConfig = f(oldConfig)
+        configModified <- newConfig match {
+          case None =>
+            logger.trace("No update to domain connection config required")
+            Future.successful(false)
+          case Some(config) =>
+            logger.info(
+              s"Updating to new domain connection config for domain $domain. Old config: $oldConfig, new config: $config"
+            )
+            for {
+              _ <- setDomainConnectionConfig(config)
+            } yield true
+        }
+      } yield configModified,
+      logger,
+    )
+  }
 
   private def modifyOrRegisterDomainConnectionConfig(
       config: DomainConnectionConfig,
