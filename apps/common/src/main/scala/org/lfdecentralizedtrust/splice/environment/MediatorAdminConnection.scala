@@ -60,7 +60,8 @@ class MediatorAdminConnection(
       MediatorAdministrationCommands.Initialize(
         domainId,
         SequencerConnections.single(sequencerConnection),
-        SequencerConnectionValidation.All,
+        // TODO(#10985) Consider enabling this.
+        SequencerConnectionValidation.Disabled,
       )
     )
 
