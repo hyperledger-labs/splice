@@ -623,7 +623,7 @@ Current Canton commit: `7613b111d4d2a6d60b9ef59d204781b99774094c`
       The exclusion is because those files are under a symlink and we don’t want to change them twice.
    4. Create a commit to ease review, `git add canton/ && git commit -m"Undo our changes" --no-verify`
 3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.1
-   1. Learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.   
+   1. Learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
 5. Execute the following steps in your Canton Network Node repo:
    1. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
    2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit" --no-verify`
@@ -1132,11 +1132,12 @@ Check the `--help` for more options.
 
 To test a full hard migration flow, you need to run the custom hard migration workflow in CI. To do so, trigger a CI pipeline on the branch you want to test with the following variables:
 
-- `run-job`: `deploy-hard-migration`
+- `run-job`: `deploy-hdm-operator`
 - `cluster`: the scratch you want to use, eg: `scratchneta`
-- `base-version`: the version from which to upgrade, ideally the latest available release, eg: `0.1.15`
+- `base-version`: the Git reference from which to upgrade; for testing what is currently being run on `ciperiodic`, use the output of `build-tools/find_latest_hard_migration_base_version.sh`
 
 The workflow will deploy everything required for the `base-version`, run the preflights, prepare and execute a hard migration to the artifacts built from the branch, and run the preflights again to ensure the migration was successful.
+All that using the Pulumi operator, just like on `ciperiodic` and our long-running clusters.
 
 In case you want to test an upgrade to a specific (snapshot) release that is different from the latest state on your branch, you can pick this release via the optional `upgrade-version` parameter.
 
