@@ -42,11 +42,28 @@ Requirements
 
 1) A linux/MacOS machine with the following:
 
-   a. ``docker`` - at least version 2.26.0 for Docker Engine, or an up-to-date version of Docker Desktop.
-   b. ``curl``
-   c. ``jq``
+   a. `docker compose <https://docs.docker.com/compose/install/>`__ - at least version 2.26.0 or newer
+   b. `curl <https://curl.se/>`__
+   c. `jq <https://jqlang.org/>`__
 
    Note that both AMD64 and ARM64 architectures are supported.
+
+To validate that the dependencies are set up correctly, run the
+following commands. All commands should succeed and print out the
+version. Note that the exact versions you see may be different from
+the example here. As long as you have docker-compose 2.0 or newer you should be fine.
+
+.. code-block:: bash
+
+   > docker compose version
+   Docker Compose version 2.32.1
+   > curl --version
+   curl 8.11.0 (x86_64-pc-linux-gnu) libcurl/8.11.0 OpenSSL/3.3.2 zlib/1.3.1 brotli/1.1.0 zstd/1.5.6 libidn2/2.3.7 libpsl/0.21.5 libssh2/1.11.1 nghttp2/1.64.0
+   Release-Date: 2024-11-06
+   Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns mqtt pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp
+   Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe TLS-SRP UnixSockets zstd
+   > jq --version
+   jq-1.7.1
 
 2) Your machine should either be connected to a VPN that is whitelisted on the network
    (contact your sponsor SV to obtain access), or have a static egress IP address.
