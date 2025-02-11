@@ -103,3 +103,17 @@ the validator top-up config.
 .. code:: bash
 
     Insufficient funds to buy configured traffic amount. Please ensure that the validator’s wallet has enough amulets to purchase 1.9998 MB of traffic to continue healthy operation.
+
+Gave up getting app version
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A log of the form below can often indicate that you used a scan URL in
+a place where an SV URL was expected or the other way around. Note the
+mismatch between the prefix ``https://scan.`` and the path ``/api/sv``
+at the end.
+
+In a docker-compose setup, verify the URL passed to ``-s`` which should be a SV URL or ``svSponsorAddress`` for the helm deployment.
+
+.. code:: bash
+
+    2025-02-11T10:16:13.098Z [⋮] ERROR - o.l.s.v.ValidatorSvConnection:validator=validator_backend (7427be2620676fce8a464eee769eb1d8-app_version-2d71c55f5ecd731b-793d382fa2d6ce14) - Gave up getting 'app version of https://scan.sv-2.dev.global.canton.network.digitalasset.com/api/sv' org.apache.pekko.http.scaladsl.unmarshalling.Unmarshaller$UnsupportedContentTypeException: Unsupported Content-Type [Some(text/html)], supported: application/json
