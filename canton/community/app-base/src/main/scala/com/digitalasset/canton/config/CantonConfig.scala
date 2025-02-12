@@ -58,7 +58,6 @@ import com.digitalasset.canton.platform.apiserver.configuration.{
   RateLimitingConfig,
 }
 import com.digitalasset.canton.platform.config.InteractiveSubmissionServiceConfig
-import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig
 import com.digitalasset.canton.pureconfigutils.SharedConfigReaders.catchConvertError
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -71,27 +70,29 @@ import com.digitalasset.canton.synchronizer.mediator.{
   MediatorPruningConfig,
   RemoteMediatorConfig,
 }
-import com.digitalasset.canton.synchronizer.sequencing.config.{
+import com.digitalasset.canton.synchronizer.sequencer.*
+import com.digitalasset.canton.synchronizer.sequencer.block.DriverBlockSequencerFactory
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.{
+  BftBlockOrderer,
+  BftSequencerFactory,
+}
+import com.digitalasset.canton.synchronizer.sequencer.config.{
   RemoteSequencerConfig,
   SequencerNodeConfigCommon,
   SequencerNodeInitConfig,
   SequencerNodeParameterConfig,
   SequencerNodeParameters,
 }
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.*
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.block.DriverBlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.block.bftordering.core.driver.{
-  BftBlockOrderer,
-  BftSequencerFactory,
-}
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.traffic.SequencerTrafficConfig
+import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.tracing.TracingConfig
+import com.digitalasset.canton.util.BytesUnit
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import com.typesafe.config.{
   Config,
   ConfigException,
   ConfigFactory,
   ConfigList,
+  ConfigMemorySize,
   ConfigObject,
   ConfigRenderOptions,
   ConfigValue,
@@ -190,13 +191,12 @@ object ClockConfig {
 
   /** Configure Canton to use the wall clock (default)
     *
-    * @param skew    maximum simulated clock skew (0)
-    *                If positive, Canton nodes will use a WallClock, but the time of the wall clocks
-    *                will be shifted by a random number. The clocks will never move backwards.
+    * @param skews   map of clock skews, indexed by node name (used for testing, default empty)
+    *                Any node whose name is contained in the map will use a WallClock, but
+    *                the time of the clock will by shifted by the associated duration, which can be positive
+    *                or negative. The clock shift will be constant during the life of the node.
     */
-  final case class WallClock(
-      skew: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(0)
-  ) extends ClockConfig
+  final case class WallClock(skews: Map[String, FiniteDuration] = Map.empty) extends ClockConfig
 
   /** Configure Canton to use a remote clock
     *
@@ -228,8 +228,8 @@ final case class RetentionPeriodDefaults(
   * @param startupParallelism Start up to N nodes in parallel (default is num-threads)
   * @param nonStandardConfig don't fail config validation on non-standard configuration settings
   * @param sessionSigningKeys Configure the use of session signing keys in the protocol
-  * @param alphaVersionSupport If true, allow synchronizer nodes to use alpha protocol versions and participant nodes to connect to such domains
-  * @param betaVersionSupport If true, allow synchronizer nodes to use beta protocol versions and participant nodes to connect to such domains
+  * @param alphaVersionSupport If true, allow synchronizer nodes to use alpha protocol versions and participant nodes to connect to such synchronizers
+  * @param betaVersionSupport If true, allow synchronizer nodes to use beta protocol versions and participant nodes to connect to such synchronizers
   * @param timeouts Sets the timeouts used for processing and console
   * @param portsFile A ports file name, where the ports of all participants will be written to after startup
   * @param exitOnFatalFailures If true the node will exit/stop the process in case of fatal failures
@@ -777,6 +777,8 @@ object CantonConfig {
     lazy implicit final val communityNewDatabaseSequencerWriterConfigReader
         : ConfigReader[SequencerWriterConfig] =
       deriveReader[SequencerWriterConfig]
+    lazy implicit final val bytesUnitReader: ConfigReader[BytesUnit] =
+      BasicReaders.configMemorySizeReader.map(cms => BytesUnit(cms.toBytes))
     lazy implicit final val communityNewDatabaseSequencerWriterConfigHighThroughputReader
         : ConfigReader[SequencerWriterConfig.HighThroughput] =
       deriveReader[SequencerWriterConfig.HighThroughput]
@@ -851,9 +853,6 @@ object CantonConfig {
     lazy implicit final val remoteMediatorConfigReader: ConfigReader[RemoteMediatorConfig] =
       deriveReader[RemoteMediatorConfig]
 
-    lazy implicit final val acsCommitmentsCatchUpConfigReader
-        : ConfigReader[AcsCommitmentsCatchUpConfig] =
-      deriveReader[AcsCommitmentsCatchUpConfig]
     lazy implicit final val sequencerTrafficConfigReader: ConfigReader[SequencerTrafficConfig] =
       deriveReader[SequencerTrafficConfig]
 
@@ -936,12 +935,15 @@ object CantonConfig {
       deriveReader[MonitoringConfig]
     }
 
+    import Crypto.*
     lazy implicit final val sessionSigningKeysConfigReader: ConfigReader[SessionSigningKeysConfig] =
       deriveReader[SessionSigningKeysConfig]
 
     lazy implicit final val cachingConfigsReader: ConfigReader[CachingConfigs] = {
       implicit val cacheConfigWithTimeoutReader: ConfigReader[CacheConfigWithTimeout] =
         deriveReader[CacheConfigWithTimeout]
+      implicit val cacheConfigWithMemoryBoundsReader: ConfigReader[CacheConfigWithMemoryBounds] =
+        deriveReader[CacheConfigWithMemoryBounds]
 
       implicit val sessionEncryptionKeyCacheConfigReader
           : ConfigReader[SessionEncryptionKeyCacheConfig] =
@@ -1285,6 +1287,10 @@ object CantonConfig {
     lazy implicit final val communityDatabaseSequencerWriterConfigWriter
         : ConfigWriter[SequencerWriterConfig] =
       deriveWriter[SequencerWriterConfig]
+    lazy implicit final val bytesUnitWriter: ConfigWriter[BytesUnit] =
+      BasicWriters.configMemorySizeWriter.contramap[BytesUnit](b =>
+        ConfigMemorySize.ofBytes(b.bytes)
+      )
     lazy implicit final val communityDatabaseSequencerWriterConfigHighThroughputWriter
         : ConfigWriter[SequencerWriterConfig.HighThroughput] =
       deriveWriter[SequencerWriterConfig.HighThroughput]
@@ -1363,9 +1369,6 @@ object CantonConfig {
       deriveWriter[MediatorNodeParameterConfig]
     lazy implicit final val remoteMediatorConfigWriter: ConfigWriter[RemoteMediatorConfig] =
       deriveWriter[RemoteMediatorConfig]
-    lazy implicit final val acsCommitmentsCatchUpConfigWriter
-        : ConfigWriter[AcsCommitmentsCatchUpConfig] =
-      deriveWriter[AcsCommitmentsCatchUpConfig]
 
     lazy implicit final val monitoringConfigWriter: ConfigWriter[MonitoringConfig] = {
       implicit val tracingConfigDisabledSpanExporterWriter
@@ -1443,6 +1446,7 @@ object CantonConfig {
       deriveWriter[MonitoringConfig]
     }
 
+    import Crypto.*
     lazy implicit final val sessionSigningKeysConfigWriter: ConfigWriter[SessionSigningKeysConfig] =
       deriveWriter[SessionSigningKeysConfig]
 
@@ -1451,6 +1455,8 @@ object CantonConfig {
         deriveWriter[CacheConfig]
       implicit val cacheConfigWithTimeoutWriter: ConfigWriter[CacheConfigWithTimeout] =
         deriveWriter[CacheConfigWithTimeout]
+      implicit val cacheConfigWithMemoryBoundsWriter: ConfigWriter[CacheConfigWithMemoryBounds] =
+        deriveWriter[CacheConfigWithMemoryBounds]
       implicit val sessionEncryptionKeyCacheConfigWriter
           : ConfigWriter[SessionEncryptionKeyCacheConfig] =
         deriveWriter[SessionEncryptionKeyCacheConfig]

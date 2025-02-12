@@ -99,4 +99,6 @@ object HashPurpose {
   val OnlinePartyReplicationId = HashPurpose(50, "OnlinePartyReplication")
   val PartyUpdateId = HashPurpose(51, "PartyUpdateId")
   val BftSignedConsensusMessage = HashPurpose(52, "BftSignedConsensusMessage")
+  val BftSignedStateTransferMessage = HashPurpose(53, "BftSignedStateTransferMessage")
+  val BftSignedRetransmissionMessage = HashPurpose(54, "BftSignedRetransmissionMessage")
 }

@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.protocol
 
-import com.digitalasset.canton
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -41,8 +40,7 @@ final case class DynamicSequencingParameters(payload: Option[ByteString])(
     )
 }
 
-object DynamicSequencingParameters
-    extends HasProtocolVersionedCompanion[DynamicSequencingParameters] {
+object DynamicSequencingParameters extends VersioningCompanion[DynamicSequencingParameters] {
 
   def default(
       representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -51,16 +49,14 @@ object DynamicSequencingParameters
   ): DynamicSequencingParameters =
     DynamicSequencingParameters(None)(representativeProtocolVersion)
 
-  override val supportedProtoVersions
-      : canton.protocol.DynamicSequencingParameters.SupportedProtoVersions =
-    SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v33)(
-        v30.DynamicSequencingParameters
-      )(
-        supportedProtoVersion(_)(fromProtoV30),
-        _.toProtoV30,
-      )
+  override val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+      v30.DynamicSequencingParameters
+    )(
+      supportedProtoVersion(_)(fromProtoV30),
+      _.toProtoV30,
     )
+  )
 
   override def name: String = "dynamic sequencing parameters"
 

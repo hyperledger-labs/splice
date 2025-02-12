@@ -6,7 +6,7 @@ package com.digitalasset.canton.participant.protocol.reassignment
 import cats.data.EitherT
 import cats.syntax.foldable.*
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi}
+import com.digitalasset.canton.crypto.{HashPurpose, SigningKeyUsage, SyncCryptoApi}
 import com.digitalasset.canton.data.{CantonTimestamp, FullUnassignmentTree}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.protocol.reassignment.DeliveredUnassignmentResultValidation.{
@@ -160,7 +160,7 @@ private[reassignment] final case class DeliveredUnassignmentResultValidation(
       )
 
       _ <- sourceTopology.unwrap
-        .unsafePartialVerifySequencerSignatures(hash, signatures)
+        .unsafePartialVerifySequencerSignatures(hash, signatures, SigningKeyUsage.ProtocolOnly)
         .leftMap[Error](err => IncorrectSignatures("sequencers", err.show))
     } yield ()
 }
@@ -188,7 +188,7 @@ object DeliveredUnassignmentResultValidation {
       expected: SynchronizerId,
       found: SynchronizerId,
   ) extends Error {
-    override def error: String = s"Incorrect domain: found $found but expected $expected"
+    override def error: String = s"Incorrect synchronizer: found $found but expected $expected"
   }
 
   final case class IncorrectInformees(

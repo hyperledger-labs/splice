@@ -4,7 +4,8 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data as javaApi
+import com.daml.ledger.javaapi.{data, data as javaApi}
+import com.daml.ledger.javaapi.data.TransactionTree
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -13,6 +14,7 @@ import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
@@ -53,7 +55,7 @@ sealed trait ScanHttpEncodings {
               tree.getEventsById.asScala.map { case (nodeId, treeEvent) =>
                 val eventId = eventIdBuilder(tree.getUpdateId, nodeId)
                 eventId -> javaToHttpEvent(
-                  tree.getUpdateId,
+                  tree,
                   eventId,
                   treeEvent,
                   eventIdBuilder,
@@ -119,7 +121,7 @@ sealed trait ScanHttpEncodings {
   }
 
   private def javaToHttpEvent(
-      updateId: String,
+      tree: TransactionTree,
       eventId: String,
       treeEvent: javaApi.TreeEvent,
       eventIdBuild: (String, Int) => String,
@@ -142,9 +144,11 @@ sealed trait ScanHttpEncodings {
               event.getPackageName,
               event.getChoice,
               encodeChoiceArgument(event),
-              event.getChildNodeIds.asScala
+              tree
+                .getChildNodeIds(event)
+                .asScala
                 .map(
-                  eventIdBuild(updateId, _)
+                  eventIdBuild(tree.getUpdateId, _)
                 )
                 .toVector,
               encodeExerciseResult(event),
@@ -187,7 +191,17 @@ sealed trait ScanHttpEncodings {
       httpToLapiReassignment(httpReassignment)
   }
 
-  def httpToLapiTransaction(http: httpApi.UpdateHistoryTransaction): TreeUpdateWithMigrationId =
+  private def httpToLapiTransaction(
+      http: httpApi.UpdateHistoryTransaction
+  ): TreeUpdateWithMigrationId = {
+    val nodesWithChildren = http.eventsById.map {
+      case (eventId, _: members.CreatedEvent) =>
+        EventId.nodeIdFromEventId(eventId) -> Seq.empty
+      case (eventId, exercise: members.ExercisedEvent) =>
+        EventId.nodeIdFromEventId(eventId) -> exercise.value.childEventIds.map(
+          EventId.nodeIdFromEventId
+        )
+    }
     TreeUpdateWithMigrationId(
       ledgerApi.LedgerClient.GetTreeUpdatesResponse(
         update = ledgerApi.TransactionTreeUpdate(
@@ -199,16 +213,10 @@ sealed trait ScanHttpEncodings {
             LegacyOffset.Api.assertFromStringToLong(http.offset),
             http.eventsById.map { case (eventId, treeEventHttp) =>
               Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
-                treeEventHttp
+                nodesWithChildren,
+                treeEventHttp,
               )
             }.asJava,
-            http.rootEventIds
-              .map(id =>
-                Integer.valueOf(
-                  EventId.nodeIdFromEventId(id)
-                )
-              )
-              .asJava,
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
@@ -218,6 +226,7 @@ sealed trait ScanHttpEncodings {
       ),
       http.migrationId,
     )
+  }
 
   def httpToLapiReassignment(http: httpApi.UpdateHistoryReassignment): TreeUpdateWithMigrationId =
     http.event match {
@@ -268,13 +277,16 @@ sealed trait ScanHttpEncodings {
         )
     }
 
-  def httpToJavaEvent(http: httpApi.TreeEvent): javaApi.TreeEvent = http match {
+  private def httpToJavaEvent(
+      nodesWithChildren: Map[Int, Seq[Int]],
+      http: httpApi.TreeEvent,
+  ): javaApi.TreeEvent = http match {
     case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
     case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
-      httpToJavaExercisedEvent(exercisedHttp)
+      httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
   }
 
-  def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
+  private def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
     val templateId = parseTemplateId(http.templateId)
     new javaApi.CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
@@ -294,12 +306,16 @@ sealed trait ScanHttpEncodings {
     )
   }
 
-  def httpToJavaExercisedEvent(http: httpApi.ExercisedEvent): javaApi.ExercisedEvent = {
+  private def httpToJavaExercisedEvent(
+      nodesWithChildren: Map[Int, Seq[Int]],
+      http: httpApi.ExercisedEvent,
+  ): javaApi.ExercisedEvent = {
     val templateId = parseTemplateId(http.templateId)
+    val nodeId = EventId.nodeIdFromEventId(http.eventId)
     new javaApi.ExercisedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
       /*offset = */ 0, // not populated
-      /*nodeId = */ EventId.nodeIdFromEventId(http.eventId),
+      /*nodeId = */ nodeId,
       templateId,
       http.packageName,
       http.interfaceId.map(parseTemplateId(_)).toJava,
@@ -308,7 +324,10 @@ sealed trait ScanHttpEncodings {
       decodeChoiceArgument(templateId, http.choice, http.choiceArgument),
       http.actingParties.asJava,
       http.consuming,
-      http.childEventIds.map(EventId.nodeIdFromEventId).map(Integer.valueOf).asJava,
+      EventId.lastDescendedNodeFromChildNodeIds(
+        nodeId,
+        nodesWithChildren,
+      ),
       decodeExerciseResult(templateId, http.choice, http.exerciseResult),
     )
   }
@@ -383,14 +402,14 @@ sealed trait ScanHttpEncodings {
 
 object ScanHttpEncodings {
 
-  sealed trait Version
-  case object V0 extends Version
-  case object V1 extends Version
+  sealed trait ApiVersion
+  case object V0 extends ApiVersion
+  case object V1 extends ApiVersion
 
   def encodeUpdate(
       update: TreeUpdateWithMigrationId,
       encoding: definitions.DamlValueEncoding,
-      version: Version,
+      version: ApiVersion,
   )(implicit
       elc: ErrorLoggingContext
   ): definitions.UpdateHistoryItem = {
@@ -488,7 +507,16 @@ object ScanHttpEncodings {
   ): javaApi.TransactionTree = {
     val mapping = Trees
       .getLocalEventIndices(tree)
-
+    val nodesWithChildren = tree.getEventsById.asScala.map {
+      case (nodeId, exercised: data.ExercisedEvent) =>
+        mapping(nodeId.intValue()) -> tree
+          .getChildNodeIds(exercised)
+          .asScala
+          .toSeq
+          .map(_.intValue())
+          .map(mapping)
+      case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
+    }
     val eventsById = tree.getEventsById.asScala.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
@@ -508,10 +536,11 @@ object ScanHttpEncodings {
           created.createdAt,
         )
       case (nodeId, exercised: javaApi.ExercisedEvent) =>
+        val newNodeId = mapping(exercised.getNodeId)
         mapping(nodeId) -> new javaApi.ExercisedEvent(
           exercised.getWitnessParties,
           exercised.getOffset,
-          mapping(exercised.getNodeId),
+          newNodeId,
           exercised.getTemplateId,
           exercised.getPackageName,
           exercised.getInterfaceId,
@@ -520,12 +549,14 @@ object ScanHttpEncodings {
           exercised.getChoiceArgument,
           exercised.getActingParties,
           exercised.isConsuming,
-          exercised.getChildNodeIds.asScala.map(id => Integer.valueOf(mapping(id))).asJava,
+          EventId.lastDescendedNodeFromChildNodeIds(
+            newNodeId,
+            nodesWithChildren.toMap,
+          ),
           exercised.getExerciseResult,
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
-    val rootEventIds = tree.getRootNodeIds.asScala.map(mapping(_))
 
     new javaApi.TransactionTree(
       tree.getUpdateId,
@@ -536,7 +567,6 @@ object ScanHttpEncodings {
       eventsById.map { case (key, value) =>
         Integer.valueOf(key) -> value
       }.asJava,
-      rootEventIds.map(Integer.valueOf).asJava,
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,

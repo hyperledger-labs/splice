@@ -32,7 +32,7 @@ object Trees {
           state = onCreate(state, created, pathToNode)
         case exercised: ExercisedEvent =>
           state = onExercise(state, exercised, pathToNode)
-          val children = exercised.getChildNodeIds.asScala.map(tree.getEventsById.get(_))
+          val children = tree.getChildNodeIds(exercised).asScala.map(tree.getEventsById.get(_))
           stack.pushAll(children.map((_, pathToNode :+ node)).reverse)
         case _ =>
       }
@@ -59,7 +59,7 @@ object Trees {
               makeEventIdToNumber(tail, acc + (created.getNodeId.intValue() -> acc.size))
             case exercised: ExercisedEvent =>
               makeEventIdToNumber(
-                exercised.getChildNodeIds.asScala.map(eventsById).toList ++ tail,
+                tree.getChildNodeIds(exercised).asScala.map(eventsById).toList ++ tail,
                 acc + (exercised.getNodeId.intValue() -> acc.size),
               )
             case _ => sys.error(s"Unexpected event type: $head")

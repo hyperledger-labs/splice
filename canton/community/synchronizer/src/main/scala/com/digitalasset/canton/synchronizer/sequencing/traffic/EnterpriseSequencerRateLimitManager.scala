@@ -14,7 +14,7 @@ import com.digitalasset.canton.crypto.{
   Signature,
   SyncCryptoApi,
   SyncCryptoClient,
-  SynchronizerSyncCryptoClient,
+  SynchronizerCryptoClient,
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
@@ -32,8 +32,8 @@ import com.digitalasset.canton.sequencing.traffic.EventCostCalculator.EventCostD
 import com.digitalasset.canton.sequencing.traffic.TrafficConsumedManager.NotEnoughTraffic
 import com.digitalasset.canton.sequencing.{GroupAddressResolver, TrafficControlParameters}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.traffic.SequencerRateLimitError.SequencingCostValidationError
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.traffic.{
+import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitError.SequencingCostValidationError
+import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerRateLimitError,
   SequencerRateLimitManager,
   SequencerTrafficConfig,
@@ -56,7 +56,7 @@ class EnterpriseSequencerRateLimitManager(
     override protected val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
     metrics: SequencerMetrics,
-    synchronizerSyncCryptoApi: SynchronizerSyncCryptoClient,
+    synchronizerSyncCryptoApi: SynchronizerCryptoClient,
     protocolVersion: ProtocolVersion,
     trafficConfig: SequencerTrafficConfig,
     sequencerMemberRateLimiterFactory: TrafficConsumedManagerFactory =

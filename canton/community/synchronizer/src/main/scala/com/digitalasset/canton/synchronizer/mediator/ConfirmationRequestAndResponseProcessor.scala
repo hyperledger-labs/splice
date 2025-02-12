@@ -13,8 +13,9 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{
+  SigningKeyUsage,
+  SynchronizerCryptoClient,
   SynchronizerSnapshotSyncCryptoApi,
-  SynchronizerSyncCryptoClient,
 }
 import com.digitalasset.canton.data.{CantonTimestamp, ViewConfirmationParameters, ViewType}
 import com.digitalasset.canton.error.MediatorError
@@ -47,7 +48,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     synchronizerId: SynchronizerId,
     private val mediatorId: MediatorId,
     verdictSender: VerdictSender,
-    crypto: SynchronizerSyncCryptoClient,
+    crypto: SynchronizerCryptoClient,
     timeTracker: SynchronizerTimeTracker,
     val mediatorState: MediatorState,
     protocolVersion: ProtocolVersion,
@@ -242,6 +243,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
                 for {
                   aggregation <- aggregationF
+
                   _ <- mediatorState.add(aggregation)
                 } yield {
                   timeTracker.requestTick(participantResponseDeadline)
@@ -314,6 +316,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           request.rootHash.unwrap,
           request.submittingParticipant,
           request.submittingParticipantSignature,
+          SigningKeyUsage.ProtocolOnly,
         )
         .leftMap { err =>
           val reject = MediatorError.MalformedMessage.Reject(
@@ -808,10 +811,9 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
           _ <- {
             if (
-              // Note: This check relies on mediator trusting its sequencer
-              // and the sequencer performing validation `checkToAtMostOneMediator`
-              // in the `BlockUpdateGenerator`
-              recipients.allRecipients.sizeCompare(1) == 0 &&
+              // Check that this message was sent to all mediators in the group.
+              // Ignore other recipients of the response so that this check does not rely any recipients restrictions
+              // that are enforced in the sequencer.
               recipients.allRecipients.contains(responseAggregation.request.mediator)
             ) {
               OptionT.some[FutureUnlessShutdown](())

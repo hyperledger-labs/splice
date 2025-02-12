@@ -505,6 +505,7 @@ object BaseTest {
     requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
     requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
     requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
+    requiredSignatureFormats = SymbolicCryptoProvider.supportedSignatureFormats,
     protocolVersion = protocolVersion,
   )
 

@@ -18,6 +18,7 @@ export abstract class PackageIdResolver {
     }
     return `${parts[1]}:${parts[2]}`;
   }
+
   abstract resolveTemplateId(templateId: string): Promise<string>;
 
   async resolveTemplateOrInterface<T extends object, K>(
@@ -46,6 +47,7 @@ export class LedgerApiClient {
   private userId: string;
   private packageIdResolver: PackageIdResolver;
   private headers: Headers;
+
   constructor(
     jsonApiUrl: string,
     token: string,
@@ -59,6 +61,7 @@ export class LedgerApiClient {
     this.userId = userId;
     this.packageIdResolver = packageIdResolver;
   }
+
   async getPrimaryParty(): Promise<string> {
     const user = await callWithLogging(
       ANS_LEDGER_NAME,
@@ -81,6 +84,7 @@ export class LedgerApiClient {
     );
     return user.primaryParty!;
   }
+
   async exercise<T extends object, C, R, K>(
     actAs: string[],
     readAs: string[],
@@ -100,30 +104,30 @@ export class LedgerApiClient {
     );
     const command = {
       ExerciseCommand: {
-        template_id: choice.template().templateId,
-        contract_id: contractId,
+        templateId: choice.template().templateId,
+        contractId: contractId,
         choice: choice.choiceName,
-        choice_argument: choice.argumentEncode(argument),
+        choiceArgument: choice.argumentEncode(argument),
       },
     };
 
     const body = {
       commands: [command],
-      workflow_id: '',
-      application_id: '',
-      command_id: uuidv4(),
-      deduplication_period: { Empty: {} },
-      act_as: actAs,
-      read_as: readAs,
-      submission_id: '',
-      disclosed_contracts: disclosedContracts.map(c => ({
+      workflowId: '',
+      applicationId: '',
+      commandId: uuidv4(),
+      deduplicationPeriod: { Empty: {} },
+      actAs: actAs,
+      readAs: readAs,
+      submissionId: '',
+      disclosedContracts: disclosedContracts.map(c => ({
         contractId: c.contractId,
         createdEventBlob: c.createdEventBlob,
         synchronizerId: '',
         templateId: c.templateId,
       })),
-      synchronizer_id: domainId || '',
-      package_id_selection_preference: [],
+      synchronizerId: domainId || '',
+      packageIdSelectionPreference: [],
     };
 
     const describeChoice = `Exercised choice: actAs=${JSON.stringify(
@@ -150,10 +154,12 @@ export class LedgerApiClient {
         throw e;
       });
 
-    const tree = responseBody.transaction_tree;
-    const rootEvent = tree.events_by_id[tree.root_node_ids[0]];
+    const tree = responseBody.transactionTree;
+    const eventIds = Object.keys(tree.eventsById).map(Number);
+    const rootEventId = Math.min(...eventIds);
+    const rootEvent = tree.eventsById[rootEventId];
     const exerciseResult = choice.resultDecoder.runWithException(
-      rootEvent.ExercisedTreeEvent.exercise_result
+      rootEvent.ExercisedTreeEvent.exerciseResult
     );
     return exerciseResult;
   }

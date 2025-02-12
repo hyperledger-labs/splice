@@ -27,7 +27,7 @@ import com.digitalasset.canton.config.RequireTypes.{
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.synchronizer.sequencing.config.RemoteSequencerConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.model.Uri
 

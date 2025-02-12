@@ -182,24 +182,23 @@ class ReconcileDynamicSynchronizerParametersTrigger(
     // Make sure that the bootstrap script for the upgrade domain is aligned with any changes made to the
     // dynamic domain parameters here to prevent the soft synchronizer upgrade test from failing
     existingDomainParameters.tryUpdate(
-      trafficControlParameters =
-        existingDomainParameters.trafficControlParameters.map { trafficControl =>
-          trafficControl.copy(
-            maxBaseTrafficAmount =
-              NonNegativeLong.tryCreate(domainFeesConfig.baseRateTrafficLimits.burstAmount),
-            readVsWriteScalingFactor =
-              PositiveInt.tryCreate(domainFeesConfig.readVsWriteScalingFactor.toInt),
-            maxBaseTrafficAccumulationDuration = PositiveFiniteDuration.tryOfSeconds(
-              domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds / 1000_000
-            ),
-          )
-        },
+      trafficControlParameters = existingDomainParameters.trafficControl.map { trafficControl =>
+        trafficControl.copy(
+          maxBaseTrafficAmount =
+            NonNegativeLong.tryCreate(domainFeesConfig.baseRateTrafficLimits.burstAmount),
+          readVsWriteScalingFactor =
+            PositiveInt.tryCreate(domainFeesConfig.readVsWriteScalingFactor.toInt),
+          maxBaseTrafficAccumulationDuration = PositiveFiniteDuration.tryOfSeconds(
+            domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds / 1000_000
+          ),
+        )
+      },
       reconciliationInterval = synchronizerConfig
         .flatMap(_.acsCommitmentReconciliationInterval.toScala)
         .fold(
           PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval)
         )(PositiveSeconds.tryOfSeconds(_)),
-      acsCommitmentsCatchUpConfigParameter = Some(SvUtil.defaultAcsCommitmentsCatchUpConfig),
+      acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
       submissionTimeRecordTimeTolerance = submissionTimeRecordTimeToleranceTarget.getOrElse(
         existingDomainParameters.submissionTimeRecordTimeTolerance
       ),

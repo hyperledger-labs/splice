@@ -131,7 +131,7 @@ class UserWalletTxLogParser(
                           Either[InvalidTransferReason, Seq[ExercisedEvent]],
                       )
                     ],
-                    exercised.getChildNodeIds.asScala.map(tree.getEventsById.asScala),
+                    tree.getChildNodeIds(exercised).asScala.map(tree.getEventsById.asScala),
                   )
                 )({
                   case ((result, nextChildEvents), r) => {
@@ -312,7 +312,7 @@ class UserWalletTxLogParser(
               stateFromChildren <- defer {
                 parseTrees(
                   tree,
-                  exercised.getChildNodeIds.asScala.toList,
+                  tree.getChildNodeIds(exercised).asScala.toList,
                   synchronizerId,
                 )
               }.map(_.setTransferSubtype(TransferTransactionSubtype.P2PPaymentCompleted))
@@ -367,7 +367,7 @@ class UserWalletTxLogParser(
               stateFromChildren <- defer {
                 parseTrees(
                   tree,
-                  exercised.getChildNodeIds.asScala.toList,
+                  tree.getChildNodeIds(exercised).asScala.toList,
                   synchronizerId,
                 )
               }
@@ -402,7 +402,7 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildNodeIds.asScala.toList,
+                tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
               )
             }.map(_.setTransferSubtype(TransferTransactionSubtype.AppPaymentAccepted))
@@ -412,7 +412,7 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildNodeIds.asScala.toList,
+                tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
               )
             }.map(_.mergeBalanceChangesIntoTransfer(TransferTransactionSubtype.AppPaymentCollected))
@@ -446,7 +446,7 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildNodeIds.asScala.toList,
+                tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
               )
             }.map(
@@ -458,7 +458,7 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildNodeIds.asScala.toList,
+                tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
               )
             }.map(
@@ -491,7 +491,7 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildNodeIds.asScala.toList,
+                tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
               )
             }.map(_.setTransferSubtype(TransferTransactionSubtype.SubscriptionPaymentAccepted))
@@ -512,7 +512,7 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildNodeIds.asScala.toList,
+                tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
               )
             }.map(
@@ -675,7 +675,9 @@ class UserWalletTxLogParser(
             )
 
           case _ =>
-            defer { parseTrees(tree, exercised.getChildNodeIds.asScala.toList, synchronizerId) }
+            defer {
+              parseTrees(tree, tree.getChildNodeIds(exercised).asScala.toList, synchronizerId)
+            }
         }
 
       case created: CreatedEvent =>

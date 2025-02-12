@@ -3,9 +3,68 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+## Until 2025-01-29 (Exclusive)
+- Added a buffer for serving events that is limited by an upper bound for memory consumption:
+    ```hocon
+        canton.sequencers.<sequencer>.sequencer.block.writer {
+          type = high-throughput // NB: this is required for the writer config to be parsed properly
+          
+          // maximum memory the buffered events will occupy
+          buffered-events-max-memory = 2MiB // Default value
+          // batch size for warming up the events buffer at the start of the sequencer until the buffer is full
+          buffered-events-preload-batch-size = 50 // Default value
+        }
+    ```
+  - The previous setting `canton.sequencers.<sequencer>.sequencer.block.writer.max-buffered-events-size` has been removed and has no effect anymore
+- The sequencer's payload cache configuration changed slightly to disambiguate the memory-limit config from a number-of-elements config:
+    ```hocon
+    canton.sequencers.<sequencer>.parameters.caching {
+      sequencer-payload-cache {
+        expire-after-access = "1 minute" // Default value
+        maximum-memory = 200MiB // Default value
+      }
+    }
+    ```
+  - The previous setting `canton.sequencers.<sequencer>.parameters.caching.sequencer-payload-cache.maximum-size` has been removed and has no effect anymore.
+
+
 ## Until 2025-01-22 (Exclusive)
 
 - Added metric `daml.mediator.approved-requests.total` to count the number of approved confirmation requests
+- Topology related error codes have been renamed to contain the prefix `TOPOLOGY_`:
+  - Simple additions of prefix
+    - `SECRET_KEY_NOT_IN_STORE` -> `TOPOLOGY_SECRET_KEY_NOT_IN_STORE`
+    - `SERIAL_MISMATCH` -> `TOPOLOGY_SERIAL_MISMATCH`
+    - `INVALID_SYNCHRONIZER` -> `TOPOLOGY_INVALID_SYNCHRONIZER`
+    - `NO_APPROPRIATE_SIGNING_KEY_IN_STORE` -> `TOPOLOGY_NO_APPROPRIATE_SIGNING_KEY_IN_STORE`
+    - `NO_CORRESPONDING_ACTIVE_TX_TO_REVOKE` -> `TOPOLOGY_NO_CORRESPONDING_ACTIVE_TX_TO_REVOKE`
+    - `REMOVING_LAST_KEY_MUST_BE_FORCED` -> `TOPOLOGY_REMOVING_LAST_KEY_MUST_BE_FORCED`
+    - `DANGEROUS_COMMAND_REQUIRES_FORCE_ALIEN_MEMBER` -> `TOPOLOGY_DANGEROUS_COMMAND_REQUIRES_FORCE_ALIEN_MEMBER`
+    - `REMOVING_KEY_DANGLING_TRANSACTIONS_MUST_BE_FORCED` -> `TOPOLOGY_REMOVING_KEY_DANGLING_TRANSACTIONS_MUST_BE_FORCED`
+    - `INCREASE_OF_SUBMISSION_TIME_TOLERANCE` -> `TOPOLOGY_INCREASE_OF_SUBMISSION_TIME_TOLERANCE`
+    - `INSUFFICIENT_KEYS` -> `TOPOLOGY_INSUFFICIENT_KEYS`
+    - `UNKNOWN_MEMBERS` -> `TOPOLOGY_UNKNOWN_MEMBERS`
+    - `UNKNOWN_PARTIES` -> `TOPOLOGY_UNKNOWN_PARTIES`
+    - `ILLEGAL_REMOVAL_OF_SYNCHRONIZER_TRUST_CERTIFICATE` -> `TOPOLOGY_ILLEGAL_REMOVAL_OF_SYNCHRONIZER_TRUST_CERTIFICATE`
+    - `PARTICIPANT_ONBOARDING_REFUSED` -> `TOPOLOGY_PARTICIPANT_ONBOARDING_REFUSED`
+    - `MEDIATORS_ALREADY_IN_OTHER_GROUPS` -> `TOPOLOGY_MEDIATORS_ALREADY_IN_OTHER_GROUPS`
+    - `MEMBER_CANNOT_REJOIN_SYNCHRONIZER` -> `TOPOLOGY_MEMBER_CANNOT_REJOIN_SYNCHRONIZER`
+    - `NAMESPACE_ALREADY_IN_USE` -> `TOPOLOGY_NAMESPACE_ALREADY_IN_USE`
+    - `DANGEROUS_VETTING_COMMAND_REQUIRES_FORCE_FLAG` -> `TOPOLOGY_DANGEROUS_VETTING_COMMAND_REQUIRES_FORCE_FLAG`
+    - `DEPENDENCIES_NOT_VETTED` -> `TOPOLOGY_DEPENDENCIES_NOT_VETTED`
+    - `CANNOT_VET_DUE_TO_MISSING_PACKAGES` -> `TOPOLOGY_CANNOT_VET_DUE_TO_MISSING_PACKAGES`
+  - Additional minor renaming
+    - `INVALID_TOPOLOGY_TX_SIGNATURE_ERROR` -> `TOPOLOGY_INVALID_TOPOLOGY_TX_SIGNATURE`
+    - `DUPLICATE_TOPOLOGY_TRANSACTION` -> `TOPOLOGY_DUPLICATE_TRANSACTION`
+    - `UNAUTHORIZED_TOPOLOGY_TRANSACTION` -> `TOPOLOGY_UNAUTHORIZED_TRANSACTION`
+    - `INVALID_TOPOLOGY_MAPPING` -> `TOPOLOGY_INVALID_MAPPING`
+    - `INCONSISTENT_TOPOLOGY_SNAPSHOT` -> `TOPOLOGY_INCONSISTENT_SNAPSHOT`
+    - `MISSING_TOPOLOGY_MAPPING` -> `TOPOLOGY_MISSING_MAPPING`
+- Added the last_descendant_node_id field in the exercised event of the ledger api. This field specifies the upper
+  boundary of the node ids of the events in the same transaction that appeared as a result of the exercised event.
+- Removed the child_node_ids and the root_node_ids fields from the exercised event of the ledger api. After this change
+  it will be possible to check that an event is child of another or a root event through the descendant relationship
+  using the last_descendant_node_id field.
 
 ## Until 2025-01-15 (Exclusive)
 
@@ -19,7 +78,7 @@ Please also consult the [full documentation of this release](https://docs.daml.c
 - Changed the `signedBy` parameter of the console command `topology.party_to_participant_mapping.propose` from `Optional`
   to `Seq`.
 
-## Until 2025-01-010 (Exclusive)
+## Until 2025-01-10 (Exclusive)
 
 ### Initial Topology Snapshot Validation
 The initial topology snapshot, both for initializing a new domain and for onboarding a new member,

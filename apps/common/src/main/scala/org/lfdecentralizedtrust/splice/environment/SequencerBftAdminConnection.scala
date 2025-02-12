@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.canton.admin.api.client.commands.SequencerBftAdminCommands
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.block.bftordering.admin.SequencerBftAdminData
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContextExecutor, Future}

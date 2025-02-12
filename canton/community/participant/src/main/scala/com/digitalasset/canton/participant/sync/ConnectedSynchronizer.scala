@@ -13,7 +13,7 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
-import com.digitalasset.canton.crypto.SynchronizerSyncCryptoClient
+import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, ReassignmentSubmitterMetadata}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{
@@ -98,13 +98,13 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /** A connected synchronizer from the synchronization service.
   *
-  * @param synchronizerId          The identifier of the connected domain.
+  * @param synchronizerId          The identifier of the connected synchronizer.
   * @param synchronizerHandle      A synchronizer handle providing sequencer clients.
   * @param participantId     The participant node id hosting this sync service.
-  * @param persistent        The persistent state of the sync domain.
-  * @param ephemeral         The ephemeral state of the sync domain.
+  * @param persistent        The persistent state of the connected synchronizer.
+  * @param ephemeral         The ephemeral state of the connected synchronizer.
   * @param packageService    Underlying package management service.
-  * @param synchronizerCrypto      Synchronisation crypto utility combining IPS and Crypto operations for a single domain.
+  * @param synchronizerCrypto      Synchronisation crypto utility combining IPS and Crypto operations for a single synchronizer.
   */
 class ConnectedSynchronizer(
     val synchronizerId: SynchronizerId,
@@ -116,7 +116,7 @@ class ConnectedSynchronizer(
     private[sync] val persistent: SyncPersistentState,
     val ephemeral: SyncEphemeralState,
     val packageService: Eval[PackageService],
-    synchronizerCrypto: SynchronizerSyncCryptoClient,
+    synchronizerCrypto: SynchronizerCryptoClient,
     identityPusher: ParticipantTopologyDispatcher,
     topologyProcessor: TopologyTransactionProcessor,
     missingKeysAlerter: MissingKeysAlerter,
@@ -126,6 +126,7 @@ class ConnectedSynchronizer(
     journalGarbageCollector: JournalGarbageCollector,
     val acsCommitmentProcessor: AcsCommitmentProcessor,
     clock: Clock,
+    promiseUSFactory: DefaultPromiseUnlessShutdownFactory,
     metrics: ConnectedSynchronizerMetrics,
     futureSupervisor: FutureSupervisor,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -135,8 +136,7 @@ class ConnectedSynchronizer(
     with FlagCloseableAsync
     with ReassignmentSubmissionHandle
     with CloseableHealthComponent
-    with AtomicHealthComponent
-    with HasCloseContext {
+    with AtomicHealthComponent {
 
   val topologyClient: SynchronizerTopologyClientWithInit = synchronizerHandle.topologyClient
 
@@ -198,7 +198,7 @@ class ConnectedSynchronizer(
     futureSupervisor,
     packageResolver = packageResolver,
     testingConfig = testingConfig,
-    this,
+    promiseUSFactory,
   )
 
   private val unassignmentProcessor: UnassignmentProcessor = new UnassignmentProcessor(
@@ -217,7 +217,7 @@ class ConnectedSynchronizer(
     loggerFactory,
     futureSupervisor,
     testingConfig = testingConfig,
-    this,
+    promiseUSFactory,
   )
 
   private val assignmentProcessor: AssignmentProcessor = new AssignmentProcessor(
@@ -236,7 +236,7 @@ class ConnectedSynchronizer(
     loggerFactory,
     futureSupervisor,
     testingConfig = testingConfig,
-    this,
+    promiseUSFactory,
   )
 
   private val trafficProcessor =
@@ -527,7 +527,7 @@ class ConnectedSynchronizer(
     } yield ()
   }
 
-  /** Starts the sync domain. NOTE: Must only be called at most once on a synchronizer instance. */
+  /** Starts the connected synchronizer. NOTE: Must only be called at most once on a synchronizer instance. */
   private[sync] def start()(implicit
       initializationTraceContext: TraceContext
   ): FutureUnlessShutdown[Either[ConnectedSynchronizerInitializationError, Unit]] =
@@ -591,7 +591,7 @@ class ConnectedSynchronizer(
             Lambda[`+X <: Envelope[_]` => Traced[Seq[PossiblyIgnoredSequencedEvent[X]]]],
             ClosedEnvelope,
           ] {
-            override def name: String = s"sync-domain-$synchronizerId"
+            override def name: String = s"connected-synchronizer-$synchronizerId"
 
             override def subscriptionStartsAt(
                 start: SubscriptionStart,
@@ -650,7 +650,7 @@ class ConnectedSynchronizer(
         _ <- waitForParticipantToBeInTopology(initializationTraceContext)
         _ <-
           registerIdentityTransactionHandle
-            .domainConnected()(initializationTraceContext)
+            .synchronizerConnected()(initializationTraceContext)
             .leftMap[ConnectedSynchronizerInitializationError](
               ParticipantTopologyHandshakeError.apply
             )
@@ -880,13 +880,22 @@ class ConnectedSynchronizer(
   def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit] =
     sequencerClient.logout()
 
+  // We must run this even before the invocation `closeAsync`,
+  // because it will abort tasks that need to complete
+  // before `closeAsync` is invoked.
+  runOnShutdown_(new RunOnShutdown {
+    override def name: String = "Cancel promises of ConnectedSynchronizer.promiseUSFactory"
+    override def done: Boolean = promiseUSFactory.isClosing
+    override def run(): Unit = promiseUSFactory.close()
+  })(TraceContext.empty)
+
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
     // As the commitment and protocol processors use the sequencer client to send messages, close
     // them before closing the synchronizerHandle. Both of them will ignore the requests from the message dispatcher
     // after they get closed.
     Seq(
       SyncCloseable(
-        "sync-domain",
+        "connected-synchronizer",
         LifeCycle.close(
           // Close the synchronizer crypto client first to stop waiting for snapshots that may block the sequencer subscription
           synchronizerCrypto,
@@ -912,7 +921,7 @@ class ConnectedSynchronizer(
 }
 
 object ConnectedSynchronizer {
-  val healthName: String = "sync-domain"
+  val healthName: String = "connected-synchronizer"
 
   // Whether the synchronizer is ready for submission
   final case class SubmissionReady(v: Boolean) extends AnyVal {
@@ -969,14 +978,15 @@ object ConnectedSynchronizer {
         persistentState: SyncPersistentState,
         ephemeralState: SyncEphemeralState,
         packageService: Eval[PackageService],
-        synchronizerCrypto: SynchronizerSyncCryptoClient,
+        synchronizerCrypto: SynchronizerCryptoClient,
         identityPusher: ParticipantTopologyDispatcher,
         topologyProcessorFactory: TopologyTransactionProcessor.Factory,
         missingKeysAlerter: MissingKeysAlerter,
         reassignmentCoordination: ReassignmentCoordination,
         commandProgressTracker: CommandProgressTracker,
         clock: Clock,
-        syncDomainMetrics: ConnectedSynchronizerMetrics,
+        promiseUSFactory: DefaultPromiseUnlessShutdownFactory,
+        connectedSynchronizerMetrics: ConnectedSynchronizerMetrics,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
         testingConfig: TestingConfigInternal,
@@ -994,13 +1004,14 @@ object ConnectedSynchronizer {
         persistentState: SyncPersistentState,
         ephemeralState: SyncEphemeralState,
         packageService: Eval[PackageService],
-        synchronizerCrypto: SynchronizerSyncCryptoClient,
+        synchronizerCrypto: SynchronizerCryptoClient,
         identityPusher: ParticipantTopologyDispatcher,
         topologyProcessorFactory: TopologyTransactionProcessor.Factory,
         missingKeysAlerter: MissingKeysAlerter,
         reassignmentCoordination: ReassignmentCoordination,
         commandProgressTracker: CommandProgressTracker,
         clock: Clock,
+        promiseUSFactory: DefaultPromiseUnlessShutdownFactory,
         connectedSynchronizerMetrics: ConnectedSynchronizerMetrics,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
@@ -1076,6 +1087,7 @@ object ConnectedSynchronizer {
         journalGarbageCollector,
         acsCommitmentProcessor,
         clock,
+        promiseUSFactory,
         connectedSynchronizerMetrics,
         futureSupervisor,
         loggerFactory,

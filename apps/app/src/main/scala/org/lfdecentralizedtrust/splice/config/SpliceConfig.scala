@@ -68,7 +68,7 @@ import scala.util.control.NoStackTrace
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.synchronizer.sequencing.config.RemoteSequencerConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 

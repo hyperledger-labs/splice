@@ -1112,6 +1112,7 @@ object BuildCommon {
       .dependsOn(
         `canton-util-external`,
         `canton-daml-errors` % "compile->compile;test->test",
+        `canton-bindings-java` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
         `canton-util-logging`,
         `canton-ledger-api`,

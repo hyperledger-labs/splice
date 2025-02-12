@@ -31,7 +31,7 @@ import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.resource.DbMigrationsFactory
 import com.digitalasset.canton.synchronizer.mediator.{MediatorNodeBootstrap, MediatorNodeParameters}
 import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
-import com.digitalasset.canton.synchronizer.sequencing.SequencerNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
 import com.digitalasset.canton.telemetry.{ConfiguredOpenTelemetry, OpenTelemetryFactory}
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
@@ -46,6 +46,7 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, blocking}
 import scala.util.control.NonFatal
 
@@ -250,17 +251,25 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         )
         clock.advanceTo(parent.now)
         clock
+
       case ClockConfig.RemoteClock(clientConfig) =>
         RemoteClock(
           clientConfig,
           config.parameters.timeouts.processing,
           clockLoggerFactory,
         )
-      case ClockConfig.WallClock(skewW) =>
-        val skewMs = skewW.asJava.toMillis
-        val tickTock =
-          if (skewMs == 0) TickTock.Native
-          else new TickTock.RandomSkew(Math.min(skewMs, Int.MaxValue).toInt)
+
+      case ClockConfig.WallClock(skews) =>
+        val tickTock: TickTock = nodeTypeAndName.map { case (_, nodeName) => nodeName } match {
+          case None => TickTock.Native
+          case Some(nodeName) if !skews.contains(nodeName) => TickTock.Native
+          case Some(nodeName) =>
+            val skewMs = skews.getOrElse(nodeName, 0.seconds).toMillis
+            if (skewMs == 0) TickTock.Native
+            else
+              TickTock.FixedSkew(Math.min(skewMs, Int.MaxValue).toInt)
+        }
+
         new WallClock(timeouts, clockLoggerFactory, tickTock)
     }
   }
@@ -302,15 +311,11 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     List(sequencers, mediators, participants)
   private def runningNodes: Seq[CantonNodeBootstrap[CantonNode]] = allNodes.flatMap(_.running)
 
-  private def autoConnectLocalNodes(): Either[StartupError, Unit] =
-    // TODO(#14048) extend this to x-nodes
-    Left(StartFailed("participants", "auto connect local nodes not yet implemented"))
-
   /** Try to startup all nodes in the configured environment and reconnect them to one another.
     * The first error will prevent further nodes from being started.
     * If an error is returned previously started nodes will not be stopped.
     */
-  def startAndReconnect(autoConnectLocal: Boolean): Either[StartupError, Unit] =
+  def startAndReconnect(): Either[StartupError, Unit] =
     withNewTraceContext { implicit traceContext =>
       if (config.parameters.manualStart) {
         logger.info("Manual start requested.")
@@ -320,7 +325,6 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         val startup = for {
           _ <- startAll()
           _ <- reconnectParticipants
-          _ <- if (autoConnectLocal) autoConnectLocalNodes() else Either.unit
         } yield writePortsFile()
         // log results
         startup
@@ -334,7 +338,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
     }
 
-  private def writePortsFile()(implicit
+  private[canton] def writePortsFile()(implicit
       traceContext: TraceContext
   ): Unit = {
     final case class ParticipantApis(ledgerApi: Int, adminApi: Int)
@@ -377,7 +381,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
           EitherT.rightT(())
         case Some(node) =>
           node
-            .reconnectSynchronizersIgnoreFailures()
+            .reconnectSynchronizersIgnoreFailures(isTriggeredManually = false)
             .leftMap(err => StartFailed(instance.name.unwrap, err.toString))
             .onShutdown(Left(StartFailed(instance.name.unwrap, "aborted due to shutdown")))
 

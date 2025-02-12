@@ -95,7 +95,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                 new CreatedEvent(
                   /*witnessParties*/ Seq(party1).asJava,
                   /*offset = */ 32,
-                  /*nodeId = */ 52,
+                  /*nodeId = */ 53,
                   /*templateId*/ id1,
                   /*packageName*/ "somePackageName",
                   /*contractId*/ contractId,
@@ -122,7 +122,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*choiceArgument*/ someValue,
                   /*actingParties*/ List(party1).asJava,
                   /*consuming*/ false,
-                  /*childEventIds*/ List(Integer.valueOf(64)).asJava,
+                  /*lastDescendedNodeId*/ Integer.valueOf(52),
                   /*exerciseResult*/ someValue,
                 ),
               ),

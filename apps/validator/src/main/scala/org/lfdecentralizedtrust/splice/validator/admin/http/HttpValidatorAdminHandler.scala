@@ -321,7 +321,7 @@ class HttpValidatorAdminHandler(
       ),
       isProposal = true,
     )(
-      SignedTopologyTransaction.supportedProtoVersions
+      SignedTopologyTransaction.versioningTable
         .protocolVersionRepresentativeFor(ProtocolVersion.dev)
     )
 

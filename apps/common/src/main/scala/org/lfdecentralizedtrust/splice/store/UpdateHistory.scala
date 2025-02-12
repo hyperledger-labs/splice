@@ -454,7 +454,12 @@ class UpdateHistory(
           case created: CreatedEvent =>
             insertCreateEventRow(tree.getUpdateId, created, updateRowId)
           case exercised: ExercisedEvent =>
-            insertExerciseEventRow(tree.getUpdateId, exercised, updateRowId)
+            insertExerciseEventRow(
+              tree.getUpdateId,
+              exercised,
+              updateRowId,
+              tree.getChildNodeIds(exercised).asScala.toSeq.map(_.intValue()),
+            )
           case _ =>
             throw new RuntimeException("Unsupported event type")
         }*
@@ -536,13 +541,14 @@ class UpdateHistory(
       updateId: String,
       event: ExercisedEvent,
       updateRowId: Long,
+      childNodeids: Seq[Int],
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeEventId = lengthLimited(
       EventId.prefixedFromUpdateIdAndNodeId(updateId, event.getNodeId)
     )
     val safeChoice = lengthLimited(event.getChoice)
     val safeContractId = lengthLimited(event.getContractId)
-    val safeChildEventIds = event.getChildNodeIds.asScala.toSeq
+    val safeChildEventIds = childNodeids
       .map(EventId.prefixedFromUpdateIdAndNodeId(updateId, _))
       .map(lengthLimited)
     val templateId = event.getTemplateId
@@ -561,7 +567,10 @@ class UpdateHistory(
       event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
     val interfaceIdPackageId =
       event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
-
+    import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.emptyTraceContext
+    logger.debug(
+      s"Ingesting event  ${safeEventId} with children ${safeChildEventIds} and original last descendent ${event.getLastDescendantNodeId}"
+    )
     sqlu"""
       insert into update_history_exercises(
         history_id, event_id, update_row_id,
@@ -1147,36 +1156,41 @@ class UpdateHistory(
         Integer.valueOf(EventId.nodeIdFromEventId(row.eventId)) -> row.toCreatedEvent.event
       )
       .toMap
-    val exerciseEventsById = exerciseRows
-      .map(row =>
-        Integer.valueOf(EventId.nodeIdFromEventId(row.eventId)) -> new ExercisedEvent(
-          /*witnessParties = */ java.util.Collections.emptyList(),
-          /*offset = */ 0, // not populated
-          /*nodeId = */ EventId.nodeIdFromEventId(row.eventId),
-          /*templateId = */ tid(
-            row.templatePackageId,
-            row.templateModuleName,
-            row.templateEntityName,
-          ),
-          /*packageName = */ row.packageName.getOrElse(missingString),
-          /*interfaceId = */ tid(
-            row.interfacePackageId,
-            row.interfaceModuleName,
-            row.interfaceEntityName,
-          ).toJava,
-          /*contractId = */ row.contractId,
-          /*choice = */ row.choice,
-          /*choiceArgument = */ ProtobufCodec.deserializeValue(row.argument),
-          /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
-          /*consuming = */ row.consuming,
-          /*childNodeIds = */ row.childEventIds
-            .map(id => Integer.valueOf(EventId.nodeIdFromEventId(id)))
-            .asJava,
-          /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
-        )
+    // TODO(#17370) - remove this conversion as it's costly
+    val nodesWithChildren = exerciseRows
+      .map(exercise =>
+        EventId.nodeIdFromEventId(exercise.eventId) -> exercise.childEventIds
+          .map(EventId.nodeIdFromEventId)
       )
       .toMap
-    val rootEventsIds = updateRow.rootEventIds
+    val exerciseEventsById = exerciseRows.map { row =>
+      val nodeId = EventId.nodeIdFromEventId(row.eventId)
+      Integer.valueOf(nodeId) -> new ExercisedEvent(
+        /*witnessParties = */ java.util.Collections.emptyList(),
+        /*offset = */ 0, // not populated
+        /*nodeId = */ nodeId,
+        /*templateId = */ tid(
+          row.templatePackageId,
+          row.templateModuleName,
+          row.templateEntityName,
+        ),
+        /*packageName = */ row.packageName.getOrElse(missingString),
+        /*interfaceId = */ tid(
+          row.interfacePackageId,
+          row.interfaceModuleName,
+          row.interfaceEntityName,
+        ).toJava,
+        /*contractId = */ row.contractId,
+        /*choice = */ row.choice,
+        /*choiceArgument = */ ProtobufCodec.deserializeValue(row.argument),
+        /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
+        /*consuming = */ row.consuming,
+        /*lastDescendedNodeId = */ Integer.valueOf(
+          EventId.lastDescendedNodeFromChildNodeIds(nodeId, nodesWithChildren)
+        ),
+        /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
+      )
+    }.toMap
     val eventsById = createEventsById ++ exerciseEventsById
 
     LedgerClient.GetTreeUpdatesResponse(
@@ -1188,10 +1202,6 @@ class UpdateHistory(
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
           /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
           /*eventsById = */ eventsById.asJava,
-
-          /*rootNodeIds = */ rootEventsIds
-            .map(id => Integer.valueOf(EventId.nodeIdFromEventId(id)))
-            .asJava,
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,

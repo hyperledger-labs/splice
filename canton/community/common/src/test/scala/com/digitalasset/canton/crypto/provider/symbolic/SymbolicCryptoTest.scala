@@ -34,7 +34,9 @@ class SymbolicCryptoTest
       )
 
     behave like signingProvider(
+      SymbolicCryptoProvider.supportedSigningSpecs.keys.forgetNE,
       SymbolicCryptoProvider.supportedSigningSpecs.algorithms.forgetNE,
+      SymbolicCryptoProvider.supportedSignatureFormats,
       symbolicCrypto(),
     )
     behave like encryptionProvider(

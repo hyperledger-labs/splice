@@ -70,9 +70,7 @@ class DbAcsCommitmentStore(
 
   implicit val getSignedCommitment: GetResult[SignedProtocolMessage[AcsCommitment]] = GetResult(r =>
     SignedProtocolMessage
-      .fromByteString(protocolVersion)(
-        ByteString.copyFrom(r.<<[Array[Byte]])
-      )
+      .fromTrustedByteString(protocolVersion)(ByteString.copyFrom(r.<<[Array[Byte]]))
       .fold(
         err =>
           throw new DbDeserializationException(
@@ -127,7 +125,7 @@ class DbAcsCommitmentStore(
       case _: DbStorage.Profile.H2 =>
         """merge into par_computed_acs_commitments cs
             using (
-              select cast(? as int) synchronizer_idx, cast(? as varchar(300)) counter_participant, cast(? as bigint) from_exclusive,
+              select cast(? as int) synchronizer_idx, cast(? as varchar) counter_participant, cast(? as bigint) from_exclusive,
               cast(? as bigint) to_inclusive, cast(? as binary large object) commitment from dual)
             excluded on (cs.synchronizer_idx = excluded.synchronizer_idx and cs.counter_participant = excluded.counter_participant and
             cs.from_exclusive = excluded.from_exclusive and cs.to_inclusive = excluded.to_inclusive)
@@ -369,8 +367,12 @@ class DbAcsCommitmentStore(
         .getAllActiveNoWaitCounterParticipants(Seq(indexedSynchronizer.synchronizerId), Seq.empty)
       outstandingOpt <- adjustedTsOpt.traverse { ts =>
         storage.query(
-          sql"select from_exclusive, to_inclusive, counter_participant from par_outstanding_acs_commitments where synchronizer_idx=$indexedSynchronizer and from_exclusive < $ts and matching_state != ${CommitmentPeriodState.Matched}"
-            .as[(CantonTimestamp, CantonTimestamp, ParticipantId)]
+          sql"""select from_exclusive, to_inclusive, counter_participant, multi_hosted_cleared from par_outstanding_acs_commitments
+               where synchronizer_idx=$indexedSynchronizer
+               and from_exclusive < $ts
+               and matching_state != ${CommitmentPeriodState.Matched}
+               and multi_hosted_cleared = false"""
+            .as[(CantonTimestamp, CantonTimestamp, ParticipantId, Boolean)]
             .withTransactionIsolation(Serializable),
           operationName = "commitments: compute no outstanding",
         )
@@ -380,10 +382,10 @@ class DbAcsCommitmentStore(
         ts <- adjustedTsOpt
         outstanding <- outstandingOpt.map { vector =>
           vector
-            .filter { case (_, _, participantId) =>
+            .filter { case (_, _, participantId, _) =>
               !ignores.exists(config => config.participantId == participantId)
             }
-            .map { case (start, end, _) =>
+            .map { case (start, end, _, _) =>
               (start, end)
             }
         }
@@ -463,6 +465,19 @@ class DbAcsCommitmentStore(
       runningCommitments,
       queue,
     )(logger)
+
+  override def markMultiHostedCleared(period: CommitmentPeriod)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] =
+    storage.update_(
+      sqlu"""update par_outstanding_acs_commitments
+                set multi_hosted_cleared = true
+                where synchronizer_idx = $indexedSynchronizer
+                and from_exclusive = ${period.fromExclusive}
+                and to_inclusive = ${period.toInclusive}""",
+      "markMultiHostedCleared",
+    )
+
 }
 
 class DbIncrementalCommitmentStore(
