@@ -37,7 +37,6 @@ You can find more information in the following sub-sections:
 .. todo:: split into validator/wallet api, scan api, daml, ledger API
 .. todo:: add section on testing including spinning up localnet
 .. todo:: add section on deployment for app devs, e.g., DAR uploads
-
 .. todo::
 
     Add overview of how to integrate with CC at the Daml level

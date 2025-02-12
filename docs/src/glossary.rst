@@ -36,6 +36,13 @@ Glossary
       purpose of providing access to a particular multi-party business process
       to other entities on the Canton network.
 
+    BFT
+
+      Byzantine Fault Tolerance.
+      A property of a distributed system that allows it to continue operating correctly
+      in the presence of a certain number of faulty nodes.
+      Where ``f`` is the number of failures, A distributed system can tolerate ``f`` failures and remain available
+      if ``f+1``` agreeing responses are received from ``2f+1`` requests.
 
     CN Global Domain
 
