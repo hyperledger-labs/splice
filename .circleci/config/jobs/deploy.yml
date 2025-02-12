@@ -59,12 +59,14 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            # even if it was on the last run and this is a retry
+            # and this breaks get-snapshot-version ...
+            export CI_IGNORE_DIRTY_REPO=1
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
             cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -142,6 +144,10 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            # even if it was on the last run and this is a retry
+            # and this breaks get-snapshot-version ...
+            export CI_IGNORE_DIRTY_REPO=1
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -151,8 +157,6 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
             cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
             cncluster activate
             cncluster ci_apply_validator $VERSION
@@ -258,12 +262,14 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            # even if it was on the last run and this is a retry
+            # and this breaks get-snapshot-version ...
+            export CI_IGNORE_DIRTY_REPO=1
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
             cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
