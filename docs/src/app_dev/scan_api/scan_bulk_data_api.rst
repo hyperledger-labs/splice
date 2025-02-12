@@ -58,7 +58,7 @@ Please see the Scan `Open API specification <https://github.com/hyperledger-labs
 Look for APIs starting with `/v1/updates/ <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L511>`_
 and `/v0/state/ <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L603>`_, respectively for updates and ACS snapshots.
 
-Example URLs for accessing the Scan Bulk Data API on Devnet are:
+Example URLs for accessing the Scan Bulk Data API are:
 
 - ``https://|gsf_scan_url|/api/scan/v1/updates``
 - ``https://|gsf_scan_url|/api/scan/v0/state/acs/snapshot-timestamp``
@@ -117,7 +117,7 @@ The response returns a list of transactions. Every transaction contains the foll
 
 * **migration_id** : This ID increments with every hard synchronizer migration. A hard synchronizer migration is performed for every significant Canton version upgrade.
   The current migration ID can be inquired from an SV,
-  or by using the ``/v0/dso-sequencers`` API, for instance on Devnet at `/v0/dso-sequencers <https://|gsf_scan_url|/api/scan/v0/dso-sequencers>`_
+  or by using the ``/v0/dso-sequencers`` API at `/v0/dso-sequencers <https://|gsf_scan_url|/api/scan/v0/dso-sequencers>`_
   which returns a ``migrationId`` per sequencer.
 * **synchronizer_id**: The instance ID of a Synchronizer (for example the ID of the Global Synchronizer).
   When contract assignments migrate, they become unavailable for processing via the old instance of the synchronizer
@@ -137,7 +137,7 @@ The response returns a list of transactions. Every transaction contains the foll
   returning events through the scan API.
 * **events_by_id**: This object contains all events in the transaction update tree, indexed by their event ID.
 
-An example list of transactions response for the beginning of the Devnet network is shown below:
+An example list of transactions response for the beginning of the network is shown below:
 
 .. code-block:: json
 
