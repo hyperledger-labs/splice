@@ -423,9 +423,12 @@ paths:
                 "$ref": "#/components/schemas/ListDsoSequencersResponse"
   /v0/scans:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "listDsoScans"
+      description: |
+        Retrieve Canton scan configuration for all SVs, grouped by
+        connected synchronizer ID
       responses:
         "200":
           description: ok
@@ -435,7 +438,7 @@ paths:
                 "$ref": "#/components/schemas/ListDsoScansResponse"
   /v0/activities:
     post:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "listActivity"
       description: |
@@ -459,7 +462,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/transactions:
     post:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "listTransactionHistory"
       description: |
@@ -485,7 +488,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/updates:
     post:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getUpdateHistory"
       description: |
@@ -510,7 +513,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v1/updates:
     post:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getUpdateHistoryV1"
       description: |
@@ -536,7 +539,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/updates/{update_id}:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getUpdateById"
       description: |
@@ -570,7 +573,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v1/updates/{update_id}:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getUpdateByIdV1"
       description: |
@@ -602,7 +605,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/state/acs/snapshot-timestamp:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getDateOfMostRecentSnapshotBefore"
       description: |
@@ -641,7 +644,7 @@ paths:
 
   /v0/state/acs:
     post:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "getAcsSnapshotAt"
       description: |
@@ -1525,6 +1528,9 @@ components:
         domainId:
           type: string
         scans:
+          description: |
+            SV scans for the associated synchronizer ID; there is at most one
+            scan per SV for each synchronizer ID.
           type: array
           items:
             $ref: "#/components/schemas/ScanInfo"
@@ -1533,8 +1539,10 @@ components:
       required: ["publicUrl", "svName"]
       properties:
         publicUrl:
+          description: The public accessible url of the scan.
           type: string
         svName:
+          description: The sequencer's operating SV name.
           type: string
     TransactionHistoryRequest:
       type: object
@@ -1745,7 +1753,7 @@ components:
       properties:
         submitter:
           description: |
-            The party who submitted this reassignment
+            The party ID who submitted this reassignment
           type: string
         source_synchronizer:
           description: |
@@ -1762,7 +1770,9 @@ components:
           format: int64
         unassign_id:
           description: |
-            The id of the corresponding unassign event
+            The id of the corresponding unassign event; this assignment will
+            usually, but not always, occur after the so-identified unassignment
+            event.
           type: string
         created_event:
           description: |
@@ -1828,7 +1838,8 @@ components:
       properties:
         update_id:
           description: |
-            The id of the update.
+            The id of the update. This is not comparable to other updates; it's
+            meant for correlating with server logs.
           type: string
         migration_id:
           description: |
@@ -1837,11 +1848,13 @@ components:
           format: int64
         workflow_id:
           description: |
-            The id of the workflow to which this transaction belongs.
+            This transaction's Daml workflow ID; a workflow ID can be associated
+            with multiple transactions. If empty, no workflow ID was set.
           type: string
         record_time:
           description: |
-            The time at which the transaction was sequenced.
+            The time at which the transaction was sequenced, with microsecond
+            resolution, using ISO-8601 representation.
           type: string
         synchronizer_id:
           description: |
@@ -1849,22 +1862,29 @@ components:
           type: string
         effective_at:
           description: |
-            Ledger effective time.
+            Ledger effective time, using ISO-8601 representation. This is the time
+            returned by `getTime` for all Daml executed as part of this transaction,
+            both by the submitting participant and all confirming participants.
           type: string
         offset:
           description: |
             The absolute offset.
             Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
+            However, within a single SV's scan, it is monotonically, lexicographically increasing.
           type: string
         root_event_ids:
           description: |
-            Roots of the transaction tree.
+            Roots of the transaction tree. These are guaranteed to occur as keys
+            of the `events_by_id` object.
           type: array
           items:
             type: string
         events_by_id:
           description: |
-            Changes to the ledger that were caused by this transaction. Nodes of the transaction tree.
+            Changes to the ledger that were caused by this transaction, keyed by ID.
+            Values are nodes of the transaction tree.
+            Within a transaction, IDs may be referenced by `root_event_ids` or
+            `child_event_ids` in `ExercisedEvent` herein.
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
@@ -1897,7 +1917,8 @@ components:
           type: string
         event_id:
           description: |
-            The ID of this particular event.
+            The ID of this particular event. Equal to the key of this element of
+            the containing `events_by_id` if this is part of a `TreeEvent`.
           type: string
         contract_id:
           description: |
@@ -1913,7 +1934,8 @@ components:
           type: string
         create_arguments:
           description: |
-            The arguments that have been used to create the contract.
+            The arguments that have been used to create the contract, in the
+            form of JSON representation of a Daml record.
           type: object
         created_at:
           description: |
@@ -1922,13 +1944,13 @@ components:
           format: date-time
         signatories:
           description: |
-            Signatories to the contract.
+            Signatories to the contract, in the form of party IDs.
           type: array
           items:
             type: string
         observers:
           description: |
-            Observers to the contract.
+            Observers to the contract, in the form of party IDs.
           type: array
           items:
             type: string
@@ -1951,7 +1973,8 @@ components:
           type: string
         event_id:
           description: |
-            The ID of this particular event.
+            The ID of this particular event. Equal to the key of this element of
+            the containing `events_by_id` if this is part of a `TreeEvent`.
           type: string
         contract_id:
           description: |
@@ -1967,11 +1990,15 @@ components:
           type: string
         choice:
           description: |
-            The choice that was exercised on the target contract.
+            The choice that was exercised on the target contract, as an unqualified
+            choice name, i.e. with no package or module name qualifiers.
           type: string
         choice_argument:
           description: |
-            The argument of the exercised choice.
+            The argument of the exercised choice, in the form of JSON
+            representation of a Daml value. This is usually a record with field
+            names being the argument names, even in the case of a single apparent
+            choice argument, which is represented as a single-element Daml record.
           type: object
         child_event_ids:
           description: |
@@ -1983,7 +2010,8 @@ components:
             type: string
         exercise_result:
           description: |
-            The result of exercising the choice.
+            The result of exercising the choice, as the JSON representation of a
+            Daml value.
           type: object
         consuming:
           description: |
@@ -1991,7 +2019,7 @@ components:
           type: boolean
         acting_parties:
           description: |
-            The parties that exercised the choice.
+            The parties that exercised the choice, in the form of party IDs.
           type: array
           items:
             type: string
@@ -2031,7 +2059,10 @@ components:
           type: integer
           format: int64
           description: |
-            Pagination token for the next page of results.
+            Pagination token for the next page of results. For this to be valid,
+            this must be the `next_page_token` from a prior request with identical
+            parameters aside from `after` and `page_size`; the response may be
+            invalid otherwise.
         page_size:
           description: |
             The maximum number of created events returned for this request.
@@ -2042,13 +2073,13 @@ components:
           items:
             type: string
           description: |
-            Filters the ACS by contracts in which these party_ids are stakeholders.
+            Filters the ACS by contracts in which these party IDs are stakeholders.
         templates:
           type: array
           items:
             type: string
           description: |
-            Filters the ACS by contracts with these template_ids, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
+            Filters the ACS by contracts with these template IDs, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
     HoldingsStateRequest: # subset of AcsRequest
       type: object
       required:
@@ -2135,12 +2166,15 @@ components:
         - created_events
       properties:
         record_time:
+          description: The same `record_time` as in the request.
           type: string
           format: date-time
         migration_id:
+          description: The same `migration_id` as in the request.
           type: integer
           format: int64
         created_events:
+          description: Up to `page_size` contracts in the ACS.
           type: array
           items:
             $ref: "#/components/schemas/CreatedEvent"
@@ -2149,7 +2183,7 @@ components:
           format: int64
           description: |
             When requesting the next page of results, pass this as `after` to the `AcsRequest`.
-            Will be empty when there's no more pages.
+            Will be absent when there are no more pages.
 
     HoldingsSummaryResponse:
       type: object
@@ -2842,7 +2876,7 @@ components:
         as the one used in the HTTP JSON API or the JavaScript codegen.
         "protobuf_json" is a verbose JSON encoding that is more difficult to parse,
         but contains type information, i.e., the values can be parsed losslessly
-        without having access to the DAML source code.
+        without having access to the Daml source code.
         Optional and defaults to "compact_json".
       enum:
         - "compact_json"
