@@ -29,4 +29,5 @@ ONBOARDING_SECRET
      .. parsed-literal::
 
         curl -X POST SPONSOR_SV_URL/api/sv/v0/devnet/onboard/validator/prepare
+
      Note that this self-served secret is only valid for 1 hour.
