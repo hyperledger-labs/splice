@@ -41,8 +41,9 @@ Glossary
       Byzantine Fault Tolerance.
       A property of a distributed system that allows it to continue operating correctly
       in the presence of a certain number of faulty nodes.
-      Where ``f`` is the number of failures, A distributed system can tolerate ``f`` failures and remain available
-      if ``f+1``` agreeing responses are received from ``2f+1`` requests.
+      Typically ``f`` denotes the number of faulty nodes that the system can tolerate.
+      Across all layers of Splice, ``f`` corresponds to slighly less than 1/3 of the total number of SVs
+      (``floor((n-1)/3)``, to be exact).
 
     CN Global Domain
 
