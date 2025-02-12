@@ -193,6 +193,7 @@ components:
         - vote_request_contract_ids
       properties:
         vote_request_contract_ids:
+          description: Contract IDs of Daml template `Splice.DsoRules:VoteRequest`.
           type: array
           items:
             type: string
@@ -203,11 +204,15 @@ components:
         - vote_requests
       properties:
         vote_requests:
+          description: |
+            Contracts of Daml template `Splice.DsoRules:VoteRequest` that match
+            `vote_request_contract_ids` in the request.
           type: array
           items:
             $ref: "./common-external.yaml#/components/schemas/Contract"
 
     LookupDsoRulesVoteRequestResponse:
+      description: A contract of Daml template `Splice.DsoRules:VoteRequest`.
       type: object
       required:
         - dso_rules_vote_request
@@ -216,6 +221,7 @@ components:
           $ref: "./common-external.yaml#/components/schemas/Contract"
 
     ListDsoRulesVoteRequestsResponse:
+      description: Contracts of Daml template `Splice.DsoRules:VoteRequest`.
       type: object
       required:
         - dso_rules_vote_requests
@@ -259,6 +265,7 @@ components:
         - validator_licenses
       properties:
         validator_licenses:
+          description: Contracts of Daml template `Splice.ValidatorLicense:ValidatorLicense`.
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
