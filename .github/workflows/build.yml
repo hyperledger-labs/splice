@@ -228,7 +228,7 @@ jobs:
             # shellcheck disable=SC2129
             echo "FORCE=false" >> "$GITHUB_ENV"
             echo "JOBS<<EOF" >> "$GITHUB_ENV"
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
+            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "docs", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
           else
             echo "Checking if all jobs succeeded."
