@@ -235,7 +235,7 @@ sharedAllocateImpl provider allocation holdings extraArgs = do
 
 transferImpl : TransferInstruction.TransferSpecification -> ExtraArgs -> Update TransferInstruction.TransferFactory_TransferResult
 transferImpl transferSpec extraArgs = do
-  -- TODO(#115): check `dsoParty` correspondence with transfer instrument
+  -- TODO(#115): check issuer correspondence with transfer instrument
   let transfer = transferSpec.transfer
   let holdings = transferSpec.holdingCids
   now <- getTime

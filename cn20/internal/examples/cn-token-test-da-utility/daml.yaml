@@ -3,14 +3,14 @@
 # classes. You should either use `daml build` or `sbt ~compile`, but NOT both
 # at the same time (see #179 for more context).
 
-sdk-version: 3.3.0-snapshot.20250117.13525.0.v9e9dcacc
+sdk-version: 3.3.0-snapshot.20250211.13600.0.vce3140e2
 name: cn-token-test-da-utility
 source: daml
 version: 0.1.5
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml3-script
+  - daml-script
 data-dependencies:
   - ../../../cn-token-standard-proposal/cnrc-1-token-metadata/.daml/dist/canton-network-token-rc1-current.dar
   - ../../../cn-token-standard-proposal/cnrc-2-holdings/.daml/dist/canton-network-token-rc2-current.dar
@@ -20,7 +20,6 @@ data-dependencies:
   - ../../../cn-token-standard-proposal/cnrc-6-allocation-instruction/.daml/dist/canton-network-token-rc6-current.dar
   - ../../../cn-token-standard-proposal/examples/splice/daml/splice-util/.daml/dist/splice-util.dar
   - ../../../cn-token-standard-proposal/examples/splice/daml/splice-amulet/.daml/dist/splice-amulet.dar
-  - ../../../cn-token-standard-proposal/examples/splice/daml/splice-wallet/.daml/dist/splice-wallet.dar
   - ../../../cn-token-standard-proposal/examples/cn-token-test-splice/.daml/dist/cn-token-test-splice.dar
   - ../../../cn-token-standard-proposal/examples/trading/daml/trading-app/.daml/dist/trading-app.dar
   - ../utility/daml/credential-model/v0/src/main/.daml/dist/credential.dar
@@ -33,5 +32,3 @@ build-options:
   - --target=2.1
   - --output=.daml/dist/cn-token-test-da-utility.dar
   - --enable-interfaces=yes
-  # This is test-code only, so it is fine to ignore this warning
-  - -Wno-upgrade-serialized-daml-script

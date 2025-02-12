@@ -372,7 +372,7 @@ object DamlPlugin extends AutoPlugin {
       log: Logger,
   ) = {
     // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
-    val damlLibsDependencyTypes = Seq("daml-script" -> "daml3-script")
+    val damlLibsDependencyTypes = Seq("daml-script" -> "daml-script")
     val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq.empty[String])(_ :+ "-" + _)
     (for {
       (depType, depName) <- damlLibsDependencyTypes

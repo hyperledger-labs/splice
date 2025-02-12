@@ -3,23 +3,22 @@
 # classes. You should either use `daml build` or `sbt ~compile`, but NOT both
 # at the same time (see #179 for more context).
 
-sdk-version: 3.3.0-snapshot.20250117.13525.0.v9e9dcacc
+sdk-version: 3.3.0-snapshot.20250211.13600.0.vce3140e2
 name: splice-amulet-test
 source: daml
 version: 0.1.8
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml3-script
+  - daml-script
 data-dependencies:
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
+  - -Wno-template-interface-depends-on-daml-script
   - --target=2.1
-  # This is test-code only, so it is fine to ignore this warning
-  - -Wno-upgrade-serialized-daml-script
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
