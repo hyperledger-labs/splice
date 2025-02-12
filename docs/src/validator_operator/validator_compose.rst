@@ -191,3 +191,20 @@ command, as follows:
 .. code-block:: bash
 
     ./start.sh -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m $MIGRATION_ID -w -a
+
+Integration with systemd and other init systems
++++++++++++++++++++++++++++++++++++++++++++++++
+
+If you want to manage the validator through systemd or a similar init
+system, create a service that calls the ``start.sh`` script with the
+right arguments. However, note that ``start.sh`` invokes ``docker
+compose up`` with the ``-d/--detach`` option so the script exits after
+the containers are up instead of continuing running.
+
+You need to make sure that your service does not stop docker compose
+at that point. To accomplish this with systemd set
+``RemainAfterExit=true``. Refer to the
+`systemd documentation <https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html>`_
+for more details. If you are using another init system, look for similar options to ensure that docker compose continues running after the script exits.
+
+Alternatively, you can edit the script to remove the ``-d`` option so the script continues running.
