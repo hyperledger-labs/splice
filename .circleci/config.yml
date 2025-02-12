@@ -2114,7 +2114,7 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
+            # cncluster update_config makes the repo dirty
             # even if it was on the last run and this is a retry
             # and this breaks get-snapshot-version ...
             export CI_IGNORE_DIRTY_REPO=1
@@ -2122,7 +2122,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -2199,7 +2199,7 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
+            # cncluster update_config makes the repo dirty
             # even if it was on the last run and this is a retry
             # and this breaks get-snapshot-version ...
             export CI_IGNORE_DIRTY_REPO=1
@@ -2212,7 +2212,7 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -2317,7 +2317,7 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
+            # cncluster update_config makes the repo dirty
             # even if it was on the last run and this is a retry
             # and this breaks get-snapshot-version ...
             export CI_IGNORE_DIRTY_REPO=1
@@ -2325,7 +2325,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -2856,7 +2856,7 @@ jobs:
             fi
             BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF
+            cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
 
@@ -2954,9 +2954,9 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
-            cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true
@@ -3015,7 +3015,7 @@ jobs:
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            cncluster hard_domain_migration_update_config_to_migrate
+            cncluster update_config_to_migrate
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -3068,7 +3068,7 @@ jobs:
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
-            cncluster hard_domain_migration_update_config_to_archive_legacy_migration
+            cncluster update_config_to_archive_legacy_migration
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -3140,7 +3140,7 @@ jobs:
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
-            cncluster hard_domain_migration_update_config_to_remove_migrating_from
+            cncluster update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
             git commit -m "Add migration config to remove migratingFrom" || true

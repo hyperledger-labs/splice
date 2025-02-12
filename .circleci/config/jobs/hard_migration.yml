@@ -353,7 +353,7 @@ jobs:
             fi
             BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF
+            cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
 
@@ -451,9 +451,9 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
-            cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true
@@ -512,7 +512,7 @@ jobs:
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            cncluster hard_domain_migration_update_config_to_migrate
+            cncluster update_config_to_migrate
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -565,7 +565,7 @@ jobs:
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
-            cncluster hard_domain_migration_update_config_to_archive_legacy_migration
+            cncluster update_config_to_archive_legacy_migration
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -637,7 +637,7 @@ jobs:
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
-            cncluster hard_domain_migration_update_config_to_remove_migrating_from
+            cncluster update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
             git commit -m "Add migration config to remove migratingFrom" || true

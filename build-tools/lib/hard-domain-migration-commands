@@ -9,9 +9,9 @@ function subcmd_hard_domain_migration_trigger() {
   subcmd_preflight_global_domain_upgrade
 }
 
-subcommand_whitelist[hard_domain_migration_update_config]='Upgrade the hard domain migration config'
+subcommand_whitelist[update_config]='Upgrade the hard domain migration config'
 
-function subcmd_hard_domain_migration_update_config() {
+function subcmd_update_config() {
   local migration_type
   local migration_id
   local migration_canton_stack
@@ -48,9 +48,9 @@ EOF
   _update_cluster_config "$migration_config" "synchronizerMigration.$migration_type"
 }
 
-subcommand_whitelist[hard_domain_migration_update_config_to_migrate]='Upgrade the hard domain migration config to migrate cluster'
+subcommand_whitelist[update_config_to_migrate]='Upgrade the cluster config.yaml to migrate cluster'
 
-function subcmd_hard_domain_migration_update_config_to_migrate() {
+function subcmd_update_config_to_migrate() {
   local configFile
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
@@ -63,9 +63,9 @@ function subcmd_hard_domain_migration_update_config_to_migrate() {
   yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
 }
 
-subcommand_whitelist[hard_domain_migration_update_config_to_archive_legacy_migration]='Upgrade the hard domain migration config to archive legacy migration'
+subcommand_whitelist[update_config_to_archive_legacy_migration]='Upgrade the cluster config.yaml to archive legacy migration'
 
-function subcmd_hard_domain_migration_update_config_to_archive_legacy_migration() {
+function subcmd_update_config_to_archive_legacy_migration() {
   local configFile
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
@@ -76,9 +76,9 @@ function subcmd_hard_domain_migration_update_config_to_archive_legacy_migration(
   yq e '.synchronizerMigration.archived = [ .synchronizerMigration.legacy ] | del(.synchronizerMigration.legacy)' -i $configFile
 }
 
-subcommand_whitelist[hard_domain_migration_update_config_to_remove_migrating_from]='Upgrade the hard domain migration config to remove migratingFrom field from active migration'
+subcommand_whitelist[update_config_to_remove_migrating_from]='Upgrade the cluster config.yaml to remove migratingFrom field from active migration'
 
-function subcmd_hard_domain_migration_update_config_to_remove_migrating_from() {
+function subcmd_update_config_to_remove_migrating_from() {
   local configFile
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
