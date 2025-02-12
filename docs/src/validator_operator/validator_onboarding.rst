@@ -77,7 +77,7 @@ or from within your Kubernetes cluster.
 
 Note that the following snippet requires installing `JQ <https://jqlang.org/>`_.
 
-.. code-block:: bash
+.. parsed-literal::
 
    for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/scans | jq -r '.scans | .[].scans | .[] | .publicUrl' ); do
      echo -n "$url: ";
@@ -106,7 +106,7 @@ you can use the following snippet to confirm that you're able to reach those end
 (i.e., that SVs have whitelisted your IP for those endpoints as well).
 Note that the following snippet requires installing `JQ <https://jqlang.org/>`_ and `grpcurl <https://github.com/fullstorydev/grpcurl>`_.
 
-.. code-block:: bash
+.. parsed-literal::
 
    for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/dso-sequencers | jq -r '.domainSequencers | .[] | .sequencers.[].url | sub("https://"; "")' ); do
      echo -n "$url: ";
