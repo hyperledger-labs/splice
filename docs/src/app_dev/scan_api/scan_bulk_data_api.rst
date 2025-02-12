@@ -60,8 +60,8 @@ and `/v0/state/ <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395
 
 Example URLs for accessing the Scan Bulk Data API are:
 
-- ``https://|gsf_scan_url|/api/scan/v1/updates``
-- ``https://|gsf_scan_url|/api/scan/v0/state/acs/snapshot-timestamp``
+- |gsf_scan_url|/api/scan/v1/updates
+- |gsf_scan_url|/api/scan/v0/state/acs/snapshot-timestamp
 
 Please note the `api/scan` prefix in the URLs, which is the base path for the Scan API.
 
@@ -117,7 +117,7 @@ The response returns a list of transactions. Every transaction contains the foll
 
 * **migration_id** : This ID increments with every hard synchronizer migration. A hard synchronizer migration is performed for every significant Canton version upgrade.
   The current migration ID can be inquired from an SV,
-  or by using the ``/v0/dso-sequencers`` API at `/v0/dso-sequencers <https://|gsf_scan_url|/api/scan/v0/dso-sequencers>`_
+  or by using the ``/v0/dso-sequencers`` API at |gsf_scan_url|/api/scan/v0/dso-sequencers,
   which returns a ``migrationId`` per sequencer.
 * **synchronizer_id**: The instance ID of a Synchronizer (for example the ID of the Global Synchronizer).
   When contract assignments migrate, they become unavailable for processing via the old instance of the synchronizer
@@ -346,9 +346,9 @@ The returned timestamp corresponds to the record time of the last transaction in
 
 An example request to get the timestamp of the most recent snapshot before a given date is shown below:
 
-.. code-block:: bash
+.. parsed-literal::
 
-    curl https://|gsf_scan_url|/api/scan/v0/state/acs/snapshot-timestamp\?before\="2025-02-12T00:00:00.000000Z"\&migration_id\=4
+    curl |gsf_scan_url|/api/scan/v0/state/acs/snapshot-timestamp\?before\="2025-02-12T00:00:00.000000Z"\&migration_id\=4
 
 The response returns the timestamp of the most recent snapshot before the given date:
 
@@ -450,9 +450,9 @@ To use the script, you need to provide the URL of the Scan App and other optiona
 The script can be run from the command line with the appropriate arguments.
 Example command:
 
-.. code-block:: bash
+.. parsed-literal::
 
-    python3 scan_txlog.py https://|gsf_scan_url| \
+    python3 scan_txlog.py |gsf_scan_url| \
       --verbose \
       --cache-file-path cache.json \
       --report-output report.csv \
