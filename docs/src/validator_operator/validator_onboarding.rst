@@ -75,14 +75,13 @@ from the same egress IP from which you want to deploy your validator,
 e.g., from the VM that you want to run your docker compose setup from
 or from within your Kubernetes cluster.
 
-Note that the following command requires installing `JQ <https://jqlang.org/>`_.
+Note that the following snippet requires installing `JQ <https://jqlang.org/>`_.
 
 .. code-block:: bash
 
-   for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/scans | jq -r '.scans | .[].scans | .[] | .publicUrl' ); \\
-   do \\
-   echo -n "$url: "; \\
-   curl -sSL --connect-timeout 5 --fail-with-body $url/api/scan/version | jq -r '.version'; \\
+   for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/scans | jq -r '.scans | .[].scans | .[] | .publicUrl' ); do
+     echo -n "$url: ";
+     curl -sSL --connect-timeout 5 --fail-with-body $url/api/scan/version | jq -r '.version';
    done
 
 You should see output in the form shown below, where each line indicates one SV and the version it is on. If you see timeouts that SV has not yet added you to their allowlist,
@@ -100,6 +99,54 @@ if you do not get any errors, then all SVs have added you. Note that the URLs an
    https://scan.sv-2.test.global.canton.network.cumberland.io: 0.3.6
    https://scan.sv-1.test.global.canton.network.c7.digital: 0.3.6
    https://scan.sv-1.test.global.canton.network.digitalasset.com: 0.3.6
+
+Apart from connectivity to Scan, your validator must also be able to connect to the sequencer endpoints of the SVs.
+If you are encountering issues related to connecting to the synchronizer,
+you can use the following snippet to confirm that you're able to reach those endpoints
+(i.e., that SVs have whitelisted your IP for those endpoints as well).
+Note that the following snippet requires installing `JQ <https://jqlang.org/>`_ and `grpcurl <https://github.com/fullstorydev/grpcurl>`_.
+
+.. code-block:: bash
+
+   for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/dso-sequencers | jq -r '.domainSequencers | .[] | .sequencers.[].url | sub("https://"; "")' ); do
+     echo -n "$url: ";
+     grpcurl --max-time 10 $url:443 grpc.health.v1.Health/Check;
+   done
+
+Sequencers that are functional and have whitelisted your IP correctly will return ``status: SERVING`` in the ``grpcurl`` output.
+
+.. code-block:: bash
+
+   sequencer-1.sv-2.test.global.canton.network.digitalasset.com: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv.test.global.canton.network.tradeweb.com: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv-1.test.global.canton.network.cumberland.io: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv-1.test.global.canton.network.orb1lp.mpch.io: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv-1.test.global.canton.network.sync.global: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv.test.global.canton.network.sv-nodeops.com: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv-1.test.global.canton.network.mpch.io: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv-2.test.global.canton.network.cumberland.io: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv-1.test.global.canton.network.c7.digital: {
+     "status": "SERVING"
+   }
+   sequencer-1.sv-1.test.global.canton.network.digitalasset.com: {
+     "status": "SERVING"
+   }
 
 Stay Connected
 --------------
