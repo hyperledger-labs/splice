@@ -7,10 +7,10 @@ on:
       - 'main'
       - 'release-line-**'
 
-# Cancel previously runs of this workflow on the same branch, unless it's main
+# Cancel previously runs of this workflow on the same branch, unless it's main or a release-line branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !endsWith(github.ref, 'heads/main') }}
+  cancel-in-progress: ${{ !endsWith(github.ref, 'heads/main') && !contains(github.ref, 'heads/release-line-') }}
 
 jobs:
 
