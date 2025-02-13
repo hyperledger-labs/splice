@@ -13,6 +13,21 @@ function usage() {
   echo "  -w: Wait for the SV node to be ready"
 }
 
+# issue a user friendly red error
+function _error_msg(){
+  # shellcheck disable=SC2145
+  echo -e "\e[1;31mERROR: $@\e[0m" >&2
+}
+
+# issue a user friendly green informational message
+function _info(){
+  local first_line="INFO: "
+  while read -r; do
+    printf -- "\e[32;1m%s%s\e[0m\n" "${first_line:-     }" "${REPLY}"
+    unset first_line
+  done < <(echo -e "$@")
+}
+
 wait=0
 while getopts "hw" opt; do
   case ${opt} in
@@ -31,11 +46,11 @@ while getopts "hw" opt; do
 done
 
 if [ -z "${IMAGE_TAG:-}" ]; then
-  if [ ! -f "${script_dir}/../VERSION" ]; then
-    _error_msg "Could not derive image tags automatically, ${script_dir}/../VERSION is missing. Please make sure that file exists, or export an image tag in IMAGE_TAG"
+  if [ ! -f "${script_dir}/../../VERSION" ]; then
+    _error_msg "Could not derive image tags automatically, ${script_dir}/../../VERSION is missing. Please make sure that file exists, or export an image tag in IMAGE_TAG"
     exit 1
   else
-    IMAGE_TAG=$(cat "${script_dir}/../VERSION")
+    IMAGE_TAG=$(cat "${script_dir}/../../VERSION")
     _info "Using version ${IMAGE_TAG}"
     export IMAGE_TAG
   fi

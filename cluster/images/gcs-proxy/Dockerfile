@@ -14,4 +14,6 @@ RUN apt-get update \
 
 ENV GOOGLE_CLOUD_PROJECT=da-cn-shared
 
+COPY target/LICENSE .
+
 CMD ["/gcsproxy", "-v", "-b", "0.0.0.0:8080" ]

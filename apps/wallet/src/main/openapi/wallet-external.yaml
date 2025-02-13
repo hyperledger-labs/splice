@@ -9,9 +9,20 @@ servers:
 paths:
   /v0/wallet/transfer-offers:
     post:
+      description: |
+        Create an offer to directly transfer a given amount of Amulet to another party.
+        Direct transfers are a three-step process:
+        1. The sender creates a transfer offer
+        2. The receiver accepts the offer
+        3. The sender's wallet automation consumes the accepted offer and transfers the amount.
+           Amulets are not locked for direct transfers.
+           If the sender's wallet does not have enough Amulet to fulfill the offer at this point,
+           the transfer will fail.
       tags: [ wallet ]
       x-jvm-package: external.wallet
       operationId: "createTransferOffer"
+      security:
+        - walletUserAuth: []
       requestBody:
         required: true
         content:
@@ -59,9 +70,13 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
     get:
+      description:
+        List all open transfer offers where the user is either sender or receiver.
       tags: [ wallet ]
       x-jvm-package: external.wallet
       operationId: "listTransferOffers"
+      security:
+        - walletUserAuth: []
       responses:
         "200":
           description: ok
@@ -75,9 +90,13 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/wallet/transfer-offers/{tracking_id}/status:
     post:
+      description: |
+        Check the status of a transfer offer with a given tracking id.
       tags: [ wallet ]
       x-jvm-package: external.wallet
       operationId: "getTransferOfferStatus"
+      security:
+        - walletUserAuth: []
       parameters:
         - in: path
           name: tracking_id
@@ -108,6 +127,8 @@ paths:
       tags: [ wallet ]
       x-jvm-package: external.wallet
       operationId: "createBuyTrafficRequest"
+      security:
+        - walletUserAuth: []
       requestBody:
         required: true
         content:
@@ -153,9 +174,13 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
   /v0/wallet/buy-traffic-requests/{tracking_id}/status:
     post:
+      description: |
+        Check the status of a buy traffic request with a given tracking id.
       tags: [ wallet ]
       x-jvm-package: external.wallet
       operationId: "getBuyTrafficRequestStatus"
+      security:
+        - walletUserAuth: []
       parameters:
         - in: path
           name: tracking_id
@@ -176,6 +201,14 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
           description: No request with this tracking id was found.
 components:
+  securitySchemes:
+    walletUserAuth:
+      description: |
+        JWT token as described in [spliceAppBearerAuth]("../../../../common/src/main/openapi/common-external.yaml#/components/securitySchemes/spliceAppBearerAuth").
+        The subject of the token must be ledger API user of the user whose wallet the endpoint affects.
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     CreateTransferOfferRequest:
       type: object
@@ -187,10 +220,18 @@ components:
         - tracking_id
       properties:
         receiver_party_id:
+          description: |
+            The party id of the receiver.
           type: string
         amount:
+          description: |
+            The amount of Amulet to transfer.
           type: string
         description:
+          description: |
+            An arbitrary, user chosen text.
+            This should be a human readable string that describes the purpose of the transfer.
+            It will be shown to the receiver when they decide whether to accept the offer.
           type: string
         expires_at:
           description: |
@@ -203,7 +244,7 @@ components:
           format: int64
         tracking_id:
           description: |
-            tracking id to support exactly once submission. Once submitted, all successive calls with the same tracking id
+            Tracking id to support exactly once submission. Once submitted, all successive calls with the same tracking id
             will get rejected with a 409 or 429 status code unless the command fails and the offer did not get created.
             Clients should create a fresh tracking id when they try to create a new transfer offer. If that command submission fails
             with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same

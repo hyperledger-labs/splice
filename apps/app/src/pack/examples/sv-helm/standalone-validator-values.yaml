@@ -9,7 +9,7 @@ onboardingSecretFrom:
     optional: false
 # Party ID hint for the validator operator party, should be of format <organization>-<function>-<enumerator>,
 # e.g. digitalAsset-finance-1
-validatorPartyHint: ""
+validatorPartyHint: "YOUR_VALIDATOR_PARTY_HINT"
 
 # MIGRATION_START
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.
@@ -33,6 +33,6 @@ persistence:
 # migrateValidatorParty: true
 # PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
 
-# Replace YOUR_VALIDATOR_NAME with the name you provided for your validator identity.
+# Replace YOUR_VALIDATOR_NODE_NAME with the name you provided for your validator identity.
 # This value will be used for the node identifier of your participant.
-nodeIdentifier: YOUR_VALIDATOR_NAME
+nodeIdentifier: "YOUR_VALIDATOR_NODE_NAME"

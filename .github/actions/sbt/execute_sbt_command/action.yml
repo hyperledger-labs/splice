@@ -9,10 +9,10 @@ inputs:
     required: true
   artifactory_user:
     description: "Artifactory user"
-    required: true
+    required: false
   artifactory_password:
     description: "Artifactory password"
-    required: true
+    required: false
   extra_env_vars:
     description: "Extra environment variables to set before running the SBT command"
     required: false

@@ -11,6 +11,7 @@ commands:
           cluster: << parameters.cluster >>
           no_output_timeout: "30m"
           gce_authenticate: true
+          additional_nix_args: "--keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             EXPECTED_GIT_COMMIT=$(echo "refs/heads/$(git rev-parse --abbrev-ref HEAD)@sha1:$(git rev-parse HEAD)")
@@ -40,7 +41,8 @@ commands:
 
                 # TODO(#15978): remove this hack, this is only necessary because the operator restarts and gets stuck with its own lock.
                 LAST_UNLOCK_AGO=$((CURRENT_TIME - LAST_UNLOCK_TIME))
-                if [ $LAST_UNLOCK_AGO -ge 120 ]; then
+                # we also unlock only for ciperiodic because this would break other clusters (scratches)
+                if [ $LAST_UNLOCK_AGO -ge 120 ]  && [ "<<parameters.cluster>>" = "ciperiodic" ]; then
                   echo "Force-cancelling pulumi locks under the assumption that the operator got stuck."
                   cncluster pcancel
                   LAST_UNLOCK_TIME=$(date +%s)

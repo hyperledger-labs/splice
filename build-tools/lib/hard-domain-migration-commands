@@ -1,63 +1,5 @@
 # -*- shell-script -*-
 
-subcommand_whitelist[hard_domain_migration_prepare]='Prepare a hard domain migration'
-
-function subcmd_hard_domain_migration_prepare() {
-
-  _prompt_to_confirm
-  _cluster_must_exist
-
-  if [ "$#" -gt 0 ]; then
-    if ! _contained "$1" "all" "core" "sv"; then
-      _error "Usage: $0 hard_domain_migration_prepare [all|core|sv] [active_version] [upgrade_version] [pulumi-args...]"
-    fi
-    scope="$1"
-    shift
-  else
-    scope="all"
-  fi
-
-  # You can substitute `local` for any of those versions to use the locally built charts
-  if [ "$#" -gt 0 ]; then
-    # the default, active version
-    export CHARTS_VERSION="$1"
-    shift
-  fi
-  local upgrade_version
-  if [ "$#" -gt 0 ]; then
-    # the version of the new pods
-    upgrade_version="$1"
-    shift
-  fi
-
-  # this ensures we redeploy the pods on the old domain during the prepare step already
-  # so the actual migrate step does not have to redeploy them and is therefore faster.
-  export DISABLE_COMETBFT_STATE_SYNC="true"
-
-  local migration_config
-  migration_config=$(cat <<EOF
-  upgrade:
-    id: 1
-    provider: external
-    version: $upgrade_version
-EOF
-  )
-  _update_cluster_config "$migration_config" "synchronizerMigration"
-
-
-  if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
-   _pulumi_automation_run_up
-   subcmd_pulumi_up_canton
-  fi
-
-  if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
-    subcmd_pulumi sv-runbook up "$@"
-    export SPLICE_DEPLOY_SV_RUNBOOK=true
-    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
-    subcmd_pulumi_up_canton
-  fi
-}
-
 subcommand_whitelist[hard_domain_migration_trigger]='Propose a (nearly immediate) hard domain migration start and vote with SVs 1-4'
 
 function subcmd_hard_domain_migration_trigger() {
@@ -67,74 +9,9 @@ function subcmd_hard_domain_migration_trigger() {
   subcmd_preflight_global_domain_upgrade
 }
 
-subcommand_whitelist[hard_domain_migration_migrate]='Complete a hard domain migration'
+subcommand_whitelist[update_config]='Upgrade the hard domain migration config'
 
-function subcmd_hard_domain_migration_migrate() {
-  _prompt_to_confirm
-  _cluster_must_exist
-
-  if [ "$#" -gt 0 ]; then
-    if ! _contained "$1" "all" "core" "sv" "validator"; then
-      _error "Usage: $0 hard_domain_migration_migrate [all|core|sv|validator] [legacy_version] [active_version] [pulumi-args...]"
-    fi
-    scope="$1"
-    shift
-  else
-    scope="all"
-  fi
-
-  local legacy_version
-  # You can substitute `local` for any of those versions to use the locally built charts
-  if [ "$#" -gt 0 ]; then
-    # the version of the old Canton and CometBFT pods
-    legacy_version="$1"
-    shift
-  fi
-  if [ "$#" -gt 0 ]; then
-    # the new default, active version
-    export CHARTS_VERSION="$1"
-    shift
-  fi
-
-  local migration_config
-  migration_config=$(cat <<EOF
-  legacy:
-    id: 0
-    provider: internal
-    version: $legacy_version
-  active:
-    id: 1
-    provider: external
-    migratingFrom: 0
-EOF
-  )
-  _update_cluster_config "$migration_config" "synchronizerMigration"
-
-  # pulumi will show a preview and ask us to confirm each deployment step
-
-  if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
-    # make sure infra has the latest version
-    subcmd_pulumi infra up "$@"
-
-    _pulumi_automation_run_up
-    subcmd_pulumi_up_canton
-  fi
-
-  if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
-    export SPLICE_DEPLOY_SV_RUNBOOK=true
-    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
-    subcmd_pulumi_up_canton
-    subcmd_pulumi sv-runbook up "$@"
-  fi
-
-  if [ "$scope" == "all" ] || [ "$scope" == "validator" ]; then
-    subcmd_pulumi validator-runbook up "$@"
-  fi
-}
-
-subcommand_whitelist[hard_domain_migration_update_config]='Upgrade the hard domain migration config'
-
-function subcmd_hard_domain_migration_update_config() {
+function subcmd_update_config() {
   local migration_type
   local migration_id
   local migration_canton_stack
@@ -171,9 +48,9 @@ EOF
   _update_cluster_config "$migration_config" "synchronizerMigration.$migration_type"
 }
 
-subcommand_whitelist[hard_domain_migration_update_config_to_migrate]='Upgrade the hard domain migration config to migrate cluster'
+subcommand_whitelist[update_config_to_migrate]='Upgrade the cluster config.yaml to migrate cluster'
 
-function subcmd_hard_domain_migration_update_config_to_migrate() {
+function subcmd_update_config_to_migrate() {
   local configFile
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
@@ -186,9 +63,9 @@ function subcmd_hard_domain_migration_update_config_to_migrate() {
   yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
 }
 
-subcommand_whitelist[hard_domain_migration_update_config_to_archive_legacy_migration]='Upgrade the hard domain migration config to archive legacy migration'
+subcommand_whitelist[update_config_to_archive_legacy_migration]='Upgrade the cluster config.yaml to archive legacy migration'
 
-function subcmd_hard_domain_migration_update_config_to_archive_legacy_migration() {
+function subcmd_update_config_to_archive_legacy_migration() {
   local configFile
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
@@ -199,9 +76,9 @@ function subcmd_hard_domain_migration_update_config_to_archive_legacy_migration(
   yq e '.synchronizerMigration.archived = [ .synchronizerMigration.legacy ] | del(.synchronizerMigration.legacy)' -i $configFile
 }
 
-subcommand_whitelist[hard_domain_migration_update_config_to_remove_migrating_from]='Upgrade the hard domain migration config to remove migratingFrom field from active migration'
+subcommand_whitelist[update_config_to_remove_migrating_from]='Upgrade the cluster config.yaml to remove migratingFrom field from active migration'
 
-function subcmd_hard_domain_migration_update_config_to_remove_migrating_from() {
+function subcmd_update_config_to_remove_migrating_from() {
   local configFile
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"

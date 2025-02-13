@@ -65,7 +65,8 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
           return (is404or409 || isDomainConnectionError) && failureCount < 10;
         },
-        retryDelay: 500,
+        // Exponential backoff up to a maximum of 30 seconds
+        retryDelay: attemptIndex => Math.min(1000 * 1.5 ** attemptIndex, 30000),
       },
     },
   });

@@ -1,0 +1,10 @@
+self-hosted-runner:
+  labels:
+    - self-hosted-docker-tiny
+    - self-hosted-docker-medium
+    - self-hosted-docker-large
+    - self-hosted-k8s-x-small
+    - self-hosted-k8s-small
+    - self-hosted-k8s-medium
+    - self-hosted-k8s-large
+    - self-hosted-k8s-x-large

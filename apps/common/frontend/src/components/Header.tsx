@@ -1,16 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { Fragment } from 'react';
 import { NavLink } from 'react-router-dom';
 
-import { Badge, Stack, Toolbar } from '@mui/material';
+import { Warning } from '@mui/icons-material';
+import { Badge, Box, Stack, Toolbar } from '@mui/material';
 import Typography, { TypographyOwnProps } from '@mui/material/Typography';
 
 interface HeaderProps extends React.PropsWithChildren {
   title: string;
   titleVariant?: TypographyOwnProps['variant'];
-  navLinks?: { name: string; path: string; badgeCount?: number }[];
+  navLinks?: { name: string; path: string; badgeCount?: number; hasAlert?: boolean }[];
   noBorder?: boolean;
 }
 
@@ -42,14 +42,21 @@ const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks
           variant={titleVariant || 'h5'}
           fontFamily={theme => theme.fonts.monospace.fontFamily}
           fontWeight={theme => theme.fonts.monospace.fontWeight}
+          sx={{ flexShrink: 0, textWrap: 'balance', marginRight: 2 }}
         >
           {title}
         </Typography>
 
         {navLinks && (
-          <Stack direction="row" spacing={3} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={3}
+            alignItems="center"
+            justifyContent="space-evenly"
+            sx={{ flex: 1 }}
+          >
             {navLinks.map((navLink, index) => (
-              <Fragment key={`nav-link-${index}`}>
+              <Box key={`nav-link-${index}`}>
                 <NavLink
                   key={index}
                   id={`navlink-${navLink.path}`}
@@ -57,14 +64,28 @@ const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks
                   style={p => applyNavStyle(p.isActive)}
                 >
                   {navLink.name}
+
+                  {navLink.badgeCount ? (
+                    <Badge
+                      key={`nav-badge-${index}`}
+                      id={`nav-badge-${navLink.path}-count`}
+                      color="error"
+                      badgeContent={navLink.badgeCount}
+                      sx={{ marginLeft: 2 }}
+                    />
+                  ) : navLink.hasAlert ? (
+                    <Badge
+                      key={`nav-alert-badge-${index}`}
+                      id={`nav-badge-${navLink.path}-alert`}
+                      badgeContent={
+                        <Warning fontSize="small" color="secondary" sx={{ marginLeft: 3 }} />
+                      }
+                    />
+                  ) : (
+                    <></>
+                  )}
                 </NavLink>
-                <Badge
-                  key={`nav-badge-${index}`}
-                  id={`nav-badge-${navLink.path}-count`}
-                  color="error"
-                  badgeContent={navLink.badgeCount}
-                />
-              </Fragment>
+              </Box>
             ))}
           </Stack>
         )}

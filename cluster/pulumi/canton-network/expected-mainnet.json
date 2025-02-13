@@ -328,7 +328,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "docs-docs",
     "provider": "",
@@ -709,7 +709,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -763,7 +763,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -967,7 +967,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1069,14 +1069,9 @@
         },
         "approvedSvIdentities": [
           {
-            "name": "Liberty-City-Ventures",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeZ7ocmkxbNggLzGcSPxSF/pb1SK5lf2ReUxKokBH1KUZLeyQMNn8E5Xr4K3D4buoBxsnupO2IRkjWKQHRgsf0Q==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 430000
+            "rewardWeightBps": 270000
           },
           {
             "name": "Digital-Asset-1",
@@ -1116,7 +1111,12 @@
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYMTwBnr8tq7dL7/o5WyzZ1hzm6CvFCWtXHnyTC5zkmXKYcr37d7CQ8+tBBy0JAHvsGvmE33B+tAucEVfJnkBzw==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7-Technology-Services-Limited",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdRk0Ef3U0VSxdBo3/azkCY2Y7VFV6sM/7O1u93VHbAgJSqIeQK3B2yklxjKvZJDUyz0jNjuSF4Zvc780nv9IHg==",
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
@@ -1135,7 +1135,6 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-2-mediator",
@@ -1209,7 +1208,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1327,7 +1326,7 @@
           }
         }
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

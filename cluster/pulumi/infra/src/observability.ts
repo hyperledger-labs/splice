@@ -441,7 +441,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                       version: 'v1',
                       kind: 'GitRepository',
                     },
-                    metricNamePrefix: 'cn_deployment_flux',
+                    metricNamePrefix: 'splice_deployment_flux',
                     metrics: [
                       {
                         name: 'resource_info',
@@ -471,7 +471,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                       version: 'v1',
                       kind: 'Stack',
                     },
-                    metricNamePrefix: 'cn_deployment_pulumi',
+                    metricNamePrefix: 'splice_deployment_pulumi',
                     labelsFromPath: {
                       stack: ['spec', 'stack'],
                       state: ['status', 'lastUpdate', 'state'],

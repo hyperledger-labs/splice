@@ -214,10 +214,11 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'postgres', 'postgres', false);
+    : postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false);
 
   const appsPostgres =
-    defaultPostgres || postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, true);
+    defaultPostgres ||
+    postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true);
   const canton = installCanton(
     xns,
     decentralizedSynchronizerUpgradeConfig,

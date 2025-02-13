@@ -34,7 +34,6 @@ export async function installValidator1(
   onboardingSecret: string,
   validatorWalletUser: string,
   splitPostgresInstances: boolean,
-
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   installSplitwell: boolean,
   backupConfig?: BackupConfig,
@@ -58,15 +57,17 @@ export async function installValidator1(
   );
 
   const kmsConfig = validator1Config?.kms;
+  const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
   const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
-    ? postgres.installPostgres(xns, 'postgres', 'postgres', false)
+    ? postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false)
     : undefined;
 
   const validatorPostgres =
-    defaultPostgres || postgres.installPostgres(xns, `validator-pg`, `validator-pg`, true);
+    defaultPostgres ||
+    postgres.installPostgres(xns, `validator-pg`, `validator-pg`, activeVersion, true);
   const validatorDbName = `validator1`;
 
   const validatorSecrets = await installValidatorSecrets({
@@ -127,6 +128,8 @@ export async function installValidator1(
     secrets: validatorSecrets,
     autoAcceptTransfers: autoAcceptTransfers,
     nodeIdentifier: 'validator1',
+    participantPruningConfig,
+    deduplicationDuration: validator1Config?.deduplicationDuration,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

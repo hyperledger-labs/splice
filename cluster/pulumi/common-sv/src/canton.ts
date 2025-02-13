@@ -60,12 +60,19 @@ export function installCantonComponents(
   const isActiveMigration = migrationConfig.active.id === migrationId;
   const auth0Config = auth0Client.getCfg();
   const migrationStillRunning = migrationConfig.isStillRunning(migrationId);
+  const migrationInfo = migrationConfig.allMigrations.find(
+    migration => migration.id === migrationId
+  );
+  if (!migrationInfo) {
+    throw new Error(`Migration ${migrationId} not found in migration config`);
+  }
   const participantPg =
     dbs?.participant ||
     installPostgres(
       xns,
       `participant-${migrationId}-pg`,
       `participant-pg`,
+      migrationInfo.version,
       true,
       migrationStillRunning,
       migrationId,
@@ -77,6 +84,7 @@ export function installCantonComponents(
       xns,
       `mediator-${migrationId}-pg`,
       `mediator-pg`,
+      migrationInfo.version,
       true,
       migrationStillRunning,
       migrationId,
@@ -88,18 +96,13 @@ export function installCantonComponents(
       xns,
       `sequencer-${migrationId}-pg`,
       `sequencer-pg`,
+      migrationInfo.version,
       true,
       migrationStillRunning,
       migrationId,
       disableProtection
     );
   if (migrationStillRunning) {
-    const migrationInfo = migrationConfig
-      .runningMigrations()
-      .find(migration => migration.id === migrationId);
-    if (!migrationInfo) {
-      throw new Error(`Migration ${migrationId} not found in migration config`);
-    }
     const participant = installSvParticipant(
       xns,
       migrationId,

@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{WalletTestUtil}
+import org.lfdecentralizedtrust.splice.wallet.store.{BalanceChangeTxLogEntry, TxLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.metrics.MetricValue
 
@@ -51,6 +52,28 @@ class WalletMetricsTest
           BigDecimal(after) should beWithin(tapCC - smallAmount, tapCC)
         },
       )
+
+      val time = inside(aliceWalletClient.listTransactions(None, 1000).loneElement) {
+        case tx: BalanceChangeTxLogEntry =>
+          tx.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+          tx.date.value
+      }
+      val metrics = aliceValidatorBackend.metrics
+        .get(
+          s"$MetricsPrefix.store.last-ingested-record-time-ms",
+          Map("store_party" -> aliceUserParty.toString),
+        )
+        .select[MetricValue.LongPoint]
+        .value
+      // The metric is record time, our TX history exposes LET so we need to allow for skew
+      val recordTimeLedgerTimeTolerance = 60 * 1e3
+      BigDecimal(metrics.value) should beWithin(
+        BigDecimal(time.toEpochMilli) - recordTimeLedgerTimeTolerance,
+        BigDecimal(time.toEpochMilli) + recordTimeLedgerTimeTolerance,
+      )
+      val synchronizerId =
+        sv1Backend.participantClient.domains.list_connected().loneElement.domainId
+      metrics.attributes("synchronizer_id") shouldBe synchronizerId.toString
     }
   }
 

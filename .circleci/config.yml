@@ -32,7 +32,7 @@ parameters:
         build,
         deploy-cidaily,
         deploy-upgrade,
-        deploy-ciperiodic-migration-operator,
+        deploy-hdm-operator,
         determine-ciperiodic-migration-operator-work,
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
@@ -58,11 +58,10 @@ parameters:
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
-        deploy-hard-migration,
+        preview-operator,
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
-        preview-operator,
         purge-unused-dbs-cidaily,
       ]
     default: build
@@ -83,12 +82,12 @@ parameters:
   run-daml-upgrade:
     type: boolean
     default: true
-  # The base version to be used as part of a `deploy_ciupgrade` and `deploy_ciperiodic_migration` job
+  # The base version to be used as part of a `deploy_ciupgrade` and `deploy_hdm_operator` job
   # Empty/default means "upgrade version if set, else latest on branch"
   base-version:
     type: string
     default: ""
-  # The target version for hard migrations in the `deploy_ciperiodic_migration` job
+  # The target version for hard migrations in the `deploy_hdm_operator` job
   # Empty/default means "latest on branch"
   upgrade-version:
     type: string
@@ -226,7 +225,6 @@ commands:
             if ! cncluster ci_assert_fresh_lock; then
               .circleci/post-slack-message.sh "The cluster lock on << parameters.cluster >> held by ${slack_mention_text} is too old. \n*Unlocking and resetting cluster.* :reaper: ( <${CIRCLE_BUILD_URL}|CI Build> )" "C05DT77QF5M"
 
-              cncluster prefresh
               cncluster ci_reset_unlock
 
               # Ensure the apps node pool can scale down (this might have been left as prevented if a scratchnet CCI deployment has failed)
@@ -235,29 +233,7 @@ commands:
               .circleci/post-slack-message.sh "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*" "C05DT77QF5M"
             fi
           cmd_retry_count: 3
-  start_canton_in_background:
-    description: Start canton in the background
-    parameters:
-      start_canton_options:
-        type: string
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Start canton"
-          cmd: |
-            mkdir -p log
-            ./start-canton.sh << parameters.start_canton_options >> -b
-          background: true
-          additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX --keep PROMETHEUS_REMOTE_WRITE_JWT"
-          # Retrying as sometimes it fails finding the images
-          cmd_retry_count: 3
 
-  stop_canton:
-    description: Stop Canton
-    steps:
-      - run_bash_command_in_nix:
-          when: always
-          cmd_name: "Stop canton"
-          cmd: ./stop-canton.sh || true
   setup_vpn:
     steps:
       - run:
@@ -509,23 +485,6 @@ commands:
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-
-  docker_pull_test_images:
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Pull docker images used for integration tests"
-          additional_nix_args: "--keep DOCKER_CERT_PATH \
-                              --keep DOCKER_HOST \
-                              --keep DOCKER_MACHINE_NAME \
-                              --keep DOCKER_TLS_VERIFY \
-                              --keep NO_PROXY"
-          # Retrying as network stuff can be flaky
-          cmd_retry_count: 5
-          cmd: |
-            docker pull ${COMETBFT_DOCKER_IMAGE}
-            docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
-            docker pull ${OTEL_COLLECTOR_IMAGE}
-
 
   cancel_entire_workflow_if_this_job_failed:
     steps:
@@ -1181,6 +1140,7 @@ commands:
           cluster: << parameters.cluster >>
           no_output_timeout: "30m"
           gce_authenticate: true
+          additional_nix_args: "--keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             EXPECTED_GIT_COMMIT=$(echo "refs/heads/$(git rev-parse --abbrev-ref HEAD)@sha1:$(git rev-parse HEAD)")
@@ -1210,7 +1170,8 @@ commands:
 
                 # TODO(#15978): remove this hack, this is only necessary because the operator restarts and gets stuck with its own lock.
                 LAST_UNLOCK_AGO=$((CURRENT_TIME - LAST_UNLOCK_TIME))
-                if [ $LAST_UNLOCK_AGO -ge 120 ]; then
+                # we also unlock only for ciperiodic because this would break other clusters (scratches)
+                if [ $LAST_UNLOCK_AGO -ge 120 ]  && [ "<<parameters.cluster>>" = "ciperiodic" ]; then
                   echo "Force-cancelling pulumi locks under the assumption that the operator got stuck."
                   cncluster pcancel
                   LAST_UNLOCK_TIME=$(date +%s)
@@ -1401,49 +1362,6 @@ commands:
           name: Upload list of tests executed in this run (as empty files)
           path: tests
           destination: _tests # the _ is so this appears on top in the artifacts list
-
-
-  run_splitted_scala_tests:
-    description: run splitted scala tests
-    parameters:
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      start_canton_options:
-        type: string
-      additional_nix_args:
-        type: string
-        default: ""
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Wait for canton to be ready before running tests"
-          cmd: |
-            if [[ "<< parameters.start_canton_options >>" == *"-w"* ]]; then
-              ./wait-for-canton.sh -w
-            elif [[ "<< parameters.start_canton_options >>" == *"-s"* ]]; then
-              ./wait-for-canton.sh -s
-            fi
-      - execute_sbt_command:
-          # run all tests except the live cluster ones
-          pre_sbt_cmd: |
-            << parameters.pre_sbt_cmd >>
-          extra_env_vars: POSTGRES_DB=postgres
-          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET << parameters.additional_nix_args >>"
-          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
-          # it is in our best interest for our tests to be faster than this,
-          # but failing CI because of slow tests is also not very nice
-          # TODO(#8608): reduce `timeout` to at least 25m again
-          timeout: "35m"
-          no_output_timeout: "20m"
-      - execute_sbt_command:
-          # we don't care if some integration test happened to make the repo dirty
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
-          cmd: "checkErrors"
 
   ##### Overall setup
   ###### Pre job
@@ -1764,8 +1682,8 @@ commands:
               git checkout "$CIRCLE_BRANCH"
 
               git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
-            
-              if [ << parameters.checkout-branch >> != "" ]; then
+
+              if [ "<< parameters.checkout-branch >>" != "" ]; then
                 echo "Checking out branch << parameters.checkout-branch >>."
                 git fetch origin << parameters.checkout-branch >>
                 git checkout << parameters.checkout-branch >>
@@ -1776,6 +1694,11 @@ commands:
             }
 
             for i in $(seq 1 10); do checkout && s=0 && break || s=$? && sleep 10; done; (exit $s)
+      - add_ssh_keys:
+          # CCI seems to somehow prevent the main SSH key from being used to pull submodules
+          # outside of the org. We therefore need to use a different key for the GSF submodules.
+          fingerprints:
+            - "SHA256:EVy+GfTPH0cHHF8+DgeKRqioQEspYUWxsWeCwMemIjM"
       - run:
           name: Checkout submodule
           command: |
@@ -2191,13 +2114,15 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
+            # cncluster update_config makes the repo dirty
+            # even if it was on the last run and this is a retry
+            # and this breaks get-snapshot-version ...
+            export CI_IGNORE_DIRTY_REPO=1
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -2274,6 +2199,10 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
+            # cncluster update_config makes the repo dirty
+            # even if it was on the last run and this is a retry
+            # and this breaks get-snapshot-version ...
+            export CI_IGNORE_DIRTY_REPO=1
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -2283,9 +2212,7 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -2390,13 +2317,15 @@ jobs:
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
             fi
+            # cncluster update_config makes the repo dirty
+            # even if it was on the last run and this is a retry
+            # and this breaks get-snapshot-version ...
+            export CI_IGNORE_DIRTY_REPO=1
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # cncluster hard_domain_migration_update_config makes the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -2573,115 +2502,6 @@ jobs:
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
 
-  hard_migration:
-    executor: self_hosted
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      # What to do
-      action:
-        type: enum
-        enum:
-          [
-            "prepare",
-            "migrate"
-          ]
-      # What to migrate
-      scope:
-        type: enum
-        enum:
-          [
-            "all",
-            "core",
-            "sv",
-            "validator"
-          ]
-      # Commit hash that will become the legacy version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      base_version:
-        type: string
-        default: ""
-      # Commit hash that will become the active version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      upgrade_version:
-        type: string
-        default: ""
-      cancel_workflow_on_failure:
-        type: boolean
-        default: false
-      deploy_retry_count:
-        type: integer
-        default: 2
-      send_notifications:
-        type: boolean
-        default: true
-    steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.upgrade_version >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.upgrade_version >>
-                command: |
-                  echo "Checking out commit << parameters.upgrade_version >>"
-                  git checkout << parameters.upgrade_version >>
-      - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts for upgrade version
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-          cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Execute hard domain migration action
-          cluster: << parameters.cluster >>
-          additional_nix_args: >
-            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD
-            --keep CIRCLECI_TOKEN
-            --keep CIRCLE_WORKFLOW_ID
-            --keep SLACK_ACCESS_TOKEN
-            --keep CIRCLE_BUILD_URL
-          gce_authenticate: true
-          cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: |
-            .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-          cmd: |
-            set -eou pipefail
-
-            base_version=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            upgrade_version=$(build-tools/get-charts-version "<< parameters.upgrade_version >>")
-
-            # All CI-deployed clusters use split postgres instances per app, to support backups.
-            export SPLIT_POSTGRES_INSTANCES=true
-            # cncluster hard_domain_migration_ commands can make the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
-            echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
-            cncluster activate
-            cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - when:
-          condition: << parameters.send_notifications >>
-          steps:
-            - notify-cluster-fail:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.cancel_workflow_on_failure >>
-          steps:
-            - cancel_entire_workflow_if_this_job_failed
 
   # This job spins up a validator, and then waits until migration has been initiated and a
   # migration dump has been created. Ideally, we'd split it into two jobs, so that triggering
@@ -2726,7 +2546,9 @@ jobs:
           cmd_name: Wait for SV app to be responsive
           cmd: |
             succes=0
-            for i in {1..30}; do
+            # Wait up to 30 minutes for the sv app to be ready
+            # (we're starting this job in parallel with the initial deployment)
+            for i in {1..180}; do
               if curl -m 10 -sfL https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/version; then
                 success=1
                 break
@@ -3017,19 +2839,24 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
+            BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
             git branch -f $BASE_VERSION_BRANCH HEAD
             git checkout $BASE_VERSION_BRANCH
             git push -f origin $BASE_VERSION_BRANCH
-            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+            else
+              base_version=$(build-tools/get-snapshot-version)
+            fi
+            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF
+            cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
 
@@ -3037,6 +2864,10 @@ jobs:
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            # if the base version is a release version ensure we use the public repository
+            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+            fi
 
             git add **/.envrc.vars
             git add **/config.yaml
@@ -3093,39 +2924,56 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
             git checkout $UPGRADE_VERSION_BRANCH
             git push -f origin $UPGRADE_VERSION_BRANCH
-            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+            else
+              base_version=$(build-tools/get-snapshot-version)
+            fi
+            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
+            # We always include the runbook
+            echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
+            echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
-            cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
+            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            # Add the new entry for the staging nodes.
+            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
+            # if the base version is a release version ensure we use the public repository
+            # we add this as a workaround for deploying the operator from the upgrade branch
+            # we don't commit it as when we deploy with the upgrade version we actually want to use the  dev repository
+            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+            fi
       - deploy_operator:
           cluster: << parameters.cluster >>
           deploy_retry_count: << parameters.deploy_retry_count >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
-          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          pulumi_stack_names: "sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -3156,18 +3004,18 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            cncluster hard_domain_migration_update_config_to_migrate
+            cncluster update_config_to_migrate
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -3208,19 +3056,19 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
-            cncluster hard_domain_migration_update_config_to_archive_legacy_migration
+            cncluster update_config_to_archive_legacy_migration
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -3266,11 +3114,11 @@ jobs:
           cmd_name: Reset SV runbook
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
             export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='0,1'
@@ -3282,17 +3130,17 @@ jobs:
           cmd_name: Push new branch with migration config changes
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
-            cncluster hard_domain_migration_update_config_to_remove_migrating_from
+            cncluster update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
             git commit -m "Add migration config to remove migratingFrom" || true
@@ -3313,56 +3161,6 @@ jobs:
                 channel_notify: << parameters.channel_notify >>
                 cluster: << parameters.cluster >>
 
-
-  # Inspired by Canton, we put the lint-like checks into their own CI job
-  static_tests:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - run_bash_command_in_nix:
-          cmd_name: Verify config.yml is up to date with source.
-          cmd: .circleci/build-config.sh --check
-      # Run the cheap checks before the sbt based ones to provide fast feedback
-      - run_trailing_whitespace_check
-      - run_daml_warts_check
-      - run_daml_return_types_check
-      - run_todo_script
-      - execute_sbt_command:
-          cmd: "Test/compile lint printTests"
-      - run_bash_command_in_nix:
-          cmd_name: Verify no changes in sbt test files
-          cmd: git add . && git diff --staged --exit-code test*.log
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-          upload_caches: true
-
-  # We put our Daml tests in their own job for more parallelization
-  daml_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
-          save: true
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          cmd: "damlTest"
-          timeout: "10m"
-          extra_env_vars: DAML_DEBUG=1
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
 
   auth0_user_cleanup:
     executor: self_hosted
@@ -3446,11 +3244,51 @@ jobs:
             . .envrc.vars
             .circleci/triggers/setup-pipeline.sh
 
+  build_tests_self_hosted:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
+          upload_caches: true
+
+  build_tests_circleci:
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: xlarge
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "circleci"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "circleci"
+          upload_caches: true
+
   artifacts_push:
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
+    parameters:
+      is_public:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - restore_frontend_builds
@@ -3494,7 +3332,9 @@ jobs:
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
-          additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLE_BRANCH"
+          additional_nix_args: "--keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD \
+            --keep CIRCLE_BRANCH"
           cmd_name: Push Helm Artifacts
           cmd: |
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
@@ -3525,63 +3365,37 @@ jobs:
             # which would lead to an error due to a misisng `delete` permission
             gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
           # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - run_bash_command_in_nix:
-          cmd_name: tag git
-          additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD \
-           --keep GITHUB_TOKEN \
-           --keep CIRCLE_BRANCH"
-          cmd: |
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            RELEASE_TAG=$(get-snapshot-version)
+      - when:
+          condition:
+            equal: [ << parameters.is_public >>, true ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Copy artifacts to Github Container Registry
+                additional_nix_args: "--keep GITHUB_TOKEN \
+                  --keep ARTIFACTORY_USER \
+                  --keep ARTIFACTORY_PASSWORD"
+                cmd: |
+                  export GITHUB_USER="canton-network-da"
+                  make cluster/helm/copy_release_to_ghcr
+                  make cluster/docker/copy_release_to_ghcr
+            - run_bash_command_in_nix:
+                cmd_name: tag git
+                additional_nix_args: "--keep GITHUB_TOKEN"
+                cmd: |
+                  git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  RELEASE_TAG=$(get-snapshot-version)
 
-            if [[ "${CIRCLE_BRANCH}" != *"$RELEASE_TAG"* && "$RELEASE_TAG" != *"snapshot"* ]]; then
-               echo "Release tag '$RELEASE_TAG' is not contained in the branch name '${CIRCLE_BRANCH}'."
-               echo "You are probably publishing the wrong version."
-               exit 1
-            fi
-
-            if [ $(git tag -l "${RELEASE_TAG}") ]; then
-              echo "tag ${RELEASE_TAG} already exists. not tagging"
-            else
-              git tag "${RELEASE_TAG}"
-              git push origin "${RELEASE_TAG}"
-            fi
+                  if [ $(git tag -l "${RELEASE_TAG}") ]; then
+                    echo "tag ${RELEASE_TAG} already exists."
+                    exit 1
+                  else
+                    git tag "${RELEASE_TAG}"
+                    git push origin "${RELEASE_TAG}"
+                  fi
 
       - save_frontend_builds
       - save_sbt_job_result:
           runner_type: "circleci"
-
-  docker_images_build:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    resource_class: xlarge
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - restore_frontend_builds
-      - setup_nix
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - run_bash_command_in_nix:
-          cmd_name: Build app
-          cmd: make build -j
-          cmd_retry_count: 5 # Retry in case of dependency download errors
-          additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD"
-      # compile everything so that caches for circleci runners are up to date
-      - execute_sbt_command:
-          cmd: "Test/compile"
-      - docker_login_artifactory
-      - docker_prep_build
-      - docker_build
-      - save_frontend_builds
-      - save_sbt_job_result:
-          runner_type: "circleci"
-          upload_caches: true
 
   wait_for_previous_pipeline:
     executor: self_hosted
@@ -3753,27 +3567,6 @@ jobs:
       - notify-cluster-fail:
           cluster: "ciupgrade"
 
-  launch_ciperiodic_migration_workflow:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - run:
-          name: Launches the deploy_ciperiodic_migration workflow using the latest release branch as base_version
-          command: |
-            source .envrc.vars
-
-            latest_base_version=$(build-tools/find_latest_hard_migration_base_version.sh)
-            curl --fail-with-body --request POST \
-              --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
-              --header "Circle-Token: ${CIRCLECI_TOKEN}" \
-              --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciperiodic-migration\", \"base-version\": \"$latest_base_version\"}}"
-      - notify-cluster-fail:
-          cluster: "ciperiodic"
-
-
   launch_ciperiodic_migration_operator_workflow:
     executor: self_hosted
     environment:
@@ -3781,7 +3574,7 @@ jobs:
     steps:
       - checkout_with_retry
       - run:
-          name: Launches the deploy_ciperiodic_migration_operator workflow using the latest release branch as base_version
+          name: Launches the deploy_hdm_operator workflow using the latest release branch as base_version
           command: |
             source .envrc.vars
 
@@ -3790,7 +3583,7 @@ jobs:
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
               --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciperiodic-migration-operator\", \"base-version\": \"$latest_base_version\"}}"
+              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-hdm-operator\", \"base-version\": \"$latest_base_version\", \"cluster\":\"ciperiodic\"}}"
       - notify-cluster-fail:
           cluster: "ciperiodic"
 
@@ -3914,12 +3707,12 @@ jobs:
     steps:
       - checkout_with_retry
       - run:
-          name: Skip slack notification if no documentation has benn changed
+          name: Send slack notification if documentation has been changed
           when: always
           command: |
             commit=$(git rev-parse HEAD)
-            changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md')
-            changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' | sed ':a;N;$!ba;s/\n/\\n/g')
+            changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst')
+            changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst' | sed ':a;N;$!ba;s/\n/\\n/g')
             if [ -n "$changed_files" ]; then
               echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
               echo "export GITHUB_COMMIT_URL=\"https://github.com/DACH-NY/canton-network-node/commit/${commit}\"" >> "$BASH_ENV"
@@ -3932,7 +3725,7 @@ jobs:
           channel: << parameters.channel_notify >>
           event: always
           custom: |
-            { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
+            { "text": "*📄Changes to `.md` or `.rst` files have been detected and merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
   build_oss:
     executor: self_hosted
@@ -3942,7 +3735,9 @@ jobs:
       - checkout_with_retry
       - skip_if_flag_set:
           flag: force
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one job
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:
@@ -4618,6 +4413,8 @@ jobs:
               # silence specific alerts that may fire due to reset downtime
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
+            # Always reset the runbook even if the flag is false to ensure that any config change is accounted for
+            export SPLICE_DEPLOY_SV_RUNBOOK=true
 
             if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
@@ -4826,205 +4623,6 @@ jobs:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
-  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
-  # work on anything but the Scala tests is duplicated across all parallel runs of this job
-  scala_test:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    parameters:
-      test_names_file:
-        type: string
-      start_canton_options:
-        type: string
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      parallelism:
-        type: integer
-      resource_class:
-        type: string
-      skip_if_regex:
-        type: string
-        default: ""
-      skip_if_files_changed:
-        type: string
-        default: ""
-      with_docker_images:
-        type: boolean
-        default: false
-      additional_nix_args:
-        type: string
-        default: ""
-    resource_class: << parameters.resource_class >>
-    environment:
-      <<: *env
-      POSTGRES_HOST: localhost
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    parallelism: << parameters.parallelism >>
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - skip_if_flag_set:
-          flag: static
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_regex >>" ]
-          steps:
-            - run:
-                name: Checking git commit against regex << parameters.skip_if_regex >>
-                command: |
-                  base=$(build-tools/get-latest-main-commit)
-                  msg=$(git log "$base"..HEAD --pretty=%B)
-                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
-                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
-                    circleci-agent step halt
-                  fi
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
-          steps:
-            - run:
-                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
-                command: |
-                  latest_release=$(cat "LATEST_RELEASE")
-                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
-                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
-                  if [ -n "$changed" ]; then
-                    echo "Lock files changed ($changed), breaking"
-                    circleci-agent step halt
-                  fi
-      - setup_nix
-      - docker_prep_build
-      # Used to pull docker images for cometbft
-      - docker_login_artifactory
-      - docker_pull_test_images
-      # Start canton before compiling, as it takes a long time to start
-      # Note that we start canton before connecting VPN, so some initial
-      # metrics from Canton will be lost. Currently, they're Canton metrics
-      # before our actual tests start are not of interest for us,
-      # so we accept that.
-      - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >>
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - when:
-          condition:
-            equal: [ true, "<< parameters.with_docker_images >>" ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Build app
-                cmd: make build -j
-                cmd_retry_count: 5 # Retry in case of dependency download errors
-                additional_nix_args: "--keep ARTIFACTORY_USER \
-                  --keep ARTIFACTORY_PASSWORD"
-            - docker_build
-      - split_tests_for_parallel_run:
-          test_names_file: << parameters.test_names_file >>
-      - run_splitted_scala_tests:
-          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          start_canton_options: << parameters.start_canton_options >>
-          additional_nix_args: << parameters.additional_nix_args >>
-      - stop_canton
-      - save_sbt_job_result:
-          runner_type: "circleci"
-  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
-  # work on anything but the Scala tests is duplicated across all parallel runs of this job
-  scala_test_self_hosted:
-    executor: self_hosted_large
-    parameters:
-      test_names_file:
-        type: string
-      start_canton_options:
-        type: string
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      parallelism:
-        type: integer
-      skip_if_regex:
-        type: string
-        default: ""
-      skip_if_files_changed:
-        type: string
-        default: ""
-      additional_nix_args:
-        type: string
-        default: ""
-    environment:
-      <<: *env
-      POSTGRES_HOST: localhost
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-    parallelism: << parameters.parallelism >>
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - skip_if_flag_set:
-          flag: static
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_regex >>" ]
-          steps:
-            - run:
-                name: Checking git commit against regex << parameters.skip_if_regex >>
-                command: |
-                  base=$(build-tools/get-latest-main-commit)
-                  msg=$(git log "$base"..HEAD --pretty=%B)
-                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
-                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
-                    circleci-agent step halt
-                  fi
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
-          steps:
-            - run:
-                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
-                command: |
-                  latest_release=$(cat "LATEST_RELEASE")
-                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
-                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
-                  if [ -n "$changed" ]; then
-                    echo "Lock files changed ($changed), breaking"
-                    circleci-agent step halt
-                  fi
-      - run:
-          name: "Prepare postgres"
-          command: |
-            sudo mkdir -p /run/postgresql
-            sudo chown $USER /run/postgresql
-      - setup_nix_self_hosted
-      - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >> -p external
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - split_tests_for_parallel_run:
-          test_names_file: << parameters.test_names_file >>
-      - run_splitted_scala_tests:
-          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          start_canton_options: << parameters.start_canton_options >>
-          additional_nix_args: << parameters.additional_nix_args >>
-      - stop_canton
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
 workflows:
   version: 2
 
@@ -5037,6 +4635,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          is_public: true
       - create_oss_pr:
           <<: *notify-fail
           context:
@@ -5066,58 +4665,10 @@ workflows:
               ignore:
                 - /release-line-.*/
                 - main
-      # Daml
-      # TODO(#15988): In this job we currently also save the nix cache, if we migrate this
-      # before others, make sure to enable saving the nix cache in some other job instead.
-      - daml_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-      # Scala
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test app upgrade"
-          test_names_file: "test-full-class-names-app-upgrade.log"
-          start_canton_options: "-w"
-          resource_class: "xlarge"
-          parallelism: 1
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
-          skip_if_regex: "\\[breaking\\]"
-          skip_if_files_changed: "nix/canton-sources.json"
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test with docker images"
-          test_names_file: "test-full-class-names-docker-based.log"
-          start_canton_options: "-w -m"
-          additional_nix_args: >
-            --keep VALIDATOR_WEB_UI_PASSWORD
-            --keep OIDC_AUTHORITY_VALIDATOR_AUDIENCE
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-          with_docker_images: true
-          resource_class: "2xlarge"
-          parallelism: 2
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
           <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-      - docker_images_build:
-          <<: *notify-fail
           context:
             - artifactory
             - slack-context
@@ -5126,6 +4677,8 @@ workflows:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
+      # TODO(#15988): In this job we currently also save the nix cache. Before we retire it,
+      # make sure to enable saving the nix cache in some other job instead.
       - build_oss:
           <<: *notify-fail
           context:
@@ -5578,6 +5131,22 @@ workflows:
           context:
             - artifactory
             - slack-context
+        # We build the tests early in the workflow to populate the caches already, otherwise
+        # the tests take longer since they may build the whole repo again.
+        # We do it separately on circleci and self-hosted because their caches are separate,
+        # and we use both for preflights.
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - build_tests_circleci:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
       - wait_for_previous_pipeline:
           <<: *notify-fail
           <<: *main-branch-only
@@ -5619,6 +5188,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - preflight_check_docker:
           <<: *main-branch-only
           context:
@@ -5629,6 +5199,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:
@@ -5647,6 +5218,7 @@ workflows:
           cluster: "cimain"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -5665,6 +5237,7 @@ workflows:
           cluster: "cimain"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
@@ -5703,204 +5276,6 @@ workflows:
           requires:
             - restore_node
 
-  deploy_ciperiodic_migration_operator:
-    when:
-      equal: [ deploy-ciperiodic-migration-operator, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
-          wait_type: "wait_workflow"
-      - artifacts_push:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-      - autoscaler_prevent_scaledown:
-          cluster: "ciperiodic"
-          requires:
-            - wait_for_previous_pipeline
-      - reset_cluster:
-          name: "reset_before_deploy"
-          cluster: "ciperiodic"
-          extra_migrations_reset: "0,1"
-          unlock_shared_cluster: false
-          context:
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-      - deploy_cluster_for_migration_base_version:
-          name: "deploy_cluster_for_migration"
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciperiodic"
-          base_version: << pipeline.parameters.base-version >>
-          requires:
-            - artifacts_push
-            - autoscaler_prevent_scaledown
-            - reset_before_deploy
-      - pre_migration_dump_identities:
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciperiodic"
-          requires:
-            - prepare_cluster_for_migration
-      - pre_migration_compose_validator:
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciperiodic"
-          base_version: << pipeline.parameters.base-version >>
-          requires:
-            - deploy_cluster_for_migration
-      - prepare_cluster_for_migration:
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciperiodic"
-          base_version: << pipeline.parameters.base-version >>
-          requires:
-            - deploy_cluster_for_migration
-      - trigger_global_domain_migration:
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          requires:
-            - prepare_cluster_for_migration
-      - migrate_cluster:
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciperiodic"
-          requires:
-            - trigger_global_domain_migration
-            - pre_migration_compose_validator
-      - preflight_check:
-          name: "preflight_check_migrated"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
-          requires:
-            - migrate_cluster
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
-          requires:
-            - migrate_cluster
-      - post_migration_verify_identities:
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciperiodic"
-          requires:
-            - pre_migration_dump_identities
-            - migrate_cluster
-      - preflight_validator_check:
-          name: "preflight_validator_check_migrated"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
-          requires:
-            - migrate_cluster
-      - post_migration_compose_validator:
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "ciperiodic"
-          upgrade_version: << pipeline.parameters.upgrade-version >>
-          requires:
-            - migrate_cluster
-      - backup_cluster:
-          name: "backup_cluster_after_migration"
-          cluster: "ciperiodic"
-          checkout-branch: "ciperiodic-migration-upgrade"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - restore_node:
-          cluster: "ciperiodic"
-          checkout-branch: "ciperiodic-migration-upgrade"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - backup_cluster_after_migration
-      - reset_and_wait_for_operator_to_redeploy_sv_runbook:
-          name: "deploy_fresh_sv_runbook_after_migration"
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciperiodic"
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - preflight_sv_check:
-          name: "preflight_sv_check_redeployed"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
-          requires:
-            # We wait for the runbook to redeploy to make sure we're not testing the original deployment
-            - deploy_fresh_sv_runbook_after_migration
-      - archive_legacy_migration:
-          context:
-            - artifactory
-            - slack-context
-          cluster: "ciperiodic"
-          requires:
-            - restore_node
-            - preflight_sv_check_redeployed
-            - post_migration_compose_validator
-      - reset_cluster:
-          cluster: "ciperiodic"
-          extra_migrations_reset: "0,1"
-          context:
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - archive_legacy_migration
-      - autoscaler_allow_scaledown:
-          cluster: "ciperiodic"
-          requires:
-            - archive_legacy_migration
-
   deploy_ciperiodic_non_devnet:
     when:
       equal: [ deploy-ciperiodic-non-devnet, << pipeline.parameters.run-job >> ]
@@ -5917,7 +5292,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          workflow_names: "deploy_hdm_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - autoscaler_prevent_scaledown:
           <<: *main-branch-only
@@ -6025,7 +5400,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          workflow_names: "deploy_hdm_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - artifacts_push:
           <<: *main-branch-only
@@ -6224,6 +5599,23 @@ workflows:
           <<: *main-branch-never
           requires:
             - hold_set_scratchnet
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - set_scratchnet
+      - build_tests_circleci:
+          <<: *notify-fail
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - set_scratchnet
+          requires:
+            - set_scratchnet
       - artifacts_push:
           <<: *main-branch-never
           context:
@@ -6267,6 +5659,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - preflight_check_docker:
           <<: *main-branch-never
           context:
@@ -6277,6 +5670,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
@@ -6336,6 +5730,7 @@ workflows:
            cluster: "user-selected-scratchnet"
            requires:
              - deploy_cluster
+             - build_tests_self_hosted
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -6354,6 +5749,7 @@ workflows:
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - deploy_arm_compose_validator:
           <<: *main-branch-never
           context:
@@ -6363,6 +5759,7 @@ workflows:
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - reset_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
@@ -6686,13 +6083,28 @@ workflows:
             - slack-context
             - canton-network-vpn
 
-  deploy_hard_migration:
+  deploy_hdm_operator:
     when:
-      equal: [ deploy-hard-migration, << pipeline.parameters.run-job >> ]
+      equal: [ deploy-hdm-operator, << pipeline.parameters.run-job >> ]
     jobs:
-      - artifacts_push:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
           context:
             - artifactory
+            - slack-context
+          # a bit weird that we're waiting on the periodic workflows but we're filtering on the branch so it should be fine
+          workflow_names: "deploy_hdm_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          wait_type: "wait_workflow"
+          branch_filter: << pipeline.git.branch >>
+      - artifacts_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+      - autoscaler_prevent_scaledown:
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - wait_for_previous_pipeline
       - reset_cluster:
           name: "reset_before_deploy"
           cluster: << pipeline.parameters.cluster >>
@@ -6700,47 +6112,27 @@ workflows:
           unlock_shared_cluster: false
           context:
             - slack-context
-      - deploy_cluster:
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_cluster_for_migration_base_version:
           name: "deploy_cluster_for_migration"
           context:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          deploy_version: << pipeline.parameters.base-version >>
+          base_version: << pipeline.parameters.base-version >>
           requires:
+            - artifacts_push
+            - autoscaler_prevent_scaledown
             - reset_before_deploy
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_migration"
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: << pipeline.parameters.cluster >>
-          deploy_version: << pipeline.parameters.base-version >>
-          requires:
-            - deploy_cluster_for_migration
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_for_migration"
-          context:
-            - artifactory
-            - slack-context
-          cluster: << pipeline.parameters.cluster >>
-          deploy_version: << pipeline.parameters.base-version >>
-          requires:
-            - deploy_cluster_for_migration
       - pre_migration_dump_identities:
-          <<: *main-branch-never
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-          send_notifications: false
           requires:
-            - deploy_cluster_for_migration
-            - deploy_validator_runbook_for_migration
+            - prepare_cluster_for_migration
       - pre_migration_compose_validator:
           context:
             - artifactory
@@ -6748,41 +6140,18 @@ workflows:
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
-          send_notifications: false
           requires:
-            - deploy_cluster_for_migration
-      - hard_migration:
-          name: "prepare_cluster_for_migration"
+            - artifacts_push
+            - autoscaler_prevent_scaledown
+            - reset_before_deploy
+      - prepare_cluster_for_migration:
           context:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          action: "prepare"
-          scope: "core"
           base_version: << pipeline.parameters.base-version >>
-          upgrade_version: << pipeline.parameters.upgrade-version >>
-          send_notifications: false
           requires:
-            - artifacts_push
             - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
-      - hard_migration:
-          name: "prepare_sv_runbook_for_migration"
-          context:
-            - artifactory
-            - slack-context
-          cluster: << pipeline.parameters.cluster >>
-          action: "prepare"
-          scope: "sv"
-          base_version: << pipeline.parameters.base-version >>
-          upgrade_version: << pipeline.parameters.upgrade-version >>
-          send_notifications: false
-          requires:
-            - artifacts_push
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
       - trigger_global_domain_migration:
           context:
             - artifactory
@@ -6790,27 +6159,15 @@ workflows:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
             - prepare_cluster_for_migration
-            - prepare_sv_runbook_for_migration
-      - hard_migration:
-          name: "migrate_cluster"
+      - migrate_cluster:
           context:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          action: "migrate"
-          scope: "core"
-          base_version: << pipeline.parameters.base-version >>
-          upgrade_version: << pipeline.parameters.upgrade-version >>
-          send_notifications: false
           requires:
-            - prepare_cluster_for_migration
             - trigger_global_domain_migration
             - pre_migration_compose_validator
-            - pre_migration_dump_identities
       - preflight_check:
           name: "preflight_check_migrated"
           context:
@@ -6821,44 +6178,16 @@ workflows:
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
           requires:
-            - trigger_global_domain_migration
-      - hard_migration:
-          name: "migrate_sv_runbook"
-          context:
-            - artifactory
-            - slack-context
-          cluster: << pipeline.parameters.cluster >>
-          action: "migrate"
-          scope: "sv"
-          base_version: << pipeline.parameters.base-version >>
-          upgrade_version: << pipeline.parameters.upgrade-version >>
-          send_notifications: false
-          requires:
-            - prepare_sv_runbook_for_migration
             - migrate_cluster
-      # Re-enable once latest release is > 0.2.3
-      #      - preflight_sv_check:
-      #          name: "preflight_sv_check_migrated"
-      #          context:
-      #            - artifactory
-      #            - canton-network-vpn
-      #            - slack-context
-      #          cluster: << pipeline.parameters.cluster >>
-      #          cluster_version: << pipeline.parameters.upgrade-version >>
-      #          migration_id: 1
-      #          requires:
-      #            - migrate_cluster
-      - hard_migration:
-          name: "migrate_validator_runbook"
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
           context:
             - artifactory
+            - canton-network-vpn
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          action: "migrate"
-          scope: "validator"
-          base_version: << pipeline.parameters.base-version >>
-          upgrade_version: << pipeline.parameters.upgrade-version >>
-          send_notifications: false
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - migrate_cluster
       - post_migration_verify_identities:
@@ -6867,11 +6196,9 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-          send_notifications: false
           requires:
             - pre_migration_dump_identities
             - migrate_cluster
-            - migrate_validator_runbook
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           context:
@@ -6890,23 +6217,23 @@ workflows:
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
           upgrade_version: << pipeline.parameters.upgrade-version >>
-          send_notifications: false
           requires:
             - migrate_cluster
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: << pipeline.parameters.cluster >>
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           requires:
-            # Re-enable once latest release is > 0.2.3
-            #            - preflight_sv_check_migrated
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
           cluster: << pipeline.parameters.cluster >>
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory
@@ -6914,29 +6241,14 @@ workflows:
             - slack-context
           requires:
             - backup_cluster_after_migration
-      - reset_sv_runbook:
-          name: "reset_sv_runbook_after_migration"
-          extra_migrations_reset: "0,1"
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: << pipeline.parameters.cluster >>
-          requires:
-            - migrate_sv_runbook
-      - deploy_sv_runbook:
+      - reset_and_wait_for_operator_to_redeploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-          deploy_version: << pipeline.parameters.upgrade-version >>
-          global_domain_active_migration_id: 1
           requires:
-            - reset_sv_runbook_after_migration
-#          # Re-enable once latest release is > 0.2.3
-      #            - preflight_sv_check_migrated
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - preflight_sv_check:
@@ -6951,17 +6263,27 @@ workflows:
           requires:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration
-      - reset_cluster:
-          cluster: << pipeline.parameters.cluster >>
-          extra_migrations_reset: "0,1"
-          unlock_shared_cluster: true
+      - archive_legacy_migration:
           context:
-            - canton-network-vpn
+            - artifactory
             - slack-context
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - restore_node
             - preflight_sv_check_redeployed
             - post_migration_compose_validator
+      - reset_cluster:
+          cluster: << pipeline.parameters.cluster >>
+          extra_migrations_reset: "0,1"
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - archive_legacy_migration
+      - autoscaler_allow_scaledown:
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - archive_legacy_migration
 
   apply_infra:
     when:
@@ -7174,6 +6496,12 @@ workflows:
           workflow_names: "deploy_upgrade"
           wait_type: "cancel_waiting_and_wait_workflow"
           branch_filter: << pipeline.parameters.branch-filter >>
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
       - autoscaler_prevent_scaledown:
           cluster: << pipeline.parameters.cluster >>
           requires:
@@ -7214,6 +6542,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>
@@ -7235,6 +6564,7 @@ workflows:
           cluster: << pipeline.parameters.cluster >>
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>
@@ -7255,6 +6585,7 @@ workflows:
           cluster: << pipeline.parameters.cluster >>
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - artifacts_push:
           <<: *notify-fail
           context:

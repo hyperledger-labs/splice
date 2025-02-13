@@ -27,6 +27,9 @@ ADD target/canton.tar .
 
 COPY target/monitoring.conf target/parameters.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
 
+# Overwrite the LICENSE.txt file from canton image with the one from Splice
+COPY target/LICENSE.txt .
+
 RUN ln -s bin/canton splice-image-bin
 
 FROM fullstorydev/grpcurl:v1.9.2 AS grpcurl

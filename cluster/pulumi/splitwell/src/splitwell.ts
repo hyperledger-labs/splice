@@ -37,7 +37,13 @@ export async function installSplitwell(
   const xns = exactNamespace('splitwell', true);
   const sharedPostgres = splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'splitwell-pg', 'splitwell-pg', splitPostgresInstances);
+    : postgres.installPostgres(
+        xns,
+        'splitwell-pg',
+        'splitwell-pg',
+        activeVersion,
+        splitPostgresInstances
+      );
 
   const loopback = installSpliceHelmChart(
     xns,
@@ -70,7 +76,8 @@ export async function installSplitwell(
     }
   );
 
-  const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', true);
+  const swPostgres =
+    sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', activeVersion, true);
   const splitwellDbName = 'app_splitwell';
 
   const scanAddress = `http://scan-app.sv-1:5012`;
@@ -103,7 +110,8 @@ export async function installSplitwell(
   );
 
   const validatorPostgres =
-    sharedPostgres || postgres.installPostgres(xns, 'validator-pg', 'validator-pg', true);
+    sharedPostgres ||
+    postgres.installPostgres(xns, 'validator-pg', 'validator-pg', activeVersion, true);
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = imagePullDeps

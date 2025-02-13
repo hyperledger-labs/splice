@@ -10,15 +10,22 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   ParticipantAdminCommands,
+  PruningSchedulerCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedDomainsResult,
   NodeStatus,
   ParticipantStatus,
+  PruningSchedule,
 }
-import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsResponse}
+import com.digitalasset.canton.admin.participant.v30.{
+  DarDescription,
+  ExportAcsResponse,
+  PruningServiceGrpc,
+}
+import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -68,7 +75,7 @@ class ParticipantAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-)(implicit ec: ExecutionContextExecutor, tracer: Tracer)
+)(implicit protected val ec: ExecutionContextExecutor, tracer: Tracer)
     extends TopologyAdminConnection(
       config,
       apiLoggingConfig,
@@ -79,6 +86,16 @@ class ParticipantAdminConnection(
     with HasParticipantId
     with StatusAdminConnection {
   override val serviceName = "Canton Participant Admin API"
+
+  val pruningCommands = new PruningSchedulerCommands[PruningServiceStub](
+    PruningServiceGrpc.stub,
+    _.setSchedule(_),
+    _.clearSchedule(_),
+    _.setCron(_),
+    _.setMaxDuration(_),
+    _.setRetention(_),
+    _.getSchedule(_),
+  )
 
   override protected type Status = ParticipantStatus
 
@@ -154,8 +171,7 @@ class ParticipantAdminConnection(
       ParticipantAdminCommands.DomainConnectivity.RegisterDomain(
         config,
         handshakeOnly,
-        // TODO(#10985) Consider enabling this
-        SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.StrictActive,
       )
     )
 
@@ -348,31 +364,36 @@ class ParticipantAdminConnection(
     runCmd(
       ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(
         config,
-        // TODO(#10985) Consider enabling this
-        SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.StrictActive,
       )
     )
 
   def modifyDomainConnectionConfig(
       domain: DomainAlias,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
-  )(implicit traceContext: TraceContext): Future[Boolean] =
-    for {
-      baseConfig <- getDomainConnectionConfig(domain)
-      newConfig = f(baseConfig)
-      configModified <- newConfig match {
-        case None =>
-          logger.trace("No update to domain connection config required")
-          Future.successful(false)
-        case Some(config) =>
-          logger.info(
-            s"Updating to new domain connection config for domain $domain. base config: $baseConfig, new config: $config"
-          )
-          for {
-            _ <- setDomainConnectionConfig(config)
-          } yield true
-      }
-    } yield configModified
+  )(implicit traceContext: TraceContext): Future[Boolean] = {
+    retryProvider.retryForClientCalls(
+      "modify_domain_connection",
+      "Set the new domain connection if required",
+      for {
+        oldConfig <- getDomainConnectionConfig(domain)
+        newConfig = f(oldConfig)
+        configModified <- newConfig match {
+          case None =>
+            logger.trace("No update to domain connection config required")
+            Future.successful(false)
+          case Some(config) =>
+            logger.info(
+              s"Updating to new domain connection config for domain $domain. Old config: $oldConfig, new config: $config"
+            )
+            for {
+              _ <- setDomainConnectionConfig(config)
+            } yield true
+        }
+      } yield configModified,
+      logger,
+    )
+  }
 
   private def modifyOrRegisterDomainConnectionConfig(
       config: DomainConnectionConfig,
@@ -816,6 +837,37 @@ class ParticipantAdminConnection(
       isProposal = true,
     )
   }
+
+  private def setPruningSchedule(
+      cron: String,
+      maxDuration: PositiveDurationSeconds,
+      retention: PositiveDurationSeconds,
+  )(implicit tc: TraceContext): Future[Unit] =
+    runCmd(pruningCommands.SetScheduleCommand(cron, maxDuration, retention))
+
+  private def getPruningSchedule()(implicit tc: TraceContext): Future[Option[PruningSchedule]] =
+    runCmd(pruningCommands.GetScheduleCommand())
+
+  /** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
+    *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
+    *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
+    *      specified retention period.
+    */
+  def ensurePruningSchedule(
+      cron: String,
+      maxDuration: PositiveDurationSeconds,
+      retention: PositiveDurationSeconds,
+  )(implicit tc: TraceContext): Future[Unit] =
+    retryProvider.ensureThatB(
+      RetryFor.WaitingOnInitDependency,
+      "participant_pruning_schedule",
+      s"Pruning schedule is set to ($cron, $maxDuration, $retention)",
+      getPruningSchedule().map(scheduleO =>
+        scheduleO.exists(_ == PruningSchedule(cron, maxDuration, retention))
+      ),
+      setPruningSchedule(cron, maxDuration, retention),
+      logger,
+    )
 
   /** Version of [[ensureTopologyMapping]] that also handles proposals:
     * - a new topology transaction is created as a proposal

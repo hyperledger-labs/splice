@@ -12,6 +12,12 @@ workflow:
           workflow_names: "deploy_upgrade"
           wait_type: "cancel_waiting_and_wait_workflow"
           branch_filter: << pipeline.parameters.branch-filter >>
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
       - autoscaler_prevent_scaledown:
           cluster: << pipeline.parameters.cluster >>
           requires:
@@ -52,6 +58,7 @@ workflow:
           wait_for_sv: false
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>
@@ -73,6 +80,7 @@ workflow:
           cluster: << pipeline.parameters.cluster >>
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>
@@ -93,6 +101,7 @@ workflow:
           cluster: << pipeline.parameters.cluster >>
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - artifacts_push:
           <<: *notify-fail
           context:

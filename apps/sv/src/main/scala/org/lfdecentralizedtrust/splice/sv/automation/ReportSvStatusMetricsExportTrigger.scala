@@ -151,9 +151,9 @@ class ReportSvStatusMetricsExportTrigger(
 
 object ReportSvStatusMetricsExportTrigger {
 
-  private case class SvId(svParty: String, svName: String)
+  case class SvId(svParty: String, svName: String)
 
-  private case class SvCometBftMetrics(
+  case class SvCometBftMetrics(
       metricsFactory: LabeledMetricsFactory
   ) extends AutoCloseable {
 
@@ -188,7 +188,7 @@ object ReportSvStatusMetricsExportTrigger {
     }
   }
 
-  private case class SvStatusMetrics(
+  case class SvStatusMetrics(
       svId: SvId,
       metricsFactory: LabeledMetricsFactory,
   ) extends AutoCloseable {

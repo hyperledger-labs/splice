@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   approveDaSupportSvNode,
+  svPrivateConfigsClusterDirectory,
   config,
   isDevNet,
   isMainNet,
@@ -43,7 +44,7 @@ function extractIpRanges(x: IpRangesDict): string[] {
 
 export function loadIPRanges(): string[] {
   const externalIPRangesJson = loadJsonFromFile(
-    REPO_ROOT + '/cluster/cn-svc-configs/configs/allowed-ip-ranges-external.json'
+    `${svPrivateConfigsClusterDirectory}/allowed-ip-ranges.json`
   );
   const internalIPRangesJson = loadJsonFromFile(
     REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
@@ -53,15 +54,15 @@ export function loadIPRanges(): string[] {
     infraConfig.ipWhitelisting.extraWhitelistedIngress.concat(daSupportNodeIpRanges);
 
   if (isDevNet) {
-    return extractIpRanges(externalIPRangesJson.devnet)
+    return extractIpRanges(externalIPRangesJson)
       .concat(extractIpRanges(internalIPRangesJson.devnet))
       .concat(extraWhitelistedIps);
   } else if (isMainNet) {
-    return extractIpRanges(externalIPRangesJson.mainnet).concat(
+    return extractIpRanges(externalIPRangesJson).concat(
       extractIpRanges(internalIPRangesJson.mainnet)
     );
   } else {
-    return extractIpRanges(externalIPRangesJson.testnet)
+    return extractIpRanges(externalIPRangesJson)
       .concat(extractIpRanges(internalIPRangesJson.testnet))
       .concat(extraWhitelistedIps);
   }
