@@ -4619,6 +4619,8 @@ jobs:
 
             echo "scaling validator1 back up"
             kubectl scale deployment --replicas=1 -n validator1 validator-app
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
