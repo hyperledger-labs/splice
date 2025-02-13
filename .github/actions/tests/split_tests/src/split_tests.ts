@@ -1,12 +1,16 @@
-const fs = require('fs');
+import { getInput, setFailed, setOutput } from '@actions/core';
+import xmlParser from 'fast-xml-parser';
+import fs from 'fs';
 
-function getTestSuiteTimesFromXml(xmlParser, testReportsDir) {
+type TestTimes = { [name: string]: number };
+
+function getTestSuiteTimesFromXml(testReportsDir: string): TestTimes {
 
   const options = {
     ignoreAttributes: false
   };
   const parser = new xmlParser.XMLParser(options);
-  const testTimes = {};
+  const testTimes: TestTimes = {};
   try {
     fs.readdirSync(testReportsDir).forEach(file => {
       if (file.endsWith('.xml')) {
@@ -25,13 +29,13 @@ function getTestSuiteTimesFromXml(xmlParser, testReportsDir) {
   return testTimes;
 }
 
-function estimateTestTimes(testTimes, testNames) {
+function estimateTestTimes(testTimes: TestTimes, testNames: string[]): TestTimes {
   let maxTestTime = Math.max(...Object.values(testTimes));
   // If maxTestTime is zero, i.e. no runtimes are known, we assign everything an
   // arbitrary non-zero value of 1.0
   maxTestTime = Math.max(maxTestTime, 1.0);
 
-  const estimatedTestTimes = {};
+  const estimatedTestTimes: TestTimes = {};
   testNames.forEach(testName => {
     estimatedTestTimes[testName] = testTimes[testName] || maxTestTime;
     // Scalatest actually reported occasionally test times with negative numbers,
@@ -42,7 +46,7 @@ function estimateTestTimes(testTimes, testNames) {
   return estimatedTestTimes
 }
 
-function splitTests(sortedTestNames, estimatedTestTimes, splitTotal) {
+function splitTests(sortedTestNames: string[], estimatedTestTimes: TestTimes, splitTotal: number): string[][] {
   const bucketTimes = Array(splitTotal).fill(0);
   const buckets = Array.from(Array(splitTotal), () => new Array())
 
@@ -59,8 +63,8 @@ function splitTests(sortedTestNames, estimatedTestTimes, splitTotal) {
   return buckets;
 }
 
-function main(xmlParser, testReportsDir, testNamesFile, splitTotal) {
-  testTimes = getTestSuiteTimesFromXml(xmlParser, testReportsDir, testNamesFile);
+function computeBuckets(testReportsDir: string, testNamesFile: string, splitTotal: number) {
+  const testTimes = getTestSuiteTimesFromXml(testReportsDir);
 
   const testNames = fs.readFileSync(testNamesFile).toString().split('\n').filter(name => name.length > 0);
 
@@ -79,8 +83,5 @@ function main(xmlParser, testReportsDir, testNamesFile, splitTotal) {
   return buckets;
 }
 
-module.exports = async ({ xmlParser, testReportsDir, testNamesFile, splitTotal }) => {
-
-  return main(xmlParser, testReportsDir, testNamesFile, splitTotal);
-
-};
+const buckets = computeBuckets(getInput('test_reports_dir'), getInput('test_names_file'), parseInt(getInput('split_total')));
+setOutput('test_names', JSON.stringify(buckets));

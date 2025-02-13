@@ -30,7 +30,7 @@ jobs:
           # Checkout the PR head commit to get the commit message
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Prepare tests
+      - name: Split tests
         id: prep
         uses: ./.github/actions/tests/pre_scala_test
         with:

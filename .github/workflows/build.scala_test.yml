@@ -60,7 +60,7 @@ jobs:
           # Checkout with full history to get all commit messages on the branch
           fetch-depth: 0
 
-      - name: Prepare tests
+      - name: Split tests
         id: prep
         uses: ./.github/actions/tests/pre_scala_test
         with:
