@@ -190,6 +190,11 @@ class ManualStartIntegrationTest
           startAllSync(allCnApps*)
         }
 
+        // Wait for automation to start and the user to be reported as onboarded
+        clue("Alice is reported as onboarded") {
+          waitForWalletUser(aliceWalletClient)
+        }
+
         actAndCheck(
           "Alice taps some coin again",
           aliceWalletClient.tap(200),
