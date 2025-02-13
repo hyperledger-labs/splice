@@ -216,7 +216,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.10"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -421,7 +421,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.10"
     },
     "name": "loopback",
     "provider": "",
@@ -490,7 +490,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.10"
     },
     "name": "scan",
     "provider": "",
@@ -753,7 +753,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 330000
+            "rewardWeightBps": 270000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -766,9 +766,24 @@
             "rewardWeightBps": 100000
           },
           {
+            "name": "Tradeweb-Markets-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
+            "rewardWeightBps": 0
+          },
+          {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7-Technology-Services-Limited",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
+            "rewardWeightBps": 100000
+          },
+          {
+            "name": "Five-North-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -839,7 +854,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.10"
     },
     "name": "sv-app",
     "provider": "",
@@ -1262,7 +1277,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.3.5"
+      "version": "0.3.10"
     },
     "name": "validator",
     "provider": "",

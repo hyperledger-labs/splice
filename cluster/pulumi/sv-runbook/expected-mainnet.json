@@ -216,7 +216,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -443,7 +443,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "loopback",
     "provider": "",
@@ -513,7 +513,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "scan",
     "provider": "",
@@ -709,7 +709,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -749,14 +749,9 @@
         },
         "approvedSvIdentities": [
           {
-            "name": "Liberty-City-Ventures",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeZ7ocmkxbNggLzGcSPxSF/pb1SK5lf2ReUxKokBH1KUZLeyQMNn8E5Xr4K3D4buoBxsnupO2IRkjWKQHRgsf0Q==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 430000
+            "rewardWeightBps": 270000
           },
           {
             "name": "Digital-Asset-1",
@@ -796,7 +791,12 @@
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYMTwBnr8tq7dL7/o5WyzZ1hzm6CvFCWtXHnyTC5zkmXKYcr37d7CQ8+tBBy0JAHvsGvmE33B+tAucEVfJnkBzw==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7-Technology-Services-Limited",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdRk0Ef3U0VSxdBo3/azkCY2Y7VFV6sM/7O1u93VHbAgJSqIeQK3B2yklxjKvZJDUyz0jNjuSF4Zvc780nv9IHg==",
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
@@ -868,7 +868,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-app",
     "provider": "",
@@ -993,7 +993,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1071,7 +1071,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1149,7 +1149,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1264,7 +1264,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "validator",
     "provider": "",

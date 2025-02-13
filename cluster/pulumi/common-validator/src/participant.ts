@@ -3,7 +3,6 @@ import { Output } from '@pulumi/pulumi';
 import {
   Auth0Config,
   auth0UserNameEnvVarSource,
-  autoInitValues,
   ChartValues,
   DEFAULT_AUDIENCE,
   activeVersion,
@@ -38,7 +37,8 @@ export function installParticipant(
     : { kmsValues: {}, gkeCredentialsSecret: [] };
 
   const participantPostgres =
-    defaultPostgres || postgres.installPostgres(xns, `participant-pg`, `participant-pg`, true);
+    defaultPostgres ||
+    postgres.installPostgres(xns, `participant-pg`, `participant-pg`, activeVersion, true);
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
       OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
@@ -87,7 +87,6 @@ export function installParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
-      ...autoInitValues('splice-participant', version, nodeIdentifier),
     },
     version,
     {

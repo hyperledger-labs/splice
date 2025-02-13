@@ -1,7 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.PositiveDurationSeconds
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -24,6 +26,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.validator.config.ParticipantPruningConfig
 
 import java.util.UUID
 import scala.concurrent.duration.DurationInt
@@ -61,7 +64,14 @@ class ManualStartIntegrationTest
             _.map { aliceValidatorConfig =>
               val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
               aliceValidatorConfig.copy(
-                domains = withoutExtraDomains
+                domains = withoutExtraDomains,
+                participantPruningSchedule = Some(
+                  ParticipantPruningConfig(
+                    "0 0 * * * ?",
+                    PositiveDurationSeconds.tryFromDuration(1.hours),
+                    PositiveDurationSeconds.tryFromDuration(30.hours),
+                  )
+                ),
               )
             }
           }
@@ -152,6 +162,16 @@ class ManualStartIntegrationTest
           allTopologyConnections.foreach(assertSigningKeysDifferent.tupled)
         }
 
+        clue("Alice participant pruning config has been changed") {
+          aliceValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
+            PruningSchedule(
+              "0 0 * * * ?",
+              PositiveDurationSeconds.tryFromDuration(1.hours),
+              PositiveDurationSeconds.tryFromDuration(30.hours),
+            )
+          )
+        }
+
         // A most basic check to see whether the network is functional
         onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         actAndCheck(
@@ -168,6 +188,11 @@ class ManualStartIntegrationTest
         }
         clue("Starting all Splice apps") {
           startAllSync(allCnApps*)
+        }
+
+        // Wait for automation to start and the user to be reported as onboarded
+        clue("Alice is reported as onboarded") {
+          waitForWalletUser(aliceWalletClient)
         }
 
         actAndCheck(

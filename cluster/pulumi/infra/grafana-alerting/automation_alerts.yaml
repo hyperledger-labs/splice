@@ -125,7 +125,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: histogram_quantile(0.99, rate(splice_trigger_latency_duration_seconds{trigger_name="AcsSnapshotTrigger", namespace="sv-1"}[$__rate_interval]))
+              expr: histogram_quantile(0.99, rate(splice_trigger_latency_duration_seconds{trigger_name="AcsSnapshotTrigger", namespace="sv-1"}[10m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto

@@ -22,7 +22,7 @@ function _export_auth0_env_vars {
     exit 1
   fi
 
-  AUTH0_TENANT=canton-network-validator-test.us.auth0.com
+  AUTH0_TENANT=canton-network-test.us.auth0.com
   AUTH_URL="https://${AUTH0_TENANT}"
   export AUTH_URL
   AUTH_JWKS_URL="${AUTH_URL}/.well-known/jwks.json"
@@ -30,9 +30,9 @@ function _export_auth0_env_vars {
   AUTH_WELLKNOWN_URL="${AUTH_URL}/.well-known/openid-configuration"
   export AUTH_WELLKNOWN_URL
 
-  auth0 login --domain ${AUTH0_TENANT} --client-id "$AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID" --client-secret "$AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET"
+  auth0 login --domain ${AUTH0_TENANT} --client-id "$AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID" --client-secret "$AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
   auth0 tenants use ${AUTH0_TENANT}
-  auth0_app=$(auth0 apps ls -r --json 2> /dev/null | jq '.[] | select(.name == "Validator app backend")')
+  auth0_app=$(auth0 apps ls -r --json 2> /dev/null | jq '.[] | select(.name == "Docker-Compose Validator App")')
 
   VALIDATOR_AUTH_CLIENT_SECRET=$(echo "$auth0_app" | jq -r '.client_secret')
   export VALIDATOR_AUTH_CLIENT_SECRET
@@ -40,13 +40,13 @@ function _export_auth0_env_vars {
   export VALIDATOR_AUTH_CLIENT_ID
   LEDGER_API_ADMIN_USER="${VALIDATOR_AUTH_CLIENT_ID}@clients"
   export LEDGER_API_ADMIN_USER
-  WALLET_UI_CLIENT_ID=$(auth0 apps ls -r --json 2> /dev/null | jq -r ".[] | select(.name == \"Wallet UI (Pulumi managed, $GCP_CLUSTER_BASENAME)\") | .client_id")
+  WALLET_UI_CLIENT_ID=$(auth0 apps ls -r --json 2> /dev/null | jq -r ".[] | select(.name == \"Docker-Compose Wallet UI\") | .client_id")
   export WALLET_UI_CLIENT_ID
-  ANS_UI_CLIENT_ID=$(auth0 apps ls -r --json 2> /dev/null | jq -r ".[] | select(.name == \"ANS UI (Pulumi managed, $GCP_CLUSTER_BASENAME)\") | .client_id")
+  ANS_UI_CLIENT_ID=$(auth0 apps ls -r --json 2> /dev/null | jq -r ".[] | select(.name == \"Docker-Compose ANS UI\") | .client_id")
   export ANS_UI_CLIENT_ID
   LEDGER_API_AUTH_AUDIENCE="https://ledger_api.example.com"
   export LEDGER_API_AUTH_AUDIENCE
-  WALLET_ADMIN_USER=$(auth0 users search --query email:"admin@validator.com" --json 2>/dev/null | jq -r '.[].user_id')
+  WALLET_ADMIN_USER=$(auth0 users search --query email:"admin@compose-validator.com" --json 2>/dev/null | jq -r '.[].user_id')
   export WALLET_ADMIN_USER
   VALIDATOR_AUTH_AUDIENCE="https://validator.example.com/api"
   export VALIDATOR_AUTH_AUDIENCE
@@ -236,20 +236,20 @@ function subcmd_start {
   if [ $da_repo -eq 1 ]; then
     if [[ "$IMAGE_TAG" == *-dirty ]]; then
       export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
+    # if the base version is a release version ensure we use the public repository
+    elif [[ $IMAGE_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
     else
+      current_branch=""
       if [ -n "${CIRCLE_BRANCH:-}" ]; then
-        if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
-          export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
-        else
-          export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
-        fi
+        current_branch="${CIRCLE_BRANCH}"
       else
         current_branch=$(git rev-parse --abbrev-ref HEAD)
-        if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
-          export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
-        else
-          export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
-        fi
+      fi
+      if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
+        export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
+      else
+        export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
       fi
     fi
   else
@@ -382,7 +382,7 @@ function subcmd_start_network {
   curl -sf "scan.localhost:8080/api/scan/readyz" || _error "Scan is not ready after 5 minutes" || exit 1
 
   _info "Starting validator"
-  _do_start_validator -l -o "$secret" -p "local-composeValidator-1"
+  _do_start_validator -l -o "$secret" -p "local-composeValidator-1" -m 0
 
   _info "The full network is ready"
 }

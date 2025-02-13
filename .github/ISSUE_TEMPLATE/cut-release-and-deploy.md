@@ -29,8 +29,6 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 - [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
   - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
 - [ ] Trigger a CircleCI pipeline on the release branch with `run-job: publish-public-artifacts`
-- [ ] Merge a PR into the _ancestor branch_ with the following changes:
-  - Update `VERSION` and `LATEST_RELEASE`. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
 - [ ] If _ancestor branch_ is not `origin/main`, forward port all changes made to the _ancestor branch_ as part of this release to `origin/main`
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
   - [ ] Merge the auto-generated PR in https://github.com/digital-asset/decentralized-canton-sync
@@ -39,11 +37,13 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
       (https://github.com/digital-asset/decentralized-canton-sync/releases), find the draft
       release for the release you just created and publish it (click the edit pencil icon). This should be done after merging the PR because it will
       also automatically bundle the sources from the release-line branch.
+- [ ] Merge a PR into the _ancestor branch_ with the following changes:
+  - Update `VERSION` and `LATEST_RELEASE`. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
 
 ## Upgrade our own nodes on DevNet
 
 - [ ] If significant time has passed since cutting the release, ensure that there are no changes that need to be backported to the release branch.
-      In particular, check for changes to the `cluster/cn-svc-configs` submodule.
+      In particular, check for changes to the `cluster/configs` and `cluster/configs-private` submodules.
 - [ ] Merge a PR into the release branch (`origin/release-line-0.x.y`) with the following changes:
   - [ ] Update the cluster `config.yaml` file by setting the new reference under `synchronizerMigration.active.releaseReference` and update the `synchronizerMigration.active.version` to version `0.x.y`.
   - [ ] Update `cluster/deployment/devnet/.envrc.vars`, bumping the release version.

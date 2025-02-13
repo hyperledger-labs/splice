@@ -46,6 +46,7 @@
     - [Porting between branches](#porting-between-branches)
   - [Testing](#testing)
     - [Managing Canton for Tests](#managing-canton-for-tests)
+      - [Issues on macOS](#issues-on-macos)
       - [Using a local build of Canton](#using-a-local-build-of-canton)
     - [Managing Frontends for Tests](#managing-frontends-for-tests)
     - [Running and Debugging Integration Tests](#running-and-debugging-integration-tests)
@@ -86,18 +87,22 @@ clusters.)
 
 ## Setting up Your Development Environment
 
-1. Clone the repository using `git clone --recurse-submodules git@github.com:DACH-NY/canton-network-node.git`.
-   If you cloned the repository before, you might want to set `git config submodule.recurse true` to make sure
-   the `cn-svc-configs` submodule is updated automatically on `git pull` and similar operations.
-2. Install [direnv](https://direnv.net/#basic-installation).
-3. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
-4. Enable support for nix flakes and the nix command by adding to the
+1. Clone the repository using `git clonegit@github.com:DACH-NY/canton-network-node.git`.
+1. Submodules:
+   - Initialize and update the configs submodule using `git submodule update --init cluster/configs`
+   - If you intend to deploy to clusters, also initialize and update the private configs
+     submodule using `git submodule update --init cluster/configs-private`. In this case,
+     you might want to set `git config submodule.recurse true` to make sure
+     both submodules are updated automatically on `git pull` and similar operations.
+1. Install [direnv](https://direnv.net/#basic-installation).
+1. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
+1. Enable support for nix flakes and the nix command by adding to the
    following to your nix config (either `/etc/nix/nix.conf` if you
    have a multi-user install or `~/.config/nix/nix.conf`):
     ```
     extra-experimental-features = nix-command flakes
     ```
-6. Configure artifactory credentials
+1. Configure artifactory credentials
    You can generate an artifactory Identity Token [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
@@ -108,19 +113,19 @@ clusters.)
       login yourartifactoryusername
       password yourartifactoryidentitytoken
       ```
-   2. For access to the canton enterprise docker repo and for sbt to download internal dependencies
+   1. For access to the canton enterprise docker repo and for sbt to download internal dependencies
       To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` must be configured.
       Best would be to add the to the `.envrc.private` file like so:
       ```
       export ARTIFACTORY_USER="yourartifactoryusername"
       export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
       ```
-7. After switching to the CC repo you should see a line like
+1. After switching to the CC repo you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-amulet/.envrc is blocked. Run `direnv allow` to approve its content
    ```
-8. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
-9. If you get an authorization exception, like the following:
+1. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
+1. If you get an authorization exception, like the following:
    ```
    direnv: using nix
    error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz': HTTP error 401 ('Unauthorized')
@@ -144,7 +149,7 @@ clusters.)
       ```
       nix develop --debug --verbose path:nix
       ```
-10. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
+1. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
     ```
     pre-commit install
     # or:
@@ -160,9 +165,9 @@ clusters.)
 
      If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
-11. On MacOS, please install the following globally:
+1. On MacOS, please install the following globally:
    1. Firefox, by following the process here: <https://www.firefox.com>
-12. Configure CircleCI.
+1. Configure CircleCI.
     Open `./.circleci/cluster-lock-users.json`, and add a line of the format
     ```
     "<circleci-username>": ["<local-username>"],
@@ -177,7 +182,7 @@ clusters.)
     ```
     to receive slack pings when your cluster lock is ~1hr away from expiring. Determine your user ID
     from your profile settings, as described [here](https://www.workast.com/help/article/how-to-find-a-slack-user-id/).
-13. On MacOS, activate admin privileges using the lock icon (🔒 → 🔓) in the Dock, go to
+1. On MacOS, activate admin privileges using the lock icon (🔒 → 🔓) in the Dock, go to
     System Settings → General → AirDrop & Handoff, and disable AirPlay Receiver. Otherwise
     you will see on `start-canton.sh` runs
     ```
@@ -364,11 +369,11 @@ Test:
 Things sometimes go wrong with `sbt` in ways that are hard to debug. This section will list common tips&tricks for getting `sbt` to do what we want it to.
 - In case you see unexpected build failures after switching branches, run `sbt reload` to have sbt update its internal state.
 - In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-splice` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed.
-- 
+-
 
 ### Troubleshooting
 - MacOS: If you previously installed nix and suddenly have no access to the command. As a result, when reloading the project environment, you may see something like `./.envrc:8: nix: command not found`. To fix this, first verify that the executable is available in `/nix/var/nix/profiles/default/bin/nix`. If yes, then you may want to add the folowing as seen [here](https://github.com/NixOS/nix/issues/3616#issuecomment-903869569) to your (bash|zsh)rc file.
-  
+
 ```
   # Nix
     if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
@@ -603,39 +608,40 @@ and the package ids change. That way there is no dedicated vote required.
 
 #### Bumping Our Canton fork
 
-Current Canton commit: `7613b111d4d2a6d60b9ef59d204781b99774094c`
+Initial setup:
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
-   In that repo, execute the following steps:
-   1. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`
-   2. Checkout `main` and learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
-   3. Checkout the **current Canton commit listed above**, so we can diff our current fork against this checkout.
-      NOTE: if you can't find the commit, then you are probably using the closed source https://github.com/DACH-NY/canton repo.
-      That won't work. You need the Canton OSS repo linked above.
+2. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`. This can be added to your private env vars.
+
+Current Canton commit: `7613b111d4d2a6d60b9ef59d204781b99774094c`
+
+1. Checkout the **current Canton commit listed above** in the Canton open source repo from above, so we can diff our current fork against this checkout.
 2. Change to your checkout of the canton coin repo and execute the following steps:
    1. Create a branch named `canton-bump-<sprintnr>` in the Canton Coin repo.
    2. Create a Canton patch file capturing all our changes relative to that `./scripts/diff-canton.sh $PATH_TO_CANTON_OSS/ > canton.patch`
    3. Undo our changes: `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton -R canton.patch`
       The exclusion is because those files are under a symlink and we don’t want to change them twice.
    4. Create a commit to ease review, `git add canton/ && git commit -m"Undo our changes" --no-verify`
-3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.2
-4. Execute the following steps in your Canton Network Node repo:
+3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.1
+   1. Learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
+5. Execute the following steps in your Canton Network Node repo:
    1. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
    2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit" --no-verify`
    3. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`.
    4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -m"Reapply our changes" --no-verify`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton commit in this `README.md`
-      2. Set `version` in `CantonDependencies.scala` to the SDK version from Step 1.2
-      3. Set `sdk_version` in `nix/canton-sources.json` to the SDK release version from Step 1.2.
-      4. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same Daml SDK version.
-      5. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
-         and then call `direnv reload` to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
-         Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
+      2. If we're also updating the sdk version (this can lead to dar changes so we might skip it)
+        1. Set `version` in `CantonDependencies.scala` to the SDK version from Step 3.1
+        2. Set `sdk_version` in `nix/canton-sources.json` to the SDK release version from Step 3.1.
+        3. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same Daml SDK version.
+        4. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
+           and then call `direnv reload` to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
+           Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions" --no-verify`
-5. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
+6. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
    - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersion.latest` in the console.
-6. Test whether things compile using `sbt Test/compile`.
+7. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:
    - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
      The previous PR that bumped our Canton fork can serve as a point of comparison here.
@@ -652,12 +658,12 @@ Current Canton commit: `7613b111d4d2a6d60b9ef59d204781b99774094c`
      - If the file defining the class exists in the OSS repo but not in our fork, copy it over manually. You should also fix `copy-canton.sh` to ensure it gets
        copied over correctly in the future.
      - If the file already exists in our fork, you may need to [update the build dependencies](#updating-canton-build-dependencies).
-7. Step 5 may have made changes to `package-lock.json` files; commit all of these changes.
+8. Step 5 may have made changes to `package-lock.json` files; commit all of these changes.
    Note that you might need to fix the file formatting or dars.lock files (see the next points), due to the usage of `--no-verify` when committing in steps 1-4.
-8. Run `sbt damlDarsLockFileUpdate` and commit the changes to `daml/dars.lock`.
-9. Make a PR with your changes, so CI starts churning.
-10. If there are any, remove all `*.rej` files.
-11. Once complete, close your "bump canton fork" issue, create a new one, and assign the new issue to a random person in the team (ideally on a different squad from you).
+9. Run `sbt damlDarsLockFileUpdate` and commit the changes to `daml/dars.lock`.
+10. Make a PR with your changes, so CI starts churning.
+11. If there are any, remove all `*.rej` files.
+12. Once complete, close your "bump canton fork" issue, create a new one, and assign the new issue to a random person in the team (ideally on a different squad from you).
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
@@ -890,7 +896,9 @@ with the running Canton instance so try restarting.
 ERROR c.d.n.e.CNNodeLedgerConnection$$anon$1:WalletIntegrationTest/DSO=dso-app - Failed to instantiate ledger client due to connection failure, exiting...
 ```
 
-NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"),
+#### Issues on macOS
+
+In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"),
 put this command into ~/.tmux.conf or ~/.config/tmux/tmux.conf (for version 3.1 and later):
 
 ```
@@ -899,6 +907,9 @@ set-option default-terminal "screen-256color"
 
 This is sufficient for most cases. If you insist on using `tmux-256color` instead of switching to `screen-256color`,
 you will need to install ncurses and setup terminfo following the instructions [here](https://gist.github.com/bbqtd/a4ac060d6f6b9ea6fe3aabe735aa9d95).
+
+Another issue that you can experience on macOS is tmux being unresponsive (unable to switch windows) in the Terminal
+app (default). Then, you may need to switch to iTerm, for example.
 
 #### Using a local build of Canton
 
@@ -1121,11 +1132,12 @@ Check the `--help` for more options.
 
 To test a full hard migration flow, you need to run the custom hard migration workflow in CI. To do so, trigger a CI pipeline on the branch you want to test with the following variables:
 
-- `run-job`: `deploy-hard-migration`
+- `run-job`: `deploy-hdm-operator`
 - `cluster`: the scratch you want to use, eg: `scratchneta`
-- `base-version`: the version from which to upgrade, ideally the latest available release, eg: `0.1.15`
+- `base-version`: the Git reference from which to upgrade; for testing what is currently being run on `ciperiodic`, use the output of `build-tools/find_latest_hard_migration_base_version.sh`
 
 The workflow will deploy everything required for the `base-version`, run the preflights, prepare and execute a hard migration to the artifacts built from the branch, and run the preflights again to ensure the migration was successful.
+All that using the Pulumi operator, just like on `ciperiodic` and our long-running clusters.
 
 In case you want to test an upgrade to a specific (snapshot) release that is different from the latest state on your branch, you can pick this release via the optional `upgrade-version` parameter.
 
@@ -1379,3 +1391,10 @@ a username/password pair, are stored in the `canton-network-vpn` CircleCI Contex
 
 To rotate the VPN password, send an email to `help@digitalasset.com`, and IT will swap out the password in the context.
 No further changes to the CI config file should be necessary.
+
+### Dev Docs
+
+We publish docs from each commit from `main` to
+https://digital-asset.github.io/decentralized-canton-sync/. This can
+often be useful to answer support requests with a docs link even if
+those docs are still very recent.

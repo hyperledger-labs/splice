@@ -22,6 +22,7 @@ all_charts := $(app_charts) splice-util-lib
 
 HELM_VERSION_TAG := cluster/helm/.version-tag
 IMAGE_DIGESTS := cluster/helm/.image-digests
+APP_CHARTS_FILE := cluster/helm/.app-charts
 
 # Makefile for each file in cluster/helm/target run `helm push $file`
 .PHONY: cluster/helm/push
@@ -37,6 +38,14 @@ cluster/helm/write-version:
 .PHONY: cluster/helm/write-digests
 cluster/helm/write-digests:
 	get-docker-image-digests.sh > $(IMAGE_DIGESTS)
+
+.PHONY: cluster/helm/write-app-charts
+cluster/helm/write-app-charts:
+	overwrite-if-changed '$(shell echo $(app_charts) | tr ' ' '\n')' $(APP_CHARTS_FILE)
+
+.PHONY: cluster/helm/copy_release_to_ghcr
+cluster/helm/copy_release_to_ghcr: cluster/helm/write-app-charts cluster/helm/write-version
+	./build-tools/copy_release_helm_charts_to_ghcr.sh -v $(shell cat cluster/helm/.version-tag) -f cluster/helm/.app-charts
 
 .PHONY: cluster/helm/build
 cluster/helm/build: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-build)

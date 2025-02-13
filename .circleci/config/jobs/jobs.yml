@@ -1,55 +1,5 @@
 jobs:
 
-  # Inspired by Canton, we put the lint-like checks into their own CI job
-  static_tests:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - run_bash_command_in_nix:
-          cmd_name: Verify config.yml is up to date with source.
-          cmd: .circleci/build-config.sh --check
-      # Run the cheap checks before the sbt based ones to provide fast feedback
-      - run_trailing_whitespace_check
-      - run_daml_warts_check
-      - run_daml_return_types_check
-      - run_todo_script
-      - execute_sbt_command:
-          cmd: "Test/compile lint printTests"
-      - run_bash_command_in_nix:
-          cmd_name: Verify no changes in sbt test files
-          cmd: git add . && git diff --staged --exit-code test*.log
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-          upload_caches: true
-
-  # We put our Daml tests in their own job for more parallelization
-  daml_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
-          save: true
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          cmd: "damlTest"
-          timeout: "10m"
-          extra_env_vars: DAML_DEBUG=1
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
   auth0_user_cleanup:
     executor: self_hosted
     environment:
@@ -132,11 +82,51 @@ jobs:
             . .envrc.vars
             .circleci/triggers/setup-pipeline.sh
 
+  build_tests_self_hosted:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
+          upload_caches: true
+
+  build_tests_circleci:
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: xlarge
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "circleci"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "circleci"
+          upload_caches: true
+
   artifacts_push:
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
+    parameters:
+      is_public:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - restore_frontend_builds
@@ -180,7 +170,9 @@ jobs:
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
-          additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLE_BRANCH"
+          additional_nix_args: "--keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD \
+            --keep CIRCLE_BRANCH"
           cmd_name: Push Helm Artifacts
           cmd: |
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
@@ -211,63 +203,37 @@ jobs:
             # which would lead to an error due to a misisng `delete` permission
             gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
           # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - run_bash_command_in_nix:
-          cmd_name: tag git
-          additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD \
-           --keep GITHUB_TOKEN \
-           --keep CIRCLE_BRANCH"
-          cmd: |
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            RELEASE_TAG=$(get-snapshot-version)
+      - when:
+          condition:
+            equal: [ << parameters.is_public >>, true ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Copy artifacts to Github Container Registry
+                additional_nix_args: "--keep GITHUB_TOKEN \
+                  --keep ARTIFACTORY_USER \
+                  --keep ARTIFACTORY_PASSWORD"
+                cmd: |
+                  export GITHUB_USER="canton-network-da"
+                  make cluster/helm/copy_release_to_ghcr
+                  make cluster/docker/copy_release_to_ghcr
+            - run_bash_command_in_nix:
+                cmd_name: tag git
+                additional_nix_args: "--keep GITHUB_TOKEN"
+                cmd: |
+                  git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  RELEASE_TAG=$(get-snapshot-version)
 
-            if [[ "${CIRCLE_BRANCH}" != *"$RELEASE_TAG"* && "$RELEASE_TAG" != *"snapshot"* ]]; then
-               echo "Release tag '$RELEASE_TAG' is not contained in the branch name '${CIRCLE_BRANCH}'."
-               echo "You are probably publishing the wrong version."
-               exit 1
-            fi
-
-            if [ $(git tag -l "${RELEASE_TAG}") ]; then
-              echo "tag ${RELEASE_TAG} already exists. not tagging"
-            else
-              git tag "${RELEASE_TAG}"
-              git push origin "${RELEASE_TAG}"
-            fi
+                  if [ $(git tag -l "${RELEASE_TAG}") ]; then
+                    echo "tag ${RELEASE_TAG} already exists."
+                    exit 1
+                  else
+                    git tag "${RELEASE_TAG}"
+                    git push origin "${RELEASE_TAG}"
+                  fi
 
       - save_frontend_builds
       - save_sbt_job_result:
           runner_type: "circleci"
-
-  docker_images_build:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    resource_class: xlarge
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - restore_frontend_builds
-      - setup_nix
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - run_bash_command_in_nix:
-          cmd_name: Build app
-          cmd: make build -j
-          cmd_retry_count: 5 # Retry in case of dependency download errors
-          additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD"
-      # compile everything so that caches for circleci runners are up to date
-      - execute_sbt_command:
-          cmd: "Test/compile"
-      - docker_login_artifactory
-      - docker_prep_build
-      - docker_build
-      - save_frontend_builds
-      - save_sbt_job_result:
-          runner_type: "circleci"
-          upload_caches: true
 
   wait_for_previous_pipeline:
     executor: self_hosted
@@ -439,27 +405,6 @@ jobs:
       - notify-cluster-fail:
           cluster: "ciupgrade"
 
-  launch_ciperiodic_migration_workflow:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - run:
-          name: Launches the deploy_ciperiodic_migration workflow using the latest release branch as base_version
-          command: |
-            source .envrc.vars
-
-            latest_base_version=$(build-tools/find_latest_hard_migration_base_version.sh)
-            curl --fail-with-body --request POST \
-              --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
-              --header "Circle-Token: ${CIRCLECI_TOKEN}" \
-              --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciperiodic-migration\", \"base-version\": \"$latest_base_version\"}}"
-      - notify-cluster-fail:
-          cluster: "ciperiodic"
-
-
   launch_ciperiodic_migration_operator_workflow:
     executor: self_hosted
     environment:
@@ -467,7 +412,7 @@ jobs:
     steps:
       - checkout_with_retry
       - run:
-          name: Launches the deploy_ciperiodic_migration_operator workflow using the latest release branch as base_version
+          name: Launches the deploy_hdm_operator workflow using the latest release branch as base_version
           command: |
             source .envrc.vars
 
@@ -476,7 +421,7 @@ jobs:
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
               --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciperiodic-migration-operator\", \"base-version\": \"$latest_base_version\"}}"
+              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-hdm-operator\", \"base-version\": \"$latest_base_version\", \"cluster\":\"ciperiodic\"}}"
       - notify-cluster-fail:
           cluster: "ciperiodic"
 
@@ -600,12 +545,12 @@ jobs:
     steps:
       - checkout_with_retry
       - run:
-          name: Skip slack notification if no documentation has benn changed
+          name: Send slack notification if documentation has been changed
           when: always
           command: |
             commit=$(git rev-parse HEAD)
-            changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md')
-            changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' | sed ':a;N;$!ba;s/\n/\\n/g')
+            changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst')
+            changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst' | sed ':a;N;$!ba;s/\n/\\n/g')
             if [ -n "$changed_files" ]; then
               echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
               echo "export GITHUB_COMMIT_URL=\"https://github.com/DACH-NY/canton-network-node/commit/${commit}\"" >> "$BASH_ENV"
@@ -618,7 +563,7 @@ jobs:
           channel: << parameters.channel_notify >>
           event: always
           custom: |
-            { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
+            { "text": "*📄Changes to `.md` or `.rst` files have been detected and merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
   build_oss:
     executor: self_hosted
@@ -628,7 +573,9 @@ jobs:
       - checkout_with_retry
       - skip_if_flag_set:
           flag: force
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one job
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:

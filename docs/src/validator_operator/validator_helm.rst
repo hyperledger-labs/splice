@@ -15,74 +15,52 @@ This section describes how to deploy a standalone validator node in Kubernetes u
 Requirements
 ------------
 
-1) Access to the following two Artifactory repositories:
-
-    a. `Canton Network Docker repository <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_
-    b. `Canton Network Helm repository <https://digitalasset.jfrog.io/ui/native/canton-network-helm/>`_
-
-2) A running Kubernetes cluster in which you have administrator access to create and manage namespaces.
-3) A development workstation with the following:
+1) A running Kubernetes cluster in which you have administrator access to create and manage namespaces.
+2) A development workstation with the following:
 
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-4) Your cluster either needs to be connected to the GCP DA Canton
-   VPN or you need a static egress IP. In the latter case,
-   please provide that IP address to your contact at Digital Asset to
-   add it to the firewall rules.
+3) Your cluster needs a static egress IP. After acquiring that, provide it to your SV sponsor who will propose
+   adding it to the IP allowlist to the other SVs.
 
-5) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
+4) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
   tar xzvf |version|\_splice-node.tar.gz
 
-6) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <validator-upgrades>`.
-   If it has, please record the current migration ID of the synchronizer.
-   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+.. include:: required_network_parameters.rst
 
-.. code-block:: bash
+TRUSTED_SCAN_URL
+    The scan URL of an SV that you trust and that is reachable by your validator, often your SV sponsor. This should be of the form |generic_scan_url|,
+    e.g., for the Global Synchronizer Foundation SV it is |gsf_scan_url|.
 
-   export MIGRATION_ID=0
+Additional parameters describing your own setup as opposed to the connection to the network are described below.
+
+.. _validator-network-diagram:
+
+Validator Network Diagram
+-------------------------
+
+..
+   _LucidChart link: https://lucid.app/lucidchart/46af6ed2-25b8-4608-88f7-66fc19674fce/edit?viewport_loc=-5217%2C-3874%2C6157%2C3382%2C0_0&invitationId=inv_fc3a3c02-e9fd-4ca9-9388-8defdfaa7153
+
+
+.. image:: images/validator-network-diagram.png
+  :width: 600
+  :alt: Validator Network Diagram
 
 .. _validator-identity-token:
 
 Preparing a Cluster for Installation
 ------------------------------------
 
-In the following, you will need your Artifactory credentials from
-https://digitalasset.jfrog.io/ui/user_profile. Based on that, set the following environment variables.
-
-====================== ==========================================================================================
-Name                   Value
----------------------- ------------------------------------------------------------------------------------------
-ARTIFACTORY_USER       Your Artifactory user name shown at the top right.
-ARTIFACTORY_PASSWORD   Your Artifactory Identity token. If you don't have one you can generate one on your profile page.
-====================== ==========================================================================================
-
-Ensure that your local helm installation has access to the Digital Asset Helm chart repository:
-
-.. code-block:: bash
-
-    helm repo add canton-network-helm \
-        https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm \
-        --username ${ARTIFACTORY_USER} \
-        --password ${ARTIFACTORY_PASSWORD}
-
-Create the application namespace within Kubernetes and ensure it has image pull credentials for fetching images from the Digital Asset Artifactory repository used for Docker images.
+Create the application namespace within Kubernetes.
 
 .. code-block:: bash
 
     kubectl create ns validator
-
-    kubectl create secret docker-registry docker-reg-cred \
-        --docker-server=digitalasset-canton-network-docker.jfrog.io \
-        --docker-username=${ARTIFACTORY_USER} \
-        --docker-password=${ARTIFACTORY_PASSWORD} \
-        -n validator
-
-    kubectl patch serviceaccount default -n validator \
-        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
 .. _validator-postgres-auth:
 
@@ -92,6 +70,8 @@ Configuring PostgreSQL authentication
 The PostgreSQL instance that the helm charts create, and all apps that depend on it, require the user's password to be set through Kubernetes secrets.
 Currently, all apps use the Postgres user ``cnadmin``.
 The password can be setup with the following command, assuming you set the environment variable ``POSTGRES_PASSWORD`` to a secure value:
+
+.. todo:: call out the option of using a managed postgres instance
 
 .. code-block:: bash
 
@@ -104,24 +84,7 @@ The password can be setup with the following command, assuming you set the envir
 Preparing for Validator Onboarding
 ----------------------------------
 
-In order to become a validator, you need the sponsorship of an SV.
-Your SV will provide you with a required secret to authorize yourself towards their SV.
-
-The onboarding secret is a one-time use secret that expires after 24 hours. If you don't join before it expires, you need to request a new secret from your SV sponsor.
-
-.. admonition:: DevNet-only
-
-  On DevNet, you can obtain an onboarding secret automatically by
-  calling the following endpoint on your sponsoring SV (GSF used here for illustration):
-
-  .. parsed-literal::
-
-     curl -X POST https://sv.sv-1.TARGET_CLUSTER.global.canton.network.sync.global/api/sv/v0/devnet/onboard/validator/prepare
-
-  Note that this most be called on the same SV that sponsors your validator. Please double check the URL
-  with your sponsoring SV.
-
-Ensure that your validator onboarding secret ``VALIDATOR_SECRET`` is set in the namespace you created earlier. The value should be provided by the SV sponsoring the onboarding of your validator.
+Ensure that your validator onboarding secret ``ONBOARDING_SECRET`` is set in the namespace you created earlier.
 
 .. code-block:: bash
 
@@ -160,9 +123,9 @@ In this documentation, we assume that this document is available at ``OIDC_AUTHO
 
 For machine-to-machine (Validator node component to Validator node component) authentication,
 your OIDC provider must support the `OAuth 2.0 Client Credentials Grant <https://tools.ietf.org/html/rfc6749#section-4.4>`_ flow.
-This means that you must be able to configure (`CLIENT_ID`, `CLIENT_SECRET`) pairs for all Validator node components that need to authenticate to others.
+This means that you must be able to configure (`CLIENT_ID`, `CLIENT_SECRET`) pairs for all Validator node components that need to authenticate themselves to other components.
 Currently, this is the validator app backend - which needs to authenticate to the Validator node's Canton participant.
-The `sub` field of JWTs issued through this flow must match the user ID configured as `ledger-api-user` in :ref:`helm-validator-auth-secrets-config`.
+The `sub` field of JWTs issued through this flow must match the user ID configured as ``ledger-api-user`` in :ref:`helm-validator-auth-secrets-config`.
 In this documentation, we assume that the `sub` field of these JWTs is formed as ``CLIENT_ID@clients``.
 If this is not true for your OIDC provider, pay extra attention when configuring ``ledger-api-user`` values below.
 
@@ -195,10 +158,10 @@ Summing up, your OIDC provider setup must provide you with the following configu
 Name                    Value
 ----------------------- ---------------------------------------------------------------------------
 OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
-VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
-VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
-WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
-CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
+VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend
+VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend
+WALLET_UI_CLIENT_ID     The client id of your OIDC provider for the wallet UI.
+CNS_UI_CLIENT_ID        The client id of your OIDC provider for the CNS UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-validator-auth-secrets-config` and :ref:`helm-validator-install`.
@@ -207,6 +170,7 @@ When first starting out, it is suggested to configure both JWT token audiences b
 
 Once you can confirm that your setup is working correctly using this (simple) default,
 we recommend that you configure dedicated audience values that match your deployment and URLs.
+This is important for security to avoid tokens for your validators on one network be usable for your validators on another network.
 You can configure audiences of your choice for the participant ledger API and the validator backend API.
 We will refer to these using the following configuration values:
 
@@ -344,9 +308,11 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 - Replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``. If you are not ready to use a custom audience, you can use the suggested default ``https://canton.network.global``.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
-- Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
-- Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
-- For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
+
+If you are using the provided postgres helm chart, modify ``splice-node/examples/sv-helm/postgres-values-validator-participant.yaml`` as follows:
+
+- Add ``db.volumeSize`` and ``db.volumeStorageClass`` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and ``standard-rwo``)
+
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-participant-values.yaml`` as follows:
 
@@ -384,9 +350,11 @@ This does mean that you depend on that single SV and if it is broken or maliciou
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` as follows:
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
-- Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, for example,
-  ``https://sv-1.TARGET_CLUSTER.global.canton.network.sync.global`` for the GSF. Please make sure that you use the URL
-  of your sponsoring SV.
+- Replace ``SPONSOR_SV_URL`` with the URL of the SV that provided you your secret.
+- Replace ``YOUR_VALIDATOR_PARTY_HINT`` with the desired name for your
+  validator operator party. It must be of the format
+  ``<organization>-<function>-<enumerator>``.
+- Replace ``YOUR_VALIDATOR_NODE_NAME`` with the name you want your validator node to be represented as on the network. Usually you can use the same value as for your ``validatorPartyHint``.
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 
@@ -397,7 +365,7 @@ If you are redeploying the validator app as part of a :ref:`synchronizer migrati
 
 Finally, please add the following values to your ``standalone-validator-values.yaml`` file:
 
-.. literalinclude:: ../../../cluster/cn-svc-configs/configs/ui-config-values.yaml
+.. literalinclude:: ../../../cluster/configs/configs/ui-config-values.yaml
     :language: yaml
 
 
@@ -410,12 +378,11 @@ With these files in place, you can execute the following helm commands
 in sequence. It's generally a good idea to wait until each deployment
 reaches a stable state prior to moving on to the next step.
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm repo update
-    helm install postgres canton-network-helm/splice-postgres -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-validator-participant.yaml --wait
-    helm install participant canton-network-helm/splice-participant -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml -f splice-node/examples/sv-helm/standalone-participant-values.yaml --wait
-    helm install validator canton-network-helm/splice-validator -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/standalone-validator-values.yaml --wait
+    helm install postgres |helm_repo_prefix|/splice-postgres -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-validator-participant.yaml --wait
+    helm install participant |helm_repo_prefix|/splice-participant -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml -f splice-node/examples/sv-helm/standalone-participant-values.yaml --wait
+    helm install validator |helm_repo_prefix|/splice-validator -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/standalone-validator-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in the new
@@ -486,20 +453,11 @@ In order to install the reference charts, the following must be satisfied in you
 Installation Instructions
 +++++++++++++++++++++++++
 
-Create a `cluster-ingress` namespace with image pull permissions from the Artifactory docker repository:
+Create a `cluster-ingress` namespace:
 
 .. code-block:: bash
 
     kubectl create ns cluster-ingress
-
-    kubectl create secret docker-registry docker-reg-cred \
-        --docker-server=digitalasset-canton-network-docker.jfrog.io \
-        --docker-username=${ARTIFACTORY_USER} \
-        --docker-password=${ARTIFACTORY_PASSWORD} \
-        -n cluster-ingress
-
-    kubectl patch serviceaccount default -n cluster-ingress \
-        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
 
 Ensure that there is a cert-manager certificate available in a secret
@@ -546,9 +504,9 @@ And install it to your cluster:
 A reference Helm chart installing a gateway that uses this service is also provided.
 To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-gateway canton-network-helm/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
+    helm install cluster-gateway |helm_repo_prefix|/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
 
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
@@ -561,9 +519,9 @@ Another reference Helm chart is provided for that, which can be installed after
 using:
 
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-ingress-validator canton-network-helm/splice-cluster-ingress-runbook -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml
+    helm install cluster-ingress-validator |helm_repo_prefix|/splice-cluster-ingress-runbook -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml
 
 
 .. _helm-validator-wallet-ui:
@@ -581,17 +539,27 @@ Once logged in one should see the transactions page.
   :width: 600
   :alt: After logged in into the wallet UI
 
+.. todo:: explain the config sections below in a way that makes them also accessible to the Docker compose users
 
 .. _helm_validator_testnet_cc_grant:
 
-(Testnet-only) Granting coin to the validator for traffic purchases
+(TestNet-only) Granting coin to the validator for traffic purchases
 -------------------------------------------------------------------
 
-On testnet, your validator party will need an initial coin grant to be able to purchase traffic.
+On TestNet, your validator party will need an initial coin grant to be able to purchase traffic.
 After logging into the wallet UI in the previous section, note that the party ID is displayed in
 the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b7369e027544927703efcdf0f03cb15bd26ac53c784c627b63bdf8f041``).
 
 An SV (say your sponsor) will need to transfer coin to this party. They can do this through their wallet UI.
+
+.. todo::
+    * applies both to TestNet and MainNet
+    * show error message that people will see while the traffic purchase fails due to insufficient funds;
+      it is currentlye here: :ref:`error-insufficient-funds`
+    * link to the option to disable automatic top-ups, and call out the option of using third-party traffic providers
+    * explain liveness rewards being an alternative
+
+
 
 .. _helm-validator-ans-web-ui:
 
@@ -608,15 +576,18 @@ Canton Name Service.
   :width: 600
   :alt: After logged in into the CNS UI
 
-Configuring top-ups
--------------------
-Optionally you may want to configure a validator's traffic top-up loop for non-production validators.
+
+Configuring automatic traffic purchases
+---------------------------------------
+Optionally you may want to configure your validator to automatically purchase traffic
+on a pay-as-you-go basis with rate limiting.
 To do so, uncomment and fill in the following section in the validator-values.yaml file:
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
     :start-after: CONFIGURING_TOPUP_START
     :end-before: CONFIGURING_TOPUP_END
+
 
 Configuring sweeps and auto-accepts of transfer offers
 ------------------------------------------------------
@@ -651,5 +622,34 @@ Whenever the validator receives a transfer offer from `<senderPartyID>` to `<rec
 it will automatically accept it. Similarly to sweeps, party IDs must be known in order to
 apply this configuration.
 
-Re-onboard a validator and recover balances of all users it hosts
------------------------------------------------------------------
+.. _validator_participant_pruning:
+
+Participant Pruning
+-------------------
+
+By default, participants preserve all history (it is not preserved
+across :ref:`major upgrades <validator-upgrades>` though). However, this leads to
+gradually growing databases and can slow down certain queries, in
+particular, queries for the active contract set on the ledger API.
+
+To mitigate that it is possible to disable participant pruning which
+will remove all history beyond a specified retention point and only
+preserve the active contract set.
+
+Note that this only affects the participant stores. The CN apps
+(Validator, SV and Scan) are unaffected by enabling this, so e.g., the
+history in your wallet will never be pruned.
+
+Below you can see an example of the pruning config that you need to
+add to ``validator-values.yaml`` to retain only the history for the
+last 48h.
+
+Refer to the Canton documentation for more details on participant pruning:
+
+* https://docs.daml.com/ops/pruning.html
+* https://docs.daml.com/canton/usermanual/pruning.html
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: PARTICIPANT_PRUNING_SCHEDULE_START
+    :end-before: PARTICIPANT_PRUNING_SCHEDULE_END

@@ -32,7 +32,7 @@ class MediatorAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-)(implicit ec: ExecutionContextExecutor, tracer: Tracer)
+)(implicit protected val ec: ExecutionContextExecutor, tracer: Tracer)
     extends TopologyAdminConnection(
       config,
       apiLoggingConfig,
@@ -60,8 +60,7 @@ class MediatorAdminConnection(
       MediatorAdministrationCommands.Initialize(
         domainId,
         SequencerConnections.single(sequencerConnection),
-        // TODO(#10985) Consider enabling this.
-        SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.StrictActive,
       )
     )
 

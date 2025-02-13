@@ -604,6 +604,8 @@ object SpliceConfig {
       }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
+    implicit val participantPruningConfigReader: ConfigReader[ParticipantPruningConfig] =
+      deriveReader[ParticipantPruningConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
         val participantIdentifier =
@@ -627,6 +629,15 @@ object SpliceConfig {
             ConfigValidationFailed(
               s"New participant identifier in bootstrap dump config ${conf.participantBootstrappingDump
                   .map(_.newParticipantIdentifier)} must match participant node identifier $participantIdentifier"
+            ),
+          )
+          _ <- Either.cond(
+            conf.participantPruningSchedule.forall(
+              _.retention.underlying > conf.deduplicationDuration.underlying
+            ),
+            (),
+            ConfigValidationFailed(
+              s"Pruning retention period ${conf.participantPruningSchedule.map(_.retention)} must be bigger than the deduplication duration ${conf.deduplicationDuration}"
             ),
           )
         } yield conf
@@ -859,6 +870,8 @@ object SpliceConfig {
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
+    implicit val participantPruningConfigWriter: ConfigWriter[ParticipantPruningConfig] =
+      deriveWriter[ParticipantPruningConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =

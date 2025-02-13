@@ -8,8 +8,62 @@
 Release Notes
 =============
 
-Upcoming Release
-----------------
+Upcoming
+--------
+
+* Validator
+
+  Add an option to enable :ref:`participant pruning <validator_participant_pruning>`.
+
+0.3.10
+------
+
+* Validator app
+
+  Add support for :ref:`operating a validator participant with keys stored in an external Key Management Service (KMS) <validator-kms>`.
+
+* Metrics
+
+  Added ``splice_store_last_ingested_record_time_ms`` metric for the last ingested record time in each store and an
+  associated dashboard. This can be used to track general activity of the node.
+
+* Docs
+
+  * Add :ref:`Troubleshooting <troubleshooting>` section.
+  * Add overview docs for the :ref:`Validator Onboarding Process <validator_onboarding_process>`.
+  * Add docs for :ref:`Getting console access to Canton nodes <console_access>`.
+  * Add docs for :ref:`Configuring deployed apps <configuration>`.
+  * Add docs for :ref:`Validator Ingress & Egress requirements <validator_network>`.
+  * Add overview docs about :ref:`Metrics <metrics>`.
+  * Add overview docs about :ref:`Application Development <app_dev_overview>`.
+  * Improve API docs.
+  * Various smaller documentation updates and improvements.
+
+* SV UI
+
+  Various improvements to the SV UI.
+
+0.3.9
+-----
+
+* SV UI
+
+  * Add better spacing between items and alerts/badges in navigation bar
+
+* Docs
+
+  * Added a section on hardware requirements to the validator docs.
+  * Improved the docs around required network parameters for starting a new validator.
+  * Added network diagrams of SVs and validators.
+  * Added initial docs on how to access metrics for validators and SVs.
+
+0.3.8
+-----
+
+* Fixes to documentation and scripts around using the publicly available images and Helm charts
+
+0.3.7
+-----
 
 * Governance: voting logic
 
@@ -69,6 +123,14 @@ Upcoming Release
     ``newParticipantIdentifier``. This was already a requirement when
     ``newParticipantIdentifier`` was removed again after the restore
     was complete so this just catches misconfigurations earlier.
+  * In the docker-compose start script, the migration id is now a
+    mandatory argument instead of defaulting to 0. This should not
+    require any changes as no network is on migration id 0 at the
+    moment so you must already have it set.
+  * Release versions of docker images and helm charts are now publicly available respectively from
+    Github Container Registry at
+    ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm.
+    No credentials are required to download these release artifacts. The default `imageRepo` value in helm charts has been updated to ghcr.io/digital-asset/decentralized-canton-sync/docker.
 
 0.3.6
 -----
@@ -1639,7 +1701,7 @@ Note: 0.1.5 resulted in the issue mentioned below so both SVs and validators sho
   and the k8s secret from an API key to an Identity Token.
 
     * More information: `Introducing JFrog Access and Identity Tokens <https://jfrog.com/help/r/platform-api-key-deprecation-and-the-new-reference-tokens>`_
-    * HowTo: :ref:`add your Artifactory password<identity-token>` (we suggest deleting the existing ones using `helm repo remove` and `kubectl delete secret`)
+    * We suggest deleting the existing ones using `helm repo remove` and `kubectl delete secret`
 
 * Frontend updates:
 

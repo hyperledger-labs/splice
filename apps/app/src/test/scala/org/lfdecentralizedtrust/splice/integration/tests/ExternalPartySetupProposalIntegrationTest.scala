@@ -166,9 +166,11 @@ class ExternalPartySetupProposalIntegrationTest
       .getExternalPartyBalance(aliceParty)
       .totalUnlockedCoin shouldBe "0.0000000000"
     aliceValidatorWalletClient.transferPreapprovalSend(aliceParty, 2000.0, UUID.randomUUID.toString)
-    aliceValidatorBackend
-      .getExternalPartyBalance(aliceParty)
-      .totalUnlockedCoin shouldBe "2000.0000000000"
+    eventually() {
+      aliceValidatorBackend
+        .getExternalPartyBalance(aliceParty)
+        .totalUnlockedCoin shouldBe "2000.0000000000"
+    }
 
     // Onboard and Create/Accept ExternalPartySetupProposal for Bob
     val onboardingBob @ OnboardingResult(bobParty, _, _) =

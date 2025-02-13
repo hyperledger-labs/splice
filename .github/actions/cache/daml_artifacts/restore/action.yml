@@ -27,7 +27,7 @@ runs:
       shell: bash
       run: |
         if [[ -e /tmp/daml/daml.tar.gz ]]; then
-          tar --use-compress-program=pigz -xvf /tmp/daml/daml.tar.gz
+          tar --use-compress-program=pigz -xf /tmp/daml/daml.tar.gz
         else
           echo "No cached daml artifacts files found. Skipping..."
         fi

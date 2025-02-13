@@ -17,7 +17,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.DomainTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -83,7 +83,7 @@ class DomainConnector(
   ): Future[Map[DomainAlias, SequencerConnections]] = {
     config.domains.global.url match {
       case None =>
-        sequencerConnectionsFromScan()
+        waitForSequencerConnectionsFromScan()
       case Some(url) =>
         if (config.supportsSoftDomainMigrationPoc) {
           // TODO (#13301) Make this work by making the config more flexible.
@@ -125,42 +125,45 @@ class DomainConnector(
     )
   }
 
-  private def sequencerConnectionsFromScan(
-  )(implicit tc: TraceContext): Future[Map[DomainAlias, SequencerConnections]] = for {
-    _ <- waitForSequencerConnectionsFromScan(logger, retryProvider)
-    sequencerConnections <- getSequencerConnectionsFromScan(clock.now)
-  } yield sequencerConnections.view.mapValues { connections =>
-    NonEmpty.from(connections) match {
-      case None =>
-        sys.error("sequencer connections from scan is not expected to be empty.")
-      case Some(nonEmptyConnections) =>
-        SequencerConnections.tryMany(
-          nonEmptyConnections.forgetNE,
-          Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-          submissionRequestAmplification = SubmissionRequestAmplification(
-            Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
-            config.sequencerRequestAmplificationPatience,
-          ),
-        )
-    }
-  }.toMap
-
   private def waitForSequencerConnectionsFromScan(
-      logger: TracedLogger,
-      retryProvider: RetryProvider,
-  )(implicit tc: TraceContext) = {
-    retryProvider.waitUntil(
-      RetryFor.WaitingOnInitDependency,
+  )(implicit tc: TraceContext): Future[Map[DomainAlias, SequencerConnections]] = {
+    retryProvider.getValueWithRetries(
+      // Short retries since usually a failure here is just a misconfiguration error.
+      // The only case where this can happen is during a domain migration and even then
+      // it is fairly unlikely outside of tests for validators to come up fast enough that
+      // scan has not yet updated.
+      RetryFor.ClientCalls,
       "scan_sequencer_connections",
-      "valid sequencer connections from scan is non empty",
+      "non-empty sequencer connections from scan",
       getSequencerConnectionsFromScan(clock.now)
         .map { connections =>
-          if (connections.isEmpty)
+          if (connections.isEmpty) {
             throw Status.NOT_FOUND
               .withDescription(
                 s"sequencer connections for migration id $migrationId is empty, validate with your SV sponsor that your migration id is correct"
               )
               .asRuntimeException()
+          } else {
+            connections.view.mapValues {
+              NonEmpty.from(_) match {
+                case None =>
+                  throw Status.NOT_FOUND
+                    .withDescription(
+                      s"sequencer connections for migration id $migrationId is empty, validate with your SV sponsor that your migration id is correct"
+                    )
+                    .asRuntimeException()
+                case Some(nonEmptyConnections) =>
+                  SequencerConnections.tryMany(
+                    nonEmptyConnections.forgetNE,
+                    Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                    submissionRequestAmplification = SubmissionRequestAmplification(
+                      Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
+                      config.sequencerRequestAmplificationPatience,
+                    ),
+                  )
+              }
+            }.toMap
+          }
         },
       logger,
     )

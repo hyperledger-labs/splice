@@ -340,7 +340,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -459,7 +459,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -540,7 +540,7 @@
           }
         ]
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "validator1-participant-2",
     "provider": "",
@@ -682,6 +682,18 @@
       },
       "timeout": 300,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ONBOARDING_SECRET_ONLY_FOR_TESTING",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "secret",
+                "name": "splice-app-validator-onboarding-validator",
+                "optional": false
+              }
+            }
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "affinity": {
@@ -781,7 +793,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.3.4"
+      "version": "0.3.8"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

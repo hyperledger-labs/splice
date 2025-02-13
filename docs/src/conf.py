@@ -114,6 +114,9 @@ if not version:
     sys.exit(1)
 chart_version = version
 
+# TODO(#17226): Make the helm_repo_prefix also correct for snapshots (not an OCI one). For this case we'll also need to:
+# - put somewhere the "helm repo add" and "helm repo update" commands.
+# - put somewhere the docker login command to jfrog for docker-compose.
 if re.match(r"^[0-9]+.[0-9]+.[0-9]+$", version):
     # For releases, we download artifacts from GitHub Releases
     download_url = f"https://github.com/digital-asset/decentralized-canton-sync/releases/download/v{version}"
@@ -129,8 +132,11 @@ rst_prolog = f"""
 
 .. |splice_cluster| replace:: :raw-html:`<span class="splice-cluster">unknown_cluster</span>`
 
-.. |da_hostname| replace:: :raw-html:`<span class="splice-url-prefix">unknown_cluster</span>global.canton.network.digitalasset.com`
-.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster</span>global.canton.network.sync.global`
+.. |da_hostname| replace:: :raw-html:`<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.digitalasset.com`
+.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
+.. |generic_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
+.. |gsf_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
+.. |generic_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
 
 .. |version_literal| replace:: ``{version}``
 .. |chart_version_literal| replace:: ``{chart_version}``
@@ -145,5 +151,5 @@ rst_prolog = f"""
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_openapi.tar.gz">Download OpenAPI specs</a>`
 
-.. |canton_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-{canton_version}.tar.gz">Download Canton enterprise</a>`
+.. |helm_repo_prefix| replace:: oci://ghcr.io/digital-asset/decentralized-canton-sync/helm
 """

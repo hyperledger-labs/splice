@@ -3,7 +3,12 @@
 In the Canton Network team, we use CircleCI to manage continuous integration with tests, image building, image pushing, and ultimately deployment.
 
 Currently we run our DevNet in a kubernetes cluster hosted on Google's GCE/GKE platform.
-All images we build are pushed to Artifactory docker registries, digitalasset-canton-network-docker-dev.jfrog.io for private developer releases and digitalasset-canton-network-docker.jfrog.io for public releases.
+
+All images we build are pushed to Artifactory docker registries,
+digitalasset-canton-network-docker-dev.jfrog.io for private developer releases
+and digitalasset-canton-network-docker.jfrog.io for releases.
+
+Public releases are copied to Github Container Registry for public access at ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm.
 
 Along the way, we have the ability to issue Slack notifications from within a job to our team channel based upon the end result of a workflow.
 

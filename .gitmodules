@@ -1,4 +1,6 @@
-[submodule "cluster/cn-svc-configs"]
-	path = cluster/cn-svc-configs
-	url = ../cn-svc-configs.git
-	branch = main
+[submodule "cluster/configs"]
+	path = cluster/configs
+	url = ../../global-synchronizer-foundation/configs.git
+[submodule "cluster/configs-private"]
+	path = cluster/configs-private
+	url = ../../global-synchronizer-foundation/configs-private.git

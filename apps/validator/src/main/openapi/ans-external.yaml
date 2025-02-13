@@ -9,9 +9,18 @@ servers:
 paths:
   /v0/entry/create:
     post:
+      description: |
+        Requests the creation of a new ANS entry.
+        ANS entries need to be paid and renewed via subscription payments.
+
+        Upon requesting the creation of the ANS entry, a subscription request is created.
+        The user may accept the subscription request via their wallet by offering the initial payment.
+        Once the subscription request is accepted, the DSO automation burns the payment and creates the ANS entry.
       tags: [ans]
       x-jvm-package: external.ans
       operationId: "createAnsEntry"
+      security:
+        - userAuth: []
       requestBody:
         required: true
         content:
@@ -36,9 +45,14 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/entry/all:
     get:
+      description: |
+        Lists all ANS entries owned by the user.
+        Expired entries are not included in the response, even if the corresponding contracts are still active on the ledger.
       tags: [ ans ]
       x-jvm-package: external.ans
       operationId: "listAnsEntries"
+      security:
+        - userAuth: []
       responses:
         "200":
           description: ok
@@ -52,6 +66,14 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
 components:
+  securitySchemes:
+    userAuth:
+      description: |
+        JWT token as described in [spliceAppBearerAuth](../../../../common/src/main/openapi/common-external.yaml#/components/securitySchemes/spliceAppBearerAuth).
+        The subject of the token must be ledger API user of the user affected by the endpoint.
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     CreateAnsEntryRequest:
       type: object
@@ -62,11 +84,26 @@ components:
       properties:
         name:
           type: string
+          description: |
+            The name of the ANS entry.
+            It must end with `.unverified.<ans>` where `<ans>` is the ANS acronym chosen by the DSO.
         url:
           type: string
+          description: |
+            A valid URL or an empty string.
+            Use this to link to a website, such as the homepage of an application
+            provided by the owner of this entry.
+            Must not be longer than 255 characters.
         description:
           type: string
+          description: |
+            A human readable description of the ANS entry.
+            May be empty.
+            Must not be longer than 140 characters.
     CreateAnsEntryResponse:
+      description: |
+        The response contains the contract IDs of the corresponding subscription request.
+        The user must accept the subscription request via their wallet to create the ANS entry.
       type: object
       required:
         - name
@@ -81,10 +118,16 @@ components:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         name:
           type: string
+          description: |
+            The name of the ANS entry, as specified in the request.
         url:
           type: string
+          description: |
+            The URL of the ANS entry, as specified in the request.
         description:
           type: string
+          description: |
+            The description of the ANS entry, as specified in the request.
     ListAnsEntriesResponse:
       type: object
       required:

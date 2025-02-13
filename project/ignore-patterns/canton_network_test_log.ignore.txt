@@ -104,4 +104,7 @@ Cannot read contract.*AssignedContract, it is in flight.*SoftDomainMigrationInte
 # TODO(#13301) This is BftScanConnection.refreshAction failing to fetch the scan list while the DsoRules contract is in flight
 SoftDomainMigrationIntegrationTest.*The global domain global-domain-new.* is not present in the scans response.*getPeerScansFromStore
 
+# internal selenium error. Potentially intermittent
+Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
+
 # Make sure to have a trailing newline

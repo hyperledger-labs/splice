@@ -2,7 +2,6 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Config,
-  autoInitValues,
   ChartValues,
   DEFAULT_AUDIENCE,
   DomainMigrationIndex,
@@ -83,7 +82,6 @@ export function installSvParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
-      ...autoInitValues('splice-participant', version, onboardingName),
     },
     version,
     {

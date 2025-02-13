@@ -67,8 +67,15 @@ export class LedgerApiClient {
         const response = await fetch(`${this.jsonApiUrl}v2/users/${encodeURIComponent(userId)}`, {
           headers: this.headers,
         });
-        const responseBody = await response.json();
-        return responseBody.user;
+        if (response.ok) {
+          const responseBody = await response.json();
+          return responseBody.user;
+        } else {
+          const responseBody = await response.text();
+          throw new Error(
+            `getPrimaryParty: HTTP ${response.status} ${response.statusText}: ${responseBody}`
+          );
+        }
       },
       this.userId
     );
@@ -93,61 +100,60 @@ export class LedgerApiClient {
     );
     const command = {
       ExerciseCommand: {
-        template_id: choice.template().templateId,
-        contract_id: contractId,
+        templateId: choice.template().templateId,
+        contractId: contractId,
         choice: choice.choiceName,
-        choice_argument: choice.argumentEncode(argument),
+        choiceArgument: choice.argumentEncode(argument),
       },
     };
 
     const body = {
       commands: [command],
-      workflow_id: '',
-      application_id: '',
-      command_id: uuidv4(),
-      deduplication_period: { Empty: {} },
-      act_as: actAs,
-      read_as: readAs,
-      submission_id: '',
-      disclosed_contracts: disclosedContracts.map(c => ({
+      workflowId: '',
+      applicationId: '',
+      commandId: uuidv4(),
+      deduplicationPeriod: { Empty: {} },
+      actAs: actAs,
+      readAs: readAs,
+      submissionId: '',
+      disclosedContracts: disclosedContracts.map(c => ({
         contractId: c.contractId,
         createdEventBlob: c.createdEventBlob,
         domainId: '',
         templateId: c.templateId,
       })),
-      domain_id: domainId || '',
-      package_id_selection_preference: [],
+      domainId: domainId || '',
+      packageIdSelectionPreference: [],
     };
+
+    const describeChoice = `Exercised choice: actAs=${JSON.stringify(
+      actAs
+    )}, readAs=${JSON.stringify(readAs)}, choiceName=${choice.choiceName}, templateId=${
+      choice.template().templateId
+    }, contractId=${contractId}`;
 
     const responseBody = await fetch(
       `${this.jsonApiUrl}v2/commands/submit-and-wait-for-transaction-tree`,
       { headers: this.headers, method: 'POST', body: JSON.stringify(body) }
     )
-      .then(r => {
-        console.debug(
-          `Exercised choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
-            readAs
-          )}, choiceName=${choice.choiceName}, templateId=${
-            choice.template().templateId
-          }, contractId=${contractId} succeeded.`
-        );
-        return r.json();
+      .then(async r => {
+        if (r.ok) {
+          console.debug(`${describeChoice} succeeded.`);
+          return r.json();
+        } else {
+          const body = await r.text();
+          throw new Error(`HTTP ${r.status} ${r.statusText}: ${body}`);
+        }
       })
       .catch(e => {
-        console.debug(
-          `Exercised choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
-            readAs
-          )}, choiceName=${choice.choiceName}, templateId=${
-            choice.template().templateId
-          }, contractId=${contractId} failed: ${JSON.stringify(e)}`
-        );
+        console.debug(`${describeChoice} failed: ${JSON.stringify(e)}`);
         throw e;
       });
 
-    const tree = responseBody.transaction_tree;
-    const rootEvent = tree.events_by_id[tree.root_event_ids[0]];
+    const tree = responseBody.transactionTree;
+    const rootEvent = tree.eventsById[tree.rootEventIds[0]];
     const exerciseResult = choice.resultDecoder.runWithException(
-      rootEvent.ExercisedTreeEvent.exercise_result
+      rootEvent.ExercisedTreeEvent.exerciseResult
     );
     return exerciseResult;
   }

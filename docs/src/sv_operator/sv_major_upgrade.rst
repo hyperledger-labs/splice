@@ -8,7 +8,8 @@
 Synchronizer Upgrades with Downtime
 ===================================
 
-For supporting non-backwards-compatible major version upgrades of the Canton software the Global Synchronizer will implement a procedure for synchronizer (i.e., domain) upgrades with downtime.
+For supporting non-backwards-compatible major version upgrades of the Canton software the Global Synchronizer uses,
+the SV operatores follow the procedure for synchronizer (i.e., domain) upgrades with downtime described below.
 
 .. _sv-upgrades-overview:
 
@@ -164,6 +165,8 @@ The operators representing an SV must be:
 - Familiar with the technical details around the SV’s deployment.
 - Capable (in terms of both skills and permissions) to interact with the SV’s node deployment via Helm and (for debugging with support from the CN team) Kubernetes (kubectl) commands.
 - For being able to amend potential errors during :ref:`preparation <sv-upgrades-testing-preparation>`: Capable (in terms of both skills and permissions) to register new ingress rules for internal synchronizer components (sequencer, mediator and CometBFT) and SV participants. Resulting addresses will only be relevant to technical personnel and will follow a schema such as ``component-migrationId.hostname``. Note that for fully supporting the migration flow for CometBFT nodes, it will also be necessary to allow communication over additional ports.
+
+.. todo:: update this with references to the GSF processes, which are now being used to run these calls
 
 .. _sv-upgrades-testing:
 

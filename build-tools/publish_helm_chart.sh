@@ -10,10 +10,16 @@ chart=$1
 put_helm_chart() {
   source=$1
   full_path=$2
-  echo "Publishing helm chart ${source} to ${full_path}"
-  response=$(curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}")
-  sha=$(echo "$response" | jq .checksums.sha256)
-  echo "Published ${full_path}, sha256 digest: ${sha}"
+  echo "Publishing helm chart ${source} to Artifactory ${full_path}"
+  response=$(curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}" || true)
+  sha=$(echo "$response" | jq .checksums.sha256 || true)
+
+  if [[ -z "$sha" || "$sha" == null ]]; then
+    echo "Failed to publish to artifactory: ${response}"
+    exit 1
+  else
+    echo "Published to ${full_path}, sha256 digest: ${sha}"
+  fi
 }
 
 publish () {

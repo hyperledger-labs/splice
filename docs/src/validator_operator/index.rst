@@ -3,10 +3,15 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+.. _validator_operator:
+
 Validators
 ==========
 
 This section describes deployment and operations of a validator node.
+
+Before moving onto the deployment of your node, familiarize yourself with the general :ref:`validator_onboarding_process`.
+
 There are two primary ways to deploy a validator node: Either use a
 docker-compose based deployment or deploy it in a kubernetes cluster
 using Helm charts.
@@ -19,24 +24,23 @@ limitations.
 
 The :ref:`kubernetes based deployment <k8s_validator>` is great if you
 are already familiar with kubernetes and are looking to build a
-production-ready deployment but it can be challenging to setup if you
+production-ready deployment, but it can be challenging to setup if you
 never used kubernetes before.
+
+You can find hardware requirements for both options in a :ref:`dedicated section <validator_hardware_requirements>`.
 
 .. toctree::
    :maxdepth: 2
 
+   validator_onboarding.rst
+   validator_hardware_requirements.rst
    validator_compose.rst
    validator_helm.rst
    validator_upgrades.rst
    validator_backups.rst
    validator_disaster_recovery.rst
+   validator_security.rst
    validator_users.rst
+   validator_networking.rst
 
-.. todo:: Add sections top-level sections on upgrades, node onboarding, validator functionality, DR
-
-.. todo:: Add section on hardware requirements for
-
-   - basic validator nodes that are just minting or using an app
-   - app provider nodes running app automation for many users
-
-      - use the DA utility node hardware specs as a reference for the hardware requirements
+.. todo:: Add top-level sections on node onboarding, validator functionality

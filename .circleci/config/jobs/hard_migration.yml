@@ -1,113 +1,4 @@
 jobs:
-  hard_migration:
-    executor: self_hosted
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      # What to do
-      action:
-        type: enum
-        enum:
-          [
-            "prepare",
-            "migrate"
-          ]
-      # What to migrate
-      scope:
-        type: enum
-        enum:
-          [
-            "all",
-            "core",
-            "sv",
-            "validator"
-          ]
-      # Commit hash that will become the legacy version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      base_version:
-        type: string
-        default: ""
-      # Commit hash that will become the active version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      upgrade_version:
-        type: string
-        default: ""
-      cancel_workflow_on_failure:
-        type: boolean
-        default: false
-      deploy_retry_count:
-        type: integer
-        default: 2
-      send_notifications:
-        type: boolean
-        default: true
-    steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.upgrade_version >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.upgrade_version >>
-                command: |
-                  echo "Checking out commit << parameters.upgrade_version >>"
-                  git checkout << parameters.upgrade_version >>
-      - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts for upgrade version
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-          cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Execute hard domain migration action
-          cluster: << parameters.cluster >>
-          additional_nix_args: >
-            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD
-            --keep CIRCLECI_TOKEN
-            --keep CIRCLE_WORKFLOW_ID
-            --keep SLACK_ACCESS_TOKEN
-            --keep CIRCLE_BUILD_URL
-          gce_authenticate: true
-          cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: |
-            .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-          cmd: |
-            set -eou pipefail
-
-            base_version=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            upgrade_version=$(build-tools/get-charts-version "<< parameters.upgrade_version >>")
-
-            # All CI-deployed clusters use split postgres instances per app, to support backups.
-            export SPLIT_POSTGRES_INSTANCES=true
-            # cncluster hard_domain_migration_ commands can make the repo dirty
-            export CI_IGNORE_DIRTY_REPO=1
-            echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
-            cncluster activate
-            cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - when:
-          condition: << parameters.send_notifications >>
-          steps:
-            - notify-cluster-fail:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.cancel_workflow_on_failure >>
-          steps:
-            - cancel_entire_workflow_if_this_job_failed
 
   # This job spins up a validator, and then waits until migration has been initiated and a
   # migration dump has been created. Ideally, we'd split it into two jobs, so that triggering
@@ -152,7 +43,9 @@ jobs:
           cmd_name: Wait for SV app to be responsive
           cmd: |
             succes=0
-            for i in {1..30}; do
+            # Wait up to 30 minutes for the sv app to be ready
+            # (we're starting this job in parallel with the initial deployment)
+            for i in {1..180}; do
               if curl -m 10 -sfL https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/version; then
                 success=1
                 break
@@ -443,19 +336,24 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
+            BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
             git branch -f $BASE_VERSION_BRANCH HEAD
             git checkout $BASE_VERSION_BRANCH
             git push -f origin $BASE_VERSION_BRANCH
-            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+            else
+              base_version=$(build-tools/get-snapshot-version)
+            fi
+            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF
+            cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
 
@@ -463,6 +361,10 @@ jobs:
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            # if the base version is a release version ensure we use the public repository
+            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+            fi
 
             git add **/.envrc.vars
             git add **/config.yaml
@@ -519,39 +421,56 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
             git checkout $UPGRADE_VERSION_BRANCH
             git push -f origin $UPGRADE_VERSION_BRANCH
-            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+            else
+              base_version=$(build-tools/get-snapshot-version)
+            fi
+            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
+            # We always include the runbook
+            echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
+            echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
-            cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
+            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            # Add the new entry for the staging nodes.
+            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
+            # if the base version is a release version ensure we use the public repository
+            # we add this as a workaround for deploying the operator from the upgrade branch
+            # we don't commit it as when we deploy with the upgrade version we actually want to use the  dev repository
+            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+            fi
       - deploy_operator:
           cluster: << parameters.cluster >>
           deploy_retry_count: << parameters.deploy_retry_count >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
-          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          pulumi_stack_names: "sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -582,18 +501,18 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            cncluster hard_domain_migration_update_config_to_migrate
+            cncluster update_config_to_migrate
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -634,19 +553,19 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
-            cncluster hard_domain_migration_update_config_to_archive_legacy_migration
+            cncluster update_config_to_archive_legacy_migration
 
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
@@ -692,11 +611,11 @@ jobs:
           cmd_name: Reset SV runbook
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
             export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='0,1'
@@ -708,17 +627,17 @@ jobs:
           cmd_name: Push new branch with migration config changes
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
-            cncluster hard_domain_migration_update_config_to_remove_migrating_from
+            cncluster update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
             git commit -m "Add migration config to remove migratingFrom" || true

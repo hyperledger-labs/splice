@@ -6,7 +6,9 @@ package org.lfdecentralizedtrust.splice.store
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Timer}
 import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
+import com.digitalasset.canton.topology.DomainId
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+import scala.collection.concurrent.TrieMap
 
 class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: MetricsContext)
     extends AutoCloseable {
@@ -34,7 +36,25 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
       0L,
     )(metricsContext)
 
+  private val perSynchronizerLastIngestedRecordTimeMs: TrieMap[DomainId, Gauge[Long]] =
+    TrieMap.empty
+
+  def getLastIngestedRecordTimeMsForSynchronizer(synchronizerId: DomainId) =
+    perSynchronizerLastIngestedRecordTimeMs.getOrElseUpdate(
+      synchronizerId,
+      metricsFactory.gauge(
+        MetricInfo(
+          name = prefix :+ "last-ingested-record-time-ms",
+          summary = "The most recent record time ingested by this store",
+          Traffic,
+          "The most recent record time ingested by this store for each synchronizer in milliseconds. Note that this only updates when the store processes a new transaction so if there is no activity the time won't update.",
+        ),
+        0L,
+      )(metricsContext.merge(MetricsContext((Map("synchronizer_id" -> synchronizerId.toString))))),
+    )
+
   override def close(): Unit = {
     acsSize.close()
+    perSynchronizerLastIngestedRecordTimeMs.values.foreach(_.close())
   }
 }

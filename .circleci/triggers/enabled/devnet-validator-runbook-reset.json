@@ -3,7 +3,7 @@
     "description": "DevNet Validator Runbook Periodic Reset every 6 hours",
     "attribution-actor": "system",
     "parameters" : {
-      "branch": "release-line-0.3.6",
+      "branch": "release-line-0.3.10",
       "run-job": "reset-validator-runbook-devnet"
     },
     "timetable" : {

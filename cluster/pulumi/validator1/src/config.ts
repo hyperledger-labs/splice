@@ -12,6 +12,14 @@ export const Validator1ConfigSchema = z.object({
           keyRingId: z.string(),
         })
         .optional(),
+      participantPruningSchedule: z
+        .object({
+          cron: z.string(),
+          maxDuration: z.string(),
+          retention: z.string(),
+        })
+        .optional(),
+      deduplicationDuration: z.string().optional(),
     })
     .optional(),
 });

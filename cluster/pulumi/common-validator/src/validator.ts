@@ -21,6 +21,7 @@ import {
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
+  ParticipantPruningConfig,
   PersistenceConfig,
   spliceInstanceNames,
   validatorOnboardingSecretName,
@@ -70,6 +71,8 @@ type BasicValidatorConfig = {
   autoAcceptTransfers?: AutoAcceptTransfersConfig;
   nodeIdentifier: string;
   dependencies: CnInput<pulumi.Resource>[];
+  participantPruningConfig?: ParticipantPruningConfig;
+  deduplicationDuration?: string;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -220,6 +223,24 @@ export async function installValidatorApp(
       autoAcceptTransfers,
       contactPoint: daContactPoint,
       nodeIdentifier: config.nodeIdentifier,
+      participantPruningSchedule: config.participantPruningConfig,
+      additionalEnvVars:
+        !config.svValidator && config.onboardingSecret
+          ? // TODO(#17447): This is a horrible hacky way to test that `valueFrom` does what it should here; this should be removed ASAP.
+            [
+              {
+                name: 'ONBOARDING_SECRET_ONLY_FOR_TESTING',
+                valueFrom: {
+                  secretKeyRef: {
+                    name: validatorOnboardingSecretName('validator'),
+                    key: 'secret',
+                    optional: false,
+                  },
+                },
+              },
+            ]
+          : undefined,
+      deduplicationDuration: config.deduplicationDuration,
       ...spliceInstanceNames,
     },
     chartVersion,
