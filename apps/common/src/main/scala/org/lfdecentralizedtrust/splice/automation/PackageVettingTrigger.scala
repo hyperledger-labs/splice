@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
-import org.lfdecentralizedtrust.splice.util.PackageVetting
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, PackageVetting}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -12,7 +12,8 @@ import scala.concurrent.Future
 
 abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     extends PollingTrigger
-    with PackageIdResolver.HasAmuletRules {
+    with PackageIdResolver.HasAmuletRules
+    with PackageVetting.HasVoteRequests {
 
   protected def participantAdminConnection: ParticipantAdminConnection
 
@@ -32,7 +33,11 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
       amuletRules <- getAmuletRules()
-      _ <- vetting.vetPackages(amuletRules)
+      voteRequests <- getVoteRequests()
+      _ <- vetting.vetPackages(
+        amuletRules,
+        AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+      )
     } yield false
   }
 }

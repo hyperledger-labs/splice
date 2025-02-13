@@ -133,6 +133,7 @@ trait SvTestUtil extends TestCommon {
               // We give everyone 30 seconds to vote. Hopefully that is a good sweet spot between
               // the vote failing because of a timeout and the test taking too long.
               new RelTime(30 * 1000 * 1000),
+              None,
             )
           },
         )(

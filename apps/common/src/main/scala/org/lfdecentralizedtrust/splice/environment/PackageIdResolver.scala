@@ -3,14 +3,14 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
-import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, QualifiedName}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -36,10 +36,10 @@ abstract class PackageIdResolver()(implicit ec: ExecutionContext) {
       command: Command
   )(implicit tc: TraceContext): Future[Command] = {
     import com.daml.ledger.javaapi.data.{
-      CreateCommand,
-      ExerciseCommand,
       CreateAndExerciseCommand,
+      CreateCommand,
       ExerciseByKeyCommand,
+      ExerciseCommand,
     }
     command match {
       case create: CreateCommand =>
@@ -85,6 +85,7 @@ abstract class PackageIdResolver()(implicit ec: ExecutionContext) {
 
 object PackageIdResolver {
   trait HasAmuletRules {
+
     def getAmuletRules()(implicit
         tc: TraceContext
     ): Future[Contract[AmuletRules.ContractId, AmuletRules]]

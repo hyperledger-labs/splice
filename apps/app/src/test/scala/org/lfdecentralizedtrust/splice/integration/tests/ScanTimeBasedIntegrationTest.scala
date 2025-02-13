@@ -1,10 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -17,15 +22,13 @@ import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
 
+import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
 class ScanTimeBasedIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil
+    with AmuletConfigUtil
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -93,24 +96,31 @@ class ScanTimeBasedIntegrationTest
       )
     }
 
-    val newHoldingFee = 0.1
+    val newHoldingFee = BigDecimal(0.1)
     clue("schedule a config change, and advance time for it to take effect") {
-      val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
-      val configSchedule =
-        createConfigSchedule(
-          currentConfigSchedule,
-          (
-            defaultTickDuration.asJava,
-            mkUpdatedAmuletConfig(
-              currentConfigSchedule,
-              tickDuration = defaultTickDuration,
-              holdingFee = newHoldingFee,
-            ),
-          ),
+      val amuletRules = sv1ScanBackend.getAmuletRules().contract
+      val configs = Seq(
+        (
+          Some(Duration.ofSeconds(10)),
+          mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, holdingFee = newHoldingFee),
+          amuletRules.payload.configSchedule.initialValue,
         )
+      )
 
-      setFutureConfigSchedule(configSchedule)
-
+      setAmuletConfig(configs)
+      advanceTime(Duration.ofSeconds(20))
+      eventually() {
+        BigDecimal(
+          sv1ScanBackend
+            .getAmuletRules()
+            .payload
+            .configSchedule
+            .initialValue
+            .transferConfig
+            .holdingFee
+            .rate
+        ) should be(newHoldingFee)
+      }
       advanceRoundsByOneTick
     }
     clue("Round 4 should now be open, and have the new configuration") {

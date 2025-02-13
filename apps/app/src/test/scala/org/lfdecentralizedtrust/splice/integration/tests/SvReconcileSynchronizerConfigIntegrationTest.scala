@@ -2,18 +2,16 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.{
   AmuletDecentralizedSynchronizerConfig,
   BaseRateTrafficLimits,
   SynchronizerFeesConfig,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.*
 
 class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase {
@@ -54,12 +52,10 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
       amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor + 1,
     )
     val configChangeAction = new ARC_AmuletRules(
-      new CRARC_AddFutureAmuletConfigSchedule(
-        new AmuletRules_AddFutureAmuletConfigSchedule(
-          new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-            Instant.now().plus(20, ChronoUnit.SECONDS),
-            newAmuletConfig,
-          )
+      new CRARC_SetConfig(
+        new AmuletRules_SetConfig(
+          newAmuletConfig,
+          amuletConfig,
         )
       )
     )
@@ -74,12 +70,13 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
               "url",
               "description",
               sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
             )
           },
         )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
-        clue(s"sv2-4 accept") {
-          Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+        clue(s"sv2 and sv3 accept") {
+          Seq(sv2Backend, sv3Backend).map(sv =>
             eventuallySucceeds() {
               sv.castVote(
                 voteRequest.contractId,

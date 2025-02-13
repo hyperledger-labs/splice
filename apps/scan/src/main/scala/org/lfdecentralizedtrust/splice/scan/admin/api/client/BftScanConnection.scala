@@ -68,6 +68,7 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
 import org.slf4j.event.Level
 
 import java.util.concurrent.ConcurrentHashMap
@@ -124,6 +125,14 @@ class BftScanConnection(
         })
       )
   }
+
+  override def listVoteRequests()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    bftCall(
+      _.listVoteRequests()
+    )
 
   override def getDsoPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
     bftCall(

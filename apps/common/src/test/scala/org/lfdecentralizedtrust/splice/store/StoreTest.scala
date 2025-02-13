@@ -504,6 +504,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       requester: PartyId,
       votes: Seq[Vote],
       expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600L),
+      effectiveAt: Optional[Instant] = Optional.empty(),
       action: ActionRequiringConfirmation = addUser666Action,
   ) = {
     val cid = new VoteRequest.ContractId(nextCid())
@@ -515,7 +516,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       expiry,
       votes.map(e => (e.sv, e)).toMap.asJava,
       Optional.of(cid),
-      Optional.empty(),
+      effectiveAt,
     )
 
     contract(

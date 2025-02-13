@@ -639,7 +639,11 @@ class ValidatorApp(
             participantAdminConnection,
             loggerFactory,
           )
-          _ <- packageVetting.vetPackages(amuletRules)
+          voteRequests <- scanConnection.getVoteRequests()
+          _ <- packageVetting.vetPackages(
+            amuletRules,
+            AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+          )
         } yield ()
       }
 

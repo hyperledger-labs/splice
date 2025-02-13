@@ -203,6 +203,7 @@ class SvTimeBasedOnboardingIntegrationTest
               "url",
               "description",
               sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
             )
           },
         )(

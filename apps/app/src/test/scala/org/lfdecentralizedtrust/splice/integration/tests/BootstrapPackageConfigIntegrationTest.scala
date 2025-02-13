@@ -3,7 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.admin.participant.v30.DarDescription
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
@@ -30,16 +36,11 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{DarUtil, ProcessTestUtil, StandaloneCanton}
-import com.digitalasset.canton.admin.participant.v30.DarDescription
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.crypto.Hash
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.google.protobuf.ByteString
+import org.scalatest.time.{Minute, Span}
+
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
-import org.scalatest.time.{Minute, Span}
 
 class BootstrapPackageConfigIntegrationTest
     extends IntegrationTest
@@ -210,6 +211,7 @@ class BootstrapPackageConfigIntegrationTest
                   "url",
                   "description",
                   sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                  None,
                 )
               },
             )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
