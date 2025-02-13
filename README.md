@@ -415,17 +415,18 @@ In a nutshell, the responsibilities of an engineer on monitoring duty are:
 1. Monitor and triage failures reported on (**in priority order**):
    1. [#team-canton-network-mainnet-deployment](https://daholdings.slack.com/archives/C0731SHS3HB)
    2. [#team-canton-network-dev-testnet-deployment](https://daholdings.slack.com/archives/C06SMCCBYQH)
-   3. [#global-synchronizer-ops](https://daholdings.slack.com/archives/C05E70BCSDA) - engage on issues that could threaten overall stability and/or are possibly due to bugs in our software and/or documentation
-   4. [#validator-ops](https://daholdings.slack.com/archives/C06QB1ZEGCE) - engage on issues that are possibly due to bugs in our software and/or documentation
-   5. [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
-   6. [#team-canton-network-internal-alerts](https://daholdings.slack.com/archives/C064MTNQT88)
-   7. [#team-canton-network-cilr-notifications](https://daholdings.slack.com/archives/C06VDG5RXNE)
+   3. [#supervalidator-operations](https://daholdings.slack.com/archives/C085C3ESYCT) - engage on issues that could threaten overall stability and/or are possibly due to bugs in our software and/or documentation
+   4. [#validator-ops](https://daholdings.slack.com/archives/C08AP9QR7K4) - engage on issues that are possibly due to bugs in our software and/or documentation
+   5. [CN Cluster Failures](https://github.com/orgs/DACH-NY/projects/48) project (Inbox)
+   6. [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
+   7. [#team-canton-network-internal-alerts](https://daholdings.slack.com/archives/C064MTNQT88)
+   8. [#team-canton-network-cilr-notifications](https://daholdings.slack.com/archives/C06VDG5RXNE)
 2. Drive resolution of failures - delegate and/or alert others about frequent and disruptive failures.
 3. Escalate to “manager on duty” if too much is going on and we need additional monitoring help.
 4. (lower prio) Resolve issues yourself.
 5. (at end of rotation) Do an explicit handover to the next monitoring team.
 
-Note that while the Slack channels to monitor are listed here in priority order, it is also acceptable for engineers on the same rotation to "split up" their monitoring and triaging efforts
+Note that while the channels to monitor are listed here in priority order, it is also acceptable for engineers on the same rotation to "split up" their monitoring and triaging efforts
 (e.g.: two engineers focusing more on production clusters, the other two engineers more on CI failures and CI-managed clusters).
 However: Each engineer on monitoring rotation is responsible for ensuring that the rotation as a whole operates based on above priorities; specifically that production clusters receive a level of attention that matches their current level of (in)stability.
 
@@ -445,16 +446,19 @@ Engineers on monitoring duty that have a day off should ensure that another engi
 
 For engineers on monitoring duty, the resolution process is as follows.
 
-* When there is a Slack message on a channel you are monitoring that indicates a failure, follow the checklist [for flakes](support/FLAKE_CHECKLIST.md).
-* PR's for any fixes should also be linked to the issue.
+* When there is a Slack message or an automatically created issue that indicates a failure,
+  follow the checklist [for flakes](support/FLAKE_CHECKLIST.md).
+* PRs for any fixes should also be linked to the issue.
 * For failures that are not frequent enough to warrant a fix, the
-  issue in Github should be labeled "infrequent/no repro".
+  issue in Github should be moved to the "Infrequent / no repro" column
+  (if tracked via [the board](https://github.com/orgs/DACH-NY/projects/48/))
+  or labeled "infrequent/no repro".
 * For failures that are especially disruptive, the
   issue in Github can be labeled "now" to signal its importance.
 
-We have a script `./scripts/monitor-flaky-tests.sh` that can be helpful for keeping track of new activity (e.g. team members reporting new occurrences of flakes on individual PRs) on flaky issues you may not be subscribed to on GitHub. A good way to use this is with the watch command for live updates, like `watch -n 120 ./scripts/monitor-flaky-tests.sh`. The `gh` command requires you to authenticate to GitHub. You can run `gh auth login` once, or add a repo-scoped personal access token in a var (`export GITHUB_TOKEN=...`) in `.envrc.private`.
-
-By default, the script returns the top 5 most recent issues. Use the `-l <int>` argument to fetch more issues.
+At the end of a day of monitoring, please add to your **[standdown]** the current number of issues
+in the "Inbox" and "Triaged" columns of the [CN Cluster Failures](https://github.com/orgs/DACH-NY/projects/48/) board.
+This helps the team get a feeling for the current situation and acts as a reminder for you to check that Inbox frequently :)
 
 Further reading:
 - [alerts checklist](support/ALERTS_CHECKLIST.md)
@@ -465,6 +469,24 @@ Further reading:
 - [strategies for reacting to a failed TestNet or DevNet deployment](cluster/README.md#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment)
 
 For **support** duty, also during off hours, see [CN L3 Support](https://docs.google.com/document/d/1mc60ha2SwiTsEzGDzpOcY4eh_RKFPy415FvB5K-4XkA/edit).
+
+#### Technical helpers: tracking recent activity
+
+We have a script `./scripts/monitor-flaky-tests.sh` that can be helpful for keeping track of new activity (e.g. team members reporting new occurrences of flakes on individual PRs) on flaky issues you may not be subscribed to on GitHub. A good way to use this is with the watch command for live updates, like `watch -n 120 ./scripts/monitor-flaky-tests.sh`. The `gh` command requires you to authenticate to GitHub. You can run `gh auth login` once, or add a repo-scoped personal access token in a var (`export GITHUB_TOKEN=...`) in `.envrc.private`.
+
+By default, the script returns the top 5 most recent issues. Use the `-l <int>` argument to fetch more issues.
+
+#### Technical helpers: managing automatically generated issues
+
+Issues on the [CN Cluster Failures](https://github.com/orgs/DACH-NY/projects/48/) are generated automatically.
+This can sometimes lead to a large number of quasi-duplicate issues,
+for example when `cidaily` failed to deploy on a (Sun-)day and all `cidaily` triggers failed for that reason.
+To save you the many clicks need to close all of these issues via the UI, you can use the `gh` tool we have in our `nix` (see above).
+For example to close all issues from #2279 to #2308 you could do (fish shell snippet):
+
+```
+for num in (seq 2279 2308); gh issue close -R https://github.com/DACH-NY/cn-test-failures --comment "cidaily was down" --reason "not planned" $num; end
+```
 
 ### Contribution Guide
 
