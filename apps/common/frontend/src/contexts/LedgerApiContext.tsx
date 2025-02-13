@@ -100,30 +100,30 @@ export class LedgerApiClient {
     );
     const command = {
       ExerciseCommand: {
-        template_id: choice.template().templateId,
-        contract_id: contractId,
+        templateId: choice.template().templateId,
+        contractId: contractId,
         choice: choice.choiceName,
-        choice_argument: choice.argumentEncode(argument),
+        choiceArgument: choice.argumentEncode(argument),
       },
     };
 
     const body = {
       commands: [command],
-      workflow_id: '',
-      application_id: '',
-      command_id: uuidv4(),
-      deduplication_period: { Empty: {} },
-      act_as: actAs,
-      read_as: readAs,
-      submission_id: '',
-      disclosed_contracts: disclosedContracts.map(c => ({
+      workflowId: '',
+      applicationId: '',
+      commandId: uuidv4(),
+      deduplicationPeriod: { Empty: {} },
+      actAs: actAs,
+      readAs: readAs,
+      submissionId: '',
+      disclosedContracts: disclosedContracts.map(c => ({
         contractId: c.contractId,
         createdEventBlob: c.createdEventBlob,
         domainId: '',
         templateId: c.templateId,
       })),
-      domain_id: domainId || '',
-      package_id_selection_preference: [],
+      domainId: domainId || '',
+      packageIdSelectionPreference: [],
     };
 
     const describeChoice = `Exercised choice: actAs=${JSON.stringify(
@@ -150,10 +150,10 @@ export class LedgerApiClient {
         throw e;
       });
 
-    const tree = responseBody.transaction_tree;
-    const rootEvent = tree.events_by_id[tree.root_event_ids[0]];
+    const tree = responseBody.transactionTree;
+    const rootEvent = tree.eventsById[tree.rootEventIds[0]];
     const exerciseResult = choice.resultDecoder.runWithException(
-      rootEvent.ExercisedTreeEvent.exercise_result
+      rootEvent.ExercisedTreeEvent.exerciseResult
     );
     return exerciseResult;
   }
