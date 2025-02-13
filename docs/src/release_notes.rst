@@ -13,7 +13,11 @@ Upcoming
 
 * Validator
 
-  Add an option to enable :ref:`participant pruning <validator_participant_pruning>`.
+  * Add an option to enable :ref:`participant pruning <validator_participant_pruning>`.
+
+* Observability
+
+  * Add a dashboard for sequencer client metrics.
 
 0.3.10
 ------
