@@ -220,7 +220,7 @@ class InitialTopologySnapshotValidator(
         s"The computed effective time ($effectiveTime) for sequenced time ($sequenced) is different than the effective time from the topology snapshot ($effectiveTimeFromSnapshot).",
       )
 
-      validatedTxs <- EitherT
+      validationResult <- EitherT
         .right(
           stateProcessor
             .validateAndApplyAuthorization(
@@ -236,6 +236,7 @@ class InitialTopologySnapshotValidator(
               compactTransactions = false,
             )
         )
+      (validatedTxs, _) = validationResult
       _ = inspectAndAdvanceTopologyTransactionDelay(
         effectiveTime,
         validatedTxs,

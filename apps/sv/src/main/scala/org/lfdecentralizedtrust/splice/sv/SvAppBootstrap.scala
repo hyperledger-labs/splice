@@ -36,7 +36,7 @@ class SvAppBootstrap(
     val svAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: SvAppMetrics,
+    override val metrics: SvAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,

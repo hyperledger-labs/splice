@@ -32,17 +32,23 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
     )
     def upload(
         darPath: String,
+        description: String = "",
         vetAllPackages: Boolean = true,
         synchronizeVetting: Boolean = true,
+        expectedMainPackageId: String = "",
+        requestHeaders: Map[String, String] = Map(),
         darDataO: Option[ByteString] = None,
     ): Map[ParticipantReference, String] = {
       val res = ConsoleCommandResult.runAll(participants)(
         ParticipantCommands.dars
           .upload(
             _,
-            darPath,
+            path = darPath,
+            description = description,
             vetAllPackages = vetAllPackages,
             synchronizeVetting = synchronizeVetting,
+            expectedMainPackageId = expectedMainPackageId,
+            requestHeaders = requestHeaders,
             logger,
             darDataO,
           )

@@ -40,7 +40,6 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.{MonadUtil, PekkoUtil, SingleUseCell}
 import com.google.common.annotations.VisibleForTesting
 import io.circe.Encoder
-import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.slf4j.bridge.SLF4JBridgeHandler
 
@@ -91,6 +90,8 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       config.monitoring.metrics.cardinality.unwrap,
       loggerFactory,
     )
+  lazy val tracerProvider: TracerProvider =
+    TracerProvider.Factory(configuredOpenTelemetry, "console")
 
   lazy val metricsRegistry: MetricsRegistry = {
     config.monitoring.metrics.jvmMetrics
@@ -101,9 +102,9 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       testingConfig.metricsFactoryType,
       // TODO(#13956) - remove this once we have support in canton to not fail if histograms are not registered
       testingSupportAdhocMetrics = true,
-      histograms = histograms,
-      baseFilter = baseFilter,
-      loggerFactory = loggerFactory,
+      histograms,
+      baseFilter,
+      loggerFactory,
     )
   }
 
@@ -146,14 +147,9 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     Future {
       healthDumpGenerator
         .getOrElse {
-          val tracerProvider =
-            TracerProvider.Factory(configuredOpenTelemetry, "admin_command_runner")
-          implicit val tracer: Tracer = tracerProvider.tracer
-
           val commandRunner =
-            new GrpcAdminCommandRunner(
+            GrpcAdminCommandRunner(
               this,
-              config.parameters.timeouts.console,
               CantonGrpcUtil.ApiName.AdminApi,
             )
           val newGenerator = createHealthDumpGenerator(commandRunner)
@@ -283,6 +279,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       timeouts,
       config.participantsByString,
       config.participantNodeParametersByString,
+      apiName => GrpcAdminCommandRunner(this, apiName),
       loggerFactory,
     )
 

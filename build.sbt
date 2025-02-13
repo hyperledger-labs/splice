@@ -39,6 +39,7 @@ lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
+lazy val `canton-daml-adjustable-clock` = BuildCommon.`canton-daml-adjustable-clock`
 lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
 lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
 lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
@@ -1468,7 +1469,12 @@ printTests := {
 
   val allTestNames =
     definedTests
-      .all(ScopeFilter(inAggregates(root), inConfigurations(Test)))
+      .all(
+        ScopeFilter(inAggregates(root), inConfigurations(Test)) -- ScopeFilter(
+          inProjects(`canton-ledger-api-core`),
+          inConfigurations(Test),
+        )
+      )
       .value
       .flatten
       .map(_.name)

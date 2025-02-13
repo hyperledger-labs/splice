@@ -381,6 +381,15 @@ object BuildCommon {
       )
   }
 
+  lazy val `canton-daml-adjustable-clock` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-daml-adjustable-clock", file("canton/daml-common-staging/adjustable-clock"))
+      .settings(
+        sharedCantonSettings
+      )
+  }
+
   lazy val `canton-daml-grpc-utils` = {
     import CantonDependencies._
     sbt.Project
@@ -495,6 +504,7 @@ object BuildCommon {
         `canton-community-synchronizer`,
         `canton-community-participant`,
         `canton-community-integration-testing` % "test",
+        `canton-ledger-api-core` % "test->test",
       )
       .enablePlugins(DamlPlugin)
       .settings(
@@ -1027,6 +1037,7 @@ object BuildCommon {
           cats,
           grpc_stub,
           mockito_scala % Test,
+          scalapb_runtime_grpc,
           scalatestMockito % Test,
           scalatest % Test,
           slick,
@@ -1181,8 +1192,10 @@ object BuildCommon {
       .apply("canton-ledger-api-core", file("canton/community/ledger/ledger-api-core"))
       .dependsOn(
         `canton-ledger-common` % "compile->compile;test->test",
-        `canton-community-base`,
-        `canton-community-common`,
+        `canton-community-common` % "compile->compile;test->test",
+        `canton-daml-adjustable-clock` % "test->test",
+        `canton-daml-errors` % "test->test",
+        `canton-daml-tls` % "test->test",
       )
       .disablePlugins(
         WartRemover,
@@ -1190,7 +1203,6 @@ object BuildCommon {
       ) // to accommodate different daml repo coding style
       .settings(
         sharedCantonSettings,
-        removeTestSources,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         Compile / PB.targets := Seq(
@@ -1200,6 +1212,7 @@ object BuildCommon {
           auth0_java,
           auth0_jwks,
           circe_core,
+          daml_libs_scala_grpc_test_utils,
           daml_ports,
           daml_struct_spray_json,
           netty_boring_ssl,

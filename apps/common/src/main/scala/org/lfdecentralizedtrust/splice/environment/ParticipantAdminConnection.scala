@@ -13,20 +13,16 @@ import com.digitalasset.canton.admin.api.client.commands.{
   PruningSchedulerCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{
+  DarDescription,
   ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
   PruningSchedule,
 }
-import com.digitalasset.canton.admin.participant.v30.{
-  DarDescription,
-  ExportAcsResponse,
-  PruningServiceGrpc,
-}
+import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
-import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
@@ -59,11 +55,11 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
 }
-import org.lfdecentralizedtrust.splice.util.UploadablePackage
+import org.lfdecentralizedtrust.splice.util.{DarUtil, UploadablePackage}
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
-import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.reflect.ClassTag
 
 /** Connection to the subset of the Canton admin API that we rely
@@ -101,11 +97,6 @@ class ParticipantAdminConnection(
 
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
-
-  private val hashOps: HashOps = new HashOps {
-    override def defaultHashAlgorithm: com.digitalasset.canton.crypto.HashAlgorithm.Sha256.type =
-      HashAlgorithm.Sha256
-  }
 
   private def listConnectedDomains()(implicit
       traceContext: TraceContext
@@ -476,6 +467,7 @@ class ParticipantAdminConnection(
     uploadDarLocally(
       pkg.resourcePath,
       ByteString.readFrom(pkg.inputStream()),
+      pkg.packageId,
       retryFor,
     )
   def uploadDarFile(
@@ -485,6 +477,7 @@ class ParticipantAdminConnection(
     uploadDarFileInternal(
       pkg.resourcePath,
       ByteString.readFrom(pkg.inputStream()),
+      pkg.packageId,
       retryFor,
     )
 
@@ -496,41 +489,49 @@ class ParticipantAdminConnection(
       darFile <- Future {
         ByteString.readFrom(Files.newInputStream(path))
       }
-      _ <- uploadDarFileInternal(path.toString, darFile, retryFor)
+      pkgId <- Future {
+        DarUtil.readPackageId(path.toString, Files.newInputStream(path))
+      }
+      _ <- uploadDarFileInternal(path.toString, darFile, pkgId, retryFor)
     } yield ()
 
-  def lookupDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[ByteString]] =
+  def lookupDar(mainPackageId: String)(implicit
+      traceContext: TraceContext
+  ): Future[Option[ByteString]] =
     runCmd(
-      ParticipantAdminConnection.LookupDarByteString(hash)
+      ParticipantAdminConnection.LookupDarByteString(mainPackageId)
     )
 
   def listDars(limit: PositiveInt = PositiveInt.MaxValue)(implicit
       traceContext: TraceContext
   ): Future[Seq[DarDescription]] =
     runCmd(
-      ParticipantAdminCommands.Package.ListDars(limit)
+      ParticipantAdminCommands.Package.ListDars(filterName = "", limit)
     )
   private def uploadDarLocally(
       path: String,
       darFile: => ByteString,
+      mainPackageId: String,
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
     for {
       _ <- retryProvider
         .ensureThatO(
           retryFor,
           "upload_dar_locally",
-          s"DAR file $path with hash $darHash has been uploaded.",
-          lookupDar(darHash).map(_.map(_ => ())),
+          s"DAR file $path with packageId $mainPackageId has been uploaded.",
+          lookupDar(mainPackageId).map(_.map(_ => ())),
           runCmd(
             ParticipantAdminCommands.Package
               .UploadDar(
-                Some(path),
+                path,
                 vetAllPackages = true,
                 synchronizeVetting = false,
+                description = "",
+                expectedMainPackageId = mainPackageId,
+                requestHeaders = Map.empty,
                 logger,
                 Some(darFile),
               )
@@ -543,25 +544,28 @@ class ParticipantAdminConnection(
   private def uploadDarFileInternal(
       path: String,
       darFile: => ByteString,
+      mainPackageId: String,
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
     for {
       _ <- retryProvider
         .ensureThatO(
           retryFor,
           "upload_dar",
-          s"DAR file $path with hash $darHash has been uploaded.",
+          s"DAR file $path with package id $mainPackageId has been uploaded.",
           // TODO(#5141) and TODO(#5755): consider if we still need a check here
-          lookupDar(darHash).map(_.map(_ => ())),
+          lookupDar(mainPackageId).map(_.map(_ => ())),
           runCmd(
             ParticipantAdminCommands.Package
               .UploadDar(
-                Some(path),
+                path,
                 vetAllPackages = true,
                 synchronizeVetting = true,
+                description = "",
+                expectedMainPackageId = mainPackageId,
+                requestHeaders = Map.empty,
                 logger,
                 Some(darFile),
               )
@@ -925,28 +929,33 @@ object ParticipantAdminConnection {
   // The Canton APIs insist on writing the bytestring to a file so we define
   // our own variant.
   final case class LookupDarByteString(
-      darHash: Hash
-  ) extends GrpcAdminCommand[GetDarRequest, GetDarResponse, Option[ByteString]] {
+      mainPackageId: String
+  )(implicit ec: ExecutionContext)
+      extends GrpcAdminCommand[GetDarRequest, Option[GetDarResponse], Option[ByteString]] {
     override type Svc = PackageServiceStub
 
     override def createService(channel: ManagedChannel): PackageServiceStub =
       PackageServiceGrpc.stub(channel)
 
     override def createRequest(): Either[String, GetDarRequest] =
-      Right(GetDarRequest(darHash.toHexString))
+      Right(GetDarRequest(mainPackageId))
 
     override def submitRequest(
         service: PackageServiceStub,
         request: GetDarRequest,
-    ): Future[GetDarResponse] =
-      service.getDar(request)
+    ): Future[Option[GetDarResponse]] =
+      service.getDar(request).map(Some(_)).recover {
+        case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND => None
+      }
 
-    override def handleResponse(response: GetDarResponse): Either[String, Option[ByteString]] =
+    override def handleResponse(
+        response: Option[GetDarResponse]
+    ): Either[String, Option[ByteString]] =
       // For some reason the API does not throw a NOT_FOUND but instead returns
       // a successful response with data set to an empty bytestring.
       // To make things extra fun, this is inconsistent. Other APIs on the package service
       // do return NOT_FOUND.
-      Right(Option.when(!response.data.isEmpty)(response.data))
+      Right(response.map(_.payload))
 
     // might be a big file to download
     override def timeoutType

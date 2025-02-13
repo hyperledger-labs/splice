@@ -103,7 +103,7 @@ class DomainDataRestorer(
   private def importDars(dars: Seq[Dar])(implicit tc: TraceContext) = {
     dars
       .map { dar =>
-        UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
+        UploadablePackage.fromByteString(dar.mainPackageId, dar.content)
       }
       .parTraverse_ { dar =>
         participantAdminConnection.uploadDarFileLocally(

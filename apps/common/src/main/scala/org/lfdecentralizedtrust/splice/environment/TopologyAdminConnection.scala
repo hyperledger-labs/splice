@@ -538,7 +538,11 @@ abstract class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(
-      TopologyAdminCommands.Write.ImportTopologySnapshot(topologyTransactions, store.filterName)
+      TopologyAdminCommands.Write.ImportTopologySnapshot(
+        topologyTransactions,
+        store.filterName,
+        waitToBecomeEffective = None,
+      )
     )
   }
 
@@ -599,6 +603,7 @@ abstract class TopologyAdminConnection(
         mustFullyAuthorize = !isProposal,
         change = change,
         forceChanges = forceChanges,
+        waitToBecomeEffective = None,
       )
     )
 
@@ -757,6 +762,7 @@ abstract class TopologyAdminConnection(
           ForceFlags(
             flags*
           ),
+          waitToBecomeEffective = None,
         )
     )
 
@@ -1403,12 +1409,12 @@ object TopologyAdminConnection {
     )
   }
 
-  implicit val prettyStore: Pretty[grpc.TopologyStore] = prettyOfObject[grpc.TopologyStore]
+  implicit val prettyStore: Pretty[grpc.TopologyStoreId] = prettyOfObject[grpc.TopologyStoreId]
 
   implicit val prettyBaseResult: Pretty[BaseResult] =
     prettyNode(
       "BaseResult",
-      param("store", _.store),
+      param("storeId", _.storeId),
       param("validFrom", _.validFrom),
       param("validUntil", _.validUntil),
       param("operation", _.operation),

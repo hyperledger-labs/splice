@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.crypto.{CryptoKeyPair, Fingerprint}
 import com.digitalasset.canton.topology.ParticipantId
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
 
@@ -14,6 +16,15 @@ class ParticipantPlaintextIdentitiesIntegrationTest
 
   override def aliceParticipantDumpFilename =
     ParticipantPlaintextIdentitiesIntegrationTest.alicePlaintextIdentitiesDumpFilePath
+
+  // The key encoding can change across versions even if the key stays the same so we only compare fingerprints.
+  def toKeyFingerprints(dump: NodeIdentitiesDump): Seq[(Fingerprint, Option[String])] =
+    dump.keys.map { key =>
+      inside(key) { case NodeIdentitiesDump.NodeKey.KeyPair(bytes, name) =>
+        val pair = CryptoKeyPair.fromTrustedByteString(ByteString.copyFrom(bytes.toArray)).value
+        (pair.publicKey.fingerprint, name)
+      }
+    }
 
   "We can import and export Canton participant identities dumps with plaintext keys in them" in {
     implicit env =>
@@ -58,7 +69,9 @@ class ParticipantPlaintextIdentitiesIntegrationTest
           }
 
         clue("Checking exported keys for Alice's validator") {
-          validatorParticipantDump.keys.toSet shouldBe predefinedDump.keys.toSet
+          toKeyFingerprints(validatorParticipantDump).toSet shouldBe toKeyFingerprints(
+            predefinedDump
+          ).toSet
         }
       }
   }

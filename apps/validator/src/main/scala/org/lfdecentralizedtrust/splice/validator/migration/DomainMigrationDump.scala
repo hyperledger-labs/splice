@@ -7,7 +7,6 @@ import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.migration.Dar
-import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.google.protobuf.ByteString
@@ -43,7 +42,7 @@ final case class DomainMigrationDump(
     acsTimestamp = acsTimestamp.toString,
     dars = dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
-      http.Dar(dar.hash.toHexString, content)
+      http.Dar(dar.mainPackageId, content)
     }.toVector,
     migrationId = migrationId,
     domainId = domainId.toProtoPrimitive,
@@ -72,7 +71,7 @@ object DomainMigrationDump {
     }
     dars = response.dars.map { dar =>
       val decoded = base64Decoder.decode(dar.content)
-      Dar(Hash.tryFromHexString(dar.hash), ByteString.copyFrom(decoded))
+      Dar(dar.hash, ByteString.copyFrom(decoded))
     }
     createdAt = Instant.parse(response.createdAt)
   } yield DomainMigrationDump(

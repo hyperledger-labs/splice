@@ -36,7 +36,7 @@ class ScanAppBootstrap(
     val scanAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: ScanAppMetrics,
+    override val metrics: ScanAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
