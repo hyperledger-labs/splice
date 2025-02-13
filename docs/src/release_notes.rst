@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.11
+------
 
 * Validator
 
@@ -18,6 +18,11 @@ Upcoming
 * Observability
 
   * Add a dashboard for sequencer client metrics.
+
+* Docs
+
+  * Extend :ref:`Scan API docs <app_dev_scan_api>` docs.
+  * Various smaller documentation updates and improvements.
 
 0.3.10
 ------
