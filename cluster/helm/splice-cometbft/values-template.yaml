@@ -33,9 +33,11 @@ node:
   rpcPort: 26657
   # Identifier used to prefix created resources and as part of the optional Istio ingress
   identifier:
+  # DOCS_COMETBFT_PRUNING_START
   # Number of blocks to keep, used for pruning. 0 -> keep all blocks.
   # Number of blocks to keep for 30 days with an upper bound of 7k blocks/h.
   retainBlocks: 5040000
+  # DOCS_COMETBFT_PRUNING_END
   # Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.
   # A value below 1000 is not recommended.
   snapshotHeightDelta: 1000
@@ -92,4 +94,3 @@ metrics:
 enableAntiAffinity: true
 
 logLevel: debug
-

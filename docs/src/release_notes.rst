@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Docs
+
+  * Add :ref:`SV pruning <sv-pruning>` section.
+  * Add historical :ref:`backups <sv_backups>` section to the SV docs.
+  * Add historical :ref:`backups <validator-backups>` section to the Validator docs.
+
 0.3.11
 ------
 

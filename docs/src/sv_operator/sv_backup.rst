@@ -27,8 +27,8 @@ where `<token>` is an OAuth2 Bearer Token obtained from your OAuth provider. For
 Backup of Postgres Instances
 ++++++++++++++++++++++++++++
 
-Please make sure your Postgres instances are backed up at least every 4 hours. We will provide guidelines on retention of older backups
-at a later point in time.
+Taking backups
+^^^^^^^^^^^^^^
 
 While most backups can be taken independently, there is one strict ordering requirement between them:
 The backup of the apps postgres instance must be taken at a point in time strictly earlier than that of the participant.
@@ -37,9 +37,36 @@ Please make sure the apps instance backup is completed before starting the parti
 If you are running your own Postgres instances in the cluster, backups can be taken either using tools like `pgdump`, or through snapshots of the underlying Persistent Volume.
 Similarly, if you are using Cloud-hosted Postgres, you can either use tools like `pgdump` or backup tools provided by the Cloud provider.
 
+Please make sure your Postgres instances are backed up at least every 4 hours.
+
+Historical backups
+^^^^^^^^^^^^^^^^^^
+
+We need historical backups in order to preserve a gap-less history from genesis, which can be uses during audits and more generally prove the correctness of the current synchronizer state to outside observers.
+
+For the sequencer, when :ref:`pruning <sv-pruning-sequencer>` is enabled, historical backups must be kept for each pruning window.
+This means that backups must be preserved with a time difference between two historical backups smaller than the `retentionPeriod` set for the sequencer.
+
+For SVs, by default, the participant, mediator and the splice apps have no pruning enabled.
+
+Furthermore, backups must be retained for previous :ref:`major upgrades <sv-upgrades>`. This includes all the historical sequencer backups and the backups of the other apps.
+
 Backup of CometBFT
 ++++++++++++++++++
 
 In addition to the Postgres instances, the storage used by CometBFT should also be backed up every 4 hours.
 CometBFT does not use Postgres.
 We recommend backing up its storage by creating snapshots of the underlying Persistent Volume.
+
+Historical backups
+^^^^^^^^^^^^^^^^^^
+
+We need historical backups in order to preserve a gap-less history from genesis, which can be uses during audits and more generally prove the correctness of the current synchronizer state to outside observers.
+
+CometBFT has :ref:`pruning <sv-pruning-cometbft>` enabled by default. The pruning window is defined by the number of blocks
+to retain.
+We target to set the number of blocks to retain to a value that keeps at least 30 days of data.
+The CometBFT historical backups must be kept in such a way that the difference between the block height when two backups are taken is smaller than the configured number of blocks to retain.
+We recommend that backups are taken and preserved in a more aggressive fashion, every 2 weeks.
+
+Furthermore, backups must be retained for previous :ref:`major upgrades <sv-upgrades>`.
