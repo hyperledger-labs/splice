@@ -29,3 +29,11 @@ Validators
   How long is my Validator Onboarding Token valid?
 
     They can be used for 48h for secrets created by SVs and 1h for secrets created through the DevNet self-onboarding endpoint. They are one-time use only.
+
+  How do I check my validator liveness rewards?
+
+    You can check your validator's liveness rewards by checking the transaction history and look for transaction that mints validator rewards.
+
+    .. image:: images/transaction_history.png
+        :width: 700
+        :alt: Transaction history showing a validator reward transaction.
