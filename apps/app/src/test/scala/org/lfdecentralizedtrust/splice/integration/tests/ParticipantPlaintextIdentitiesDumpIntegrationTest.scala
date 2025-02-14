@@ -4,10 +4,7 @@ import better.files.File
 import com.digitalasset.canton.crypto.{CryptoKeyPair, Fingerprint}
 import com.digitalasset.canton.topology.ParticipantId
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.config.{
-  ConfigTransforms,
-  ParticipantBootstrapDumpConfig,
-}
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ensureNovelDamlNames,
   selfSignedTokenAuthSourceTransform,
