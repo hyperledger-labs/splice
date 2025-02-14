@@ -171,8 +171,7 @@ class ParticipantAdminConnection(
       ParticipantAdminCommands.DomainConnectivity.RegisterDomain(
         config,
         handshakeOnly,
-        // TODO(#10985) Consider enabling this
-        SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.StrictActive,
       )
     )
 
@@ -365,8 +364,7 @@ class ParticipantAdminConnection(
     runCmd(
       ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(
         config,
-        // TODO(#10985) Consider enabling this
-        SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.StrictActive,
       )
     )
 
