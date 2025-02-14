@@ -73,3 +73,12 @@ enableWallet: true
 # This can be a slack username or an email address.
 # If you do not wish to share this, set it to an empty string.
 contactPoint: "YOUR_CONTACT_POINT"
+
+# PARTICIPANT_PRUNING_SCHEDULE_START
+# To configure participant pruning uncomment the following section.
+# Refer to the documentation for more details.
+# participantPruningSchedule:
+#   cron: 0 /10 * * * ? # Run every 10min
+#   maxDuration: 5m # Run for a max of 5min per iteration
+#   retention: 48h # Retain history that is newer than 48h.
+# PARTICIPANT_PRUNING_SCHEDULE_END

@@ -21,7 +21,7 @@ spawn echo $VPN_USER $VPN_PASSWORD
 for {set tries 0} {$tries < 3} {incr tries} {
   # 3 chances for wait-for-vpn-and-del-default-route.sh to succeed
   set timeout 60
-  spawn /usr/bin/sudo charon-cmd --host $VPN_HOST_NAME --identity $VPN_USER --eap-identity $VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
+  spawn /usr/bin/sudo charon-cmd --host $VPN_HOST_NAME --identity $VPN_USER --eap-identity $VPN_USER --ike-proposal aes256-sha2_512-modp2048 --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
   expect {
     "EAP password: " {
       # sleep 2 second to wait the spawned process to be fully initialized

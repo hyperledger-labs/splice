@@ -166,7 +166,10 @@ class DockerComposeValidatorFrontendIntegrationTest
             val txs = findAll(className("tx-row")).toSeq
             val taps = txs.flatMap(readTapFromRow)
             taps should have length 1
-            taps.head.tapAmount shouldBe walletUsdToAmulet(BigDecimal.valueOf(aliceTap))
+            taps.head.tapAmountAmulet shouldBe walletUsdToAmulet(
+              BigDecimal.valueOf(aliceTap),
+              1.0 / taps.head.usdToAmulet,
+            )
           }
         }
         clue("Logout Alice") {

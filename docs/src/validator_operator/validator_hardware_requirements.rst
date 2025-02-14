@@ -10,9 +10,10 @@ Validator Hardware Requirements
 
 This section describes hardware requirements for running a
 validator. Note that these are reference values. Actual requirements
-can vary based your usage of your validator and in production you
-should monitor CPU, memory of all components and disk usage of the
-database and adjust as needed.
+can vary based your usage of your validator. We recommend
+monitoring your production validator nodes with respect to
+CPU and memory usage of all components and disk usage of the
+database, and adjust the resourcing as needed.
 
 The requirements include both the validator and participant container.
 
@@ -52,5 +53,5 @@ Database Latency
 ----------------
 
 Components are relatively sensitive to database latency. If you use a
-hosted database like GCP CloudSQL, it is recommended that you allocate
+managed database offering like GCP CloudSQL, it is recommended that you allocate
 it in the same region and zone that your cluster runs in.

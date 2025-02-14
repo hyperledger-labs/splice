@@ -64,6 +64,7 @@ class HttpWalletHandler(
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     validatorTopupConfig: ValidatorTopupConfig,
+    dedupDuration: DedupDuration,
 )(implicit
     mat: Materializer,
     ec: ExecutionContext,
@@ -602,11 +603,7 @@ class HttpWalletHandler(
               dedupConfig = Some(
                 AmuletOperationDedupConfig(
                   commandId,
-                  // Dedup for 24h which seems good enough for tap as a devnet feature and is easier
-                  // to implement than looking through the history to identify an offset.
-                  DedupDuration(
-                    com.google.protobuf.Duration.newBuilder().setSeconds(60 * 60 * 24).build()
-                  ),
+                  dedupDuration,
                 )
               ),
             )
@@ -765,7 +762,7 @@ class HttpWalletHandler(
       body: d0.TransferPreapprovalSendRequest
   )(tuser: TracedUser): Future[r0.TransferPreapprovalSendResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
-    withSpan(s"$workflowId.tap") { _ => _ =>
+    withSpan(s"$workflowId.transferPreapprovalSend") { _ => _ =>
       val receiver = Codec.tryDecode(Codec.Party)(body.receiverPartyId)
       val amount = Codec.tryDecode(Codec.JavaBigDecimal)(body.amount)
       scanConnection.lookupTransferPreapprovalByParty(receiver).flatMap {
@@ -799,10 +796,7 @@ class HttpWalletHandler(
                     Seq(wallet.store.key.endUserParty),
                     body.deduplicationId,
                   ),
-                  // Hardcoded to 24h
-                  DedupDuration(
-                    com.google.protobuf.Duration.newBuilder().setSeconds(60 * 60 * 24).build()
-                  ),
+                  dedupDuration,
                 )
               ),
             )

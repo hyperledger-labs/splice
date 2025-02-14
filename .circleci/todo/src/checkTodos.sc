@@ -253,7 +253,7 @@ val todoStyleExcludePrefixes =
     "project/CantonDependencies.scala",
     "experiments/",
     "README.md",
-    "cluster/images/splice-test-temp-runner-hook/index.js",
+    ".github/actions/tests/split_tests/dist/",
   )
 val todoStyleExcludeSuffixes =
   Seq("/checkTodos.sc", "/build.static_tests.yml")

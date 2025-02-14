@@ -27,7 +27,7 @@ parameters:
         build,
         deploy-cidaily,
         deploy-upgrade,
-        deploy-ciperiodic-migration-operator,
+        deploy-hdm-operator,
         determine-ciperiodic-migration-operator-work,
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
@@ -53,11 +53,10 @@ parameters:
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
-        deploy-hard-migration,
+        preview-operator,
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
-        preview-operator,
         purge-unused-dbs-cidaily,
       ]
     default: build
@@ -78,12 +77,12 @@ parameters:
   run-daml-upgrade:
     type: boolean
     default: true
-  # The base version to be used as part of a `deploy_ciupgrade` and `deploy_ciperiodic_migration` job
+  # The base version to be used as part of a `deploy_ciupgrade` and `deploy_hdm_operator` job
   # Empty/default means "upgrade version if set, else latest on branch"
   base-version:
     type: string
     default: ""
-  # The target version for hard migrations in the `deploy_ciperiodic_migration` job
+  # The target version for hard migrations in the `deploy_hdm_operator` job
   # Empty/default means "latest on branch"
   upgrade-version:
     type: string

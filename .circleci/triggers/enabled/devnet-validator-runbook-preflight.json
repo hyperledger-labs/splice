@@ -3,7 +3,7 @@
     "description": "DevNet Validator Runbook Preflight Tests run 1 Hour after every Runbook Reset",
     "attribution-actor": "system",
     "parameters" : {
-      "branch": "release-line-0.3.9",
+      "branch": "release-line-0.3.11",
       "run-job": "healthcheck-validator-runbook-devnet"
     },
     "timetable" : {

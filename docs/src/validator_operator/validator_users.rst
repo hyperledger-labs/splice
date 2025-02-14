@@ -9,7 +9,7 @@ Users, Parties and Wallets in the Splice Wallet
 ===============================================
 
 Canton distinguishes between parties and users, as documented in detail in the
-[Canton docs](https://docs.daml.com/app-dev/parties-users.html). In essence,
+`Canton docs <https://docs.daml.com/app-dev/parties-users.html>`_. In essence,
 a party is an identity on-ledger, while a user represents an off-ledger entity
 that can be associated with one or more parties.
 

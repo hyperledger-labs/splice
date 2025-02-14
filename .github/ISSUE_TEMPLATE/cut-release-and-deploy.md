@@ -43,7 +43,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 ## Upgrade our own nodes on DevNet
 
 - [ ] If significant time has passed since cutting the release, ensure that there are no changes that need to be backported to the release branch.
-      In particular, check for changes to the `cluster/cn-svc-configs` submodule.
+      In particular, check for changes to the `cluster/configs` and `cluster/configs-private` submodules.
 - [ ] Merge a PR into the release branch (`origin/release-line-0.x.y`) with the following changes:
   - [ ] Update the cluster `config.yaml` file by setting the new reference under `synchronizerMigration.active.releaseReference` and update the `synchronizerMigration.active.version` to version `0.x.y`.
   - [ ] Update `cluster/deployment/devnet/.envrc.vars`, bumping the release version.

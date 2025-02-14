@@ -21,10 +21,7 @@ Requirements
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-3) Your cluster either needs to be connected to the GCP DA Canton
-   VPN or you need a static egress IP. In the latter case,
-   please provide that IP address to your contact at Digital Asset to
-   add it to the firewall rules.
+3) Your cluster needs a static egress IP. After acquiring that, propose to the other SVs to add it to the IP allowlist.
 
 4) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
@@ -78,6 +75,9 @@ You will be using them every time you want to deploy a new SV node, i.e., also w
 
 The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
 For `DevNet` and the current early version of `TestNet`, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
+
+.. todo:: adjust wording above to the fact the MainNet is live
+
 
 Preparing a Cluster for Installation
 ------------------------------------
@@ -156,13 +156,13 @@ Summing up, your OIDC provider setup must provide you with the following configu
 Name                    Value
 ----------------------- ---------------------------------------------------------------------------
 OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
-VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
-VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
-SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
-SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
-WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
-SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
-CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
+VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend
+VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend
+SV_CLIENT_ID            The client id of your OIDC provider for the SV app backend
+SV_CLIENT_SECRET        The client secret of your OIDC provider for the SV app backend
+WALLET_UI_CLIENT_ID     The client id of your OIDC provider for the wallet UI.
+SV_UI_CLIENT_ID         The client id of your OIDC provider for the SV UI.
+CNS_UI_CLIENT_ID        The client id of your OIDC provider for the CNS UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
@@ -170,7 +170,9 @@ We are going to use these values, exported to environment variables named as per
 When first starting out, it is suggested to configure all three JWT token audiences below to the same value: ``https://canton.network.global``.
 
 Once you can confirm that your setup is working correctly using this (simple) default,
-we recommend that you configure dedicated audience values that match your deployment and URLs.
+we strongly recommend that you configure dedicated audience values that match your deployment and URLs.
+This will help you to avoid potential security issues that might arise from using the same audience for all components.
+
 You can configure audiences of your choice for the participant ledger API, the validator backend API, and the SV backend API.
 We will refer to these using the following configuration values:
 
@@ -290,7 +292,7 @@ The following kubernetes secret will instruct the participant to create a servic
         "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
-        "--from-literal=client-secret=${SV_CLIENT_SECRET}"
+        "--from-literal=client-secret=${SV_CLIENT_SECRET}" \
         "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 The validator app backend requires the following secret.
@@ -301,7 +303,7 @@ The validator app backend requires the following secret.
         "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
-        "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
+        "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}" \
         "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 To setup the wallet, CNS and SV UI, create the following two secrets.
@@ -494,13 +496,11 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Replace ``YOUR_NODE_NAME`` with the name you chose when creating the SV identity.
-- For the initial onboarding of your node, set ``disableAutoInit`` to ``false``.
 
 Please modify the file ``splice-node/examples/sv-helm/global-domain-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity.
-- For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
 Please modify the file ``splice-node/examples/sv-helm/scan-values.yaml`` as follows:
 
@@ -569,7 +569,7 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
-The `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs/>`_ contains recommended values for configuring your SV node. Store the paths to these YAML files in the following environment variables:
+The `configs repo <https://github.com/global-synchronizer-foundation/configs>`_ contains recommended values for configuring your SV node. Store the paths to these YAML files in the following environment variables:
 
 1. ``SV_IDENTITIES_FILE``: The list of SV identities for your node to auto-approve as peer SVs. Locate and review the ``approved-sv-id-values.yaml`` file corresponding to the network to which you are connecting.
 2. ``UI_CONFIG_VALUES_FILE``: The file is located at ``configs/ui-config-values.yaml``, and is the same for all networks.
@@ -678,7 +678,7 @@ Ingress Configuration
 +++++++++++++++++++++
 
 An IP whitelisting json file ``allowed-ip-ranges.json`` will be provided in each SV operations announcement corresponding to the network to which you are connecting.
-This file contains other clusters' egress IPs that require access to your super validator's components. These IPs typically belong to peer super-validators, validators and the Digital Asset VPN.
+This file contains other clusters' egress IPs that require access to your super validator's components. For example, it contains IPs belonging to peer super-validators and validators.
 
 Each SV is required to configure their cluster ingress to allow traffic from these IPs to be operational.
 
@@ -901,3 +901,5 @@ Note that as of now, each instance of the Scan app backend aggregates only Canto
 This will be changed in future updates, where the Scan app will guarantee correctness against all data since network start.
 At that point, data in different instances of the Scan app (hosted by different Super Validators) will always be consistent.
 This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
+
+.. todo:: update the above paragraph with an explanation of backfilling, and checking when it is complete

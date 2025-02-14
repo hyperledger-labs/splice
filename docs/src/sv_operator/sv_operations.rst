@@ -34,7 +34,7 @@ Generate a validator onboarding secret
 
 If you want to onboard a new validator, you can obtain a one-time use onboarding secret directly from the SV web UI.
 
-The onboarding secret expires after 24 hours.
+The onboarding secret expires after 48 hours.
 
 To generate this key you need to :ref:`login into the SV web UI <local-sv-web-ui>` and navigate to the `Validator Onboarding` tab. In that tab, click on the button to create the secret
 and copy the last generated `onboarding secret`.
@@ -108,27 +108,30 @@ CometBFT node identities
   and make sure that it is correctly registered by their SV app backend
   (e.g., by amending the configuration of their SV app backend and restarting it).
 
+
 Updating the reward weight of an SV
 -----------------------------------
 
-- Receive from the SV owners an agreed-upon update to the SV weights.
+The following steps are required to update the reward weight of an SV:
 
-- If the SV whose weight is being adjusted defined `extraBeneficiaries` (as described in :ref:`sv-helm`),
-  they will have to update them accordingly. Namely:
+#. Receive from the SV owners an agreed-upon update to the SV weights.
 
-  - On weight increases they should add a new entry with the extra weight, as otherwise any leftovers will go to the SV party.
+#. If the SV whose weight is being adjusted defined `extraBeneficiaries` (as described in :ref:`sv-helm`),
+   they will have to update them accordingly. Namely:
 
-  - On weight decreases, the last extra beneficiary will have their weight capped.
+   - On weight increases they should add a new entry with the extra weight, as otherwise any leftovers will go to the SV party.
 
-  Note that you can and usually should update the extra-beneficiaries config before the weight change takes effect.
-  The extra entries at the end will just be ignored.
+   - On weight decreases, the last extra beneficiary will have their weight capped.
 
-- Start a governance vote. To do so, create a new vote request in the SV web UI under the `Governance` tab.
-  Select the "Update SV Reward Weight" name, then select the SV member and specify the new reward weight.
+#. Note that you can and usually should update the extra-beneficiaries config before the weight change takes effect.
+   The extra entries at the end will just be ignored.
 
-- Wait for the vote request to get approved and executed.
-  Once that happens, the DSO info tab will show the updated reward weight,
-  and the SV will earn rewards according to the new weight moving forward.
+#. Start a governance vote. To do so, create a new vote request in the SV web UI under the `Governance` tab.
+   Select the "Update SV Reward Weight" name, then select the SV member and specify the new reward weight.
 
-- Make sure that the changed reward is also reflected on `the cn-svc-configs repository <https://github.com/DACH-NY/cn-svc-configs/>`_.
-  Otherwise, the old value would become effective again in the event of an onboarding and reonboarding.
+#. Wait for the vote request to get approved and executed.
+   Once that happens, the DSO info tab will show the updated reward weight,
+   and the SV will earn rewards according to the new weight moving forward.
+
+#. Make sure that the changed reward is also reflected on `the configs repository <https://github.com/global-synchronizer-foundation/configs>`_.
+   Otherwise, the old value would become effective again in the event of an onboarding and reonboarding.

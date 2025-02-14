@@ -12,18 +12,19 @@ Docker-Compose Based Deployment of a Validator Node
 ===================================================
 
 This section describes how to deploy a standalone validator node on a local machine
-using Docker-Compose. The deployment consists of the validator node along with associated
-wallet and CNS UIs, and onboards it to the target network.
+using `Docker Compose <https://docs.docker.com/compose/>`_. The deployment consists of the validator node along with associated
+wallet and CNS UIs, and onboards the validator node to the target network.
 
 This deployment is useful for:
 
-- Application development, where one needs an ephemeral validator that is easy to deploy
+- Application development, where one needs an ephemeral validator that is easy to deploy.
 
 - Production validators, with the following caveats:
 
   - The default deployment is highly insecure. Authentication should be enabled as described in :ref:`the authentication section <compose_validator_auth>`.
 
-  - There is no support for ingress from outside your machine, nor tls. The deployment should be kept local to your machine only and not exposed externally.
+  - There is no support for ingress from outside your machine, nor is there support for TLS.
+    The deployment should be kept local to your machine only and not exposed externally.
 
   - Reliability & scalability: docker-compose will restart containers that crash, and the deployment supports backup&restore as detailed below, but a
     docker-compose deployment is inherently more limited than a cloud-based Kubernetes one.
@@ -41,11 +42,28 @@ Requirements
 
 1) A linux/MacOS machine with the following:
 
-   a. ``docker`` - at least version 2.26.0 for Docker Engine, or an up-to-date version of Docker Desktop.
-   b. ``curl``
-   c. ``jq``
+   a. `docker compose <https://docs.docker.com/compose/install/>`__ - at least version 2.26.0 or newer
+   b. `curl <https://curl.se/>`__
+   c. `jq <https://jqlang.org/>`__
 
    Note that both AMD64 and ARM64 architectures are supported.
+
+To validate that the dependencies are set up correctly, run the
+following commands. All commands should succeed and print out the
+version. Note that the exact versions you see may be different from
+the example here. As long as you have docker-compose 2.0 or newer you should be fine.
+
+.. code-block:: bash
+
+   > docker compose version
+   Docker Compose version 2.32.1
+   > curl --version
+   curl 8.11.0 (x86_64-pc-linux-gnu) libcurl/8.11.0 OpenSSL/3.3.2 zlib/1.3.1 brotli/1.1.0 zstd/1.5.6 libidn2/2.3.7 libpsl/0.21.5 libssh2/1.11.1 nghttp2/1.64.0
+   Release-Date: 2024-11-06
+   Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns mqtt pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp
+   Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe TLS-SRP UnixSockets zstd
+   > jq --version
+   jq-1.7.1
 
 2) Your machine should either be connected to a VPN that is whitelisted on the network
    (contact your sponsor SV to obtain access), or have a static egress IP address.
@@ -68,7 +86,7 @@ Preparing for Validator Onboarding
 In order to become a validator, you need the sponsorship of an SV.
 Your SV will provide you with a required secret to authorize yourself towards their SV.
 
-The onboarding secret is a one-time use secret that expires after 24 hours. If you don't join before it expires, you need to request a new secret from your SV sponsor.
+The onboarding secret is a one-time use secret that expires after 48 hours. If you don't join before it expires, you need to request a new secret from your SV sponsor.
 
 .. admonition:: DevNet-only
 
@@ -78,6 +96,8 @@ The onboarding secret is a one-time use secret that expires after 24 hours. If y
   .. parsed-literal::
 
      curl -X POST |gsf_sv_url|/api/sv/v0/devnet/onboard/validator/prepare
+
+  Note that this self-served secret is only valid for 1 hour.
 
 Deployment
 ++++++++++
@@ -101,9 +121,9 @@ Deployment
   ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
      This must be of format `<organization>-<function>-<enumerator>`, e.g. `myCompany-myWallet-1`.
 
-Note that the validator may be stopped with the command `./stop.sh` and restarted again with the same `start`
+Note that the validator may be stopped with the command ``./stop.sh`` and restarted again with the same ``start.sh``
 command as above. Its data will be retained between invocations. In subseqent invocations, the secret itself may be
-left empty, but the `-o` is still mandatory, so a `-o ""` argument should be provided.
+left empty, but the ``-o`` is still mandatory, so a ``-o ""`` argument should be provided.
 
 Logging into the wallet UI
 ++++++++++++++++++++++++++
@@ -114,7 +134,10 @@ you should see the wallet of the administrator of your wallet.
 
 You can also logout of the administrator account and login as any other username. The first time a
 user logs in, they will be prompted with a message asking them to confirm whether they wish to be
-onboarded.
+onboarded to the validator node.
+
+.. todo:: link to section that explains what this onbarding means
+
 
 Logging into the CNS UI
 +++++++++++++++++++++++
@@ -139,8 +162,8 @@ Please refer to the :ref:`authentication section <helm-validator-auth-requiremen
 to set up an OAuth provider for your validator. The URLs to configure for callbacks are
 ``http://wallet.localhost`` and ``http://ans.localhost``.
 
-To configure the OAuth provider, you will need to set the following environment variables in the
-``.env`` file:
+Once you have set up your OAuth provider,
+you need to configure it by seting the following environment variables in the ``.env`` file:
 
 ============================= ===========================================================================
 Name                          Value
@@ -159,7 +182,7 @@ ANS_UI_CLIENT_ID              The client id of the OAuth app for the CNS UI.
 ============================= ===========================================================================
 
 If you have already deployed a validator on your machine, you will first need to irrecoverably destroy
-it and wipe its data, as that cannot be migrated to an authenticated validator.
+it and wipe its data, as that cannot be migrated to an authenticated validator on the same machine.
 To do that, first stop the validator with `./stop.sh` and wipe out all its data with
 `docker volume rm compose_postgres-splice`. You can now deploy a new validator with the
 new configuration. In order to enable auth in the deployment, add the `-a` flag to the `start.sh`
@@ -168,3 +191,20 @@ command, as follows:
 .. code-block:: bash
 
     ./start.sh -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m $MIGRATION_ID -w -a
+
+Integration with systemd and other init systems
++++++++++++++++++++++++++++++++++++++++++++++++
+
+If you want to manage the validator through systemd or a similar init
+system, create a service that calls the ``start.sh`` script with the
+right arguments. However, note that ``start.sh`` invokes ``docker
+compose up`` with the ``-d/--detach`` option so the script exits after
+the containers are up instead of continuing running.
+
+You need to make sure that your service does not stop docker compose
+at that point. To accomplish this with systemd set
+``RemainAfterExit=true``. Refer to the
+`systemd documentation <https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html>`_
+for more details. If you are using another init system, look for similar options to ensure that docker compose continues running after the script exits.
+
+Alternatively, you can edit the script to remove the ``-d`` option so the script continues running.
