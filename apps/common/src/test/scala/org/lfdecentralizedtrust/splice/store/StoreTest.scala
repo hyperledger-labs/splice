@@ -623,7 +623,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       damlUnit.getInstance(),
       Seq.empty.asJava,
       true,
-      Seq.empty.asJava,
+      1,
       damlUnit.getInstance(),
     )
   }
@@ -660,7 +660,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       argument,
       Seq.empty.asJava,
       consuming,
-      Seq.empty.asJava,
+      1,
       result,
     )
   }
@@ -699,28 +699,33 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exercised.getChoiceArgument,
         exercised.getActingParties,
         exercised.isConsuming,
-        exercised.getChildNodeIds,
+        nodeId,
         exercised.getExerciseResult,
       )
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
 
-  protected def withChildren(exercised: ExercisedEvent, childEventIds: Seq[Integer]) =
-    new ExercisedEvent(
-      exercised.getWitnessParties,
-      exercised.getOffset,
-      exercised.getNodeId,
-      exercised.getTemplateId,
-      exercised.getPackageName,
-      exercised.getInterfaceId,
-      exercised.getContractId,
-      exercised.getChoice,
-      exercised.getChoiceArgument,
-      exercised.getActingParties,
-      exercised.isConsuming,
-      childEventIds.asJava,
-      exercised.getExerciseResult,
-    )
+  protected def withlastDescendedNodeid[E <: TreeEvent](event: E, lastDescendedNodeId: Int): E = {
+    event match {
+      case exercised: ExercisedEvent =>
+        new ExercisedEvent(
+          exercised.getWitnessParties,
+          exercised.getOffset,
+          exercised.getNodeId,
+          exercised.getTemplateId,
+          exercised.getPackageName,
+          exercised.getInterfaceId,
+          exercised.getContractId,
+          exercised.getChoice,
+          exercised.getChoiceArgument,
+          exercised.getActingParties,
+          exercised.isConsuming,
+          lastDescendedNodeId,
+          exercised.getExerciseResult,
+        ).asInstanceOf[E]
+      case e => e
+    }
+  }
 
   protected lazy val dummyDomain = StoreTest.dummyDomain
 
@@ -1131,7 +1136,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       withNodeId(e, i)
     }
     val eventsById = eventsWithId.map(e => e.getNodeId -> e).toMap
-    val rootEventIds = eventsWithId.map(_.getNodeId)
     new TransactionTree(
       updateId,
       commandId,
@@ -1139,7 +1143,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       effectiveAt,
       offset,
       eventsById.asJava,
-      rootEventIds.asJava,
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
@@ -1157,10 +1160,16 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i + 1) // account for root node id
     }
-    val rootWithId =
-      withNodeId(withChildren(root, childrenWithId.map(_.getNodeId)), 0)
+    val rootWithId = {
+      withlastDescendedNodeid(
+        withNodeId(
+          root,
+          0,
+        ),
+        childrenWithId.map(_.getNodeId).maxOption.map(_.intValue()).getOrElse(0),
+      )
+    }
     val eventsById = (rootWithId +: childrenWithId).map(e => e.getNodeId -> e).toMap
-    val rootEventIds = Seq(rootWithId.getNodeId)
     new TransactionTree(
       updateId,
       "",
@@ -1168,7 +1177,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       effectiveAt,
       offset,
       eventsById.asJava,
-      rootEventIds.asJava,
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
@@ -1206,7 +1214,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       choiceArgument,
       Seq.empty.asJava,
       false,
-      Seq.empty.asJava,
+      1,
       exerciseResult,
     )
 

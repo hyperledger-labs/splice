@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.time.Duration
@@ -51,8 +52,7 @@ final class LocalSynchronizerNode(
     val sequencerPruningConfig: Option[SequencerPruningConfig],
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
-    isBftSequencer: Boolean,
-    peers: Seq[Endpoint],
+    sequencerConfig: SequencerConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -63,6 +63,7 @@ final class LocalSynchronizerNode(
       mediatorAdminConnection,
       sequencerExternalPublicUrl,
       sequencerAvailabilityDelay,
+      sequencerConfig,
     )
     with RetryProvider.Has
     with FlagCloseable
@@ -337,7 +338,8 @@ final class LocalSynchronizerNode(
   /** Onboard the sequencer operated by this SV to the domain if it is not already.
     */
   def onboardLocalSequencerIfRequired(
-      svConnection: => Future[SvConnection]
+      svConnection: => Future[SvConnection],
+      initializer: SequencerBftPeerReconciler,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -350,14 +352,15 @@ final class LocalSynchronizerNode(
       .flatMap {
         case Left(NodeStatus.NotInitialized(_, _)) =>
           logger.info("Onboarding sequencer")
-          svConnection.flatMap(onboardLocalSequencer)
+          svConnection.flatMap(onboardLocalSequencer(_, initializer))
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer is already onboarded")
           Future.unit
       }
 
   private def onboardLocalSequencer(
-      svConnection: SvConnection
+      svConnection: SvConnection,
+      initializer: SequencerBftPeerReconciler,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
@@ -407,12 +410,8 @@ final class LocalSynchronizerNode(
         },
         logger,
       )
-      _ <-
-        if (isBftSequencer) {
-          sequencerAdminConnection.setBftPeerEndpoints(peers)
-        } else Future.unit
-      _ = logger.info(
-        "Sequencer is initialized"
+      _ <- initializer.reconcileBftPeersIfRequired(
+        sequencerConfig
       )
     } yield ()
   }

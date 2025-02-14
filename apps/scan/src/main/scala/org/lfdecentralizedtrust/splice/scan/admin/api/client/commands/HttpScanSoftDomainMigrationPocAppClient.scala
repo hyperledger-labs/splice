@@ -16,6 +16,7 @@ import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersionValidation.NoValidation
 import com.google.protobuf.ByteString
 
 import java.util.Base64
@@ -66,7 +67,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
         sequencerIdentityTransactions <- identities.sequencerIdentityTransactions
           .traverse(tx =>
             // TODO(#13301) switch to safe version
-            SignedTopologyTransaction.fromTrustedByteString(
+            SignedTopologyTransaction.fromTrustedByteString(NoValidation)(
               ByteString.copyFrom(Base64.getDecoder.decode(tx))
             )
           )
@@ -76,7 +77,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
         mediatorIdentityTransactions <- identities.mediatorIdentityTransactions
           .traverse(tx =>
             // TODO(#13301) switch to safe version
-            SignedTopologyTransaction.fromTrustedByteString(
+            SignedTopologyTransaction.fromTrustedByteString(NoValidation)(
               ByteString.copyFrom(Base64.getDecoder.decode(tx))
             )
           )
@@ -118,15 +119,15 @@ object HttpScanSoftDomainMigrationPocAppClient {
     ): Either[String, SynchronizerBootstrappingTransactions] =
       (for {
         // TODO(#13301) switch to safe version
-        domainParameters <- SignedTopologyTransaction.fromTrustedByteString(
+        domainParameters <- SignedTopologyTransaction.fromTrustedByteString(NoValidation)(
           ByteString.copyFrom(Base64.getDecoder.decode(state.domainParameters))
         )
         // TODO(#13301) switch to safe version
-        sequencerDomainState <- SignedTopologyTransaction.fromTrustedByteString(
+        sequencerDomainState <- SignedTopologyTransaction.fromTrustedByteString(NoValidation)(
           ByteString.copyFrom(Base64.getDecoder.decode(state.sequencerDomainState))
         )
         // TODO(#13301) switch to safe version
-        mediatorDomainState <- SignedTopologyTransaction.fromTrustedByteString(
+        mediatorDomainState <- SignedTopologyTransaction.fromTrustedByteString(NoValidation)(
           ByteString.copyFrom(Base64.getDecoder.decode(state.mediatorDomainState))
         )
       } yield SynchronizerBootstrappingTransactions(

@@ -40,7 +40,7 @@ class InMemoryFanoutBuffer(
   @volatile private[cache] var _lookupMap =
     Map.empty[UpdateId, TransactionLogUpdate.TransactionAccepted]
 
-  private val bufferMetrics = metrics.services.index.InMemoryFanoutBuffer
+  private val bufferMetrics = metrics.services.index.inMemoryFanoutBuffer
   private val pushTimer = bufferMetrics.push
   private val pruneTimer = bufferMetrics.prune
   private val bufferSizeHistogram = bufferMetrics.bufferSize
@@ -118,6 +118,22 @@ class InMemoryFanoutBuffer(
       updateId: UpdateId
   ): Option[TransactionLogUpdate.TransactionAccepted] =
     _lookupMap.get(updateId)
+
+  /** Lookup the accepted transaction update by transaction offset. */
+  def lookup(
+      offset: Offset
+  ): Option[TransactionLogUpdate.TransactionAccepted] = {
+    val vectorSnapshot = _bufferLog
+
+    val searchResult = vectorSnapshot.view.map(_._1).search(offset)
+
+    val foundUpdate = searchResult match {
+      case Found(idx) => Some(vectorSnapshot(idx)._2)
+      case _ => None
+    }
+
+    foundUpdate.collect { case tx: TransactionLogUpdate.TransactionAccepted => tx }
+  }
 
   /** Removes entries starting from the buffer head up until `endInclusive`.
     *

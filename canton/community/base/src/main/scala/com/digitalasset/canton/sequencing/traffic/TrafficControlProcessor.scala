@@ -8,10 +8,7 @@ import cats.data.EitherT
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.crypto.{
-  SynchronizerSnapshotSyncCryptoApi,
-  SynchronizerSyncCryptoClient,
-}
+import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.Alarm
@@ -39,7 +36,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 
 class TrafficControlProcessor(
-    cryptoApi: SynchronizerSyncCryptoClient,
+    cryptoApi: SynchronizerCryptoClient,
     synchronizerId: SynchronizerId,
     maxFromStoreO: => Option[CantonTimestamp],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -93,16 +90,14 @@ class TrafficControlProcessor(
         case Deliver(sc, ts, _, _, batch, topologyTimestampO, _) =>
           logger.debug(s"Processing sequenced event with counter $sc and timestamp $ts")
 
-          val synchronizerEnvelopes = ProtocolMessage.filterSynchronizerEnvelopes(
-            batch,
-            synchronizerId,
-            (wrongMessages: List[DefaultOpenEnvelope]) => {
-              val wrongSynchronizerIds = wrongMessages.map(_.protocolMessage.synchronizerId)
-              logger.error(
-                s"Received traffic purchased entry messages with wrong synchronizer ids: $wrongSynchronizerIds"
-              )
-            },
-          )
+          val synchronizerEnvelopes =
+            ProtocolMessage.filterSynchronizerEnvelopes(batch.envelopes, synchronizerId) {
+              wrongMessages =>
+                val wrongSynchronizerIds = wrongMessages.map(_.protocolMessage.synchronizerId)
+                logger.error(
+                  s"Received traffic purchased entry messages with wrong synchronizer ids: $wrongSynchronizerIds"
+                )
+            }
 
           HandlerResult.synchronous(
             processSetTrafficPurchasedEnvelopes(ts, topologyTimestampO, synchronizerEnvelopes)

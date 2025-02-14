@@ -15,6 +15,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.sequencing.AsyncResult
 import com.digitalasset.canton.topology.processing.{
   EffectiveTime,
   SequencedTime,
@@ -27,10 +28,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Ge
 import com.digitalasset.canton.topology.transaction.TopologyMapping.MappingHash
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.topology.transaction.{
-  SignedTopologyTransaction,
   SignedTopologyTransactions,
-  TopologyChangeOp,
-  TopologyMapping,
   TopologyMappingChecks,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -112,7 +110,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       compactTransactions: Boolean = true,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[GenericValidatedTopologyTransaction]] = {
+  ): FutureUnlessShutdown[(Seq[GenericValidatedTopologyTransaction], AsyncResult[Unit])] = {
     // if transactions aren't persisted in the store but rather enqueued in the synchronizer outbox queue,
     // the processing should abort on errors, because we don't want to enqueue rejected transactions.
     val abortOnError = outboxQueue.nonEmpty
@@ -126,18 +124,15 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
     // first, pre-load the currently existing mappings and proposals for the given transactions
     val preloadTxsForMappingF = preloadTxsForMapping(effective, transactions)
     val preloadProposalsForTxF = preloadProposalsForTx(effective, transactions)
-    val duplicatesF = findDuplicates(effective, transactions)
     val ret = for {
       _ <- EitherT.right[Lft](preloadProposalsForTxF)
       _ <- EitherT.right[Lft](preloadTxsForMappingF)
-      duplicates <- EitherT.right[Lft](duplicatesF)
       // compute / collapse updates
       (removesF, pendingWrites) = {
         val pendingWrites = transactions.map(MaybePending.apply)
         val removes = pendingWrites
-          .zip(duplicates)
           .foldLeftM((Map.empty[MappingHash, PositiveInt], Set.empty[TxHash])) {
-            case ((removeMappings, removeTxs), (tx, _noDuplicateFound @ None)) =>
+            case ((removeMappings, removeTxs), tx) =>
               validateAndMerge(
                 effective,
                 tx.originalTx,
@@ -147,14 +142,6 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
                 tx.rejection.set(finalTx.rejectionReason)
                 determineRemovesAndUpdatePending(tx, removeMappings, removeTxs)
               }
-            case ((removeMappings, removeTxs), (tx, Some(duplicateTimestamp))) =>
-              tx.rejection.set(
-                Some(TopologyTransactionRejection.Duplicate(duplicateTimestamp.value))
-              )
-              FutureUnlessShutdown.pure(
-                determineRemovesAndUpdatePending(tx, removeMappings, removeTxs)
-              )
-
           }
         (removes, pendingWrites)
       }
@@ -162,8 +149,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       (mappingRemoves, txRemoves) = removes
       validatedTx = pendingWrites.map(pw => pw.validatedTx)
       _ <- EitherT.cond[FutureUnlessShutdown](
-        // TODO(#12390) differentiate error reason and only abort actual errors, not in-batch merges
-        !abortOnError || validatedTx.forall(_.nonDuplicateRejectionReason.isEmpty),
+        !abortOnError || validatedTx.forall(_.rejectionReason.isEmpty),
         (), {
           logger.info("Topology transactions failed:\n  " + validatedTx.mkString("\n  "))
           // reset caches as they are broken now if we abort
@@ -187,7 +173,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
             s"Rejected transaction ${idx + 1}/$ln ${tx.operation} ${tx.mapping} at ts=$effective (epsilon=$epsilon ms) due to $r"
           )
       }
-      _ <- outboxQueue match {
+      asyncResult <- outboxQueue match {
         case Some(queue) =>
           // if we use the synchronizer outbox queue, we must also reset the caches, because the local validation
           // doesn't automatically imply successful validation once the transactions have been sequenced.
@@ -210,21 +196,23 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
                 validatedTx,
               )
             )
-            .map { result =>
+            .map { _ =>
               logger.info(
                 s"Persisted topology transactions ($sequenced, $effective):\n" + validatedTx
                   .mkString(
                     ",\n"
                   )
               )
-              result
+              AsyncResult.immediate
             }
       }
-    } yield validatedTx
+    } yield (validatedTx, asyncResult)
     // EitherT only served to shortcircuit in case abortOnError==true.
     // Therefore we merge the left (failed validations) with the right (successful or failed validations, in case !abortOnError.
     // The caller of this method must anyway deal with rejections.
-    ret.merge
+    ret
+      .leftMap(_ -> AsyncResult.immediate)
+      .merge
   }
 
   private def clearCaches(): Unit = {
@@ -333,30 +321,6 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       case _ => (false, toValidate)
     }
 
-  /** determine whether one of the txs got already added earlier */
-  private def findDuplicates(
-      timestamp: EffectiveTime,
-      transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[Option[EffectiveTime]]] =
-    FutureUnlessShutdown.sequence((transactions.map { tx =>
-      // skip duplication check for non-adds
-      if (tx.operation == TopologyChangeOp.Remove)
-        FutureUnlessShutdown.pure(None)
-      else {
-        // check that the transaction has not been added before (but allow it if it has a different version ...)
-        store
-          .findStored(timestamp.value, tx)
-          .map(
-            _.filter(x =>
-              // if the transaction to validate has the same proto version
-              x.transaction.protoVersion == tx.protoVersion &&
-                // and the transaction to validate doesn't add new signatures
-                tx.signatures.diff(x.transaction.signatures).isEmpty
-            ).map(_.validFrom)
-          )
-      }
-    }))
-
   private def mergeWithPendingProposal(
       toValidate: GenericSignedTopologyTransaction
   ): GenericSignedTopologyTransaction =
@@ -418,7 +382,6 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       )
     } yield fullyValidated
     ret.fold(
-      // TODO(#12390) emit appropriate log message and use correct rejection reason
       rejection => ValidatedTopologyTransaction(txA, Some(rejection)),
       tx => ValidatedTopologyTransaction(tx, None),
     )
@@ -478,11 +441,6 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
             }
           )
         )
-      // TODO(#12390) if this is a removal of a certificate, compute cascading deletes
-      //   if boolean flag is set, then abort, otherwise notify
-      //   rules: if a namespace delegation is a root delegation, it won't be affected by the
-      //          cascading deletion of its authorizer. this will allow us to roll namespace certs
-      //          also, root cert authorization is only valid if serial == 1
       (
         removeMappings.updatedWith(mappingHash)(
           Ordering[Option[PositiveInt]].max(_, Some(finalTx.serial))

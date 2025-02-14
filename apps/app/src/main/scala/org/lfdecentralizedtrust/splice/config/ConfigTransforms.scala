@@ -254,10 +254,10 @@ object ConfigTransforms {
         .focus(_.scanApps)
         .modify(_.par.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) }.seq)
 
-  private def disableOnboardingParticipantPromotionDelay(): ConfigTransform =
+  def disableOnboardingParticipantPromotionDelay(): ConfigTransform =
     updateAllSvAppConfigs_(c => c.focus(_.enableOnboardingParticipantPromotionDelay).replace(false))
 
-  private def setDefaultGrpcDeadlineForBuyExtraTraffic(): ConfigTransform =
+  def setDefaultGrpcDeadlineForBuyExtraTraffic(): ConfigTransform =
     ConfigTransforms.updateAllValidatorAppConfigs_(c =>
       c.copy(domains =
         c.domains.copy(global =
@@ -269,7 +269,7 @@ object ConfigTransforms {
       )
     )
 
-  private def setDefaultGrpcDeadlineForTreasuryService(): ConfigTransform =
+  def setDefaultGrpcDeadlineForTreasuryService(): ConfigTransform =
     ConfigTransforms.updateAllValidatorAppConfigs_(c =>
       c.copy(treasury =
         c.treasury.copy(

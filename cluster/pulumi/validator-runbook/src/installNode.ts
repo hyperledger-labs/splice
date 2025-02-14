@@ -179,7 +179,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     postgres,
     undefined,
     {
-      dependsOn: [postgres],
+      dependsOn: imagePullDeps.concat([postgres]),
       // aliases and ignore can be removed once base version > 0.2.1
       aliases: [
         {

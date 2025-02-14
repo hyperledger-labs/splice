@@ -7,7 +7,7 @@ import cats.data.EitherT
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
-import com.digitalasset.canton.crypto.SynchronizerSyncCryptoClient
+import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
@@ -96,7 +96,7 @@ object MediatorRuntimeFactory {
       sequencerCounterTrackerStore: SequencerCounterTrackerStore,
       sequencedEventStore: SequencedEventStore,
       sequencerClient: RichSequencerClient,
-      syncCrypto: SynchronizerSyncCryptoClient,
+      syncCrypto: SynchronizerCryptoClient,
       topologyClient: SynchronizerTopologyClientWithInit,
       topologyTransactionProcessor: TopologyTransactionProcessor,
       topologyManagerStatus: TopologyManagerStatus,
@@ -117,6 +117,7 @@ object MediatorRuntimeFactory {
       storage,
       syncCrypto.pureCrypto,
       protocolVersion,
+      nodeParameters.cachingConfigs.finalizedMediatorConfirmationRequests,
       nodeParameters.processingTimeouts,
       loggerFactory,
     )
@@ -134,7 +135,6 @@ object MediatorRuntimeFactory {
         clock,
         metrics,
         protocolVersion,
-        nodeParameters.cachingConfigs.finalizedMediatorConfirmationRequests,
         nodeParameters.processingTimeouts,
         loggerFactory,
       )

@@ -13,7 +13,6 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
@@ -54,8 +53,8 @@ def bootstrapOtherDomain(
     parameters =>
       parameters.update(
         reconciliationInterval = PositiveDurationSeconds.ofMinutes(30),
-        acsCommitmentsCatchUpConfig = Some(
-          AcsCommitmentsCatchUpConfig(
+        acsCommitmentsCatchUpParameters = Some(
+          AcsCommitmentsCatchUpParameters(
             catchUpIntervalSkip = PositiveInt.tryCreate(24),
             nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
           )

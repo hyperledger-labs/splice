@@ -390,7 +390,7 @@ class SV1Initializer(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
-          acsCommitmentsCatchUpConfigParameter = Some(SvUtil.defaultAcsCommitmentsCatchUpConfig),
+          acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
           submissionTimeRecordTimeTolerance =
             NonNegativeFiniteDuration.fromConfig(config.submissionTimeRecordTimeTolerance),
           mediatorDeduplicationTimeout =

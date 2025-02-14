@@ -13,3 +13,4 @@ Testing
 .. toctree::
 
   localnet
+  networks_and_usecases

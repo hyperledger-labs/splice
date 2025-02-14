@@ -4,7 +4,11 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.v2.command_service.{CommandServiceGrpc, SubmitAndWaitRequest}
+import com.daml.ledger.api.v2.command_service.{
+  CommandServiceGrpc,
+  SubmitAndWaitRequest,
+  SubmitAndWaitResponse,
+}
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v2.{
   command_completion_service,
@@ -27,6 +31,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf
 import io.circe.*
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import io.circe.generic.semiauto.deriveCodec
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
@@ -93,6 +98,7 @@ class JsCommandService(
     asList(
       JsCommandService.completionListEndpoint,
       commandCompletionStream,
+      timeoutOpenEndedStream = true,
     ),
   )
 
@@ -111,7 +117,7 @@ class JsCommandService(
   }
 
   def submitAndWait(callerContext: CallerContext): TracedInput[JsCommands] => Future[
-    Either[JsCantonError, JsSubmitAndWaitResponse]
+    Either[JsCantonError, SubmitAndWaitResponse]
   ] = req => {
     implicit val token: Option[String] = callerContext.token()
     implicit val tc: TraceContext = req.traceContext
@@ -121,9 +127,6 @@ class JsCommandService(
         SubmitAndWaitRequest(commands = Some(commands))
       result <- commandServiceClient(callerContext.token())
         .submitAndWait(submitAndWaitRequest)
-        .map(protocolConverters.SubmitAndWaitResponse.toJson)(
-          ExecutionContext.parasitic
-        )
         .resultToRight
     } yield result
   }
@@ -190,61 +193,56 @@ class JsCommandService(
 }
 
 final case class JsSubmitAndWaitForTransactionTreeResponse(
-    transaction_tree: JsTransactionTree
+    transactionTree: JsTransactionTree
 )
 
 final case class JsSubmitAndWaitForTransactionResponse(
     transaction: JsTransaction
 )
 
-final case class JsSubmitAndWaitResponse(
-    update_id: String,
-    completion_offset: Long,
-)
-
 object JsCommand {
   sealed trait Command
   final case class CreateCommand(
-      template_id: String,
-      create_arguments: Json,
+      templateId: String,
+      createArguments: Json,
   ) extends Command
 
   final case class ExerciseCommand(
-      template_id: String,
-      contract_id: String,
+      templateId: String,
+      contractId: String,
       choice: String,
-      choice_argument: Json,
+      choiceArgument: Json,
   ) extends Command
 
   final case class CreateAndExerciseCommand(
-      template_id: String,
-      create_arguments: Json,
+      templateId: String,
+      createArguments: Json,
       choice: String,
-      choice_argument: Json,
+      choiceArgument: Json,
   ) extends Command
 
   final case class ExerciseByKeyCommand(
-      template_id: String,
-      contract_key: Json,
+      templateId: String,
+      contractKey: Json,
       choice: String,
-      choice_argument: Json,
+      choiceArgument: Json,
   ) extends Command
 }
 
 final case class JsCommands(
     commands: Seq[JsCommand.Command],
-    workflow_id: String,
-    application_id: String,
-    command_id: String,
-    deduplication_period: DeduplicationPeriod,
-    min_ledger_time_abs: Option[protobuf.timestamp.Timestamp],
-    min_ledger_time_rel: Option[protobuf.duration.Duration],
-    act_as: Seq[String],
-    read_as: Seq[String],
-    submission_id: String,
-    disclosed_contracts: Seq[com.daml.ledger.api.v2.commands.DisclosedContract],
-    synchronizer_id: String,
-    package_id_selection_preference: Seq[String],
+    commandId: String,
+    actAs: Seq[String],
+    applicationId: Option[String] = None,
+    readAs: Seq[String] = Seq.empty,
+    workflowId: Option[String] = None,
+    deduplicationPeriod: Option[DeduplicationPeriod] = None,
+    minLedgerTimeAbs: Option[protobuf.timestamp.Timestamp] = None,
+    minLedgerTimeRel: Option[protobuf.duration.Duration] = None,
+    submissionId: Option[String] = None,
+    disclosedContracts: Seq[com.daml.ledger.api.v2.commands.DisclosedContract] = Seq.empty,
+    synchronizerId: Option[String] = None,
+    packageIdSelectionPreference: Seq[String] = Seq.empty,
 )
 
 object JsCommandService extends DocumentationEndpoints {
@@ -266,7 +264,7 @@ object JsCommandService extends DocumentationEndpoints {
   val submitAndWait = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait"))
     .in(jsonBody[JsCommands])
-    .out(jsonBody[JsSubmitAndWaitResponse])
+    .out(jsonBody[SubmitAndWaitResponse])
     .description("Submit a batch of commands and wait for the completion details")
 
   val submitAsyncEndpoint = commands.post
@@ -317,6 +315,7 @@ object JsCommandService extends DocumentationEndpoints {
 }
 
 object JsCommandServiceCodecs {
+  import JsSchema.config
 
   implicit val deduplicationPeriodRW: Codec[DeduplicationPeriod] = deriveCodec
 
@@ -337,18 +336,18 @@ object JsCommandServiceCodecs {
   implicit val submitResponseRW: Codec[command_submission_service.SubmitResponse] =
     deriveCodec
 
+  implicit val submitAndWaitResponseRW: Codec[SubmitAndWaitResponse] =
+    deriveCodec
+
   implicit val submitReassignmentResponseRW
       : Codec[command_submission_service.SubmitReassignmentResponse] =
     deriveCodec
 
-  implicit val jsCommandsRW: Codec[JsCommands] = deriveCodec
+  implicit val jsCommandsRW: Codec[JsCommands] = deriveConfiguredCodec
 
   implicit val jsCommandCommandRW: Codec[JsCommand.Command] = deriveCodec
   implicit val jsCommandCreateRW: Codec[JsCommand.CreateCommand] = deriveCodec
   implicit val jsCommandExerciseRW: Codec[JsCommand.ExerciseCommand] = deriveCodec
-
-  implicit val jsSubmitAndWaitResponseRW: Codec[JsSubmitAndWaitResponse] =
-    deriveCodec
 
   implicit val commandCompletionRW: Codec[command_completion_service.CompletionStreamRequest] =
     deriveCodec

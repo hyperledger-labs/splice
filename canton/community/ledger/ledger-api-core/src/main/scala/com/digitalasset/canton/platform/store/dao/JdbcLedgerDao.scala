@@ -17,8 +17,8 @@ import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.config.{
   ActiveContractsServiceStreamsConfig,
-  TransactionFlatStreamsConfig,
   TransactionTreeStreamsConfig,
+  UpdatesStreamsConfig,
 }
 import com.digitalasset.canton.platform.store.*
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
@@ -41,7 +41,8 @@ import scala.util.{Failure, Success}
 
 private class JdbcLedgerDao(
     dbDispatcher: DbDispatcher & ReportsHealth,
-    servicesExecutionContext: ExecutionContext,
+    queryExecutionContext: ExecutionContext,
+    commandExecutionContext: ExecutionContext,
     metrics: LedgerApiServerMetrics,
     sequentialIndexer: SequentialWriteDao,
     participantId: Ref.ParticipantId,
@@ -50,7 +51,7 @@ private class JdbcLedgerDao(
     ledgerEndCache: LedgerEndCache,
     completionsPageSize: Int,
     activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
-    transactionFlatStreamsConfig: TransactionFlatStreamsConfig,
+    updatesStreamsConfig: UpdatesStreamsConfig,
     transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
     globalMaxEventIdQueries: Int,
     globalMaxEventPayloadQueries: Int,
@@ -232,7 +233,7 @@ private class JdbcLedgerDao(
       s"Pruning the ledger api server index db$allDivulgencePruningParticle up to ${pruneUpToInclusive.unwrap}."
     )
 
-    implicit val ec: ExecutionContext = servicesExecutionContext
+    implicit val ec: ExecutionContext = commandExecutionContext
 
     dbDispatcher
       .executeSql(metrics.index.db.pruneDbMetrics) { conn =>
@@ -285,12 +286,12 @@ private class JdbcLedgerDao(
 
   private val globalIdQueriesLimiter = new QueueBasedConcurrencyLimiter(
     parallelism = globalMaxEventIdQueries,
-    executionContext = servicesExecutionContext,
+    executionContext = queryExecutionContext,
   )
 
   private val globalPayloadQueriesLimiter = new QueueBasedConcurrencyLimiter(
     parallelism = globalMaxEventPayloadQueries,
-    executionContext = servicesExecutionContext,
+    executionContext = queryExecutionContext,
   )
 
   private val acsReader = new ACSReader(
@@ -305,7 +306,7 @@ private class JdbcLedgerDao(
     metrics = metrics,
     tracer = tracer,
     loggerFactory = loggerFactory,
-  )(servicesExecutionContext)
+  )(queryExecutionContext)
 
   private val topologyTransactionsStreamReader = new TopologyTransactionsStreamReader(
     globalIdQueriesLimiter = globalIdQueriesLimiter,
@@ -316,7 +317,7 @@ private class JdbcLedgerDao(
     eventStorageBackend = readStorageBackend.eventStorageBackend,
     metrics = metrics,
     loggerFactory = loggerFactory,
-  )(servicesExecutionContext)
+  )(queryExecutionContext)
 
   private val reassignmentStreamReader = new ReassignmentStreamReader(
     globalIdQueriesLimiter = globalIdQueriesLimiter,
@@ -327,10 +328,10 @@ private class JdbcLedgerDao(
     lfValueTranslation = translation,
     metrics = metrics,
     loggerFactory = loggerFactory,
-  )(servicesExecutionContext)
+  )(queryExecutionContext)
 
-  private val flatTransactionsStreamReader = new TransactionsFlatStreamReader(
-    config = transactionFlatStreamsConfig,
+  private val updatesStreamReader = new UpdatesStreamReader(
+    config = updatesStreamsConfig,
     globalIdQueriesLimiter = globalIdQueriesLimiter,
     globalPayloadQueriesLimiter = globalPayloadQueriesLimiter,
     dbDispatcher = dbDispatcher,
@@ -342,7 +343,7 @@ private class JdbcLedgerDao(
     topologyTransactionsStreamReader = topologyTransactionsStreamReader,
     reassignmentStreamReader = reassignmentStreamReader,
     loggerFactory = loggerFactory,
-  )(servicesExecutionContext)
+  )(queryExecutionContext)
 
   private val treeTransactionsStreamReader = new TransactionsTreeStreamReader(
     config = transactionTreeStreamsConfig,
@@ -357,15 +358,15 @@ private class JdbcLedgerDao(
     topologyTransactionsStreamReader = topologyTransactionsStreamReader,
     reassignmentStreamReader = reassignmentStreamReader,
     loggerFactory = loggerFactory,
-  )(servicesExecutionContext)
+  )(queryExecutionContext)
 
-  private val flatTransactionPointwiseReader = new TransactionFlatPointwiseReader(
+  private val transactionPointwiseReader = new TransactionPointwiseReader(
     dbDispatcher = dbDispatcher,
     eventStorageBackend = readStorageBackend.eventStorageBackend,
     metrics = metrics,
     lfValueTranslation = translation,
     loggerFactory = loggerFactory,
-  )(servicesExecutionContext)
+  )(queryExecutionContext)
 
   private val treeTransactionPointwiseReader = new TransactionTreePointwiseReader(
     dbDispatcher = dbDispatcher,
@@ -373,22 +374,20 @@ private class JdbcLedgerDao(
     metrics = metrics,
     lfValueTranslation = translation,
     loggerFactory = loggerFactory,
-  )(servicesExecutionContext)
+  )(queryExecutionContext)
 
-  override val transactionsReader: TransactionsReader =
-    new TransactionsReader(
+  override val updateReader: UpdateReader =
+    new UpdateReader(
       dispatcher = dbDispatcher,
       queryValidRange = queryValidRange,
       eventStorageBackend = readStorageBackend.eventStorageBackend,
       metrics = metrics,
-      flatTransactionsStreamReader = flatTransactionsStreamReader,
+      updatesStreamReader = updatesStreamReader,
       treeTransactionsStreamReader = treeTransactionsStreamReader,
-      flatTransactionPointwiseReader = flatTransactionPointwiseReader,
+      transactionPointwiseReader = transactionPointwiseReader,
       treeTransactionPointwiseReader = treeTransactionPointwiseReader,
       acsReader = acsReader,
-    )(
-      servicesExecutionContext
-    )
+    )(queryExecutionContext)
 
   override val contractsReader: ContractsReader =
     ContractsReader(
@@ -397,9 +396,7 @@ private class JdbcLedgerDao(
       metrics,
       readStorageBackend.contractStorageBackend,
       loggerFactory,
-    )(
-      servicesExecutionContext
-    )
+    )(commandExecutionContext)
 
   override def eventsReader: LedgerDaoEventsReader =
     new EventsReader(
@@ -410,9 +407,7 @@ private class JdbcLedgerDao(
       translation,
       ledgerEndCache,
       loggerFactory,
-    )(
-      servicesExecutionContext
-    )
+    )(queryExecutionContext)
 
   override val completions: CommandCompletionsReader =
     new CommandCompletionsReader(
@@ -435,7 +430,6 @@ private class JdbcLedgerDao(
       ledgerEffectiveTime: Timestamp,
       offset: Offset,
       transaction: CommittedTransaction,
-      hostedWitnesses: List[Party],
       recordTime: Timestamp,
   )(implicit
       loggingContext: LoggingContextWithTrace
@@ -460,7 +454,6 @@ private class JdbcLedgerDao(
               ),
               transaction = transaction,
               updateId = updateId,
-              hostedWitnesses = hostedWitnesses,
               contractMetadata = new Map[ContractId, Bytes] {
                 override def removed(key: ContractId): Map[ContractId, Bytes] = this
 
@@ -507,14 +500,15 @@ private[platform] object JdbcLedgerDao {
 
   def read(
       dbSupport: DbSupport,
-      servicesExecutionContext: ExecutionContext,
+      queryExecutionContext: ExecutionContext,
+      commandExecutionContext: ExecutionContext,
       metrics: LedgerApiServerMetrics,
       participantId: Ref.ParticipantId,
       ledgerEndCache: LedgerEndCache,
       stringInterning: StringInterning,
       completionsPageSize: Int,
       activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
-      transactionFlatStreamsConfig: TransactionFlatStreamsConfig,
+      updatesStreamsConfig: UpdatesStreamsConfig,
       transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
       globalMaxEventIdQueries: Int,
       globalMaxEventPayloadQueries: Int,
@@ -531,7 +525,8 @@ private[platform] object JdbcLedgerDao {
   ): LedgerReadDao =
     new JdbcLedgerDao(
       dbDispatcher = dbSupport.dbDispatcher,
-      servicesExecutionContext = servicesExecutionContext,
+      queryExecutionContext = queryExecutionContext,
+      commandExecutionContext = commandExecutionContext,
       metrics = metrics,
       sequentialIndexer = SequentialWriteDao.noop,
       participantId = participantId,
@@ -542,7 +537,7 @@ private[platform] object JdbcLedgerDao {
       ledgerEndCache = ledgerEndCache,
       completionsPageSize = completionsPageSize,
       activeContractsServiceStreamsConfig = activeContractsServiceStreamsConfig,
-      transactionFlatStreamsConfig = transactionFlatStreamsConfig,
+      updatesStreamsConfig = updatesStreamsConfig,
       transactionTreeStreamsConfig = transactionTreeStreamsConfig,
       globalMaxEventIdQueries = globalMaxEventIdQueries,
       globalMaxEventPayloadQueries = globalMaxEventPayloadQueries,
@@ -564,7 +559,7 @@ private[platform] object JdbcLedgerDao {
       stringInterning: StringInterning,
       completionsPageSize: Int,
       activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
-      transactionFlatStreamsConfig: TransactionFlatStreamsConfig,
+      updatesStreamsConfig: UpdatesStreamsConfig,
       transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
       globalMaxEventIdQueries: Int,
       globalMaxEventPayloadQueries: Int,
@@ -576,7 +571,8 @@ private[platform] object JdbcLedgerDao {
   ): LedgerReadDao with LedgerWriteDaoForTests =
     new JdbcLedgerDao(
       dbDispatcher = dbSupport.dbDispatcher,
-      servicesExecutionContext = servicesExecutionContext,
+      queryExecutionContext = servicesExecutionContext,
+      commandExecutionContext = servicesExecutionContext,
       metrics = metrics,
       sequentialIndexer = sequentialWriteDao,
       participantId = participantId,
@@ -587,7 +583,7 @@ private[platform] object JdbcLedgerDao {
       ledgerEndCache = ledgerEndCache,
       completionsPageSize = completionsPageSize,
       activeContractsServiceStreamsConfig = activeContractsServiceStreamsConfig,
-      transactionFlatStreamsConfig = transactionFlatStreamsConfig,
+      updatesStreamsConfig = updatesStreamsConfig,
       transactionTreeStreamsConfig = transactionTreeStreamsConfig,
       globalMaxEventIdQueries = globalMaxEventIdQueries,
       globalMaxEventPayloadQueries = globalMaxEventPayloadQueries,

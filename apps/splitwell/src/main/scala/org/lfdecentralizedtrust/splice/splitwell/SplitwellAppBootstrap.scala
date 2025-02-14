@@ -36,7 +36,7 @@ class SplitwellAppBootstrap(
     val splitwellAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: SplitwellAppMetrics,
+    override val metrics: SplitwellAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,

@@ -191,24 +191,24 @@ class SvApp(
     )
 
     val localSynchronizerNode = config.localSynchronizerNode
-      .map(config =>
+      .map(svSynchronizerConfig =>
         new LocalSynchronizerNode(
           participantAdminConnection,
           new SequencerAdminConnection(
-            config.sequencer.adminApi,
+            svSynchronizerConfig.sequencer.adminApi,
             amuletAppParameters.loggingConfig.api,
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
           ),
           new MediatorAdminConnection(
-            config.mediator.adminApi,
+            svSynchronizerConfig.mediator.adminApi,
             amuletAppParameters.loggingConfig.api,
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
           ),
-          config.parameters
+          svSynchronizerConfig.parameters
             .toStaticSynchronizerParameters(
               CommunityCryptoConfig(provider = CryptoProvider.Jce),
               ProtocolVersion.v33,
@@ -216,19 +216,22 @@ class SvApp(
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
             ),
-          config.sequencer.internalApi,
-          config.sequencer.externalPublicApiUrl,
-          config.sequencer.sequencerAvailabilityDelay.asJava,
-          config.sequencer.pruning,
+          svSynchronizerConfig.sequencer.internalApi,
+          svSynchronizerConfig.sequencer.externalPublicApiUrl,
+          svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
+          svSynchronizerConfig.sequencer.pruning,
           loggerFactory,
           retryProvider,
-          config.sequencer.isBftSequencer,
-          config.sequencer.bftPeerEndpoints,
+          SequencerConfig.fromConfig(
+            svSynchronizerConfig.sequencer,
+            cometBftConfig,
+          ),
         )
       )
     val extraSynchronizerNodes = config.synchronizerNodes.view.mapValues { c =>
       ExtraSynchronizerNode.fromConfig(
         c,
+        config.cometBftConfig,
         amuletAppParameters.loggingConfig.api,
         loggerFactory,
         metrics.grpcClientMetrics,

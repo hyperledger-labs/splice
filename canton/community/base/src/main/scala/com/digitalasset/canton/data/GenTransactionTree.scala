@@ -303,20 +303,20 @@ object GenTransactionTree {
       submitterMetadata <- MerkleTree
         .fromProtoOptionV30(
           protoTransactionTree.submitterMetadata,
-          SubmitterMetadata.fromByteString(expectedProtocolVersion)(hashOps),
+          SubmitterMetadata.fromByteString(expectedProtocolVersion, hashOps),
         )
       commonMetadata <- MerkleTree
         .fromProtoOptionV30(
           protoTransactionTree.commonMetadata,
-          CommonMetadata.fromByteString(expectedProtocolVersion)(hashOps),
+          CommonMetadata.fromByteString(expectedProtocolVersion, hashOps),
         )
-      commonMetadataUnblinded <- commonMetadata.unwrap.leftMap(_ =>
+      _commonMetadataUnblinded <- commonMetadata.unwrap.leftMap(_ =>
         InvariantViolation(field = "GenTransactionTree.commonMetadata", error = "is blinded")
       )
       participantMetadata <- MerkleTree
         .fromProtoOptionV30(
           protoTransactionTree.participantMetadata,
-          ParticipantMetadata.fromByteString(expectedProtocolVersion)(hashOps),
+          ParticipantMetadata.fromByteString(expectedProtocolVersion, hashOps),
         )
       rootViewsP <- ProtoConverter
         .required("GenTransactionTree.rootViews", protoTransactionTree.rootViews)
@@ -324,9 +324,8 @@ object GenTransactionTree {
         (
           (
             hashOps,
-            TransactionView.fromByteString(expectedProtocolVersion)(
-              (hashOps, expectedProtocolVersion)
-            ),
+            TransactionView
+              .fromByteString(expectedProtocolVersion, (hashOps, expectedProtocolVersion)),
           ),
           expectedProtocolVersion,
         ),

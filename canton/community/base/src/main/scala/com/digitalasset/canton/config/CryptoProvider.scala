@@ -11,6 +11,7 @@ import com.digitalasset.canton.crypto.{
   EncryptionKeySpec,
   HashAlgorithm,
   PbkdfScheme,
+  SignatureFormat,
   SigningAlgorithmSpec,
   SigningKeySpec,
   SymmetricKeyScheme,
@@ -22,6 +23,7 @@ sealed trait CryptoProvider extends PrettyPrinting {
 
   def name: String
 
+  // TODO(i23777): make all the crypto parameters PV-dependent
   def signingAlgorithms: CryptoProviderScheme[SigningAlgorithmSpec]
   def signingKeys: CryptoProviderScheme[SigningKeySpec]
   def encryptionAlgorithms: CryptoProviderScheme[EncryptionAlgorithmSpec]
@@ -35,6 +37,12 @@ sealed trait CryptoProvider extends PrettyPrinting {
   def supportedCryptoKeyFormatsForProtocol(
       protocolVersion: ProtocolVersion
   ): NonEmpty[Set[CryptoKeyFormat]]
+
+  def supportedSignatureFormats: NonEmpty[Set[SignatureFormat]]
+
+  def supportedSignatureFormatsForProtocol(
+      protocolVersion: ProtocolVersion
+  ): NonEmpty[Set[SignatureFormat]]
 
   override protected def pretty: Pretty[CryptoProvider.this.type] = prettyOfString(_.name)
 }
@@ -66,6 +74,7 @@ object CryptoProvider {
           SigningKeySpec.EcCurve25519,
           SigningKeySpec.EcP256,
           SigningKeySpec.EcP384,
+          SigningKeySpec.EcSecp256k1,
         ),
       )
 
@@ -121,6 +130,22 @@ object CryptoProvider {
         CryptoKeyFormat.DerX509Spki,
         CryptoKeyFormat.DerPkcs8Pki,
       )
+
+    override def supportedSignatureFormats: NonEmpty[Set[SignatureFormat]] =
+      NonEmpty(
+        Set,
+        SignatureFormat.Der,
+        SignatureFormat.Concat,
+      )
+
+    override def supportedSignatureFormatsForProtocol(
+        protocolVersion: ProtocolVersion
+    ): NonEmpty[Set[SignatureFormat]] =
+      NonEmpty(
+        Set,
+        SignatureFormat.Der,
+        SignatureFormat.Concat,
+      )
   }
 
   /** The KMS crypto provider is based on the JCE crypto provider because the non-signing/encryption part, as well as
@@ -148,6 +173,7 @@ object CryptoProvider {
           Set,
           SigningKeySpec.EcP256,
           SigningKeySpec.EcP384,
+          SigningKeySpec.EcSecp256k1,
           // EcCurve25519 is only supported to verify signatures, it does not allow generation of such keys for signing
           SigningKeySpec.EcCurve25519,
         ),
@@ -191,6 +217,22 @@ object CryptoProvider {
         CryptoKeyFormat.Raw,
         CryptoKeyFormat.DerX509Spki,
         CryptoKeyFormat.DerPkcs8Pki,
+      )
+
+    override def supportedSignatureFormats: NonEmpty[Set[SignatureFormat]] =
+      NonEmpty(
+        Set,
+        SignatureFormat.Der,
+        SignatureFormat.Concat,
+      )
+
+    override def supportedSignatureFormatsForProtocol(
+        protocolVersion: ProtocolVersion
+    ): NonEmpty[Set[SignatureFormat]] =
+      NonEmpty(
+        Set,
+        SignatureFormat.Der,
+        SignatureFormat.Concat,
       )
 
     override def symmetric: CryptoProviderScheme[SymmetricKeyScheme] = Jce.symmetric

@@ -3,16 +3,25 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.{Clock, WallClock}
+import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import monocle.Monocle.toAppliedFocusOps
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
+  TriggerClass,
+  aTrigger,
+}
 import org.lfdecentralizedtrust.splice.automation.{
   AmuletConfigReassignmentTrigger,
   AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   TransferFollowTrigger,
-}
-import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
-  TriggerClass,
-  aTrigger,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
@@ -22,19 +31,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ConstrainedTemplate
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ConstrainedTemplate
-import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.confirmation.*
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.*
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvNamespaceMembershipTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingPartyToParticipantProposalTrigger,
@@ -46,16 +53,12 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{FoundDso, I
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.{
+  BftSequencerConfig,
+  ExtraSynchronizerNode,
+  LocalSynchronizerNode,
+}
 import org.lfdecentralizedtrust.splice.util.{QualifiedName, TemplateJsonDecoder}
-import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.time.{Clock, WallClock}
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import monocle.Monocle.toAppliedFocusOps
-import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
@@ -286,6 +289,19 @@ class SvDsoAutomationService(
           upgradesConfig,
         )
       )
+    }
+    localSynchronizerNode.foreach { synchronizerNode =>
+      synchronizerNode.sequencerConfig match {
+        case BftSequencerConfig(_) =>
+          registerTrigger(
+            new SvBftSequencerPeerReconcilingTrigger(
+              triggerContext,
+              dsoStore,
+              synchronizerNode.sequencerAdminConnection,
+            )
+          )
+        case _ =>
+      }
     }
   }
 
@@ -528,5 +544,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ExternalPartyAmuletRulesTrigger],
       aTrigger[SignSynchronizerBootstrappingStateTrigger],
       aTrigger[InitializeSynchronizerTrigger],
+      aTrigger[SvBftSequencerPeerReconcilingTrigger],
     )
 }

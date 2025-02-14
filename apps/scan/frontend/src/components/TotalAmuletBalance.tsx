@@ -14,7 +14,7 @@ export const TotalAmuletBalance: React.FC = () => {
 
   const isLoading = totalAmuletBalanceQuery.isLoading || amuletPriceQuery.isLoading;
   const isError = totalAmuletBalanceQuery.isError || amuletPriceQuery.isError;
-  const title = `Total ${config.spliceInstanceNames.amuletName} Balance`;
+  const title = `Total Circulating ${config.spliceInstanceNames.amuletName}`;
 
   return isLoading ? (
     <Loading />
@@ -27,6 +27,7 @@ export const TotalAmuletBalance: React.FC = () => {
       idCC="total-amulet-balance-amulet"
       idUSD="total-amulet-balance-usd"
       amuletPrice={amuletPriceQuery.data}
+      data-testid="amount-summary"
     />
   );
 };

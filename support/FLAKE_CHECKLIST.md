@@ -11,7 +11,9 @@ responsible for resolving it.
 ## Tracking Flakes
 
 1. Make it clear to others that you're investigating the failure by
-   leaving a `:eyes:` emoji on the slack failure notification.
+   assigning yourself to the issue or
+   leaving a `:eyes:` emoji on the slack failure notification
+   (when there is no issue yet).
 2. Go to the CircleCI page and find the failing job. Look at the output you see in CircleCI.
 3. Download the logs for our apps and for Canton unless you can identify the issue
    purely based on the CircleCI output.
@@ -22,15 +24,38 @@ responsible for resolving it.
      simtime tests and `canton-standalone-$suffix.clog` for tests that
      start a new Canton instance within the test.
 4. Based on the CircleCI output and the log files, check if there is
-   already an issue in the [Flaky Tests
-   milestone](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aopen+is%3Aissue+milestone%3A%22Flaky+Tests%22). If
-   you are looking at an older failure, make sure to also consider
-   consider [closed issues](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aclosed+is%3Aissue+milestone%3A%22Flaky+Tests%22+)
-   as they might already have been fixed.
+   already an existing issue that describes the failure you are looking at (see section below).
 5. If there is no issue, create one. If there is an issue, post a
    comment on the Github issue linking to the new CI failure. This
    helps tracking the frequency of the flake.
 6. Post a link in the slack thread of the failure to the Github issue.
+
+## Finding existing issues
+
+Known failures should be organized in one of the following locations:
+
+- [`cn-test-failures`](https://github.com/DACH-NY/cn-test-failures/issues) repository
+- [Flaky Tests](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aopen+is%3Aissue+milestone%3A%22Flaky+Tests%22) milestone on our main repository
+- [Upstream Issues](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aopen+is%3Aissue+milestone%3A%22Upstream+Issues%22) milestone on our main repository
+
+Make sure to also consider closed issues as the failure might already have been (reportedly) fixed.
+
+Since you will likely need to search for matching issues frequently,
+you might want to set up some workflow for yourself that makes searching easy for you.
+Here is a fish function for example that opens all relevant searches in the browser:
+
+```
+function flake
+    echo "flake2..."
+    gh issue list -R https://github.com/DACH-NY/cn-test-failures -S "$argv" -w &
+    echo "flake..."
+    gh issue list -S "milestone:\"Flaky Tests\" $argv" -w &
+    echo "upstream issues..."
+    gh issue list -S "milestone:\"Upstream Issues\" $argv" -w &
+end
+```
+
+Alternatively, some people use keyword bookmarks in their browser that correspond to the relevant searches.
 
 ## Assigning Flakes
 

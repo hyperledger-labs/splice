@@ -1,11 +1,9 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
-import * as semver from 'semver';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
-import { CnChartVersion } from './artifacts';
 import { config, isDevNet, isMainNet } from './config';
 
 /// Environment variables
@@ -196,10 +194,11 @@ export function fixedTokens(): boolean {
 
 const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
 
-export const cnSvcConfigsClusterDirectory = `${REPO_ROOT}/cluster/cn-svc-configs/configs/${clusterDirectory}`;
+export const svPublicConfigsClusterDirectory = `${REPO_ROOT}/cluster/configs/configs/${clusterDirectory}`;
+export const svPrivateConfigsClusterDirectory = `${REPO_ROOT}/cluster/configs-private/configs/${clusterDirectory}`;
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  return loadYamlFromFile(`${cnSvcConfigsClusterDirectory}/approved-sv-id-values.yaml`)
+  return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
     .approvedSvIdentities;
 }
 
@@ -226,30 +225,3 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
-
-const withoutAutoInit = (version: CnChartVersion) =>
-  version.type == 'local' ||
-  version.version.startsWith('0.2.0') ||
-  semver.gt(version.version, '0.2.0');
-
-// TODO(#13665): Drop this once the base version of ciperiodic is >= 0.2.0, as those values were removed from the chart
-export const autoInitValues = (
-  chartName: string,
-  version: CnChartVersion,
-  nodeIdentifier: string
-): ChartValues => {
-  const versionStr =
-    version.type === 'local' ? 'local charts' : `remote charts version ${version.version}`;
-  if (withoutAutoInit(version)) {
-    console.error(`Chart ${chartName} for ${nodeIdentifier} is using ${versionStr}`);
-    return {};
-  } else {
-    console.error(
-      `Chart ${chartName} for ${nodeIdentifier} is using ${versionStr}, setting auto init values`
-    );
-    return {
-      disableAutoInit: false,
-      nodeIdentifier,
-    };
-  }
-};

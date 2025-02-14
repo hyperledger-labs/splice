@@ -29,6 +29,15 @@ function copy_dir() {
     --exclude-from=<(git -C "${REPO_ROOT}/${dir}/${name}" ls-files --exclude-standard -oi --directory)
 }
 
+function remove_dir() {
+  local path=$1
+
+  dir=$(dirname "$path")
+  name=$(basename "$path")
+
+  rm -rf "${SPLICE_DIR:?}/${dir}"
+}
+
 function copy_file() {
   local path=$1
 
@@ -52,7 +61,8 @@ copy_dir "cluster/compose"
 copy_dir "openapi-templates"
 copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
-copy_dir "docs/src/app_dev"
+remove_dir "docs/src/app_dev"
+copy_dir "docs/src/app_dev/daml_api"
 cp "${REPO_ROOT}/docs/src/splice-index.rst" "${SPLICE_DIR}/docs/src/index.rst"
 copy_dir "load-tester"
 

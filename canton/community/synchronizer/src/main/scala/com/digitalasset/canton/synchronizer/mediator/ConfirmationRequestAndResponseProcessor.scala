@@ -4,7 +4,6 @@
 package com.digitalasset.canton.synchronizer.mediator
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.alternative.*
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
@@ -13,8 +12,9 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{
+  SigningKeyUsage,
+  SynchronizerCryptoClient,
   SynchronizerSnapshotSyncCryptoApi,
-  SynchronizerSyncCryptoClient,
 }
 import com.digitalasset.canton.data.{CantonTimestamp, ViewConfirmationParameters, ViewType}
 import com.digitalasset.canton.error.MediatorError
@@ -25,10 +25,10 @@ import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.HandlerResult
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.mediator.store.MediatorState
-import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SynchronizerTimeTracker}
+import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.ShowUtil.*
@@ -47,7 +47,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     synchronizerId: SynchronizerId,
     private val mediatorId: MediatorId,
     verdictSender: VerdictSender,
-    crypto: SynchronizerSyncCryptoClient,
+    crypto: SynchronizerCryptoClient,
     timeTracker: SynchronizerTimeTracker,
     val mediatorState: MediatorState,
     protocolVersion: ProtocolVersion,
@@ -57,47 +57,47 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     extends NamedLogging
     with Spanning
     with FlagCloseable
-    with HasCloseContext {
+    with HasCloseContext
+    with MediatorEventHandler {
 
-  def handleRequestEvents(
-      timestamp: CantonTimestamp,
-      event: Option[Traced[MediatorEvent]],
-      callerTraceContext: TraceContext,
-  ): HandlerResult = {
+  override def observeTimestampWithoutEvent(sequencingTimestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): HandlerResult =
+    HandlerResult.synchronous(handleTimeouts(sequencingTimestamp))
 
-    if (logger.underlying.isInfoEnabled()) {
-      event.foreach(e =>
-        e.value match {
-          case response: MediatorEvent.Response =>
-            logger.info(show"Phase 5: Received responses for request=$timestamp: $response")(
-              e.traceContext
-            )
-          case _ => ()
-        }
-      )
-    }
-
+  override def handleMediatorEvent(
+      event: MediatorEvent
+  )(implicit traceContext: TraceContext): HandlerResult = {
     val future = for {
-      // FIXME(i12903): do not block if requestId is far in the future
-      snapshot <- crypto.ips.awaitSnapshot(timestamp)(callerTraceContext)
+      _ <- handleTimeouts(event.sequencingTimestamp)
+      _ <- doHandleMediatorEvent(event)
+    } yield ()
+    HandlerResult.synchronous(future)
+  }
 
-      synchronizerParameters <-
-        snapshot
-          .findDynamicSynchronizerParameters()(callerTraceContext)
+  private def doHandleMediatorEvent(
+      event: MediatorEvent
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    val requestTimestamp = event.requestId.unwrap
+    if (requestTimestamp > event.sequencingTimestamp) {
+      val error = MediatorError.MalformedMessage.Reject(
+        s"Received a mediator message for request $requestTimestamp with earlier sequencing time ${event.sequencingTimestamp}. Discarding the message."
+      )
+      error.report()
+      FutureUnlessShutdown.unit
+    } else {
+      for {
+        snapshot <- crypto.ips.awaitSnapshot(requestTimestamp)
+
+        synchronizerParameters <- snapshot
+          .findDynamicSynchronizerParameters()
           .flatMap(_.toFutureUS(new IllegalStateException(_)))
 
-      participantResponseDeadline <- FutureUnlessShutdown.outcomeF(
-        synchronizerParameters.participantResponseDeadlineForF(timestamp)
-      )
-      decisionTime <- synchronizerParameters.decisionTimeForF(timestamp)
-      confirmationResponseTimeout = synchronizerParameters.parameters.confirmationResponseTimeout
-      _ <-
-        handleTimeouts(timestamp)(
-          callerTraceContext
+        participantResponseDeadline <- FutureUnlessShutdown.outcomeF(
+          synchronizerParameters.participantResponseDeadlineForF(requestTimestamp)
         )
-
-      _ <- event.traverse_(e =>
-        e.value match {
+        decisionTime <- synchronizerParameters.decisionTimeForF(requestTimestamp)
+        _ <- event match {
           case MediatorEvent.Request(
                 counter,
                 _,
@@ -106,40 +106,36 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                 batchAlsoContainsTopologyTransaction,
               ) =>
             processRequest(
-              RequestId(timestamp),
+              RequestId(requestTimestamp),
               counter,
               participantResponseDeadline,
               decisionTime,
-              confirmationResponseTimeout,
               requestEnvelope,
               rootHashMessages,
               batchAlsoContainsTopologyTransaction,
-            )(e.traceContext)
+            )
           case MediatorEvent.Response(
                 counter,
-                timestamp,
+                _,
                 response,
                 topologyTimestamp,
                 recipients,
               ) =>
             processResponse(
-              timestamp,
+              requestTimestamp,
               counter,
               participantResponseDeadline,
               decisionTime,
               response,
               topologyTimestamp,
               recipients,
-            )(e.traceContext)
+            )
         }
-      )
-    } yield ()
-    HandlerResult.synchronous(future)
+      } yield ()
+    }
   }
 
-  private[mediator] def handleTimeouts(
-      timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+  private[mediator] def handleTimeouts(timestamp: CantonTimestamp): FutureUnlessShutdown[Unit] =
     mediatorState
       .pendingTimedoutRequest(timestamp) match {
       case Nil => FutureUnlessShutdown.unit
@@ -151,9 +147,9 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
   private[mediator] def handleTimeout(
       requestId: RequestId,
       timestamp: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+  ): FutureUnlessShutdown[Unit] = {
     def pendingRequestNotFound: FutureUnlessShutdown[Unit] = {
-      logger.debug(
+      noTracingLogger.debug(
         s"Pending aggregation for request [$requestId] not found. This implies the request has been finalized since the timeout was scheduled."
       )
       FutureUnlessShutdown.unit
@@ -161,36 +157,17 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
     mediatorState.getPending(requestId).fold(pendingRequestNotFound) { responseAggregation =>
       // the event causing the timeout is likely unrelated to the transaction we're actually timing out,
-      // so replace the implicit trace context with the original request trace
+      // so use the original request trace context
       implicit val traceContext: TraceContext = responseAggregation.requestTraceContext
 
-      logger
-        .info(
-          s"Phase 6: Request ${requestId.unwrap}: Timeout in state ${responseAggregation.state} at $timestamp"
-        )
+      logger.info(
+        s"Phase 6: Request ${requestId.unwrap}: Timeout in state ${responseAggregation.state} at $timestamp"
+      )
 
-      val timeout = responseAggregation.timeout(version = timestamp)
-      for {
-        snapshot <- crypto.ips.awaitSnapshot(responseAggregation.requestId.unwrap)(traceContext)
-
-        synchronizerParameters <-
-          snapshot
-            .findDynamicSynchronizerParameters()(traceContext)
-            .flatMap(_.toFutureUS(new IllegalStateException(_)))
-        decisionTime = synchronizerParameters.decisionTimeFor(responseAggregation.requestId.unwrap)
-        state <- mediatorState
-          .replace(responseAggregation, timeout)
-          .semiflatMap { _ =>
-            decisionTime.fold(
-              string =>
-                FutureUnlessShutdown
-                  .failed(new IllegalStateException(s"failed to retrieve decision time: $string")),
-              dec => sendResultIfDone(timeout, dec),
-            )
-          }
-          .getOrElse(())
-
-      } yield state
+      val timedOut = responseAggregation.timeout(version = timestamp)
+      MonadUtil.whenM(mediatorState.replace(responseAggregation, timedOut))(
+        sendResultIfDone(timedOut, responseAggregation.decisionTime)
+      )
     }
   }
 
@@ -204,13 +181,11 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       counter: SequencerCounter,
       participantResponseDeadline: CantonTimestamp,
       decisionTime: CantonTimestamp,
-      confirmationResponseTimeout: NonNegativeFiniteDuration,
       requestEnvelope: OpenEnvelope[MediatorConfirmationRequest],
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
       batchAlsoContainsTopologyTransaction: Boolean,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     withSpan("ConfirmationRequestAndResponseProcessor.processRequest") {
-      val timeout = requestId.unwrap.plus(confirmationResponseTimeout.unwrap)
       val request = requestEnvelope.protocolMessage
       implicit traceContext =>
         span =>
@@ -236,12 +211,14 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                   ResponseAggregation.fromRequest(
                     requestId,
                     request,
-                    timeout,
+                    participantResponseDeadline,
+                    decisionTime,
                     snapshot.ipsSnapshot,
                   )
 
                 for {
                   aggregation <- aggregationF
+
                   _ <- mediatorState.add(aggregation)
                 } yield {
                   timeTracker.requestTick(participantResponseDeadline)
@@ -263,10 +240,9 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                       verdict,
                       decisionTime,
                     )
-                  _ <-
-                    mediatorState.add(
-                      FinalizedResponse(requestId, request, requestId.unwrap, verdict)(traceContext)
-                    )
+                  _ <- mediatorState.add(
+                    FinalizedResponse(requestId, request, requestId.unwrap, verdict)(traceContext)
+                  )
                 } yield ()
 
               // Discard request
@@ -314,6 +290,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           request.rootHash.unwrap,
           request.submittingParticipant,
           request.submittingParticipantSignature,
+          SigningKeyUsage.ProtocolOnly,
         )
         .leftMap { err =>
           val reject = MediatorError.MalformedMessage.Reject(
@@ -353,9 +330,8 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
         .leftMap(Option.apply)
 
       // Reject, if the authorized confirming parties cannot attain the threshold
-      _ <-
-        validateAuthorizedConfirmingParties(requestId, request, topologySnapshot)
-          .leftMap(Option.apply)
+      _ <- validateAuthorizedConfirmingParties(requestId, request, topologySnapshot)
+        .leftMap(Option.apply)
 
       // Reject, if the batch also contains a topology transaction
       _ <- EitherTUtil
@@ -542,14 +518,13 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       submissionTopologyTimestamps match {
         case Seq(submissionTopologyTimestamp) =>
           val sequencingTimestamp = requestId.unwrap
-          SubmissionTopologyHelper
-            .getSubmissionTopologySnapshot(
-              timeouts,
-              sequencingTimestamp,
-              submissionTopologyTimestamp,
-              crypto,
-              logger,
-            )
+          SubmissionTopologyHelper.getSubmissionTopologySnapshot(
+            timeouts,
+            sequencingTimestamp,
+            submissionTopologyTimestamp,
+            crypto,
+            logger,
+          )
 
         case Seq() =>
           // This can only happen if there are no root hash messages.
@@ -672,7 +647,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       request: MediatorConfirmationRequest,
       snapshot: TopologySnapshot,
   )(implicit
-      loggingContext: ErrorLoggingContext
+      traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, MediatorVerdict.MediatorReject, Unit] =
     request.informeesAndConfirmationParamsByViewPosition.toList
       .parTraverse_ { case (viewPosition, viewConfirmationParameters) =>
@@ -681,28 +656,23 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           viewConfirmationParameters.confirmers.toSeq.sortBy(pId => pId)
 
         for {
-          partitionedConfirmingParties <- EitherT
-            .right[MediatorVerdict.MediatorReject](
-              snapshot
-                .isHostedByAtLeastOneParticipantF(
-                  declaredConfirmingParties.toSet,
-                  (_, attr) => attr.permission.canConfirm,
-                )(loggingContext)
-                .map { hostedConfirmingParties =>
-                  declaredConfirmingParties
-                    .map(cp => Either.cond(hostedConfirmingParties.contains(cp), cp, cp))
-                }
-            )
+          hostedConfirmingParties <- EitherT.right[MediatorVerdict.MediatorReject](
+            snapshot
+              .isHostedByAtLeastOneParticipantF(
+                declaredConfirmingParties.toSet,
+                (_, attr) => attr.permission.canConfirm,
+              )
+          )
 
-          (unauthorized, authorized) = partitionedConfirmingParties.separate
-
-          authorizedIds = authorized
+          (authorized, unauthorized) = declaredConfirmingParties.partition(
+            hostedConfirmingParties.contains
+          )
 
           confirmed = viewConfirmationParameters.quorums.forall { quorum =>
             // For the authorized informees that belong to each quorum, verify if their combined weight is enough
             // to meet the quorum's threshold.
             quorum.confirmers
-              .filter { case (partyId, _) => authorizedIds.contains(partyId) }
+              .filter { case (partyId, _) => authorized.contains(partyId) }
               .values
               .map(_.unwrap)
               .sum >= quorum.threshold.unwrap
@@ -745,7 +715,11 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       implicit traceContext => span =>
         span.setAttribute("timestamp", ts.toString)
         span.setAttribute("counter", counter.toString)
+
         val response = signedResponse.message
+        logger.info(
+          show"Phase 5: Received responses for request=${response.requestId.unwrap}: $response"
+        )
 
         (for {
           snapshot <- OptionT.liftF(crypto.awaitSnapshot(response.requestId.unwrap))
@@ -808,10 +782,9 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
           _ <- {
             if (
-              // Note: This check relies on mediator trusting its sequencer
-              // and the sequencer performing validation `checkToAtMostOneMediator`
-              // in the `BlockUpdateGenerator`
-              recipients.allRecipients.sizeCompare(1) == 0 &&
+              // Check that this message was sent to all mediators in the group.
+              // Ignore other recipients of the response so that this check does not rely any recipients restrictions
+              // that are enforced in the sequencer.
               recipients.allRecipients.contains(responseAggregation.request.mediator)
             ) {
               OptionT.some[FutureUnlessShutdown](())
@@ -827,7 +800,11 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
           nextResponseAggregation <- OptionT(
             responseAggregation.validateAndProgress(ts, response, snapshot.ipsSnapshot)
           )
-          _unit <- mediatorState.replace(responseAggregation, nextResponseAggregation)
+          _unit <- OptionT(
+            mediatorState
+              .replace(responseAggregation, nextResponseAggregation)
+              .map(Option.when(_)(()))
+          )
           _ <- OptionT.some[FutureUnlessShutdown](
             // we can send the result asynchronously, as there is no need to reply in
             // order and there is no need to guarantee delivery of verdicts

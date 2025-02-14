@@ -15,7 +15,6 @@ import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import scalaz.Isomorphism.{<~>, IsoFunctorTemplate}
 import scalaz.std.list.*
 import scalaz.std.option.*
-import scalaz.std.vector.*
 import scalaz.syntax.apply.{^, ^^}
 import scalaz.syntax.show.*
 import scalaz.syntax.tag.*
@@ -391,22 +390,21 @@ package http {
 
     def fromTransactionTree(
         tx: lav2.transaction.TransactionTree
-    ): Error \/ Vector[Contract[lav2.value.Value]] =
-      tx.rootNodeIds.toVector
-        .map(fromTreeEvent(tx.eventsById))
-        .sequence
-        .map(_.flatten)
+    ): Error \/ Vector[Contract[lav2.value.Value]] = {
+      val events = tx.eventsById.toSeq.view.sortBy(_._1).map(_._2).toVector
+      fromTreeEvents(events)
+    }
 
-    private[this] def fromTreeEvent(
-        eventsById: Map[Int, lav2.transaction.TreeEvent]
-    )(nodeId: Int): Error \/ Vector[Contract[lav2.value.Value]] = {
+    private[this] def fromTreeEvents(
+        events: Vector[lav2.transaction.TreeEvent]
+    ): Error \/ Vector[Contract[lav2.value.Value]] = {
       @tailrec
       def loop(
-          nodeIds: Vector[Int],
+          events: Vector[lav2.transaction.TreeEvent],
           acc: Error \/ Vector[Contract[lav2.value.Value]],
-      ): Error \/ Vector[Contract[lav2.value.Value]] = nodeIds match {
+      ): Error \/ Vector[Contract[lav2.value.Value]] = events match {
         case head +: tail =>
-          eventsById(head).kind match {
+          head.kind match {
             case lav2.transaction.TreeEvent.Kind.Created(created) =>
               val a =
                 ActiveContract
@@ -419,7 +417,7 @@ package http {
                 .fromLedgerApi(exercised)
                 .map(_.map(a => Contract[lav2.value.Value](-\/(a))))
               val newAcc = ^(acc, a)(_ ++ _.toVector)
-              loop(exercised.childNodeIds.toVector ++ tail, newAcc)
+              loop(tail, newAcc)
             case lav2.transaction.TreeEvent.Kind.Empty =>
               val errorMsg = s"Expected either Created or Exercised event, got: Empty"
               -\/(Error(Symbol("Contract_fromTreeEvent"), errorMsg))
@@ -429,7 +427,8 @@ package http {
           acc
       }
 
-      loop(Vector(nodeId), \/-(Vector()))
+      loop(events, \/-(Vector()))
+
     }
 
     implicit val covariant: Traverse[Contract] = new Traverse[Contract] {
@@ -585,7 +584,7 @@ package http {
       type F[A] = ContractKeyStreamRequest[Off, A]
       new Traverse[F] {
         override def traverseImpl[G[_]: Applicative, A, B](fa: F[A])(f: A => G[B]): G[F[B]] =
-          fa.ekey traverse f map (ekey => fa copy (ekey = ekey))
+          fa.ekey traverse f map (ekey => fa.copy(ekey = ekey))
       }
     }
 

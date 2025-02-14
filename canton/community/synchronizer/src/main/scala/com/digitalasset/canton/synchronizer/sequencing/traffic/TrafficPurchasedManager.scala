@@ -18,7 +18,7 @@ import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.traffic.TrafficPurchased
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.traffic.SequencerTrafficConfig
+import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.synchronizer.sequencing.traffic.TrafficPurchasedManager.{
   PendingBalanceUpdate,
   TrafficPurchasedAlreadyPruned,
@@ -252,7 +252,9 @@ class TrafficPurchasedManager(
             logger.trace(s"Dequeueing pending balances up until $timestamp")
             dequeueUntil(timestamp).foreach { update =>
               logger.trace(s"Providing balance update at timestamp ${update.desired}")
-              update.promise.completeWith(getBalanceAt(update.member, update.desired).value)
+              update.promise
+                .completeWithUS(getBalanceAt(update.member, update.desired).value)
+                .discard
             }
           }
         }

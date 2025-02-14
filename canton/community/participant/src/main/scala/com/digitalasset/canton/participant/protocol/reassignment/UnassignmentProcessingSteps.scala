@@ -38,9 +38,9 @@ import com.digitalasset.canton.participant.protocol.submission.{
   SeedGenerator,
 }
 import com.digitalasset.canton.participant.protocol.{
+  ContractAuthenticator,
   EngineController,
   ProcessingSteps,
-  SerializableContractAuthenticator,
 }
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.ActiveContractStore.{
@@ -74,7 +74,7 @@ class UnassignmentProcessingSteps(
     reassignmentCoordination: ReassignmentCoordination,
     seedGenerator: SeedGenerator,
     staticSynchronizerParameters: Source[StaticSynchronizerParameters],
-    override protected val serializableContractAuthenticator: SerializableContractAuthenticator,
+    override protected val serializableContractAuthenticator: ContractAuthenticator,
     val sourceSynchronizerProtocolVersion: Source[ProtocolVersion],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
@@ -421,15 +421,11 @@ class UnassignmentProcessingSteps(
         .getDecisionTime(sourceSnapshot.unwrap, requestTimestamp)
         .leftMap(ReassignmentParametersError(synchronizerId.unwrap, _))
 
-      reassignmentData = ReassignmentData(
-        sourceProtocolVersion = sourceSynchronizerProtocolVersion,
+      reassignmentData = UnassignmentData(
         unassignmentTs = requestTimestamp,
-        unassignmentRequestCounter = requestCounter,
         unassignmentRequest = fullTree,
         unassignmentDecisionTime = unassignmentDecisionTime,
-        contract = fullTree.contract,
         unassignmentResult = None,
-        reassignmentGlobalOffset = None,
       )
       _ <- ifThenET(isReassigningParticipant) {
         reassignmentCoordination.addUnassignmentRequest(reassignmentData)

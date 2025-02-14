@@ -21,9 +21,24 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
       .simpleTopology4Svs("BFT")
       .withTrafficTopupsEnabled
       .addConfigTransform((_, config) =>
-        ConfigTransforms.updateAllSvAppConfigs_(
-          _.focus(_.localSynchronizerNode)
-            .modify(_.map(_.focus(_.sequencer.isBftSequencer).replace(true)))
+        ConfigTransforms.updateAllSvAppConfigs((sv, appConfig) =>
+          appConfig
+            .focus(_.localSynchronizerNode)
+            .modify(
+              _.map(
+                _.focus(_.sequencer).modify(
+                  _.copy(
+                    isBftSequencer = true,
+                    externalPeerApiUrl = Some(
+                      Endpoint(
+                        "localhost",
+                        RequireTypes.Port.tryCreate(31030 + Integer.parseInt(sv.stripPrefix("sv"))),
+                      )
+                    ),
+                  )
+                )
+              )
+            )
         )(config)
       )
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
@@ -36,21 +51,7 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
                 domains = withoutExtraDomains
               )
             }
-          },
-          svApps = conf.svApps.updatedWith(InstanceName.tryCreate("sv2")) {
-            _.map { sv2Config =>
-              sv2Config.copy(
-                localSynchronizerNode = sv2Config.localSynchronizerNode.map(config =>
-                  config.copy(sequencer =
-                    config.sequencer.copy(
-                      bftPeerEndpoints =
-                        Seq(Endpoint("localhost", RequireTypes.Port.tryCreate(31030)))
-                    )
-                  )
-                )
-              )
-            }
-          },
+          }
         )
       )
       .withManualStart
@@ -59,18 +60,16 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
   "Splice apps" should {
     "start with uninitialized Canton nodes" in { implicit env =>
       sv1Backend.startSync()
-      sv1Backend
-        .sequencerClient(decentralizedSynchronizerId)
-        .bft
-        .add_peer_endpoint(
-          Endpoint(
-            "localhost",
-            RequireTypes.Port.tryCreate(
-              31031
-            ),
-          )
-        )
       sv2Backend.startSync()
+      sv3Backend.startSync()
+      eventually() {
+        forAll(Seq(sv1Backend, sv2Backend, sv3Backend)) { sv =>
+          sv.appState.localSynchronizerNode.value.sequencerAdminConnection
+            .listCurrentPeerEndpoints()
+            .futureValue
+            .size shouldBe 2
+        }
+      }
     }
   }
 

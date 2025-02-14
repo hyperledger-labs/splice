@@ -22,7 +22,6 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
-import com.digitalasset.canton.platform.apiserver.execution.StoreBackedCommandExecutor.AuthenticateContract
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
 import com.digitalasset.canton.protocol.{
@@ -57,8 +56,8 @@ private[apiserver] final class StoreBackedCommandExecutor(
     participant: Ref.ParticipantId,
     packageSyncService: PackageSyncService,
     contractStore: ContractStore,
-    authenticateContract: AuthenticateContract,
     metrics: LedgerApiServerMetrics,
+    authenticateSerializableContract: SerializableContract => Either[String, Unit],
     config: EngineLoggingConfig,
     val loggerFactory: NamedLoggerFactory,
     dynParamGetter: DynamicSynchronizerParameterGetter,
@@ -80,32 +79,6 @@ private[apiserver] final class StoreBackedCommandExecutor(
   ): FutureUnlessShutdown[Either[ErrorCause, CommandExecutionResult]] = {
     val interpretationTimeNanos = new AtomicLong(0L)
     val start = System.nanoTime()
-    val coids =
-      commands.commands.commands.toSeq
-        .foldLeft(Set.empty[Value.ContractId]) {
-          case (
-                contractIds,
-                com.digitalasset.daml.lf.command.ApiCommand.Exercise(_, coid, _, argument),
-              ) =>
-            argument.collectCids(contractIds) + coid
-          case (
-                contractIds,
-                com.digitalasset.daml.lf.command.ApiCommand.ExerciseByKey(_, _, _, argument),
-              ) =>
-            argument.collectCids(contractIds)
-          case (acc, _) => acc
-        }
-        .diff(commands.disclosedContracts.map(_.fatContractInstance.contractId).toSeq.toSet)
-
-    // Trigger loading through the state cache and the batch aggregator.
-    // Loading of contracts is a multi-stage process.
-    // - start with N items
-    // - trigger a single load in contractStore (1:1)
-    // - visit the mutableStateCache which will use the read through lookup
-    // - the read through lookup will ask the contract reader
-    // - the contract reader will ask the batchLoader
-    // - the batch loader will put independent requests together into db batches and respond
-    val loadContractsF = Future.sequence(coids.map(contractStore.lookupContractState))
     for {
       ledgerTimeRecordTimeToleranceO <- dynParamGetter
         // TODO(i15313):
@@ -118,7 +91,6 @@ private[apiserver] final class StoreBackedCommandExecutor(
         }
         .value
         .map(_.toOption)
-      _ <- FutureUnlessShutdown.outcomeF(loadContractsF)
       submissionResult <- submitToEngine(commands, submissionSeed, interpretationTimeNanos)
       submission <- consume(
         commands.actAs,
@@ -382,15 +354,30 @@ private[apiserver] final class StoreBackedCommandExecutor(
               )
             }
 
-        case ResultPrefetch(keys, resume) =>
+        case ResultPrefetch(coids, keys, resume) =>
+          // Trigger loading through the state cache and the batch aggregator.
+          // Loading of contracts is a multi-stage process.
+          // - start with N items
+          // - trigger a single load in contractStore (1:1)
+          // - visit the mutableStateCache which will use the read through lookup
+          // - the read through lookup will ask the contract reader
+          // - the contract reader will ask the batchLoader
+          // - the batch loader will put independent requests together into db batches and respond
+          val loadContractsF = Future.sequence(coids.map(contractStore.lookupContractState))
           // prefetch the contract keys via the mutable state cache / batch aggregator
-          keys
-            .parTraverse_(key =>
-              FutureUnlessShutdown.outcomeF(contractStore.lookupContractKey(Set.empty, key))
-            )
-            .flatMap { _ =>
-              resolveStep(resume())
-            }
+          // then prefetch the found contracts in the same way
+          val loadKeysF = {
+            import com.digitalasset.canton.util.FutureInstances.*
+            keys
+              .parTraverse(key => contractStore.lookupContractKey(Set.empty, key))
+              .flatMap(contractIds =>
+                contractIds.flattenOption
+                  .parTraverse_(contractId => contractStore.lookupContractState(contractId))
+              )
+          }
+          FutureUnlessShutdown
+            .outcomeF(loadContractsF.zip(loadKeysF))
+            .flatMap(_ => resolveStep(resume()))
       }
 
     resolveStep(result).thereafter { _ =>
@@ -449,61 +436,15 @@ private[apiserver] final class StoreBackedCommandExecutor(
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Option[String]] = {
+
     import UpgradeVerificationResult.*
+
     type Result = EitherT[Future, UpgradeVerificationResult, UpgradeVerificationContractData]
 
-    def checkProvidedContractMetadataAgainstRecomputed(
-        original: ContractMetadata,
-        recomputed: ContractMetadata,
-    ): Either[NonEmptyChain[String], Unit] = {
-      def check[T](recomputed: T, original: T)(desc: String): Checked[Nothing, String, Unit] =
-        Checked.fromEitherNonabort(())(
-          Either.cond(recomputed == original, (), s"$desc mismatch: $original vs $recomputed")
-        )
-
-      for {
-        _ <- check(recomputed.signatories, original.signatories)("signatories")
-        recomputedObservers = recomputed.stakeholders -- recomputed.signatories
-        originalObservers = original.stakeholders -- original.signatories
-        _ <- check(recomputedObservers, originalObservers)("observers")
-        _ <- check(recomputed.maintainers, original.maintainers)("key maintainers")
-        _ <- check(recomputed.maybeKey, original.maybeKey)("key value")
-      } yield ()
-    }.toEitherMergeNonaborts
-
     def validateContractAuthentication(
-        upgradeVerificationContractData: UpgradeVerificationContractData
-    ): Future[UpgradeVerificationResult] = {
-      import upgradeVerificationContractData.*
-
-      val result: Either[String, SerializableContract] = for {
-        salt <- DriverContractMetadata
-          .fromTrustedByteArray(driverMetadataBytes)
-          .bimap(
-            e => s"Failed to build DriverContractMetadata ($e)",
-            m => m.salt,
-          )
-        contract <- SerializableContract(
-          contractId = contractId,
-          contractInstance = contractInstance,
-          metadata = recomputedMetadata,
-          ledgerTime = ledgerTime,
-          contractSalt = Some(salt),
-        ).left.map(e => s"Failed to construct SerializableContract($e)")
-        _ <- authenticateContract(contract).leftMap { contractAuthenticationError =>
-          val firstParticle =
-            s"Upgrading contract ${upgradeVerificationContractData.contractId.coid} failed authentication check with error: $contractAuthenticationError."
-          checkProvidedContractMetadataAgainstRecomputed(originalMetadata, recomputedMetadata)
-            .leftMap(_.mkString_("['", "', '", "']"))
-            .fold(
-              value => s"$firstParticle The following upgrading checks failed: $value",
-              _ => firstParticle,
-            )
-        }
-      } yield contract
-
-      EitherT.fromEither[Future](result).fold(UpgradeFailure.apply, _ => Valid)
-    }
+        data: UpgradeVerificationContractData
+    ): Future[UpgradeVerificationResult] =
+      Future.successful(data.validate.fold(s => UpgradeFailure(s), _ => Valid))
 
     def lookupActiveContractVerificationData(): Result =
       EitherT(
@@ -515,8 +456,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
                 UpgradeVerificationContractData
                   .fromActiveContract(coid, active, recomputedContractMetadata)
               )
-            case ContractState.Archived => Left(UpgradeFailure("Contract archived"))
-            case ContractState.NotFound => Left(ContractNotFound)
+            case ContractState.Archived | ContractState.NotFound => Left(ContractNotFound)
           }
       )
 
@@ -557,7 +497,60 @@ private[apiserver] final class StoreBackedCommandExecutor(
       originalMetadata: ContractMetadata,
       recomputedMetadata: ContractMetadata,
       ledgerTime: CantonTimestamp,
-  )
+  ) {
+    private def recomputedSerializableContract: Either[String, SerializableContract] =
+      for {
+        salt <- DriverContractMetadata
+          .fromTrustedByteArray(driverMetadataBytes)
+          .bimap(
+            e => s"Failed to build DriverContractMetadata ($e)",
+            m => m.salt,
+          )
+        contract <- SerializableContract(
+          contractId = contractId,
+          contractInstance = contractInstance,
+          metadata = recomputedMetadata,
+          ledgerTime = ledgerTime,
+          contractSalt = Some(salt),
+        ).left.map(e => s"Failed to construct SerializableContract($e)")
+      } yield contract
+
+    private def checkProvidedContractMetadataAgainstRecomputed
+        : Either[NonEmptyChain[String], Unit] = {
+
+      def check[T](f: ContractMetadata => T)(desc: String): Checked[Nothing, String, Unit] = {
+        val original = f(originalMetadata)
+        val recomputed = f(recomputedMetadata)
+        Checked.fromEitherNonabort(())(
+          Either.cond(recomputed == original, (), s"$desc mismatch: $original vs $recomputed")
+        )
+      }
+
+      for {
+        _ <- check(_.signatories)("signatories")
+        _ <- check(m => m.stakeholders -- m.signatories)("observers")
+        _ <- check(_.maintainers)("key maintainers")
+        _ <- check(_.maybeKey)("key value")
+      } yield ()
+
+    }.toEitherMergeNonaborts
+
+    def validate: Either[String, Unit] =
+      (for {
+        sc <- recomputedSerializableContract
+        _ <- authenticateSerializableContract(sc)
+      } yield ()).leftMap { contractAuthenticationError =>
+        val firstParticle =
+          s"Upgrading contract with $contractId failed authentication check with error: $contractAuthenticationError."
+        checkProvidedContractMetadataAgainstRecomputed
+          .leftMap(_.mkString_("['", "', '", "']"))
+          .fold(
+            value => s"$firstParticle The following upgrading checks failed: $value",
+            _ => firstParticle,
+          )
+      }
+
+  }
 
   private object UpgradeVerificationContractData {
     def fromDisclosedContract(
@@ -614,7 +607,6 @@ private[apiserver] final class StoreBackedCommandExecutor(
 }
 
 object StoreBackedCommandExecutor {
-  type AuthenticateContract = SerializableContract => Either[String, Unit]
 
   def considerDisclosedContractsSynchronizerId(
       prescribedSynchronizerIdO: Option[SynchronizerId],

@@ -121,7 +121,11 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val actualUpdatesWithoutLostData =
       actualUpdates.map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInStoreIngestion))
     val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
-    actualUpdatesWithoutLostData should contain theSameElementsInOrderAs recordedUpdatesWithoutLostData
+    actualUpdatesWithoutLostData should have length recordedUpdatesWithoutLostData.size.longValue()
+    actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData).foreach {
+      case (actual, recorded) => actual shouldBe recorded
+    }
+    succeed
   }
 
   def compareHistoryViaLosslessScanApi(

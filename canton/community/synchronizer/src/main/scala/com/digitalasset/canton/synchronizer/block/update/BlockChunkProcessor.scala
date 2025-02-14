@@ -11,7 +11,7 @@ import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.SequencerCounter
-import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoClient, SynchronizerSyncCryptoClient}
+import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoClient, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.BaseAlarm
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
@@ -22,15 +22,15 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent
 import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent.{Acknowledgment, Send}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.*
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.Sequencer.{
+import com.digitalasset.canton.synchronizer.sequencer.*
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.{
   SignedOrderingRequest,
   SignedOrderingRequestOps,
 }
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.errors.SequencerError
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.store.SequencerMemberValidator
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.traffic.SequencerRateLimitManager
+import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
+import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
+import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.*
@@ -47,7 +47,7 @@ import SequencedSubmissionsValidator.SequencedSubmissionsValidationResult
 final class BlockChunkProcessor(
     synchronizerId: SynchronizerId,
     protocolVersion: ProtocolVersion,
-    synchronizerSyncCryptoApi: SynchronizerSyncCryptoClient,
+    synchronizerSyncCryptoApi: SynchronizerCryptoClient,
     sequencerId: SequencerId,
     rateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,

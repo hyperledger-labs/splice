@@ -133,7 +133,7 @@ class StoreBasedSynchronizerOutboxTest
     val buffer: ListBuffer[GenericSignedTopologyTransaction] = ListBuffer()
     val batches: mutable.ListBuffer[Seq[GenericSignedTopologyTransaction]] = ListBuffer()
     private val promise = new AtomicReference(
-      new PromiseUnlessShutdown[Seq[Seq[GenericSignedTopologyTransaction]]](
+      PromiseUnlessShutdown.supervised[Seq[Seq[GenericSignedTopologyTransaction]]](
         "promise",
         futureSupervisor,
       )
@@ -179,7 +179,7 @@ class StoreBasedSynchronizerOutboxTest
               )
           else FutureUnlessShutdown.unit
         }
-        _ = if (buffer.length >= expect.get()) {
+        _ = if (buffer.sizeIs >= expect.get()) {
           promise.get().success(UnlessShutdown.Outcome(batches.toSeq))
         }
       } yield {
@@ -192,7 +192,7 @@ class StoreBasedSynchronizerOutboxTest
       val ret = buffer.toList
       buffer.clear()
       expect.set(expectI)
-      promise.set(new PromiseUnlessShutdown("promise", futureSupervisor))
+      promise.set(PromiseUnlessShutdown.unsupervised())
       ret
     }
 
@@ -218,6 +218,7 @@ class StoreBasedSynchronizerOutboxTest
           signingKeys = Seq(publicKey.fingerprint),
           testedProtocolVersion,
           expectFullAuthorization = false,
+          waitToBecomeEffective = None,
         )
       )
       .value

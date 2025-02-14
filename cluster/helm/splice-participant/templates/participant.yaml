@@ -66,10 +66,9 @@ spec:
             canton.participants.participant.crypto {
               provider = kms
               kms = {
-                type = {{ .Values.kms.type }}
-                location-id = {{ .Values.kms.locationId }}
-                project-id = {{ .Values.kms.projectId }}
-                key-ring-id = {{ .Values.kms.keyRingId }}
+                {{- range $key, $value := .Values.kms }}
+                {{ $key | kebabcase }} = {{ $value }}
+                {{- end }}
               }
             }
         {{- end }}

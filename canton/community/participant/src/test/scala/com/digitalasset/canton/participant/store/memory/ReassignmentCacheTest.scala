@@ -10,20 +10,20 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.protocol.reassignment.{
+  AssignmentData,
   IncompleteReassignmentData,
-  ReassignmentData,
+  UnassignmentData,
 }
 import com.digitalasset.canton.participant.store.ReassignmentStore.*
 import com.digitalasset.canton.participant.store.memory.ReassignmentCacheTest.HookReassignmentStore
 import com.digitalasset.canton.participant.store.{ReassignmentStore, ReassignmentStoreTest}
-import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.messages.DeliveredUnassignmentResult
 import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{Checked, CheckedT}
-import com.digitalasset.canton.{BaseTest, HasExecutorService, LfPartyId, RequestCounter}
+import com.digitalasset.canton.{BaseTest, HasExecutorService, LfPartyId}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -40,7 +40,7 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
       mediator1,
       targetSynchronizerId = targetSynchronizerId,
     )
-  private val toc = TimeOfChange(RequestCounter(0), CantonTimestamp.Epoch)
+  private val ts = CantonTimestamp.Epoch
 
   private def createStore: InMemoryReassignmentStore =
     new InMemoryReassignmentStore(targetSynchronizerId, loggerFactory)
@@ -50,7 +50,7 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
     val cache = new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)
 
     for {
-      _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+      _ <- valueOrFail(store.addUnassignmentData(reassignmentData).failOnShutdown)("add failed")
       _ <- valueOrFail(store.lookup(reassignment10).failOnShutdown)(
         "lookup did not find reassignment"
       )
@@ -69,20 +69,20 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
       val store = new HookReassignmentStore(backingStore)
       val cache = new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)
       for {
-        _ <- valueOrFail(store.addReassignment(reassignmentData))("add failed")
+        _ <- valueOrFail(store.addUnassignmentData(reassignmentData))("add failed")
         _ = store.preComplete { (reassignmentId, _) =>
           assert(reassignmentId == reassignment10)
           CheckedT(
             cache.lookup(reassignment10).value.failOnShutdown.map {
-              case Left(ReassignmentCompleted(`reassignment10`, `toc`)) => Checked.result(())
+              case Left(ReassignmentCompleted(`reassignment10`, toc)) => Checked.result(())
               case result => fail(s"Invalid lookup result $result")
             }
           )
         }
-        _ <- valueOrFail(cache.completeReassignment(reassignment10, toc))("first completion failed")
+        _ <- valueOrFail(cache.completeReassignment(reassignment10, ts))("first completion failed")
         storeLookup <- store.lookup(reassignment10).value
       } yield assert(
-        storeLookup == Left(ReassignmentCompleted(reassignment10, toc)),
+        storeLookup == Left(ReassignmentCompleted(reassignment10, ts)),
         s"reassignment is gone from store when completeReassignment finished",
       )
     }.failOnShutdown
@@ -92,7 +92,7 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
       val cache = new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)
 
       for {
-        missing <- cache.completeReassignment(reassignment10, toc).value.failOnShutdown
+        missing <- cache.completeReassignment(reassignment10, ts).value.failOnShutdown
       } yield {
         assert(missing == Checked.continue(UnknownReassignmentId(reassignment10)))
       }
@@ -102,32 +102,32 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
       val backingStore = createStore
       val store = new HookReassignmentStore(backingStore)
       val cache = new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)
-      val toc2 = TimeOfChange(RequestCounter(0), CantonTimestamp.ofEpochSecond(1))
-      val toc3 = TimeOfChange(RequestCounter(1), CantonTimestamp.Epoch)
+      val ts2 = CantonTimestamp.ofEpochSecond(2)
+      val ts3 = CantonTimestamp.ofEpochSecond(1)
 
       val promise = Promise[Checked[Nothing, ReassignmentStoreError, Unit]]()
 
       for {
-        _ <- valueOrFail(store.addReassignment(reassignmentData))("add failed").failOnShutdown
+        _ <- valueOrFail(store.addUnassignmentData(reassignmentData))("add failed").failOnShutdown
         _ = store.preComplete { (reassignmentId, _) =>
           assert(reassignmentId == reassignment10)
           promise.completeWith(
-            cache.completeReassignment(reassignment10, toc2).value.failOnShutdown
+            cache.completeReassignment(reassignment10, ts2).value.failOnShutdown
           )
           CheckedT.resultT(())
         }
-        _ <- valueOrFail(cache.completeReassignment(reassignment10, toc))(
+        _ <- valueOrFail(cache.completeReassignment(reassignment10, ts))(
           "first completion failed"
         ).failOnShutdown
-        complete3 <- cache.completeReassignment(reassignment10, toc3).value.failOnShutdown
+        complete3 <- cache.completeReassignment(reassignment10, ts3).value.failOnShutdown
         complete2 <- promise.future
       } yield {
         assert(
-          complete2 == Checked.continue(ReassignmentAlreadyCompleted(reassignment10, toc2)),
+          complete2 == Checked.continue(ReassignmentAlreadyCompleted(reassignment10, ts2)),
           s"second completion fails",
         )
         assert(
-          complete3 == Checked.continue(ReassignmentAlreadyCompleted(reassignment10, toc3)),
+          complete3 == Checked.continue(ReassignmentAlreadyCompleted(reassignment10, ts3)),
           "third completion refers back to first",
         )
       }
@@ -137,27 +137,27 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
       val backingStore = createStore
       val store = new HookReassignmentStore(backingStore)
       val cache = new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)
-      val toc2 = TimeOfChange(RequestCounter(0), CantonTimestamp.ofEpochSecond(1))
+      val ts2 = CantonTimestamp.ofEpochSecond(1)
 
       val promise = Promise[Checked[Nothing, ReassignmentStoreError, Unit]]()
 
       for {
-        _ <- valueOrFail(store.addReassignment(reassignmentData))("add failed")
-        _ <- valueOrFail(store.completeReassignment(reassignment10, toc2))(
+        _ <- valueOrFail(store.addUnassignmentData(reassignmentData))("add failed")
+        _ <- valueOrFail(store.completeReassignment(reassignment10, ts2))(
           "first completion failed"
         )
         _ = store.preComplete { (reassignmentId, _) =>
           assert(reassignmentId == reassignment10)
-          promise.completeWith(cache.completeReassignment(reassignment10, toc).value.failOnShutdown)
+          promise.completeWith(cache.completeReassignment(reassignment10, ts).value.failOnShutdown)
           CheckedT.resultT(())
         }
-        complete1 <- cache.completeReassignment(reassignment10, toc).value
+        complete1 <- cache.completeReassignment(reassignment10, ts).value
         complete2 <- FutureUnlessShutdown.outcomeF(promise.future)
       } yield {
         complete1.nonaborts.toList.toSet shouldBe Set(
-          ReassignmentAlreadyCompleted(reassignment10, toc)
+          ReassignmentAlreadyCompleted(reassignment10, ts)
         )
-        complete2 shouldBe Checked.continue(ReassignmentAlreadyCompleted(reassignment10, toc))
+        complete2 shouldBe Checked.continue(ReassignmentAlreadyCompleted(reassignment10, ts))
       }
     }.failOnShutdown
 
@@ -169,35 +169,34 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
       val promise = Promise[Assertion]()
 
       for {
-        _ <- valueOrFail(store.addReassignment(reassignmentData))("add failed")
+        _ <- valueOrFail(store.addUnassignmentData(reassignmentData))("add failed")
         _ = store.preComplete { (reassignmentId, _) =>
           assert(reassignmentId == reassignment10)
           val f = for {
-            _ <- valueOrFail(cache.completeReassignment(reassignment10, toc))(
+            _ <- valueOrFail(cache.completeReassignment(reassignment10, ts))(
               "second completion should be idempotent"
             )
             lookup <- store.lookup(reassignment10).value
-          } yield lookup shouldBe Left(ReassignmentCompleted(reassignment10, toc))
+          } yield lookup shouldBe Left(ReassignmentCompleted(reassignment10, ts))
           promise.completeWith(f.failOnShutdown)
           CheckedT.resultT(())
         }
-        _ <- valueOrFail(cache.completeReassignment(reassignment10, toc))(
+        _ <- valueOrFail(cache.completeReassignment(reassignment10, ts))(
           "first completion succeeds"
         )
         _ <- FutureUnlessShutdown.outcomeF(promise.future)
       } yield succeed
     }.failOnShutdown
 
-    val earlierTimestampedCompletion = toc
-    val laterTimestampedCompletion =
-      TimeOfChange(RequestCounter(2), CantonTimestamp.ofEpochSecond(2))
+    val earlierTimestampedCompletion = ts
+    val laterTimestampedCompletion = CantonTimestamp.ofEpochSecond(2)
 
     "store the first completing request" in {
       val store = createStore
       val cache = new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)
 
       for {
-        _ <- valueOrFail(store.addReassignment(reassignmentData))("add failed")
+        _ <- valueOrFail(store.addUnassignmentData(reassignmentData))("add failed")
         _ <- valueOrFail(cache.completeReassignment(reassignment10, laterTimestampedCompletion))(
           "first completion fails"
         )
@@ -221,28 +220,26 @@ class ReassignmentCacheTest extends AsyncWordSpec with BaseTest with HasExecutor
           executorService
         )
 
-      val timestamps = (1L to 100L).toList.map { ts =>
-        TimeOfChange(RequestCounter(ts), CantonTimestamp.ofEpochSecond(ts))
-      }
+      val timestamps = (1L to 100L).toList.map(CantonTimestamp.ofEpochSecond)
 
-      def completeAndLookup(time: TimeOfChange): Future[
+      def completeAndLookup(ts: CantonTimestamp): Future[
         (
             Checked[Nothing, ReassignmentStoreError, Unit],
-            Either[ReassignmentLookupError, ReassignmentData],
+            Either[ReassignmentLookupError, UnassignmentData],
         )
       ] =
         for {
-          complete <- cache.completeReassignment(reassignment10, time).value.failOnShutdown
+          complete <- cache.completeReassignment(reassignment10, ts).value.failOnShutdown
           lookup <- (store.lookup(reassignment10)(traceContext)).value.failOnShutdown
         } yield {
           complete -> lookup
         }
 
       for {
-        _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+        _ <- valueOrFail(store.addUnassignmentData(reassignmentData).failOnShutdown)("add failed")
 
-        resultFutures = (timestamps).map { time =>
-          completeAndLookup(time)
+        resultFutures = (timestamps).map { ts =>
+          completeAndLookup(ts)
         }
         results <- resultFutures.sequence
 
@@ -266,22 +263,22 @@ object ReassignmentCacheTest extends BaseTest {
       extends ReassignmentStore {
 
     private[this] val preCompleteHook: AtomicReference[
-      (ReassignmentId, TimeOfChange) => CheckedT[Future, Nothing, ReassignmentStoreError, Unit]
+      (ReassignmentId, CantonTimestamp) => CheckedT[Future, Nothing, ReassignmentStoreError, Unit]
     ] =
       new AtomicReference(HookReassignmentStore.preCompleteNoHook)
 
     def preComplete(
         hook: (
             ReassignmentId,
-            TimeOfChange,
+            CantonTimestamp,
         ) => CheckedT[Future, Nothing, ReassignmentStoreError, Unit]
     ): Unit =
       preCompleteHook.set(hook)
 
-    override def addReassignment(reassignmentData: ReassignmentData)(implicit
+    override def addUnassignmentData(reassignmentData: UnassignmentData)(implicit
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] =
-      baseStore.addReassignment(reassignmentData)
+      baseStore.addUnassignmentData(reassignmentData)
 
     override def addUnassignmentResult(unassignmentResult: DeliveredUnassignmentResult)(implicit
         traceContext: TraceContext
@@ -289,7 +286,7 @@ object ReassignmentCacheTest extends BaseTest {
       baseStore.addUnassignmentResult(unassignmentResult)
 
     override def addReassignmentsOffsets(
-        offsets: Map[ReassignmentId, ReassignmentData.ReassignmentGlobalOffset]
+        offsets: Map[ReassignmentId, UnassignmentData.ReassignmentGlobalOffset]
     )(implicit
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] =
@@ -297,15 +294,15 @@ object ReassignmentCacheTest extends BaseTest {
 
     override def completeReassignment(
         reassignmentId: ReassignmentId,
-        timeOfCompletion: TimeOfChange,
+        tsCompletion: CantonTimestamp,
     )(implicit
         traceContext: TraceContext
     ): CheckedT[FutureUnlessShutdown, Nothing, ReassignmentStoreError, Unit] = {
       val hook = preCompleteHook.getAndSet(HookReassignmentStore.preCompleteNoHook)
-      hook(reassignmentId, timeOfCompletion)
+      hook(reassignmentId, tsCompletion)
         .mapK(FutureUnlessShutdown.outcomeK)
         .flatMap[Nothing, ReassignmentStoreError, Unit](_ =>
-          baseStore.completeReassignment(reassignmentId, timeOfCompletion)
+          baseStore.completeReassignment(reassignmentId, tsCompletion)
         )
     }
 
@@ -314,25 +311,22 @@ object ReassignmentCacheTest extends BaseTest {
     ): FutureUnlessShutdown[Unit] =
       baseStore.deleteReassignment(reassignmentId)
 
-    override def deleteCompletionsSince(criterionInclusive: RequestCounter)(implicit
+    override def deleteCompletionsSince(criterionInclusive: CantonTimestamp)(implicit
         traceContext: TraceContext
     ): FutureUnlessShutdown[Unit] =
       baseStore.deleteCompletionsSince(criterionInclusive)
 
-    override def find(
-        filterSource: Option[Source[SynchronizerId]],
-        filterTimestamp: Option[CantonTimestamp],
-        filterSubmitter: Option[LfPartyId],
-        limit: Int,
-    )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[ReassignmentData]] =
-      baseStore.find(filterSource, filterTimestamp, filterSubmitter, limit)
+    override def addAssignmentDataIfAbsent(assignmentData: AssignmentData)(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] =
+      baseStore.addAssignmentDataIfAbsent(assignmentData)
 
     override def findAfter(
         requestAfter: Option[(CantonTimestamp, Source[SynchronizerId])],
         limit: Int,
     )(implicit
         traceContext: TraceContext
-    ): FutureUnlessShutdown[Seq[ReassignmentData]] = baseStore.findAfter(requestAfter, limit)
+    ): FutureUnlessShutdown[Seq[UnassignmentData]] = baseStore.findAfter(requestAfter, limit)
 
     override def findIncomplete(
         sourceSynchronizer: Option[Source[SynchronizerId]],
@@ -349,7 +343,7 @@ object ReassignmentCacheTest extends BaseTest {
 
     override def lookup(reassignmentId: ReassignmentId)(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, ReassignmentLookupError, ReassignmentData] =
+    ): EitherT[FutureUnlessShutdown, ReassignmentLookupError, UnassignmentData] =
       baseStore.lookup(reassignmentId)
 
     override def findContractReassignmentId(
@@ -366,14 +360,19 @@ object ReassignmentCacheTest extends BaseTest {
         unassignmentTs,
         completionTs,
       )
+
+    override def findReassignmentEntry(reassignmentId: ReassignmentId)(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, UnknownReassignmentId, ReassignmentEntry] =
+      baseStore.findReassignmentEntry(reassignmentId)
   }
 
   object HookReassignmentStore {
     val preCompleteNoHook: (
         ReassignmentId,
-        TimeOfChange,
+        CantonTimestamp,
     ) => CheckedT[Future, Nothing, ReassignmentStoreError, Unit] =
-      (_: ReassignmentId, _: TimeOfChange) => CheckedT(Future.successful(Checked.result(())))
+      (_: ReassignmentId, _: CantonTimestamp) => CheckedT(Future.successful(Checked.result(())))
   }
 
   class PromiseHook[A](promise: Promise[A]) extends Promise[A] {

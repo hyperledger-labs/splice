@@ -18,7 +18,7 @@ import com.digitalasset.canton.synchronizer.mediator.{
   CommunityMediatorNodeConfig,
   RemoteMediatorConfig,
 }
-import com.digitalasset.canton.synchronizer.sequencing.config.{
+import com.digitalasset.canton.synchronizer.sequencer.config.{
   CommunitySequencerNodeConfig,
   RemoteSequencerConfig,
 }
@@ -74,29 +74,32 @@ object CantonCommunityConfig {
   )
   import pureconfig.generic.semiauto.*
   import CantonConfig.*
-  import ConfigReaders.*
-  import CantonConfig.ConfigReaders.Crypto.*
-  import BaseCantonConfig.Readers.*
 
-  implicit val memoryReader: ConfigReader[StorageConfig.Memory] =
-    deriveReader[StorageConfig.Memory]
+  import BaseCantonConfig.Readers.dbParamsReader
+
   implicit val h2Reader: ConfigReader[DbConfig.H2] =
     deriveReader[DbConfig.H2]
   implicit val postgresReader: ConfigReader[DbConfig.Postgres] =
     deriveReader[DbConfig.Postgres]
   implicit val dbConfigReader: ConfigReader[DbConfig] =
     deriveReader[DbConfig]
-  implicit val communityStorageConfigReader: ConfigReader[StorageConfig] =
-    deriveReader[StorageConfig]
-  // Implemented as a def so we can pass the ErrorLoggingContext to be used during parsing
-  @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
+
+  @nowarn("cat=unused")
   private implicit val cantonCommunityConfigReader: ConfigReader[CantonCommunityConfig] = {
+    import ConfigReaders.*
+    import DeprecatedConfigUtils.*
+    import CantonConfig.ConfigReaders.Crypto.*
+    import BaseCantonConfig.Readers.*
     implicit val driverKmsConfigReader: ConfigReader[CommunityKmsConfig.Driver] =
       deriveReader[CommunityKmsConfig.Driver]
     implicit val kmsConfigReader: ConfigReader[CommunityKmsConfig] =
       deriveReader[CommunityKmsConfig]
     implicit val communityCryptoReader: ConfigReader[CommunityCryptoConfig] =
       deriveReader[CommunityCryptoConfig]
+    implicit val memoryReader: ConfigReader[StorageConfig.Memory] =
+      deriveReader[StorageConfig.Memory]
+    implicit val communityStorageConfigReader: ConfigReader[StorageConfig] =
+      deriveReader[StorageConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
       deriveReader[CommunityParticipantConfig]
 

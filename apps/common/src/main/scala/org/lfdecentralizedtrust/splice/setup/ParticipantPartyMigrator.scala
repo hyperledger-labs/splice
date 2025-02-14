@@ -220,8 +220,8 @@ class ParticipantPartyMigrator(
         "dars_uploaded",
         "Required dars are uploaded",
         participantAdminConnection.listDars().map { dars =>
-          val availablesHases = dars.map(_.hash)
-          if (!requiredDars.forall(dar => availablesHases.contains(dar.darHash.toHexString)))
+          val availablePackageIds = dars.map(_.darId)
+          if (!requiredDars.forall(dar => availablePackageIds.contains(dar.packageId)))
             throw Status.FAILED_PRECONDITION
               .withDescription(
                 s"Required dars $requiredDars are not yet available"

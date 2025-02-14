@@ -42,12 +42,12 @@ final case class ActiveContract(
 
 }
 
-object ActiveContract extends HasProtocolVersionedCompanion[ActiveContract] {
+object ActiveContract extends VersioningCompanion[ActiveContract] {
 
   override def name: String = "ActiveContract"
 
-  override def supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v33)(v30.ActiveContract)(
+  override def versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ActiveContract)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
     )

@@ -30,24 +30,23 @@ import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.Future
 
-private[platform] trait LedgerDaoTransactionsReader {
-  def getFlatTransactions(
+private[platform] trait LedgerDaoUpdateReader {
+  def getUpdates(
       startInclusive: Offset,
       endInclusive: Offset,
-      filter: TemplatePartiesFilter,
-      eventProjectionProperties: EventProjectionProperties,
+      internalUpdateFormat: InternalUpdateFormat,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdatesResponse), NotUsed]
 
-  def lookupFlatTransactionById(
+  def lookupTransactionById(
       updateId: UpdateId,
-      requestingParties: Set[Party],
+      internalTransactionFormat: InternalTransactionFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]]
 
-  def lookupFlatTransactionByOffset(
+  def lookupTransactionByOffset(
       offset: Offset,
-      requestingParties: Set[Party],
+      internalTransactionFormat: InternalTransactionFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]]
 
   def getTransactionTrees(
@@ -113,7 +112,7 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
   /** Looks up the current ledger end */
   def lookupLedgerEnd()(implicit loggingContext: LoggingContextWithTrace): Future[Option[LedgerEnd]]
 
-  def transactionsReader: LedgerDaoTransactionsReader
+  def updateReader: LedgerDaoUpdateReader
 
   def contractsReader: LedgerDaoContractsReader
 
@@ -213,7 +212,6 @@ private[platform] trait LedgerWriteDaoForTests extends ReportsHealth {
       ledgerEffectiveTime: Timestamp,
       offset: Offset,
       transaction: CommittedTransaction,
-      hostedWitnesses: List[Party],
       recordTime: Timestamp,
   )(implicit
       loggingContext: LoggingContextWithTrace

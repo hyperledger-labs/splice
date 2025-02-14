@@ -44,9 +44,15 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const refetchInterval = useConfigPollInterval();
 
   interface JsonApiError {
-    status: number;
+    code?: string;
+    error?: string;
     errors?: string[];
+    status: number;
   }
+
+  const checkErrorStrings = (keywords: string[], error: string | undefined) => {
+    return keywords.some(k => error?.includes(k));
+  };
 
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -59,8 +65,12 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
           // We only retry certain JSON API errors. Retrying everything is more confusing than helpful
           // because that then also retries on invalid user input.
           const errResponse = error as JsonApiError;
+          const keywords = ['NOT_CONNECTED_TO_ANY_DOMAIN', 'NOT_CONNECTED_TO_DOMAIN'];
           const isDomainConnectionError =
-            errResponse.errors?.some(e => e.includes('NOT_CONNECTED_TO_ANY_DOMAIN')) || false;
+            errResponse.errors?.some(e => checkErrorStrings(keywords, e)) ||
+            checkErrorStrings(keywords, errResponse.error) ||
+            checkErrorStrings(keywords, errResponse.code) ||
+            false;
           const is404or409 = [404, 409].includes(errResponse.status);
 
           return (is404or409 || isDomainConnectionError) && failureCount < 10;

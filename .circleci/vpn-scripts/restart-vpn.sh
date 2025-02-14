@@ -21,6 +21,6 @@ echo "Setting VPN routes again"
 
 if docker network inspect onvpn >/dev/null 2>&1; then
   echo "Setting up docker network again"
-  docker network delete onvpn
+  docker network rm onvpn
   /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
 fi

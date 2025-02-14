@@ -206,7 +206,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transaction = transaction,
         updateId = updateId,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
-        hostedWitnesses = Nil,
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
         sequencerCounter = someSequencerCounter,
@@ -321,7 +320,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transaction = transaction,
         updateId = updateId,
         contractMetadata = Map.empty,
-        hostedWitnesses = Nil,
         synchronizerId = someSynchronizerId1,
         requestCounter = RequestCounter(100),
         sequencerCounter = SequencerCounter(110),
@@ -350,7 +348,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument = emptyArray,
           exercise_result = Some(emptyArray),
           exercise_actors = Set("signatory"),
-          exercise_child_node_ids = Vector.empty,
           exercise_last_descendant_node_id = exerciseNodeId.index,
           create_key_value_compression = compressionAlgorithmId,
           exercise_argument_compression = compressionAlgorithmId,
@@ -434,7 +431,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transaction = transaction,
         updateId = updateId,
         contractMetadata = Map.empty,
-        hostedWitnesses = Nil,
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
         sequencerCounter = someSequencerCounter,
@@ -463,7 +459,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument = emptyArray,
           exercise_result = Some(emptyArray),
           exercise_actors = Set("signatory"),
-          exercise_child_node_ids = Vector.empty,
           exercise_last_descendant_node_id = exerciseNodeId.index,
           create_key_value_compression = compressionAlgorithmId,
           exercise_argument_compression = compressionAlgorithmId,
@@ -475,6 +470,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
+          template_id = exerciseNode.templateId.toString,
           party_id = "signatory",
         ),
         DbDto.CommandCompletion(
@@ -504,291 +500,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           publication_time = 0,
           record_time = someRecordTime.toMicros,
           synchronizer_id = someSynchronizerId1.toProtoPrimitive,
-          event_sequential_id_first = 0,
-          event_sequential_id_last = 0,
-        ),
-      )
-    }
-
-    "handle TransactionAccepted (single non-consuming exercise node)" in {
-      val completionInfo = someCompletionInfo
-      val transactionMeta = someTransactionMeta
-      val builder = TxBuilder()
-      val exerciseNode = {
-        val createNode = builder.create(
-          id = builder.newCid,
-          templateId = "M:T",
-          argument = Value.ValueUnit,
-          signatories = List("signatory"),
-          observers = List("observer"),
-        )
-        builder.exercise(
-          contract = createNode,
-          choice = "someChoice",
-          consuming = false,
-          actingParties = Set("signatory"),
-          argument = Value.ValueUnit,
-          result = Some(Value.ValueUnit),
-          choiceObservers = Set.empty,
-          byKey = false,
-        )
-      }
-      val exerciseNodeId = builder.add(exerciseNode)
-      val transaction = builder.buildCommitted()
-      val update = state.Update.TransactionAccepted(
-        completionInfoO = Some(completionInfo),
-        transactionMeta = transactionMeta,
-        transaction = transaction,
-        transactionId = transactionId,
-        recordTime = someRecordTime,
-        divulgedContracts = List.empty,
-        blindingInfoO = None,
-        contractMetadata = Map.empty,
-        hostedWitnesses = Nil,
-      )
-      val dtos = updateToDtos(update, multiDomainEnabled = true)
-
-      dtos should contain theSameElementsInOrderAs List(
-        DbDto.EventExercise(
-          consuming = false,
-          event_offset = Some(someOffset.toHexString),
-          transaction_id = Some(update.transactionId),
-          ledger_effective_time = Some(transactionMeta.ledgerEffectiveTime.micros),
-          command_id = Some(completionInfo.commandId),
-          workflow_id = transactionMeta.workflowId,
-          application_id = Some(completionInfo.applicationId),
-          submitters = Some(completionInfo.actAs.toSet),
-          node_index = Some(exerciseNodeId.index),
-          event_id = Some(EventId(update.transactionId, exerciseNodeId).toLedgerString),
-          contract_id = exerciseNode.targetCoid.coid,
-          template_id = Some(exerciseNode.templateId.toString),
-          flat_event_witnesses = Set.empty, // stakeholders
-          tree_event_witnesses = Set("signatory"), // informees
-          create_key_value = None,
-          exercise_choice = Some(exerciseNode.choiceId),
-          exercise_argument = Some(emptyArray),
-          exercise_result = Some(emptyArray),
-          exercise_actors = Some(Set("signatory")),
-          exercise_child_event_ids = Some(Vector.empty),
-          create_key_value_compression = compressionAlgorithmId,
-          exercise_argument_compression = compressionAlgorithmId,
-          exercise_result_compression = compressionAlgorithmId,
-          event_sequential_id = 0,
-          domain_id = Some(someDomainId1.toProtoPrimitive),
-        ),
-        DbDto.IdFilterNonConsumingInformee(
-          event_sequential_id = 0,
-          party_id = "signatory",
-        ),
-        DbDto.CommandCompletion(
-          completion_offset = someOffset.toHexString,
-          record_time = update.recordTime.micros,
-          application_id = completionInfo.applicationId,
-          submitters = completionInfo.actAs.toSet,
-          command_id = completionInfo.commandId,
-          transaction_id = Some(update.transactionId),
-          rejection_status_code = None,
-          rejection_status_message = None,
-          rejection_status_details = None,
-          submission_id = completionInfo.submissionId,
-          deduplication_offset = None,
-          deduplication_duration_nanos = None,
-          deduplication_duration_seconds = None,
-          deduplication_start = None,
-          domain_id = Some(someDomainId1.toProtoPrimitive),
-        ),
-        DbDto.TransactionMeta(
-          transaction_id = transactionId,
-          event_offset = someOffset.toHexString,
-          event_sequential_id_first = 0,
-          event_sequential_id_last = 0,
-        ),
-      )
-    }
-
-    "handle TransactionAccepted (nested exercise nodes) single-domain" in {
-      // Previous transaction
-      // └─ #1 Create
-      // Transaction
-      // └─ #2 Exercise (choice A)
-      //    ├─ #3 Exercise (choice B)
-      //    └─ #4 Exercise (choice C)
-      val completionInfo = someCompletionInfo
-      val transactionMeta = someTransactionMeta
-      val builder = TxBuilder()
-      val createNode = builder.create(
-        id = builder.newCid,
-        templateId = "M:T",
-        argument = Value.ValueUnit,
-        signatories = List("signatory"),
-        observers = List("observer"),
-      )
-      val exerciseNodeA = builder.exercise(
-        contract = createNode,
-        choice = "A",
-        consuming = false,
-        actingParties = Set("signatory"),
-        argument = Value.ValueUnit,
-        result = Some(Value.ValueUnit),
-        choiceObservers = Set.empty,
-        byKey = false,
-      )
-      val exerciseNodeB = builder.exercise(
-        contract = createNode,
-        choice = "B",
-        consuming = false,
-        actingParties = Set("signatory"),
-        argument = Value.ValueUnit,
-        result = Some(Value.ValueUnit),
-        choiceObservers = Set.empty,
-        byKey = false,
-      )
-      val exerciseNodeC = builder.exercise(
-        contract = createNode,
-        choice = "C",
-        consuming = false,
-        actingParties = Set("signatory"),
-        argument = Value.ValueUnit,
-        result = Some(Value.ValueUnit),
-        choiceObservers = Set.empty,
-        byKey = false,
-      )
-      val exerciseNodeAId = builder.add(exerciseNodeA)
-      val exerciseNodeBId = builder.add(exerciseNodeB, exerciseNodeAId)
-      val exerciseNodeCId = builder.add(exerciseNodeC, exerciseNodeAId)
-      val transaction = builder.buildCommitted()
-      val update = state.Update.TransactionAccepted(
-        completionInfoO = Some(completionInfo),
-        transactionMeta = transactionMeta,
-        transaction = transaction,
-        transactionId = transactionId,
-        recordTime = someRecordTime,
-        divulgedContracts = List.empty,
-        blindingInfoO = None,
-        contractMetadata = Map.empty,
-        hostedWitnesses = Nil,
-      )
-      val dtos = updateToDtos(update, multiDomainEnabled = true)
-
-      dtos should contain theSameElementsInOrderAs List(
-        DbDto.EventExercise(
-          consuming = false,
-          event_offset = Some(someOffset.toHexString),
-          transaction_id = Some(update.transactionId),
-          ledger_effective_time = Some(transactionMeta.ledgerEffectiveTime.micros),
-          command_id = Some(completionInfo.commandId),
-          workflow_id = transactionMeta.workflowId,
-          application_id = Some(completionInfo.applicationId),
-          submitters = Some(completionInfo.actAs.toSet),
-          node_index = Some(exerciseNodeAId.index),
-          event_id = Some(EventId(update.transactionId, exerciseNodeAId).toLedgerString),
-          contract_id = exerciseNodeA.targetCoid.coid,
-          template_id = Some(exerciseNodeA.templateId.toString),
-          flat_event_witnesses = Set.empty, // stakeholders
-          tree_event_witnesses = Set("signatory"), // informees
-          create_key_value = None,
-          exercise_choice = Some(exerciseNodeA.choiceId),
-          exercise_argument = Some(emptyArray),
-          exercise_result = Some(emptyArray),
-          exercise_actors = Some(Set("signatory")),
-          exercise_child_event_ids = Some(
-            Vector(
-              EventId(update.transactionId, exerciseNodeBId).toLedgerString,
-              EventId(update.transactionId, exerciseNodeCId).toLedgerString,
-            )
-          ),
-          create_key_value_compression = compressionAlgorithmId,
-          exercise_argument_compression = compressionAlgorithmId,
-          exercise_result_compression = compressionAlgorithmId,
-          event_sequential_id = 0,
-          domain_id = Some(someDomainId1.toProtoPrimitive),
-        ),
-        DbDto.IdFilterNonConsumingInformee(
-          event_sequential_id = 0,
-          party_id = "signatory",
-        ),
-        DbDto.EventExercise(
-          consuming = false,
-          event_offset = Some(someOffset.toHexString),
-          transaction_id = Some(update.transactionId),
-          ledger_effective_time = Some(transactionMeta.ledgerEffectiveTime.micros),
-          command_id = Some(completionInfo.commandId),
-          workflow_id = transactionMeta.workflowId,
-          application_id = Some(completionInfo.applicationId),
-          submitters = Some(completionInfo.actAs.toSet),
-          node_index = Some(exerciseNodeBId.index),
-          event_id = Some(EventId(update.transactionId, exerciseNodeBId).toLedgerString),
-          contract_id = exerciseNodeB.targetCoid.coid,
-          template_id = Some(exerciseNodeB.templateId.toString),
-          flat_event_witnesses = Set.empty, // stakeholders
-          tree_event_witnesses = Set("signatory"), // informees
-          create_key_value = None,
-          exercise_choice = Some(exerciseNodeB.choiceId),
-          exercise_argument = Some(emptyArray),
-          exercise_result = Some(emptyArray),
-          exercise_actors = Some(Set("signatory")),
-          exercise_child_event_ids = Some(Vector.empty),
-          create_key_value_compression = compressionAlgorithmId,
-          exercise_argument_compression = compressionAlgorithmId,
-          exercise_result_compression = compressionAlgorithmId,
-          event_sequential_id = 0,
-          domain_id = Some(someDomainId1.toProtoPrimitive),
-        ),
-        DbDto.IdFilterNonConsumingInformee(
-          event_sequential_id = 0,
-          party_id = "signatory",
-        ),
-        DbDto.EventExercise(
-          consuming = false,
-          event_offset = Some(someOffset.toHexString),
-          transaction_id = Some(update.transactionId),
-          ledger_effective_time = Some(transactionMeta.ledgerEffectiveTime.micros),
-          command_id = Some(completionInfo.commandId),
-          workflow_id = transactionMeta.workflowId,
-          application_id = Some(completionInfo.applicationId),
-          submitters = Some(completionInfo.actAs.toSet),
-          node_index = Some(exerciseNodeCId.index),
-          event_id = Some(EventId(update.transactionId, exerciseNodeCId).toLedgerString),
-          contract_id = exerciseNodeC.targetCoid.coid,
-          template_id = Some(exerciseNodeC.templateId.toString),
-          flat_event_witnesses = Set.empty, // stakeholders
-          tree_event_witnesses = Set("signatory"), // informees
-          create_key_value = None,
-          exercise_choice = Some(exerciseNodeC.choiceId),
-          exercise_argument = Some(emptyArray),
-          exercise_result = Some(emptyArray),
-          exercise_actors = Some(Set("signatory")),
-          exercise_child_event_ids = Some(Vector.empty),
-          create_key_value_compression = compressionAlgorithmId,
-          exercise_argument_compression = compressionAlgorithmId,
-          exercise_result_compression = compressionAlgorithmId,
-          event_sequential_id = 0,
-          domain_id = Some(someDomainId1.toProtoPrimitive),
-        ),
-        DbDto.IdFilterNonConsumingInformee(
-          event_sequential_id = 0,
-          party_id = "signatory",
-        ),
-        DbDto.CommandCompletion(
-          completion_offset = someOffset.toHexString,
-          record_time = update.recordTime.micros,
-          application_id = completionInfo.applicationId,
-          submitters = completionInfo.actAs.toSet,
-          command_id = completionInfo.commandId,
-          transaction_id = Some(update.transactionId),
-          rejection_status_code = None,
-          rejection_status_message = None,
-          rejection_status_details = None,
-          submission_id = completionInfo.submissionId,
-          deduplication_offset = None,
-          deduplication_duration_nanos = None,
-          deduplication_duration_seconds = None,
-          deduplication_start = None,
-          domain_id = Some(someDomainId1.toProtoPrimitive),
-        ),
-        DbDto.TransactionMeta(
-          transaction_id = transactionId,
-          event_offset = someOffset.toHexString,
           event_sequential_id_first = 0,
           event_sequential_id_last = 0,
         ),
@@ -864,7 +575,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transaction = transaction,
         updateId = updateId,
         contractMetadata = Map.empty,
-        hostedWitnesses = Nil,
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
         sequencerCounter = someSequencerCounter,
@@ -893,10 +603,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument = emptyArray,
           exercise_result = Some(emptyArray),
           exercise_actors = Set("signatory"),
-          exercise_child_node_ids = Vector(
-            exerciseNodeBId.index,
-            exerciseNodeCId.index,
-          ),
           exercise_last_descendant_node_id = exerciseNodeDId.index,
           create_key_value_compression = compressionAlgorithmId,
           exercise_argument_compression = compressionAlgorithmId,
@@ -908,6 +614,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
+          template_id = exerciseNodeA.templateId.toString,
           party_id = "signatory",
         ),
         DbDto.EventExercise(
@@ -930,7 +637,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument = emptyArray,
           exercise_result = Some(emptyArray),
           exercise_actors = Set("signatory"),
-          exercise_child_node_ids = Vector.empty,
           exercise_last_descendant_node_id = exerciseNodeBId.index,
           create_key_value_compression = compressionAlgorithmId,
           exercise_argument_compression = compressionAlgorithmId,
@@ -942,6 +648,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
+          template_id = exerciseNodeB.templateId.toString,
           party_id = "signatory",
         ),
         DbDto.EventExercise(
@@ -964,7 +671,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument = emptyArray,
           exercise_result = Some(emptyArray),
           exercise_actors = Set("signatory"),
-          exercise_child_node_ids = Vector(exerciseNodeDId.index),
           exercise_last_descendant_node_id = exerciseNodeDId.index,
           create_key_value_compression = compressionAlgorithmId,
           exercise_argument_compression = compressionAlgorithmId,
@@ -976,6 +682,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
+          template_id = exerciseNodeC.templateId.toString,
           party_id = "signatory",
         ),
         DbDto.EventExercise(
@@ -998,7 +705,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument = emptyArray,
           exercise_result = Some(emptyArray),
           exercise_actors = Set("signatory"),
-          exercise_child_node_ids = Vector.empty,
           exercise_last_descendant_node_id = exerciseNodeDId.index,
           create_key_value_compression = compressionAlgorithmId,
           exercise_argument_compression = compressionAlgorithmId,
@@ -1010,6 +716,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
+          template_id = exerciseNodeD.templateId.toString,
           party_id = "signatory",
         ),
         DbDto.CommandCompletion(
@@ -1083,7 +790,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transactionMeta = transactionMeta,
         transaction = transaction,
         updateId = updateId,
-        hostedWitnesses = Nil,
         contractMetadata = Map.empty,
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
@@ -1159,7 +865,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transactionMeta = transactionMeta,
         transaction = transaction,
         updateId = updateId,
-        hostedWitnesses = Nil,
         contractMetadata = Map.empty,
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
@@ -1189,7 +894,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument = emptyArray,
           exercise_result = Some(emptyArray),
           exercise_actors = Set("signatory"),
-          exercise_child_node_ids = Vector.empty,
           exercise_last_descendant_node_id = exerciseNodeId.index,
           create_key_value_compression = compressionAlgorithmId,
           exercise_argument_compression = compressionAlgorithmId,
@@ -1211,6 +915,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         ),
         DbDto.IdFilterConsumingNonStakeholderInformee(
           event_sequential_id = 0,
+          template_id = exerciseNode.templateId.toString,
           party_id = "divulgee",
         ),
         DbDto.CommandCompletion(
@@ -1279,7 +984,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transactionMeta = transactionMeta,
         transaction = transaction,
         updateId = updateId,
-        hostedWitnesses = Nil,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
@@ -1341,7 +1045,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         exercise_argument = emptyArray,
         exercise_result = Some(emptyArray),
         exercise_actors = Set("signatory"),
-        exercise_child_node_ids = Vector.empty,
         exercise_last_descendant_node_id = exerciseNodeId.index,
         create_key_value_compression = compressionAlgorithmId,
         exercise_argument_compression = compressionAlgorithmId,
@@ -1363,6 +1066,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
       )
       dtos(6) shouldEqual DbDto.IdFilterConsumingNonStakeholderInformee(
         event_sequential_id = 0,
+        template_id = exerciseNode.templateId.toString,
         party_id = "divulgee",
       )
       dtos(7) shouldEqual DbDto.CommandCompletion(
@@ -1434,7 +1138,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transactionMeta = transactionMeta,
         transaction = transaction,
         updateId = updateId,
-        hostedWitnesses = Nil,
         contractMetadata = Map.empty,
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
@@ -1497,7 +1200,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         transactionMeta = transactionMeta,
         transaction = transaction,
         updateId = Ref.TransactionId.assertFromString("UpdateId"),
-        hostedWitnesses = Nil,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
         synchronizerId = someSynchronizerId1,
         requestCounter = someRequestCounter,
@@ -1637,7 +1339,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
             transactionMeta = transactionMeta,
             transaction = transaction,
             updateId = updateId,
-            hostedWitnesses = Nil,
             contractMetadata = Map(contractId -> someContractDriverMetadata),
             synchronizerId = someSynchronizerId1,
             requestCounter = someRequestCounter,
@@ -1735,7 +1436,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           targetSynchronizer = Target(SynchronizerId.tryFromString("x::synchronizer2")),
           submitter = Option(someParty),
           reassignmentCounter = 1500L,
-          hostedStakeholders = Nil,
           unassignId = CantonTimestamp.assertFromLong(1000000000),
           isReassigningParticipant = true,
         ),
@@ -1840,7 +1540,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           targetSynchronizer = Target(SynchronizerId.tryFromString("x::synchronizer2")),
           submitter = Option(someParty),
           reassignmentCounter = 1500L,
-          hostedStakeholders = Nil,
           unassignId = CantonTimestamp.assertFromLong(1000000000),
           isReassigningParticipant = true,
         ),

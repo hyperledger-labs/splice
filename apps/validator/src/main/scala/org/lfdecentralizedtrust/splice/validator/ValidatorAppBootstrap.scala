@@ -36,7 +36,7 @@ class ValidatorAppBootstrap(
     val validatorAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: ValidatorAppMetrics,
+    override val metrics: ValidatorAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,

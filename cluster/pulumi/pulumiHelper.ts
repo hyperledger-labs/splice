@@ -3,6 +3,7 @@ import {
   mustInstallSplitwell,
   mustInstallValidator1,
 } from 'splice-pulumi-common-validator/src/validators';
+import { runForAllMigrations } from 'sv-canton-pulumi-deployment/pulumi';
 
 import {
   awaitAllOrThrowAllExceptions,
@@ -59,6 +60,9 @@ export async function runStacksRefresh() {
   operations.push(refreshOperation(validatorRunbookStack, abortController));
   const deploymentStack = await stack('deployment', 'deployment', true, {});
   operations.push(refreshOperation(deploymentStack, abortController));
+  await runForAllMigrations(stack => {
+    return refreshStack(stack, abortController);
+  }, false);
   await awaitAllOrThrowAllExceptions(operations);
 }
 

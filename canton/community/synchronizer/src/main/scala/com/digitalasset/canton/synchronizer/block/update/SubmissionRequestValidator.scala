@@ -11,7 +11,7 @@ import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.SequencerCounter
-import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SynchronizerSyncCryptoClient}
+import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.{BaseAlarm, BaseCantonError}
@@ -21,15 +21,15 @@ import com.digitalasset.canton.sequencing.GroupAddressResolver
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.*
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.InFlightAggregation.AggregationBySender
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.Sequencer.{
+import com.digitalasset.canton.synchronizer.sequencer.*
+import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.{
   SignedOrderingRequest,
   SignedOrderingRequestOps,
 }
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.errors.SequencerError
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.store.SequencerMemberValidator
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.traffic.SequencerRateLimitManager
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
+import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
+import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -46,7 +46,7 @@ import SubmissionRequestValidator.*
 private[update] final class SubmissionRequestValidator(
     synchronizerId: SynchronizerId,
     protocolVersion: ProtocolVersion,
-    synchronizerSyncCryptoApi: SynchronizerSyncCryptoClient,
+    synchronizerSyncCryptoApi: SynchronizerCryptoClient,
     sequencerId: SequencerId,
     rateLimitManager: SequencerRateLimitManager,
     override val loggerFactory: NamedLoggerFactory,

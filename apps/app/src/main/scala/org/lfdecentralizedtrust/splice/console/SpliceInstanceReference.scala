@@ -36,9 +36,9 @@ import com.digitalasset.canton.console.{
   RemoteSequencerReference,
 }
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.synchronizer.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.NodeIdentity
 
 import java.io.File

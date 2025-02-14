@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.sv.config.SvSynchronizerNodeConfig
+import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvSynchronizerNodeConfig}
 
 import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor
@@ -26,6 +26,7 @@ final class ExtraSynchronizerNode(
     val parameters: SynchronizerParametersConfig,
     val sequencerPublicApi: ClientConfig,
     override val sequencerExternalPublicUrl: String,
+    override val sequencerConfig: SequencerConfig,
     override val sequencerAvailabilityDelay: Duration,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
@@ -34,6 +35,7 @@ final class ExtraSynchronizerNode(
       mediatorAdminConnection,
       sequencerExternalPublicUrl,
       sequencerAvailabilityDelay,
+      sequencerConfig,
     )
     with FlagCloseable
     with NamedLogging {
@@ -46,6 +48,7 @@ final class ExtraSynchronizerNode(
 object ExtraSynchronizerNode {
   def fromConfig(
       conf: SvSynchronizerNodeConfig,
+      cometbftConfig: Option[CometBftConfig],
       loggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
       grpcClientMetrics: GrpcClientMetrics,
@@ -71,6 +74,7 @@ object ExtraSynchronizerNode {
       conf.parameters,
       conf.sequencer.internalApi,
       conf.sequencer.externalPublicApiUrl,
+      SequencerConfig.fromConfig(conf.sequencer, cometbftConfig),
       conf.sequencer.sequencerAvailabilityDelay.asJava,
       loggerFactory,
       retryProvider.timeouts,

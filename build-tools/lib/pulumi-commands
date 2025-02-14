@@ -1,4 +1,3 @@
-# -*- shell-script -*-
 
 ###
 
@@ -574,4 +573,11 @@ subcommand_whitelist[pulumi_cancel_canton]="Cancel the pulumi operations on sv-c
 function subcmd_pulumi_cancel_canton() {
   _info "Canceling sv-canton stacks"
   _pulumi_automation_run_cancel "sv-canton"
+}
+
+subcommand_whitelist[pulumi_refresh_automation]="Refresh stacks managed through automation"
+
+function subcmd_pulumi_refresh_automation() {
+  _info "Refreshing stacks"
+  _pulumi_automation_run_refresh
 }

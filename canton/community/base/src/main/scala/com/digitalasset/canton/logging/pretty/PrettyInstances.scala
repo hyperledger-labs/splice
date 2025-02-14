@@ -34,10 +34,10 @@ import slick.util.{DumpInfo, Dumpable}
 
 import java.lang.Long as JLong
 import java.net.URI
-import java.time.{Duration as JDuration, Instant}
+import java.time.{Instant, Duration as JDuration}
 import java.util.UUID
 import scala.annotation.nowarn
-import scala.concurrent.duration.{Duration}
+import scala.concurrent.duration.Duration
 
 /** Collects instances of [[Pretty]] for common types.
   */
