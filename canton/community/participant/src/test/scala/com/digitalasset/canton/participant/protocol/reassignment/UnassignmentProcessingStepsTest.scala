@@ -19,7 +19,7 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.UnassignmentViewType
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.{DefaultPromiseUnlessShutdownFactory, FutureUnlessShutdown}
 import com.digitalasset.canton.participant.admin.PackageDependencyResolver
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.{LedgerApiIndexer, LedgerApiStore}
@@ -48,9 +48,9 @@ import com.digitalasset.canton.participant.protocol.validation.{
   AuthenticationValidator,
 }
 import com.digitalasset.canton.participant.protocol.{
+  ContractAuthenticator,
   EngineController,
   ProcessingStartingPoints,
-  SerializableContractAuthenticator,
 }
 import com.digitalasset.canton.participant.store.memory.*
 import com.digitalasset.canton.participant.store.{
@@ -183,6 +183,7 @@ final class UnassignmentProcessingStepsTest
       persistentState,
       ledgerApiIndexer,
       contractStore,
+      new DefaultPromiseUnlessShutdownFactory(timeouts, loggerFactory),
       ProcessingStartingPoints.default,
       ParticipantTestMetrics.synchronizer,
       exitOnFatalFailures = true,
@@ -290,7 +291,7 @@ final class UnassignmentProcessingStepsTest
       reassignmentCoordination,
       seedGenerator,
       Source(defaultStaticSynchronizerParameters),
-      SerializableContractAuthenticator(crypto.pureCrypto),
+      ContractAuthenticator(crypto.pureCrypto),
       Source(testedProtocolVersion),
       loggerFactory,
     )(executorService)
@@ -833,7 +834,6 @@ final class UnassignmentProcessingStepsTest
           RequestId(CantonTimestamp.Epoch),
           rootHash,
           Verdict.Approve(testedProtocolVersion),
-          Set(),
           testedProtocolVersion,
         )
 

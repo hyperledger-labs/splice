@@ -312,7 +312,6 @@ object SequentialWriteDaoSpec {
     exercise_argument = Array.empty,
     exercise_result = None,
     exercise_actors = Set.empty,
-    exercise_child_node_ids = Vector.empty,
     exercise_last_descendant_node_id = 3,
     create_key_value_compression = None,
     exercise_argument_compression = None,
@@ -350,7 +349,7 @@ object SequentialWriteDaoSpec {
     }
 
   private val dbDtoToStringsForInterningFixture: Iterable[DbDto] => DomainStringIterators = {
-    case iterable if iterable.size == 5 =>
+    case iterable if iterable.sizeIs == 5 =>
       new DomainStringIterators(
         Iterator.empty,
         List("1").iterator,

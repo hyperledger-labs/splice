@@ -43,7 +43,7 @@ class DsoTxLogParser(
         exercised match {
           case DsoRulesCloseVoteRequest(node) =>
             State.fromCloseVoteRequest(node)
-          case _ => parseTrees(tree, synchronizerId, exercised.getChildNodeIds.asScala.toList)
+          case _ => parseTrees(tree, synchronizerId, tree.getChildNodeIds(exercised).asScala.toList)
         }
 
       case _: CreatedEvent => State.empty

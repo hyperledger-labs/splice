@@ -94,7 +94,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
       loggerFactory,
       parameters.processingTimeouts,
       futureSupervisor,
-      nodeMetrics.metricsFactory,
+      nodeMetrics.openTelemetryMetricsFactory,
     )
 
   override val timeouts = parameters.processingTimeouts

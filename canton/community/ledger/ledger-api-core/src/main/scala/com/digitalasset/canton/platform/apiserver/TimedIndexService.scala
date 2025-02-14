@@ -15,11 +15,12 @@ import com.daml.ledger.api.v2.update_service.{
 import com.daml.metrics.Timed
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.health.HealthStatus
-import com.digitalasset.canton.ledger.api.{TransactionFilter, UpdateId}
+import com.digitalasset.canton.ledger.api.{EventFormat, UpdateFormat, UpdateId}
 import com.digitalasset.canton.ledger.participant.state.index.*
 import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ReportData
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.InternalTransactionFormat
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{ApplicationId, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -47,35 +48,33 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
       delegate.getCompletions(begin, applicationId, parties),
     )
 
-  override def transactions(
+  override def updates(
       begin: Option[Offset],
       endAt: Option[Offset],
-      filter: TransactionFilter,
-      verbose: Boolean,
+      updateFormat: UpdateFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetUpdatesResponse, NotUsed] =
     Timed.source(
       metrics.services.index.transactions,
-      delegate.transactions(begin, endAt, filter, verbose),
+      delegate.updates(begin, endAt, updateFormat),
     )
 
   override def transactionTrees(
       begin: Option[Offset],
       endAt: Option[Offset],
-      filter: TransactionFilter,
-      verbose: Boolean,
+      eventFormat: EventFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetUpdateTreesResponse, NotUsed] =
     Timed.source(
       metrics.services.index.transactionTrees,
-      delegate.transactionTrees(begin, endAt, filter, verbose),
+      delegate.transactionTrees(begin, endAt, eventFormat),
     )
 
   override def getTransactionById(
       updateId: UpdateId,
-      requestingParties: Set[Ref.Party],
+      internalTransactionFormat: InternalTransactionFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]] =
     Timed.future(
       metrics.services.index.getTransactionById,
-      delegate.getTransactionById(updateId, requestingParties),
+      delegate.getTransactionById(updateId, internalTransactionFormat),
     )
 
   override def getTransactionTreeById(
@@ -89,11 +88,11 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
 
   def getTransactionByOffset(
       offset: Offset,
-      requestingParties: Set[Ref.Party],
+      internalTransactionFormat: InternalTransactionFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]] =
     Timed.future(
       metrics.services.index.getTransactionByOffset,
-      delegate.getTransactionByOffset(offset, requestingParties),
+      delegate.getTransactionByOffset(offset, internalTransactionFormat),
     )
 
   def getTransactionTreeByOffset(
@@ -106,13 +105,12 @@ final class TimedIndexService(delegate: IndexService, metrics: LedgerApiServerMe
     )
 
   override def getActiveContracts(
-      filter: TransactionFilter,
-      verbose: Boolean,
+      filter: EventFormat,
       activeAt: Option[Offset],
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetActiveContractsResponse, NotUsed] =
     Timed.source(
       metrics.services.index.getActiveContracts,
-      delegate.getActiveContracts(filter, verbose, activeAt),
+      delegate.getActiveContracts(filter, activeAt),
     )
 
   override def lookupActiveContract(

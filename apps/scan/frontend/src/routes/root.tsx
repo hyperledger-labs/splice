@@ -60,7 +60,7 @@ const Root: React.FC = () => {
           </div>
         </Grid>
 
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12} lg={6} data-testid="circulating-supply-container">
           <TotalAmuletBalance />
         </Grid>
 

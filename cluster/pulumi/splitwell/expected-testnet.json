@@ -421,7 +421,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -550,7 +550,7 @@
           }
         ]
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -631,7 +631,7 @@
           }
         ]
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "splitwell-participant-1",
     "provider": "",
@@ -761,7 +761,7 @@
           }
         ]
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -904,6 +904,18 @@
       "timeout": 300,
       "values": {
         "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-current.dar\"]\n}",
+        "additionalEnvVars": [
+          {
+            "name": "ONBOARDING_SECRET_ONLY_FOR_TESTING",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "secret",
+                "name": "splice-app-validator-onboarding-validator",
+                "optional": false
+              }
+            }
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [
           {
@@ -1016,7 +1028,7 @@
         "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

@@ -50,4 +50,4 @@ runs:
       id: setup_sbt
       uses: ./.github/actions/sbt/setup_sbt
       with:
-        cache_version: 1
+        cache_version: 2

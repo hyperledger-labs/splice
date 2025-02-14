@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.environment
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import com.digitalasset.daml.lf.language.Ast.PackageMetadata
 import org.lfdecentralizedtrust.splice.util.DarUtil
-import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashOps, HashPurpose}
 import com.google.protobuf.ByteString
 import scala.util.Using
 
@@ -85,6 +84,7 @@ object DarResources {
   val dsoGovernance_0_1_9 = DarResource("splice-dso-governance-0.1.9.dar")
   val dsoGovernance_0_1_10 = DarResource("splice-dso-governance-0.1.10.dar")
   val dsoGovernance_0_1_11 = DarResource("splice-dso-governance-0.1.11.dar")
+  val dsoGovernance_0_1_12 = DarResource("splice-dso-governance-0.1.12.dar")
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
@@ -100,7 +100,8 @@ object DarResources {
 //      dsoGovernance_0_1_8,
 //      dsoGovernance_0_1_9,
 //      dsoGovernance_0_1_10,
-      dsoGovernance_0_1_11
+//      dsoGovernance_0_1_11
+      dsoGovernance_0_1_12
     ),
   )
 
@@ -267,17 +268,11 @@ final case class PackageResource(
 final case class DarResource(
     path: String,
     packageId: String,
-    darHash: Hash,
     metadata: PackageMetadata,
     dependencyPackageIds: Set[String],
 )
 
 object DarResource {
-  private val hashOps = new HashOps {
-    override def defaultHashAlgorithm: com.digitalasset.canton.crypto.HashAlgorithm.Sha256.type =
-      HashAlgorithm.Sha256
-  }
-
   def apply(file: String): DarResource = {
     val input = getClass.getClassLoader.getResourceAsStream(file)
     if (input == null) {
@@ -289,11 +284,9 @@ object DarResource {
         val metadata = Using.resource(bytes.newInput())(DarUtil.readDar(file, _))
         (bytes, metadata)
       }
-    val hash = hashOps.digest(HashPurpose.DarIdentifier, darBytes)
     DarResource(
       file,
       dar.main._1,
-      hash,
       dar.main._2.metadata,
       dar.dependencies.map(_._1).toSet,
     )

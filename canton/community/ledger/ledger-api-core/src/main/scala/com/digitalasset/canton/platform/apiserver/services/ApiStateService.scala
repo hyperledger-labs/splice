@@ -10,13 +10,14 @@ import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.{GrpcApiService, StreamingServiceLifecycleManagement}
 import com.digitalasset.canton.ledger.api.validation.{
   FieldValidator,
+  FormatValidator,
   ParticipantOffsetValidator,
-  TransactionFilterValidator,
+  ValidationErrors,
 }
 import com.digitalasset.canton.ledger.participant.state.SyncService
 import com.digitalasset.canton.ledger.participant.state.index.{
   IndexActiveContractsService as ACSBackend,
-  IndexTransactionsService,
+  IndexUpdateService,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
@@ -40,7 +41,7 @@ import scala.concurrent.{ExecutionContext, Future}
 final class ApiStateService(
     acsService: ACSBackend,
     syncService: SyncService,
-    txService: IndexTransactionsService,
+    updateService: IndexUpdateService,
     metrics: LedgerApiServerMetrics,
     telemetry: Telemetry,
     val loggerFactory: NamedLoggerFactory,
@@ -62,9 +63,34 @@ final class ApiStateService(
     registerStream(responseObserver) {
 
       val result = for {
-        filters <- TransactionFilterValidator.validate(
-          request.getFilter
-        )
+        filters <- (request.filter, request.verbose, request.eventFormat) match {
+          case (Some(_), _, Some(_)) =>
+            Left(
+              ValidationErrors.invalidArgument(
+                s"Both filter/verbose and event_format is specified. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
+              )
+            )
+
+          case (Some(legacyFilter), legacyVerbose, None) =>
+            FormatValidator.validate(legacyFilter, legacyVerbose)
+
+          case (None, true, Some(_)) =>
+            Left(
+              ValidationErrors.invalidArgument(
+                s"Both filter/verbose and event_format is specified. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
+              )
+            )
+
+          case (None, false, Some(eventFormat)) =>
+            FormatValidator.validate(eventFormat)
+
+          case (None, _, None) =>
+            Left(
+              ValidationErrors.invalidArgument(
+                s"Either filter/verbose or event_format is required. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
+              )
+            )
+        }
 
         activeAt <- ParticipantOffsetValidator.validateNonNegative(
           request.activeAtOffset,
@@ -72,7 +98,7 @@ final class ApiStateService(
         )
       } yield {
         withEnrichedLoggingContext(telemetry)(
-          logging.filters(filters)
+          logging.eventFormat(filters)
         ) { implicit loggingContext =>
           logger.info(
             s"Received request for active contracts: $request, ${loggingContext.serializeFiltered("filters")}."
@@ -80,7 +106,6 @@ final class ApiStateService(
           acsService
             .getActiveContracts(
               filter = filters,
-              verbose = request.verbose,
               activeAt = activeAt,
             )
         }
@@ -143,7 +168,7 @@ final class ApiStateService(
   override def getLedgerEnd(request: GetLedgerEndRequest): Future[GetLedgerEndResponse] = {
     implicit val traceContext =
       TraceContext.fromDamlTelemetryContext(telemetry.contextFromGrpcThreadLocalContext())
-    txService
+    updateService
       .currentLedgerEnd()
       .map(offset =>
         GetLedgerEndResponse(
@@ -158,7 +183,7 @@ final class ApiStateService(
   ): Future[GetLatestPrunedOffsetsResponse] = {
     implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
 
-    txService
+    updateService
       .latestPrunedOffsets()
       .map { case (prunedUptoInclusive, divulgencePrunedUptoInclusive) =>
         GetLatestPrunedOffsetsResponse(

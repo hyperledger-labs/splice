@@ -7,7 +7,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.crypto.SynchronizerSyncCryptoClient
+import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.ContractAuthenticationFailed
@@ -17,6 +17,7 @@ import com.digitalasset.canton.participant.protocol.validation.*
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.protocol.{ContractMetadata, LfContractId, SerializableContract}
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.daml.lf.transaction.FatContractInstance
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -27,7 +28,7 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
   private val participantId: ParticipantId = ParticipantId("participant")
 
   private def buildTestInstance(
-      contractAuthenticatorBehaviors: (SerializableContract, Either[String, Unit])*
+      behaviors: Map[SerializableContract, Either[String, Unit]]
   ) = new TransactionProcessingSteps(
     synchronizerId = synchronizerId,
     participantId = participantId,
@@ -35,13 +36,16 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
     confirmationResponseFactory = mock[TransactionConfirmationResponseFactory],
     modelConformanceChecker = mock[ModelConformanceChecker],
     staticSynchronizerParameters = defaultStaticSynchronizerParameters,
-    crypto = mock[SynchronizerSyncCryptoClient],
+    crypto = mock[SynchronizerCryptoClient],
     metrics = ParticipantTestMetrics.synchronizer.transactionProcessing,
-    serializableContractAuthenticator = new SerializableContractAuthenticator {
-      val behaviors: Map[SerializableContract, Either[String, Unit]] =
-        contractAuthenticatorBehaviors.toMap
-      override def authenticate(contract: SerializableContract): Either[String, Unit] = behaviors(
-        contract
+    serializableContractAuthenticator = new ContractAuthenticator {
+      override def authenticateSerializable(contract: SerializableContract): Either[String, Unit] =
+        behaviors.getOrElse(
+          contract,
+          fail(s"authenticateSerializable did not find ${contract.contractId}"),
+        )
+      override def authenticateFat(contract: FatContractInstance): Either[String, Unit] = fail(
+        "unexpected"
       )
       override def verifyMetadata(
           contract: SerializableContract,
@@ -49,6 +53,7 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
       ): Either[String, Unit] = Either.unit
     },
     transactionEnricher = tx => _ => EitherT.pure(tx),
+    createNodeEnricher = node => _ => EitherT.pure(node),
     new AuthorizationValidator(participantId, true),
     new InternalConsistencyChecker(
       loggerFactory
@@ -66,7 +71,8 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
 
     "provided with valid input contracts" should {
       "succeed" in {
-        val testInstance = buildTestInstance(c1 -> Either.unit, c2 -> Either.unit)
+        val testInstance =
+          buildTestInstance(Map(c1 -> Either.unit, c2 -> Either.unit))
 
         val result = testInstance.authenticateInputContractsInternal(inputContracts)
         result.value.map(_ shouldBe Right[TransactionProcessorError, Unit](()))
@@ -76,7 +82,9 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
     "provided with contracts failing authentication" must {
       "convert failure and raise alarm" in {
         val testInstance =
-          buildTestInstance(c1 -> Either.unit, c2 -> Left("some authentication failure"))
+          buildTestInstance(
+            Map(c1 -> Either.unit, c2 -> Left("some authentication failure"))
+          )
 
         val (expectedLog, expectedResult) = {
           val expectedLog: LogEntry => Assertion =

@@ -25,10 +25,10 @@ import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencing.OrdinarySerializedEvent
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerParameters
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
+import com.digitalasset.canton.synchronizer.sequencer.{Sequencer, SequencerValidations}
 import com.digitalasset.canton.synchronizer.sequencing.authentication.grpc.IdentityContextHelper
-import com.digitalasset.canton.synchronizer.sequencing.config.SequencerParameters
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.errors.SequencerError
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.{Sequencer, SequencerValidations}
 import com.digitalasset.canton.synchronizer.sequencing.service.GrpcSequencerService.{
   SignedAcknowledgeRequest,
   WrappedAcknowledgeRequest,
@@ -58,7 +58,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /** Authenticate the current user can perform an operation on behalf of the given member */
-private[sequencing] trait AuthenticationCheck {
+private[synchronizer] trait AuthenticationCheck {
 
   /** Can the authenticated member perform an action on behalf of the provided member.
     * Return a left with a user presentable error message if not.
@@ -205,13 +205,14 @@ class GrpcSequencerService(
         maxRequestSize: MaxRequestSize
     ): Either[SendAsyncError, SignedContent[SubmissionRequest]] = for {
       signedContent <- SignedContent
-        .fromByteString(protocolVersion)(proto.signedSubmissionRequest)
+        .fromByteString(protocolVersion, proto.signedSubmissionRequest)
         .leftMap(requestDeserializationError(_, maxRequestSize))
       signedSubmissionRequest <- signedContent
         .deserializeContent(
           SubmissionRequest
-            .fromByteString(protocolVersion)(
-              MaxRequestSizeToDeserialize.Limit(maxRequestSize.value)
+            .fromByteString(
+              protocolVersion,
+              MaxRequestSizeToDeserialize.Limit(maxRequestSize.value),
             )
         )
         .leftMap(requestDeserializationError(_, maxRequestSize))
@@ -480,8 +481,8 @@ class GrpcSequencerService(
       request: v30.AcknowledgeSignedRequest
   ): Future[v30.AcknowledgeSignedResponse] = {
     val acknowledgeRequestE = SignedContent
-      .fromByteString(protocolVersion)(request.signedAcknowledgeRequest)
-      .flatMap(_.deserializeContent(AcknowledgeRequest.fromByteString(protocolVersion)))
+      .fromByteString(protocolVersion, request.signedAcknowledgeRequest)
+      .flatMap(_.deserializeContent(AcknowledgeRequest.fromByteString(protocolVersion, _)))
     performAcknowledge(acknowledgeRequestE.map(SignedAcknowledgeRequest.apply))
   }
 

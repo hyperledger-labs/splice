@@ -16,8 +16,8 @@ and major upgrades (this corresponds to an upgrade from ``0.B.X`` to
 ``0.CY``).
 
 Minor upgrades can be done by each node independently and only require
-a ``helm upgrade``. Make sure to contact the :ref:`release_notes` for
-any changes you may need to make as part of the upgrade.
+a ``helm upgrade``. Make sure to read the :ref:`release_notes` to learn
+about changes you may need to make as part of the upgrade.
 
 Major upgrades require a more complex :ref:`procedure <sv-upgrades>`
 procedure with network-wide coordination and downtime.

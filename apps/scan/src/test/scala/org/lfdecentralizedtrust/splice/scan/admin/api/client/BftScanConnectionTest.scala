@@ -164,7 +164,6 @@ class BftScanConnectionTest
           jtime(n),
           n.toLong,
           java.util.Map.of(),
-          java.util.List.of(),
           synchronizerId.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           jtime(n),

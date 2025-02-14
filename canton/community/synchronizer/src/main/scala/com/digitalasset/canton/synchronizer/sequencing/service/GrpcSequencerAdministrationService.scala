@@ -25,16 +25,14 @@ import com.digitalasset.canton.sequencer.admin.v30.{
 }
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.traffic.TimestampSelector
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.{
-  OnboardingStateForSequencer,
-  Sequencer,
-}
+import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector
+import com.digitalasset.canton.synchronizer.sequencer.{OnboardingStateForSequencer, Sequencer}
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
+import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.topology.{
   Member,
   SequencerId,
@@ -140,7 +138,7 @@ class GrpcSequencerAdministrationService(
         result =>
           v30.SnapshotResponse(
             v30.SnapshotResponse.Value.VersionedSuccess(
-              v30.SnapshotResponse.VersionedSuccess(result.toProtoVersioned.toByteString)
+              v30.SnapshotResponse.VersionedSuccess(result.toByteString)
             )
           ),
       )
@@ -185,8 +183,8 @@ class GrpcSequencerAdministrationService(
                 txOpt
                   .map(stored => stored.validFrom)
                   .toRight(
-                    TopologyManagerError.InternalError
-                      .Other(s"Did not find onboarding topology transaction for $sequencerId")
+                    TopologyManagerError.MissingTopologyMapping
+                      .Reject(Map(sequencerId -> Seq(SequencerSynchronizerState.code)))
                   )
               )
           )

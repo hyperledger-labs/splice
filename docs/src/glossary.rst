@@ -36,6 +36,14 @@ Glossary
       purpose of providing access to a particular multi-party business process
       to other entities on the Canton network.
 
+    BFT
+
+      Byzantine Fault Tolerance.
+      A property of a distributed system that allows it to continue operating correctly
+      in the presence of a certain number of faulty nodes.
+      Typically ``f`` denotes the number of faulty nodes that the system can tolerate.
+      Across all layers of Splice, ``f`` corresponds to slighly less than 1/3 of the total number of SVs
+      (``floor((n-1)/3)``, to be exact).
 
     CN Global Domain
 
@@ -67,6 +75,13 @@ Glossary
       * validator app for admin operations by the validator operator like
         user/party management
 
+    CN Supervalidator
+
+      * One node in the CN
+      * In addition to CN Validator components, also consists of canton sequencer, canton mediator, sv app and scan app
+      * sv app for admin operations of the :term:`CN Global Domain`
+      * scan app for providing publicly visible data
+
     CN Wallet
 
       * provides payment APIs for other apps to build upon ("pay with CC") and corresponding UI, e.g., approve payment
@@ -82,6 +97,16 @@ Glossary
         (similar to reverse DNS)
       * provides APIs for resolution in both directions that can be used by
         other apps (e.g., the wallet) to display and accept CNS names instead of party ids
+
+    Global Synchronizer Foundation
+      * Foundation charged with fostering the development and growth of the
+        Global Synchronizer in the Canton Network, and facilitate its
+        governance, see https://sync.global/.
+
+    GSF
+
+      * abbreviation for :term:`Global Synchronizer Foundation`
+
 
     Splice
 

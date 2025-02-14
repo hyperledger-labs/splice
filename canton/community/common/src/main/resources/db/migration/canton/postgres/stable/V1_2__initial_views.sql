@@ -8,7 +8,7 @@ create schema debug;
 -- -------------------
 
 -- convert bigint to the time format used in canton logs
-create or replace function debug.canton_timestamp(bigint) returns varchar(300) as
+create or replace function debug.canton_timestamp(bigint) returns varchar as
 $$
 select to_char(to_timestamp($1/1000000.0) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"');
 $$
@@ -44,7 +44,7 @@ $$
   returns null on null input;
 
 -- convert the integer representation to the TopologyChangeOp name.
-create or replace function debug.topology_change_op(integer) returns varchar(300) as
+create or replace function debug.topology_change_op(integer) returns varchar as
 $$
 select
   case
@@ -58,7 +58,7 @@ $$
   returns null on null input;
 
 -- convert the integer representation to the name of the key purpose
-create or replace function debug.key_purpose(integer) returns varchar(300) as
+create or replace function debug.key_purpose(integer) returns varchar as
 $$
 select
   case
@@ -72,7 +72,7 @@ $$
   returns null on null input;
 
 -- convert the integer representation to the name of the signing key usage
-create or replace function debug.key_usage(integer) returns varchar(300) as
+create or replace function debug.key_usage(integer) returns varchar as
 $$
 select
 case
@@ -89,7 +89,7 @@ $$
   returns null on null input;
 
 -- convert the integer representation to the name of the signing key usage
-create or replace function debug.key_usages(integer[]) returns varchar(300)[] as
+create or replace function debug.key_usages(integer[]) returns varchar[] as
 $$
 select array_agg(debug.key_usage(m)) from unnest($1) as m;
 $$
@@ -97,8 +97,8 @@ $$
   stable
   returns null on null input;
 
--- resolve an interned string to the text representation
-create or replace function debug.resolve_common_static_string(integer) returns varchar(300) as
+-- resolve an interned string to the textual representation
+create or replace function debug.resolve_common_static_string(integer) returns varchar as
 $$
 select string from common_static_strings where id = $1;
 $$
@@ -106,8 +106,8 @@ $$
   stable
   returns null on null input;
 
--- resolve an interned sequencer member id to the text representation
-create or replace function debug.resolve_sequencer_member(integer) returns varchar(300) as
+-- resolve an interned sequencer member id to the textual representation
+create or replace function debug.resolve_sequencer_member(integer) returns varchar as
 $$
 select member from sequencer_members where id = $1;
 $$
@@ -115,8 +115,8 @@ $$
   stable
   returns null on null input;
 
--- resolve multiple interned sequencer member ids to the text representation
-create or replace function debug.resolve_sequencer_members(integer[]) returns varchar(300)[] as
+-- resolve multiple interned sequencer member ids to the textual representation
+create or replace function debug.resolve_sequencer_members(integer[]) returns varchar[] as
 $$
 select array_agg(debug.resolve_sequencer_member(m)) from unnest($1) as m;
 $$
@@ -138,21 +138,23 @@ create or replace view debug.par_daml_packages as
   select
     package_id,
     data,
-    source_description,
+    name,
+    version,
     uploaded_at,
     package_size
   from par_daml_packages;
 
 create or replace view debug.par_dars as
   select
-    hash_hex,
-    hash,
+    main_package_id,
     data,
-    name
+    description,
+    name,
+    version
   from par_dars;
 
 create or replace view debug.par_dar_packages as
-select dar_hash_hex, package_id from par_dar_packages;
+select main_package_id , package_id from par_dar_packages;
 
 create or replace view debug.common_crypto_private_keys as
   select
@@ -287,14 +289,12 @@ create or replace view debug.par_reassignments as
     unassignment_global_offset,
     assignment_global_offset,
     debug.canton_timestamp(unassignment_timestamp) as unassignment_timestamp,
-    unassignment_request_counter,
+    source_synchronizer_id,
     unassignment_request,
     debug.canton_timestamp(unassignment_decision_time) as unassignment_decision_time,
-    contract,
     unassignment_result,
-    submitter_lf,
-    debug.canton_timestamp(time_of_completion_request_counter) as time_of_completion_request_counter,
-    debug.canton_timestamp(time_of_completion_timestamp) as time_of_completion_timestamp,
+    contract,
+    debug.canton_timestamp(assignment_timestamp) as assignment_timestamp,
     source_protocol_version
   from par_reassignments;
 
@@ -333,7 +333,8 @@ create or replace view debug.par_outstanding_acs_commitments as
     counter_participant,
     debug.canton_timestamp(from_exclusive) as from_exclusive,
     debug.canton_timestamp(to_inclusive) as to_inclusive,
-    matching_state
+    matching_state,
+    multi_hosted_cleared
   from par_outstanding_acs_commitments;
 
 create or replace view debug.par_last_computed_acs_commitments as
@@ -668,10 +669,14 @@ create or replace view debug.ord_metadata_output_blocks as
   select
     epoch_number,
     block_number,
-    debug.canton_timestamp(bft_ts) as bft_ts,
-    epoch_could_alter_sequencing_topology,
-    pending_topology_changes_in_next_epoch
+    debug.canton_timestamp(bft_ts) as bft_ts
   from ord_metadata_output_blocks;
+
+create or replace view debug.ord_metadata_output_epochs as
+  select
+    epoch_number,
+    could_alter_ordering_topology
+  from ord_metadata_output_epochs;
 
 create or replace view debug.common_static_strings as
   select

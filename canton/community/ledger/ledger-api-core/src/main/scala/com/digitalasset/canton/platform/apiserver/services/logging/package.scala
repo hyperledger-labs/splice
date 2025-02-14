@@ -9,13 +9,16 @@ import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.{
   Commands,
   CumulativeFilter,
+  EventFormat,
   TemplateWildcardFilter,
-  TransactionFilter,
+  TopologyFormat,
+  TransactionFormat,
+  TransactionShape,
+  UpdateFormat,
   UpdateId,
 }
 import com.digitalasset.daml.lf.data.Ref.{Identifier, Party}
 import com.digitalasset.daml.lf.data.logging.*
-import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
 import scalaz.syntax.tag.ToTagOps
 
@@ -63,17 +66,80 @@ package object logging {
   private[services] def commandId(id: String): LoggingEntry =
     "commandId" -> id
 
-  private[services] def filters(
-      filters: TransactionFilter
+  private[services] def eventFormat(
+      eventFormat: EventFormat
   ): LoggingEntry =
     "filters" -> LoggingValue.Nested(
       LoggingEntries.fromMap(
-        filters.filtersByParty.view.map { case (party, partyFilters) =>
+        eventFormat.filtersByParty.view.map { case (party, partyFilters) =>
           party.toLoggingKey -> filtersToLoggingValue(partyFilters)
         }.toMap ++
-          filters.filtersForAnyParty.fold(Map.empty[LoggingKey, LoggingValue])(filters =>
+          eventFormat.filtersForAnyParty.fold(Map.empty[LoggingKey, LoggingValue])(filters =>
             Map("anyParty" -> filtersToLoggingValue(filters))
           )
+      )
+    )
+
+  private[services] def transactionShape(
+      transactionShape: TransactionShape
+  ): LoggingEntry =
+    "transactionShape" -> LoggingValue.OfString(
+      transactionShape match {
+        case TransactionShape.LedgerEffects => "LedgerEffects"
+        case TransactionShape.AcsDelta => "AcsDelta"
+      }
+    )
+
+  private[services] def transactionFormat(
+      transactionFormat: TransactionFormat
+  ): LoggingEntry =
+    "transaction format" -> LoggingValue.Nested(
+      LoggingEntries.fromMap(
+        Map(
+          "filters" -> eventFormat(transactionFormat.eventFormat)._2,
+          transactionShape(transactionFormat.transactionShape),
+        )
+      )
+    )
+
+  private[services] def topologyFormat(
+      topologyFormat: TopologyFormat
+  ): LoggingEntry =
+    "topologyFormat" -> LoggingValue.Nested(
+      LoggingEntries.fromMap(
+        Map(
+          "participantAuthorizationFormat" -> topologyFormat.participantAuthorizationFormat
+            .map(_.parties match {
+              case Some(parties) => (if (parties.isEmpty) "all parties" else parties): LoggingValue
+              case None => LoggingValue.Empty
+            })
+            .getOrElse(LoggingValue.Empty)
+        )
+      )
+    )
+
+  private[services] def updateFormat(
+      updateFormat: UpdateFormat
+  ): LoggingEntry =
+    "updateFormat" -> LoggingValue.Nested(
+      LoggingEntries.fromMap(
+        Map(
+          "transaction format" -> LoggingValue.OfIterable(
+            updateFormat.includeTransactions
+              .map(transactionFormat(_)._2)
+              .toList
+          ),
+          "reassignment filters" -> LoggingValue.OfIterable(
+            updateFormat.includeReassignments
+              .map(eventFormat(_)._2)
+              .toList
+          ),
+          "topology format" -> LoggingValue.OfIterable(
+            updateFormat.includeTopologyEvents
+              .map(topologyFormat(_)._2)
+              .toList
+          ),
+        )
       )
     )
 
@@ -123,9 +189,6 @@ package object logging {
 
   private[services] def contractId(id: ContractId): LoggingEntry =
     "contractId" -> id.coid
-
-  private[services] def contractKey(key: Value): LoggingEntry =
-    "contractKey" -> key.toString
 
   private[services] def templateId(id: Identifier): LoggingEntry =
     "templateId" -> id.toString

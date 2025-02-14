@@ -28,4 +28,15 @@ object EventId {
     }
   }
 
+  // TODO(#17370) - remove this conversion as it's costly
+  def lastDescendedNodeFromChildNodeIds(
+      nodeId: Int,
+      nodesWithChildren: Map[Int, Seq[Int]],
+  ): Int =
+    nodesWithChildren
+      .getOrElse(nodeId, Seq.empty)
+      .maxOption
+      .map(lastChildId => lastDescendedNodeFromChildNodeIds(lastChildId, nodesWithChildren))
+      .getOrElse(nodeId)
+
 }

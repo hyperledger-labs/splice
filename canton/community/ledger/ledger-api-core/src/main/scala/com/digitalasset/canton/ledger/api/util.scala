@@ -17,9 +17,35 @@ import scalaz.syntax.tag.*
 
 import scala.collection.immutable
 
-final case class TransactionFilter(
+final case class UpdateFormat(
+    includeTransactions: Option[TransactionFormat],
+    includeReassignments: Option[EventFormat],
+    includeTopologyEvents: Option[TopologyFormat],
+)
+
+final case class TopologyFormat(
+    participantAuthorizationFormat: Option[ParticipantAuthorizationFormat]
+)
+
+// The list of parties for which the topology transactions should be sent. If None then all the parties that the
+// participant can read as are denoted (wildcard party).
+final case class ParticipantAuthorizationFormat(parties: Option[Set[Ref.Party]])
+
+final case class TransactionFormat(
+    eventFormat: EventFormat,
+    transactionShape: TransactionShape,
+)
+
+sealed trait TransactionShape
+object TransactionShape {
+  case object LedgerEffects extends TransactionShape
+  case object AcsDelta extends TransactionShape
+}
+
+final case class EventFormat(
     filtersByParty: immutable.Map[Ref.Party, CumulativeFilter],
-    filtersForAnyParty: Option[CumulativeFilter] = None,
+    filtersForAnyParty: Option[CumulativeFilter],
+    verbose: Boolean,
 )
 
 final case class InterfaceFilter(

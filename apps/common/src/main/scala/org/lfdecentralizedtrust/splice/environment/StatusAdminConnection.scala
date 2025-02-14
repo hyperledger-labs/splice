@@ -7,16 +7,22 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 trait StatusAdminConnection {
-  this: AppConnection =>
-
+  this: AppConnection & RetryProvider.Has =>
+  protected implicit val ec: ExecutionContextExecutor
   protected type Status <: NodeStatus.Status
   protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[Status]]
 
-  def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[Status]] = runCmd(
-    getStatusRequest
-  )
+  def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[Status]] =
+    retryProvider.retryForClientCalls(
+      "status",
+      "Get node status",
+      runCmd(
+        getStatusRequest
+      ),
+      logger,
+    )
 
 }

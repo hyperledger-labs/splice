@@ -97,7 +97,7 @@ abstract class NodeBootstrapBase[
         parameterConfig.loggingConfig.queryCost,
         clock,
         Some(scheduler),
-        nodeMetrics.dbStorage,
+        nodeMetrics.storageMetrics,
         parameterConfig.processingTimeouts,
         loggerFactory,
       )

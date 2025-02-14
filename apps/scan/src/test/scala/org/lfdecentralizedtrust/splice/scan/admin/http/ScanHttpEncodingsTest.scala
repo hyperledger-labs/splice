@@ -198,9 +198,9 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       case (updateId, index) => s"$updateId:$index"
     }
     val leftRootId = originalEventIds(0)
-    val rightRootId = originalEventIds(1)
-    val leftChildId1 = originalEventIds(2)
-    val leftChildId2 = originalEventIds(3)
+    val rightRootId = originalEventIds(3)
+    val leftChildId1 = originalEventIds(1)
+    val leftChildId2 = originalEventIds(2)
     val rightChildId1 = originalEventIds(4)
     val rightChildId2 = originalEventIds(5)
 
@@ -279,20 +279,22 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val newLeftRoot = withoutLocalData.getEventsById
       .get(withoutLocalData.getRootNodeIds.get(0))
       .asInstanceOf[javaApi.ExercisedEvent]
+    val newLeftRootChildNodeIds = withoutLocalData.getChildNodeIds(newLeftRoot)
     val newRightRoot = withoutLocalData.getEventsById
       .get(withoutLocalData.getRootNodeIds.get(1))
       .asInstanceOf[javaApi.ExercisedEvent]
     val newLeftChild1 = withoutLocalData.getEventsById
-      .get(newLeftRoot.getChildNodeIds.get(0))
+      .get(newLeftRootChildNodeIds.get(0))
       .asInstanceOf[javaApi.CreatedEvent]
     val newLeftChild2 = withoutLocalData.getEventsById
-      .get(newLeftRoot.getChildNodeIds.get(1))
+      .get(newLeftRootChildNodeIds.get(1))
       .asInstanceOf[javaApi.CreatedEvent]
+    val newRightRootChildNodeIds = withoutLocalData.getChildNodeIds(newRightRoot)
     val newRightChild1 = withoutLocalData.getEventsById
-      .get(newRightRoot.getChildNodeIds.get(0))
+      .get(newRightRootChildNodeIds.get(0))
       .asInstanceOf[javaApi.CreatedEvent]
     val newRightChild2 = withoutLocalData.getEventsById
-      .get(newRightRoot.getChildNodeIds.get(1))
+      .get(newRightRootChildNodeIds.get(1))
       .asInstanceOf[javaApi.CreatedEvent]
 
     // In the above transaction, contract ids are always equal to event ids

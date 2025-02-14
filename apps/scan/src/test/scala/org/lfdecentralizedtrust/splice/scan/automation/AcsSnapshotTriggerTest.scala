@@ -513,7 +513,6 @@ class AcsSnapshotTriggerTest
           recordTime.toInstant,
           0L,
           java.util.Map.of(),
-          java.util.List.of(),
           dummyDomain.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           recordTime.toInstant,

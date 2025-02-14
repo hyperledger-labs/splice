@@ -61,7 +61,7 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
     val builder = Hash.build(HashPurpose.TopologyTransactionSignature, HashAlgorithm.Sha256)
     signatures.toList
       .sortBy(_.signedBy.toProtoPrimitive)
-      .foreach(tx => builder.add(tx.toByteString(protocolVersion)))
+      .foreach(signature => builder.add(signature.toByteString(protocolVersion)))
     builder.finish()
   }
 
@@ -134,8 +134,10 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
 }
 
 object SignedTopologyTransaction
-    extends HasProtocolVersionedWithOptionalValidationCompanion[
-      SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]
+    extends VersioningCompanionContext[
+      SignedTopologyTransaction[TopologyChangeOp, TopologyMapping],
+      // Validation is done in synchronizer store but not in authorized store
+      ProtocolVersionValidation,
     ] {
 
   val InitialTopologySequencingTime: CantonTimestamp = CantonTimestamp.MinValue.immediateSuccessor
@@ -148,8 +150,8 @@ object SignedTopologyTransaction
   type PositiveSignedTopologyTransaction =
     SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v33)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
       v30.SignedTopologyTransaction
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -174,7 +176,7 @@ object SignedTopologyTransaction
       signaturesNE <- signingKeys.toSeq.toNEF.parTraverse { case (keyId, usage) =>
         crypto.sign(transaction.hash.hash, keyId, usage)
       }
-      representativeProtocolVersion = supportedProtoVersions.protocolVersionRepresentativeFor(
+      representativeProtocolVersion = versioningTable.protocolVersionRepresentativeFor(
         protocolVersion
       )
     } yield SignedTopologyTransaction(transaction, signaturesNE.toSet, isProposal)(
@@ -230,19 +232,19 @@ object SignedTopologyTransaction
   ): ParsingResult[GenericSignedTopologyTransaction] = {
     val v30.SignedTopologyTransaction(txBytes, signaturesP, isProposal) = transactionP
     for {
-      transaction <- TopologyTransaction.fromByteString(protocolVersionValidation)(txBytes)
+      transaction <- TopologyTransaction.fromByteString(protocolVersionValidation, txBytes)
       signatures <- ProtoConverter.parseRequiredNonEmpty(
         Signature.fromProtoV30,
         "SignedTopologyTransaction.signatures",
         signaturesP,
       )
-      rpv <- supportedProtoVersions.protocolVersionRepresentativeFor(ProtoVersion(30))
+      rpv <- versioningTable.protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield SignedTopologyTransaction(transaction, signatures.toSet, isProposal)(rpv)
   }
 
   def createGetResultSynchronizerTopologyTransaction: GetResult[GenericSignedTopologyTransaction] =
     GetResult { r =>
-      fromTrustedByteString(r.<<[ByteString]).valueOr(err =>
+      fromTrustedByteStringPVV(r.<<[ByteString]).valueOr(err =>
         throw new DbSerializationException(
           s"Failed to deserialize SignedTopologyTransaction: $err"
         )
@@ -290,12 +292,12 @@ final case class SignedTopologyTransactions[
 }
 
 object SignedTopologyTransactions
-    extends HasProtocolVersionedWithContextCompanion[
+    extends VersioningCompanionContext[
       SignedTopologyTransactions[TopologyChangeOp, TopologyMapping],
-      ProtocolVersion,
+      ProtocolVersionValidation,
     ] {
-  override val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v33)(
+  override val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
       v30.SignedTopologyTransactions
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -313,19 +315,21 @@ object SignedTopologyTransactions
       protocolVersion: ProtocolVersion,
   ): SignedTopologyTransactions[Op, M] =
     SignedTopologyTransactions(transactions)(
-      supportedProtoVersions.protocolVersionRepresentativeFor(protocolVersion)
+      versioningTable.protocolVersionRepresentativeFor(protocolVersion)
     )
 
   def fromProtoV30(
-      expectedProtocolVersion: ProtocolVersion,
+      expectedProtocolVersion: ProtocolVersionValidation,
       proto: v30.SignedTopologyTransactions,
   ): ParsingResult[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]] =
     for {
       transactions <- proto.signedTransaction
         .traverse(
-          SignedTopologyTransaction.fromByteString(expectedProtocolVersion)(
-            ProtocolVersionValidation.PV(expectedProtocolVersion)
-          )(_)
+          SignedTopologyTransaction.fromByteString(
+            expectedProtocolVersion,
+            expectedProtocolVersion,
+            _,
+          )
         )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield SignedTopologyTransactions(transactions)(rpv)

@@ -34,7 +34,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
         val trafficControlParameters =
           sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
             .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-            .trafficControlParameters
+            .trafficControl
             .value
         trafficControlParameters.maxBaseTrafficAmount.value shouldBe
           amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount
@@ -112,7 +112,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
         val trafficControlParameters =
           sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
             .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-            .trafficControlParameters
+            .trafficControl
             .value
         trafficControlParameters.maxBaseTrafficAmount.value shouldBe
           amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1

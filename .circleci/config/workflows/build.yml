@@ -9,6 +9,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+          is_public: true
       - create_oss_pr:
           <<: *notify-fail
           context:

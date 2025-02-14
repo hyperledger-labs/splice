@@ -2,7 +2,6 @@ import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource, Resource } from '@pulumi/pulumi';
 import {
-  autoInitValues,
   ChartValues,
   domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
@@ -168,7 +167,6 @@ export class InStackDecentralizedSynchronizerNode
               ...(dbs.setCoreDbNames ? { databaseName: mediatorDbName } : {}),
             },
           },
-          ...autoInitValues('splice-global-domain', version, onboardingName),
           enablePostgresMetrics: true,
           metrics: {
             enable: true,

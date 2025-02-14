@@ -11,7 +11,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
 import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrap
-import com.digitalasset.canton.synchronizer.sequencing.SequencerNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.metrics.SpliceMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.ScanAppBootstrap

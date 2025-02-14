@@ -20,6 +20,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.Assertion
 
 import scala.concurrent.Future
@@ -311,6 +312,13 @@ object UpdateHistoryTestBase {
   }
 
   private def withoutLostData(tree: TransactionTree, mode: LostDataMode): TransactionTree = {
+    // TODO(#17370) - remove this data loss
+    // we recalculate the last descendant id because it's lost during the ingestion and it's recalculated based on the visible events
+    val nodesWithChildren = tree.getEventsById.asScala.view.map {
+      case (nodeId, event: ExercisedEvent) =>
+        nodeId.intValue() -> tree.getChildNodeIds(event).asScala.toSeq.map(_.intValue())
+      case (nodeId, _) => nodeId.intValue() -> Seq.empty
+    }.toMap
     new TransactionTree(
       /*updateId = */ tree.getUpdateId,
       /*commandId = */ if (mode == LostInScanApi) { "" }
@@ -320,8 +328,10 @@ object UpdateHistoryTestBase {
       /*workflowId = */ tree.getWorkflowId,
       /*effectiveAt = */ tree.getEffectiveAt,
       /*offset = */ tree.getOffset,
-      /*eventsById = */ tree.getEventsById.asScala.view.mapValues(withoutLostData).toMap.asJava,
-      /*rootEventIds = */ tree.getRootNodeIds,
+      /*eventsById = */ tree.getEventsById.asScala.view
+        .mapValues(withoutLostData(nodesWithChildren, _))
+        .toMap
+        .asJava,
       /*synchronizerId = */ tree.getSynchronizerId,
 
       // We don't care about tracing information in the update history.
@@ -331,12 +341,15 @@ object UpdateHistoryTestBase {
     )
   }
 
-  private def withoutLostData(event: TreeEvent): TreeEvent = {
+  private def withoutLostData(
+      nodesWithChildren: Map[Int, Seq[Int]],
+      event: TreeEvent,
+  ): TreeEvent = {
     event match {
       case created: CreatedEvent =>
         withoutLostData(created)
       case exercised: ExercisedEvent =>
-        withoutLostData(exercised)
+        withoutLostData(nodesWithChildren, exercised)
       case _ => throw new RuntimeException("Invalid event type")
     }
   }
@@ -372,7 +385,10 @@ object UpdateHistoryTestBase {
     )
   }
 
-  private def withoutLostData(exercised: ExercisedEvent): ExercisedEvent = {
+  private def withoutLostData(
+      nodesWithChildren: Map[Int, Seq[Int]],
+      exercised: ExercisedEvent,
+  ): ExercisedEvent = {
     new ExercisedEvent(
       // The witnesses returned by the API is the intersection of actual witnesses according
       // to the daml model with the subscribing parties, and we're always subscribing as a single party,
@@ -389,7 +405,10 @@ object UpdateHistoryTestBase {
       /*choiceArgument = */ exercised.getChoiceArgument,
       /*actingParties = */ exercised.getActingParties,
       /*consuming = */ exercised.isConsuming,
-      /*childEventIds = */ exercised.getChildNodeIds,
+      /*lastDescendedNodeid = */ EventId.lastDescendedNodeFromChildNodeIds(
+        exercised.getNodeId.intValue(),
+        nodesWithChildren,
+      ),
       /*exerciseResult = */ exercised.getExerciseResult,
     )
   }

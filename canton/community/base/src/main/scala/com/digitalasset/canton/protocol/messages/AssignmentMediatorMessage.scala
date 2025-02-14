@@ -14,10 +14,11 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.version.{
-  HasProtocolVersionedWithContextCompanion,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
+  VersionedProtoCodec,
+  VersioningCompanionContext,
 }
 
 import java.util.UUID
@@ -69,18 +70,16 @@ final case class AssignmentMediatorMessage(
 
   @transient override protected lazy val companionObj: AssignmentMediatorMessage.type =
     AssignmentMediatorMessage
-
-  override def informeesArePublic: Boolean = true
 }
 
 object AssignmentMediatorMessage
-    extends HasProtocolVersionedWithContextCompanion[
+    extends VersioningCompanionContext[
       AssignmentMediatorMessage,
       (HashOps, Target[ProtocolVersion]),
     ] {
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v33)(v30.AssignmentMediatorMessage)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.AssignmentMediatorMessage)(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
       _.toProtoV30,
     )

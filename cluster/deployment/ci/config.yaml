@@ -1,0 +1,5 @@
+pulumiProjectConfig:
+  default:
+    allowedArtifactories:
+      - "public"
+      - "private"

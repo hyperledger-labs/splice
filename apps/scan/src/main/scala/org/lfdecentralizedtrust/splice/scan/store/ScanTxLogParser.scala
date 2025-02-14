@@ -128,7 +128,7 @@ class ScanTxLogParser(
             parseTrees(
               tree,
               synchronizerId,
-              exercised.getChildNodeIds.asScala.toList,
+              tree.getChildNodeIds(exercised).asScala.toList,
             )
         }
 

@@ -67,6 +67,10 @@ export class DecentralizedSynchronizerMigrationConfig {
       .filter(migration => migration.provider === MigrationProvider.INTERNAL);
   }
 
+  get allMigrations(): MigrationInfo[] {
+    return this.runningMigrations().concat(this.archived);
+  }
+
   get hasInternalRunningMigration(): boolean {
     return this.allInternalMigrations.some(migration => this.isStillRunning(migration.id));
   }

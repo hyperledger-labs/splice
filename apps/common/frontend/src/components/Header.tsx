@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { NavLink } from 'react-router-dom';
 
-import { WarningAmberRounded } from '@mui/icons-material';
+import { Warning } from '@mui/icons-material';
 import { Badge, Box, Stack, Toolbar } from '@mui/material';
 import Typography, { TypographyOwnProps } from '@mui/material/Typography';
 
@@ -78,11 +78,7 @@ const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks
                       key={`nav-alert-badge-${index}`}
                       id={`nav-badge-${navLink.path}-alert`}
                       badgeContent={
-                        <WarningAmberRounded
-                          fontSize="small"
-                          color="secondary"
-                          sx={{ marginLeft: 3 }}
-                        />
+                        <Warning fontSize="small" color="secondary" sx={{ marginLeft: 3 }} />
                       }
                     />
                   ) : (

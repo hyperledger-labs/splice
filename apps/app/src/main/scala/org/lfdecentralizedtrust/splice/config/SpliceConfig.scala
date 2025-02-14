@@ -68,7 +68,7 @@ import scala.util.control.NoStackTrace
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.synchronizer.sequencing.config.RemoteSequencerConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 
@@ -442,13 +442,22 @@ object SpliceConfig {
       implicit val sequencerPruningConfig2 = sequencerPruningConfig
       deriveReader[SvSequencerConfig]
         .emap { sequencerConfig =>
-          UrlValidator
-            .isValid(sequencerConfig.externalPublicApiUrl)
-            .bimap(
-              invalidUrl =>
-                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
-              _ => sequencerConfig,
-            )
+          for {
+            _ <- UrlValidator
+              .isValid(sequencerConfig.externalPublicApiUrl)
+              .leftMap(invalidUrl =>
+                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl")
+              )
+            _ <-
+              if (sequencerConfig.isBftSequencer) {
+                sequencerConfig.externalPeerApiUrl
+                  .toRight(
+                    ConfigValidationFailed(
+                      "Sequencer external peer url must be set for BFT sequencers"
+                    )
+                  )
+              } else Right(())
+          } yield sequencerConfig
         }
     }
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =
@@ -615,6 +624,15 @@ object SpliceConfig {
             ConfigValidationFailed(
               s"New participant identifier in bootstrap dump config ${conf.participantBootstrappingDump
                   .map(_.newParticipantIdentifier)} must match participant node identifier $participantIdentifier"
+            ),
+          )
+          _ <- Either.cond(
+            conf.participantPruningSchedule.forall(
+              _.retention.underlying > conf.deduplicationDuration.underlying
+            ),
+            (),
+            ConfigValidationFailed(
+              s"Pruning retention period ${conf.participantPruningSchedule.map(_.retention)} must be bigger than the deduplication duration ${conf.deduplicationDuration}"
             ),
           )
         } yield conf

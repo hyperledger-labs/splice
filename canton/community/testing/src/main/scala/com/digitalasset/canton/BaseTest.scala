@@ -407,7 +407,7 @@ trait BaseTest
       body: A => Assertion
   )(implicit executionContext: ExecutionContext): Assertion = forEvery(inputs.parTraverse { input =>
     Future(Try(body(input)))
-  }.futureValue)(_.get)
+  }.futureValue)(_.success.value)
 
   lazy val CantonExamplesPath: String = BaseTest.CantonExamplesPath
   lazy val CantonTestsPath: String = BaseTest.CantonTestsPath
@@ -505,6 +505,7 @@ object BaseTest {
     requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
     requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
     requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
+    requiredSignatureFormats = SymbolicCryptoProvider.supportedSignatureFormats,
     protocolVersion = protocolVersion,
   )
 

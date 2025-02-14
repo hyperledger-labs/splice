@@ -19,8 +19,8 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.admin.v30.OnboardingStateResponse
 import com.digitalasset.canton.sequencing.protocol
-import com.digitalasset.canton.synchronizer.sequencing.admin.grpc.InitializeSequencerResponse
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.SequencerPruningStatus
+import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
+import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.admin.v30.GenesisStateResponse
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions

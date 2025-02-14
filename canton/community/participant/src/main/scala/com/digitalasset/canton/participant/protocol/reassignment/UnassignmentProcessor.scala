@@ -7,10 +7,7 @@ import cats.data.EitherT
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
-import com.digitalasset.canton.crypto.{
-  SynchronizerSnapshotSyncCryptoApi,
-  SynchronizerSyncCryptoClient,
-}
+import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.ViewType.UnassignmentViewType
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -19,10 +16,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionSynchronizerTracker,
   SeedGenerator,
 }
-import com.digitalasset.canton.participant.protocol.{
-  ProtocolProcessor,
-  SerializableContractAuthenticator,
-}
+import com.digitalasset.canton.participant.protocol.{ContractAuthenticator, ProtocolProcessor}
 import com.digitalasset.canton.participant.store.SyncEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
@@ -42,7 +36,7 @@ class UnassignmentProcessor(
     reassignmentCoordination: ReassignmentCoordination,
     inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
     ephemeral: SyncEphemeralState,
-    synchronizerCrypto: SynchronizerSyncCryptoClient,
+    synchronizerCrypto: SynchronizerCryptoClient,
     seedGenerator: SeedGenerator,
     sequencerClient: SequencerClient,
     override protected val timeouts: ProcessingTimeout,
@@ -65,7 +59,7 @@ class UnassignmentProcessor(
         reassignmentCoordination,
         seedGenerator,
         staticSynchronizerParameters,
-        SerializableContractAuthenticator(synchronizerCrypto.pureCrypto),
+        ContractAuthenticator(synchronizerCrypto.pureCrypto),
         sourceProtocolVersion,
         loggerFactory,
       ),

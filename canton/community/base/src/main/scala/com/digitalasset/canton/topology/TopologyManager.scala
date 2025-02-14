@@ -5,12 +5,13 @@ package com.digitalasset.canton.topology
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -20,6 +21,7 @@ import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
   StaticSynchronizerParameters,
 }
+import com.digitalasset.canton.sequencing.AsyncResult
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.TopologyManager.assignExpectedUsageToKeys
 import com.digitalasset.canton.topology.TopologyManagerError.{
@@ -32,9 +34,17 @@ import com.digitalasset.canton.topology.processing.{
   SequencedTime,
   TopologyManagerSigningKeyDetection,
 }
-import com.digitalasset.canton.topology.store.TopologyStoreId.{AuthorizedStore, SynchronizerStore}
+import com.digitalasset.canton.topology.store.TopologyStoreId.{
+  AuthorizedStore,
+  SynchronizerStore,
+  TemporaryStore,
+}
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction.GenericValidatedTopologyTransaction
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
+import com.digitalasset.canton.topology.store.{
+  TopologyStore,
+  TopologyStoreId,
+  ValidatedTopologyTransaction,
+}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.RequiredAuth
@@ -103,7 +113,9 @@ class SynchronizerTopologyManager(
       expectFullAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[(Seq[GenericValidatedTopologyTransaction], CantonTimestamp)]] = {
+  ): FutureUnlessShutdown[
+    (Seq[(Seq[GenericValidatedTopologyTransaction], CantonTimestamp)], AsyncResult[Unit])
+  ] = {
     val ts = timestampForValidation()
     processor
       .validateAndApplyAuthorization(
@@ -112,9 +124,29 @@ class SynchronizerTopologyManager(
         transactions,
         expectFullAuthorization,
       )
-      .map(txs => Seq(txs -> ts))
+      .map { case (txs, asyncResult) => (Seq(txs -> ts), asyncResult) }
   }
 }
+
+class TemporaryTopologyManager(
+    nodeId: UniqueIdentifier,
+    clock: Clock,
+    crypto: Crypto,
+    store: TopologyStore[TemporaryStore],
+    timeouts: ProcessingTimeout,
+    futureSupervisor: FutureSupervisor,
+    loggerFactory: NamedLoggerFactory,
+)(implicit ec: ExecutionContext)
+    extends LocalTopologyManager(
+      nodeId,
+      clock,
+      crypto,
+      store,
+      exitOnFatalFailures = false,
+      timeouts,
+      futureSupervisor,
+      loggerFactory,
+    )
 
 class AuthorizedTopologyManager(
     nodeId: UniqueIdentifier,
@@ -126,7 +158,28 @@ class AuthorizedTopologyManager(
     futureSupervisor: FutureSupervisor,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
-    extends TopologyManager[AuthorizedStore, CryptoPureApi](
+    extends LocalTopologyManager(
+      nodeId,
+      clock,
+      crypto,
+      store,
+      exitOnFatalFailures = exitOnFatalFailures,
+      timeouts,
+      futureSupervisor,
+      loggerFactory,
+    )
+
+abstract class LocalTopologyManager[StoreId <: TopologyStoreId](
+    nodeId: UniqueIdentifier,
+    clock: Clock,
+    crypto: Crypto,
+    store: TopologyStore[StoreId],
+    exitOnFatalFailures: Boolean,
+    timeouts: ProcessingTimeout,
+    futureSupervisor: FutureSupervisor,
+    loggerFactory: NamedLoggerFactory,
+)(implicit ec: ExecutionContext)
+    extends TopologyManager[StoreId, CryptoPureApi](
       nodeId,
       clock,
       crypto,
@@ -158,7 +211,9 @@ class AuthorizedTopologyManager(
       expectFullAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[(Seq[GenericValidatedTopologyTransaction], CantonTimestamp)]] =
+  ): FutureUnlessShutdown[
+    (Seq[(Seq[GenericValidatedTopologyTransaction], CantonTimestamp)], AsyncResult[Unit])
+  ] =
     MonadUtil
       .sequentialTraverse(transactions) { transaction =>
         val ts = timestampForValidation()
@@ -169,7 +224,11 @@ class AuthorizedTopologyManager(
             Seq(transaction),
             expectFullAuthorization,
           )
-          .map(_ -> ts)
+          .map { case (txs, asyncResult) => ((txs, ts), asyncResult) }
+      }
+      .map { txs =>
+        val (txsAndTimestamp, asyncResults) = txs.unzip
+        (txsAndTimestamp, asyncResults.combineAll)
       }
 }
 
@@ -254,9 +313,14 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
       protocolVersion: ProtocolVersion,
       expectFullAuthorization: Boolean,
       forceChanges: ForceFlags = ForceFlags.none,
+      waitToBecomeEffective: Option[NonNegativeFiniteDuration],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TopologyManagerError, GenericSignedTopologyTransaction] = {
+  ): EitherT[
+    FutureUnlessShutdown,
+    TopologyManagerError,
+    GenericSignedTopologyTransaction,
+  ] = {
     logger.debug(show"Attempting to build, sign, and $op $mapping with serial $serial")
     for {
       existingTransaction <- findExistingTransaction(mapping)
@@ -271,7 +335,15 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
         existingTransaction,
         forceChanges,
       )
-      _ <- add(Seq(signedTx), forceChanges, expectFullAuthorization)
+
+      asyncResult <- add(Seq(signedTx), forceChanges, expectFullAuthorization)
+      _ <- waitToBecomeEffective match {
+        case Some(timeout) =>
+          EitherT.pure[FutureUnlessShutdown, TopologyManagerError](
+            timeout.awaitUS(s"proposeAndAuthorize-wait-for-effective")(asyncResult.unwrap)
+          )
+        case None => EitherTUtil.unitUS[TopologyManagerError]
+      }
     } yield signedTx
   }
 
@@ -322,9 +394,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
         expectFullAuthorization = expectFullAuthorization,
         forceChanges = forceChanges,
       )
-    } yield {
-      extendedTransaction
-    }
+    } yield extendedTransaction
   }
 
   def findExistingTransaction[M <: TopologyMapping](mapping: M)(implicit
@@ -549,7 +619,9 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
       expectFullAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[(Seq[GenericValidatedTopologyTransaction], CantonTimestamp)]]
+  ): FutureUnlessShutdown[
+    (Seq[(Seq[GenericValidatedTopologyTransaction], CantonTimestamp)], AsyncResult[Unit])
+  ]
 
   /** sequential(!) adding of topology transactions
     *
@@ -561,7 +633,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
       expectFullAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, AsyncResult[Unit]] =
     sequentialQueue.executeEUS(
       for {
         _ <- MonadUtil.sequentialTraverse_(transactions)(
@@ -590,35 +662,39 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
           )
         }
 
-        _ <-
+        asyncResult <-
           if (newTransactionsOrAdditionalSignatures.isEmpty)
-            EitherT.pure[FutureUnlessShutdown, TopologyManagerError](())
+            EitherT.pure[FutureUnlessShutdown, TopologyManagerError](AsyncResult.immediate)
           else {
             // validate incrementally and apply to in-memory state
-            EitherT
-              .right[TopologyManagerError](
-                validateTransactions(
-                  newTransactionsOrAdditionalSignatures,
-                  expectFullAuthorization,
+            for {
+              transactionsAndTimestampAndAsyncResult <- EitherT
+                .right[TopologyManagerError](
+                  validateTransactions(
+                    newTransactionsOrAdditionalSignatures,
+                    expectFullAuthorization,
+                  )
                 )
-              )
-              .flatMap(filterDuplicatesAndNotify)
+              (transactionsAndTimestamp, asyncResult) = transactionsAndTimestampAndAsyncResult
+              _ <- failOrNotifyObservers(transactionsAndTimestamp)
+            } yield asyncResult
           }
-      } yield (),
+      } yield asyncResult,
       "add-topology-transaction",
     )
 
-  private def filterDuplicatesAndNotify(
+  private def failOrNotifyObservers(
       validatedTxWithTimestamps: Seq[(Seq[GenericValidatedTopologyTransaction], CantonTimestamp)]
   )(implicit traceContext: TraceContext) = {
-    val nonDuplicateRejectionReasons =
-      validatedTxWithTimestamps.flatMap(_._1.flatMap(_.nonDuplicateRejectionReason))
-    val firstError = nonDuplicateRejectionReasons.headOption.map(_.toTopologyManagerError)
+    val firstError =
+      validatedTxWithTimestamps.iterator
+        .flatMap { case (transactions, _ts) =>
+          transactions.collectFirst { case ValidatedTopologyTransaction(_, Some(rejection), _) =>
+            rejection.toTopologyManagerError
+          }
+        }
+        .nextOption()
     EitherT(
-      // if the only rejections where duplicates (i.e. headOption returns None),
-      // we filter them out and proceed with all other validated transactions, because the
-      // TopologyStateProcessor will have treated them as such as well.
-      // this is similar to how duplicate transactions are not considered failures in processor.validateAndApplyAuthorization
       firstError
         .toLeft(validatedTxWithTimestamps)
         .traverse { transactionsList =>

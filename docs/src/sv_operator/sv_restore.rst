@@ -11,15 +11,15 @@ Disaster Recovery
 
 There are three ways to recover from disasters:
 
-In simple cases where only a single node is affected but the overall
-network is still healthy, a :ref:`Restore from backup <sv_backup_restore>` is
-usually sufficient.
+#. In simple cases where only a single node is affected but the overall
+   network is still healthy, a :ref:`Restore from backup <sv_backup_restore>` is
+   usually sufficient.
 
-If a full backup is unavailable but an identity backup has been
-created, the balance of the SV can be :ref:`recovered <sv_reonboard>` on a dedicated
-validator but the SV must be onboarded as a separate node.
+#. If a full backup is unavailable but an identity backup has been
+   created, the balance of the SV can be :ref:`recovered <sv_reonboard>` on a dedicated
+   validator but the SV must be onboarded as a separate node.
 
-Lastly, For network-wide failures, a more complex :ref:`Disaster recovery procedure <sv_network_dr>` is required.
+#. Lastly, For network-wide failures, a more complex :ref:`Disaster recovery procedure <sv_network_dr>` is required.
 
 
 .. _sv_backup_restore:

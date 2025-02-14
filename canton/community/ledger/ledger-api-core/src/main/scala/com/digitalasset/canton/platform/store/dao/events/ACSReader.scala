@@ -30,9 +30,9 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawUnassignEvent,
   UnassignProperties,
 }
-import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForFlatTx
+import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForUpdatesAcsDelta
 import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPaginationState
-import com.digitalasset.canton.platform.store.dao.events.TransactionsReader.endSpanOnTermination
+import com.digitalasset.canton.platform.store.dao.events.UpdateReader.endSpanOnTermination
 import com.digitalasset.canton.platform.store.dao.{
   DbDispatcher,
   EventProjectionProperties,
@@ -99,7 +99,7 @@ class ACSReader(
   ): Source[GetActiveContractsResponse, NotUsed] = {
     val (activeAtOffset, activeAtLong) = activeAt
     val span =
-      Telemetry.Transactions.createSpan(tracer, activeAtOffset)(qualifiedNameOfCurrentFunc)
+      Telemetry.Updates.createSpan(tracer, activeAtOffset)(qualifiedNameOfCurrentFunc)
     val event =
       tracing.Event("contract", Map((SpanAttribute.Offset, activeAtLong.toString)))
     Spans.addEventToSpan(event, span)
@@ -387,17 +387,17 @@ class ACSReader(
       else
         globalPayloadQueriesLimiter.execute(
           dispatcher
-            .executeSql(metrics.index.db.flatTxStream.fetchEventCreatePayloads) {
+            .executeSql(metrics.index.db.updatesAcsDeltaStream.fetchEventCreatePayloads) {
               implicit connection =>
                 val result = withValidatedActiveAt(
                   eventStorageBackend.transactionStreamingQueries
-                    .fetchEventPayloadsFlat(EventPayloadSourceForFlatTx.Create)(
+                    .fetchEventPayloadsAcsDelta(EventPayloadSourceForUpdatesAcsDelta.Create)(
                       eventSequentialIds = ids,
                       allFilterParties = allFilterParties,
                     )(connection)
                 )
                 logger.debug(
-                  s"fetchEventPayloadsFlat for Create returned ${ids.size}/${result.size} ${ids.lastOption
+                  s"fetchEventPayloads for Create returned ${ids.size}/${result.size} ${ids.lastOption
                       .map(last => s"until $last")
                       .getOrElse("")}"
                 )
@@ -646,7 +646,7 @@ class ACSReader(
               workflowId = rawAssignEntry.workflowId.getOrElse(""),
               contractEntry = GetActiveContractsResponse.ContractEntry.IncompleteAssigned(
                 IncompleteAssigned(
-                  Some(TransactionsReader.toAssignedEvent(rawAssignEntry.event, createdEvent))
+                  Some(UpdateReader.toAssignedEvent(rawAssignEntry.event, createdEvent))
                 )
               ),
             )
@@ -670,7 +670,7 @@ class ACSReader(
             contractEntry = GetActiveContractsResponse.ContractEntry.IncompleteUnassigned(
               IncompleteUnassigned(
                 createdEvent = Some(createdEvent),
-                unassignedEvent = Some(TransactionsReader.toUnassignedEvent(rawUnassignEntry.event)),
+                unassignedEvent = Some(UpdateReader.toUnassignedEvent(rawUnassignEntry.event)),
               )
             ),
           )

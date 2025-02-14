@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.setup
 import cats.implicits.{showInterpolator, toFoldableOps}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
-import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey, SigningPublicKeyWithName}
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
@@ -240,32 +240,21 @@ class NodeInitializer(
       _ <- importAuthorizedStoreSnapshot(dump.authorizedStoreSnapshot)
       _ <-
         if (expectedId != dump.id) {
-          connection.listMyKeys().flatMap { keys =>
-            val nonNamespaceKeys = keys.filter { key =>
-              key.publicKeyWithName match {
-                case SigningPublicKeyWithName(signignKey, _)
-                    // namespace keys are implicitly owned and they cannot be used to prove ownership of other keys
-                    if signignKey.usage == SigningKeyUsage.NamespaceOnly =>
-                  false
-                case _ => true
-              }
-            }
-            NonEmpty.from(nonNamespaceKeys) match {
-              case None =>
-                Future.failed(
-                  Status.INTERNAL
-                    .withDescription(
-                      "Node is bootstrapping from dump but list of keys is empty"
-                    )
-                    .asRuntimeException
-                )
-              case Some(keysNE) =>
-                connection.ensureInitialOwnerToKeyMapping(
-                  expectedId.member,
-                  keysNE.map(_.publicKey),
-                  RetryFor.Automation,
-                )
-            }
+          connection.listOwnerToKeyMapping(dump.id.member).flatMap {
+            case Seq(mapping) =>
+              connection.ensureInitialOwnerToKeyMapping(
+                expectedId.member,
+                mapping.mapping.keys,
+                RetryFor.Automation,
+              )
+            case mappings =>
+              Future.failed(
+                Status.INTERNAL
+                  .withDescription(
+                    s"Expected exactly one OwnerToKeyMapping for old node id ${dump.id} but got $mappings"
+                  )
+                  .asRuntimeException
+              )
           }
         } else Future.unit
     } yield ()

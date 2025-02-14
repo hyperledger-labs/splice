@@ -12,7 +12,6 @@ import com.digitalasset.canton.console.{
   StandardConsoleOutput,
 }
 import com.digitalasset.canton.crypto.CommunityCryptoFactory
-import com.digitalasset.canton.crypto.admin.grpc.GrpcVaultService.CommunityGrpcVaultServiceFactory
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
@@ -29,9 +28,11 @@ import com.digitalasset.canton.synchronizer.mediator.{
   MediatorNodeParameters,
 }
 import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
-import com.digitalasset.canton.synchronizer.sequencing.SequencerNodeBootstrap
-import com.digitalasset.canton.synchronizer.sequencing.config.CommunitySequencerNodeConfig
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.CommunitySequencerFactory
+import com.digitalasset.canton.synchronizer.sequencer.config.CommunitySequencerNodeConfig
+import com.digitalasset.canton.synchronizer.sequencer.{
+  CommunitySequencerFactory,
+  SequencerNodeBootstrap,
+}
 
 class CommunityEnvironment(
     override val config: CantonCommunityConfig,
@@ -80,7 +81,6 @@ class CommunityEnvironment(
         new CommunityStorageFactory(sequencerConfig.storage),
         new CommunityCryptoFactory(),
         new CommunityCryptoPrivateStoreFactory(),
-        new CommunityGrpcVaultServiceFactory,
       )
       .valueOr(err =>
         throw new RuntimeException(s"Failed to create sequencer node $name: $err")
@@ -100,7 +100,6 @@ class CommunityEnvironment(
         new CommunityStorageFactory(mediatorConfig.storage),
         new CommunityCryptoFactory(),
         new CommunityCryptoPrivateStoreFactory(),
-        new CommunityGrpcVaultServiceFactory(),
       )
       .valueOr(err =>
         throw new RuntimeException(s"Failed to create mediator bootstrap: $err")
