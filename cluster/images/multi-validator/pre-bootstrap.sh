@@ -79,6 +79,7 @@ canton.validator-apps.validator_backend_$index = {
                 portNumber = \${SPLICE_APP_POSTGRES_PORT}
                 user = \${SPLICE_APP_POSTGRES_USER}
                 password = \${SPLICE_APP_POSTGRES_PASSWORD}
+                tcpKeepAlive = true
             }
         }
     }

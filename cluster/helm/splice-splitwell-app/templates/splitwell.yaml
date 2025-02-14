@@ -41,9 +41,7 @@ spec:
         - name: ADDITIONAL_CONFIG_PERSISTENCE
           value: |
             canton.splitwell-apps.splitwell_backend.storage {
-              type = postgres
               config {
-                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
                 properties = {
                   databaseName = "{{ .databaseName }}"
                   currentSchema = "{{ .schema }}"
