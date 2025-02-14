@@ -86,7 +86,6 @@ services:
                   portNumber = ${SPLICE_DB_PORT}
                   user = ${SPLICE_DB_USER}
                   password = ${SPLICE_DB_PASSWORD}
-                  tcpKeepAlive = true
                 }
               }
             }

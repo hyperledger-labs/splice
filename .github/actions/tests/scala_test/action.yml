@@ -119,7 +119,7 @@ runs:
           fi
           mkdir -p log
           ./start-canton.sh -p external -D ${{ inputs.start_canton_options }}
-        additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD ${{ inputs.additional_nix_args }}"
+        additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD ${{ inputs.additional_nix_args }}"
 
     - name: Set up SBT
       id: setup_sbt

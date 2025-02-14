@@ -149,6 +149,10 @@ case "$1_$2" in
         docker_start
         docker_wait
         docker_create_user
+
+        # These environment variables are used by the Canton configuration file mixin for Postgres
+        export CANTON_DB_USER=$POSTGRES_CANTON_USER
+        export CANTON_DB_PASSWORD=$POSTGRES_CANTON_PASSWORD
     ;;
     docker_wait)
         docker_wait
@@ -157,6 +161,10 @@ case "$1_$2" in
         pgctl_start
         psql_wait
         psql_create_user
+
+        # These environment variables are used by the Canton configuration file mixin for Postgres
+        export CANTON_DB_USER=$POSTGRES_CANTON_USER
+        export CANTON_DB_PASSWORD=$POSTGRES_CANTON_PASSWORD
     ;;
     local_wait)
         psql_wait
@@ -164,6 +172,10 @@ case "$1_$2" in
     external_start)
         psql_wait
         psql_create_user
+
+        # These environment variables are used by the Canton configuration file mixin for Postgres
+        export CANTON_DB_USER=$POSTGRES_CANTON_USER
+        export CANTON_DB_PASSWORD=$POSTGRES_CANTON_PASSWORD
     ;;
     external_wait)
         psql_wait
