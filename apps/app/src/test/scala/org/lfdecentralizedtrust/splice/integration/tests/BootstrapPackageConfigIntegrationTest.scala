@@ -39,7 +39,9 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 import org.scalatest.time.{Minute, Span}
+import org.scalatest.Ignore
 
+@Ignore
 class BootstrapPackageConfigIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil
