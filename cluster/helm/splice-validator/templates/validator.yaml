@@ -131,9 +131,7 @@ spec:
         - name: ADDITIONAL_CONFIG_PERSISTENCE
           value: |
             canton.validator-apps.validator_backend.storage {
-              type = postgres
               config {
-                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
                 properties = {
                   databaseName = "{{ .databaseName }}"
                   currentSchema = "{{ .schema }}"
