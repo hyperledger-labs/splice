@@ -1,7 +1,14 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as std from '@pulumi/std';
-import { CLUSTER_BASENAME, ExactNamespace, KmsConfig, ServiceAccount } from 'splice-pulumi-common';
+import {
+  CLUSTER_BASENAME,
+  ExactNamespace,
+  KmsConfig,
+  loadYamlFromFile,
+  REPO_ROOT,
+  ServiceAccount,
+} from 'splice-pulumi-common';
 
 export type ParticipantKmsHelmResources = {
   kms: KmsConfig;
@@ -45,30 +52,15 @@ export const getParticipantKmsHelmResources = (
     },
   });
 
-  const kmsValues = {
-    additionalEnvVars: [
-      {
-        name: 'GOOGLE_APPLICATION_CREDENTIALS',
-        value: '/app/gcp-credentials.json',
-      },
-    ],
-    extraVolumeMounts: [
-      {
-        name: 'gcp-credentials',
-        mountPath: '/app/gcp-credentials.json',
-        subPath: 'googleCredentials',
-      },
-    ],
-    extraVolumes: [
-      {
-        name: 'gcp-credentials',
-        secret: {
-          secretName: 'gke-credentials',
-        },
-      },
-    ],
-    kms: kmsConfig,
-  };
+  // Note that our Pulumi code supports only GCP KMS for now
+  const kmsValues = loadYamlFromFile(
+    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/kms-participant-gcp-values.yaml`,
+    {
+      LOCATION_ID: kmsConfig.locationId,
+      PROJECT_ID: kmsConfig.projectId,
+      KEY_RING_ID: kmsConfig.keyRingId,
+    }
+  );
 
   return {
     kmsValues,

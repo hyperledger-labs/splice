@@ -62,7 +62,15 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         val newTaps = tapsAfter.filter(tap => !txDatesBefore.exists(_ == tap.date))
         logger.debug(s"New taps: $newTaps")
         forAtLeast(1, newTaps) { tap =>
-          tap.tapAmount shouldBe walletUsdToAmulet(tapQuantity)
+          {
+            val roundError = 0.01
+            assertInRange(tap.tapAmountUsd, (tapQuantity - roundError, tapQuantity + roundError))
+            val tapQuantityAmt = walletUsdToAmulet(tapQuantity, 1.0 / tap.usdToAmulet)
+            assertInRange(
+              tap.tapAmountAmulet,
+              (tapQuantityAmt - roundError, tapQuantityAmt + roundError),
+            )
+          }
         }
       }
     }
@@ -230,26 +238,39 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       transactionRow: Element
   )(implicit env: SpliceTestConsoleEnvironment): Option[Tap] = {
     val date = readDateFromRow(transactionRow)
-    val amountO =
-      if (
-        transactionRow
-          .childElement(className("tx-action"))
-          .text
-          .contains("Balance Change") && transactionRow
-          .childElement(className("tx-subtype"))
-          .text
-          .contains("Tap")
-      ) {
-        Some(
+    if (
+      transactionRow
+        .childElement(className("tx-action"))
+        .text
+        .contains("Balance Change") && transactionRow
+        .childElement(className("tx-subtype"))
+        .text
+        .contains("Tap")
+    ) {
+      Some(
+        Tap(
+          date,
           parseAmountText(
             transactionRow
               .childElement(className("tx-amount-amulet"))
               .text,
             unit = amuletNameAcronym,
-          )
+          ),
+          parseAmountText(
+            transactionRow
+              .childElement(className("tx-amount-usd"))
+              .text,
+            unit = "USD",
+          ),
+          parseAmountText(
+            transactionRow
+              .childElement(className("tx-amount-rate"))
+              .text,
+            unit = s"$amuletNameAcronym/USD",
+          ),
         )
-      } else None
-    amountO.map(Tap(date, _))
+      )
+    } else None
   }
 
   protected def waitForTrafficPurchase()(implicit driver: WebDriverType) = {
@@ -290,6 +311,8 @@ object WalletFrontendTestUtil {
 
   final case class Tap(
       date: String,
-      tapAmount: BigDecimal,
+      tapAmountAmulet: BigDecimal,
+      tapAmountUsd: BigDecimal,
+      usdToAmulet: BigDecimal,
   )
 }

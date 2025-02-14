@@ -167,18 +167,22 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
     checkNumberNumberOfDiffs(1);
   });
 
-  test('of a SetConfig vote result in the executed section 2.', async () => {
-    const user = userEvent.setup();
-    render(<AppWithConfig />);
+  test(
+    'of a SetConfig vote result in the executed section 2.',
+    async () => {
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Executed', action, user, 2);
+      await goToGovernanceTabAndClickOnAction('Executed', action, user, 2);
 
-    const mockJsonContent = getMockJsonContentForDsoRules('1800');
+      const mockJsonContent = getMockJsonContentForDsoRules('1800');
 
-    await checkDsoRulesExpectedConfigDiffsHTML(mockJsonContent, 0, true);
+      await checkDsoRulesExpectedConfigDiffsHTML(mockJsonContent, 0, true);
 
-    checkNumberNumberOfDiffs(1);
-  });
+      checkNumberNumberOfDiffs(1);
+    },
+    { retry: 3 }
+  );
 
   test('in the rejected section.', async () => {
     const user = userEvent.setup();
@@ -214,8 +218,11 @@ async function goToGovernanceTabAndClickOnAction(
   expect(await screen.findByText('Vote Requests')).toBeDefined();
   expect(await screen.findByText('Governance')).toBeDefined();
 
-  expect(await screen.findByText(tableType)).toBeDefined();
+  const button = await screen.findByText(tableType);
+  expect(button).toBeDefined();
   await user.click(screen.getByText(tableType));
+
+  expect(button.getAttribute('aria-selected')).toBe('true');
 
   expect(await screen.findAllByText(action)).toBeDefined();
 

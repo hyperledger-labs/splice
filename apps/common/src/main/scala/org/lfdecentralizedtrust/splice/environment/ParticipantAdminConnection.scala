@@ -71,7 +71,7 @@ class ParticipantAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-)(implicit ec: ExecutionContextExecutor, tracer: Tracer)
+)(implicit protected val ec: ExecutionContextExecutor, tracer: Tracer)
     extends TopologyAdminConnection(
       config,
       apiLoggingConfig,
@@ -170,7 +170,7 @@ class ParticipantAdminConnection(
       ParticipantAdminCommands.SynchronizerConnectivity.RegisterSynchronizer(
         config,
         handshakeOnly,
-        SequencerConnectionValidation.All,
+        SequencerConnectionValidation.ThresholdActive,
       )
     )
 
@@ -372,30 +372,36 @@ class ParticipantAdminConnection(
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity.ModifySynchronizerConnection(
         config,
-        SequencerConnectionValidation.All,
+        SequencerConnectionValidation.ThresholdActive,
       )
     )
 
   def modifySynchronizerConnectionConfig(
-      domain: SynchronizerAlias,
+      synchronizer: SynchronizerAlias,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
-  )(implicit traceContext: TraceContext): Future[Boolean] =
-    for {
-      oldConfig <- getSynchronizerConnectionConfig(domain)
-      newConfig = f(oldConfig)
-      configModified <- newConfig match {
-        case None =>
-          logger.trace("No update to domain connection config required")
-          Future.successful(false)
-        case Some(config) =>
-          logger.info(
-            s"Updating to new domain connection config for domain $domain. Old config: $oldConfig, new config: $config"
-          )
-          for {
-            _ <- setSynchronizerConnectionConfig(config)
-          } yield true
-      }
-    } yield configModified
+  )(implicit traceContext: TraceContext): Future[Boolean] = {
+    retryProvider.retryForClientCalls(
+      "modify_synchronizer_connection",
+      "Set the new synchronizer connection if required",
+      for {
+        oldConfig <- getSynchronizerConnectionConfig(synchronizer)
+        newConfig = f(oldConfig)
+        configModified <- newConfig match {
+          case None =>
+            logger.trace("No update to synchronizer connection config required")
+            Future.successful(false)
+          case Some(config) =>
+            logger.info(
+              s"Updating to new synchronizer connection config for synchronizer $synchronizer. Old config: $oldConfig, new config: $config"
+            )
+            for {
+              _ <- setSynchronizerConnectionConfig(config)
+            } yield true
+        }
+      } yield configModified,
+      logger,
+    )
+  }
 
   private def modifyOrRegisterSynchronizerConnectionConfig(
       config: SynchronizerConnectionConfig,

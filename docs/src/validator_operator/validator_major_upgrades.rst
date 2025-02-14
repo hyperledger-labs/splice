@@ -8,7 +8,8 @@
 Synchronizer Upgrades with Downtime
 ===================================
 
-For supporting non-backwards-compatible major version upgrades of the Canton software the Global Synchronizer will implement a procedure for synchronizer (i.e., domain) upgrades with downtime.
+To consume non-backwards-compatible major version upgrades of the Canton software the Global Synchronizer
+uses, you need to follow the procedure for synchronizer (i.e., domain) upgrades with downtime described below.
 
 .. _validator-upgrades-overview:
 
@@ -22,9 +23,12 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 2. SVs agree and eventually confirm via an on-ledger vote on which specific date and time the network downtime necessary for the upgrade will start. Information about the downtime window is communicated to validators.
 3. At the start of the downtime window, the DSO automatically pauses all traffic on the operating version of the global synchronizer.
 4. Shortly after traffic on the global synchronizer has been paused (there is a short delay to ensure that all components have synced up to the final state of the existing synchronizer), the validator node software automatically exports so-called migration dumps to attached Kubernetes volumes. See :ref:`validator-upgrades-dumps`.
+
+   .. todo:: document where the dump lands in a docker compose setup
+
 5. Validator operators verify that their nodes have caught up to the now-paused global synchronizer. See :ref:`validator-upgrades-catching-up`.
 6. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`validator-backups`.
-7. Validator wait until the DSO has signaled that the migration has been successful.
+7. Validators wait until the DSO has signaled that the migration has been successful.
 8. All validators upgrade theirs deployments. See :ref:`validator-upgrades-deploying`.
 9. Upon (re-)initialization, the validator backend automatically consumes the migration dump and initializes the validator participant based on the contents of this dump. App databases are :ref:`preserved <validator-upgrades-state>`.
 
@@ -45,7 +49,7 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 Technical Details
 -----------------
 
-The following section assumes that the validator node on the original synchronizer has already been deployed.
+The following section assumes that the validator node connected to the original synchronizer has already been deployed.
 
 .. _validator-upgrades-state:
 
@@ -83,6 +87,8 @@ a persistent Kubernetes volume is attached to the ``validator-app`` pod and conf
 When redeploying the validator app as part of the migration process (see :ref:`validator-upgrades-deploying`),
 the validator app will automatically consume the migration dump and initialize the participant based on the contents of this dump.
 
+.. todo:: also talk about docker compose setup in the paragraph above
+
 .. _validator-upgrades-catching-up:
 
 Catching Up Before the Migration
@@ -90,8 +96,8 @@ Catching Up Before the Migration
 
 In order for the migration to the new synchronizer to be safe and successful, it is important that the validator node is fully caught up on the existing synchronizer before proceeding to :ref:`validator-upgrades-deploying`.
 
-* For making sure that the validator participant has caught up and the :ref:`migration dump <validator-upgrades-dumps>` has been created as expected, operators can check the logs of the ``validator-app`` pod for ``Wrote domain migration dump`` messages.
-* For making sure that the validator app has caught up, operators can check the logs of the ``validator-app`` pod for the message ``Ingested transaction``.
+* To ensure that the validator participant has caught up and the :ref:`migration dump <validator-upgrades-dumps>` has been created as expected, operators can check the logs of the ``validator-app`` pod for ``Wrote domain migration dump`` messages.
+* To ensure that the validator app has caught up, operators can check the logs of the ``validator-app`` pod for the message ``Ingested transaction``.
   If the latest such message is 10 or more minutes old, the validator app has very likely (with a large safety margin) caught up to the state on the participant, and hence to the state of the existing (paused) synchronizer.
 
 .. _validator-upgrades-deploying:
@@ -126,15 +132,15 @@ Once you confirmed that your validator is caught up, as explained above, confirm
 
   docker compose logs validator | grep "Wrote domain migration dump"
 
-(For general reading about docker compose log retentaion and rotation, see `the docs <https://docs.docker.com/engine/logging/configure/>`_).
+(For general reading about docker compose log retention and rotation, see these `Docker docs <https://docs.docker.com/engine/logging/configure/>`_).
 
 If the migration dump has been created, proceed with the following steps:
 
 * Stop the validator, using ``./stop.sh``.
-* Restart the validator, while updating the migration ID in the `-m <migration ID>` argument,
-  and also including `-M` to instruct the validator to perform the actual migration
-  to the new migration ID. Note that `-M` is required only in the first startup after the migration,
+* Restart the validator, while updating the migration ID in the ``-m <migration ID>`` argument,
+  and also including ``-M`` to instruct the validator to perform the actual migration
+  to the new migration ID. Note that ``-M`` is required only in the first startup after the migration,
   to instruct the validator to perform the actual migration. Followup restarts should keep the
-  `-m <migration ID>`, but omit the `-M`.
+  ``-m <migration ID>``, but omit the ``-M``.
 
 

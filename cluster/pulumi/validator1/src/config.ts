@@ -19,6 +19,7 @@ export const Validator1ConfigSchema = z.object({
           retention: z.string(),
         })
         .optional(),
+      deduplicationDuration: z.string().optional(),
     })
     .optional(),
 });

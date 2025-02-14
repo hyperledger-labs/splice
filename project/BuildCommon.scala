@@ -1358,6 +1358,8 @@ object BuildCommon {
       )
       .settings(
         sharedCantonSettings,
+        Test / unmanagedSources :=
+          (Test / unmanagedSources).value.filter(_.getName == "Generators.scala"),
         disableTests,
         sharedSettings,
         compileOrder := CompileOrder.JavaThenScala,

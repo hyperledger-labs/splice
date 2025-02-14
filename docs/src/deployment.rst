@@ -12,9 +12,4 @@ Overview
    - docker compose vs. helm based deployments
    - available networks and releases and their difference
 
-.. todo:: Add "Monitoring" section
-
-  - generated metrics docs
-  - grafana dashboards
-
   Consider inlining these into the SV and validator node docs

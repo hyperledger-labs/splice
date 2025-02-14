@@ -90,20 +90,21 @@ object Headers {
     Compile / headerSources := {
       val pySources = (
         ((Compile / baseDirectory).value ** "*.py") ---
-          // TODO (#13695) directory moving/renaming
-          ((Compile / baseDirectory).value ** "cn-svc-configs" ** "*") ---
+          ((Compile / baseDirectory).value ** "configs" ** "*") ---
+          ((Compile / baseDirectory).value ** "configs-private" ** "*") ---
           ((Compile / baseDirectory).value ** "node_modules" ** "*")
       ).get
 
       val shSources = (
         ((Compile / baseDirectory).value ** "*.sh") ---
           ((Compile / baseDirectory).value ** "node_modules" ** "*") ---
-          // TODO (#13695) directory moving/renaming
-          ((Compile / baseDirectory).value ** "cn-svc-configs" ** "*") ---
+          ((Compile / baseDirectory).value ** "configs" ** "*") ---
+          ((Compile / baseDirectory).value ** "configs-private" ** "*") ---
           ((Compile / baseDirectory).value ** "community" ** "*") ---
           ((Compile / baseDirectory).value ** "*ts-client" ** "*") ---
           ((Compile / baseDirectory).value ** "target" ** "*") ---
-          ((Compile / baseDirectory).value ** "cmd-*.sh")
+          ((Compile / baseDirectory).value ** "cmd-*.sh") ---
+          ((Compile / baseDirectory).value ** "example-script.sh")
       ).get
 
       val sbtScalaSources = (

@@ -401,16 +401,40 @@ uses our redistributable Helm charts to install a Canton Network
 test environment inside a cluster already configured with the
 infrastructure script.
 
+### Versions and Repositories
+
+The version is set to `${next-version}-${user}-dirty` by default for images and helm charts that are built locally.
+Images and helm charts with a `*-dirty` version are pushed respectively to the **Development** Artifactory Docker Registry at
+digitalasset-canton-network-docker-dev.jfrog.io and the **Development** Helm chart Repository at https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm-dev.
+PR branch snapshots built through CCI are also pushed to **Development** registry and repository.
+
+Release versions are pushed to the **Release** Artifactory Docker Registry at digitalasset-canton-network-docker.jfrog.io
+and the **Release** Helm chart Repository at https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm.
+These versions are also pushed to the **Public** Github Container Registry at ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm,
+respectively for docker images and helm charts. The deployment scripts do not use the **Public** Github Container Registry at this time.
+
+If you want to deploy a specific release or snapshot version instead of a locally built one,
+you can set the `CHARTS_VERSION` and `OVERRIDE_VERSION` environment variables in the `.envrc.vars` file of the corresponding cluster.
+
+You will need to set the `SPLICE_ARTIFACTS_REPOSITORY` environment variable to `public` to use the **release** artifacts from the
+**Release** Artifactory Docker Registry and the **Release** Helm chart Repository if needed for a snapshot built from main or daily builds, or for release versions.
+
+All scratchnet clusters define `SPLICE_ARTIFACTS_REPOSITORY` as `private` to use the **Development** artifacts by default.
+All other clusters are set up to use the **Release** artifacts by default, `SPLICE_ARTIFACTS_REPOSITORY` is set to `public` in the default `.envrc.vars.da` file.
+
+.. todo:: Cleanup tech debt of confusing public, private and release repositories and registries.
+
+### Deploy a local build to a cluster
 1. Start from a clean slate: `make -C $REPO_ROOT clean`
    - Note that this step internally calls `sbt bundle` to build the most recent version of our apps.
      later steps don't call `sbt bundle` automatically, as it takes too long.
 1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
    - Note: helm charts built locally reference the docker images using just your username.
-     Make sure to `make docker-push`, whenever you want to propagate local changes.
+     Make sure to `make docker-push`, whenever you want to propagate local changes to the Development Artifactory Docker Registry.
    - If this fails, you may need to run `echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin` to login to the Artifactory docker registry for development.
 1. If you plan on using manual `pulumi` commands for deployment (i.e., calling `cncluster pulumi ...` instead of `cncluster apply`),
    ensure that pulumi is set up: `make -C $REPO_ROOT cluster/build -j`
-   - This step is handled automatically by `cncluster apply`.
+   - This step is handled automatically by `cncluster apply`. This uses locally built helm charts by default.
 1. Start with a working cluster and change to its deployment directory.
 1. Acquire the cluster lock `cncluster lock`.
 1. Delete the existing cluster resources managed by pulumi: `cncluster reset`.
@@ -427,6 +451,7 @@ infrastructure script.
 1. The Pulumi and Helm charts may now be edited and `cncluster apply`
    once again used to apply only the changes to the cluster.
 1. Release the cluster lock `cncluster unlock`, which also resets the cluster.
+
 
 
 ### Manual Google Cloud Configuration
@@ -1287,11 +1312,13 @@ The allowed IP ranges are stored in `allowed-ip-ranges.json` for the respective 
 [`allowed-ip-ranges-cn-internal.json`](./allowed-ip-ranges-cn-internal.json) for the IPs of our own clusters.
 
 Note that the external allowed IP ranges are managed in the
-[cn-svc-configs](https://github.com/DACH-NY/cn-svc-configs) repo so
-any change should be made there and then after merging it, bump the
+[configs-private](https://github.com/global-synchronizer-foundation/configs-private)
+repo so any change should be made there and then after merging it, bump the
 submodule in this repo.
 
-To update the submodule to a new commit
+To update the submodule to a new commit, use the following command. But please note that
+we don't necessarily need to accept any change pushed to the config repos. Please review
+all changes that you consume before applying this command.
 
 ```
 git submodule update --remote
@@ -1473,7 +1500,7 @@ The SV runbook prompts them to do so.
 
 #### Approving via SV config
 
-SV identities should be changed in the [cn-svc-configs](https://github.com/DACH-NY/cn-svc-configs) repo.
+SV identities should be changed in the [configs](https://github.com/global-synchronizer-foundation/configs) repo.
 After merging a PR there, bump the submodule in this repo.
 
 2. if you cannot wait the next update then, checkout the deployment branch of the cluster you want to update. You can run `make cluster/helm/build` to rebuild the helm charts, and then `cncluster apply` to redeploy the SVs.

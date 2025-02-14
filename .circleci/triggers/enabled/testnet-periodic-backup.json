@@ -3,13 +3,28 @@
   "description": "Periodic backup of TestNet",
   "attribution-actor": "system",
   "parameters": {
-    "branch": "release-line-0.3.5",
+    "branch": "release-line-0.3.9",
     "run-job": "backup-testnet"
   },
   "timetable": {
     "per-hour": 1,
-    "hours-of-day": [0, 4, 8, 12, 16, 20],
-    "days-of-week": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+    "hours-of-day": [
+      0,
+      4,
+      8,
+      12,
+      16,
+      20
+    ],
+    "days-of-week": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI",
+      "SAT",
+      "SUN"
+    ],
     "days-of-month": [],
     "months": [
       "JAN",

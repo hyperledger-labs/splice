@@ -1,1 +1,3 @@
-encryptionsalt: v1:ePtZxBfaNmw=:v1:XgFCY/Ikmx7Pjbe8:AcSgTDGxNc1iW3ZN2mbCnFLlS3A/cQ==
+secretsprovider: >-
+  gcpkms://projects/da-cn-scratchnet/locations/us-central1/keyRings/pulumi/cryptoKeys/scratchc
+encryptedkey: CiQAnkvof12cISaNL36rhz3Ly7OqlmJ7a0p6gq7TJdEkhGm4mOoSSQDtn4ly5b9Um1GsoZrOoa6Ue1SNdtjZf/Jnnuasy+NQjk7ikWya+yLQKIzSLmrm0dpfaJDNntRh30bKUySd6h5SwK38EHfyu48=

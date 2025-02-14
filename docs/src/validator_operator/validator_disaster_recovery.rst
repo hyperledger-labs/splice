@@ -11,15 +11,16 @@ Disaster Recovery
 
 There are three ways to recover from disasters:
 
-In simple cases where only a single node is affected but the overall
-network is still healthy, a :ref:`Restore from backup <validator_backup_restore>` is
-usually sufficient.
+#. In simple cases where only a single node is affected but the overall
+   network is still healthy, a :ref:`Restore from backup <validator_backup_restore>` is
+   usually sufficient.
 
-If a full backup is unavailable but an identity backup has been
-created, the balance of the validator can be :ref:`recovered <validator_reonboard>` on a new
-validator.
+#. If a full backup is unavailable but an identity backup has been
+   created, the balance of the validator can be :ref:`recovered <validator_reonboard>` on a new
+   validator.
 
-Lastly, For network-wide failures, a more complex :ref:`Disaster recovery procedure <validator_network_dr>` is required.
+#. Lastly, for network-wide failures, a more complex :ref:`Disaster recovery procedure <validator_network_dr>` is required.
+
 
 .. _validator_backup_restore:
 
@@ -36,7 +37,7 @@ The following steps can be taken to restore a node from backups:
    process for this depends on the storage and DBs used by the components, and
    is not documented here.
 #. Once all storage has been restored, scale up all components in the validator node
-   back to 1 replica
+   back to 1 replica.
 
 **NOTE:** Currently, you have to manually re-onboard any users that were
 onboarded after the backup was taken.
@@ -81,6 +82,9 @@ Once the new validator is up and running, you should be able to login as the adm
 and see its balance. Other users hosted on the validator would need to re-onboard, but their
 coin balance and CNS entries should be recovered.
 
+.. todo:: explain that the recovery only automatically works for users whose parties were allocated in the participant namespace
+
+
 Docker-Compose Deployment
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -102,9 +106,8 @@ In the case of a catastrophic failure of the validator node, some data owned by 
 In order to be able to recover the data, you must have a backup of the identities of the
 validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
 
-We can deploy a new validator node to which the data will be recovered.
-
-Repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
+You can deploy a new validator node to which the data will be recovered by
+repeating the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
 
 While doing so, please note the following:
 
@@ -132,7 +135,7 @@ While doing so, please note the following:
 Disaster recovery from loss of the CometBFT storage layer of the global synchronizer
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-In case of a complete disaster, where the complete CometBFT layer of the network is lost beyond repair, the SVs will
+In highly unlikely case of a complete disaster, where the complete CometBFT layer of the network is lost beyond repair, the SVs will
 follow a process somewhat similar to the migration dumps used for :ref:`sv-upgrades` to recover the network to
 a consistent state from before the disaster. Correspondingly, the validators will need to follow a process
 similar to the one described in :ref:`validator-upgrades`.

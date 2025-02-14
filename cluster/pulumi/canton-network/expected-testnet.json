@@ -262,7 +262,7 @@
           }
         ]
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "docs-docs",
     "provider": "",
@@ -657,7 +657,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -711,7 +711,7 @@
           }
         ]
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -793,7 +793,7 @@
           }
         ]
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -861,7 +861,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 230000
+            "rewardWeightBps": 270000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -995,7 +995,7 @@
           }
         ]
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1113,7 +1113,7 @@
           }
         }
       },
-      "version": "0.3.6"
+      "version": "0.3.9"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

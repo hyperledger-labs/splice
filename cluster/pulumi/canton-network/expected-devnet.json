@@ -1075,7 +1075,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1947,7 +1947,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -2001,7 +2001,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -2205,7 +2205,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -2354,7 +2354,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 230000
+            "rewardWeightBps": 270000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2380,6 +2380,11 @@
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "Five-North-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -2492,7 +2497,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -2598,7 +2603,7 @@
           }
         }
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -2827,7 +2832,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -2881,7 +2886,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -3085,7 +3090,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -3234,7 +3239,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 230000
+            "rewardWeightBps": 270000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -3260,6 +3265,11 @@
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "Five-North-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -3346,7 +3356,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -3445,7 +3455,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -3674,7 +3684,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -3728,7 +3738,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -3932,7 +3942,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -4081,7 +4091,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 230000
+            "rewardWeightBps": 270000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -4107,6 +4117,11 @@
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "Five-North-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -4193,7 +4208,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -4292,7 +4307,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -4521,7 +4536,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -4575,7 +4590,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -4779,7 +4794,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -4928,7 +4943,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 230000
+            "rewardWeightBps": 270000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -4954,6 +4969,11 @@
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "Five-North-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -5040,7 +5060,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -5139,7 +5159,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       },
-      "version": "0.3.9"
+      "version": "0.3.11"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",

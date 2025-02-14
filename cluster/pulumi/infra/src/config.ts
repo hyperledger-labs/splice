@@ -1,7 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   approveDaSupportSvNode,
-  cnSvcConfigsClusterDirectory,
+  svPrivateConfigsClusterDirectory,
   config,
   isDevNet,
   isMainNet,
@@ -44,7 +44,7 @@ function extractIpRanges(x: IpRangesDict): string[] {
 
 export function loadIPRanges(): string[] {
   const externalIPRangesJson = loadJsonFromFile(
-    `${cnSvcConfigsClusterDirectory}/allowed-ip-ranges.json`
+    `${svPrivateConfigsClusterDirectory}/allowed-ip-ranges.json`
   );
   const internalIPRangesJson = loadJsonFromFile(
     REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'

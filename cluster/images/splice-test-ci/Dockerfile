@@ -16,7 +16,9 @@ RUN groupadd --gid=1002 ci && \
     sudo -u ci mkdir -p /github/home/.local/bin && \
     sudo chown -R ci:ci /github/home
 
-RUN sudo pip3 install GitPython gql humanize marshmallow-dataclass requests requests_toolbelt prometheus_client --break-system-packages
+RUN sudo pip3 install \
+    GitPython gql humanize marshmallow-dataclass requests requests_toolbelt prometheus_client flask waitress json-logging \
+    --break-system-packages
 
 RUN sudo ln -s /usr/bin/python3 /usr/bin/python
 
@@ -28,5 +30,6 @@ RUN whoami && \
 ENV COURSIER_CACHE=/cache/coursier
 
 COPY target/LICENSE .
+COPY target/gha-runner-rpc.py .
 
 WORKDIR /github/home/project

@@ -1,6 +1,12 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, CLUSTER_NAME, conditionalString, config } from 'splice-pulumi-common';
+import {
+  CLUSTER_BASENAME,
+  CLUSTER_NAME,
+  conditionalString,
+  config,
+  isMainNet,
+} from 'splice-pulumi-common';
 
 import { slackToken } from './alertings';
 
@@ -82,7 +88,13 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
 -- TODO(#15720): Don't just ignore this - investigate!
 -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"Request to.*/accept resulted in a timeout")
-
+-- TODO(#17636): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher
+-(jsonPayload.message=~"signalWhenIngested.* has not completed after .* milliseconds")
+${conditionalString(
+  !isMainNet,
+  '-- TODO(#17025): Stop ignoring these again once we have topology-aware package selection\n' +
+    '-(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))'
+)}
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
