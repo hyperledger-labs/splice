@@ -29,7 +29,7 @@ WORKDIR /app
 # move tarball to a static name
 ADD target/splice-node.tar.gz .
 
-COPY target/monitoring.conf target/parameters.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml target/LICENSE /app/
+COPY target/storage.conf target/monitoring.conf target/parameters.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml target/LICENSE /app/
 RUN mkdir -p /app/splice-node/docs/html/cn-release-bundles
 
 RUN ln -s splice-node/bin/splice-node splice-image-bin
