@@ -14,13 +14,13 @@ trait SequencerBftAdminConnection {
   this: AppConnection =>
   implicit val ec: ExecutionContextExecutor
 
-  def addPeerEndpoint(peer: Endpoint)(implicit tc: TraceContext) = {
+  def addPeerEndpoint(peer: Endpoint)(implicit tc: TraceContext): Future[Unit] = {
     runCmd(
       SequencerBftAdminCommands.AddPeerEndpoint(endpoint = peer)
     )
   }
 
-  def removePeerEndpoint(peer: Endpoint)(implicit tc: TraceContext) = {
+  def removePeerEndpoint(peer: Endpoint)(implicit tc: TraceContext): Future[Unit] = {
     runCmd(
       SequencerBftAdminCommands.RemovePeerEndpoint(endpoint = peer)
     )

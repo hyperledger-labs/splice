@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.store.DsoRulesStore
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.DsoRulesTopologyStateReconciler
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, SequencerConfig}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
@@ -24,24 +23,8 @@ class SequencerBftPeerReconciler(
     override protected val svDsoStore: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
     val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext)
-    extends DsoRulesTopologyStateReconciler[BftPeerDifference]
+) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
     with NamedLogging {
-
-  def reconcileBftPeersIfRequired(
-      config: SequencerConfig
-  )(implicit tc: TraceContext): Future[Unit] = {
-    config match {
-      case BftSequencerConfig(_) =>
-        for {
-          dsoRules <- svDsoStore
-            .getDsoRulesWithSvNodeStates()
-          diff <- diffDsoRulesWithTopology(dsoRules)
-          _ <- diff.traverse(reconcileTask)
-        } yield {}
-      case _ => Future.unit
-    }
-  }
 
   override protected def diffDsoRulesWithTopology(
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeStates

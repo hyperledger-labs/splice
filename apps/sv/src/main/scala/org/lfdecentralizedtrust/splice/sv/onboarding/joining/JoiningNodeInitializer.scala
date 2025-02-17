@@ -47,7 +47,6 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.
 import org.lfdecentralizedtrust.splice.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
-  SequencerBftPeerReconciler,
   SetupUtil,
   SynchronizerNodeInitializer,
   SynchronizerNodeReconciler,
@@ -351,11 +350,6 @@ class JoiningNodeInitializer(
         ),
       ).tupled
       _ <- localSynchronizerNode.traverse_ { localSynchronizerNode =>
-        val sequencerBftInitializer = new SequencerBftPeerReconciler(
-          dsoStore,
-          localSynchronizerNode.sequencerAdminConnection,
-          loggerFactory,
-        )
         for {
           // First, make sure the identity of the new domain nodes is known on the domain
           _ <-
@@ -377,8 +371,7 @@ class JoiningNodeInitializer(
           // Finally, fully onboard the sequencer and mediator
           _ <-
             localSynchronizerNode.onboardLocalSequencerIfRequired(
-              svConnection.map(_._2),
-              sequencerBftInitializer,
+              svConnection.map(_._2)
             )
           // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
           _ = if (!skipTrafficReconciliationTriggers)

@@ -58,7 +58,7 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
   }
 
   "Splice apps" should {
-    "start with uninitialized Canton nodes" in { implicit env =>
+    "start with the bft sequencers" in { implicit env =>
       sv1Backend.startSync()
       sv2Backend.startSync()
       sv3Backend.startSync()

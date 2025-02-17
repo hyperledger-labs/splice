@@ -31,7 +31,6 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
-import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.time.Duration
@@ -69,7 +68,8 @@ final class LocalSynchronizerNode(
     with FlagCloseable
     with NamedLogging {
 
-  val sequencerConnection = LocalSynchronizerNode.toSequencerConnection(sequencerInternalConfig)
+  val sequencerConnection: GrpcSequencerConnection =
+    LocalSynchronizerNode.toSequencerConnection(sequencerInternalConfig)
 
   private def containsIdentityTransactions(
       uid: UniqueIdentifier,
@@ -338,8 +338,7 @@ final class LocalSynchronizerNode(
   /** Onboard the sequencer operated by this SV to the domain if it is not already.
     */
   def onboardLocalSequencerIfRequired(
-      svConnection: => Future[SvConnection],
-      initializer: SequencerBftPeerReconciler,
+      svConnection: => Future[SvConnection]
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -352,15 +351,14 @@ final class LocalSynchronizerNode(
       .flatMap {
         case Left(NodeStatus.NotInitialized(_, _)) =>
           logger.info("Onboarding sequencer")
-          svConnection.flatMap(onboardLocalSequencer(_, initializer))
+          svConnection.flatMap(onboardLocalSequencer(_))
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer is already onboarded")
           Future.unit
       }
 
   private def onboardLocalSequencer(
-      svConnection: SvConnection,
-      initializer: SequencerBftPeerReconciler,
+      svConnection: SvConnection
   )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
@@ -409,9 +407,6 @@ final class LocalSynchronizerNode(
             )
         },
         logger,
-      )
-      _ <- initializer.reconcileBftPeersIfRequired(
-        sequencerConfig
       )
     } yield ()
   }
