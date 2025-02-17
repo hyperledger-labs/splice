@@ -35,7 +35,7 @@ images := \
 	splice-test-ci \
 	splice-test-docker-runner \
 	splice-test-cometbft \
-	splice-test-temp-runner-hook \
+	splice-test-runner-hook \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app
