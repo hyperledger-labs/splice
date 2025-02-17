@@ -89,7 +89,6 @@ export class InStackDecentralizedSynchronizerNode
       };
       enableStateSync?: boolean;
       enableTimeoutCommit?: boolean;
-      volumeSize?: string;
     },
     active: boolean,
     runningMigration: boolean,
