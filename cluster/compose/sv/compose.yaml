@@ -105,6 +105,7 @@ services:
                   portNumber = ${SPLICE_SV_DB_PORT}
                   user = ${SPLICE_SV_DB_USER}
                   password = ${SPLICE_SV_DB_PASSWORD}
+                  tcpKeepAlive = true
                 }
               }
             }
@@ -166,6 +167,7 @@ services:
                   portNumber = ${SPLICE_SV_DB_PORT}
                   user = ${SPLICE_SV_DB_USER}
                   password = ${SPLICE_SV_DB_PASSWORD}
+                  tcpKeepAlive = true
                 }
               }
             }
@@ -217,6 +219,7 @@ services:
                   portNumber = ${SPLICE_SV_DB_PORT}
                   user = ${SPLICE_SV_DB_USER}
                   password = ${SPLICE_SV_DB_PASSWORD}
+                  tcpKeepAlive = true
                 }
               }
             }

@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
@@ -54,6 +55,18 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
           )
         )
       })
+      .addConfigTransformToFront((_, config) => {
+        // Set a broken sequencer URL for sv4 to test that validators can still successfully connect.
+        config
+          .focus(_.svApps)
+          .modify(_.updatedWith(InstanceName.tryCreate("sv4")) {
+            _.map(
+              _.focus(_.localSynchronizerNode).modify(
+                _.map(_.focus(_.sequencer.externalPublicApiUrl).replace("http://example.com"))
+              )
+            )
+          })
+      })
 
   "start and restart cleanly" in { implicit env =>
     initDsoWithSv1Only()
@@ -99,6 +112,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   "validator apps connect to all DSO sequencers" in { implicit env =>
     initDso()
+
     // Start Alice’s validator
     aliceValidatorBackend.startSync()
 
@@ -111,12 +125,11 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         )
         .value
         .sequencerConnections
-
       sequencerConnections.connections.size shouldBe 4
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
       sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
-        NonNegativeFiniteDuration.ofSeconds(10),
+        NonNegativeFiniteDuration.ofSeconds(5),
       )
     }
   }

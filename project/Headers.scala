@@ -103,7 +103,8 @@ object Headers {
           ((Compile / baseDirectory).value ** "community" ** "*") ---
           ((Compile / baseDirectory).value ** "*ts-client" ** "*") ---
           ((Compile / baseDirectory).value ** "target" ** "*") ---
-          ((Compile / baseDirectory).value ** "cmd-*.sh")
+          ((Compile / baseDirectory).value ** "cmd-*.sh") ---
+          ((Compile / baseDirectory).value ** "example-script.sh")
       ).get
 
       val sbtScalaSources = (
