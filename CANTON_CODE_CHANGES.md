@@ -26,6 +26,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `ActiveContract.loadFromByteString` made public
 * ``PositiveFiniteDuration` config reader and writer made public
 ## Misc
+* Added support for interface filters in ledger api ACS commands. TODO (#17403): This should be upstreamed.
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`
 * Removed a trailing comma in many places because the CC Scala compiler doesn't like it (e.g. `.authorize(op, domain, mediator, side, key.some, )` -> `.authorize(op, domain, mediator, side, key.some)`)

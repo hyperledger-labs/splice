@@ -4,6 +4,12 @@
 {-# LANGUAGE MultiWayIf #-}
 module Splice.ExternalPartyAmuletRules where
 
+import Canton.Network.RC1.TokenMetadata
+import Canton.Network.RC2.Holding qualified as RC2
+import Canton.Network.RC3.TransferInstruction qualified as TransferInstruction
+import Canton.Network.RC4.Allocation
+import Canton.Network.RC6.AllocationInstruction
+import Splice.AmuletAllocation
 import Splice.AmuletRules
 import Splice.Types
 import Splice.Util
@@ -40,6 +46,18 @@ template ExternalPartyAmuletRules
            expiresAt
            nonce
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
+
+    interface instance TransferInstruction.TransferFactory for ExternalPartyAmuletRules where
+      view = TransferInstruction.TransferFactoryView with
+        admin = dso
+
+      transferFactory_transferImpl = transferImpl
+
+    interface instance AllocationFactory for ExternalPartyAmuletRules where
+      view = AllocationFactoryView with
+        admin = dso
+
+      allocationFactory_allocateImpl allocation = sharedAllocateImpl allocation.transfer.sender allocation
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
@@ -201,3 +219,40 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
     sender : Party -- Returned to simplify tx log parsing
     nonce : Int -- Returned to simplify tx log parsing
   deriving (Show, Eq)
+
+
+-- Token standard support
+-------------------------
+
+sharedAllocateImpl : Party -> AllocationView -> [ContractId RC2.Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
+sharedAllocateImpl provider allocation holdings extraArgs = do
+  paymentContext <- paymentFromChoiceContext extraArgs.context
+  let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
+  allocCid <- fundAllocation provider allocation paymentContext transferInputs
+  pure AllocationFactory_AllocateResult with
+    allocationOrInstruction = AOI_Allocation with allocation = allocCid
+    meta = emptyMetadata
+
+transferImpl : TransferInstruction.TransferSpecification -> ExtraArgs -> Update TransferInstruction.TransferFactory_TransferResult
+transferImpl transferSpec extraArgs = do
+  -- TODO(#115): check issuer correspondence with transfer instrument
+  let transfer = transferSpec.transfer
+  let holdings = transferSpec.holdingCids
+  now <- getTime
+  require "Transfer must be executed before expiry" (now < transferSpec.executeBefore)
+  require "Holdings must be specified when transferring without a delegate"
+    (not $ null transferSpec.holdingCids)
+  paymentContext <- paymentFromChoiceContext extraArgs.context
+  let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
+  preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context "splice.lfdecentralizedtrust.org/transfer-preapproval"
+  preapproval <- fetchChecked (ForOwner with dso = transfer.instrumentId.admin; owner = transfer.receiver) preapprovalCid
+  require "Preapproval receiver matches transfer receiver" (preapproval.receiver == transfer.receiver)
+  _ <- exercise preapprovalCid TransferPreapproval_Send
+    with
+      sender = transfer.sender
+      context = paymentContext
+      inputs = transferInputs
+      amount = transfer.amount
+  pure TransferInstruction.TransferFactory_TransferResult with
+    optTransferInstructionCid = None
+    meta = emptyMetadata

@@ -1,0 +1,131 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | This module is available starting from version `0.1.0` of this package.
+module Utility.Registry.App.V0.Configuration.Registrar where
+
+import DA.Assert
+import DA.List (head)
+import DA.Map as Map
+import DA.Optional (fromSome)
+import DA.Set (singleton)
+
+import Canton.Network.RC1.TokenMetadata
+import Canton.Network.RC6.AllocationInstruction
+
+import Utility.Credential.V0.Credential
+import Utility.Registry.Holding.V0.Holding
+import Utility.Registry.V0.Configuration.Instrument
+import Utility.Registry.V0.Holding.Allocation (HoldingAllocation(..))
+
+-- | Defines criteria for being onboarded by a Registrar.
+template RegistrarConfiguration
+  with
+    operator : Party
+      -- ^ The operator party.
+    provider : Party
+      -- ^ The provider party.
+    registrar : Party
+      -- ^ The registrar party.
+    enforcementRequirements : [PartyCredentialRequirement]
+      -- ^ Credential requirements in order to enter into an `EnforcementService` contract with
+      -- this registrar.
+  where
+    signatory provider, registrar
+    observer operator
+
+    interface instance AllocationFactory for RegistrarConfiguration where
+      view = AllocationFactoryView with
+        admin = registrar
+
+      allocationFactory_allocateImpl allocation inputHoldings extraArgs = do
+
+        -- unpack choice context
+        receiverLabel <- fromSome <$>
+          getContextItemAsText extraArgs.context "da-utility/receiver-label"
+
+        instrumentConfigurationCid <- fromSome <$>
+          getContextItemAsCid extraArgs.context "da-utility/instrument-configuration"
+
+        credentialCids <- fromSome <$>
+          getContextItemAsCids extraArgs.context "da-utility/sender-credentials"
+
+        -- TODO (#17541): add support for unspecified label (via AllocationInstruction rather than allocation)
+
+        -- merge and validate holding
+        mergedHoldingCid <- case fmap coerceContractId inputHoldings of
+          [h] -> pure h
+          h :: hs -> (.holdingCid) <$> exercise h Holding_Merge with holdingCids = hs
+          [] -> abort "Empty input holdings"
+
+        holding <- fetch mergedHoldingCid
+        holding.operator === operator
+        holding.owner === allocation.transfer.sender
+        holding.registrar === registrar
+        holding.instrument.id === allocation.transfer.instrumentId.id
+        holding.instrument.source === allocation.transfer.instrumentId.admin
+
+        -- validate instrument configuration
+        instrumentConfiguration <- fetch @InstrumentConfiguration instrumentConfigurationCid
+        instrumentConfiguration.defaultIdentifier.id === allocation.transfer.instrumentId.id
+        instrumentConfiguration.defaultIdentifier.source === allocation.transfer.instrumentId.admin
+
+        -- validate credential for locking
+        credentials <- mapA fetch credentialCids
+        assertFulfillsAllRequirements allocation.transfer.sender instrumentConfiguration.holderRequirements credentials
+
+        -- split and lock
+        splitResult <- exercise mergedHoldingCid Holding_Split with
+          amounts = [allocation.transfer.amount]
+
+        lockResult <- exercise (head splitResult.splitCids) Holding_Lock with
+          lockers = singleton registrar
+          context = show allocation.settlement.settlementCid <> ";" <> show allocation.transferId
+
+        allocationCid <- toInterfaceContractId <$> create HoldingAllocation with
+          lockedHoldingCid = lockResult.holdingCid
+          receiverLabel
+          allocation
+          operator
+
+        pure AllocationFactory_AllocateResult with
+          allocationOrInstruction = AOI_Allocation with allocation = allocationCid
+          meta = emptyMetadata
+
+    nonconsuming choice RegistrarConfiguration_Get : RegistrarConfiguration_Get_Result
+      -- ^ Gets the registrar configuration.
+      with
+        actor : Party
+          -- ^ The actor party.
+      controller actor
+      do
+        pure RegistrarConfiguration_Get_Result with registrarConfiguration = this
+
+-- | Result of `RegistrarConfiguration_Get`.
+data RegistrarConfiguration_Get_Result = RegistrarConfiguration_Get_Result
+  with
+    registrarConfiguration : RegistrarConfiguration
+      -- ^ The registrar configuration.
+  deriving (Eq, Show)
+
+getContextItemAsText : ChoiceContext -> Text -> Update (Optional Text)
+getContextItemAsText context k = do
+  case Map.lookup k context of
+    None -> pure None
+    Some (AV_Text t) -> pure (Some t)
+    Some value -> fail $ "Expected text for: " <> k <> ", got: " <> show value
+
+getContextItemAsCid : ChoiceContext -> Text -> Update (Optional (ContractId t))
+getContextItemAsCid context k = do
+  case Map.lookup k context of
+    None -> pure None
+    Some (AV_ContractId cid) -> pure . Some $ coerceContractId cid
+    Some value -> fail $ "Expected ContractId for: " <> k <> ", got: " <> show value
+
+getContextItemAsCids : ChoiceContext -> Text -> Update (Optional [ContractId t])
+getContextItemAsCids context k = do
+  case Map.lookup k context of
+    None -> pure None
+    Some (AV_List cidVals) ->
+      pure $ Some [coerceContractId cid | AV_ContractId cid <- cidVals]
+    Some value -> fail $ "Expected ContractIds for: " <> k <> ", got: " <> show value

@@ -34,7 +34,8 @@ class SpliceConsoleEnvironment(
     ThrowWithDetailsErrorHandler
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-    DarResources.splitwell.all ++
+    DarResources.TokenStandard.allPackageResources.flatMap(_.all) ++
+      DarResources.splitwell.all ++
       DarResources.validatorLifecycle.all ++
       DarResources.wallet.all ++
       DarResources.amulet.all ++

@@ -1165,16 +1165,17 @@ function subcmd_cluster_ans_amulet() {
 
 subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml references'
 function subcmd_no_illegal_daml_references() {
+    # TODO (#17137): canton was excluded here, but is used in several token standard damls
     local illegal_words=(
       currency founder founding leader collective consortium
-      coin cn whitepaper canton
-      domain global
+      coin whitepaper
+      domain
       DsoReward
       'google'
       )
     for word in "${illegal_words[@]}"; do
         echo "Checking for occurences of '$word' (case-insensitive)"
-        if rg -i "$word" daml/; then
+        if rg -i "$word" daml/ -g '!daml/token-standard' -g '!daml/dars.lock'; then
             echo "$word occurs in Daml code, remove all references"
             exit 1
         fi
@@ -1182,6 +1183,8 @@ function subcmd_no_illegal_daml_references() {
     local illegal_patterns=(
       svc SVC Svc   # to avoid conflict with PerSvContracts
       '(?<![a-z])cc(?!(ept|essor|g[.]github))'
+      'cn(?!(rc|\-token\-standard|20))' # TODO (#17137): revisit, allows cnrc but not cn
+      '(?<!(cnrc-1\.))global' # TODO (#17137): revisit
       CC
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
       # Allow only Dso as in DsoRules in comments
@@ -1199,7 +1202,7 @@ function subcmd_no_illegal_daml_references() {
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' (case sensitive, in code other than splitwell)"
-        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock'; then
+        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock' -g '!daml/token-standard'; then
             echo "$pattern occurs in Daml code (other than splitwell), remove all references"
             exit 1
         fi
@@ -1234,7 +1237,8 @@ function subcmd_no_amulet_in_ui() {
 subcommand_whitelist[no_bad_things_repo_wide]='Repo-wide checks for bad patterns'
 function subcmd_no_bad_things_repo_wide() {
     local illegal_patterns=(
-      'http.*(?<!sc)ans[.](?!(com|AnsResource))'
+      # exclude scans and frogans (???)
+      'http.*(?<!(sc|frog))ans[.](?!(localhost|com|AnsResource))'
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' in repo"

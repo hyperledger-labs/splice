@@ -117,6 +117,18 @@ object PackageIdResolver {
               case Package.SpliceValidatorLifecycle => DarResources.validatorLifecycle
               case Package.SpliceWallet => DarResources.wallet
               case Package.SpliceWalletPayments => DarResources.walletPayments
+              case Package.TokenStandard.Rc1TokenMetadata =>
+                DarResources.TokenStandard.rc1TokenMetadata
+              case Package.TokenStandard.Rc2Holding =>
+                DarResources.TokenStandard.rc2Holding
+              case Package.TokenStandard.Rc3TransferInstruction =>
+                DarResources.TokenStandard.rc3TransferInstruction
+              case Package.TokenStandard.Rc4Allocation =>
+                DarResources.TokenStandard.rc4Allocation
+              case Package.TokenStandard.Rc5AllocationRequest =>
+                DarResources.TokenStandard.rc5AllocationRequest
+              case Package.TokenStandard.Rc6AllocationInstruction =>
+                DarResources.TokenStandard.rc6AllocationInstruction
             }
         }
     }
@@ -189,6 +201,18 @@ object PackageIdResolver {
       case SpliceValidatorLifecycle => packageConfig.validatorLifecycle
       case SpliceWallet => packageConfig.wallet
       case SpliceWalletPayments => packageConfig.walletPayments
+      case TokenStandard.Rc1TokenMetadata =>
+        DarResources.TokenStandard.rc1TokenMetadata.bootstrap.metadata.version.toString()
+      case TokenStandard.Rc2Holding =>
+        DarResources.TokenStandard.rc2Holding.bootstrap.metadata.version.toString()
+      case TokenStandard.Rc3TransferInstruction =>
+        DarResources.TokenStandard.rc3TransferInstruction.bootstrap.metadata.version.toString()
+      case TokenStandard.Rc4Allocation =>
+        DarResources.TokenStandard.rc4Allocation.bootstrap.metadata.version.toString()
+      case TokenStandard.Rc5AllocationRequest =>
+        DarResources.TokenStandard.rc5AllocationRequest.bootstrap.metadata.version.toString()
+      case TokenStandard.Rc6AllocationInstruction =>
+        DarResources.TokenStandard.rc6AllocationInstruction.bootstrap.metadata.version.toString()
     }
     PackageVersion.assertFromString(version)
   }
@@ -216,6 +240,12 @@ object PackageIdResolver {
     "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
     "Splice.Wallet.ExternalParty" -> Package.SpliceWallet,
     "Splice.Wallet.TransferPreapproval" -> Package.SpliceWallet,
+    "Canton.Network.RC1.TokenMetadata" -> Package.TokenStandard.Rc1TokenMetadata,
+    "Canton.Network.RC2.Holding" -> Package.TokenStandard.Rc2Holding,
+    "Canton.Network.RC3.TransferInstruction" -> Package.TokenStandard.Rc3TransferInstruction,
+    "Canton.Network.RC4.Allocation" -> Package.TokenStandard.Rc4Allocation,
+    "Canton.Network.RC5.AllocationRequest" -> Package.TokenStandard.Rc5AllocationRequest,
+    "Canton.Network.RC6.AllocationInstruction" -> Package.TokenStandard.Rc6AllocationInstruction,
   )
 
   sealed abstract class Package extends Product with Serializable {
@@ -230,6 +260,14 @@ object PackageIdResolver {
   }
 
   object Package {
+    object TokenStandard {
+      final case object Rc1TokenMetadata extends Package
+      final case object Rc2Holding extends Package
+      final case object Rc3TransferInstruction extends Package
+      final case object Rc4Allocation extends Package
+      final case object Rc5AllocationRequest extends Package
+      final case object Rc6AllocationInstruction extends Package
+    }
     final case object SpliceAmulet extends Package
     final case object SpliceAmuletNameService extends Package
     final case object SpliceDsoGovernance extends Package

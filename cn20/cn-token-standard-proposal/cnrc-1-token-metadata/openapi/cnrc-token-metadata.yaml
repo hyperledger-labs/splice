@@ -1,0 +1,187 @@
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+openapi: 3.0.0
+info:
+  title: CN token metadata service
+  description: |
+    Implemented by CN token registries for the purpose of serving metadata about
+    their tokens and the standards supported by the registry.
+  version: 1.0.0
+paths:
+
+  /registry/info:
+    get:
+      operationId: "getRegistryInfo"
+      description: |
+        Get information about the registry.
+        The response includes the CNRCs supported by the registry.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRegistryInfoResponse"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/instruments:
+    get:
+      operationId: listInstruments
+      description:
+        List all instruments managed by this intrument admin.
+      parameters:
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+          description: "Number of instruments per page."
+        - name: page_token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "The `next_page_token` received from the response for the previous page."
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListInstrumentsResponse"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/instruments/{instrument_id}:
+    get:
+      operationId: "getInstrument"
+      description:
+        Retrieve an instrument's metadata.
+      parameters:
+        - name: instrument_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Instrument"
+        "404":
+          $ref: "#/components/responses/404"
+
+
+components:
+  responses:
+    "400":
+      description: "bad request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "404":
+      description: "not found"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "409":
+      description: "conflict"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    GetRegistryInfoResponse:
+      type: object
+      properties:
+        provider_id:
+          description: "The Daml party representing the registry app"
+          type: string
+        supported_cnrcs:
+          description: "The CNRCs supported by the registry."
+          type: array
+          items:
+            description: "SemVer reference of the most recent RC version supported"
+            type: string
+          example:
+            - "cnrc-1-token-metadata=1.0"
+            - "cnrc-2-holdings=1.0"
+            - "cnrc-3-transfer-instruction=1.0"
+            - "cnrc-4-allocation-instruction=1.0"
+        registry_ui_url:
+          type: string
+          description: |
+            The URL to redirect to for giving the user access to the registry specific
+            functionality; e.g., setting up preapprovals wrt who is allowed to transfer assets
+            to them.
+      required:
+        - supported_cnrcs
+        - registry_ui_url
+
+    InstrumentId:
+      type: object
+      description: "Globally unique instrument identifier"
+      properties:
+        provider_id:
+          description: "The party representing the registry app"
+          type: string
+        id:
+          description: "The unique ID of the instrument used by the registry app for this instrument"
+          type: string
+      required:
+        - provider_id
+        - id
+
+    Instrument:
+      type: object
+      properties:
+        instrument_id:
+          description: "The unique identifier assigned by the registry app to the instrument."
+          type:
+            $ref: "#/components/schemas/InstrumentId"
+        name:
+          description: "The display name for the instrument recommended by the intrument admin. This is not necessarily unique."
+          type: string
+        symbol:
+          description: "The symbol for the instrument recommended by the intrument admin. This is not necessarily unique."
+          type: string
+        total_supply:
+          description: "Decimal encoded current total supply of the instrument."
+          type: string
+      required:
+        [
+          "provider_id",
+          "instrument_id",
+          "name",
+          "symbol",
+        ]
+
+    ListInstrumentsResponse:
+      type: object
+      properties:
+        instruments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Instrument"
+        next_page_token:
+          type: string
+          description: "The token for the next page of results, to be used as the last_instrument_id for the next page."
+      required:
+        - instruments
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+

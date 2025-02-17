@@ -9,7 +9,44 @@ import org.lfdecentralizedtrust.splice.util.DarUtil
 import com.google.protobuf.ByteString
 import scala.util.Using
 
+// TODO (#17153): all the old packages have been commented out to avoid
+// "DAR_NOT_VALID_UPGRADE [...] cannot be an upgrade of existing package P [...] Reason: Implementation of interface X
 object DarResources {
+  object TokenStandard {
+    val rc1TokenMetadata = PackageResource(
+      DarResource(s"canton-network-token-rc1-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc1-0.0.1.dar")),
+    )
+    val rc2Holding = PackageResource(
+      DarResource(s"canton-network-token-rc2-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc2-0.0.1.dar")),
+    )
+    val rc3TransferInstruction = PackageResource(
+      DarResource(s"canton-network-token-rc3-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc3-0.0.1.dar")),
+    )
+    val rc4Allocation = PackageResource(
+      DarResource(s"canton-network-token-rc4-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc4-0.0.1.dar")),
+    )
+    val rc5AllocationRequest = PackageResource(
+      DarResource(s"canton-network-token-rc5-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc5-0.0.1.dar")),
+    )
+    val rc6AllocationInstruction = PackageResource(
+      DarResource(s"canton-network-token-rc6-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc6-0.0.1.dar")),
+    )
+    val allPackageResources = Seq(
+      rc1TokenMetadata,
+      rc2Holding,
+      rc3TransferInstruction,
+      rc4Allocation,
+      rc5AllocationRequest,
+      rc6AllocationInstruction,
+    )
+  }
+
   val amulet_0_1_0 = DarResource("splice-amulet-0.1.0.dar")
   val amulet_0_1_1 = DarResource("splice-amulet-0.1.1.dar")
   val amulet_0_1_2 = DarResource("splice-amulet-0.1.2.dar")
@@ -18,18 +55,20 @@ object DarResources {
   val amulet_0_1_5 = DarResource("splice-amulet-0.1.5.dar")
   val amulet_0_1_6 = DarResource("splice-amulet-0.1.6.dar")
   val amulet_0_1_7 = DarResource("splice-amulet-0.1.7.dar")
+  val amulet_0_1_8 = DarResource("splice-amulet-0.1.8.dar")
   val amulet_current = DarResource("splice-amulet-current.dar")
   val amulet = PackageResource(
     amulet_current,
     Seq(
-      amulet_0_1_0,
-      amulet_0_1_1,
-      amulet_0_1_2,
-      amulet_0_1_3,
-      amulet_0_1_4,
-      amulet_0_1_5,
-      amulet_0_1_6,
-      amulet_0_1_7,
+//      amulet_0_1_0,
+//      amulet_0_1_1,
+//      amulet_0_1_2,
+//      amulet_0_1_3,
+//      amulet_0_1_4,
+//      amulet_0_1_5,
+//      amulet_0_1_6,
+//      amulet_0_1_7,
+      amulet_0_1_8
     ),
   )
 
@@ -45,22 +84,24 @@ object DarResources {
   val dsoGovernance_0_1_9 = DarResource("splice-dso-governance-0.1.9.dar")
   val dsoGovernance_0_1_10 = DarResource("splice-dso-governance-0.1.10.dar")
   val dsoGovernance_0_1_11 = DarResource("splice-dso-governance-0.1.11.dar")
+  val dsoGovernance_0_1_12 = DarResource("splice-dso-governance-0.1.12.dar")
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
     Seq(
-      dsoGovernance_0_1_0,
-      dsoGovernance_0_1_1,
-      dsoGovernance_0_1_2,
-      dsoGovernance_0_1_3,
-      dsoGovernance_0_1_4,
-      dsoGovernance_0_1_5,
-      dsoGovernance_0_1_6,
-      dsoGovernance_0_1_7,
-      dsoGovernance_0_1_8,
-      dsoGovernance_0_1_9,
-      dsoGovernance_0_1_10,
-      dsoGovernance_0_1_11,
+//      dsoGovernance_0_1_0,
+//      dsoGovernance_0_1_1,
+//      dsoGovernance_0_1_2,
+//      dsoGovernance_0_1_3,
+//      dsoGovernance_0_1_4,
+//      dsoGovernance_0_1_5,
+//      dsoGovernance_0_1_6,
+//      dsoGovernance_0_1_7,
+//      dsoGovernance_0_1_8,
+//      dsoGovernance_0_1_9,
+//      dsoGovernance_0_1_10,
+//      dsoGovernance_0_1_11
+      dsoGovernance_0_1_12
     ),
   )
 
@@ -72,18 +113,20 @@ object DarResources {
   val amuletNameService_0_1_5 = DarResource("splice-amulet-name-service-0.1.5.dar")
   val amuletNameService_0_1_6 = DarResource("splice-amulet-name-service-0.1.6.dar")
   val amuletNameService_0_1_7 = DarResource("splice-amulet-name-service-0.1.7.dar")
+  val amuletNameService_0_1_8 = DarResource("splice-amulet-name-service-0.1.8.dar")
   val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
   val amuletNameService = PackageResource(
     amuletNameService_current,
     Seq(
-      amuletNameService_0_1_0,
-      amuletNameService_0_1_1,
-      amuletNameService_0_1_2,
-      amuletNameService_0_1_3,
-      amuletNameService_0_1_4,
-      amuletNameService_0_1_5,
-      amuletNameService_0_1_6,
-      amuletNameService_0_1_7,
+//      amuletNameService_0_1_0,
+//      amuletNameService_0_1_1,
+//      amuletNameService_0_1_2,
+//      amuletNameService_0_1_3,
+//      amuletNameService_0_1_4,
+//      amuletNameService_0_1_5,
+//      amuletNameService_0_1_6,
+//      amuletNameService_0_1_7,
+      amuletNameService_0_1_8
     ),
   )
 
@@ -95,18 +138,20 @@ object DarResources {
   val splitwell_0_1_5 = DarResource("splitwell-0.1.5.dar")
   val splitwell_0_1_6 = DarResource("splitwell-0.1.6.dar")
   val splitwell_0_1_7 = DarResource("splitwell-0.1.7.dar")
+  val splitwell_0_1_8 = DarResource("splitwell-0.1.8.dar")
   val splitwell_current = DarResource("splitwell-current.dar")
   val splitwell = PackageResource(
     splitwell_current,
     Seq(
-      splitwell_0_1_0,
-      splitwell_0_1_1,
-      splitwell_0_1_2,
-      splitwell_0_1_3,
-      splitwell_0_1_4,
-      splitwell_0_1_5,
-      splitwell_0_1_6,
-      splitwell_0_1_7,
+//      splitwell_0_1_0,
+//      splitwell_0_1_1,
+//      splitwell_0_1_2,
+//      splitwell_0_1_3,
+//      splitwell_0_1_4,
+//      splitwell_0_1_5,
+//      splitwell_0_1_6,
+//      splitwell_0_1_7,
+      splitwell_0_1_8
     ),
   )
 
@@ -118,18 +163,20 @@ object DarResources {
   val wallet_0_1_5 = DarResource("splice-wallet-0.1.5.dar")
   val wallet_0_1_6 = DarResource("splice-wallet-0.1.6.dar")
   val wallet_0_1_7 = DarResource("splice-wallet-0.1.7.dar")
+  val wallet_0_1_8 = DarResource("splice-wallet-0.1.8.dar")
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_current,
     Seq(
-      wallet_0_1_0,
-      wallet_0_1_1,
-      wallet_0_1_2,
-      wallet_0_1_3,
-      wallet_0_1_4,
-      wallet_0_1_5,
-      wallet_0_1_6,
-      wallet_0_1_7,
+//      wallet_0_1_0,
+//      wallet_0_1_1,
+//      wallet_0_1_2,
+//      wallet_0_1_3,
+//      wallet_0_1_4,
+//      wallet_0_1_5,
+//      wallet_0_1_6,
+//      wallet_0_1_7,
+      wallet_0_1_8
     ),
   )
 
@@ -141,18 +188,20 @@ object DarResources {
   val walletPayments_0_1_5 = DarResource("splice-wallet-payments-0.1.5.dar")
   val walletPayments_0_1_6 = DarResource("splice-wallet-payments-0.1.6.dar")
   val walletPayments_0_1_7 = DarResource("splice-wallet-payments-0.1.7.dar")
+  val walletPayments_0_1_8 = DarResource("splice-wallet-payments-0.1.8.dar")
   val walletPayments_current = DarResource("splice-wallet-payments-current.dar")
   val walletPayments = PackageResource(
     walletPayments_current,
     Seq(
-      walletPayments_0_1_0,
-      walletPayments_0_1_1,
-      walletPayments_0_1_2,
-      walletPayments_0_1_3,
-      walletPayments_0_1_4,
-      walletPayments_0_1_5,
-      walletPayments_0_1_6,
-      walletPayments_0_1_7,
+//      walletPayments_0_1_0,
+//      walletPayments_0_1_1,
+//      walletPayments_0_1_2,
+//      walletPayments_0_1_3,
+//      walletPayments_0_1_4,
+//      walletPayments_0_1_5,
+//      walletPayments_0_1_6,
+//      walletPayments_0_1_7,
+      walletPayments_0_1_8
     ),
   )
 
@@ -165,7 +214,7 @@ object DarResources {
   )
 
   private val packageResources: Seq[PackageResource] =
-    Seq(
+    TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,
       DarResources.amuletNameService,
       DarResources.splitwell,
@@ -225,8 +274,12 @@ final case class DarResource(
 
 object DarResource {
   def apply(file: String): DarResource = {
+    val input = getClass.getClassLoader.getResourceAsStream(file)
+    if (input == null) {
+      throw new IllegalArgumentException(s"Not found: $file")
+    }
     val (darBytes, dar) =
-      Using.resource(getClass.getClassLoader.getResourceAsStream(file)) { resourceStream =>
+      Using.resource(input) { resourceStream =>
         val bytes = ByteString.readFrom(resourceStream)
         val metadata = Using.resource(bytes.newInput())(DarUtil.readDar(file, _))
         (bytes, metadata)

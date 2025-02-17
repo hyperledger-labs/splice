@@ -1,0 +1,184 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | This module is available starting from version `0.1.0` of this package.
+module Utility.Registry.App.V0.Service.Enforcement where
+
+import Utility.Credential.V0.Credential (Credential, assertFulfillsAllRequirements)
+import Utility.Registry.App.V0.Configuration.Registrar (RegistrarConfiguration)
+import Utility.Registry.V0.Holding.ForceTransfer (ForceTransferRequest, ForceTransferRequest_Accept, ForceTransferRequest_Accept_Result)
+import Utility.Registry.V0.Util (fetchAndValidate)
+
+-- | A service for managing enforcement relationships, granting the registrar the authority to
+-- enforce actions like transfers between holders.
+template EnforcementService
+  with
+    operator : Party
+      -- ^ Service operator.
+    provider : Party
+      -- ^ Service provider.
+    registrar : Party
+      -- ^ Service registrar.
+    holder : Party
+      -- ^ Service holder.
+  where
+    signatory provider, registrar, holder
+    observer operator
+
+    choice EnforcementService_Terminate : EnforcementService_Terminate_Result
+      -- ^ Terminates the service.
+      controller registrar
+      do
+        pure EnforcementService_Terminate_Result
+
+    nonconsuming choice EnforcementService_AcceptForceTransferRequest
+      : ForceTransferRequest_Accept_Result
+      -- ^ Accepts a force transfer request.
+      with
+        cid : ContractId ForceTransferRequest
+          -- ^ Force transfer request.
+        payload : ForceTransferRequest_Accept
+          -- ^ Choice payload.
+        receiverEnforcementServiceCid : ContractId EnforcementService
+          -- ^ Receiver enforcement service.
+      controller registrar
+      do
+        let sender = holder
+        fetchAndValidate receiverEnforcementServiceCid
+          [ ("Operator", .operator, operator)
+          , ("Provider", .provider, provider)
+          , ("Registrar", .registrar, registrar)
+          ]
+        exercise receiverEnforcementServiceCid
+          EnforcementService_AcceptForceTransferRequestWithSenderAuthorization with
+            cid
+            payload
+            sender
+
+    nonconsuming choice EnforcementService_AcceptForceTransferRequestWithSenderAuthorization
+      : ForceTransferRequest_Accept_Result
+      -- ^ Accepts a force-transfer request with sender authorization.
+      with
+        cid : ContractId ForceTransferRequest
+          -- ^ Force transfer request to accept.
+        payload : ForceTransferRequest_Accept
+          -- ^ Choice payload.
+        sender : Party
+          -- ^ Sender of the transfer to force accept.
+      controller provider, registrar, sender
+      -- NOTE: The provider serves as an additional controller to guard this choice, intended for
+      -- use exclusively via EnforcementService_AcceptForceTransferRequest.
+      do
+        let receiver = holder
+        fetchAndValidate cid
+          [ ("Operator", .forceTransfer.transfer.operator, operator)
+          , ("Provider", .forceTransfer.transfer.provider, provider)
+          , ("Registrar", .forceTransfer.transfer.registrar, registrar)
+          , ("Sender", .forceTransfer.transfer.sender, sender)
+          , ("Receiver", .forceTransfer.transfer.receiver, receiver)
+          ]
+        exercise cid payload
+
+-- | Result of `EnforcementService_Terminate`.
+data EnforcementService_Terminate_Result = EnforcementService_Terminate_Result {}
+  deriving (Eq, Show)
+
+-- | A enforcement service request.
+template EnforcementServiceRequest
+  with
+    operator : Party
+      -- ^ Service operator.
+    provider : Party
+      -- ^ Service provider.
+    registrar : Party
+      -- ^ Service registrar.
+    holder : Party
+      -- ^ Service holder.
+  where
+    signatory holder
+    observer operator, provider, registrar
+
+    choice EnforcementServiceRequest_Accept : EnforcementServiceRequest_Accept_Result
+      -- ^ Accept request.
+      with
+        registrarConfigurationCid : ContractId RegistrarConfiguration
+          -- ^ Registrar configuration.
+        credentialCids : [ContractId Credential]
+          -- ^ Holder credentials.
+      controller provider, registrar
+      do
+        -- Assert configuration
+        configuration <- fetchAndValidate registrarConfigurationCid
+          [ ("Operator", .operator, operator)
+          , ("Provider", .provider, provider)
+          , ("Registrar", .registrar, registrar)
+          ]
+
+        -- Assert credentials
+        credentials <- mapA fetch credentialCids
+        assertFulfillsAllRequirements holder configuration.enforcementRequirements credentials
+
+        -- Create service
+        serviceCid <- create EnforcementService with operator; provider; registrar; holder
+        pure EnforcementServiceRequest_Accept_Result with
+          enforcementServiceCid = serviceCid
+
+    choice EnforcementServiceRequest_Reject : EnforcementServiceRequest_Reject_Result
+      -- ^ Reject request.
+      with
+        reason : Text
+          -- ^ Rejection reason.
+      controller provider, registrar
+      do
+        rejectedEnforcementServiceRequestCid <-
+          create RejectedEnforcementServiceRequest with request = this; reason
+        pure EnforcementServiceRequest_Reject_Result with
+          rejectedEnforcementServiceRequestCid
+
+    choice EnforcementServiceRequest_Cancel : EnforcementServiceRequest_Cancel_Result
+      -- ^ Cancel request.
+      controller holder
+      do
+        pure EnforcementServiceRequest_Cancel_Result
+
+-- | Result of `EnforcementServiceRequest_Accept`.
+data EnforcementServiceRequest_Accept_Result = EnforcementServiceRequest_Accept_Result
+  with
+    enforcementServiceCid : ContractId EnforcementService
+      -- ^ Registrar-holder service.
+  deriving (Eq, Show)
+
+-- | Result of `EnforcementServiceRequest_Reject`.
+data EnforcementServiceRequest_Reject_Result = EnforcementServiceRequest_Reject_Result
+  with
+    rejectedEnforcementServiceRequestCid : ContractId RejectedEnforcementServiceRequest
+      -- ^ Rejected enforcement service request.
+  deriving (Eq, Show)
+
+-- | Result of `EnforcementServiceRequest_Cancel`.
+data EnforcementServiceRequest_Cancel_Result =
+  EnforcementServiceRequest_Cancel_Result {}
+  deriving (Eq, Show)
+
+-- | A rejected enforcement service request.
+template RejectedEnforcementServiceRequest
+  with
+    request : EnforcementServiceRequest
+      -- ^ The rejected request payload.
+    reason : Text
+      -- ^ The rejection reason.
+  where
+    signatory request.provider, request.registrar, request.holder
+    observer request.operator
+
+    choice RejectedEnforcementServiceRequest_Delete
+      : RejectedEnforcementServiceRequest_Delete_Result
+      -- ^ Deletes a rejected enforcement service request.
+      controller request.provider
+      do
+        pure RejectedEnforcementServiceRequest_Delete_Result
+
+-- | Result of `RejectedEnforcementServiceRequest_Delete`.
+data RejectedEnforcementServiceRequest_Delete_Result =
+  RejectedEnforcementServiceRequest_Delete_Result {}
+  deriving (Eq, Show)

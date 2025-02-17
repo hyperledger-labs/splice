@@ -6,6 +6,10 @@ module Splice.Amulet where
 
 import Prelude hiding (forA)
 import DA.Action (void)
+import DA.Map as Map
+
+import Canton.Network.RC1.TokenMetadata qualified as TokenMetadata
+import Canton.Network.RC2.Holding qualified as Holding
 
 import Splice.Expiry
 import Splice.Fees
@@ -89,12 +93,39 @@ template Amulet
                 changeToHoldingFeesRate = - (amount.ratePerRound.rate)
           return Amulet_ExpireResult with ..
 
+    interface instance Holding.Holding for Amulet where
+      view = Holding.HoldingView with
+        owner
+        instrumentId = amuletInstrumentId dso
+        amount = amount.initialAmount
+        lock = None
+        metadata = TokenMetadata.Metadata
+          with
+            values = Map.fromList [
+              ("splice.lfdecentralizedtrust.org/created-in-round", show amount.createdAt),
+              ("splice.lfdecentralizedtrust.org/rate-per-round", show amount.ratePerRound)
+              ]
+
 template LockedAmulet
   with
     amulet : Amulet
     lock : TimeLock
   where
     signatory lock.holders, signatory amulet
+
+    interface instance Holding.Holding for LockedAmulet where
+      view = Holding.HoldingView with
+        owner = amulet.owner
+        instrumentId = amuletInstrumentId amulet.dso
+        amount = amulet.amount.initialAmount
+        lock = Some Holding.Lock with
+          holders = lock.holders
+        metadata = TokenMetadata.Metadata
+          with
+            values = Map.fromList [
+              ("splice.lfdecentralizedtrust.org/created-in-round", show amulet.amount.createdAt),
+              ("splice.lfdecentralizedtrust.org/rate-per-round", show amulet.amount.ratePerRound)
+              ]
 
 
     choice LockedAmulet_Unlock : LockedAmulet_UnlockResult
@@ -295,6 +326,11 @@ requireAmuletExpiredForAllOpenRounds roundCid amulet = do
   -- point in time; and we ensure that a amulet can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
+
+-- | Shared definition of the instrument-id used for amulets.
+amuletInstrumentId : Party -> Holding.InstrumentId
+amuletInstrumentId dso =
+  Holding.InstrumentId with admin = dso; id = "Amulet"
 
 
 -- instances

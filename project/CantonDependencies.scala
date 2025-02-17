@@ -91,7 +91,7 @@ object CantonDependencies {
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
   lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % daml_libraries_version
-  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_compiler_version
+  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
   lazy val daml_lf_transaction_test_lib =
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
   lazy val daml_lf_api_type_signature =

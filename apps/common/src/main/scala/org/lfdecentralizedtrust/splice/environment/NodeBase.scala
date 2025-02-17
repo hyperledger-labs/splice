@@ -103,7 +103,8 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   protected def isInitialized = isInitializedVar.get()
 
-  protected def packages = DarResources.amulet.all
+  protected def packages =
+    DarResources.amulet.all ++ DarResources.TokenStandard.allPackageResources.flatMap(_.all)
 
   lazy private val packageSignatures = {
     ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)

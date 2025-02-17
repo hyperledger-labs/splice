@@ -1,0 +1,92 @@
+module Utility.Scripts.CnTokenTestUtils where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Foldable (foldr1)
+import DA.Optional (fromSome)
+import DA.List (head)
+import DA.Map as Map
+
+import Canton.Network.RC1.TokenMetadata as RC1
+import Canton.Network.RC3.TransferInstruction as RC3
+import Canton.Network.RC4.Allocation qualified as RC4
+import Canton.Network.RC6.AllocationInstruction
+
+import Utility.Credential.V0.Credential
+import Utility.Registry.App.V0.Configuration.Registrar
+import Utility.Registry.Holding.V0.Holding
+import Utility.Registry.V0.Configuration.Instrument
+import Utility.Registry.V0.Holding.Allocation
+
+import Util.Disclosure
+
+-- Support code for Utility
+---------------------------
+
+-- | Get holding allocation factory, which we implement on the `RegistrarConfiguration` contract.
+getHoldingAllocationFactory : Party -> Party -> Script (ContractId AllocationFactory, Disclosures')
+getHoldingAllocationFactory operator registrar = do
+  [(registrarConfigurationCid, registrarConfiguration)] <- query @RegistrarConfiguration operator
+  registrarConfiguration.registrar === registrar
+  let factoryCid = toInterfaceContractId @AllocationFactory registrarConfigurationCid
+  disclosure <- queryDisclosure' operator registrarConfigurationCid
+  pure (factoryCid, disclosure)
+
+-- | Get instrument configuration.
+getInstrumentConfiguration : Party -> Party -> Text -> Script ((Text, RC1.AnyValue), Disclosures')
+getInstrumentConfiguration operator registrar id = do
+  instrumentConfigurationCid <- fst . head <$> queryFilter @InstrumentConfiguration operator \ic
+    -> ic.defaultIdentifier.id == id
+    && ic.defaultIdentifier.scheme == "RegistrarInternalScheme"
+    && ic.defaultIdentifier.source == registrar
+
+  let cid = AV_ContractId $ coerceContractId instrumentConfigurationCid
+
+  disclosure <- queryDisclosure' operator instrumentConfigurationCid
+  pure (("da-utility/instrument-configuration", cid), disclosure)
+
+-- | Placeholder for any arbitrarily complex logic the operator can implement off-ledger to
+-- determine the receiver's holding label. It can e.g. depend on instrument, sender, transfer amount, ...
+-- When not provided the `Allocation` cannot be directly created but an `AllocationInstruction`
+-- needs to be created instead.
+getReceiverLabel : Text -> Script (Text, AnyValue)
+getReceiverLabel label = pure ("da-utility/receiver-label", AV_Text $ label)
+
+-- | Get sender's credentials.
+getCredentials : Party -> Party -> Text -> Script ((Text, RC1.AnyValue), Disclosures')
+getCredentials operator holder label = do
+  credentialCids <- fmap fst <$> queryFilter @Credential operator \c -> c.holder == holder
+  disclosures <- foldr1 (<>) <$> forA credentialCids \cid -> queryDisclosure' operator cid
+  let cids = AV_List $ fmap (AV_ContractId . coerceContractId) credentialCids
+  pure ((label, cids), disclosures)
+
+-- | Get additional context required to create an Allocation.
+getUtilityAllocationFactory_AllocateContext : Party -> RC3.Transfer -> Text -> Script (ContractId AllocationFactory, ExtraArgs, Disclosures')
+getUtilityAllocationFactory_AllocateContext operator transfer receiverLabel = do
+  (allocationFactory, allocationFactoryDisclosure) <- getHoldingAllocationFactory operator transfer.instrumentId.admin
+  receiverLabel <- getReceiverLabel receiverLabel
+  (instrumentConfiguration, instrumentConfigurationDisclosure) <- getInstrumentConfiguration operator transfer.instrumentId.admin transfer.instrumentId.id
+  (senderCredentials, _) <- getCredentials operator transfer.sender "da-utility/sender-credentials"
+  let context = Map.fromList [receiverLabel, instrumentConfiguration, senderCredentials]
+  let extraArgs = ExtraArgs with context; meta = emptyMetadata
+  pure (allocationFactory, extraArgs, allocationFactoryDisclosure <> instrumentConfigurationDisclosure)
+
+-- | Get settlement execution context.
+-- We explicitly disclose the holding as we currently have no way to set the settler as an observer.
+getUtilityAllocation_ExecuteTransferContext : Party -> ContractId RC4.Allocation -> Script (Disclosures', ExtraArgs)
+getUtilityAllocation_ExecuteTransferContext operator allocationCid = do
+  allocationO <- queryContractId @HoldingAllocation operator $ coerceContractId allocationCid
+  let
+    allocation = fromSome allocationO
+    transfer = allocation.allocation.transfer
+  lockedHolding <- queryDisclosure' @Holding operator $ allocation.lockedHoldingCid
+  (instrumentConfiguration, instrumentConfigurationDisclosure) <- getInstrumentConfiguration operator transfer.instrumentId.admin transfer.instrumentId.id
+  (senderCredentials, senderCredentialsDisclosure) <- getCredentials operator transfer.sender "da-utility/sender-credentials"
+  (receiverCredentials, receiverCredentialsDisclosure) <- getCredentials operator transfer.receiver "da-utility/receiver-credentials"
+  let
+    context = Map.fromList [instrumentConfiguration, senderCredentials, receiverCredentials]
+    extraArgs = ExtraArgs with context; meta = emptyMetadata
+    disclosures = lockedHolding <> instrumentConfigurationDisclosure <> senderCredentialsDisclosure <> receiverCredentialsDisclosure
+  pure (disclosures, extraArgs)
+
