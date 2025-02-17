@@ -2,7 +2,7 @@ import * as automation from '@pulumi/pulumi/automation';
 import * as gcp from '@pulumi/gcp';
 import * as cloudsql from '@google-cloud/sql';
 import { stack } from './pulumi';
-import { runSvCantonForAllMigrations } from './sv-canton/pulumi';
+import { runForAllMigrations } from './sv-canton/pulumi';
 import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
 import * as readline from 'readline';
 import { program } from 'commander';
@@ -27,7 +27,7 @@ async function getAllPulumiDbs(): Promise<gcp.sql.DatabaseInstance[]> {
     await getDBsInStack(await stack(project, project, true, {}))
   )).then(dbs => dbs.flat());
 
-  const migrationDbsRet = await runSvCantonForAllMigrations(async (stack, migration, sv) => {
+  const migrationDbsRet = await runForAllMigrations(async (stack, migration, sv) => {
     return getDBsInStack(stack)
   }, false).then(result => Array.from(result.values()).flat());
 

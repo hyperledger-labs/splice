@@ -14,16 +14,19 @@ subcommand_whitelist[update_config]='Upgrade the hard domain migration config'
 function subcmd_update_config() {
   local migration_type
   local migration_id
-  if [ "$#" -ge 2 ]; then
+  local migration_canton_stack
+  if [ "$#" -ge 3 ]; then
     migration_type="$1"
     migration_id="$2"
-    shift 2
+    migration_canton_stack="$3"
+    shift 3
   else
-    _error "Usage: $0 $SCRIPTNAME migration_type migration_id [version] [release_reference]"
+    _error "Usage: $0 $SCRIPTNAME migration_type migration_id migration_canton_stack [version] [release_reference]"
   fi
   local migration_config
   migration_config=$(cat <<EOF
       id: $migration_id
+      provider: $migration_canton_stack
 EOF
   )
   if [ "$#" -gt 0 ]; then

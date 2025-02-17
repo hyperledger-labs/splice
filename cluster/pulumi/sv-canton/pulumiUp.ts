@@ -1,9 +1,9 @@
 import { PulumiAbortController } from '../pulumi';
-import { pulumiOptsForMigration, runSvCantonForAllMigrations } from './pulumi';
+import { pulumiOptsForMigration, runForAllMigrations } from './pulumi';
 
 const abortController = new PulumiAbortController();
 
-runSvCantonForAllMigrations(async (stack, migration, sv) => {
+runForAllMigrations(async (stack, migration, sv) => {
   console.log(`[migration=${migration.id}]Updating stack for ${sv}`);
   const pulumiOpts = pulumiOptsForMigration(migration.id, sv, abortController.signal);
   await stack.refresh(pulumiOpts).catch(err => {

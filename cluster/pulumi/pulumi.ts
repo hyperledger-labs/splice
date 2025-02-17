@@ -91,7 +91,12 @@ export async function stack(
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
 }
 
-export async function ensureStackSettingsAreUpToDate(stack: automation.Stack) {
+export async function refreshStack(
+  stack: automation.Stack,
+  abortController: PulumiAbortController
+): Promise<void> {
+  const name = stack.name;
+  console.log(`${name} - Refreshing stack`);
   // This nice API ensures that the local stack file is updated with the latest settings stored in the actual state file
   // if not done, pulumi automation will sometimes complain that the secrets passphrase is not set
   const settings = await stack.workspace.stackSettings(stack.name);
@@ -99,15 +104,6 @@ export async function ensureStackSettingsAreUpToDate(stack: automation.Stack) {
     ...settings,
     secretsProvider: getSecretsProvider(),
   });
-}
-
-export async function refreshStack(
-  stack: automation.Stack,
-  abortController: PulumiAbortController
-): Promise<void> {
-  const name = stack.name;
-  console.log(`${name} - Refreshing stack`);
-  await ensureStackSettingsAreUpToDate(stack);
   await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
     abortController.abort(`Aborting because of caught exception`);
     throw e;

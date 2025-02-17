@@ -8,7 +8,7 @@ import {
   Operation,
   PulumiAbortController,
 } from '../pulumi';
-import { runSvCantonForAllMigrations, stackForMigration, svsToDeploy } from './pulumi';
+import { runForAllMigrations, stackForMigration, svsToDeploy } from './pulumi';
 
 // used in CI clusters that run HDM to ensure everything is cleaned up
 const extraMigrationsToReset =
@@ -51,13 +51,9 @@ async function downMigrationId(migrationId: DomainMigrationIndex): Promise<void>
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export async function downAllTheStacks() {
-  await runSvCantonForAllMigrations(
-    async stack => {
-      await downStack(stack, abortController);
-    },
-    false,
-    true
-  ).then(async () => {
+  await runForAllMigrations(async stack => {
+    await downStack(stack, abortController);
+  }, false).then(async () => {
     const downOperations: Operation[] = [];
     for (const migrationId of extraMigrationsToReset) {
       downOperations.push(operation(`down-sv-canton-${migrationId}`, downMigrationId(migrationId)));
@@ -67,14 +63,10 @@ export async function downAllTheStacks() {
   });
 }
 
-export async function cancelAllTheStacks(): Promise<void> {
-  await runSvCantonForAllMigrations(
-    async stack => {
-      await stack.cancel();
-    },
-    false,
-    true
-  ).then(async () => {
+export async function cancelAllTheStacks() {
+  await runForAllMigrations(async stack => {
+    await stack.cancel();
+  }, false).then(async () => {
     const cancelOperations: Operation[] = [];
     for (const migrationId of extraMigrationsToReset) {
       cancelOperations.push(
