@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import cats.data.OptionT
-import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple6Semigroupal}
+import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple7Semigroupal}
 import cats.instances.future.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -221,6 +221,7 @@ class SvApp(
           config.sequencer.externalPublicApiUrl,
           config.sequencer.sequencerAvailabilityDelay.asJava,
           config.sequencer.pruning,
+          config.mediator.sequencerRequestAmplification,
           loggerFactory,
           retryProvider,
         )
@@ -429,7 +430,7 @@ class SvApp(
           } yield res
       }
 
-      (_, _, isDevNet, _, _, _) <- (
+      (_, _, isDevNet, _, _, _, _) <- (
         // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
         // 1. The ValidatorLicense has both the DSO and the SV as a stakeholder.
         //    That can cause problems during the DSO party migration because the contract is imported there
@@ -483,6 +484,17 @@ class SvApp(
         },
         appInitStep("Wait until configured onboarding contracts have been created") {
           waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
+        },
+        localSynchronizerNode match {
+          case Some(node) =>
+            appInitStep(
+              "Ensure that the local mediators's sequencer request amplification config is up to date"
+            ) {
+              // Normally we set this up during mediator init
+              // but if the config changed without a mediator reset we need to update it here.
+              node.ensureMediatorSequencerRequestAmplification()
+            }
+          case None => Future.unit
         },
       ).tupled
 

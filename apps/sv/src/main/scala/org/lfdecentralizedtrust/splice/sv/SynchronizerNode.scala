@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import org.lfdecentralizedtrust.splice.environment.*
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 
 import java.time.Duration
 
@@ -12,4 +13,5 @@ abstract class SynchronizerNode(
     val mediatorAdminConnection: MediatorAdminConnection,
     val sequencerExternalPublicUrl: String,
     val sequencerAvailabilityDelay: Duration,
+    val mediatorSequencerAmplification: SubmissionRequestAmplification,
 ) {}
