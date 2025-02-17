@@ -46,9 +46,10 @@ export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
 type RunForAllMigrationsResult<T> = Map<[MigrationInfo, string], T>;
 
-export async function runForAllMigrations<T>(
+export async function runSvCantonForAllMigrations<T>(
   runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<T>,
-  requiresExistingStack: boolean
+  requiresExistingStack: boolean,
+  forceSvRunbook: boolean = false
 ): Promise<RunForAllMigrationsResult<T>> {
   console.log(
     `Running for migration ${JSON.stringify(migrations)} and svs ${JSON.stringify(svsToDeploy)}`
@@ -58,7 +59,7 @@ export async function runForAllMigrations<T>(
     console.log(`Running for migration ${migration.id}`);
 
     const data = await Promise.allSettled(
-      svsToDeploy.map(async sv => {
+      svsToDeploy.concat(!DeploySvRunbook && forceSvRunbook ? ['sv'] : []).map(async sv => {
         const stack = await stackForMigration(sv, migration.id, requiresExistingStack);
         const result = await runForStack(stack, migration, sv);
         ret.set([migration, sv], result);

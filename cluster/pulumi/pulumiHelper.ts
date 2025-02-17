@@ -3,7 +3,7 @@ import {
   mustInstallSplitwell,
   mustInstallValidator1,
 } from 'splice-pulumi-common-validator/src/validators';
-import { runForAllMigrations } from 'sv-canton-pulumi-deployment/pulumi';
+import { runSvCantonForAllMigrations } from 'sv-canton-pulumi-deployment/pulumi';
 
 import {
   awaitAllOrThrowAllExceptions,
@@ -50,6 +50,8 @@ export async function runStacksRefresh() {
   operations.push(refreshOperation(mainStack, abortController));
   const validator1 = await stack('validator1', 'validator1', true, {});
   operations.push(refreshOperation(validator1, abortController));
+  const infra = await stack('infra', 'infra', true, {});
+  operations.push(refreshOperation(infra, abortController));
   const splitwell = await stack('splitwell', 'splitwell', true, {});
   operations.push(refreshOperation(splitwell, abortController));
   const multiValidatorStack = await stack('multi-validator', 'multi-validator', true, {});
@@ -60,9 +62,13 @@ export async function runStacksRefresh() {
   operations.push(refreshOperation(validatorRunbookStack, abortController));
   const deploymentStack = await stack('deployment', 'deployment', true, {});
   operations.push(refreshOperation(deploymentStack, abortController));
-  await runForAllMigrations(stack => {
-    return refreshStack(stack, abortController);
-  }, false);
+  await runSvCantonForAllMigrations(
+    stack => {
+      return refreshStack(stack, abortController);
+    },
+    false,
+    true
+  );
   await awaitAllOrThrowAllExceptions(operations);
 }
 

@@ -353,7 +353,7 @@ jobs:
             fi
             BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
-            cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
+            cncluster update_config active 0 $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
 
@@ -451,9 +451,9 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
-            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
-            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true

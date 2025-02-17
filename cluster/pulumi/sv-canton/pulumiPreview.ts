@@ -1,6 +1,6 @@
-import { runForAllMigrations } from './pulumi';
+import { runSvCantonForAllMigrations } from './pulumi';
 
-runForAllMigrations(async (stack, migration, sv) => {
+runSvCantonForAllMigrations(async (stack, migration, sv) => {
   const preview = await stack.preview({
     parallel: 128,
     diff: true,

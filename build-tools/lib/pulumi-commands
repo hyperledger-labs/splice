@@ -212,43 +212,6 @@ function subcmd_prefresh() {
         _prompt_to_confirm
     fi
     _cluster_must_exist
-
-    stacks="multi-validator sv-runbook validator-runbook infra"
-
-    refresh_stack() {
-        stack="$1"
-        _info "Refreshing $1 stack"
-        _uses_pulumi_stack "$stack"
-
-        RETCODE=0
-        ERRFILE="./.tmp_ERRFILE"
-        ERRMSG=""
-        touch "$ERRFILE"
-
-        subcmd_pulumi "$1" refresh --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
-        }
-
-        rm -rf "$ERRFILE"
-
-        if [ "$RETCODE" -ne 0 ] && [ "${CLUSTER_LOCK_REAPER_RUN:-}" == "true" ]; then
-            case "${ERRMSG}" in
-                *"stack is currently locked"*)
-                    echo "Stack $stack is locked, cancelling lock before retrying"
-                    subcmd_pulumi "$stack" cancel --yes
-                    refresh_stack "$stack"
-                    ;;
-                *)
-                    _error "Failed refreshing stack $stack, aborting"
-                    exit 1
-                    ;;
-            esac
-        fi
-   }
-
-    for stack in $stacks; do
-      refresh_stack "$stack"
-    done
-
     _pulumi_automation_run_refresh
 }
 
