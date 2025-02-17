@@ -3,6 +3,7 @@ import {
   mustInstallValidator1,
   mustInstallSplitwell,
 } from 'splice-pulumi-common-validator/src/validators';
+import { runSvCantonForAllMigrations } from 'sv-canton-pulumi-deployment/pulumi';
 
 import {
   awaitAllOrThrowAllExceptions,
@@ -17,7 +18,11 @@ async function runCoreStacksUp() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
   const operations: Operation[] = [];
   const abortController = new PulumiAbortController();
+  const cantonStacks = runSvCantonForAllMigrations(stack => {
+    return upStack(stack, abortController);
+  }, false);
   await upStack(mainStack, abortController).then(async () => {
+    await cantonStacks;
     if (mustInstallValidator1) {
       const validator1 = await stack('validator1', 'validator1', true, {});
       operations.push(upOperation(validator1, abortController));
@@ -26,7 +31,7 @@ async function runCoreStacksUp() {
       const splitwell = await stack('splitwell', 'splitwell', true, {});
       operations.push(upOperation(splitwell, abortController));
     }
-    await awaitAllOrThrowAllExceptions(operations);
+    return await awaitAllOrThrowAllExceptions(operations);
   });
 }
 
