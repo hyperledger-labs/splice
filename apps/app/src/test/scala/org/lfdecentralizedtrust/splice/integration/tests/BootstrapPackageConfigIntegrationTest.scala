@@ -41,6 +41,7 @@ import scala.jdk.CollectionConverters.*
 import org.scalatest.time.{Minute, Span}
 import org.scalatest.Ignore
 
+// TODO(#17544) Reenable once the DAR issues are fixed
 @Ignore
 class BootstrapPackageConfigIntegrationTest
     extends IntegrationTest
