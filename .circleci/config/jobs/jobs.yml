@@ -135,6 +135,10 @@ jobs:
           runner_type: "circleci"
       - docker_login_artifactory
       - run_bash_command_in_nix:
+          cmd_name: Check if release tag is on anything but a release-line branch
+          additional_nix_args: --keep CIRCLE_BRANCH --keep REPO_ROOT
+          cmd: ./scripts/halt-on-bad-release-commit-msg.sh .halt-build-step
+      - run_bash_command_in_nix:
           cmd_name: Check if images already exist
           cmd: |
             if make docker-image-reference-exists IMG_REF_EXISTS_ARG=--err-missing; then
