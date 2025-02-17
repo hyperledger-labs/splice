@@ -51,6 +51,7 @@ function copy_file() {
 # Source code
 copy_dir "apps"
 copy_dir "canton"
+copy_dir "cn20"
 copy_dir "daml"
 copy_dir "scripts/scan-txlog"
 copy_file "scripts/external-signing/external-signing.py"

@@ -1,0 +1,59 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Utility.Registry.V0.Util where
+
+import DA.Foldable (forA_)
+import DA.Map (Map)
+import DA.Map qualified as Map (insert, lookup)
+import Utility.Registry.Holding.V0.Types (InstrumentId(..))
+import Utility.Registry.V0.Configuration.Instrument (InstrumentConfiguration)
+
+-- | Like `List.groupOn`, but returns the output in a `Map`.
+groupBy : Ord k => (a -> k) -> [a] -> Map k [a]
+groupBy f = foldl g mempty
+  where
+    g acc x =
+      let
+        k = f x
+        z = case Map.lookup k acc of
+          None -> [x]
+          Some xs -> x :: xs
+      in Map.insert k z acc
+
+-- | Asserts that the instrumen configuration matches expected values, and returns the default
+-- instrument identifier.
+assertConfigurationAndGetDefaultIdentifier :
+  ( CanAssert m
+  , HasField "operator" p Party
+  , HasField "provider" p Party
+  , HasField "registrar" p Party
+  , HasField "instrumentId" p InstrumentId
+  )
+  => InstrumentConfiguration -> p -> m ()
+assertConfigurationAndGetDefaultIdentifier configuration expected = do
+  assertEqual "Operator" configuration.operator expected.operator
+  assertEqual "Provider" configuration.provider expected.provider
+  assertEqual "Registrar" configuration.registrar expected.registrar
+  let recognizedIdentifiers = configuration.defaultIdentifier :: configuration.additionalIdentifiers
+  assertMsg
+    ("Instrument identifier ["
+      <> show expected.instrumentId
+      <> "] must be recognized ["
+      <> show recognizedIdentifiers
+      <> "]"
+    ) $ expected.instrumentId `elem` recognizedIdentifiers
+
+-- | HIDE
+-- Asserts that two values are equal.
+assertEqual : (CanAssert m, Eq a, Show a) => Text -> a -> a -> m ()
+assertEqual fieldName actual expected =
+  assertMsg (fieldName <> " [" <> show actual <> "] must match [" <> show expected <> "]") $
+    actual == expected
+
+-- | Fetch a contract and validate that fields are as expected.
+fetchAndValidate : (HasFetch t, Eq a, Show a) => ContractId t -> [(Text, (t -> a), a)] -> Update t
+fetchAndValidate contractId assertions = do
+  contract <- fetch contractId
+  forA_ assertions \(name, getActual, expected) -> assertEqual name (getActual contract) expected
+  pure contract

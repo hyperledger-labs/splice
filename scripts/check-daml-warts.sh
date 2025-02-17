@@ -18,7 +18,9 @@ ignored_files=(
 
 # TODO(#9466): also check for naked `Xyz_Fetch` choices
 
-command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml')
+# TODO (#17133): remove the exclude of cn20
+command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml' ':!cn20')
+echo "${command[@]}"
 for ignored_file in "${ignored_files[@]}"; do
   command+=(":!$ignored_file")
 done

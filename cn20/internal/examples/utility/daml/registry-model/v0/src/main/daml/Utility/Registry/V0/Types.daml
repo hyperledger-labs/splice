@@ -1,0 +1,17 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Utility.Registry.V0.Types where
+
+-- | Metadata for a batch.
+data Batch = Batch
+  with
+    id : Text
+      -- ^ A unique identifier for the batch.
+    size : Int
+      -- ^ Number of items in the batch.
+    settlementFrom : Optional Time
+      -- ^ Earliest time the batch can be settled.
+    settlementUntil : Optional Time
+      -- ^ Latest time the batch can be settled (it will be failed after).
+  deriving (Eq, Ord, Show)

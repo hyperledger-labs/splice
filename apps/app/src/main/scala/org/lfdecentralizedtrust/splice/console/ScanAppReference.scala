@@ -43,6 +43,7 @@ import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, He
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
 
 import java.time.Instant
 
@@ -472,6 +473,12 @@ abstract class ScanAppReference(
   def getSpliceInstanceNames() = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetSpliceInstanceNames())
+    }
+  }
+
+  def getTransferFactory(choiceArgs: transferinstruction.TransferFactory_Transfer) = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferFactory(choiceArgs))
     }
   }
 

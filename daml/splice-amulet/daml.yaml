@@ -3,19 +3,27 @@
 # classes. You should either use `daml build` or `sbt ~compile`, but NOT both
 # at the same time (see #179 for more context).
 
-sdk-version: 3.0.0-snapshot.20240318.12913.0.v1c415c97
+sdk-version: 3.3.0-snapshot.20250211.13600.0.vce3140e2
 name: splice-amulet
 source: daml
-version: 0.1.7
+version: 0.1.8
 dependencies:
   - daml-prim
   - daml-stdlib
 data-dependencies:
+  - ../../cn20/cn-token-standard-proposal/cnrc-1-token-metadata/.daml/dist/canton-network-token-rc1-current.dar
+  - ../../cn20/cn-token-standard-proposal/cnrc-2-holdings/.daml/dist/canton-network-token-rc2-current.dar
+  - ../../cn20/cn-token-standard-proposal/cnrc-3-transfer-instruction/.daml/dist/canton-network-token-rc3-current.dar
+  - ../../cn20/cn-token-standard-proposal/cnrc-4-allocation/.daml/dist/canton-network-token-rc4-current.dar
+  - ../../cn20/cn-token-standard-proposal/cnrc-5-allocation-request/.daml/dist/canton-network-token-rc5-current.dar
+  - ../../cn20/cn-token-standard-proposal/cnrc-6-allocation-instruction/.daml/dist/canton-network-token-rc6-current.dar
   - ../splice-util/.daml/dist/splice-util-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
   - --target=2.1
+  - --enable-interfaces=yes
+  - -Wno-upgrade-exceptions
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java

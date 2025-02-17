@@ -1,0 +1,314 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Utility.Registry.V0.Holding.Transfer where
+
+import Utility.Credential.V0.Credential (Credential, assertFulfillsAllRequirements)
+import Utility.Registry.Holding.V0.Holding (Holding(..), Holding_Transfer(..), Holding_Transfer_Result, assertHolding)
+import Utility.Registry.Holding.V0.Types (InstrumentId(..), Parties)
+import Utility.Registry.V0.Configuration.Instrument (InstrumentConfiguration)
+import Utility.Registry.V0.Types (Batch)
+import Utility.Registry.V0.Util (assertConfigurationAndGetDefaultIdentifier)
+
+-- | Transfer payload.
+data Transfer = Transfer
+  with
+    operator : Party
+      -- ^ Utility operator.
+    provider : Party
+      -- ^ Holder service provider.
+    registrar : Party
+      -- ^ Registrar of the holding.
+    sender : Party
+      -- ^ Holding sender.
+    receiver : Party
+      -- ^ Holding receiver.
+    instrumentId : InstrumentId
+      -- ^ Instrument id to transfer.
+    amount : Decimal
+      -- ^ Amount to transfer.
+    reference : Text
+      -- ^ Reference for the transfer.
+    batch : Batch
+      -- ^ Batch the transfer belongs to.
+  deriving (Eq, Show)
+
+-- NOTE: The benfit of putting a Batch onto the transfer payload itself, is that some workflow
+-- could result in multiple mint/burn/lock/transfer instructions, which are supposed to be
+-- manually approved, but must execute together. To the automation it doesn't matter if a batch was
+-- created directly as AcceptedTransfers or was manually assembled from Instructions.
+
+-- | An offer to transfer a holding
+template TransferOffer
+  with
+    transfer : Transfer
+      -- ^ Transfer offer payload.
+    senderLabel : Text
+      -- ^ Label of the holding to transfer.
+  where
+    signatory transfer.provider, transfer.sender
+    observer transfer.operator, transfer.registrar, transfer.receiver
+
+    choice TransferOffer_Accept : TransferOffer_Accept_Result
+      -- ^ Accepts a transfer offer.
+      with
+        receiverLabel : Text
+          -- ^ Label of the holding to receive.
+      controller transfer.receiver
+      do
+        acceptedTransferCid <- create AcceptedTransfer with
+          transfer
+          senderLabel
+          receiverLabel
+          observers = None
+        pure TransferOffer_Accept_Result with acceptedTransferCid
+
+    choice TransferOffer_Reject : TransferOffer_Reject_Result
+      -- ^ Rejects a transfer offer.
+      with
+        reason : Text
+          -- ^ Reason for rejection.
+      controller transfer.receiver
+      do
+        rejectedTransferCid <- create RejectedTransfer with transfer; reason; observers = None
+        pure TransferOffer_Reject_Result with rejectedTransferCid
+
+    choice TransferOffer_Cancel : TransferOffer_Cancel_Result
+      -- ^ Cancels a transfer request.
+      controller transfer.sender
+      do
+        pure TransferOffer_Cancel_Result
+
+-- | A request to transfer a holding
+template TransferRequest
+  with
+    transfer : Transfer
+      -- ^ Transfer offer payload.
+    receiverLabel : Text
+      -- ^ Label of the holding to receive.
+  where
+    signatory transfer.provider, transfer.receiver
+    observer transfer.operator, transfer.registrar, transfer.sender
+
+    choice TransferRequest_Accept : TransferRequest_Accept_Result
+      -- ^ Accepts a transfer request.
+      with
+        senderLabel : Text
+          -- ^ Label of the holding to send.
+      controller transfer.sender
+      do
+        acceptedTransferCid <- create AcceptedTransfer with
+          transfer
+          senderLabel
+          receiverLabel
+          observers = None
+        pure TransferRequest_Accept_Result with acceptedTransferCid
+
+    choice TransferRequest_Reject : TransferRequest_Reject_Result
+      -- ^ Rejects a transfer request.
+      with
+        reason : Text
+          -- ^ Reason for rejection.
+      controller transfer.sender
+      do
+        rejectedTransferCid <- create RejectedTransfer with transfer; reason; observers = None
+        pure TransferRequest_Reject_Result with rejectedTransferCid
+
+    choice TransferRequest_Cancel : TransferRequest_Cancel_Result
+      -- ^ Cancels a transfer request.
+      controller transfer.receiver
+      do
+        pure TransferRequest_Cancel_Result
+
+-- | An accepted transfer.
+template AcceptedTransfer
+  with
+    transfer : Transfer
+      -- ^ Accepted transfer payload.
+    senderLabel : Text
+      -- ^ Label of the holding to send.
+    receiverLabel : Text
+      -- ^ Label of the holding to receive.
+    observers : Optional Parties
+      -- ^ Parties that can observe the transfer.
+      -- This field is available starting from version `0.2.0` of this package.
+  where
+    signatory transfer.sender, transfer.receiver
+    observer transfer.operator, transfer.provider, transfer.registrar, observers
+
+    choice AcceptedTransfer_Execute : AcceptedTransfer_Execute_Result
+      -- ^ Execute an accepted transfer.
+      with
+        instrumentConfigurationCid : ContractId InstrumentConfiguration
+          -- ^ Instrument configuration.
+        senderCredentialCids : [ContractId Credential]
+          -- ^ Sender credential cids.
+        receiverCredentialCids : [ContractId Credential]
+          -- ^ Receiver credential cids.
+        holdingCid : ContractId Holding
+          -- ^ Holding to transfer.
+      controller transfer.registrar
+      do
+        -- Assert instrument configuration
+        configuration <- fetch instrumentConfigurationCid
+        assertConfigurationAndGetDefaultIdentifier configuration transfer
+
+        -- Assert credentials
+        senderCredentials <- mapA fetch senderCredentialCids
+        assertFulfillsAllRequirements transfer.sender configuration.holderRequirements
+          senderCredentials
+        receiverCredentials <- mapA fetch receiverCredentialCids
+        assertFulfillsAllRequirements transfer.receiver configuration.holderRequirements
+          receiverCredentials
+
+        -- Assert holding
+        holding <- fetch holdingCid
+        assertHolding holding transfer.operator transfer.provider transfer.registrar transfer.sender
+          configuration.defaultIdentifier transfer.amount senderLabel None
+
+        -- Transfer holding
+        holdingTransferResult <- exercise holdingCid Holding_Transfer with
+          newOwner = transfer.receiver
+          newLabel = receiverLabel
+
+        -- Create executed transfer
+        executedTransferCid <- create ExecutedTransfer with
+          transfer; senderLabel; receiverLabel; observers
+
+        pure AcceptedTransfer_Execute_Result with holdingTransferResult; executedTransferCid
+
+    choice AcceptedTransfer_Fail : AcceptedTransfer_Fail_Result
+      -- ^ Fail an accepted transfer.
+      with
+        reason : Text
+          -- ^ Reason for failure.
+      controller transfer.registrar
+      do
+        failedTransferCid <- create FailedTransfer with
+          transfer; reason; observers
+        pure AcceptedTransfer_Fail_Result with failedTransferCid
+
+-- | A rejected transfer.
+template RejectedTransfer
+  with
+    transfer : Transfer
+      -- ^ Rejected transfer payload.
+    reason : Text
+      -- ^ Reason for rejection.
+    observers : Optional Parties
+      -- ^ Parties that can observe the transfer.
+      -- This field is available starting from version `0.2.0` of this package.
+  where
+    signatory transfer.sender, transfer.receiver
+    observer transfer.operator, transfer.provider, transfer.registrar, observers
+
+    choice RejectedTransfer_Delete : RejectedTransfer_Delete_Result
+      -- ^ Deletes a rejected transfer.
+      controller transfer.registrar
+      do
+        pure RejectedTransfer_Delete_Result
+
+-- | A failed transfer.
+template FailedTransfer
+  with
+    transfer : Transfer
+      -- ^ Rejected transfer payload.
+    reason : Text
+      -- ^ Reason for failure.
+    observers : Optional Parties
+      -- ^ Parties that can observe the transfer.
+      -- This field is available starting from version `0.2.0` of this package.
+  where
+    signatory transfer.registrar
+    observer transfer.operator, transfer.provider, transfer.sender, transfer.receiver, observers
+
+    choice FailedTransfer_Delete : FailedTransfer_Delete_Result
+      -- ^ Deletes a rejected transfer.
+      controller transfer.registrar
+      do
+        pure FailedTransfer_Delete_Result
+
+-- | An executed transfer.
+template ExecutedTransfer
+  with
+    transfer : Transfer
+      -- ^ Transfer payload.
+    senderLabel : Text
+      -- ^ Label of sender holding.
+    receiverLabel : Text
+      -- ^ Label of receiver holding
+    observers : Optional Parties
+      -- ^ Parties that can observe the transfer.
+      -- This field is available starting from version `0.2.0` of this package.
+  where
+    signatory transfer.registrar
+    observer transfer.operator, transfer.provider, transfer.sender, transfer.receiver, observers
+
+    choice ExecutedTransfer_Delete : ExecutedTransfer_Delete_Result
+      -- ^ Deletes an executed transfer.
+      controller transfer.registrar
+      do
+        pure ExecutedTransfer_Delete_Result
+
+-- | Result of `TransferOffer_Accept`.
+data TransferOffer_Accept_Result = TransferOffer_Accept_Result
+  with
+    acceptedTransferCid : ContractId AcceptedTransfer
+      -- ^ Accepted transfer.
+  deriving (Eq, Show)
+
+-- | Result of `TransferOffer_Reject`.
+data TransferOffer_Reject_Result = TransferOffer_Reject_Result
+  with
+    rejectedTransferCid : ContractId RejectedTransfer
+      -- ^ Rejected transfer.
+  deriving (Eq, Show)
+
+data TransferOffer_Cancel_Result = TransferOffer_Cancel_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `TransferRequest_Accept`.
+data TransferRequest_Accept_Result = TransferRequest_Accept_Result
+  with
+    acceptedTransferCid : ContractId AcceptedTransfer
+      -- ^ Accepted transfer.
+  deriving (Eq, Show)
+
+-- | Result of `TransferRequest_Reject`.
+data TransferRequest_Reject_Result = TransferRequest_Reject_Result
+  with
+    rejectedTransferCid : ContractId RejectedTransfer
+      -- ^ Rejected transfer.
+  deriving (Eq, Show)
+
+-- | Result of `TransferRequest_Cancel`.
+data TransferRequest_Cancel_Result = TransferRequest_Cancel_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `AcceptedTransfer_Execute`.
+data AcceptedTransfer_Execute_Result = AcceptedTransfer_Execute_Result
+  with
+    holdingTransferResult : Holding_Transfer_Result
+      -- ^ Holding transfer result.
+    executedTransferCid : ContractId ExecutedTransfer
+      -- ^ Executed transfer.
+  deriving (Eq, Show)
+
+-- | Result of `AcceptedTransfer_Fail`.
+data AcceptedTransfer_Fail_Result = AcceptedTransfer_Fail_Result
+  with
+    failedTransferCid : ContractId FailedTransfer
+      -- ^ Failed transfer.
+  deriving (Eq, Show)
+
+-- | Result of `FailedTransfer_Delete`.
+data FailedTransfer_Delete_Result = FailedTransfer_Delete_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `RejectedTransfer_Delete`.
+data RejectedTransfer_Delete_Result = RejectedTransfer_Delete_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `ExecutedTransfer_Delete`.
+data ExecutedTransfer_Delete_Result = ExecutedTransfer_Delete_Result {}
+  deriving (Eq, Show)

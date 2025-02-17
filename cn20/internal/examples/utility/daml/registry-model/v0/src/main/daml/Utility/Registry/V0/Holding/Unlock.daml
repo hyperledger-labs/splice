@@ -1,0 +1,332 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Utility.Registry.V0.Holding.Unlock where
+
+import DA.Action (foldlA)
+import DA.List qualified as List (head, tail)
+import DA.Set (singleton)
+import Utility.Credential.V0.Credential (Credential, assertFulfillsAllRequirements)
+import Utility.Registry.Holding.V0.Holding (Holding(..), Holding_Lock(..), Holding_Merge(..), Holding_Split(..), Holding_Split_Result(..), Holding_Unlock(..), Holding_Unlock_Result(..), Lock(..), assertHolding)
+import Utility.Registry.Holding.V0.Types (InstrumentId(..))
+import Utility.Registry.V0.Configuration.Instrument (InstrumentConfiguration)
+import Utility.Registry.V0.Types (Batch)
+import Utility.Registry.V0.Util (assertConfigurationAndGetDefaultIdentifier)
+
+-- | Unlock payload.
+data Unlock = Unlock
+  with
+    operator : Party
+      -- ^ Utility operator.
+    provider : Party
+      -- ^ Holder service provider.
+    registrar : Party
+      -- ^ Registrar of holding.
+    holder : Party
+      -- ^ Holder.
+    locker : Party
+      -- ^ Locker.
+    lockContext : Text
+      -- ^ Context for the lock.
+    instrumentId : InstrumentId
+      -- ^ Instrument id to unlock.
+    amount : Decimal
+      -- ^ Amount to unlock.
+    reference : Text
+      -- ^ Reference for the unlock.
+    batch : Batch
+      -- ^ Batch the unlock belongs to.
+  deriving (Eq, Show)
+
+-- | An offer to unlock a holding
+template UnlockOffer
+  with
+    unlock : Unlock
+      -- ^ Unlock payload.
+    holdingLabel : Text
+      -- ^ Label of the holding to lock.
+  where
+    signatory unlock.provider, unlock.holder
+    observer unlock.operator, unlock.registrar, unlock.locker
+
+    choice UnlockOffer_Accept : UnlockOffer_Accept_Result
+      -- ^ Accepts a unlock offer.
+      controller unlock.locker
+      do
+        acceptedUnlockCid <- create AcceptedUnlock with unlock; holdingLabel
+        pure UnlockOffer_Accept_Result with acceptedUnlockCid
+
+    choice UnlockOffer_Reject : UnlockOffer_Reject_Result
+      -- ^ Rejects a unlock offer.
+      with
+        reason : Text
+          -- ^ Reason for rejection.
+      controller unlock.locker
+      do
+        rejectedUnlockCid <- create RejectedUnlock with unlock; reason
+        pure UnlockOffer_Reject_Result with rejectedUnlockCid
+
+    choice UnlockOffer_Cancel : UnlockOffer_Cancel_Result
+      -- ^ Cancels a unlock offer.
+      controller unlock.holder
+      do
+        pure UnlockOffer_Cancel_Result
+
+-- | A request to unlock a holding
+template UnlockRequest
+  with
+    unlock : Unlock
+      -- ^ Lock offer payload.
+  where
+    signatory unlock.provider, unlock.locker
+    observer unlock.operator, unlock.registrar, unlock.holder
+
+    choice UnlockRequest_Accept : UnlockRequest_Accept_Result
+      -- ^ Accepts an unlock request.
+      with
+        holdingLabel : Text
+          -- ^ Label of the holding to lock.
+      controller unlock.holder
+      do
+        acceptedUnlockCid <- create AcceptedUnlock with unlock; holdingLabel
+        pure UnlockRequest_Accept_Result with acceptedUnlockCid
+
+    choice UnlockRequest_Reject : UnlockRequest_Reject_Result
+      -- ^ Rejects an unlock request.
+      with
+        reason : Text
+          -- ^ Reason for rejection.
+      controller unlock.holder
+      do
+        rejectedUnlockCid <- create RejectedUnlock with unlock; reason
+        pure UnlockRequest_Reject_Result with rejectedUnlockCid
+
+    choice UnlockRequest_Cancel : UnlockRequest_Cancel_Result
+      -- ^ Cancels an unlock request.
+      controller unlock.locker
+      do
+        pure UnlockRequest_Cancel_Result
+
+-- | An accepted unlock.
+template AcceptedUnlock
+  with
+    unlock : Unlock
+      -- ^ Accepted unlock payload.
+    holdingLabel : Text
+      -- ^ Label of the holding to unlock.
+  where
+    signatory unlock.holder, unlock.locker
+    observer unlock.operator, unlock.provider, unlock.registrar
+
+    choice AcceptedUnlock_Execute : AcceptedUnlock_Execute_Result
+      -- ^ Execute an accepted unlock.
+      with
+        instrumentConfigurationCid : ContractId InstrumentConfiguration
+          -- ^ Instrument configuration.
+        credentialCids : [ContractId Credential]
+          -- ^ Credentials of the holder.
+        holdingCids : [ContractId Holding]
+          -- ^ Holdings to unlock.
+      controller unlock.registrar
+      do
+        -- Assert instrument configuration
+        configuration <- fetch instrumentConfigurationCid
+        assertConfigurationAndGetDefaultIdentifier configuration unlock
+
+        -- Assert credentials
+        credentials <- mapA fetch credentialCids
+        assertFulfillsAllRequirements unlock.holder configuration.holderRequirements credentials
+
+        -- Initialize variables
+        let requiredAmount = unlock.amount
+
+        -- Process holdings
+        (unlockedHoldings, remainingHoldings, totalUnlocked) <- foldlA
+          (\(unlockedCids, lockedCids, total) holdingCid -> do
+            holding <- fetch holdingCid
+            assertHolding holding unlock.operator unlock.provider unlock.registrar unlock.holder
+              configuration.defaultIdentifier holding.amount holdingLabel
+              (Some $ Lock with lockers = singleton unlock.locker; context = unlock.lockContext)
+            if total >= requiredAmount then
+              -- We have unlocked enough
+              pure (unlockedCids, holdingCid :: lockedCids, total)
+            else do
+              -- Need to unlock this holding
+              Holding_Unlock_Result{holdingCid} <- exercise holdingCid Holding_Unlock
+              let newTotal = total + holding.amount
+              pure (holdingCid :: unlockedCids, lockedCids, newTotal)
+          )
+          ([], [], 0.0)
+          holdingCids
+
+        -- Ensure total unlocked amount covers the unlock amount
+        assertMsg
+          ( "Total available amount [" <> show totalUnlocked
+            <> "] must be greater or equal to unlock amount ["
+            <> show requiredAmount <> "]"
+          ) $ totalUnlocked >= requiredAmount
+
+        -- Reverse lists to maintain original order
+        let
+          unlockedHoldingsRev = reverse unlockedHoldings
+          remainingHoldingsRev = reverse remainingHoldings
+
+        -- Merge unlocked holdings if there are more than one
+        mergedUnlockedHoldingCid <- case unlockedHoldingsRev of
+          [holdingCid] -> pure holdingCid
+          _ -> (.holdingCid) <$> exercise (List.head unlockedHoldingsRev)
+            Holding_Merge with holdingCids = List.tail unlockedHoldingsRev
+
+        -- Split the merged holding to get the unlock amount
+        Holding_Split_Result{splitCids; remaining} <- exercise mergedUnlockedHoldingCid
+          Holding_Split with amounts = [requiredAmount]
+
+        let
+          unlockHoldingCid = List.head splitCids
+          remainingUnlockedCids = case remaining of
+            Some remainingCid -> [remainingCid]
+            None -> []
+
+        -- Relock the remaining holdings from the split
+        relockedHoldingCids <- forA remainingUnlockedCids $ \cid ->
+          (.holdingCid) <$> exercise cid Holding_Lock with
+            lockers = singleton unlock.locker
+            context = unlock.lockContext
+
+        -- Collect all remaining locked holdings
+        let remainingCids = remainingHoldingsRev <> relockedHoldingCids
+
+        -- Create executed unlock
+        executedUnlockCid <- create ExecutedUnlock with unlock; holdingLabel
+
+        pure AcceptedUnlock_Execute_Result with
+          holdingCid = unlockHoldingCid
+          remainingCids
+          executedUnlockCid
+
+    choice AcceptedUnlock_Fail : AcceptedUnlock_Fail_Result
+      -- ^ Fail an accepted unlock.
+      with
+        reason : Text
+          -- ^ Reason for failure.
+      controller unlock.registrar
+      do
+        failedUnlockCid <- create FailedUnlock with unlock; reason
+        pure AcceptedUnlock_Fail_Result with failedUnlockCid
+
+-- | A rejected unlock.
+template RejectedUnlock
+  with
+    unlock : Unlock
+      -- ^ Rejected unlock payload.
+    reason : Text
+      -- ^ Reason for rejection.
+  where
+    signatory unlock.holder, unlock.locker
+    observer unlock.operator, unlock.provider, unlock.registrar
+
+    choice RejectedUnlock_Delete : RejectedUnlock_Delete_Result
+      -- ^ Deletes a rejected unlock.
+      controller unlock.registrar
+      do
+        pure RejectedUnlock_Delete_Result
+
+-- | A failed unlock.
+template FailedUnlock
+  with
+    unlock : Unlock
+      -- ^ Rejected unlock payload.
+    reason : Text
+      -- ^ Reason for failure.
+  where
+    signatory unlock.registrar
+    observer unlock.operator, unlock.provider, unlock.holder, unlock.locker
+
+    choice FailedUnlock_Delete : FailedUnlock_Delete_Result
+      -- ^ Deletes a rejected unlock.
+      controller unlock.registrar
+      do
+        pure FailedUnlock_Delete_Result
+
+-- | An executed unlock.
+template ExecutedUnlock
+  with
+    unlock : Unlock
+      -- ^ Lock payload.
+    holdingLabel : Text
+      -- ^ Label of the holding to unlock.
+  where
+    signatory unlock.registrar
+    observer unlock.operator, unlock.provider, unlock.holder, unlock.locker
+
+    choice ExecutedUnlock_Delete : ExecutedUnlock_Delete_Result
+      -- ^ Deletes an executed unlock.
+      controller unlock.registrar
+      do
+        pure ExecutedUnlock_Delete_Result
+
+-- | Result of `UnlockOffer_Accept`.
+data UnlockOffer_Accept_Result = UnlockOffer_Accept_Result
+  with
+    acceptedUnlockCid : ContractId AcceptedUnlock
+      -- ^ Accepted unlock.
+  deriving (Eq, Show)
+
+-- | Result of `UnlockOffer_Reject`.
+data UnlockOffer_Reject_Result = UnlockOffer_Reject_Result
+  with
+    rejectedUnlockCid : ContractId RejectedUnlock
+      -- ^ Rejected unlock.
+  deriving (Eq, Show)
+
+-- | Result of `UnlockOffer_Cancel`.
+data UnlockOffer_Cancel_Result = UnlockOffer_Cancel_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `UnlockRequest_Accept`.
+data UnlockRequest_Accept_Result = UnlockRequest_Accept_Result
+  with
+    acceptedUnlockCid : ContractId AcceptedUnlock
+      -- ^ Accepted unlock.
+  deriving (Eq, Show)
+
+-- | Result of `UnlockRequest_Reject`.
+data UnlockRequest_Reject_Result = UnlockRequest_Reject_Result
+  with
+    rejectedUnlockCid : ContractId RejectedUnlock
+      -- ^ Rejected unlock.
+  deriving (Eq, Show)
+
+-- | Result of `UnlockRequest_Cancel`.
+data UnlockRequest_Cancel_Result = UnlockRequest_Cancel_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `AcceptedUnlock_Execute`.
+data AcceptedUnlock_Execute_Result = AcceptedUnlock_Execute_Result
+  with
+    holdingCid : ContractId Holding
+      -- ^ Result of unlock.
+    remainingCids : [ContractId Holding]
+      -- ^ Remaining locked holdings.
+    executedUnlockCid : ContractId ExecutedUnlock
+      -- ^ Executed unlock.
+  deriving (Eq, Show)
+
+-- | Result of `AcceptedUnlock_Fail`.
+data AcceptedUnlock_Fail_Result = AcceptedUnlock_Fail_Result
+  with
+    failedUnlockCid : ContractId FailedUnlock
+      -- ^ Failed unlock.
+  deriving (Eq, Show)
+
+-- | Result of `FailedUnlock_Delete`.
+data FailedUnlock_Delete_Result = FailedUnlock_Delete_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `RejectedUnlock_Delete`.
+data RejectedUnlock_Delete_Result = RejectedUnlock_Delete_Result {}
+  deriving (Eq, Show)
+
+-- | Result of `ExecutedUnlock_Delete`.
+data ExecutedUnlock_Delete_Result = ExecutedUnlock_Delete_Result {}
+  deriving (Eq, Show)
