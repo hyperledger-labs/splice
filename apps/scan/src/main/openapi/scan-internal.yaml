@@ -1064,7 +1064,7 @@ paths:
       tags: [ scan, internal ]
       x-jvm-package: scan
       operationId: "listVoteRequestsByTrackingCid"
-      description: Look up several `VoteRequest`s at once by their contract IDs.
+      description: Look up several `VoteRequest`\ s at once by their contract IDs.
       requestBody:
         required: true
         content:
@@ -1108,7 +1108,7 @@ paths:
       tags: [ scan, internal ]
       x-jvm-package: scan
       operationId: "listDsoRulesVoteRequests"
-      description: List all active `VoteRequest`s.
+      description: List all active `VoteRequest`\ s.
       responses:
         "200":
           description: ok

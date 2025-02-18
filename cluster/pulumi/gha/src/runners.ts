@@ -290,8 +290,6 @@ function installDockerRunnerScaleSet(
       dependsOn: dependsOn,
     }
   );
-
-  // imagePullSecretByNamespaceName(runnersNamespace.metadata.name, )
 }
 
 function installDockerRunnerScaleSets(
@@ -418,6 +416,10 @@ function installK8sRunnerScaleSet(
                   claimName: cachePvcName,
                 },
               },
+              {
+                name: 'logs',
+                emptyDir: {},
+              },
             ],
             containers: [
               {
@@ -426,6 +428,10 @@ function installK8sRunnerScaleSet(
                   {
                     name: 'cache',
                     mountPath: '/cache',
+                  },
+                  {
+                    name: 'logs',
+                    mountPath: '/logs',
                   },
                 ],
                 // required to mount the nix store inside the container from the NFS
@@ -449,6 +455,7 @@ function installK8sRunnerScaleSet(
                     protocol: 'TCP',
                   },
                 ],
+                imagePullPolicy: 'Always',
               },
             ],
             serviceAccountName: serviceAccountName,
@@ -467,6 +474,10 @@ function installK8sRunnerScaleSet(
       dependsOn: runnersNamespace,
     }
   );
+
+  // TODO(#15988): use a release once 0.3.12 is out
+  const runnerImage =
+    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.12-snapshot.20250213.8303.0.v242e36d9';
 
   return new k8s.helm.v3.Release(
     name,
@@ -489,15 +500,8 @@ function installK8sRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                // image: 'ghcr.io/actions/actions-runner:latest',
-                // TODO(#15988): This is a temporary image that is built from the actions-runner-controller
-                // fork with some additional patches. We should switch to the official image once the patches
-                // are merged upstream.
-                // Upstream PR: https://github.com/actions/runner-container-hooks/pull/200
-                image:
-                  // TODO(#15988): use a snapshot after this is merged, and a release once 0.3.11 is out
-                  'digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.11-itai-dirty',
-                imagePullPolicy: 'Always',
+                image: runnerImage,
+                imagePullPolicy: 'dirty'.indexOf(runnerImage) ? 'Always' : 'IfNotPresent',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -637,6 +641,11 @@ function installRunnersServiceAccount(runnersNamespace: Namespace, name: string)
         apiGroups: [''],
         resources: ['pods/log'],
         verbs: ['list', 'get', 'watch'],
+      },
+      {
+        apiGroups: [''],
+        resources: ['services'],
+        verbs: ['create', 'get', 'list', 'delete'],
       },
       {
         apiGroups: ['batch'],

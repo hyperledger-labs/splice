@@ -1171,7 +1171,7 @@ commands:
                 # TODO(#15978): remove this hack, this is only necessary because the operator restarts and gets stuck with its own lock.
                 LAST_UNLOCK_AGO=$((CURRENT_TIME - LAST_UNLOCK_TIME))
                 # we also unlock only for ciperiodic because this would break other clusters (scratches)
-                if [ $LAST_UNLOCK_AGO -ge 120 ]  && [ "<<parameters.cluster>>" = "ciperiodic" ]; then
+                if [ $LAST_UNLOCK_AGO -ge 900 ]  && [ "<<parameters.cluster>>" = "ciperiodic" ]; then
                   echo "Force-cancelling pulumi locks under the assumption that the operator got stuck."
                   cncluster pcancel
                   LAST_UNLOCK_TIME=$(date +%s)
@@ -3297,6 +3297,10 @@ jobs:
           runner_type: "circleci"
       - docker_login_artifactory
       - run_bash_command_in_nix:
+          cmd_name: Check if release tag is on anything but a release-line branch
+          additional_nix_args: --keep CIRCLE_BRANCH --keep REPO_ROOT
+          cmd: ./scripts/halt-on-bad-release-commit-msg.sh .halt-build-step
+      - run_bash_command_in_nix:
           cmd_name: Check if images already exist
           cmd: |
             if make docker-image-reference-exists IMG_REF_EXISTS_ARG=--err-missing; then
@@ -4619,6 +4623,8 @@ jobs:
 
             echo "scaling validator1 back up"
             kubectl scale deployment --replicas=1 -n validator1 validator-app
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>

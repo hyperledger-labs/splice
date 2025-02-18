@@ -40,6 +40,7 @@ canton.participants.participant_$index = {
                 password = "cnadmin"
                 user = \${?CANTON_PARTICIPANT_POSTGRES_USER}
                 password = \${?CANTON_PARTICIPANT_POSTGRES_PASSWORD}
+                tcpKeepAlive = true
             }
         }
         parameters {

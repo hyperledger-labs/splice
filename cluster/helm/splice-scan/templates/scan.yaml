@@ -36,9 +36,7 @@ spec:
         - name: ADDITIONAL_CONFIG_PERSISTENCE
           value: |
             canton.scan-apps.scan-app.storage {
-              type = postgres
               config {
-                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
                 properties = {
                   databaseName = "{{ .databaseName }}"
                   currentSchema = "{{ .schema }}"

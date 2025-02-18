@@ -53,7 +53,7 @@ Global Synchronizer for the Canton Network
    :maxdepth: 2
    :caption: FAQ
 
-.. todo:: Add FAQ section to serve as a catch-all for docs that don't fit elsewhere
+   faq.rst
 
 .. toctree::
    :maxdepth: 2

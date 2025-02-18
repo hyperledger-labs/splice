@@ -47,6 +47,7 @@ import com.digitalasset.canton.participant.config.{
   CommunityParticipantConfig,
   RemoteParticipantConfig,
 }
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import org.slf4j.{Logger, LoggerFactory}
@@ -450,6 +451,9 @@ object SpliceConfig {
     implicit val cometBftConfigReader: ConfigReader[CometBftConfig] = deriveReader
     implicit val sequencerPruningConfig: ConfigReader[SequencerPruningConfig] =
       deriveReader[SequencerPruningConfig]
+    implicit val SubmissionRequestAmplificationReader
+        : ConfigReader[SubmissionRequestAmplification] =
+      deriveReader[SubmissionRequestAmplification]
     implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] = {
       implicit val sequencerPruningConfig2 = sequencerPruningConfig
       deriveReader[SvSequencerConfig]
@@ -491,6 +495,8 @@ object SpliceConfig {
     )
     implicit val beneficiaryConfigReader: ConfigReader[BeneficiaryConfig] =
       deriveReader[BeneficiaryConfig]
+    implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
+      deriveReader[SvParticipantClientConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -811,6 +817,9 @@ object SpliceConfig {
     implicit val cometBftConfigWriter: ConfigWriter[CometBftConfig] = deriveWriter
     implicit val svSequencerConfig: ConfigWriter[SvSequencerConfig] =
       deriveWriter[SvSequencerConfig]
+    implicit val submissionRequestAmplificationWriter
+        : ConfigWriter[SubmissionRequestAmplification] =
+      deriveWriter[SubmissionRequestAmplification]
     implicit val sequencerPruningConfig: ConfigWriter[SequencerPruningConfig] =
       deriveWriter[SequencerPruningConfig]
     implicit val svMediatorConfig: ConfigWriter[SvMediatorConfig] =
@@ -840,6 +849,8 @@ object SpliceConfig {
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
       deriveWriter[BeneficiaryConfig]
+    implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =
+      deriveWriter[SvParticipantClientConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

@@ -62,7 +62,7 @@ import org.lfdecentralizedtrust.splice.util.{
   UploadablePackage,
 }
 import com.digitalasset.canton.config.DomainTimeTrackerConfig
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -141,8 +141,10 @@ class JoiningNodeInitializer(
     val domainConfigO = config.domains.global.url.map(url =>
       DomainConnectionConfig(
         config.domains.global.alias,
-        SequencerConnections.single(
-          GrpcSequencerConnection.tryCreate(url)
+        SequencerConnections.tryMany(
+          Seq(GrpcSequencerConnection.tryCreate(url)),
+          PositiveInt.one,
+          config.participantClient.sequencerRequestAmplification,
         ),
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
         // This is changed to false after SV onboarding completes.

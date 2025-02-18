@@ -17,7 +17,7 @@ inputs:
     description: 'If the nix cache should be saved'
     # this should be run just from one job to ensure we avoid multi write conflicts, which makes everything worse
     default: 'false'
-    type: boolean
+
 runs:
   using: 'composite'
   steps:

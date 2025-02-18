@@ -28,8 +28,26 @@ For a Super Validator, in addition, we have the following components:
 Scraping the metrics
 ++++++++++++++++++++
 
-The metrics are exposed in the Prometheus format, and can be scraped by a Prometheus server.
+We use OpenTelemetry to build the metrics and they are exposed in the Prometheus format, and can be scraped by a Prometheus server.
 For a reference of the existing metrics please check the :ref:`metrics reference <metrics-reference>`.
+
+
+Histograms
+----------
+
+We expose the histograms as `exponential histograms <https://opentelemetry.io/docs/specs/otel/metrics/data-model/#exponentialhistogram>`_ which are converted to `prometheus native histograms  <https://prometheus.io/docs/specs/native_histograms/>`_.
+
+.. note::
+
+    Prometheus support must be enabled using the flag `-enable-feature=native-histograms`.
+
+    Native histograms are available only on the protobuf format so Prometheus will switch to the protobuf collection format.
+
+
+You can switch back to regular histograms node by adding the following environment variable to a node: `ADDITIONAL_CONFIG_DISABLE_NATIVE_HISTOGRAMS="canton.monitoring.metrics.histograms=[]"`
+
+Enabling metrics
+----------------
 
 Configuring a helm deployment to enable metrics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -52,3 +70,7 @@ Grafana Dashboards
 The release bundle (|bundle_download_link|) contains a set of Grafana dashboards that are built based on the metrics above.
 These dashboards can be imported into a Grafana instance. The dashboards are built assuming a K8s deployment, and may need to be modified for other deployment types.
 The dashboards can be found under the `grafana-dashboards` folder in the release bundle.
+
+.. note::
+
+    The dashboards are built using queries specific for Prometheus native histograms.

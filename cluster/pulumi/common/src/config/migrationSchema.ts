@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { CHARTS_VERSION, CnChartVersion, parsedVersion } from '../artifacts';
 import { spliceEnvConfig } from './envConfig';
-import { config } from './index';
 
 export enum MigrationProvider {
   INTERNAL = 'internal',
@@ -18,7 +17,7 @@ export const defaultActiveMigration = {
 };
 
 // defined here to prevent cyclic dependency
-const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
+const artifactsRepository = spliceEnvConfig.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
 
 const migrationVersion = z
   .string()

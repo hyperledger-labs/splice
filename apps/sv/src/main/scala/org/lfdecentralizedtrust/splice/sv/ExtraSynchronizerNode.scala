@@ -14,6 +14,7 @@ import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, Processin
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import io.opentelemetry.api.trace.Tracer
 
 import java.time.Duration
@@ -27,6 +28,7 @@ final class ExtraSynchronizerNode(
     val sequencerPublicApi: ClientConfig,
     override val sequencerExternalPublicUrl: String,
     override val sequencerAvailabilityDelay: Duration,
+    override val mediatorSequencerAmplification: SubmissionRequestAmplification,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 ) extends SynchronizerNode(
@@ -34,6 +36,7 @@ final class ExtraSynchronizerNode(
       mediatorAdminConnection,
       sequencerExternalPublicUrl,
       sequencerAvailabilityDelay,
+      mediatorSequencerAmplification,
     )
     with FlagCloseable
     with NamedLogging {
@@ -72,6 +75,7 @@ object ExtraSynchronizerNode {
       conf.sequencer.internalApi,
       conf.sequencer.externalPublicApiUrl,
       conf.sequencer.sequencerAvailabilityDelay.asJava,
+      conf.mediator.sequencerRequestAmplification,
       loggerFactory,
       retryProvider.timeouts,
     )
