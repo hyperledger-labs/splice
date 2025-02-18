@@ -13,37 +13,37 @@ import scala.util.Using
 // "DAR_NOT_VALID_UPGRADE [...] cannot be an upgrade of existing package P [...] Reason: Implementation of interface X
 object DarResources {
   object TokenStandard {
-    val rc1TokenMetadata = PackageResource(
-      DarResource(s"canton-network-token-rc1-current.dar"),
-      Seq(DarResource(s"canton-network-token-rc1-0.0.1.dar")),
+    val tokenMetadata = PackageResource(
+      DarResource(s"splice-api-token-metadata-v1-current.dar"),
+      Seq(DarResource(s"splice-api-token-metadata-v1-0.0.1.dar")),
     )
-    val rc2Holding = PackageResource(
-      DarResource(s"canton-network-token-rc2-current.dar"),
-      Seq(DarResource(s"canton-network-token-rc2-0.0.1.dar")),
+    val tokenHolding = PackageResource(
+      DarResource(s"splice-api-token-holding-v1-current.dar"),
+      Seq(DarResource(s"splice-api-token-holding-v1-0.0.1.dar")),
     )
-    val rc3TransferInstruction = PackageResource(
-      DarResource(s"canton-network-token-rc3-current.dar"),
-      Seq(DarResource(s"canton-network-token-rc3-0.0.1.dar")),
+    val tokenTransferInstruction = PackageResource(
+      DarResource(s"splice-api-token-transfer-instruction-v1-current.dar"),
+      Seq(DarResource(s"splice-api-token-transfer-instruction-v1-0.0.1.dar")),
     )
-    val rc4Allocation = PackageResource(
-      DarResource(s"canton-network-token-rc4-current.dar"),
-      Seq(DarResource(s"canton-network-token-rc4-0.0.1.dar")),
+    val tokenAllocation = PackageResource(
+      DarResource(s"splice-api-token-allocation-v1-current.dar"),
+      Seq(DarResource(s"splice-api-token-allocation-v1-0.0.1.dar")),
     )
-    val rc5AllocationRequest = PackageResource(
-      DarResource(s"canton-network-token-rc5-current.dar"),
-      Seq(DarResource(s"canton-network-token-rc5-0.0.1.dar")),
+    val tokenAllocationRequest = PackageResource(
+      DarResource(s"splice-api-token-allocation-request-v1-current.dar"),
+      Seq(DarResource(s"splice-api-token-allocation-request-v1-0.0.1.dar")),
     )
-    val rc6AllocationInstruction = PackageResource(
-      DarResource(s"canton-network-token-rc6-current.dar"),
-      Seq(DarResource(s"canton-network-token-rc6-0.0.1.dar")),
+    val tokenAllocationInstruction = PackageResource(
+      DarResource(s"splice-api-token-allocation-instruction-v1-current.dar"),
+      Seq(DarResource(s"splice-api-token-allocation-instruction-v1-0.0.1.dar")),
     )
     val allPackageResources = Seq(
-      rc1TokenMetadata,
-      rc2Holding,
-      rc3TransferInstruction,
-      rc4Allocation,
-      rc5AllocationRequest,
-      rc6AllocationInstruction,
+      tokenMetadata,
+      tokenHolding,
+      tokenTransferInstruction,
+      tokenAllocation,
+      tokenAllocationRequest,
+      tokenAllocationInstruction,
     )
   }
 
