@@ -495,6 +495,8 @@ object SpliceConfig {
     )
     implicit val beneficiaryConfigReader: ConfigReader[BeneficiaryConfig] =
       deriveReader[BeneficiaryConfig]
+    implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
+      deriveReader[SvParticipantClientConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =
@@ -847,6 +849,8 @@ object SpliceConfig {
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
       deriveWriter[BeneficiaryConfig]
+    implicit val svParticipantClientConfigWriter: ConfigWriter[SvParticipantClientConfig] =
+      deriveWriter[SvParticipantClientConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

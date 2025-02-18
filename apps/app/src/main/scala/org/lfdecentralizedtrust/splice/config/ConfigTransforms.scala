@@ -635,6 +635,15 @@ object ConfigTransforms {
       .focus(_.ledgerApi)
       .modify(portTransform(bump, _))
 
+  private def portTransform(
+      bump: Int,
+      c: SvParticipantClientConfig,
+  ): SvParticipantClientConfig =
+    c.focus(_.adminApi)
+      .modify(portTransform(bump, _))
+      .focus(_.ledgerApi)
+      .modify(portTransform(bump, _))
+
   private def portTransform(bump: Int, c: SvSequencerConfig): SvSequencerConfig =
     c.focus(_.adminApi)
       .modify(portTransform(bump, _))
