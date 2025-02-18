@@ -84,6 +84,8 @@ The Open API spec for `/v1/updates <https://github.com/hyperledger-labs/splice/b
 and `/v1/updates/{update_id} <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L571>`_
 describe the APIs in detail.
 
+.. _v1_updates:
+
 POST /v1/updates
 ^^^^^^^^^^^^^^^^
 
@@ -426,6 +428,16 @@ An example response is shown below:
 The ``created_events`` object contains the created events in the ACS snapshot.
 A ``created_event`` is encoded exactly as explained in `Created Event`_.
 
+POST /v0/state/acs/force
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. note:: This is a **development environment only** endpoint, and is unavailable in production environments.
+
+During testing, the :ref:`last snapshot timestamp <v0_state_acs_snapshot-timestamp>` can be inconveniently old.
+A production app must be able to deal with this by using :ref:`v1_updates`, but an app's ability to deal with data in the snapshot is important too.
+Therefore, on properly-configured testing Scans, `/v0/state/acs/force <scan_openapi.html#post--v0-state-acs-force>`_ will cause Scan to immediately snapshot the ACS, returning the new snapshot time in the ``record_time`` property.
+But most environments will return an error, as this endpoint is disabled.
+
 Scan TxLog Script
 -----------------
 
@@ -543,5 +555,3 @@ If the ``exercised_event`` is consuming, the contract is removed from the ``acti
     and then process the updates from the timestamp of that snapshot via the ``/v1/updates``, adding
     ``created_event``\ s to the dictionary under its ``contract_id`` key and
     remove the contract from the dictionary by ``contract_id`` if ``exercised_event``\ s are consuming.
-
-.. todo:: state/acs/force

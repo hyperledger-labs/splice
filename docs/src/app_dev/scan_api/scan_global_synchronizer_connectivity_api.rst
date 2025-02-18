@@ -79,8 +79,10 @@ For example, query from `/v0/dso-sequencers <|gsf_scan_url|/api/scan/v0/dso-sequ
       ]
     }
 
-As ``svName`` is the same as the ``svName`` in ``/v0/scans``, it can be used to join the results of these endpoints, if necessary.
+As ``svName`` is the same as the ``svName`` in `Listing all SV Scans`_, it can be used to join the results of these endpoints, if necessary.
 ``url`` is the base URL of that SV's sequencer.
+
+.. _Listing_all_Validators:
 
 Listing all Validators
 ----------------------
@@ -147,4 +149,16 @@ the sequence of pages terminates with an absent or null token as follows:
       "next_page_token": null
     }
 
-.. todo:: getPartyToParticipant
+Parties' Hosting Participants
+-----------------------------
+
+In any Canton deployment, `each party is hosted on a participant <https://docs.daml.com/canton/architecture/overview.html#synchronization-domain-entities>`_.
+This can be accessed through Scan with `/v0/domains/{domain_id}/parties/{party_id}/participant-id <scan_openapi.html#get--v0-domains-domain_id-parties-party_id-participant-id>`_.
+
+For example, looking up `/v0/domains/global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17/parties/digitalasset-testValidator-1::1220e92bbc9d80cb6e283184017b307b9f44f23d32d7d195cdbcac033ae91eac2f28/participant-id <|gsf_scan_url|/api/scan/v0/domains/global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17/parties/digitalasset-testValidator-1::1220e92bbc9d80cb6e283184017b307b9f44f23d32d7d195cdbcac033ae91eac2f28/participant-id>`_ on a test network yields
+
+.. code-block:: json
+
+    {
+      "participant_id": "PAR::validator-runbook::1220e92bbc9d80cb6e283184017b307b9f44f23d32d7d195cdbcac033ae91eac2f28"
+    }

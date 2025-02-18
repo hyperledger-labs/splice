@@ -93,8 +93,8 @@ paths:
           in: query
           required: true
           description: |
-            A comma-separated list of validator party IDs.  Any party IDs
-            not matching onboarded validators will be ignored
+            A list of validator party IDs, one per specification of the parameter.
+            Any party IDs not matching onboarded validators will be ignored
           schema:
             type: array
             items:
