@@ -1,6 +1,5 @@
 import * as automation from '@pulumi/pulumi/automation';
 import fs from 'fs';
-import util from 'node:util';
 import os from 'os';
 import path from 'path';
 import { config } from 'splice-pulumi-common/src/config';
@@ -91,12 +90,7 @@ export async function stack(
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
 }
 
-export async function refreshStack(
-  stack: automation.Stack,
-  abortController: PulumiAbortController
-): Promise<void> {
-  const name = stack.name;
-  console.log(`${name} - Refreshing stack`);
+export async function ensureStackSettingsAreUpToDate(stack: automation.Stack): Promise<void> {
   // This nice API ensures that the local stack file is updated with the latest settings stored in the actual state file
   // if not done, pulumi automation will sometimes complain that the secrets passphrase is not set
   const settings = await stack.workspace.stackSettings(stack.name);
@@ -104,6 +98,15 @@ export async function refreshStack(
     ...settings,
     secretsProvider: getSecretsProvider(),
   });
+}
+
+export async function refreshStack(
+  stack: automation.Stack,
+  abortController: PulumiAbortController
+): Promise<void> {
+  const name = stack.name;
+  console.log(`${name} - Refreshing stack`);
+  await ensureStackSettingsAreUpToDate(stack);
   await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
     abortController.abort(`Aborting because of caught exception`);
     throw e;
@@ -116,27 +119,21 @@ export async function downStack(
 ): Promise<void> {
   const name = stack.name;
   console.error(`${name} - Refreshing & Destroying stack`);
-  await stack
-    .refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal))
-    .then(() => stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)))
-    .catch(e => {
+  try {
+    console.error(`[${name}] Refreshing`);
+    await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal));
+    console.error(`[${name}] Destroying`);
+    await stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal));
+  } catch (e) {
+    if (e instanceof automation.ConcurrentUpdateError) {
+      console.error(`[${name}] Stack is locked, cancelling and re-running.`);
+      await stack.cancel();
+      await downStack(stack, abortController);
+    } else {
       abortController.abort(`Aborting because of caught exception`);
       throw e;
-    });
-}
-
-export async function upStack(
-  stack: automation.Stack,
-  abortController: PulumiAbortController
-): Promise<void> {
-  const name = stack.name;
-  const result = await stack
-    .up(pulumiOptsWithPrefix(`[${name}]`, abortController.signal))
-    .catch(e => {
-      abortController.abort(`Aborting because of caught exception`);
-      throw e;
-    });
-  console.log(util.inspect(result.summary, { colors: true, depth: null, maxStringLength: null }));
+    }
+  }
 }
 
 // An AbortController that:
@@ -160,13 +157,24 @@ export class PulumiAbortController {
 
   private controller = new AbortController();
   private aborted = false;
+  private sentAbort = false;
 
   private WAIT_BEFORE_ABORT = 10000;
 
-  public abort(reason?: any): void {
+  public abort(reason?: unknown): void {
     if (!this.aborted) {
-      new Promise(f => setTimeout(f, this.WAIT_BEFORE_ABORT)).then(() =>
-        this.controller.abort(reason)
+      console.error(`Aborting after the wait time: ${reason}`);
+      const c = this.controller;
+      setTimeout(
+        () => {
+          console.error(`Aborting: ${reason}`);
+          if (!this.sentAbort) {
+            this.sentAbort = true;
+            c.abort(reason);
+          }
+        },
+        // some randomness to prevent double execution
+        Math.random() * 1000 + this.WAIT_BEFORE_ABORT
       );
     }
     this.aborted = true;
@@ -182,7 +190,7 @@ export interface Operation {
   promise: Promise<void>;
 }
 
-export function operation(name: string, promise: Promise<void>) {
+export function operation(name: string, promise: Promise<void>): Operation {
   return { name, promise };
 }
 
@@ -190,10 +198,14 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
   const data = await Promise.allSettled(
     operations.map(op => {
       console.error(`Running operation ${op.name}`);
-      op.promise.then(
-        ok => console.error(`Operation ${op.name} succeeded.`),
+      return op.promise.then(
+        () => console.error(`Operation ${op.name} succeeded.`),
         err => {
-          console.error(`Operation ${op.name} failed.`, err);
+          if (err instanceof automation.CommandError) {
+            console.error(`Operation ${op.name} failed.`);
+          } else {
+            console.error(`Operation ${op.name} failed with an unknown error.`);
+          }
           throw err;
         }
       );
@@ -203,6 +215,8 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
     data.filter(res => res.status === 'rejected') as PromiseRejectedResult[]
   ).map(res => res.reason);
   if (rejectionReasons.length > 0) {
-    throw new Error(rejectionReasons.join('\n'));
+    const message = `Ran ${operations.length} operations. ${rejectionReasons.length} failed`;
+    console.error(message);
+    throw new Error(message);
   }
 }

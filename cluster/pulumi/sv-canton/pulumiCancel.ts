@@ -1,7 +1,14 @@
-import { cancelAllTheStacks } from "./pulumiHelper";
+import { awaitAllOrThrowAllExceptions } from '../pulumi';
+import { runSvCantonForAllMigrations } from './pulumi';
 
-cancelAllTheStacks().catch(err => {
-  console.error('Failed to run cancel');
-  console.error(err);
-  process.exit(1);
-});
+export async function cancelAllCantonStacks(): Promise<void> {
+  await awaitAllOrThrowAllExceptions(
+    runSvCantonForAllMigrations(
+      stack => {
+        return stack.cancel();
+      },
+      false,
+      true
+    )
+  );
+}
