@@ -45,6 +45,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx_copybutton",
     "sphinx_reredirects",
+    "sphinxcontrib.openapi",
     # ^^ Adds a copy-to-clipboard button to code-blocks.
     # It does not (yet) work for `parsed-literal::` directives, which
     # we use to inject version strings.
