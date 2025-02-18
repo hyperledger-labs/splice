@@ -5,6 +5,9 @@ ARG base_version
 
 FROM splice-app:${base_version}
 
+ARG base_version
+LABEL org.opencontainers.image.base.name="splice-app:${base_version}"
+
 EXPOSE 5012
 EXPOSE 10013
 

@@ -46,10 +46,14 @@ ifdef CI
     # never use the cache in CI on the master branch
     cache_opt := --no-cache
     platform_opt := --platform=linux/amd64,linux/arm64
+    repo = $(CIRCLE_PROJECT_REPONAME)
+    commit_sha = $(CIRCLE_SHA1)
 else
     # Local builds (which may be on an M1) are explicitly constrained
     # to x86.
     platform_opt := --platform=linux/amd64
+    repo = NoRepoForLocalBuild
+    commit_sha = NoShaForLocalBuild
 endif
 
 docker-build := target/docker.id
@@ -110,7 +114,13 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 	docker-check-multi-arch
 	mkdir -pv $(@D)
 	@echo docker build triggered because these files changed: $?
-	docker buildx build $(platform_opt) --iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
+	docker buildx build $(platform_opt) \
+		--label "org.opencontainers.image.ref.name=$$(basename $$(dirname $(@D)))" \
+		--label "org.opencontainers.image.version=$(shell get-snapshot-version)" \
+		--label "org.opencontainers.image.source=$(repo)" \
+		--label "org.opencontainers.image.created=$$(date +%FT%T.%3NZ)" \
+		--label "org.opencontainers.image.revision=$(commit_sha)" \
+		--iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
 
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<))

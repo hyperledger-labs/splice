@@ -22,6 +22,11 @@ Upcoming
   * Updated table definitions in Scan to improve performance of ``/transactions`` and ``/activities`` endpoints.
     This requires a SQL migration that will run on app startup for ~15m on devnet and ~2m on mainnet according to our tests.
 
+* Deployment
+
+  * Add OCI annotations to provide standardized information attached to a Docker image. Details provided are image name, image version, 
+    creation date, base image, repository, and commit hash.
+
 0.3.11
 ------
 

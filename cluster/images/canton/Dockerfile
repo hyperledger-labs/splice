@@ -42,5 +42,6 @@ COPY --from=build /app/ /app/
 
 WORKDIR /app
 
+LABEL org.opencontainers.image.base.name="debian:bookworm-slim"
 # point entrypoint to the amulet executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]
