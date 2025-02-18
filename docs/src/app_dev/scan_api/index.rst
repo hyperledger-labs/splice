@@ -37,6 +37,8 @@ The Scan API is grouped in the following categories:
 * :ref:`scan_current_state_api`
 * :ref:`scan_aggregates_api`
 
+Please see the :ref:`scan_openapi` for the full API reference.
+
 .. toctree::
    :hidden:
 
@@ -47,3 +49,4 @@ The Scan API is grouped in the following categories:
    scan_cc_reference_data_api
    scan_current_state_api
    scan_aggregates_api
+   scan_openapi

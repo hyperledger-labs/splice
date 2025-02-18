@@ -36,4 +36,15 @@ runs:
         name: ${{ inputs.name }}
         path: log
 
+    - name: Upload runner logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}-runner
+        path: /logs
+
+    - name: Upload runner temp directory
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}-runner-temp
+        path: /__w/_temp
 

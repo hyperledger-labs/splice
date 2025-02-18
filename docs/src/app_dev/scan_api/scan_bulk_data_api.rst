@@ -39,7 +39,7 @@ Since the API exposes the underlying Daml transactions directly, there are a cou
   This means that you get direct access to all information in the transactions, and you need to familiarize yourself
   with the Daml code that underlies these events.
   Please see `Reference Documentation`_ for a refresher on how the Ledger changes through actions grouped in transactions,
-  and how UTXO contract states are created, spent (exercised) and archived in general. We'll discuss the specifics of the Daml models in more detail in the `Scan TxLog Script`_ section.
+  and how UTXO contract states are created, exercised and archived in general. We'll discuss the specifics of the Daml models in more detail in the `Scan TxLog Script`_ section.
 
 * The events need to be parsed in a flexible manner. Choices and optional fields can be added over time, and new templates and data types can be introduced.
   A parser should be able to ignore these kinds of changes, and not fail when they occur.
@@ -120,9 +120,10 @@ The response returns a list of transactions. Every transaction contains the foll
   or by using the ``/v0/dso-sequencers`` API at |gsf_scan_url|/api/scan/v0/dso-sequencers,
   which returns a ``migrationId`` per sequencer.
 * **synchronizer_id**: The instance ID of a Synchronizer (for example the ID of the Global Synchronizer).
-  When contract assignments migrate, they become unavailable for processing via the old instance of the synchronizer
+  When contracts get reassigned, they become unavailable for processing via the old instance of the synchronizer
   and become available via the new instance of the synchronizer.
-  Every contract is associated with a ``synchronizer_id``, which represents the (set of) synchronizer(s) it has been sequenced on.
+  Every contract is assigned to a ``synchronizer_id``, which represents the synchronizer that the stakeholders agreed
+  on to use for sequencing future transactions on this contract.
 * **update_id**: Uniquely identifies an update (globally unique across networks and synchronizers).
 * **record_time**: The time at which the update was sequenced.
   Within a given migration and synchronizer, the record time of updates is strictly monotonically increasing (and thus unique).
@@ -132,9 +133,9 @@ The response returns a list of transactions. Every transaction contains the foll
   To traverse the update tree, start with the ``root_event_ids`` in order, get event by ID from ``events_by_id``,
   traverse events in preorder, process ``child_event_ids`` recursively.
   Note: event ids are stored as a string of the format ``<update_id>:<event_index>``.
-  The event index is assigned locally by the participant, and different participants might assign different indices to the same event.
-  For this reason, the scan app creates common, deterministically computed event indices across all synchronizer nodes when
-  returning events through the scan API.
+  The event index exposed by scan is consistent cross all SVs for the same event.
+  Note that it differs from the event index that the ledger API exposes on an individual participant
+  as those can differ between different participants for the same event.
 * **events_by_id**: This object contains all events in the transaction update tree, indexed by their event ID.
 
 An example list of transactions response for the beginning of the network is shown below:

@@ -22,6 +22,7 @@ import {
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
 import { svsConfiguration } from '../clusterSvConfig';
+import { svConfig } from '../config';
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync } from './cometbftConfig';
 
@@ -136,7 +137,7 @@ export function installCometBftNode(
       labels: [{ key: 'active_migration', value: isActiveDomain }],
     },
     db: {
-      volumeSize: clusterSmallDisk ? '240Gi' : undefined,
+      volumeSize: clusterSmallDisk ? '240Gi' : svConfig?.cometbft?.volumeSize,
     },
     extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
   });

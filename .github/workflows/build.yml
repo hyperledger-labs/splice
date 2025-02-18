@@ -7,10 +7,10 @@ on:
       - 'main'
       - 'release-line-**'
 
-# Cancel previously runs of this workflow on the same branch, unless it's main
+# Cancel previously runs of this workflow on the same branch, unless it's main or a release-line branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !endsWith(github.ref, 'heads/main') }}
+  cancel-in-progress: ${{ !endsWith(github.ref, 'heads/main') && !contains(github.ref, 'heads/release-line-') }}
 
 jobs:
 
@@ -208,8 +208,8 @@ jobs:
     - docs
     runs-on: self-hosted-docker-tiny
     container:
-      # TODO(#15988): use a release once 0.3.9 is out
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.9-snapshot.20250128.8151.0.v4bb647e2
+      # TODO(#15988): use a release once 0.3.12 is out
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12-snapshot.20250213.8303.0.v242e36d9
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

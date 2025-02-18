@@ -10,7 +10,7 @@
   },
   "overrides": {
     "@pulumi/kubernetes-cert-manager": {
-      "@pulumi/kubernetes": "4.11.0"
+      "@pulumi/kubernetes": "4.21.1"
     }
   },
   "scripts": {

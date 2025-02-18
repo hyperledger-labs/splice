@@ -21,6 +21,7 @@ plugins=(
   "pulumi/kubernetes=4.7.1"
   # currently used
   "pulumi/kubernetes=4.11.0"
+  "pulumi/kubernetes=4.21.1"
   "pulumi/random=4.14.0"
   "pulumi/gcp=7.2.1"
   "pulumi/auth0=3.3.2"

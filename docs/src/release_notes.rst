@@ -11,9 +11,27 @@ Release Notes
 Upcoming
 --------
 
+* Docs
+
+  * Add :ref:`SV pruning <sv-pruning>` section.
+  * Add historical :ref:`backups <sv_backups>` section to the SV docs.
+  * Add historical :ref:`backups <validator-backups>` section to the Validator docs.
+
+0.3.11
+------
+
 * Validator
 
-  Add an option to enable :ref:`participant pruning <validator_participant_pruning>`.
+  * Add an option to enable :ref:`participant pruning <validator_participant_pruning>`.
+
+* Observability
+
+  * Add a dashboard for sequencer client metrics.
+
+* Docs
+
+  * Extend :ref:`Scan API docs <app_dev_scan_api>` docs.
+  * Various smaller documentation updates and improvements.
 
 0.3.10
 ------

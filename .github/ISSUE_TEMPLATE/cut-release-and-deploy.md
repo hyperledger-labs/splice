@@ -8,26 +8,37 @@ assignees: ""
 
 ## Cut release
 
-Note: Some commands assume you are using the [fish](https://fishshell.com/) shell. If you are using other shells, you may need to adjust the commands accordingly. For example, `foo (bar)` in `fish` is equivalent to `foo $(bar)` in `bash`.
+Note: Some commands assume you are using the [fish](https://fishshell.com/) shell.
+If you are using other shells, you may need to adjust the commands accordingly.
+For example, `foo (bar)` in `fish` is equivalent to `foo $(bar)` in `bash`.
 
-- [ ] Wait for everything to be merged that we want in it
+The `VERSION` file specifies the release version to build, here referred to as `0.x.z`.
+The previous release is referred to as `0.x.y` in these instructions.
+
+Regular releases are started from `origin/main`, while bugfix / patch releases are started from a previous release line.
+For the rest of this checklist, this will be called the _ancestor branch_.
+
+Release versions can only be published from a _release line branch_. The _release line branch_ is `release-line-0.x.z` for release `0.x.z` in these instructions.
+A _release line branch_ is branched from the _ancestor branch_.
+
+- [ ] Choose the _ancestor branch_. This can be `origin/main` for all regular releases or `origin/release-line-0.x.y` for bugfix releases.
+- [ ] Wait for everything to be merged in the _ancestor branch_ that we want in `0.x.z`.
   - [ ] ...
-- [ ] Figure out from which branch we want to release. This can be `origin/main` or `origin/release-line-0.x`.
-      For the rest of this checklist, this will be called the _ancestor branch_.
-- [ ] Ensure all changes to the previous release branch `origin/release-line-0.x.z` are also included in both the _ancestor branch_ and `origin/main`.
+- [ ] Ensure all changes to the previous release branch `origin/release-line-0.x.y` are also included in both the _ancestor branch_ and `origin/main`.
       This should be the case but sometimes a change gets missed.
-    - Use one of the following approaches to find changes applied to release line `0.x.z` after it was branched off its ancestor branch (which may be different from the ancestor branch of the new release).
-        - Run `git diff (git merge-base origin/release-line-0.x.z ANCESTOR_BRANCH) origin/release-line-0.x.z` and compare it to the checked out source code of the release line you're upgrading to.
-        - Run `git log (git merge-base origin/release-line-0.x.z ANCESTOR_BRANCH)..origin/release-line-0.x.z` and compare it to the log of the release line you're upgrading to.
-        - Open https://github.com/DACH-NY/canton-network-node/compare/BRANCH_COMMIT...release-line-0.x.z to see the changes in the GitHub UI, where `BRANCH_COMMIT` is the commit that the release line was branched off from.
+    - Use one of the following approaches to find changes applied to release line `0.x.y` after it was branched off its ancestor branch (which may be different from the ancestor branch of the new release).
+        - Run `git diff (git merge-base origin/release-line-0.x.y ANCESTOR_BRANCH) origin/release-line-0.x.y` and compare it to the checked out source code of the release line you're upgrading to.
+        - Run `git log (git merge-base origin/release-line-0.x.y ANCESTOR_BRANCH)..origin/release-line-0.x.y` and compare it to the log of the release line you're upgrading to.
+        - Open https://github.com/DACH-NY/canton-network-node/compare/BRANCH_COMMIT...release-line-0.x.y to see the changes in the GitHub UI, where `BRANCH_COMMIT` is the commit that the release line was branched off from.
 - [ ] Merge a PR into the _ancestor branch_ with the following changes:
   - [ ] Update the release notes (`docs/src/release_notes.rst`):
     - Replace `Upcoming` by the target version
     - Fix any spelling mistakes and make sure the RST rendering is not broken
-    - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the prev version)
-  - [ ] Make sure the merge commit has a `[release]` tag so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
-- [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
-  - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
+    - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.y..` (replace `0.x.y` with the prev version)
+- [ ] Create a release branch called `release-line-0.x.z` from the merged commit
+    - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
+- [ ] Merge a PR into the release branch (`origin/release-line-0.x.z`) with the following changes:
+  - [ ] Create an empty commit with `[release]` in the commit message so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
 - [ ] Trigger a CircleCI pipeline on the release branch with `run-job: publish-public-artifacts`
 - [ ] If _ancestor branch_ is not `origin/main`, forward port all changes made to the _ancestor branch_ as part of this release to `origin/main`
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
@@ -44,7 +55,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 
 - [ ] If significant time has passed since cutting the release, ensure that there are no changes that need to be backported to the release branch.
       In particular, check for changes to the `cluster/configs` and `cluster/configs-private` submodules.
-- [ ] Merge a PR into the release branch (`origin/release-line-0.x.y`) with the following changes:
+- [ ] Merge a PR into the release branch (`origin/release-line-0.x.z`) with the following changes:
   - [ ] Update the cluster `config.yaml` file by setting the new reference under `synchronizerMigration.active.releaseReference` and update the `synchronizerMigration.active.version` to version `0.x.y`.
   - [ ] Update `cluster/deployment/devnet/.envrc.vars`, bumping the release version.
     - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.

@@ -45,7 +45,6 @@ at least every 4 hours. Note that there is a strict order requirement
 between the backups: **the backup of the validator app's postgres instance must be taken at
 a point in time strictly earlier than that of the participant**.
 Please make sure the app's instance backup is completed before starting the participant one.
-We will provide guidelines on retention of older backups at a later point in time.
 
 If you are running your own Postgres instances in the cluster, backups can be
 taken either using tools like ``pg_dump``, or through snapshots of the underlying
@@ -61,3 +60,12 @@ the validator app.
   docker exec -i compose-postgres-splice-1 pg_dump -U cnadmin validator > "${backup_dir}"/validator-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
   active_participant_db=$(docker exec compose-participant-1 bash -c 'echo $CANTON_PARTICIPANT_POSTGRES_DB')
   docker exec compose-postgres-splice-1 pg_dump -U cnadmin "${active_participant_db}" > "${backup_dir}"/"${active_participant_db}"-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
+
+Historical backups
+^^^^^^^^^^^^^^^^^^
+
+If you have enabled participant :ref:`pruning <validator_participant_pruning>`, but wish to preserve participant data for longer, e.g. for future auditability, then you should preserve historical backups such that they are apart by no more than the size of your pruning window
+
+This means that backups must be preserved with a time difference between two historical backups smaller than the `retention` set for the participant.
+
+Furthermore, backups should be retained for previous :ref:`major upgrades <validator-upgrades>`, both the historical backups for the participant and all the backups for the other apps.

@@ -1,19 +1,37 @@
-import { SvOnboarding } from 'canton-network-pulumi-deployment/src/sv';
+import * as pulumi from '@pulumi/pulumi';
 import {
   ApprovedSvIdentity,
   Auth0Client,
   BackupConfig,
   BackupLocation,
   BootstrappingDumpConfig,
+  CnInput,
   ExpectedValidatorOnboarding,
+  SvIdKey,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
 import { SweepConfig } from 'splice-pulumi-common-validator';
+import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
+import { z } from 'zod';
 
 import {
   StaticCometBftConfig,
   StaticCometBftConfigWithNodeName,
 } from './synchronizer/cometbftConfig';
+
+export type SvOnboarding =
+  | { type: 'domain-migration' }
+  | {
+      type: 'found-dso';
+      sv1SvRewardWeightBps: number;
+      roundZeroDuration?: string;
+    }
+  | {
+      type: 'join-with-key';
+      keys: CnInput<SvIdKey>;
+      sponsorRelease: pulumi.Resource;
+      sponsorApiUrl: string;
+    };
 
 export interface StaticSvConfig {
   nodeName: string;
@@ -53,3 +71,21 @@ export interface SvConfig extends StaticSvConfig {
   disableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
 }
+
+export const SvConfigSchema = z.object({
+  sv: z
+    .object({
+      cometbft: z
+        .object({
+          volumeSize: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+export type Config = z.infer<typeof SvConfigSchema>;
+
+// eslint-disable-next-line
+// @ts-ignore
+export const svConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
