@@ -289,7 +289,6 @@ class AnsSubscriptionInitialPaymentTrigger(
           .yieldUnit()
           .map { _ =>
             val msg = s"confirmed to reject payment $paymentCid for ans entry $entryName: $reason"
-            logger.warn(msg)
             TaskSuccess(msg)
           }
       case QueryResult(_, Some(_)) =>

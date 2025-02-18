@@ -19,7 +19,11 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnection,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.topology.{DomainId, ForceFlag, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -49,6 +53,7 @@ final class LocalSynchronizerNode(
     override val sequencerExternalPublicUrl: String,
     override val sequencerAvailabilityDelay: Duration,
     val sequencerPruningConfig: Option[SequencerPruningConfig],
+    override val mediatorSequencerAmplification: SubmissionRequestAmplification,
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
 )(implicit
@@ -61,6 +66,7 @@ final class LocalSynchronizerNode(
       mediatorAdminConnection,
       sequencerExternalPublicUrl,
       sequencerAvailabilityDelay,
+      mediatorSequencerAmplification,
     )
     with RetryProvider.Has
     with FlagCloseable
@@ -253,6 +259,7 @@ final class LocalSynchronizerNode(
             mediatorAdminConnection.initialize(
               domainId,
               sequencerConnection,
+              mediatorSequencerAmplification,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -410,6 +417,47 @@ final class LocalSynchronizerNode(
       )
     } yield ()
   }
+
+  def ensureMediatorSequencerRequestAmplification()(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    retryProvider.ensureThat(
+      RetryFor.WaitingOnInitDependency,
+      "ensure_mediator_sequencer_request_amplification",
+      s"The mediator's sequencer request amplification is set to $mediatorSequencerAmplification",
+      for {
+        sequencerConnectionsO <- mediatorAdminConnection.getSequencerConnections()
+        sequencerConnections = sequencerConnectionsO.getOrElse(
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              "Mediator not initialized properly; getSequencerConnections returned None"
+            )
+            .asRuntimeException
+        )
+        connections: Seq[SequencerConnection] = sequencerConnections.connections.toSeq
+      } yield connections match {
+        case Seq(connection) =>
+          if (
+            sequencerConnections.submissionRequestAmplification == mediatorSequencerAmplification
+          ) {
+            Right(())
+          } else {
+            Left(connection)
+          }
+        case _ =>
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              s"Mediator not initialized properly; expected a single sequencer connection got ${connections}"
+            )
+            .asRuntimeException
+      },
+      (sequencerConnection: SequencerConnection) =>
+        mediatorAdminConnection.setSequencerConnection(
+          sequencerConnection,
+          mediatorSequencerAmplification,
+        ),
+      logger,
+    )
 
   override protected def onClosed(): Unit = {
     Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)

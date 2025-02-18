@@ -24,10 +24,12 @@ import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeLong,
   NonNegativeNumeric,
   PositiveNumeric,
+  PositiveInt,
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.model.Uri
 
@@ -307,7 +309,11 @@ final case class SvSequencerConfig(
 }
 
 final case class SvMediatorConfig(
-    adminApi: ClientConfig
+    adminApi: ClientConfig,
+    sequencerRequestAmplification: SubmissionRequestAmplification = SubmissionRequestAmplification(
+      PositiveInt.tryCreate(5),
+      NonNegativeFiniteDuration.ofSeconds(5),
+    ),
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

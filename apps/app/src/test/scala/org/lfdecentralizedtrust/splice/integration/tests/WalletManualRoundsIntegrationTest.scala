@@ -285,7 +285,7 @@ class WalletManualRoundsIntegrationTest
           },
         )
 
-        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
+        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
           {
             actAndCheck(
               "Resume ansSubscriptionInitialPaymentTrigger to check if it should accept payment", {
