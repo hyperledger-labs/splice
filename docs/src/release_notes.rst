@@ -17,6 +17,11 @@ Upcoming
   * Add historical :ref:`backups <sv_backups>` section to the SV docs.
   * Add historical :ref:`backups <validator-backups>` section to the Validator docs.
 
+* Performance
+
+  * Updated table definitions in Scan to improve performance of ``/transactions`` and ``/activities`` endpoints.
+    This requires a SQL migration that will run on app startup for ~15m on devnet and ~2m on mainnet according to our tests.
+
 0.3.11
 ------
 
