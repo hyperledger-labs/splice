@@ -469,6 +469,7 @@ class SV1Initializer(
             synchronizerNode.mediatorAdminConnection.initialize(
               domainId,
               synchronizerNode.sequencerConnection,
+              synchronizerNode.mediatorSequencerAmplification,
             ),
             logger,
           )
