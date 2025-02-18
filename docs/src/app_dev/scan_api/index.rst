@@ -32,7 +32,6 @@ The Scan API is grouped in the following categories:
 * :ref:`scan_bulk_data_api`: A comprehensive API that provides access to the exact and full history of updates and ACS snapshots as recorded on the SV participant node.
 * :ref:`scan_global_synchronizer_connectivity_api`
 * :ref:`scan_global_synchronizer_operations_api`
-* :ref:`scan_vote_requests_results_api`
 * :ref:`scan_cc_reference_data_api`
 * :ref:`scan_current_state_api`
 * :ref:`scan_aggregates_api`
@@ -45,7 +44,6 @@ Please see the :ref:`scan_openapi` for the full API reference.
    scan_bulk_data_api
    scan_global_synchronizer_connectivity_api
    scan_global_synchronizer_operations_api
-   scan_vote_requests_results_api
    scan_cc_reference_data_api
    scan_current_state_api
    scan_aggregates_api

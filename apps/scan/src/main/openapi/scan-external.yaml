@@ -9,7 +9,7 @@ servers:
 paths:
   /v0/domains/{domain_id}/members/{member_id}/traffic-status:
     get:
-      tags: [scan, external]
+      tags: [scan, external, current-state]
       x-jvm-package: external.scan
       operationId: "getMemberTrafficStatus"
       description: |
@@ -46,7 +46,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
     get:
-      tags: [scan, external]
+      tags: [scan, external, gs-connectivity]
       x-jvm-package: external.scan
       operationId: "getPartyToParticipant"
       description: |
@@ -81,7 +81,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/validators/validator-faucets:
     get:
-      tags: [ scan, external ]
+      tags: [ scan, external, gs-operations ]
       x-jvm-package: external.scan
       operationId: "getValidatorFaucetsByValidator"
       description: |

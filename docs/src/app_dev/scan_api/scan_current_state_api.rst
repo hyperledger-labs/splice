@@ -8,4 +8,12 @@
 Scan API for Current state of CC, CNS, and Synchronizer Traffic
 ===============================================================
 
-.. todo:: add docs
+.. todo:: member traffic-status
+.. todo:: open-and-issuing-mining-rounds
+
+Closed Mining Rounds
+--------------------
+
+.. todo:: closed-rounds
+
+.. todo:: add docs, Accessing current state of CC and CNS and Synchronizer Traffic

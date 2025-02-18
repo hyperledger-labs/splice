@@ -8,4 +8,11 @@
 Scan Global Synchronizer Operations API
 =======================================
 
+.. todo:: validator-faucets
+
+DSO Info
+--------
+
+.. todo:: dso
+
 .. todo:: add docs
