@@ -27,7 +27,7 @@ TestNet
     the Tokenomics Committee of the Global Synchronizer Foundation.
     You can initiate a request to do so through https://sync.global/validator-request/.
     Just like for DevNet, is also still requires your validator’s egress IP to be added to the allowlist
-    and it requires an onboarding secret from your SV.
+    and it requires an onboarding secret from your SV sponsor.
     Just like DevNet, TestNet gets reset every 3-6 months,
     but the reset schedule is shifted so TestNet never gets reset at the same time as DevNet.
     TestNet upgrades to new versions after DevNet, but before MainNet so it provides an additional layer of testing.
@@ -72,10 +72,10 @@ Validating that your IP has been approved
 To validate that the SVs have added you to their respective IP
 allowlists, you can query their Scan URLs. Note that this must be run
 from the same egress IP from which you want to deploy your validator,
-e.g., from the VM that you want to run your docker compose setup from
+e.g., from the VM that you want to run your docker compose setup on,
 or from within your Kubernetes cluster.
 
-Note that the following snippet requires installing `JQ <https://jqlang.org/>`_.
+Note that the following snippet requires installing `jq <https://jqlang.org/>`_.
 
 .. parsed-literal::
 
@@ -102,9 +102,9 @@ if you do not get any errors, then all SVs have added you. Note that the URLs an
 
 Apart from connectivity to Scan, your validator must also be able to connect to the sequencer endpoints of the SVs.
 If you are encountering issues related to connecting to the synchronizer,
-you can use the following snippet to confirm that you're able to reach those endpoints
+you can use the following snippet to confirm that you are able to reach those endpoints
 (i.e., that SVs have whitelisted your IP for those endpoints as well).
-Note that the following snippet requires installing `JQ <https://jqlang.org/>`_ and `grpcurl <https://github.com/fullstorydev/grpcurl>`_.
+Note that the following snippet requires installing `jq <https://jqlang.org/>`_ and `grpcurl <https://github.com/fullstorydev/grpcurl>`_.
 
 .. parsed-literal::
 
@@ -166,6 +166,6 @@ You can sign up for various mailing lists provided by the :term:`Global Synchron
 We recommend the following lists:
 
 * `main <https://lists.sync.global/g/main/messages>`_: for overall information about the Canton Network.
-* `cip announce <https://lists.sync.global/g/cip-announce/messages>`_: for new Canton Improvement Proposals (CIPs)
+* `cip announce <https://lists.sync.global/g/cip-announce/messages>`_: for new Canton Improvement Proposals (CIPs).
 * `tokenomics-announce <https://lists.sync.global/g/tokenomics-announce/messages>`_: for announcements from the Tokenomics commitee. This also includes approval of new validators.
-* `validator-announce <https://lists.sync.global/g/validator-announce/messages>`_: for other announcements intended for validator operators
+* `validator-announce <https://lists.sync.global/g/validator-announce/messages>`_: for other announcements intended for validator operators.

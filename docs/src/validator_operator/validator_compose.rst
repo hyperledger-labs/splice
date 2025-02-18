@@ -11,7 +11,7 @@
 Docker-Compose Based Deployment of a Validator Node
 ===================================================
 
-This section describes how to deploy a standalone validator node on a local machine
+This section describes how to deploy a standalone validator node on a VM or a local machine
 using `Docker Compose <https://docs.docker.com/compose/>`_. The deployment consists of the validator node along with associated
 wallet and CNS UIs, and onboards the validator node to the target network.
 
@@ -31,7 +31,7 @@ This deployment is useful for:
 
   - Monitoring: The deployment, as opposed to a Kubernetes-based one, does not include monitoring.
 
-  - For productions settings, you should aim to keep your validator up and running constantly,
+  - For production settings, you should aim to keep your validator up and running constantly,
     in order to avoid losing out on rewards, and avoid issues with catching up on ledger state
     after significant downtime.
 
@@ -51,7 +51,7 @@ Requirements
 To validate that the dependencies are set up correctly, run the
 following commands. All commands should succeed and print out the
 version. Note that the exact versions you see may be different from
-the example here. As long as you have docker-compose 2.0 or newer you should be fine.
+the example here. As long as you have docker-compose 2.26.0 or newer you should be fine.
 
 .. code-block:: bash
 
@@ -80,29 +80,10 @@ the example here. As long as you have docker-compose 2.0 or newer you should be 
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
-Preparing for Validator Onboarding
-++++++++++++++++++++++++++++++++++
-
-In order to become a validator, you need the sponsorship of an SV.
-Your SV will provide you with a required secret to authorize yourself towards their SV.
-
-The onboarding secret is a one-time use secret that expires after 48 hours. If you don't join before it expires, you need to request a new secret from your SV sponsor.
-
-.. admonition:: DevNet-only
-
-  On DevNet, you can obtain an onboarding secret automatically by
-  calling the following endpoint on any SV (the GSF URL used here for illustration):
-
-  .. parsed-literal::
-
-     curl -X POST |gsf_sv_url|/api/sv/v0/devnet/onboard/validator/prepare
-
-  Note that this self-served secret is only valid for 1 hour.
-
 Deployment
 ++++++++++
 
-1) Change to the `docker-compose`` directory inside the extracted bundle:
+1) Change to the `docker-compose` directory inside the extracted bundle:
 
 .. code-block:: bash
 
@@ -171,12 +152,12 @@ Name                          Value
 AUTH_URL                      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
 AUTH_JWKS_URL                 The URL of your OIDC provider for obtaining the ``jwks.json``, will typically be ``${AUTH_URL}/.well-known/jwks.json``.
 AUTH_WELLKNOWN_URL            The URL of your OIDC provider for obtaining the ``openid-configuration``, will typically be ``${AUTH_URL}/.well-known/openid-configuration``.
-LEDGER_API_AUTH_AUDIENCE      The audience for the participant ledger API. e.g. ``https://ledger_api.example.com``
-VALIDATOR_AUTH_AUDIENCE       The audience for the validator backend API. e.g. ``https://validator.example.com``
+LEDGER_API_AUTH_AUDIENCE      The audience for the participant ledger API. e.g. ``https://ledger_api.example.com``.
+VALIDATOR_AUTH_AUDIENCE       The audience for the validator backend API. e.g. ``https://validator.example.com``.
 VALIDATOR_AUTH_CLIENT_ID      The client id of the OAuth app for the validator app backend.
 VALIDATOR_AUTH_CLIENT_SECRET  The client secret of the OAuth app for the validator app backend.
 LEDGER_API_ADMIN_USER         Should match the `sub` field of JWTs issued for the validator app. For some auth providers, this would be formed as ``CLIENT_ID@clients``.
-WALLET_ADMIN_USER             The user ID of the user which should login as the wallet administrator. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
+WALLET_ADMIN_USER             The user ID of the user which should login as the wallet administrator. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``.
 WALLET_UI_CLIENT_ID           The client id of the OAuth app for the wallet UI.
 ANS_UI_CLIENT_ID              The client id of the OAuth app for the CNS UI.
 ============================= ===========================================================================
@@ -190,7 +171,7 @@ command, as follows:
 
 .. code-block:: bash
 
-    ./start.sh -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m $MIGRATION_ID -w -a
+    ./start.sh -s "<SPONSOR_SV_URL>" -o "<ONBOARDING_SECRET>" -p "<party_hint>" -m "<MIGRATION_ID>" -w -a
 
 Integration with systemd and other init systems
 +++++++++++++++++++++++++++++++++++++++++++++++

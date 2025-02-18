@@ -138,6 +138,7 @@ rst_prolog = f"""
 .. |generic_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
 .. |gsf_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
 .. |generic_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
+.. |gsf_sequencer_url| replace:: :raw-html:`https://sequencer-MIGRATION_ID.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
 
 .. |version_literal| replace:: ``{version}``
 .. |chart_version_literal| replace:: ``{chart_version}``
