@@ -746,9 +746,11 @@
         "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.test.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
+          "enableBftSequencer": false,
           "mediatorAddress": "global-domain-1-mediator",
           "sequencerAddress": "global-domain-1-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
+          "sequencerBftPublicUrlSuffix": "sv.test.global.canton.network.digitalasset.com",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",

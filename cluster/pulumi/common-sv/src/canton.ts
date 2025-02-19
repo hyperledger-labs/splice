@@ -11,7 +11,8 @@ import { installPostgres, Postgres } from 'splice-pulumi-common/src/postgres';
 
 import {
   DecentralizedSynchronizerNode,
-  InStackDecentralizedSynchronizerNode,
+  InStackCantonBftDecentralizedSynchronizerNode,
+  InStackCometBftDecentralizedSynchronizerNode,
   StaticCometBftConfigWithNodeName,
   SvParticipant,
 } from './index';
@@ -115,22 +116,35 @@ export function installCantonComponents(
       auth0UserNameEnvVarSource('sv'),
       opts
     );
-    const decentralizedSynchronizerNode = new InStackDecentralizedSynchronizerNode(
-      migrationId,
-      xns,
-      {
-        sequencerPostgres: sequencerPostgres,
-        mediatorPostgres: mediatorPostgres,
-        setCoreDbNames: svConfig.isCoreSv,
-      },
-      cometbft,
-      isActiveMigration,
-      migrationConfig.isRunningMigration(),
-      svConfig.onboardingName,
-      logLevel,
-      migrationInfo.version,
-      opts
-    );
+    const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
+      ? new InStackCantonBftDecentralizedSynchronizerNode(
+          migrationId,
+          xns,
+          {
+            sequencerPostgres: sequencerPostgres,
+            mediatorPostgres: mediatorPostgres,
+            setCoreDbNames: svConfig.isCoreSv,
+          },
+          isActiveMigration,
+          logLevel,
+          migrationInfo.version,
+          opts
+        )
+      : new InStackCometBftDecentralizedSynchronizerNode(
+          cometbft,
+          migrationId,
+          xns,
+          {
+            sequencerPostgres: sequencerPostgres,
+            mediatorPostgres: mediatorPostgres,
+            setCoreDbNames: svConfig.isCoreSv,
+          },
+          isActiveMigration,
+          migrationConfig.isRunningMigration(),
+          svConfig.onboardingName,
+          logLevel,
+          migrationInfo.version
+        );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,
       participant: {

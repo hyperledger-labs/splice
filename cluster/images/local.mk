@@ -39,6 +39,7 @@ images := \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app
+sequencer-image := cluster/images/canton-sequencer
 splice-ui-image := cluster/images/splice-web-ui
 images_file := cluster/images/.images
 

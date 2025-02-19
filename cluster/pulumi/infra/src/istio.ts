@@ -170,6 +170,7 @@ function configureInternalGatewayService(
     externalIPRanges,
     [
       ingressPort('grpc-cd-pub-api', 5008),
+      ingressPort('grpc-cs-p2p-api', 5010),
       ingressPort('grpc-svcp-adm', 5002),
       ingressPort('grpc-svcp-lg', 5001),
       ingressPort('svcp-metrics', 10013),

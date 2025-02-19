@@ -7,6 +7,7 @@ import {
 } from 'splice-pulumi-common';
 import {
   CometBftNodeConfigs,
+  CrossStackCometBftDecentralizedSynchronizerNode,
   CrossStackDecentralizedSynchronizerNode,
   installCantonComponents,
   InstalledMigrationSpecificSv,
@@ -39,10 +40,13 @@ export function installCanton(
   };
   installCometbftKeys(svNamespace);
   const externalActiveMigration = {
-    decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
-      activeMigrationId,
-      new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier
-    ),
+    decentralizedSynchronizer: decentralizedSynchronizerMigrationConfig.active.sequencer
+      .enableBftSequencer
+      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId)
+      : new CrossStackCometBftDecentralizedSynchronizerNode(
+          activeMigrationId,
+          new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier
+        ),
     participant: {
       asDependencies: [],
       internalClusterAddress: Output.create(`participant-${activeMigrationId}`),

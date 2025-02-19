@@ -1,6 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
-import { ComponentResource, Resource } from '@pulumi/pulumi';
+import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 import {
   ChartValues,
   domainLivenessProbeInitialDelaySeconds,
@@ -24,9 +24,12 @@ import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { installCometBftNode } from './cometbft';
 import { StaticCometBftConfigWithNodeName } from './cometbftConfig';
 
+export interface CometbftSynchronizerNode {
+  cometbftRpcServiceName: string;
+}
+
 export interface DecentralizedSynchronizerNode {
   migrationId: number;
-  cometbftRpcServiceName: string;
   readonly namespaceInternalSequencerAddress: string;
   readonly namespaceInternalMediatorAddress: string;
   readonly sv1InternalSequencerAddress: string;
@@ -36,12 +39,10 @@ export interface DecentralizedSynchronizerNode {
 export class CrossStackDecentralizedSynchronizerNode implements DecentralizedSynchronizerNode {
   name: string;
   migrationId: number;
-  cometbftRpcServiceName: string;
 
-  constructor(migrationId: DomainMigrationIndex, cometbftNodeIdentifier: string) {
+  constructor(migrationId: DomainMigrationIndex) {
     this.migrationId = migrationId;
     this.name = 'global-domain-' + migrationId.toString();
-    this.cometbftRpcServiceName = `${cometbftNodeIdentifier}-cometbft-rpc`;
   }
 
   get namespaceInternalSequencerAddress(): string {
@@ -59,81 +60,61 @@ export class CrossStackDecentralizedSynchronizerNode implements DecentralizedSyn
   readonly dependencies: Resource[] = [];
 }
 
-export class InStackDecentralizedSynchronizerNode
+export class CrossStackCometBftDecentralizedSynchronizerNode
+  extends CrossStackDecentralizedSynchronizerNode
+  implements CometbftSynchronizerNode
+{
+  cometbftRpcServiceName: string;
+
+  constructor(migrationId: DomainMigrationIndex, cometbftNodeIdentifier: string) {
+    super(migrationId);
+    this.cometbftRpcServiceName = `${cometbftNodeIdentifier}-cometbft-rpc`;
+  }
+}
+
+abstract class InStackDecentralizedSynchronizerNode
   extends ComponentResource
   implements DecentralizedSynchronizerNode
 {
+  xns: ExactNamespace;
   migrationId: number;
   name: string;
-  cometbft: {
-    onboardingName: string;
-    syncSource?: Release;
-  };
-  cometbftRpcServiceName: string;
   version: CnChartVersion;
+
   readonly dependencies: Resource[] = [this];
 
-  constructor(
-    migrationId: DomainMigrationIndex,
-    xns: ExactNamespace,
+  constructor(migrationId: DomainMigrationIndex, xns: ExactNamespace, version: CnChartVersion) {
+    super('canton:network:domain:global', `${xns.logicalName}-global-domain-${migrationId}`);
+    this.xns = xns;
+    this.migrationId = migrationId;
+    this.name = 'global-domain-' + migrationId.toString();
+    this.version = version;
+  }
+
+  protected installDecentralizedSynchronizer(
     dbs: {
       setCoreDbNames: boolean;
       sequencerPostgres: Postgres;
       mediatorPostgres: Postgres;
     },
-    cometbft: {
-      nodeConfigs: {
-        self: StaticCometBftConfigWithNodeName;
-        sv1: StaticCometBftConfigWithNodeName;
-        peers: StaticCometBftConfigWithNodeName[];
-      };
-      enableStateSync?: boolean;
-      enableTimeoutCommit?: boolean;
-    },
     active: boolean,
-    runningMigration: boolean,
-    onboardingName: string,
     logLevel: LogLevel,
-    version: CnChartVersion,
+    driver: { type: 'cometbft'; host: Output<string>; port: number } | { type: 'cantonbft' },
     opts?: SpliceCustomResourceOptions
   ) {
-    super('canton:network:domain:global', `${xns.logicalName}-global-domain-${migrationId}`);
-    this.migrationId = migrationId;
-    this.cometbft = { ...cometbft, onboardingName };
-    this.name = 'global-domain-' + migrationId.toString();
     const sanitizedName = sanitizedForPostgres(this.name);
     const mediatorDbName = `${sanitizedName}_mediator`;
     const sequencerDbName = `${sanitizedName}_sequencer`;
-    this.version = version;
-
-    const cometbftRelease = installCometBftNode(
-      xns,
-      this.cometbft.onboardingName,
-      new CometBftNodeConfigs(migrationId, cometbft.nodeConfigs),
-      migrationId,
-      active,
-      runningMigration,
-      logLevel.toLowerCase(),
-      version,
-      cometbft.enableStateSync,
-      cometbft.enableTimeoutCommit,
-      {
-        ...opts,
-        parent: this,
-      }
-    );
-
-    this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
 
     const decentralizedSynchronizerValues: ChartValues = loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
       {
-        MIGRATION_ID: migrationId.toString(),
+        MIGRATION_ID: this.migrationId.toString(),
       }
     );
 
     installSpliceHelmChart(
-      xns,
+      this.xns,
       this.name,
       'splice-global-domain',
       {
@@ -149,11 +130,7 @@ export class InStackDecentralizedSynchronizerNode
               postgresName: dbs.sequencerPostgres.instanceName,
               ...(dbs.setCoreDbNames ? { databaseName: sequencerDbName } : {}),
             },
-            driver: {
-              type: 'cometbft',
-              host: pulumi.interpolate`${this.cometbftRpcServiceName}.${xns.logicalName}.svc.cluster.local`,
-              port: 26657,
-            },
+            driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
             ...sequencerResources,
           },
@@ -171,7 +148,7 @@ export class InStackDecentralizedSynchronizerNode
           metrics: {
             enable: true,
             migration: {
-              id: migrationId,
+              id: this.migrationId,
               active: active,
             },
           },
@@ -185,19 +162,15 @@ export class InStackDecentralizedSynchronizerNode
             : undefined,
         },
       },
-      version,
+      this.version,
       {
         ...opts,
-        dependsOn: (opts?.dependsOn || []).concat([
-          cometbftRelease.release,
-          dbs.sequencerPostgres,
-          dbs.mediatorPostgres,
-        ]),
+        dependsOn: (opts?.dependsOn || []).concat([dbs.sequencerPostgres, dbs.mediatorPostgres]),
         parent: this,
         // TODO(#14507) - remove alias once latest release is 0.2.0
         aliases: [
           {
-            name: `global-domain-${migrationId}`,
+            name: `global-domain-${this.migrationId}`,
             parent: undefined,
           },
         ],
@@ -215,5 +188,100 @@ export class InStackDecentralizedSynchronizerNode
 
   get sv1InternalSequencerAddress(): string {
     return `http://${this.namespaceInternalSequencerAddress}.sv-1:5008`;
+  }
+}
+
+export class InStackCometBftDecentralizedSynchronizerNode
+  extends InStackDecentralizedSynchronizerNode
+  implements CometbftSynchronizerNode
+{
+  cometbft: {
+    onboardingName: string;
+    syncSource?: Release;
+  };
+  cometbftRpcServiceName: string;
+
+  constructor(
+    cometbft: {
+      nodeConfigs: {
+        self: StaticCometBftConfigWithNodeName;
+        sv1: StaticCometBftConfigWithNodeName;
+        peers: StaticCometBftConfigWithNodeName[];
+      };
+      enableStateSync?: boolean;
+      enableTimeoutCommit?: boolean;
+    },
+    migrationId: DomainMigrationIndex,
+    xns: ExactNamespace,
+    dbs: {
+      setCoreDbNames: boolean;
+      sequencerPostgres: Postgres;
+      mediatorPostgres: Postgres;
+    },
+    active: boolean,
+    runningMigration: boolean,
+    onboardingName: string,
+    logLevel: LogLevel,
+    version: CnChartVersion,
+    opts?: SpliceCustomResourceOptions
+  ) {
+    super(migrationId, xns, version);
+    const cometbftRelease = installCometBftNode(
+      xns,
+      onboardingName,
+      new CometBftNodeConfigs(migrationId, cometbft.nodeConfigs),
+      migrationId,
+      active,
+      runningMigration,
+      logLevel.toLowerCase(),
+      version,
+      cometbft.enableStateSync,
+      cometbft.enableTimeoutCommit,
+      {
+        ...opts,
+        parent: this,
+      }
+    );
+
+    this.cometbft = { ...cometbft, onboardingName };
+    this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
+    this.installDecentralizedSynchronizer(
+      dbs,
+      active,
+      logLevel,
+      {
+        type: 'cometbft',
+        host: pulumi.interpolate`${cometbftRelease.rpcServiceName}.${xns.logicalName}.svc.cluster.local`,
+        port: 26657,
+      },
+      opts
+    );
+  }
+}
+
+export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecentralizedSynchronizerNode {
+  constructor(
+    migrationId: DomainMigrationIndex,
+    xns: ExactNamespace,
+    dbs: {
+      setCoreDbNames: boolean;
+      sequencerPostgres: Postgres;
+      mediatorPostgres: Postgres;
+    },
+    active: boolean,
+    logLevel: LogLevel,
+    version: CnChartVersion,
+    opts?: SpliceCustomResourceOptions
+  ) {
+    super(migrationId, xns, version);
+    this.installDecentralizedSynchronizer(
+      dbs,
+      active,
+      logLevel,
+      {
+        type: 'cantonbft',
+      },
+      opts
+    );
   }
 }

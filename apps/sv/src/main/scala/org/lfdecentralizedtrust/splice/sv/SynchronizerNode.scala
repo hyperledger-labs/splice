@@ -29,7 +29,7 @@ object SequencerConfig {
   ): SequencerConfig = {
     if (sequencerConfig.isBftSequencer) {
       BftSequencerConfig(
-        sequencerConfig.externalPeerApiUrl.getOrElse(
+        sequencerConfig.externalPeerApiUrlSuffix.getOrElse(
           throw Status.INVALID_ARGUMENT
             .withDescription("External peer URL is required")
             .asRuntimeException()

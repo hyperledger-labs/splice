@@ -19,6 +19,7 @@ class SvBftSequencerPeerReconcilingTrigger(
     baseContext: TriggerContext,
     store: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
+    migrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -34,6 +35,7 @@ class SvBftSequencerPeerReconcilingTrigger(
       store,
       sequencerAdminConnection,
       loggerFactory,
+      migrationId,
     )
 
 }

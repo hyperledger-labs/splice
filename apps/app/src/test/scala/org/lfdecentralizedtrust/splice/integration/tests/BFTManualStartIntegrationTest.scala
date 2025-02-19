@@ -29,10 +29,11 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
                 _.focus(_.sequencer).modify(
                   _.copy(
                     isBftSequencer = true,
-                    externalPeerApiUrl = Some(
+                    externalPeerApiUrlSuffix = Some(
                       Endpoint(
                         "localhost",
-                        RequireTypes.Port.tryCreate(31030 + Integer.parseInt(sv.stripPrefix("sv"))),
+                        RequireTypes.Port
+                          .tryCreate(5010 + Integer.parseInt(sv.stripPrefix("sv")) * 100),
                       )
                     ),
                   )

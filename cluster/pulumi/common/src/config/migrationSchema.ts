@@ -15,6 +15,9 @@ export const defaultActiveMigration = {
   id: 0,
   version: CHARTS_VERSION,
   provider: MigrationProvider.INTERNAL,
+  sequencer: {
+    enableBftSequencer: false,
+  },
 };
 
 // defined here to prevent cyclic dependency
@@ -43,6 +46,11 @@ export const MigrationInfoSchema = z
     version: migrationVersion,
     provider: z.nativeEnum(MigrationProvider),
     releaseReference: z.string().optional(),
+    sequencer: z
+      .object({
+        enableBftSequencer: z.boolean().default(false),
+      })
+      .default({}),
   })
   .strict();
 

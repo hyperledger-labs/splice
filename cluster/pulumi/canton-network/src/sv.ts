@@ -37,6 +37,7 @@ import {
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
+  CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   SvParticipant,
@@ -378,6 +379,7 @@ function installSvApp(
 ) {
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
+  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,
@@ -392,10 +394,14 @@ function installSvApp(
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
-    cometBFT: {
-      enabled: true,
-      connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
-    },
+    ...(useCantonBft
+      ? {}
+      : {
+          cometBFT: {
+            enabled: true,
+            connectionUri: pulumi.interpolate`http://${(decentralizedSynchronizer as unknown as CometbftSynchronizerNode).cometbftRpcServiceName}:26657`,
+          },
+        }),
     decentralizedSynchronizerUrl:
       config.onboarding.type == 'found-dso' &&
       withoutFounderDecentralizedSynchronizerUrl(activeVersion)
@@ -411,6 +417,13 @@ function installSvApp(
         // required to prevent participants from using new nodes when the domain is upgraded
         sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
         sequencerPruningConfig: config.sequencerPruningConfig,
+        ...(useCantonBft
+          ? {
+              enableBftSequencer: true,
+              // TODO(#15343) - add back the public url when the p2p supports tls https://github.com/DACH-NY/canton/issues/23835
+              sequencerBftPublicUrlSuffix: `${xns.logicalName}.svc.cluster.local`,
+            }
+          : {}),
       },
     scan: {
       publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,

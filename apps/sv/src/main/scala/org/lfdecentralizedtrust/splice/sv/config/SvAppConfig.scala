@@ -289,7 +289,7 @@ final case class SvSequencerConfig(
     adminApi: ClientConfig,
     internalApi: ClientConfig,
     externalPublicApiUrl: String,
-    externalPeerApiUrl: Option[Endpoint] = None,
+    externalPeerApiUrlSuffix: Option[Endpoint] = None,
     // This needs to be participantResponseTimeout + mediatorResponseTimeout to make sure that the sequencer
     // does not have to serve requests that have been in flight before the sequencer's signing keys became valid.
     // See also https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109

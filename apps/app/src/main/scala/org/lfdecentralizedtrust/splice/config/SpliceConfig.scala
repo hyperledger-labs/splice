@@ -450,7 +450,7 @@ object SpliceConfig {
               )
             _ <-
               if (sequencerConfig.isBftSequencer) {
-                sequencerConfig.externalPeerApiUrl
+                sequencerConfig.externalPeerApiUrlSuffix
                   .toRight(
                     ConfigValidationFailed(
                       "Sequencer external peer url must be set for BFT sequencers"

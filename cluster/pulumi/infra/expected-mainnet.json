@@ -1424,6 +1424,12 @@
               "targetPort": 5008
             },
             {
+              "name": "grpc-cs-p2p-api",
+              "port": 5010,
+              "protocol": "TCP",
+              "targetPort": 5010
+            },
+            {
               "name": "grpc-svcp-adm",
               "port": 5002,
               "protocol": "TCP",
