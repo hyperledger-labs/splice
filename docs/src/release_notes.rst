@@ -24,8 +24,10 @@ Upcoming
 
 * Deployment
 
-  * Add OCI annotations to provide standardized information attached to a Docker image. Details provided are image name, image version, 
+  * Add OCI annotations to provide standardized information attached to a Docker image. Details provided are image name, image version,
     creation date, base image, repository, and commit hash.
+  * Fix an issue in the SV helm chart where the resource section was omitted if ``attachPvc`` was set to ``false``.
+    See https://github.com/digital-asset/decentralized-canton-sync/issues/299
 
 0.3.11
 ------
