@@ -65,6 +65,19 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
+  bump_configs:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Bump configs
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
+            .circleci/cn-scripts/bump-configs.sh
+
   update_pipeline_schedule:
     docker:
       - image: cimg/base:2024.01

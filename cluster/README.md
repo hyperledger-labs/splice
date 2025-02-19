@@ -1324,6 +1324,11 @@ all changes that you consume before applying this command.
 git submodule update --remote
 ```
 
+On a daily basis, PRs are created for the production release line branches that bump this submodule.
+But, as mentioned above, please review all changes before approving and merging that PR.
+To trigger a bump earlier than the daily automation, you may also trigger the `bump-configs` workflow
+in CircleCI (on the main branch), which will create that bump PR.
+
 ## TLS Certificate Provisioning
 
 Certificates are issued and renewed in the cluster automatically by
