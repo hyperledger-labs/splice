@@ -54,9 +54,26 @@ Since the API exposes the underlying Daml transactions directly, there are a cou
 
 Open API Specification
 ----------------------
-Please see the Scan `Open API specification <https://github.com/hyperledger-labs/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan-internal.yaml>`_.
-Look for APIs starting with `/v1/updates/ <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L511>`_
-and `/v0/state/ <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L603>`_, respectively for updates and ACS snapshots.
+The :ref:`scan_openapi` describes the Scan API in detail.
+The below table provides a quick overview of the endpoints that the Scan Bulk Data API consists of:
+
+.. list-table::
+   :widths: 10 30
+   :header-rows: 1
+
+   * - Endpoint
+     - Description
+   * - `POST /v1/updates <scan_openapi.html#post--v1-updates>`_
+     - Returns the update history
+   * - `GET /v0/updates/\{update_id\} <scan_openapi.html#get--v0-updates-update_id>`_
+     - Returns the update with the given update_id
+   * - `GET /v0/state/acs/snapshot-timestamp <scan_openapi.html#get--v0-state-acs-snapshot-timestamp>`_
+     - Returns the timestamp of the most recent snapshot
+   * - `POST /v0/state/acs <scan_openapi.html#post--v0-state-acs>`_
+     - Returns the ACS Snapshot for a given record time
+
+If you would rather read the yaml Open API specification file directly, this can be found in the Splice repository at
+`scan-internal.yaml <https://github.com/hyperledger-labs/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan-internal.yaml>`_.
 
 Example URLs for accessing the Scan Bulk Data API are:
 
@@ -76,13 +93,9 @@ An update can be one of two things:
   They will begin to appear in the update stream as the global synchronizer introduces rolling upgrades later in 2025 or early 2026;
   for this reason we'll omit further details for now, you can safely ignore reassignments and only handle transactions.
 
-`/v1/updates <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L511>`_
+`/v1/updates <scan_openapi.html#post--v1-updates>`_
 provides a JSON encoded version of the recorded update history. Once you have an ``update_id`` for a specific update, you can retrieve the details by using
-`/v1/updates/{update_id} <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L571>`_.
-
-The Open API spec for `/v1/updates <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L511>`_
-and `/v1/updates/{update_id} <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L571>`_
-describe the APIs in detail.
+`/v0/updates/\{update_id\} <scan_openapi.html#get--v0-updates-update_id>`_.
 
 .. _v1_updates:
 
@@ -332,9 +345,18 @@ In general, processing the updates involves the following steps:
 ACS Snapshots
 ~~~~~~~~~~~~~
 
-The `Open API spec <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml>`_
-for `/v0/state/acs/snapshot-timestamp <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L603>`_
-and `/v0/state/acs <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L642>`_ describes the APIs in detail.
+The :ref:`scan_openapi` describes the relevant APIs for ACS Snapshots in detail, which are shown in the table below:
+
+.. list-table::
+   :widths: 10 30
+   :header-rows: 1
+
+   * - Endpoint
+     - Description
+   * - `GET /v0/state/acs/snapshot-timestamp <scan_openapi.html#get--v0-state-acs-snapshot-timestamp>`_
+     - Returns the timestamp of the most recent snapshot
+   * - `POST /v0/state/acs <scan_openapi.html#post--v0-state-acs>`_
+     - Returns the ACS Snapshot for a given record time
 
 The ACS snapshots are periodically taken and stored in the Scan App. This endpoint only provides the snapshots that have been periodically taken.
 You can compute the state at any point in time by starting from a periodic snapshot and
@@ -345,7 +367,7 @@ then stream updates from the timestamp of that snapshot. We'll discuss this in m
 GET /v0/state/acs/snapshot-timestamp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The ``/v0/state/acs/snapshot-timestamp`` endpoint returns the timestamp of the most recent snapshot before the given date,
+The `/v0/state/acs/snapshot-timestamp <scan_openapi.html#get--v0-state-acs-snapshot-timestamp>`_ endpoint returns the timestamp of the most recent snapshot before the given date,
 for the given ``migration_id``. Specify ``migration_id = 0`` for the beginning of the network.
 The returned timestamp corresponds to the record time of the last transaction in the snapshot.
 
@@ -368,7 +390,7 @@ The response returns the timestamp of the most recent snapshot before the given 
 POST /v0/state/acs
 ^^^^^^^^^^^^^^^^^^
 
-The ``/v0/state/acs`` endpoint returns the ACS in creation date ascending order, paged, for a given migration id and record time.
+The `/v0/state/acs <scan_openapi.html#post--v0-state-acs>`_ endpoint returns the ACS in creation date ascending order, paged, for a given migration id and record time.
 Post an ``AcsRequest`` with a ``migration_id``, ``record_time`` and ``page_size`` to get a page of contracts.
 An optional ``templates`` field filters the ACS by a set of ``template_id``\ s.
 
@@ -551,7 +573,7 @@ If the ``exercised_event`` is consuming, the contract is removed from the ``acti
 
 .. note::
     To build up an ACS snapshot for any ``record_time``, first
-    get a periodic snapshot using the ``/v0/state/acs`` endpoint, store the ACS in a dictionary keyed by ``contract_id``
+    get a periodic snapshot using the `/v0/state/acs <scan_openapi.html#post--v0-state-acs>`_ endpoint, store the ACS in a dictionary keyed by ``contract_id``
     and then process the updates from the timestamp of that snapshot via the ``/v1/updates``, adding
     ``created_event``\ s to the dictionary under its ``contract_id`` key and
     remove the contract from the dictionary by ``contract_id`` if ``exercised_event``\ s are consuming.

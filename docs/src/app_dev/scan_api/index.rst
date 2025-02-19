@@ -26,6 +26,10 @@ The Scan App subscribes to the SV participant as the DSO (Decentralized Synchron
 This includes CC (Canton Coin) transfers and governance operations but excludes most other things.
 In particular, any custom Daml app that does not interact with CC will be excluded.
 
+You can directly connect to a Scan API hosted by a single SV, or you can read from multiple Scan APIs and compare the results.
+
+The validator node contains a :ref:`validator-api-scan-proxy` that
+provides :term:`BFT` reads to Scan APIs hosted by Super Validators.
 
 The Scan API is grouped in the following categories:
 
