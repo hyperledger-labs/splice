@@ -20,6 +20,7 @@ spec:
       labels:
         app: splitwell-web-ui
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
       - name: splitwell-web-ui
         image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).splitwell_web_ui) }}"

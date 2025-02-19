@@ -28,6 +28,7 @@ Upcoming
     creation date, base image, repository, and commit hash.
   * Fix an issue in the SV helm chart where the resource section was omitted if ``attachPvc`` was set to ``false``.
     See https://github.com/digital-asset/decentralized-canton-sync/issues/299
+  * Add a new ``serviceAccountName`` value to all Splice Helm charts to allow specifying a custom service account for deployed pods.
 
 0.3.11
 ------

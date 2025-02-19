@@ -26,6 +26,7 @@ spec:
         app: {{ $validatorAppLabel }}
         migration: {{ .Values.migration.id | quote }}
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
       - name: validator-app
         image: "{{ .Values.imageRepo }}/validator-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).validator_app) }}"

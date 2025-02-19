@@ -21,6 +21,7 @@ spec:
       labels:
         app: docs
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
         - name: docs
           image: "{{ .Values.imageRepo }}/docs:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).docs) }}"

@@ -95,6 +95,7 @@ export class InStackDecentralizedSynchronizerNode
     onboardingName: string,
     logLevel: LogLevel,
     version: CnChartVersion,
+    imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${migrationId}`);
@@ -117,6 +118,7 @@ export class InStackDecentralizedSynchronizerNode
       version,
       cometbft.enableStateSync,
       cometbft.enableTimeoutCommit,
+      imagePullServiceAccountName,
       {
         ...opts,
         parent: this,
@@ -183,6 +185,7 @@ export class InStackDecentralizedSynchronizerNode
                 volumeStorageClass: 'standard-rwo',
               }
             : undefined,
+          serviceAccountName: imagePullServiceAccountName,
         },
       },
       version,
