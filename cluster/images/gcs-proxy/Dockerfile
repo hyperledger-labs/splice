@@ -3,6 +3,9 @@
 
 FROM --platform=$BUILDPLATFORM debian:bookworm-slim
 
+ARG base_version
+LABEL org.opencontainers.image.base.name="debian:bookworm-slim"
+
 WORKDIR /tmp
 ENV GCSPROXY_VERSION=0.3.1
 

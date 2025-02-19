@@ -112,4 +112,7 @@ Too many log messages detected
 # TODO(#17081) Figure out why this happens
 Thread starvation or clock leap detected
 
+# TODO(#2423) Figure out what causes this
+The sequencer clock timestamp .* is already past the max sequencing time
+
 # Make sure to have a trailing newline
