@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round as roundCodegen
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
   DarResources,
   Node,
   ParticipantAdminConnection,
@@ -75,7 +76,7 @@ class ScanApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends Node[ScanApp.State](
+) extends Node[ScanApp.State, Unit](
       config.svUser,
       config.participantClient,
       amuletAppParameters,
@@ -88,10 +89,16 @@ class ScanApp(
   override def packages =
     super.packages ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
+  override def preInitializeAfterLedgerConnection(
+      connection: BaseLedgerConnection,
+      ledgerClient: SpliceLedgerClient,
+  )(implicit traceContext: TraceContext) = Future.unit
+
   override def initialize(
       ledgerClient: SpliceLedgerClient,
       // The primary party in scan as that points to the SV party
       serviceUserPrimaryParty: PartyId,
+      preInitializeState: Unit,
   )(implicit tc: TraceContext): Future[ScanApp.State] = {
     val appInitConnection = ledgerClient
       .readOnlyConnection(
