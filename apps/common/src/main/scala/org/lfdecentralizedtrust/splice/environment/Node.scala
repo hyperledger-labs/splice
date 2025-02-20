@@ -16,11 +16,10 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Subclass of NodeBase that provides default initialization for most apps */
-abstract class Node[State <: AutoCloseable & HasHealth](
+abstract class Node[State <: AutoCloseable & HasHealth, PreInitializeState](
     serviceUser: String,
     participantClient: ParticipantClientConfig,
     parameters: SharedSpliceAppParameters,
@@ -51,16 +50,15 @@ abstract class Node[State <: AutoCloseable & HasHealth](
   // Code that is run after a ledger connection becomes available but before
   // waiting for the primary party. This can be used for things like
   // domain connections and allocation of the primary party.
-  @nowarn("cat=unused")
   protected def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
       ledgerClient: SpliceLedgerClient,
-  )(implicit tc: TraceContext): Future[Unit] =
-    Future.unit
+  )(implicit tc: TraceContext): Future[PreInitializeState]
 
   def initialize(
       ledgerClient: SpliceLedgerClient,
       party: PartyId,
+      preInitializeState: PreInitializeState,
   )(implicit tc: TraceContext): Future[State]
 
   override protected def initializeNode(
@@ -73,7 +71,7 @@ abstract class Node[State <: AutoCloseable & HasHealth](
         loggerFactory,
       )
     }
-    _ <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
+    preInitializeState <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
     serviceParty <- appInitStep("Get primary party") {
       retryProvider.getValueWithRetries[PartyId](
         RetryFor.WaitingOnInitDependency,
@@ -92,6 +90,6 @@ abstract class Node[State <: AutoCloseable & HasHealth](
       logger.info(s"Required packages: ${requiredPackageIds}")
       initConnection.waitForPackages(requiredPackageIds)
     }
-    state <- initialize(ledgerClient, serviceParty)
+    state <- initialize(ledgerClient, serviceParty, preInitializeState)
   } yield state
 }
