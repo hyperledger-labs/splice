@@ -25,12 +25,14 @@ paths:
                 "$ref": "#/components/schemas/GetRegistryInfoResponse"
         "404":
           $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
 
   /registry/instruments:
     get:
-      operationId: listInstruments
+      operationId: "listInstruments"
       description:
-        List all instruments managed by this intrument admin.
+        List all instruments managed by this instrument admin.
       parameters:
         - name: page_size
           in: query
@@ -54,6 +56,8 @@ paths:
                 "$ref": "#/components/schemas/ListInstrumentsResponse"
         "404":
           $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
 
   /registry/instruments/{instrument_id}:
     get:
@@ -75,6 +79,8 @@ paths:
                 "$ref": "#/components/schemas/Instrument"
         "404":
           $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
 
 
 components:
@@ -93,6 +99,12 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     "409":
       description: "conflict"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "500":
+      description: "Internal server error"
       content:
         application/json:
           schema:
@@ -145,13 +157,12 @@ components:
       properties:
         instrument_id:
           description: "The unique identifier assigned by the registry app to the instrument."
-          type:
-            $ref: "#/components/schemas/InstrumentId"
+          $ref: "#/components/schemas/InstrumentId"
         name:
-          description: "The display name for the instrument recommended by the intrument admin. This is not necessarily unique."
+          description: "The display name for the instrument recommended by the instrument admin. This is not necessarily unique."
           type: string
         symbol:
-          description: "The symbol for the instrument recommended by the intrument admin. This is not necessarily unique."
+          description: "The symbol for the instrument recommended by the instrument admin. This is not necessarily unique."
           type: string
         total_supply:
           description: "Decimal encoded current total supply of the instrument."
