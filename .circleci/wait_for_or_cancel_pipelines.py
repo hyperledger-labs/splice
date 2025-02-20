@@ -117,7 +117,7 @@ def cancel_self_if_in_period_after_finish(pipeline: Pipeline):
   if not cancelled_because_still_running:
     workflows = fetch_workflows(pipeline.id)
     # all workflows are guaranteed to be complete because cancel_self_if_pipeline_running was called
-    cancel_after = START_TIME - timedelta(seconds=args.extra_seconds_after_finish)
+    cancel_after = datetime.now(timezone.utc) - timedelta(seconds=args.extra_seconds_after_finish)
     for workflow in workflows:
       if workflow.stopped_at is None:
         print(f"Workflow has no stopped_at, but should already be complete! {workflow}")
