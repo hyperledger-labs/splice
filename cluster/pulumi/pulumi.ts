@@ -100,42 +100,6 @@ export async function ensureStackSettingsAreUpToDate(stack: automation.Stack): P
   });
 }
 
-export async function refreshStack(
-  stack: automation.Stack,
-  abortController: PulumiAbortController
-): Promise<void> {
-  const name = stack.name;
-  console.log(`${name} - Refreshing stack`);
-  await ensureStackSettingsAreUpToDate(stack);
-  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
-    abortController.abort(`Aborting because of caught exception`);
-    throw e;
-  });
-}
-
-export async function downStack(
-  stack: automation.Stack,
-  abortController: PulumiAbortController
-): Promise<void> {
-  const name = stack.name;
-  console.error(`${name} - Refreshing & Destroying stack`);
-  try {
-    console.error(`[${name}] Refreshing`);
-    await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal));
-    console.error(`[${name}] Destroying`);
-    await stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal));
-  } catch (e) {
-    if (e instanceof automation.ConcurrentUpdateError) {
-      console.error(`[${name}] Stack is locked, cancelling and re-running.`);
-      await stack.cancel();
-      await downStack(stack, abortController);
-    } else {
-      abortController.abort(`Aborting because of caught exception`);
-      throw e;
-    }
-  }
-}
-
 // An AbortController that:
 // 1. Also listens for SIGINT and SIGTERM signals
 // 2. Guarantees it will signal only once because aborting pulumi is not idempotent, if we signal twice
@@ -188,10 +152,6 @@ export class PulumiAbortController {
 export interface Operation {
   name: string;
   promise: Promise<void>;
-}
-
-export function operation(name: string, promise: Promise<void>): Operation {
-  return { name, promise };
 }
 
 export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Promise<void> {

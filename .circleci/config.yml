@@ -1889,7 +1889,7 @@ jobs:
         default: 3
       internal_stack:
         type: boolean
-        default: true
+        default: false
       checkout-branch:
         type: string
         default: "" # Default set to $CIRCLE_SHA1
@@ -2008,7 +2008,7 @@ jobs:
         type: string
       internal_stack:
         type: boolean
-        default: true
+        default: false
       silence_deployment_alerts:
         type: boolean
         default: false
@@ -2123,7 +2123,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -2213,7 +2213,7 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -2326,7 +2326,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -2857,6 +2857,7 @@ jobs:
             fi
             BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
+            #TODO(#15759) - remove the internal param after HDM base version is >= 0.3.12
             cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
@@ -2955,9 +2956,9 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
-            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
-            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true

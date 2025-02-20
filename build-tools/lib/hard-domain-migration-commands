@@ -14,21 +14,25 @@ subcommand_whitelist[update_config]='Upgrade the hard domain migration config'
 function subcmd_update_config() {
   local migration_type
   local migration_id
-  local migration_canton_stack
-  if [ "$#" -ge 3 ]; then
+  if [ "$#" -ge 2 ]; then
     migration_type="$1"
     migration_id="$2"
-    migration_canton_stack="$3"
-    shift 3
+    shift 2
   else
-    _error "Usage: $0 $SCRIPTNAME migration_type migration_id migration_canton_stack [version] [release_reference]"
+    _error "Usage: $0 $SCRIPTNAME migration_type migration_id [version] [release_reference]"
   fi
   local migration_config
   migration_config=$(cat <<EOF
       id: $migration_id
-      provider: $migration_canton_stack
 EOF
   )
+  if [ "$#" -gt 0 ]; then
+     # to keep backwards compatibility with the CCI config when latest HDM version is set to 0.3.12
+     # Can be removed after the HDM version is set to 0.3.12
+     if [ "$1" = "internal" ] || [ "$1" = "external" ]; then
+        shift
+      fi
+  fi
   if [ "$#" -gt 0 ]; then
     migration_config+=$(cat <<EOF
 

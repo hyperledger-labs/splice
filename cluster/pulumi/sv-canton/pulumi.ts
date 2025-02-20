@@ -1,7 +1,7 @@
 import * as automation from '@pulumi/pulumi/automation';
 import { MigrationProvider } from 'splice-pulumi-common';
 import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
-import { config, DeploySvRunbook, isDevNet } from 'splice-pulumi-common/src/config';
+import { DeploySvRunbook, isDevNet } from 'splice-pulumi-common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
 // as we have no pulumi runtime
 import {
@@ -41,14 +41,14 @@ export async function stackForMigration(
   );
 }
 
-const onlyRunbook = config.envFlag('SPLICE_DEPLOY_ONLY_SV_RUNBOOK');
 const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
-const coreSvs = onlyRunbook ? [] : Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
+const coreSvs = Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
 type RunForAllMigrationsResult = Operation[];
 
 export function runSvCantonForAllMigrations(
+  operation: string,
   runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<void>,
   requiresExistingStack: boolean,
   // allow the ability to force run for the runbook in certain cases
@@ -57,35 +57,51 @@ export function runSvCantonForAllMigrations(
   forceSvRunbook: boolean = false,
   forceMigrations: DomainMigrationIndex[] = []
 ): RunForAllMigrationsResult {
+  const svsToRunFor = svsToDeploy.concat(
+    !DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : []
+  );
+  return runSvCantonForSvs(
+    svsToRunFor,
+    operation,
+    runForStack,
+    requiresExistingStack,
+    forceMigrations
+  );
+}
+
+export function runSvCantonForSvs(
+  svsToRunFor: string[],
+  operation: string,
+  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<void>,
+  requiresExistingStack: boolean,
+  forceMigrations: DomainMigrationIndex[] = []
+): Operation[] {
   const migrationIds = migrations.map(migration => migration.id);
   console.log(
-    `Running for migration ${JSON.stringify(migrationIds)} and svs ${JSON.stringify(svsToDeploy)}`
+    `Running for migration ${JSON.stringify(migrationIds)} and svs ${JSON.stringify(svsToRunFor)}`
   );
-  return migrations
-    .concat(
-      forceMigrations
-        .filter(migration => {
-          return !migrationIds.includes(migration);
-        })
-        .map(id => {
-          return {
-            id: id,
-            version: activeVersion,
-            provider: MigrationProvider.EXTERNAL,
-          };
-        })
-    )
-    .flatMap(migration => {
-      return svsToDeploy
-        .concat(!DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : [])
-        .map(sv => {
-          console.error(`Adding operation for migration ${migration.id} and sv ${sv}`);
-          return {
-            name: `canton-M${migration.id}-${sv}`,
-            promise: stackForMigration(sv, migration.id, requiresExistingStack).then(stack => {
-              return runForStack(stack, migration, sv);
-            }),
-          };
-        });
+  const migrationsToRunFor = migrations.concat(
+    forceMigrations
+      .filter(migration => {
+        return !migrationIds.includes(migration);
+      })
+      .map(id => {
+        return {
+          id: id,
+          version: activeVersion,
+          provider: MigrationProvider.EXTERNAL,
+        };
+      })
+  );
+  return migrationsToRunFor.flatMap(migration => {
+    return svsToRunFor.map(sv => {
+      console.error(`Adding operation for migration ${migration.id} and sv ${sv}`);
+      return {
+        name: `${operation}-canton-M${migration.id}-${sv}`,
+        promise: stackForMigration(sv, migration.id, requiresExistingStack).then(stack => {
+          return runForStack(stack, migration, sv);
+        }),
+      };
     });
+  });
 }

@@ -273,7 +273,7 @@ function restore_component() {
     type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
-        restore_pvc_postgres "$namespace" "$component" "$run_id"
+        restore_pvc_postgres "$namespace" "$instance" "$run_id"
         ;;
       "canton:cloud:postgres")
         restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id" "$internal" "$restore_cluster"
