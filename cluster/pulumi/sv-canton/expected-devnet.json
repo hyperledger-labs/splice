@@ -2075,7 +2075,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-2-docker-reg-cred",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -2097,7 +2097,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-2-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -2117,7 +2117,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-3-docker-reg-cred",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -2139,7 +2139,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-3-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -2159,7 +2159,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-4-docker-reg-cred",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -2181,7 +2181,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-4-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -3190,7 +3190,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-2-docker-reg-cred",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -3212,7 +3212,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-2-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -3232,7 +3232,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-3-docker-reg-cred",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -3254,7 +3254,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-3-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -3274,7 +3274,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-4-docker-reg-cred",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -3296,7 +3296,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-4-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -4305,7 +4305,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-2-docker-reg-cred",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -4327,7 +4327,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-2-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -4347,7 +4347,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-3-docker-reg-cred",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -4369,7 +4369,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-3-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -4389,7 +4389,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-4-docker-reg-cred",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -4411,7 +4411,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-4-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -5420,7 +5420,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-2-docker-reg-cred",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -5442,7 +5442,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-2-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -5462,7 +5462,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-3-docker-reg-cred",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -5484,7 +5484,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-3-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -5504,7 +5504,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-4-docker-reg-cred",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -5526,7 +5526,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-4-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -6745,7 +6745,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-2-docker-reg-cred",
         "namespace": "sv"
       },
       "stringData": {
@@ -6767,7 +6767,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-2-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -6787,7 +6787,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-3-docker-reg-cred",
         "namespace": "sv"
       },
       "stringData": {
@@ -6809,7 +6809,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-3-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
@@ -6829,7 +6829,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-4-docker-reg-cred",
         "namespace": "sv"
       },
       "stringData": {
@@ -6851,7 +6851,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-4-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",

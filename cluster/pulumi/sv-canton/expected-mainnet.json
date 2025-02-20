@@ -585,7 +585,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "docker-reg-cred",
+        "name": "sv-canton-migration-2-docker-reg-cred",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -607,7 +607,7 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "docker-reg-cred"
+          "name": "sv-canton-migration-2-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",

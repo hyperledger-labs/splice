@@ -84,11 +84,15 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
     return JSON.stringify({ auths });
   });
 
+  // We do this to avoid having to rename existing secrets
+  const secretName =
+    serviceAccountName === 'default' ? 'docker-reg-cred' : `${serviceAccountName}-docker-reg-cred`;
+
   const secret = new k8s.core.v1.Secret(
-    `${ns}-${serviceAccountName}-docker-reg-cred`,
+    `${ns}-${secretName}`,
     {
       metadata: {
-        name: 'docker-reg-cred',
+        name: secretName,
         namespace: ns,
       },
       type: 'kubernetes.io/dockerconfigjson',
