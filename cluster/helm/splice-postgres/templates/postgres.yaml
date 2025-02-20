@@ -31,6 +31,7 @@ spec:
         app: {{ .Release.Name }}
         namespace: {{ .Release.Namespace }}
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
       - name: {{ .Release.Name }}
         image: postgres:14

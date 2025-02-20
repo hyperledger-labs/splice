@@ -19,7 +19,7 @@ abstract class SpliceBackendConfig extends LocalNodeConfig {
   override val topology: TopologyConfig = TopologyConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
-  def participantClient: ParticipantClientConfig
+  def participantClient: BaseParticipantClientConfig
   def automation: AutomationConfig
 }
 

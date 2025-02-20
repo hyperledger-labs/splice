@@ -5,4 +5,7 @@ ARG base_version
 
 FROM splice-app:${base_version}
 
+ARG base_version
+LABEL org.opencontainers.image.base.name="splice-app:${base_version}"
+
 COPY app.conf bootstrap.sc pre-bootstrap.sh health-check.sh /app/
