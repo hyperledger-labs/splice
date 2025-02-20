@@ -4,6 +4,7 @@
 dir := $(call current_dir)
 
 $(dir)/$(docker-build): $(dir)/configs $(dir)/target/LICENSE
+$(dir)/$(docker-build): build_arg := --build-arg cometbft_version=${COMETBFT_RELEASE_VERSION}
 
 $(dir)/clean: $(dir)/clean-configs
 

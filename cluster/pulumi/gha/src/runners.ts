@@ -165,8 +165,7 @@ function installDockerRunnerScaleSet(
               {
                 name: 'runner',
                 image:
-                  // TODO(#15988): use a release once 0.3.10 is out
-                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.10-snapshot.20250130.8177.0.v73bb0744',
+                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.12',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -484,9 +483,8 @@ function installK8sRunnerScaleSet(
     }
   );
 
-  // TODO(#15988): use a release once 0.3.12 is out
   const runnerImage =
-    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.12-snapshot.20250213.8303.0.v242e36d9';
+    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.12';
 
   return new k8s.helm.v3.Release(
     name,
@@ -736,7 +734,7 @@ function installPodMonitor(runnersNamespace: Namespace) {
         selector: {
           matchExpressions: [
             {
-              // TODO(#15988): This does not work for docker runners
+              // TODO(#16963): This does not work for docker runners
               key: 'runner-pod',
               operator: 'Exists',
             },
@@ -774,7 +772,7 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         // Note that the user needs admin rights on the repo for this to work, since the controller and
         // listeners use the actions/runners/registration-token endpoint to create a temporary token
         // for registration, and this endpoint seems to require admin rights.
-        // TODO(#15988): The recommended thing to do is use a GitHub App. See here for a guide
+        // TODO(#17842): The recommended thing to do is use a GitHub App. See here for a guide
         // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
         github_token: spliceEnvConfig.requireEnv('GITHUB_RUNNERS_ACCESS_TOKEN'),
       },

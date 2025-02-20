@@ -51,7 +51,7 @@ workflow:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
-      # TODO(#15988): In this job we currently also save the nix cache. Before we retire it,
+      # Note that in the build_oss job we currently also save the nix cache. Before we retire it,
       # make sure to enable saving the nix cache in some other job instead.
       - build_oss:
           <<: *notify-fail

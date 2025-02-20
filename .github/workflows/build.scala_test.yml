@@ -81,8 +81,7 @@ jobs:
         runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
-      # TODO(#15988): use a release once 0.3.12 is out
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12-snapshot.20250213.8303.0.v242e36d9
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12
 
     services:
       postgres:
