@@ -15,10 +15,13 @@ import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0
 import v0.definitions
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 
 import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import scala.jdk.CollectionConverters.*
 
 class HttpTokenStandardTransferInstructionHandler(
     store: ScanStore,
@@ -85,16 +88,21 @@ class HttpTokenStandardTransferInstructionHandler(
             definitions.ChoiceContext(
               // TODO (#17517): this will be updated to have a ChoiceContextData data so it can be to/from json'd
               choiceContextData = Some(
-                io.circe.Json.fromFields(
-                  Seq(
-                    "splice.lfdecentralizedtrust.org/amulet-rules" -> io.circe.Json
-                      .fromString(amuletRules.contractId.contractId),
-                    "splice.lfdecentralizedtrust.org/open-round" -> io.circe.Json
-                      .fromString(newestOpenRound.contractId.contractId),
-                    "splice.lfdecentralizedtrust.org/transfer-preapproval" -> io.circe.Json
-                      .fromString(transferPreapproval.contractId.contractId),
+                io.circe.parser
+                  .parse(
+                    new metadatav1.ChoiceContext(
+                      Map(
+                        "splice.lfdecentralizedtrust.org/amulet-rules" -> amuletRules.contractId.contractId,
+                        "splice.lfdecentralizedtrust.org/open-round" -> newestOpenRound.contractId.contractId,
+                        "splice.lfdecentralizedtrust.org/transfer-preapproval" -> transferPreapproval.contractId.contractId,
+                      ).map[String, metadatav1.AnyValue] { case (k, v) =>
+                        k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
+                      }.asJava
+                    ).toJson
                   )
-                )
+                  .getOrElse(
+                    throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
+                  )
               ),
               disclosedContracts = Vector(
                 toTokenStandardDisclosedContract(

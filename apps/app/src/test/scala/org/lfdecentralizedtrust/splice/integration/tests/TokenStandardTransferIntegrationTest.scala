@@ -16,7 +16,6 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
@@ -99,29 +98,23 @@ class TokenStandardTransferIntegrationTest
             .asJava,
         ),
         new metadatav1.ExtraArgs(
-          java.util.Map.of(),
+          new metadatav1.ChoiceContext(java.util.Map.of()),
           new metadatav1.Metadata(java.util.Map.of()),
         ),
       )
       val transferFactory = sv1ScanBackend.getTransferFactory(choiceArgs)
-      // TODO (#17517): replace with a better conversion
-      val jsonChoiceContextData: Map[String, metadatav1.AnyValue] =
-        transferFactory.choiceContext.choiceContextData
-          .flatMap(_.asObject)
-          .valueOrFail("Choice context data must be defined.")
-          .toMap
-          .map { case (key, value) =>
-            // only contract ids are specified
-            key -> new metadatav1.anyvalue.AV_ContractId(
-              new AnyContract.ContractId(value.asString.value)
-            )
-          }
+      val choiceContextData =
+        metadatav1.ChoiceContext.fromJson(
+          transferFactory.choiceContext.choiceContextData
+            .valueOrFail("Choice context data must be defined.")
+            .noSpaces
+        )
       val commands = new transferinstructionv1.TransferFactory.ContractId(transferFactory.factoryId)
         .exerciseTransferFactory_Transfer(
           new transferinstructionv1.TransferFactory_Transfer(
             choiceArgs.transferSpecification,
             new metadatav1.ExtraArgs(
-              jsonChoiceContextData.asJava,
+              choiceContextData,
               new metadatav1.Metadata(java.util.Map.of()),
             ),
           )

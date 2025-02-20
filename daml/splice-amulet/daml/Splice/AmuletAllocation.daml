@@ -72,10 +72,11 @@ template AmuletAllocation
 
 -- | TODO (#17541):move to script support functions
 paymentToChoiceContext : PaymentTransferContext -> ChoiceContext
-paymentToChoiceContext context = Map.fromList
-  [ ("splice.lfdecentralizedtrust.org/amulet-rules", AV_ContractId $ coerceContractId context.amuletRules)
-  , ("splice.lfdecentralizedtrust.org/open-round", AV_ContractId $ coerceContractId context.context.openMiningRound)
-  ]
+paymentToChoiceContext context = ChoiceContext with
+  values = Map.fromList
+    [ ("splice.lfdecentralizedtrust.org/amulet-rules", AV_ContractId $ coerceContractId context.amuletRules)
+    , ("splice.lfdecentralizedtrust.org/open-round", AV_ContractId $ coerceContractId context.context.openMiningRound)
+    ]
 
 paymentFromChoiceContext : ChoiceContext -> Update PaymentTransferContext
 paymentFromChoiceContext context = do
@@ -93,7 +94,7 @@ paymentFromChoiceContext context = do
 
 lookupContextContractId : Template t => ChoiceContext -> Text -> Update (Optional (ContractId t))
 lookupContextContractId context k = do
-  case Map.lookup k context of
+  case Map.lookup k context.values of
     None -> pure None
     Some (AV_ContractId anyCid) -> pure (Some (coerceContractId anyCid))
     Some value -> fail $ "Expected contract id for: " <> k <> ", got: " <> show value

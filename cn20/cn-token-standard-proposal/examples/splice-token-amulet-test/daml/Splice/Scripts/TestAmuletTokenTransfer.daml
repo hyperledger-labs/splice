@@ -82,7 +82,7 @@ test_happy_path = script do
   (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
 
   -- validate our expectations on the transfer context
-  Map.size extraArgs.context === 4 -- amulet rules, open round, transfer pre-approval, featured app right
+  Map.size extraArgs.context.values === 4 -- amulet rules, open round, transfer pre-approval, featured app right
   Map.size disclosedContracts.disclosures === 6  -- the above plus the referenced holding contract
 
   -- Trigger an atomic, single-transaction transfer

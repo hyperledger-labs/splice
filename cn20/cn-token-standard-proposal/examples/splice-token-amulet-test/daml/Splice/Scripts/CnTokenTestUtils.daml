@@ -43,23 +43,22 @@ getAmuletTransferFactory_TransferContext app transferSpecification = do
   -- massage choice context into shape
   (disclosures, extraArgs0) <- getAmuletTransferChoiceContext app providerUser
   let extraArgs = extraArgs0 with
-        context =
-          Map.union featuredContext $
-          Map.insert "splice.lfdecentralizedtrust.org/transfer-preapproval"
-            (AV_ContractId (coerceContractId preapprovalCid))
-          extraArgs0.context
+        context = ChoiceContext with
+          values =
+            Map.union featuredContext.values $
+            Map.insert "splice.lfdecentralizedtrust.org/transfer-preapproval"
+              (AV_ContractId (coerceContractId preapprovalCid))
+            extraArgs0.context.values
   pure (amuletFactory, extraArgs, extAmuletRules <> amuletDiscs <> preapprovalDisc <> disclosures <> featuredDiscs)
 
 getFeaturedAppRightIfExists : AmuletApp -> Party -> Script (Disclosures', ChoiceContext)
 getFeaturedAppRightIfExists app provider = do
   appRights <- queryFilter @FeaturedAppRight app.dso (\appRight -> appRight.provider == provider)
   case appRights of
-    [] -> pure (mempty, Map.empty)
+    [] -> pure (mempty, ChoiceContext with values=Map.empty)
     (rightCid, _) :: _ -> do
       rightDisc <- queryDisclosure' @FeaturedAppRight app.dso rightCid
-      let context = Map.fromList
-            [ ("splice.lfdecentralizedtrust.org/featured-app-right" , AV_ContractId (coerceContractId rightCid))
-            ]
+      let context = ChoiceContext with values=(Map.fromList [ ("splice.lfdecentralizedtrust.org/featured-app-right" , AV_ContractId (coerceContractId rightCid)) ])
       pure (rightDisc, context)
 
 getAmuletAllocationFactory : AmuletApp -> Script (ContractId AllocationFactory, Disclosures')
