@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Types and interfaces for retrieving metadata about tokens.
-module Canton.Network.RC1.TokenMetadata where
+module Splice.Api.Token.MetadataV1 where
 
 import DA.Action (unless)
 import DA.Map as Map

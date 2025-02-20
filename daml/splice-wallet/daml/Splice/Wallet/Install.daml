@@ -3,7 +3,7 @@
 
 module Splice.Wallet.Install where
 
-import Canton.Network.RC1.TokenMetadata as TokenMetadata
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 
 import DA.Action (void)
 import DA.Exception
@@ -401,11 +401,11 @@ template WalletAppInstall
     -- Choice context Map Text AnyValue --> can be parsed from Daml, keep qualified
 
     -- 1. map user-specific endpoints for context
-    interface instance TokenMetadata.RegistryAppInstall for WalletAppInstall where
-      view = TokenMetadata.RegistryAppInstallView with
+    interface instance Api.Token.MetadataV1.RegistryAppInstall for WalletAppInstall where
+      view = Api.Token.MetadataV1.RegistryAppInstallView with
         appUser = endUserParty
         instrumentAdmin = dsoParty
-        meta = TokenMetadata.Metadata with
+        meta = Api.Token.MetadataV1.Metadata with
           values = Map.fromList [
             -- For Amulet the registry URL needs to point to their local validator, so that the proper BFT reads are done.
             -- TODO (#17541): store that URL as part of the `WalletAppInstall` contract, so that it can be updated.

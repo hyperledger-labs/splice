@@ -59,7 +59,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0.definitions.GetFactoryRequest
 
 import java.util.Base64
@@ -1342,7 +1342,7 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetTransferFactory(choiceArgs: transferinstruction.TransferFactory_Transfer)
+  case class GetTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)
       extends TokenStandardBaseCommand[
         tokenStandardHttp.GetTransferFactoryResponse,
         tokenStandardHttp.definitions.FactoryWithChoiceContext,

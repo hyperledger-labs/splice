@@ -2,9 +2,9 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | Types and interfaces for retrieving an investor's holdings.
-module Canton.Network.RC2.Holding where
+module Splice.Api.Token.HoldingV1 where
 
-import Canton.Network.RC1.TokenMetadata
+import Splice.Api.Token.MetadataV1
 
 -- | A globally unique identifier for instruments.
 data InstrumentId = InstrumentId

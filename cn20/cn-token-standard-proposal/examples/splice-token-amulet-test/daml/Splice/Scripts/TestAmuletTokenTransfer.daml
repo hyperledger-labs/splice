@@ -1,11 +1,11 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
-module Splice.Scripts.TestCnTokenTransfer where
+module Splice.Scripts.TestAmuletTokenTransfer where
 
-import Canton.Network.RC1.TokenMetadata
-import Canton.Network.RC2.Holding
-import Canton.Network.RC3.TransferInstruction as RC3
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
 
 import Daml.Script
 
@@ -25,7 +25,7 @@ data TestSetup = TestSetup with
   bobAmuletCid : ContractId Amulet
   bobHoldingCid : ContractId Holding
   now : Time
-  defaultTransferSpec : RC3.TransferSpecification
+  defaultTransferSpec : Api.Token.TransferInstructionV1.TransferSpecification
 
 setupTest : Script TestSetup
 setupTest = do
@@ -53,7 +53,7 @@ setupTest = do
 
   -- Define default transfer from Bob to Alice
   let
-    transfer = RC3.Transfer with
+    transfer = Api.Token.TransferInstructionV1.Transfer with
       sender = bob.primaryParty
       receiver = alice.primaryParty
       amount = 10.0
@@ -62,7 +62,7 @@ setupTest = do
       metadata = Metadata with
         values = Map.fromList [("cnrc-1.sync.global/correlation-id", "<test-UUID>")]
   let
-    defaultTransferSpec = RC3.TransferSpecification with
+    defaultTransferSpec = Api.Token.TransferInstructionV1.TransferSpecification with
       transfer
       executeBefore = now `addRelTime` days 1
       holdingCids = [bobHoldingCid]
@@ -86,7 +86,7 @@ test_happy_path = script do
   Map.size disclosedContracts.disclosures === 6  -- the above plus the referenced holding contract
 
   -- Trigger an atomic, single-transaction transfer
-  submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+  submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
       extraArgs
       transferSpecification
@@ -114,7 +114,7 @@ test_no_holdings = script do
 
   -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
   (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
-  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
       extraArgs
       transferSpecification
@@ -133,7 +133,7 @@ test_expired = script do
 
   -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
   (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
-  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid RC3.TransferFactory_Transfer
+  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
       extraArgs
       transferSpecification

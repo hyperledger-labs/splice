@@ -10,12 +10,12 @@ import com.daml.ledger.javaapi.data.codegen.{
   DamlRecord,
   Contract as JavaGenContract,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc2.holding
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc4.allocation
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc5.allocationrequest
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc6.allocationinstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceAmulet,
   DecoderSpliceAmuletNameService,
@@ -57,14 +57,14 @@ object ContractCompanions {
 
   // Unfortunately interfaces need to be declared explicitly, as there's no auto-generated list of decoders
   private val interfaces = Seq(
-    tokenmetadata.RegistryAppInstall.INTERFACE,
-    holding.Holding.INTERFACE,
-    transferinstruction.TransferInstruction.INTERFACE,
-    transferinstruction.TransferFactory.INTERFACE,
-    allocation.Allocation.INTERFACE,
-    allocationrequest.AllocationRequest.INTERFACE,
-    allocationinstruction.AllocationInstruction.INTERFACE,
-    allocationinstruction.AllocationFactory.INTERFACE,
+    metadatav1.RegistryAppInstall.INTERFACE,
+    holdingv1.Holding.INTERFACE,
+    transferinstructionv1.TransferInstruction.INTERFACE,
+    transferinstructionv1.TransferFactory.INTERFACE,
+    allocationv1.Allocation.INTERFACE,
+    allocationrequestv1.AllocationRequest.INTERFACE,
+    allocationinstructionv1.AllocationInstruction.INTERFACE,
+    allocationinstructionv1.AllocationFactory.INTERFACE,
   )
 
   private def templatesMatch(id: Identifier, qualifiedName: QualifiedName) =

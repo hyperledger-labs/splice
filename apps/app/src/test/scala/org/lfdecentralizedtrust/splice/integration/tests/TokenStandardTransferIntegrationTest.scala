@@ -15,10 +15,10 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata.AnyContract
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc2.holding
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 
 import java.time.Instant
@@ -63,7 +63,7 @@ class TokenStandardTransferIntegrationTest
       val senderHoldings =
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs.of_party(
           party = sender,
-          filterInterfaces = Seq(holding.Holding.TEMPLATE_ID).map(templateId =>
+          filterInterfaces = Seq(holdingv1.Holding.TEMPLATE_ID).map(templateId =>
             Identifier(
               templateId.getPackageId,
               templateId.getModuleName,
@@ -83,46 +83,46 @@ class TokenStandardTransferIntegrationTest
             )
           )
         )
-      val choiceArgs = new transferinstruction.TransferFactory_Transfer(
-        new transferinstruction.TransferSpecification(
-          new transferinstruction.Transfer(
+      val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
+        new transferinstructionv1.TransferSpecification(
+          new transferinstructionv1.Transfer(
             sender.toProtoPrimitive,
             receiver.toProtoPrimitive,
             amount.bigDecimal,
-            new holding.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+            new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
             java.util.Optional.empty(),
-            new tokenmetadata.Metadata(java.util.Map.of()),
+            new metadatav1.Metadata(java.util.Map.of()),
           ),
           Instant.now().plus(10, ChronoUnit.MINUTES),
           senderHoldings
-            .map(senderHolding => new holding.Holding.ContractId(senderHolding.contractId))
+            .map(senderHolding => new holdingv1.Holding.ContractId(senderHolding.contractId))
             .asJava,
         ),
-        new tokenmetadata.ExtraArgs(
+        new metadatav1.ExtraArgs(
           java.util.Map.of(),
-          new tokenmetadata.Metadata(java.util.Map.of()),
+          new metadatav1.Metadata(java.util.Map.of()),
         ),
       )
       val transferFactory = sv1ScanBackend.getTransferFactory(choiceArgs)
       // TODO (#17517): replace with a better conversion
-      val jsonChoiceContextData: Map[String, tokenmetadata.AnyValue] =
+      val jsonChoiceContextData: Map[String, metadatav1.AnyValue] =
         transferFactory.choiceContext.choiceContextData
           .flatMap(_.asObject)
           .valueOrFail("Choice context data must be defined.")
           .toMap
           .map { case (key, value) =>
             // only contract ids are specified
-            key -> new tokenmetadata.anyvalue.AV_ContractId(
+            key -> new metadatav1.anyvalue.AV_ContractId(
               new AnyContract.ContractId(value.asString.value)
             )
           }
-      val commands = new transferinstruction.TransferFactory.ContractId(transferFactory.factoryId)
+      val commands = new transferinstructionv1.TransferFactory.ContractId(transferFactory.factoryId)
         .exerciseTransferFactory_Transfer(
-          new transferinstruction.TransferFactory_Transfer(
+          new transferinstructionv1.TransferFactory_Transfer(
             choiceArgs.transferSpecification,
-            new tokenmetadata.ExtraArgs(
+            new metadatav1.ExtraArgs(
               jsonChoiceContextData.asJava,
-              new tokenmetadata.Metadata(java.util.Map.of()),
+              new metadatav1.Metadata(java.util.Map.of()),
             ),
           )
         )

@@ -240,12 +240,12 @@ object PackageIdResolver {
     "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
     "Splice.Wallet.ExternalParty" -> Package.SpliceWallet,
     "Splice.Wallet.TransferPreapproval" -> Package.SpliceWallet,
-    "Canton.Network.RC1.TokenMetadata" -> Package.TokenStandard.TokenMetadata,
-    "Canton.Network.RC2.Holding" -> Package.TokenStandard.TokenHolding,
-    "Canton.Network.RC3.TransferInstruction" -> Package.TokenStandard.TokenTransferInstruction,
-    "Canton.Network.RC4.Allocation" -> Package.TokenStandard.TokenAllocation,
-    "Canton.Network.RC5.AllocationRequest" -> Package.TokenStandard.TokenAllocationRequest,
-    "Canton.Network.RC6.AllocationInstruction" -> Package.TokenStandard.TokenAllocationInstruction,
+    "Splice.Api.Token.MetadataV1" -> Package.TokenStandard.TokenMetadata,
+    "Splice.Api.Token.HoldingV1" -> Package.TokenStandard.TokenHolding,
+    "Splice.Api.Token.TransferInstructionV1" -> Package.TokenStandard.TokenTransferInstruction,
+    "Splice.Api.Token.AllocationV1" -> Package.TokenStandard.TokenAllocation,
+    "Splice.Api.Token.AllocationRequestV1" -> Package.TokenStandard.TokenAllocationRequest,
+    "Splice.Api.Token.AllocationInstructionV1" -> Package.TokenStandard.TokenAllocationInstruction,
   )
 
   sealed abstract class Package extends Product with Serializable {

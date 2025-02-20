@@ -8,15 +8,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   types as typesCodegen,
   validatorlicense as validatorlicenseCodegen,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.{
   AnyContract,
   anyvalue,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc2.holding
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules
 
@@ -141,31 +141,33 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
     "convert between choice arguments/results that come from interfaces and JSON values" in {
       val sender = providerParty(1).toProtoPrimitive
       val receiver = providerParty(2).toProtoPrimitive
-      val originalArgument: JavaApi.DamlRecord = new transferinstruction.TransferFactory_Transfer(
-        new transferinstruction.TransferSpecification(
-          new transferinstruction.Transfer(
+      val originalArgument: JavaApi.DamlRecord = new transferinstructionv1.TransferFactory_Transfer(
+        new transferinstructionv1.TransferSpecification(
+          new transferinstructionv1.Transfer(
             sender,
             receiver,
             numeric(6.12947561),
-            new holding.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+            new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
             Some(
-              new holding.Lock(java.util.List.of(sender, receiver))
+              new holdingv1.Lock(java.util.List.of(sender, receiver))
             ).toJava,
             someMetadata,
           ),
           /*executeBefore =*/ Instant.now().plusMillis(1000L),
           /*holdingCids =*/ List(validContractId(1), validContractId(2))
-            .map(new holding.Holding.ContractId(_))
+            .map(new holdingv1.Holding.ContractId(_))
             .asJava,
         ),
-        new tokenmetadata.ExtraArgs(
+        new metadatav1.ExtraArgs(
           allAnyValuesMap.asJava,
           someMetadata,
         ),
       ).toValue
       val originalResult: JavaApi.DamlRecord =
-        new transferinstruction.TransferFactory_TransferResult(
-          Optional.of(new transferinstruction.TransferInstruction.ContractId(validContractId(333))),
+        new transferinstructionv1.TransferFactory_TransferResult(
+          Optional.of(
+            new transferinstructionv1.TransferInstruction.ContractId(validContractId(333))
+          ),
           someMetadata,
         ).toValue
 
@@ -173,8 +175,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
         contractId = validContractId(3),
         templateId = externalpartyamuletrules.ExternalPartyAmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
         interfaceId =
-          Some(transferinstruction.TransferFactory.INTERFACE.TEMPLATE_ID_WITH_PACKAGE_ID),
-        choice = transferinstruction.TransferFactory.CHOICE_TransferFactory_Transfer.name,
+          Some(transferinstructionv1.TransferFactory.INTERFACE.TEMPLATE_ID_WITH_PACKAGE_ID),
+        choice = transferinstructionv1.TransferFactory.CHOICE_TransferFactory_Transfer.name,
         consuming = false,
         argument = originalArgument,
         result = originalResult,
@@ -210,7 +212,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
     }
   }
 
-  private lazy val allSimpleValuesMap: Map[String, tokenmetadata.AnyValue] = Map(
+  private lazy val allSimpleValuesMap: Map[String, metadatav1.AnyValue] = Map(
     "av_decimal" -> new anyvalue.AV_Decimal(numeric(3.1957419)),
     "av_party" -> new anyvalue.AV_Party(dsoParty.toProtoPrimitive),
     "av_date" -> new anyvalue.AV_Date(LocalDate.now()),
@@ -223,11 +225,11 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
     "av_text" -> new anyvalue.AV_Text(scala.util.Random.nextString(13)),
     "av_reltime" -> new anyvalue.AV_RelTime(new RelTime(scala.util.Random.nextLong())),
   )
-  private lazy val allAnyValuesMap: Map[String, tokenmetadata.AnyValue] = allSimpleValuesMap ++ Map(
+  private lazy val allAnyValuesMap: Map[String, metadatav1.AnyValue] = allSimpleValuesMap ++ Map(
     "av_list" -> new anyvalue.AV_List(allSimpleValuesMap.values.toList.asJava),
     "av_map" -> new anyvalue.AV_Map(allSimpleValuesMap.asJava),
   )
   private lazy val someMetadata =
-    new tokenmetadata.Metadata(Map("any" -> "thing", "goes" -> "here").asJava)
+    new metadatav1.Metadata(Map("any" -> "thing", "goes" -> "here").asJava)
 
 }

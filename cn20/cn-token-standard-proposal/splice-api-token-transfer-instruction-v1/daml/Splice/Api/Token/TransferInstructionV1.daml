@@ -6,7 +6,7 @@
 -- Can be used to implement "free of payment" settlement for securities, cash, or other assets,
 -- where the payment leg is not linked atomically to the transfer of the asset; e.g. because the
 -- payment leg is settled off ledger.
-module Canton.Network.RC3.TransferInstruction where
+module Splice.Api.Token.TransferInstructionV1 where
 
 {-
 
@@ -19,8 +19,8 @@ TODO(#93): move this into the CIP/RFC docs for an external audience.
 
 import qualified DA.Map as Map
 
-import Canton.Network.RC1.TokenMetadata
-import Canton.Network.RC2.Holding
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
 
 -- | A specification of a transfer of holdings between two parties.
 data Transfer = Transfer with

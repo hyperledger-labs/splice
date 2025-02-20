@@ -9,7 +9,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0
 import v0.definitions
@@ -40,7 +40,7 @@ class HttpTokenStandardTransferInstructionHandler(
     withSpan(s"$workflowId.getTransferFactory") { _ => _ =>
       for {
         transfer <- Try(
-          transferinstruction.TransferFactory_Transfer.fromJson(body.choiceArguments.noSpaces)
+          transferinstructionv1.TransferFactory_Transfer.fromJson(body.choiceArguments.noSpaces)
         ) match {
           case Success(transfer) => Future.successful(transfer)
           case Failure(_) =>

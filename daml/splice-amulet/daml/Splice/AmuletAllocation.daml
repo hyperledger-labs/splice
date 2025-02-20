@@ -3,8 +3,8 @@
 
 module Splice.AmuletAllocation where
 
-import Canton.Network.RC1.TokenMetadata
-import Canton.Network.RC4.Allocation
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV1
 import DA.Map qualified as Map
 import Splice.Amulet
 import Splice.AmuletRules
