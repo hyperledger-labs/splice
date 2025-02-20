@@ -113,7 +113,7 @@ class ValidatorApp(
     esf: ExecutionSequencerFactory,
     ec: ExecutionContextExecutor,
     tracer: Tracer,
-) extends Node[ValidatorApp.State](
+) extends Node[ValidatorApp.State, Option[CantonTimestamp]](
       config.ledgerApiUser,
       config.participantClient,
       amuletAppParameters,
@@ -163,9 +163,9 @@ class ValidatorApp(
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
       ledgerClient: SpliceLedgerClient,
-  )(implicit traceContext: TraceContext) =
+  )(implicit traceContext: TraceContext): scala.concurrent.Future[Option[CantonTimestamp]] =
     for {
-      _ <-
+      initialSynchronizerTime <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
             scanConnection <- appInitStep("Getting BFT scan connection") {
@@ -182,11 +182,21 @@ class ValidatorApp(
               config,
               participantAdminConnection,
               scanConnection,
-              clock,
               config.domainMigrationId,
               retryProvider,
               loggerFactory,
             )
+            domainAlreadyRegistered <- participantAdminConnection
+              .lookupDomainConnectionConfig(config.domains.global.alias)
+              .map(_.isDefined)
+            now = clock.now
+            // This is used by the ReconcileSequencerConnectionsTrigger to avoid travelling back in time if the domain time is behind this.
+            // We want to avoid using this when we already have a synchronizer connection as then synchronizer time should be used so we
+            // only use it when the domain has not been registered at all.
+            // Note that the logic below is also a bit dodgy as it uses CantonTimestamp.now
+            // even if we have already registered which could be an issue after a restart.
+            // For now this seems acceptable.
+            initialSynchronizerTime = Option.when(!domainAlreadyRegistered)(now)
             _ <- readRestoreDump match {
               case Some(migrationDump) =>
                 val decentralizedSynchronizerInitializer = new DomainDataRestorer(
@@ -194,7 +204,7 @@ class ValidatorApp(
                   config.timeTrackerMinObservationDuration,
                   loggerFactory,
                 )
-                domainConnector.getDecentralizedSynchronizerSequencerConnections.flatMap {
+                domainConnector.getDecentralizedSynchronizerSequencerConnections(now).flatMap {
                   allSequencerConnections =>
                     val sequencerConnections = allSequencerConnections.values.toSeq match {
                       case Seq() =>
@@ -226,7 +236,7 @@ class ValidatorApp(
                 else
                   appInitStep("Ensuring decentralized synchronizer registered") {
                     domainConnector
-                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()
+                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(now)
                   }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
@@ -351,9 +361,9 @@ class ValidatorApp(
                 pruningConfig.retention,
               )
             }
-          } yield ()
+          } yield initialSynchronizerTime
         }
-    } yield ()
+    } yield initialSynchronizerTime
 
   private def readRestoreDump = config.restoreFromMigrationDump.map { path =>
     if (config.svValidator)
@@ -606,6 +616,7 @@ class ValidatorApp(
   override def initialize(
       ledgerClient: SpliceLedgerClient,
       validatorParty: PartyId,
+      initialSynchronizerTime: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): Future[ValidatorApp.State] =
     for {
       _ <- Future.successful(())
@@ -793,7 +804,6 @@ class ValidatorApp(
           config,
           participantAdminConnection,
           scanConnection,
-          clock,
           config.domainMigrationId,
           retryProvider,
           loggerFactory,
@@ -807,6 +817,7 @@ class ValidatorApp(
         config.sequencerRequestAmplificationPatience,
         config.contactPoint,
         config.supportsSoftDomainMigrationPoc,
+        initialSynchronizerTime,
         loggerFactory,
       )
       domainId <- scanConnection.getAmuletRulesDomain()(traceContext)
