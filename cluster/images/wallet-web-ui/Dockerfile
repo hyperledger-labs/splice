@@ -7,6 +7,9 @@ FROM splice-app:${base_version} AS splice
 ARG base_version
 FROM splice-web-ui:${base_version}
 
+ARG base_version
+LABEL org.opencontainers.image.base.name="splice-web-ui:${base_version}"
+
 COPY --from=splice app/splice-node/web-uis/wallet /usr/share/nginx/html/
 COPY config.js /tmpl/config.js.tmpl
 COPY --chmod=500 docker-entrypoint.sh /custom-docker-entrypoint.sh

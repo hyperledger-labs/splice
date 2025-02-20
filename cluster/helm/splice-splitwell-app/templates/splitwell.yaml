@@ -21,6 +21,7 @@ spec:
       labels:
         app: splitwell-app
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
       - name: splitwell-app
         image: "{{ .Values.imageRepo }}/splitwell-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).splitwell_app) }}"

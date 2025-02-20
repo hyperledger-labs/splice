@@ -441,6 +441,12 @@ object ScanStore {
               svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
             )
         },
+        mkFilter(splice.dso.amuletprice.AmuletPriceVote.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract
+            )
+        },
         mkFilter(splice.dsorules.VoteRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract,

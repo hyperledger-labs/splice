@@ -8,3 +8,8 @@ description: Splice gateway that loops back traffic to the same cluster without 
 
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
+
+dependencies:
+- name: splice-util-lib
+  version: 0.3.0
+  repository: file://../splice-util-lib

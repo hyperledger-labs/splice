@@ -5,7 +5,7 @@ imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 
 # -- Annotations for the comebft pods
 pod:
-  annotations: {}
+  annotations: { }
 
 # Node names use as a moniker to identify the node in the CometBFT network
 nodeName: ""
@@ -19,11 +19,11 @@ stateSync:
   trustPeriod: "168h0m0s"
 
 peers:
-  # Permanent peers to add alongside the sv1
-  # The CometBFT node ID of the peer node
-  #- nodeId:
-  # External address, in the format <host>:<port> that can be used to access the p2p port of the peer
-  #  externalAddress:
+# Permanent peers to add alongside the sv1
+# The CometBFT node ID of the peer node
+#- nodeId:
+# External address, in the format <host>:<port> that can be used to access the p2p port of the peer
+#  externalAddress:
 node:
   # The CometBFT node ID
   id:
@@ -94,3 +94,10 @@ metrics:
 enableAntiAffinity: true
 
 logLevel: debug
+mempool:
+  # max number of transactions kept in the mempool
+  size: 1000
+  # number of transactions to keep to deduplicate new transactions
+  deduplicationCacheSize: 100000
+  # max number of seconds that a transaction will be kept in the mempool without being included in a block before being discarded
+  ttlSeconds: 300
