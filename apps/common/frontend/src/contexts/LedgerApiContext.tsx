@@ -10,6 +10,26 @@ import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const ANS_LEDGER_NAME = 'ans-ledger';
 
+interface JsonApiErrorResponse {
+  status: number;
+  statusText: string;
+  body: string;
+}
+
+export class JsonApiError extends Error {
+  status: number;
+  statusText: string;
+  body: string;
+
+  constructor({ status, body, statusText }: JsonApiErrorResponse) {
+    super(body);
+    this.name = 'JsonApiError';
+    this.status = status;
+    this.statusText = statusText;
+    this.body = body;
+  }
+}
+
 export abstract class PackageIdResolver {
   protected getQualifiedName(templateId: string): string {
     const parts = templateId.split(':');
@@ -81,6 +101,7 @@ export class LedgerApiClient {
     );
     return user.primaryParty!;
   }
+
   async exercise<T extends object, C, R, K>(
     actAs: string[],
     readAs: string[],
@@ -142,11 +163,17 @@ export class LedgerApiClient {
           return r.json();
         } else {
           const body = await r.text();
-          throw new Error(`HTTP ${r.status} ${r.statusText}: ${body}`);
+          throw new JsonApiError({ status: r.status, body: body, statusText: r.statusText });
         }
       })
       .catch(e => {
-        console.debug(`${describeChoice} failed: ${JSON.stringify(e)}`);
+        if (e instanceof JsonApiError) {
+          console.debug(
+            `${describeChoice} failed with status ${e.status}: ${e.statusText} and body: ${e.body}`
+          );
+        } else {
+          console.debug(`${describeChoice} failed: ${JSON.stringify(e)}`);
+        }
         throw e;
       });
 
