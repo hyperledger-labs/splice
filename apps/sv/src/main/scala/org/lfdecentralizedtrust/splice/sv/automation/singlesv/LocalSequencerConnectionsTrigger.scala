@@ -36,6 +36,7 @@ class LocalSequencerConnectionsTrigger(
     decentralizedSynchronizerAlias: DomainAlias,
     store: SvDsoStore,
     sequencerInternalConfig: ClientConfig,
+    sequencerRequestAmplification: SubmissionRequestAmplification,
     migrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
@@ -103,7 +104,7 @@ class LocalSequencerConnectionsTrigger(
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
             PositiveInt.tryCreate(1),
-            submissionRequestAmplification = SubmissionRequestAmplification.NoAmplification,
+            submissionRequestAmplification = sequencerRequestAmplification,
           )
           if (conf.sequencerConnections == newConnections) {
             logger.trace(

@@ -27,6 +27,7 @@ spec:
         migration_id: {{ .id | quote }}
         {{- end }}
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
       - name: mediator
         image: "{{ .Values.imageRepo }}/canton-mediator:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).canton_mediator) }}"

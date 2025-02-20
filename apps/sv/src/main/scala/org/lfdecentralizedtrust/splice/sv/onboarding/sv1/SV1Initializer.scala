@@ -156,13 +156,17 @@ class SV1Initializer(
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         DomainConnectionConfig(
           config.domains.global.alias,
-          sequencerConnections = SequencerConnections.single(
-            new GrpcSequencerConnection(
-              NonEmpty.mk(Seq, LocalSynchronizerNode.toEndpoint(internalSequencerApi)),
-              transportSecurity = internalSequencerApi.tls.isDefined,
-              customTrustCertificates = None,
-              SequencerAlias.Default,
-            )
+          sequencerConnections = SequencerConnections.tryMany(
+            Seq(
+              new GrpcSequencerConnection(
+                NonEmpty.mk(Seq, LocalSynchronizerNode.toEndpoint(internalSequencerApi)),
+                transportSecurity = internalSequencerApi.tls.isDefined,
+                customTrustCertificates = None,
+                SequencerAlias.Default,
+              )
+            ),
+            PositiveInt.one,
+            config.participantClient.sequencerRequestAmplification,
           ),
           manualConnect = false,
           domainId = None,

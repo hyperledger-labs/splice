@@ -431,6 +431,7 @@ class SvDsoAutomationService(
         internalClientConfig.decentralizedSynchronizerAlias,
         dsoStore,
         internalClientConfig.sequencerInternalConfig,
+        config.participantClient.sequencerRequestAmplification,
         config.domainMigrationId,
       )
     )
