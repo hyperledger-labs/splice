@@ -4,12 +4,12 @@
 repos:
   - repo: local
     hooks:
-      # - id: copyright
-      #   name: Check that all source files have the correct copyright header
-      #   language: system
-      #   require_serial: true
-      #   entry: "bash -c 'sbt --client \"headerCreate\"' bash"
-      #   files: '(.*\.daml|.*\.scala|.*\.sh|.*\.py|.*\.tsx|.*\.rst)'
+      - id: copyright
+        name: Check that all source files have the correct copyright header
+        language: system
+        require_serial: true
+        entry: "bash -c 'sbt --client \"headerCreate\"' bash"
+        files: '(.*\.daml|.*\.scala|.*\.sh|.*\.py|.*\.tsx|.*\.rst)'
       - id: scalafmt
         name: scalafmt
         language: system
