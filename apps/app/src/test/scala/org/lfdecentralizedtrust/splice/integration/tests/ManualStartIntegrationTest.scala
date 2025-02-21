@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.PositiveDurationSeconds
@@ -192,6 +193,28 @@ class ManualStartIntegrationTest
             )
             // otherwise we get log warnings
             mediatorConnection.close()
+          }
+        }
+
+        clue("SV1 and SV2 have configured amplification on the participant sequencer connection") {
+          Seq(
+            participantAdminConnection("sv1", sv1Backend.config),
+            participantAdminConnection("sv2", sv2Backend.config),
+          ).map { participantConnection =>
+            val sequencerConnections =
+              participantConnection
+                .lookupDomainConnectionConfig(DomainAlias.tryCreate("global"))
+                .futureValue
+                .value
+                .sequencerConnections
+            sequencerConnections.connections.size shouldBe 1
+            sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
+            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+              PositiveInt.tryCreate(5),
+              NonNegativeFiniteDuration.ofSeconds(5),
+            )
+            // otherwise we get log warnings
+            participantConnection.close()
           }
         }
 

@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
 import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -67,6 +68,7 @@ class ValidatorAutomationService(
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     contactPoint: String,
     supportsSoftDomainMigrationPoc: Boolean,
+    initialSynchronizerTime: Option[CantonTimestamp],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -196,6 +198,7 @@ class ValidatorAutomationService(
         domainConnector,
         sequencerSubmissionAmplificationPatience,
         supportsSoftDomainMigrationPoc,
+        initialSynchronizerTime,
       )
     )
 
