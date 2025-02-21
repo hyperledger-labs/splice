@@ -11,17 +11,16 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Skip on [static]
         id: skip
         shell: bash
         run: |
-          last_commit_msg=$(git log -1 --pretty=%B)
+          git fetch origin ${{ github.event.pull_request.head.sha }}
+          last_commit_msg=$(git log -1 --pretty=%B ${{ github.event.pull_request.head.sha }})
           echo "Last commit message: $last_commit_msg"
           if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
-            echo "Skipping UI tests because of [static] label"
+            echo "Skipping Daml tests because of [static] label"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 

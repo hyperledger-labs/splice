@@ -494,7 +494,7 @@ function installK8sRunnerScaleSet(
     }
   );
 
-  // TODO(#15988): use a release once 0.3.13 is out
+  // TODO(#17841): use a release once 0.3.13 is out
   const runnerImage =
     'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.13-snapshot.20250221.8384.0.v94412fc9';
 

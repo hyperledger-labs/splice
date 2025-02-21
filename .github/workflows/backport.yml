@@ -75,8 +75,6 @@ jobs:
             });
 
   do_backport:
-    # I couldn't get webfactory/ssh-agent to work in a self-hosted runner, nor in an Ubuntu or cimg
-    # container job, so we're using a GH runner for now.
     runs-on: ubuntu-latest
     needs: get_commit_sha
     steps:
