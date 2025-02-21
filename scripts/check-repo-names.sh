@@ -41,9 +41,6 @@ function check_patterns_locally() {
     'GcpConfig\.scala:' # cluster-specific
     '/da-cn-shared/cn-images|GOOGLE_CLOUD_PROJECT=da-cn-shared|"KMS_PROJECT_ID" -> "da-cn-shared"' # gcp
     '/cn-release-bundles' # docs route
-    'cn-token-standard' # TODO (#17137): revisit
-    'cn20' # TODO (#17137): revisit
-    'cn-token-test-splice' # TODO (#17137): revisit
     'cn-(http|apps|public-http)-gateway' # helm gateway templates
     'SpliceTests\.scala.*getMeterProvider\.get."cn_tests"' # test metrics
     '^[^:]+package-lock\.json:.*"integrity"' # appears in hashes

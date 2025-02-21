@@ -285,7 +285,7 @@ lazy val docs = project
 // Shared token standard code
 lazy val `splice-api-token-metadata-v1-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/splice-api-token-metadata-v1"))
+    .in(file("token-standard/splice-api-token-metadata-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -294,7 +294,7 @@ lazy val `splice-api-token-metadata-v1-daml` =
 
 lazy val `splice-api-token-holding-v1-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/splice-api-token-holding-v1"))
+    .in(file("token-standard/splice-api-token-holding-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -305,7 +305,7 @@ lazy val `splice-api-token-holding-v1-daml` =
 
 lazy val `splice-api-token-transfer-instruction-v1-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/splice-api-token-transfer-instruction-v1"))
+    .in(file("token-standard/splice-api-token-transfer-instruction-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -317,7 +317,7 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
 
 lazy val `splice-api-token-allocation-v1-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/splice-api-token-allocation-v1"))
+    .in(file("token-standard/splice-api-token-allocation-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -329,7 +329,7 @@ lazy val `splice-api-token-allocation-v1-daml` =
 
 lazy val `splice-api-token-allocation-request-v1-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/splice-api-token-allocation-request-v1"))
+    .in(file("token-standard/splice-api-token-allocation-request-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -342,7 +342,7 @@ lazy val `splice-api-token-allocation-request-v1-daml` =
 
 lazy val `splice-api-token-allocation-instruction-v1-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/splice-api-token-allocation-instruction-v1"))
+    .in(file("token-standard/splice-api-token-allocation-instruction-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -355,7 +355,7 @@ lazy val `splice-api-token-allocation-instruction-v1-daml` =
 
 lazy val `splice-token-trading-test-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/examples/splice-token-trading-test"))
+    .in(file("token-standard/examples/splice-token-trading-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -372,7 +372,7 @@ lazy val `splice-token-trading-test-daml` =
 
 lazy val `splice-token-amulet-test-daml` =
   project
-    .in(file("cn20/cn-token-standard-proposal/examples/splice-token-amulet-test"))
+    .in(file("token-standard/examples/splice-token-amulet-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -777,14 +777,14 @@ lazy val `apps-scan` =
           )
         } :+ ScalaServer(
           new File(
-            "cn20/cn-token-standard-proposal/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction.yaml"
+            "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction.yaml"
           ),
           pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0",
           modules = List("pekko-http-v1.0.0", "circe"),
           customExtraction = true,
         ) :+ ScalaClient(
           new File(
-            "cn20/cn-token-standard-proposal/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction.yaml"
+            "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction.yaml"
           ),
           modules = List("pekko-http-v1.0.0", "circe"),
           pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0",
@@ -1431,7 +1431,17 @@ cleanCnDars := {
   runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)
   // daml/dars contains the versions of all dars that we want to keep committed, so we don't delete them
   runCommand(
-    Seq("find", "cn20", "daml", "-name", "*.dar", "-not", "-path", "*daml/dars/*", "-delete"),
+    Seq(
+      "find",
+      "token-standard",
+      "daml",
+      "-name",
+      "*.dar",
+      "-not",
+      "-path",
+      "*daml/dars/*",
+      "-delete",
+    ),
     log,
   )
 }
