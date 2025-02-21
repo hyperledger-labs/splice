@@ -71,6 +71,10 @@ export class DecentralizedSynchronizerMigrationConfig {
     return this.runningMigrations().concat(this.archived);
   }
 
+  get highestMigrationId(): DomainMigrationIndex {
+    return Math.max(...this.allMigrations.map(m => m.id));
+  }
+
   get hasInternalRunningMigration(): boolean {
     return this.allInternalMigrations.some(migration => this.isStillRunning(migration.id));
   }

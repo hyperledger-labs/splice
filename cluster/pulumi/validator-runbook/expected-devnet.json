@@ -252,6 +252,9 @@
           "hostname": "dev.global.canton.network.digitalasset.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 6
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
