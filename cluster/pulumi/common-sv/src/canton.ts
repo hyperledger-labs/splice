@@ -48,7 +48,8 @@ export function installCantonComponents(
     sequencer: Postgres;
   },
   opts?: SpliceCustomResourceOptions,
-  disableProtection?: boolean
+  disableProtection?: boolean,
+  imagePullServiceAccountName?: string
 ): InstalledMigrationSpecificSv | undefined {
   const logLevel = config.envFlag('SPLICE_DEPLOYMENT_NO_SV_DEBUG')
     ? 'INFO'
@@ -114,6 +115,7 @@ export function installCantonComponents(
       migrationInfo.version,
       svConfig.onboardingName,
       auth0UserNameEnvVarSource('sv'),
+      imagePullServiceAccountName,
       opts
     );
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
@@ -128,6 +130,7 @@ export function installCantonComponents(
           isActiveMigration,
           logLevel,
           migrationInfo.version,
+          imagePullServiceAccountName,
           opts
         )
       : new InStackCometBftDecentralizedSynchronizerNode(
@@ -143,7 +146,8 @@ export function installCantonComponents(
           migrationConfig.isRunningMigration(),
           svConfig.onboardingName,
           logLevel,
-          migrationInfo.version
+          migrationInfo.version,
+          imagePullServiceAccountName
         );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,

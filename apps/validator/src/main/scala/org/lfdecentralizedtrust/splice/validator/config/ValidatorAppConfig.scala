@@ -176,7 +176,7 @@ case class ValidatorAppBackendConfig(
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     enableWallet: Boolean = true,
     sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(10),
+      NonNegativeFiniteDuration.ofSeconds(5),
     /** The configuration for sweeping funds periodically to other validator's wallet
       */
     walletSweep: Map[String, WalletSweepConfig] = Map.empty,

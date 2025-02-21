@@ -8,9 +8,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
   BackupDumpConfig,
+  BaseParticipantClientConfig,
   GcpBucketConfig,
+  LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
-  ParticipantClientConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
@@ -23,11 +24,13 @@ import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeLong,
   NonNegativeNumeric,
   PositiveNumeric,
+  PositiveInt,
 }
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.model.Uri
 
@@ -196,6 +199,13 @@ final case class BeneficiaryConfig(
     weight: NonNegativeLong,
 )
 
+final case class SvParticipantClientConfig(
+    override val adminApi: ClientConfig,
+    override val ledgerApi: LedgerApiClientConfig,
+    sequencerRequestAmplification: SubmissionRequestAmplification =
+      SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
+) extends BaseParticipantClientConfig(adminApi, ledgerApi)
+
 case class SvAppBackendConfig(
     override val adminApi: AdminServerConfig = AdminServerConfig(),
     override val storage: DbConfig,
@@ -205,7 +215,7 @@ case class SvAppBackendConfig(
     // so it needs to know the expected user name.
     validatorLedgerApiUser: String,
     auth: AuthConfig,
-    participantClient: ParticipantClientConfig,
+    participantClient: SvParticipantClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvSynchronizerConfig,
     expectedValidatorOnboardings: List[ExpectedValidatorOnboardingConfig] = Nil,
@@ -272,6 +282,13 @@ case class SvAppBackendConfig(
     }
 }
 
+object SvAppBackendConfig {
+  val DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION = SubmissionRequestAmplification(
+    PositiveInt.tryCreate(5),
+    NonNegativeFiniteDuration.ofSeconds(5),
+  )
+}
+
 case class CometBftConfig(
     enabled: Boolean = false,
     connectionUri: String = "",
@@ -309,7 +326,9 @@ final case class SvSequencerConfig(
 }
 
 final case class SvMediatorConfig(
-    adminApi: ClientConfig
+    adminApi: ClientConfig,
+    sequencerRequestAmplification: SubmissionRequestAmplification =
+      SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

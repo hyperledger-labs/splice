@@ -997,7 +997,7 @@
       }
     },
     "name": "docs-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-docs::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-docs-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -1007,9 +1007,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "docs"
       },
@@ -1110,7 +1107,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-docs",
+    "name": "k8s-imgpull-docs-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1120,7 +1117,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-1",
+    "name": "k8s-imgpull-sv-1-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1130,7 +1127,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-2",
+    "name": "k8s-imgpull-sv-2-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1140,7 +1137,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-3",
+    "name": "k8s-imgpull-sv-3-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1150,7 +1147,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-4",
+    "name": "k8s-imgpull-sv-4-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1858,7 +1855,7 @@
       }
     },
     "name": "sv-1-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -1868,9 +1865,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "sv-1"
       },
@@ -2385,6 +2379,11 @@
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -2743,7 +2742,7 @@
       }
     },
     "name": "sv-2-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -2753,9 +2752,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "sv-2"
       },
@@ -3270,6 +3266,11 @@
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -3595,7 +3596,7 @@
       }
     },
     "name": "sv-3-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -3605,9 +3606,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "sv-3"
       },
@@ -4122,6 +4120,11 @@
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -4447,7 +4450,7 @@
       }
     },
     "name": "sv-4-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -4457,9 +4460,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "sv-4"
       },
@@ -4973,6 +4973,11 @@
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
           }
         ],

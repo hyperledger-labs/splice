@@ -36,6 +36,10 @@
         sha256 = "659ba41363c23cea895e6e8425f7f20e2165d24effe7a7aaa37c545b5eccc5e2";
       }
       {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.21.1/pulumi-resource-kubernetes-v4.21.1-linux-amd64.tar.gz";
+        sha256 = "8ddd4ef54778577478e79dc4fcbef3d92ffbf92a5b6fcc4de9e36efe23cd5efd";
+      }
+      {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.7.1/pulumi-resource-kubernetes-v4.7.1-linux-amd64.tar.gz";
         sha256 = "4f71421b353159067f8864fdad3a28dbd799ec8de213a4bfd23826aaddb49b86";
       }
@@ -84,6 +88,10 @@
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.11.0/pulumi-resource-kubernetes-v4.11.0-darwin-amd64.tar.gz";
         sha256 = "efab48604cb1942572afe83e951fe42cb77cbbe1ff23022c8d71c6fe0968e1de";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.21.1/pulumi-resource-kubernetes-v4.21.1-darwin-amd64.tar.gz";
+        sha256 = "37be280d4a76ef005053859199dd84bdcb715e28823f8754d536861e18230785";
       }
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.7.1/pulumi-resource-kubernetes-v4.7.1-darwin-amd64.tar.gz";
@@ -136,6 +144,10 @@
         sha256 = "6a45ce78cf1e7fbb9ea16ad31ac24083a9f2082ed84dc01f6a17efbef5926399";
       }
       {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.21.1/pulumi-resource-kubernetes-v4.21.1-linux-arm64.tar.gz";
+        sha256 = "34cdcf8f8bdebdcbebfb9011529bd0ae5ab7f57c51c56422b26e0f2b817d5a28";
+      }
+      {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.7.1/pulumi-resource-kubernetes-v4.7.1-linux-arm64.tar.gz";
         sha256 = "ffe3fe3847fc6bd9445d5f35503877291e00f3ffd2d68d7e90f2bc4da6f55451";
       }
@@ -184,6 +196,10 @@
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.11.0/pulumi-resource-kubernetes-v4.11.0-darwin-arm64.tar.gz";
         sha256 = "d6b4179aae4549bbb1238469fa600d4035b47f641d7941d79d5230f7434d79df";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.21.1/pulumi-resource-kubernetes-v4.21.1-darwin-arm64.tar.gz";
+        sha256 = "99a8c1922c28109c594d56087cee282e8d77cc4e5afcfdb8f8cb1f03ceea5d6b";
       }
       {
         url = "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.7.1/pulumi-resource-kubernetes-v4.7.1-darwin-arm64.tar.gz";

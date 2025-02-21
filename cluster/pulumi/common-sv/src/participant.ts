@@ -31,6 +31,7 @@ export function installSvParticipant(
   version: CnChartVersion,
   onboardingName: string,
   participantAdminUserNameFrom?: k8s.types.input.core.v1.EnvVarSource,
+  imagePullServiceAccountName?: string,
   customOptions?: SpliceCustomResourceOptions
 ): InstalledHelmChart {
   const name = `participant-${migrationId}`;
@@ -39,13 +40,6 @@ export function installSvParticipant(
       MIGRATION_ID: migrationId.toString(),
       OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
     }),
-    metrics: {
-      enable: true,
-      migration: {
-        id: migrationId,
-        active: isActive,
-      },
-    },
   };
 
   const participantValuesWithOverwrites: ChartValues = {
@@ -82,6 +76,7 @@ export function installSvParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
+      serviceAccountName: imagePullServiceAccountName,
     },
     version,
     {

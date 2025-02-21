@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
+import json
 import os
 import re
 from datetime import datetime, timezone, timedelta
@@ -49,6 +50,7 @@ def parse_args():
   parser.add_argument('--branch_filter_is_regex', required=False, default=False, type=str2bool)
   parser.add_argument('--branch_ignores', required=False, default="^$")
   parser.add_argument('--max_age_seconds', required=False, default=0, type=int)
+  parser.add_argument('--extra_seconds_after_finish', required=False, default=0, type=int)
   parser.add_argument('--waiting_job_name', required=False, default="wait_for_previous_pipeline")
   parser.add_argument('operation',
                       choices=[
@@ -56,7 +58,6 @@ def parse_args():
                         'wait_workflow',
                         'cancel_waiting_and_wait_workflow',
                         'cancel_self',
-                        'cancel_self_if_found',
                         'cancel_pipeline']
                         )
 
@@ -105,9 +106,24 @@ def wait_for_workflow_to_complete(pipeline: Pipeline, workflow: Workflow):
     if datetime.now() - START_TIME > MAX_TIMEOUT:
       raise TimeoutError(f"Timed out after {MAX_TIMEOUT}")
 
-def cancel_self_if_pipeline_running(pipeline: Pipeline):
+def cancel_self_if_pipeline_running(pipeline: Pipeline) -> bool:
   if not pipeline_workflows_complete(pipeline):
     cancel_workflow(SELF_WORKFLOW_ID)
+    return True
+  return False
+
+def cancel_self_if_in_period_after_finish(pipeline: Pipeline):
+  cancelled_because_still_running = cancel_self_if_pipeline_running(pipeline)
+  if not cancelled_because_still_running:
+    workflows = fetch_workflows(pipeline.id)
+    # all workflows are guaranteed to be complete because cancel_self_if_pipeline_running was called
+    cancel_after = datetime.now(timezone.utc) - timedelta(seconds=args.extra_seconds_after_finish)
+    for workflow in workflows:
+      if workflow.stopped_at is None:
+        print(f"Workflow has no stopped_at, but should already be complete! {workflow}")
+      elif workflow.stopped_at > cancel_after:
+        print(f"Workflow {workflow.name} ({workflow.id}) was stopped at {workflow.stopped_at}, which is after {cancel_after}. Cancelling self workflow...")
+        cancel_workflow(SELF_WORKFLOW_ID)
 
 def cancel_all_pipeline_workflows(pipeline: Pipeline):
   # Here we cancel all non-terminated workflows to simulate the behaviour of CCI with
@@ -145,11 +161,8 @@ def main(args):
           print(f"Pipeline {pipeline_number} contains workflow {workflow.name}, checking if it is also waiting, or already running")
           cancel_if_waiting_or_wait_workflow(pipeline, workflow, args.waiting_job_name)
         case 'cancel_self':
-          print(f"Pipeline contains workflow {workflow.name}, cancelling current workflow if pipeline is still running...")
-          cancel_self_if_pipeline_running(pipeline)
-        case 'cancel_self_if_found':
-          print(f"Pipeline contains workflow {workflow.name}, cancelling current workflow (regardless of the found pipeline's status)")
-          cancel_workflow(SELF_WORKFLOW_ID)
+          print(f"Pipeline contains workflow {workflow.name}, cancelling current workflow if pipeline is still running or was finished less than {args.extra_seconds_after_finish} seconds ago")
+          cancel_self_if_in_period_after_finish(pipeline)
         case 'cancel_pipeline':
           print(f"Pipeline contains workflow {workflow.name}, cancelling all workflows for the pipeline")
           cancel_all_pipeline_workflows(pipeline)

@@ -65,6 +65,19 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
+  bump_configs:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Bump configs
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
+            .circleci/cn-scripts/bump-configs.sh
+
   update_pipeline_schedule:
     docker:
       - image: cimg/base:2024.01
@@ -134,6 +147,10 @@ jobs:
       - setup_sbt_test_job:
           runner_type: "circleci"
       - docker_login_artifactory
+      - run_bash_command_in_nix:
+          cmd_name: Check if release tag is on anything but a release-line branch
+          additional_nix_args: --keep CIRCLE_BRANCH --keep REPO_ROOT
+          cmd: ./scripts/halt-on-bad-release-commit-msg.sh .halt-build-step
       - run_bash_command_in_nix:
           cmd_name: Check if images already exist
           cmd: |
@@ -293,20 +310,14 @@ jobs:
       max_pipeline_age_secs:
         type: integer
         default: 28800  # limit search to pipelines that are 8 hours old
-      only_if_running:
-        # if set to false, will cancel if a relevant pipeline is found, regardless of its current status
-        type: boolean
-        default: true
+      extra_seconds_after_finish:
+        type: integer
+        default: 0
     steps:
       - checkout_with_retry
       - run:
           name: "Cancel if previous pipeline"
           command: |
-            if [[ << parameters.only_if_running >> == true ]]; then
-              action="cancel_self"
-            else
-              action="cancel_self_if_found"
-            fi
             .circleci/wait_for_or_cancel_pipelines.sh \
               --current_pipeline_number << pipeline.number >> \
               --workflow_names "<< parameters.workflow_names >>" \
@@ -314,7 +325,8 @@ jobs:
               --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
               --branch_ignores "<< parameters.branch_ignores >>" \
               --max_age_seconds << parameters.max_pipeline_age_secs >> \
-              $action
+              --extra_seconds_after_finish << parameters.extra_seconds_after_finish >> \
+              cancel_self
 
   cancel_previous_pipelines:
     executor: self_hosted

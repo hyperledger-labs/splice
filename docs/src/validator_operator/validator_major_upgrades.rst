@@ -21,14 +21,14 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 
 1. Canton releases containing breaking changes become available and Splice releases compatible with these Canton releases become available.
 2. SVs agree and eventually confirm via an on-ledger vote on which specific date and time the network downtime necessary for the upgrade will start. Information about the downtime window is communicated to validators.
-3. At the start of the downtime window, the DSO automatically pauses all traffic on the operating version of the global synchronizer.
-4. Shortly after traffic on the global synchronizer has been paused (there is a short delay to ensure that all components have synced up to the final state of the existing synchronizer), the validator node software automatically exports so-called migration dumps to attached Kubernetes volumes. See :ref:`validator-upgrades-dumps`.
-
-   .. todo:: document where the dump lands in a docker compose setup
-
+3. At the start of the downtime window, the SVs automatically pause all traffic on the operating version of the global synchronizer.
+4. Shortly after traffic on the global synchronizer has been paused (there is a short delay to ensure that all components have synced up to the final state of the existing synchronizer), the validator node software automatically exports so-called migration dumps.
+   In a Kubernetes deployment, this dump is saved to attached Kubernetes volumes.
+   In Docker-compose deployments, the dump is saved to a docker volume.
+   See :ref:`validator-upgrades-dumps`.
 5. Validator operators verify that their nodes have caught up to the now-paused global synchronizer. See :ref:`validator-upgrades-catching-up`.
 6. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`validator-backups`.
-7. Validators wait until the DSO has signaled that the migration has been successful.
+7. Validators wait until the SVs signal that the migration has been successful.
 8. All validators upgrade theirs deployments. See :ref:`validator-upgrades-deploying`.
 9. Upon (re-)initialization, the validator backend automatically consumes the migration dump and initializes the validator participant based on the contents of this dump. App databases are :ref:`preserved <validator-upgrades-state>`.
 
@@ -80,14 +80,18 @@ Migration Dumps
 +++++++++++++++
 
 Migration dumps contain identity and transaction data from the validator participant.
-When using the official Helm charts and following the :ref:`Helm-based deployment documentation <k8s_validator>`,
-the migration dump is automatically created once a scheduled synchronizer upgrade begins and the existing synchronizer has been paused.
-As part of the Helm-based deployment of the validator app (``splice-validator``),
-a persistent Kubernetes volume is attached to the ``validator-app`` pod and configured as the target storage location for migration dumps.
+The migration dump is automatically created once a scheduled synchronizer upgrade begins and the existing synchronizer has been paused.
 When redeploying the validator app as part of the migration process (see :ref:`validator-upgrades-deploying`),
 the validator app will automatically consume the migration dump and initialize the participant based on the contents of this dump.
 
-.. todo:: also talk about docker compose setup in the paragraph above
+For Kubernetes deployments deployed using the official Helm charts and following
+the :ref:`Helm-based deployment documentation <k8s_validator>`,
+a persistent Kubernetes volume is attached to the ``validator-app`` pod and configured
+as the target storage location for migration dumps.
+
+Similarly, for Docker-compose deployments, a docker volume is created, mounted to the
+``validator-app`` container, and is configured
+as the target storage location for migration dumps.
 
 .. _validator-upgrades-catching-up:
 
@@ -99,13 +103,23 @@ In order for the migration to the new synchronizer to be safe and successful, it
 * To ensure that the validator participant has caught up and the :ref:`migration dump <validator-upgrades-dumps>` has been created as expected, operators can check the logs of the ``validator-app`` pod for ``Wrote domain migration dump`` messages.
 * To ensure that the validator app has caught up, operators can check the logs of the ``validator-app`` pod for the message ``Ingested transaction``.
   If the latest such message is 10 or more minutes old, the validator app has very likely (with a large safety margin) caught up to the state on the participant, and hence to the state of the existing (paused) synchronizer.
+* Note that the sequencers of the existing (old) synchronizer will be kept available by SVs for a limited
+  time after the migration to the new synchronizer has been completed. Once they are shut down, the validator
+  will not be able to catch up anymore. You should therefore ensure that your node is caught up and migrated
+  to the new synchronizer in a timely manner after the migration.
 
 .. _validator-upgrades-deploying:
 
+Deploying the Validator App and Participant
++++++++++++++++++++++++++++++++++++++++++++
+
 Deploying the Validator App and Participant (Kubernetes)
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 This section refers to validators that have been deployed in Kubernetes using the instructions in :ref:`k8s_validator`.
+
+Once you confirmed that your validator is caught up, as explained above, confirm that a migration dump has been created by
+searching the logs of the ``validator-app`` pod for ``Wrote domain migration dump`` messages.
 
 Repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant,
 substituting the migration ID (``MIGRATION_ID``) with the target migration ID after the upgrade (typically the existing synchronizer's migration ID + 1).
@@ -122,7 +136,7 @@ While doing so, please note the following:
 * Please make sure that Helm chart deployments are upgraded to the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.
 
 Deploying the validator App and Participant (Docker-Compose)
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 This section refers to validators that have been deployed in Docker-Compose using the instructions in :ref:`compose_validator`.
 

@@ -93,6 +93,7 @@ spec:
       labels:
         app: {{ $name }}
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       volumes:
         - name: postgres-password
           secret:
@@ -199,3 +200,8 @@ spec:
   value: {{ .logLevel }}
 {{- end }}
 {{- end }}
+{{- define "splice-util-lib.service-account" -}}
+{{- if .serviceAccountName -}}
+serviceAccountName: {{ .serviceAccountName }}
+{{- end -}}
+{{- end -}}

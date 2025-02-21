@@ -1,6 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { config, ServiceAccount } from 'splice-pulumi-common';
+import { config, GcpServiceAccount } from 'splice-pulumi-common';
 
 import { ImportedSecret } from './importedSecret';
 
@@ -87,7 +87,7 @@ class GcpProject extends pulumi.ComponentResource {
     this.importSecretIdFromDevnet('grafana-keys');
 
     // Manage IAM and permissions
-    new ServiceAccount(
+    new GcpServiceAccount(
       'circleci',
       {
         accountId: 'circleci',

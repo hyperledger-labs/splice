@@ -1,6 +1,9 @@
 # tag should match the version in nix/cometbft-driver-sources.json
-# TODO(#15988): Don't hardcode the version here, get it from Nix instead
-FROM digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:3.2.0-snapshot.20241007.14241.0.v55249174-r1
+ARG cometbft_version
+FROM digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:$cometbft_version
+
+ARG cometbft_version
+LABEL org.opencontainers.image.base.name="digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:$cometbft_version"
 
 # Copy the configuration files
 COPY configs /

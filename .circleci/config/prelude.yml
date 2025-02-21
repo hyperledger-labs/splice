@@ -58,6 +58,7 @@ parameters:
         backup-status-testnet,
         backup-status-mainnet,
         purge-unused-dbs-cidaily,
+        bump-configs,
       ]
     default: build
   # Whether the cluster should be reset before deploying.

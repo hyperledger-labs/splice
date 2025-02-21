@@ -30,8 +30,6 @@ runs:
         export USER=$(whoami)
         . ~/.nix-profile/etc/profile.d/nix.sh
 
-        # TODO(#15988): Support "working_dir" argument
-
         # Attempt to build the nix env with retries to work around transient download failures
         echo "building nix env"
         MAX_RETRY_NIX_ENV=5
@@ -79,7 +77,7 @@ runs:
 
           . .envrc.vars
 
-          # TODO(#15988): once we support cluster deployments in GHA, add cluster authentication here
+          # TODO(#17839): once we support cluster deployments in GHA, add cluster authentication here
 
           MAX_RETRY=${{ inputs.cmd_retry_count }}
           n=0
@@ -114,7 +112,7 @@ runs:
               }
               cmd_wrapper && break
 
-              # TODO(#15988): support a conditional retry (cmd_retry_condition argument in CCI)
+              # TODO(#17839): support a conditional retry (cmd_retry_condition argument in CCI), used for retrying if VPN failed
 
               n=$[$n+1]
           done

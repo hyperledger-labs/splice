@@ -17,7 +17,7 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
   /v0/dso:
     get:
-      tags: [scan, external]
+      tags: [scan, external, gs-operations]
       x-jvm-package: scan
       operationId: "getDsoInfo"
       responses:
@@ -29,7 +29,7 @@ paths:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
   /v0/dso-party-id:
     get:
-      tags: [scan, external]
+      tags: [scan, external, refdata]
       x-jvm-package: scan
       operationId: "getDsoPartyId"
       description: |
@@ -43,12 +43,12 @@ paths:
                 "$ref": "#/components/schemas/GetDsoPartyIdResponse"
   /v0/closed-rounds:
     get:
-      tags: [scan, external]
+      tags: [scan, external, current-state]
       x-jvm-package: scan
       operationId: "getClosedRounds"
       description: |
-        Every closed mining round on the ledger for the connected Splice network,
-        in round number order, earliest-first.
+        Every closed mining round on the ledger still in post-close process for
+        the connected Splice network, in round number order, earliest-first.
       responses:
         "200":
           description: ok
@@ -58,7 +58,7 @@ paths:
                 "$ref": "#/components/schemas/GetClosedRoundsResponse"
   /v0/open-and-issuing-mining-rounds:
     post:
-      tags: [scan, external]
+      tags: [scan, external, current-state]
       x-jvm-package: scan
       operationId: "getOpenAndIssuingMiningRounds"
       description: |
@@ -408,7 +408,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/dso-sequencers:
     get:
-      tags: [scan, external]
+      tags: [scan, external, gs-connectivity]
       x-jvm-package: scan
       operationId: "listDsoSequencers"
       description: |
@@ -423,7 +423,7 @@ paths:
                 "$ref": "#/components/schemas/ListDsoSequencersResponse"
   /v0/scans:
     get:
-      tags: [scan, external]
+      tags: [scan, external, gs-connectivity]
       x-jvm-package: scan
       operationId: "listDsoScans"
       description: |
@@ -513,7 +513,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v1/updates:
     post:
-      tags: [scan, external]
+      tags: [scan, external, bulk-data]
       x-jvm-package: scan
       operationId: "getUpdateHistoryV1"
       description: |
@@ -573,7 +573,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v1/updates/{update_id}:
     get:
-      tags: [scan, external]
+      tags: [scan, external, bulk-data]
       x-jvm-package: scan
       operationId: "getUpdateByIdV1"
       description: |
@@ -605,7 +605,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/state/acs/snapshot-timestamp:
     get:
-      tags: [scan, external]
+      tags: [scan, external, bulk-data]
       x-jvm-package: scan
       operationId: "getDateOfMostRecentSnapshotBefore"
       description: |
@@ -644,7 +644,7 @@ paths:
 
   /v0/state/acs:
     post:
-      tags: [scan, external]
+      tags: [scan, external, bulk-data]
       x-jvm-package: scan
       operationId: "getAcsSnapshotAt"
       description: |
@@ -671,7 +671,7 @@ paths:
 
   /v0/state/acs/force:
     post:
-      tags: [scan, external]
+      tags: [scan, external, bulk-data]
       x-jvm-package: scan
       operationId: "forceAcsSnapshotNow"
       description: |
@@ -694,7 +694,7 @@ paths:
 
   /v0/holdings/state:
     post:
-      tags: [scan, external]
+      tags: [scan, external, aggregate]
       x-jvm-package: scan
       operationId: "getHoldingsStateAt"
       description: |
@@ -721,7 +721,7 @@ paths:
 
   /v0/holdings/summary:
     post:
-      tags: [scan, external]
+      tags: [scan, external, aggregate]
       x-jvm-package: scan
       operationId: "getHoldingsSummaryAt"
       description: |
@@ -749,7 +749,7 @@ paths:
 
   /v0/ans-entries:
     get:
-      tags: [scan, external]
+      tags: [scan, external, aggregate]
       x-jvm-package: scan
       operationId: "listAnsEntries"
       description: |
@@ -782,7 +782,7 @@ paths:
                 "$ref": "#/components/schemas/ListEntriesResponse"
   /v0/ans-entries/by-party/{party}:
     get:
-      tags: [scan, external]
+      tags: [scan, external, aggregate]
       x-jvm-package: scan
       operationId: "lookupAnsEntryByParty"
       description: |
@@ -806,7 +806,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/ans-entries/by-name/{name}:
     get:
-      tags: [scan, external]
+      tags: [scan, external, aggregate]
       x-jvm-package: scan
       operationId: "lookupAnsEntryByName"
       description: If present, the ANS entry named exactly `name`.
@@ -1064,7 +1064,7 @@ paths:
       tags: [ scan, internal ]
       x-jvm-package: scan
       operationId: "listVoteRequestsByTrackingCid"
-      description: Look up several `VoteRequest`s at once by their contract IDs.
+      description: Look up several `VoteRequest`\ s at once by their contract IDs.
       requestBody:
         required: true
         content:
@@ -1108,7 +1108,7 @@ paths:
       tags: [ scan, internal ]
       x-jvm-package: scan
       operationId: "listDsoRulesVoteRequests"
-      description: List all active `VoteRequest`s.
+      description: List all active `VoteRequest`\ s.
       responses:
         "200":
           description: ok
@@ -1136,7 +1136,7 @@ paths:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteResultsResponse"
   /v0/admin/validator/licenses:
     get:
-      tags: [ scan, external ]
+      tags: [ scan, external, gs-connectivity ]
       x-jvm-package: scan
       operationId: "listValidatorLicenses"
       description: |
@@ -1144,7 +1144,8 @@ paths:
         sorted newest-first.
       parameters:
         - name: "after"
-          description: How many records at the start to skip, 0 by default.
+          description: |
+            A `next_page_token` from a prior response; if absent, return the first page.
           in: "query"
           required: false
           schema:
@@ -1254,8 +1255,9 @@ components:
       properties:
         rounds:
           description: |
-            Contracts of the Daml template `Splice.Round.ClosedMiningRound`, one
-            for every closed round.
+            Contracts of the Daml template `Splice.Round:ClosedMiningRound`, one
+            for every closed round that is still in process, i.e. it either has
+            unprocessed rewards or a missing `Splice.DsoRules:Confirmation`.
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
@@ -2665,7 +2667,9 @@ components:
       required: ["user", "name", "url", "description"]
       properties:
         contract_id:
-          description: Daml contract ID of template `Splice.Ans:AnsEntry`.
+          description: |
+            If present, Daml contract ID of template `Splice.Ans:AnsEntry`.
+            If absent, this is a DSO-provided entry for either the DSO or an SV.
           type: string
         user:
           description: Owner party ID of this ANS entry.
@@ -2683,6 +2687,8 @@ components:
           description: |
             Time after which this ANS entry expires; if renewed, it will have a
             new `contract_id` and `expires_at`.
+            If `null` or absent, does not expire; this is the case only for
+            special entries provided by the DSO.
           type: string
           format: date-time
     GetAggregatedRoundsResponse:

@@ -11,6 +11,7 @@ import {
 import { slackToken } from './alertings';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
+const disableReplayWarnings = config.envFlag('DISABLE_REPLAY_WARNINGS');
 
 export function getNotificationChannel(
   name: string = `${CLUSTER_BASENAME} Slack Alert Notification Channel`
@@ -98,7 +99,16 @@ ${conditionalString(
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
-)}`,
+)}
+${conditionalString(
+  disableReplayWarnings,
+  '-(resource.labels.container_name=~"participant" AND (' +
+    'jsonPayload.message=~"LOCAL_VERDICT_CREATES_EXISTING_CONTRACTS.*Rejected transaction would create contract\\(s\\) that already exist"' +
+    ' OR ' +
+    'jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_REQUEST.*belongs to a replayed transaction"' +
+    '))'
+)}
+`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
       namespace: 'EXTRACT(resource.labels.namespace_name)',

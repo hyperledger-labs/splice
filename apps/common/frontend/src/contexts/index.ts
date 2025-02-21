@@ -9,5 +9,6 @@ export {
   LedgerApiClientProvider,
   useLedgerApiClient,
   PackageIdResolver,
+  JsonApiError,
 } from './LedgerApiContext';
 export { ConfigProvider, useConfig } from './ConfigContext';

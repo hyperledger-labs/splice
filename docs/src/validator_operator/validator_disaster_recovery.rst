@@ -84,34 +84,14 @@ coin balance and CNS entries should be recovered.
 
 .. todo:: explain that the recovery only automatically works for users whose parties were allocated in the participant namespace
 
-
-Docker-Compose Deployment
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-To re-onboard a validator and recover the balances of all users it hosts, type:
-
-.. code-block:: bash
-
-    ./start.sh -s <sponsor_sv_address> -o "" -p <party_hint> -m $MIGRATION_ID -i <node_identities_dump_file> -P <new_participant_id> -w
-
-where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
-``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
-Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
-
 Kubernetes Deployment
 ^^^^^^^^^^^^^^^^^^^^^
 
-In the case of a catastrophic failure of the validator node, some data owned by the validator and users it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved by deploying another validator node with control over the validator's participant keys.
-
-In order to be able to recover the data, you must have a backup of the identities of the
-validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
-
-You can deploy a new validator node to which the data will be recovered by
-repeating the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
-
+To re-onboard a validator in a Docker-compose deployment and recover the balances of all users it hosts,
+repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
 While doing so, please note the following:
 
-* Create a Kubernetes secret with the content of that dump file.
+* Create a Kubernetes secret with the content of the identities dump file.
   Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a dump file path, you can create the secret with the following command:
 
 .. code-block:: bash
@@ -128,6 +108,20 @@ While doing so, please note the following:
     :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
     :end-before: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
+
+Docker-Compose Deployment
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To re-onboard a validator in a Docker-compose deployment and recover the balances of all users it hosts, type:
+
+.. code-block:: bash
+
+    ./start.sh -s "<SPONSOR_SV_URL>" -o "" -p <party_hint> -m "<MIGRATION_ID>" -i "<node_identities_dump_file>" -P "<new_participant_id>" -w
+
+where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
+``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
+Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
+
 
 
 .. _validator_network_dr:
@@ -149,19 +143,20 @@ The steps at the high level are:
 1. All SVs agree on the timestamp from which they will be recovering, and follow the disaster recovery process for SVs.
 2. Validator operators wait until the SVs have signaled that the restore procedure has been successful, and to which timestamp they have restored.
 3. Validator operators create a dump file through their validator app.
-4. Validator operators copy the dump file to their validator app's PVC and restart the app to restore the data.
-
-Technical Details
-^^^^^^^^^^^^^^^^^
+4. Validator operators copy the dump file to their validator app's migration dump volume and restart the app to restore the data.
 
 We recommend first familiarizing yourself with the :ref:`migration <validator-upgrades>` process, as the disaster recovery process is similar.
 In case of disaster, the SVs will inform you of the need to recover, and indicate the timestamp from which the network will be recovering.
 
 The following steps will produce a data dump through the validator app, consisting of your node's private identities as well as the
-Active Contract Set (ACS) as of the required timestamp. That data dump will then be stored on the validator app's PVC,
+Active Contract Set (ACS) as of the required timestamp. That data dump will then be stored on the validator app's volume,
 and the validator app and participant will be configured to consume it and restore the data from it.
 
 Please make sure before you fetch a data dump from the validator app that your participant was healthy around the timestamp that the SVs have provided.
+
+Technical Details (Kubernetes)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 The data dump can be fetched from the validator app by running the following command:
 
 .. code-block:: bash
@@ -176,10 +171,8 @@ If the `curl` command fails with a 400 error, that typically means that your par
 and your node cannot generate the requested dump.
 If it fails with a 429, that means the timestamp is too late for your participant to create a
 dump for, i.e. your participant has not caught up to a late enough point before the disaster.
-Either way, you will need to go through a process of recreating your validator and recovering your balance,
-which will be documented soon.
-
-.. TODO(#11472): refer here to validator re-onboarding docs once they exist.
+Either way, you will need to go through a process of recreating your validator and recovering your balance.
+See :ref:`validator_reonboard` for more information.
 
 This file can now be copied to the Validator app's PVC:
 
@@ -189,20 +182,42 @@ This file can now be copied to the Validator app's PVC:
 
 where `<validator_pod_name>` is the full name of the pod running the validator app.
 
-Migrating the Data:
+Migrating the Data
+""""""""""""""""""
 
-Please follow the instructions in the :ref:`Deploying the Validator App and Participant <validator-upgrades-deploying>` section
+Please follow the instructions in the :ref:`validator-upgrades-deploying` section
 to update the configuration of the validator app and participant to consume the migration dump file.
 
-For docker-compose validator deployments, the process is similar with the following modifications:
+Technical Details (Docker-Compose)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-#. For the endpoint for fetching the data dump, replace `https://wallet.validator.YOUR_HOSTNAME` with `http://wallet.localhost`.
+The data dump can be fetched from the validator app by running the following command:
 
-#. If you are running your validator without auth, you can use the utility Python script `get-token.py`
-   to generate a token for the `curl` command by running ``python get-token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
+.. code-block:: bash
 
-#. Copy the dump file to the validator's docker volume using:
+    curl -sSLf "https://wallet.localhost/api/validator/v0/admin/domain/data-snapshot?timestamp=<timestamp>&force=true" -H "authorization: Bearer <token>" -X GET -H "Content-Type: application/json" > dump_response.json
+    cat dump_response.json | jq '.data_snapshot' > dump.json
+
+where `<token>` is an OAuth2 Bearer Token with enough claims to access the Validator app, as obtained from your OAuth provider, and `<timestamp>` is the timestamp provided by the SVs,
+in the format `"2024-04-17T19:12:02Z"`.
+If you are running your validator without auth, you can use the utility Python script `get-token.py`
+to generate a token for the `curl` command by running ``python get-token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
+
+If the `curl` command fails with a 400 error, that typically means that your participant has been pruned beyond the chosen timestamp,
+and your node cannot generate the requested dump.
+If it fails with a 429, that means the timestamp is too late for your participant to create a
+dump for, i.e. your participant has not caught up to a late enough point before the disaster.
+Either way, you will need to go through a process of recreating your validator and recovering your balance.
+See :ref:`validator_reonboard` for more information.
+
+This file can now be copied to the Validator app's Docker volume using the following command:
 
 .. code-block:: bash
 
     docker run --rm -v "domain-upgrade-dump:/volume" -v "$(pwd):/backup" alpine sh -c "cp /backup/dump.json /volume/domain_migration_dump.json"
+
+Migrating the Data
+""""""""""""""""""
+
+Please follow the instructions in the :ref:`validator-upgrades-deploying` section
+to update the configuration of the validator app and participant to consume the migration dump file.

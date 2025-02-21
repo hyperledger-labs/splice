@@ -10,7 +10,7 @@ Validator Hardware Requirements
 
 This section describes hardware requirements for running a
 validator. Note that these are reference values. Actual requirements
-can vary based your usage of your validator. We recommend
+can vary based on usage of your validator. We recommend
 monitoring your production validator nodes with respect to
 CPU and memory usage of all components and disk usage of the
 database, and adjust the resourcing as needed.

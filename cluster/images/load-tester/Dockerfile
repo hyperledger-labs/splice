@@ -3,6 +3,8 @@
 
 FROM grafana/k6:0.48.0
 
+LABEL org.opencontainers.image.base.name="grafana/k6:0.48.0"
+
 COPY entrypoint.sh .
 COPY target/test/* ./
 COPY target/LICENSE .

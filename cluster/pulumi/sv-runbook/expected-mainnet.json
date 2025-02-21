@@ -132,7 +132,7 @@
       }
     },
     "name": "cluster-ingress-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-cluster-ingress::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-cluster-ingress-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -142,9 +142,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "cluster-ingress"
       },
@@ -216,7 +213,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -384,7 +381,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-cluster-ingress",
+    "name": "k8s-imgpull-cluster-ingress-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -394,7 +391,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv",
+    "name": "k8s-imgpull-sv-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -443,7 +440,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "loopback",
     "provider": "",
@@ -513,7 +510,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "scan",
     "provider": "",
@@ -709,7 +706,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -870,7 +867,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "sv-app",
     "provider": "",
@@ -893,7 +890,7 @@
       }
     },
     "name": "sv-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -903,9 +900,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "sv"
       },
@@ -995,7 +989,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1073,7 +1067,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1151,7 +1145,7 @@
           }
         ]
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1266,7 +1260,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.3.8"
+      "version": "0.3.9"
     },
     "name": "validator",
     "provider": "",

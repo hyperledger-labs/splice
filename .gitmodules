@@ -6,4 +6,4 @@
 	url = ../../global-synchronizer-foundation/configs-private.git
 [submodule ".github/runners/runner-container-hooks"]
 	path = .github/runners/runner-container-hooks
-	url = git@github.com:isegall-da/runner-container-hooks.git
+	url = ../../hyperledger-labs/splice-runner-container-hooks.git

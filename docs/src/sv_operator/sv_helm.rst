@@ -547,10 +547,7 @@ For configuring your sv app, please modify the file ``splice-node/examples/sv-he
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - Please set `domain.sequencerPublicUrl` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 - Please set `scan.publicUrl` to the URL to your Scan app in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
-- It is recommended to set the ``sequencerPruningConfig.pruningInterval`` to ``1 hour``
-  and the ``sequencerPruningConfig.retentionPeriod`` to ``30 days``.
-  The pruning interval is the time between two consecutive prunings,
-  and the retention period is the time for which the sequencer will retain the data.
+- It is recommended to :ref:`configure pruning <sv-pruning>` .
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. If you do not want to share
   this, set it to an empty string.
 - If you would like to redistribute all or part of the SV rewards with other parties, you can fill up the `extraBeneficiaries` section with the desired parties and the percentage of the reward that corresponds to them.

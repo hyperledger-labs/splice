@@ -180,6 +180,7 @@ class InitializeSynchronizerTrigger(
           .initialize(
             task.synchronizerId,
             LocalSynchronizerNode.toSequencerConnection(node.sequencerPublicApi),
+            node.mediatorSequencerAmplification,
           )
           .map(_ => ()),
         logger,

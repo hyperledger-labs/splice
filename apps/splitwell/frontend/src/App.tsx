@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider, UserProvider, theme, PackageIdResolver } from 'common-frontend';
+import {
+  AuthProvider,
+  UserProvider,
+  theme,
+  PackageIdResolver,
+  JsonApiError,
+} from 'common-frontend';
 import { replaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
@@ -43,17 +49,6 @@ class SplitwellPackageIdResolver extends PackageIdResolver {
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const refetchInterval = useConfigPollInterval();
 
-  interface JsonApiError {
-    code?: string;
-    error?: string;
-    errors?: string[];
-    status: number;
-  }
-
-  const checkErrorStrings = (keywords: string[], error: string | undefined) => {
-    return keywords.some(k => error?.includes(k));
-  };
-
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -66,11 +61,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
           // because that then also retries on invalid user input.
           const errResponse = error as JsonApiError;
           const keywords = ['NOT_CONNECTED_TO_ANY_DOMAIN', 'NOT_CONNECTED_TO_DOMAIN'];
-          const isDomainConnectionError =
-            errResponse.errors?.some(e => checkErrorStrings(keywords, e)) ||
-            checkErrorStrings(keywords, errResponse.error) ||
-            checkErrorStrings(keywords, errResponse.code) ||
-            false;
+          const isDomainConnectionError = keywords.some(k => errResponse.body?.includes(k));
           const is404or409 = [404, 409].includes(errResponse.status);
 
           return (is404or409 || isDomainConnectionError) && failureCount < 10;

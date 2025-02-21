@@ -26,6 +26,7 @@ spec:
         app: {{ $scanAppLabel }}
         migration: {{ .Values.migration.id | quote }}
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
       - name: scan-app
         image: "{{ .Values.imageRepo }}/scan-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).scan_app) }}"
@@ -36,9 +37,7 @@ spec:
         - name: ADDITIONAL_CONFIG_PERSISTENCE
           value: |
             canton.scan-apps.scan-app.storage {
-              type = postgres
               config {
-                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
                 properties = {
                   databaseName = "{{ .databaseName }}"
                   currentSchema = "{{ .schema }}"

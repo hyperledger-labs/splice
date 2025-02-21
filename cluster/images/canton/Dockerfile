@@ -25,7 +25,7 @@ WORKDIR /app
 # move tarball to a static name
 ADD target/canton.tar .
 
-COPY target/monitoring.conf target/parameters.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
+COPY target/monitoring.conf target/parameters.conf target/storage.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
 
 # Overwrite the LICENSE.txt file from canton image with the one from Splice
 COPY target/LICENSE.txt .
@@ -42,5 +42,6 @@ COPY --from=build /app/ /app/
 
 WORKDIR /app
 
+LABEL org.opencontainers.image.base.name="debian:bookworm-slim"
 # point entrypoint to the amulet executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]

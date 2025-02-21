@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvSynchronizerNodeConfig}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 
 import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor
@@ -28,6 +29,7 @@ final class ExtraSynchronizerNode(
     override val sequencerExternalPublicUrl: String,
     override val sequencerConfig: SequencerConfig,
     override val sequencerAvailabilityDelay: Duration,
+    override val mediatorSequencerAmplification: SubmissionRequestAmplification,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 ) extends SynchronizerNode(
@@ -36,6 +38,7 @@ final class ExtraSynchronizerNode(
       sequencerExternalPublicUrl,
       sequencerAvailabilityDelay,
       sequencerConfig,
+      mediatorSequencerAmplification,
     )
     with FlagCloseable
     with NamedLogging {
@@ -76,6 +79,7 @@ object ExtraSynchronizerNode {
       conf.sequencer.externalPublicApiUrl,
       SequencerConfig.fromConfig(conf.sequencer, cometbftConfig),
       conf.sequencer.sequencerAvailabilityDelay.asJava,
+      conf.mediator.sequencerRequestAmplification,
       loggerFactory,
       retryProvider.timeouts,
     )

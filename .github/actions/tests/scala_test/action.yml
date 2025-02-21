@@ -119,12 +119,7 @@ runs:
           fi
           mkdir -p log
           ./start-canton.sh -p external -D ${{ inputs.start_canton_options }}
-        additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD ${{ inputs.additional_nix_args }}"
-        cmd_retry_count: 3
-      # TODO(#15988): GHA does not support background jobs, therefore we introduced the -D flag
-      # and just running in the background, but this means that we are not retrying on all
-      # failures. Consider wrapping start-canton in a script that also retries, and
-      # running that in the background.
+        additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD ${{ inputs.additional_nix_args }}"
 
     - name: Set up SBT
       id: setup_sbt

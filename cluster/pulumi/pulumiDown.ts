@@ -1,25 +1,20 @@
-import * as automation from '@pulumi/pulumi/automation';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
 } from 'splice-pulumi-common-validator/src/validators';
+import { startDownOperationsForCantonStacks } from 'sv-canton-pulumi-deployment/pulumiDown';
 
-import {
-  awaitAllOrThrowAllExceptions,
-  downStack,
-  PulumiAbortController,
-  stack,
-  Operation,
-  operation,
-} from './pulumi';
-import { runStacksCancel, runStacksRefresh } from './pulumiHelper';
-import { cancelAllTheStacks, downAllTheStacks } from './sv-canton/pulumiHelper';
+import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
+import { downOperation } from './pulumiOperations';
+
+const abortController = new PulumiAbortController();
 
 async function runStacksDown() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
-  const operations: Operation[] = [];
-  const abortController = new PulumiAbortController();
+  let operations: Operation[] = [];
   operations.push(downOperation(mainStack, abortController));
+  const cantonDown = startDownOperationsForCantonStacks(abortController);
+  operations = operations.concat(cantonDown);
   if (mustInstallValidator1) {
     const validator1 = await stack('validator1', 'validator1', true, {});
     operations.push(downOperation(validator1, abortController));
@@ -39,38 +34,7 @@ async function runStacksDown() {
   await awaitAllOrThrowAllExceptions(operations);
 }
 
-function downOperation(stack: automation.Stack, abortController: PulumiAbortController): Operation {
-  return operation(`down-${stack.name}`, downStack(stack, abortController));
-}
-
-function runAllStacksDown(cancelStacks: boolean = true) {
-  if (cancelStacks) {
-    runStacksCancel().catch(e => {
-      console.error(e);
-    });
-  }
-  runStacksDown().catch(e => {
-    console.error(e);
-    if ('the stack is currently locked' in e) {
-      runStacksCancel().catch(e => {
-        console.error(e);
-      });
-      runStacksRefresh().catch(e => {
-        console.error(e);
-      });
-      runAllStacksDown(false);
-    } else {
-      console.error('Failed uninstalling stack, aborting');
-    }
-    process.exit(1);
-  });
-  cancelAllTheStacks().catch(e => {
-    console.error(e);
-  });
-  downAllTheStacks().catch(e => {
-    console.error(e);
-    process.exit(1);
-  });
-}
-
-runAllStacksDown();
+runStacksDown().catch(e => {
+  console.error(e);
+  process.exit(1);
+});
