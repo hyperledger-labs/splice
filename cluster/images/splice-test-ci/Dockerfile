@@ -1,7 +1,8 @@
 # Note that we don't currently support arm64 runners, so we build this only for amd64
 FROM --platform=$BUILDPLATFORM ubuntu:24.04
 
-# TODO(#15988): consider whether we can move some of the things installed here (and with pip below) into nix
+LABEL org.opencontainers.image.base.name="ubuntu:24.04"
+# TODO(#17437): consider whether we can move some of the things installed here (and with pip below) into nix
 RUN apt-get update && \
     apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip && \
     rm -rf /var/lib/apt/lists/*

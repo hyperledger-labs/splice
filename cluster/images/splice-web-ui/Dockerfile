@@ -12,6 +12,8 @@ FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS build
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 
+LABEL org.opencontainers.image.base.name="debian:bookworm-slim"
+
 COPY --from=xx / /
 
 RUN xx-apt-get update && \

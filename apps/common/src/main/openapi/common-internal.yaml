@@ -274,3 +274,4 @@ components:
           format: int64
           description: |
             When requesting the next page of results, pass this as URL query parameter `after`.
+            If absent or `null`, there are no more pages.
