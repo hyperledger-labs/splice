@@ -198,6 +198,13 @@ function installDockerRunnerScaleSet(
                     mountPath: '/cache',
                   },
                 ],
+                ports: [
+                  {
+                    name: 'metrics',
+                    containerPort: 8000,
+                    protocol: 'TCP',
+                  },
+                ],
               },
               {
                 name: 'dind',
@@ -278,6 +285,10 @@ function installDockerRunnerScaleSet(
             // prevent eviction by the gke autoscaler
             annotations: {
               'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
+            labels: {
+              // We add a runner-pod label, so that we can easily select it for monitoring
+              'runner-pod': 'true',
             },
           },
         },
@@ -734,7 +745,6 @@ function installPodMonitor(runnersNamespace: Namespace) {
         selector: {
           matchExpressions: [
             {
-              // TODO(#16963): This does not work for docker runners
               key: 'runner-pod',
               operator: 'Exists',
             },
