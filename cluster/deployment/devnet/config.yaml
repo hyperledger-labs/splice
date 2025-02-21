@@ -26,3 +26,8 @@ synchronizerMigration:
     provider: external
     version: 0.3.12
     releaseReference: "refs/heads/release-line-0.3.12"
+  upgrade:
+    id: 5
+    provider: external
+    version: 0.3.12
+    releaseReference: "refs/heads/release-line-0.3.12"
