@@ -7,7 +7,7 @@ module Splice.ExternalPartyAmuletRules where
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
-import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.AllocationV1 qualified as Api.Token.AllocationV1
 import Splice.Api.Token.AllocationInstructionV1
 import Splice.AmuletAllocation
 import Splice.AmuletRules
@@ -224,7 +224,7 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
 -- Token standard support
 -------------------------
 
-sharedAllocateImpl : Party -> AllocationView -> [ContractId Api.Token.HoldingV1.Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
+sharedAllocateImpl : Party -> Api.Token.AllocationV1.AllocationView -> [ContractId Api.Token.HoldingV1.Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
 sharedAllocateImpl provider allocation holdings extraArgs = do
   paymentContext <- paymentFromChoiceContext extraArgs.context
   let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]

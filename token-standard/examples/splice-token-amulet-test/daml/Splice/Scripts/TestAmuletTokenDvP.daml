@@ -18,7 +18,6 @@ import Splice.Amulet
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
-import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
 import Splice.Api.Token.AllocationRequestV1
 import Splice.Api.Token.AllocationInstructionV1
@@ -42,13 +41,12 @@ testDvP = script do
     user = alice.primaryParty
 
   let amuletId = InstrumentId app.dso "Amulet"
-  let mkTransfer sender receiver amount = Api.Token.TransferInstructionV1.Transfer with
+  let mkTransfer sender receiver amount = Api.Token.AllocationV1.Transfer with
         sender
         receiver
         amount
         instrumentId = amuletId
         meta = emptyMetadata
-        lock = None
   let aliceLeg = mkTransfer alice.primaryParty bob.primaryParty 100.0
   -- TODO (#17541):use another asset instead of Amulet for Bob, once we have a second asset available in our example
   let bobLeg = mkTransfer bob.primaryParty alice.primaryParty 20.0
