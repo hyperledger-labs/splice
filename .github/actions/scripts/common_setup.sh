@@ -10,7 +10,9 @@ set -euo pipefail
 # `git log main..$BRANCH` so both main and the branch have to be local refs
 
 git config --global --add safe.directory "$(pwd)"
+echo "FETCHING ORIGIN"
 git fetch --tags --force origin
+echo "CHECKING OUT MAIN"
 git checkout main
 echo "GITHUB_HEAD_REF: ${GITHUB_HEAD_REF:-}"
 if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
