@@ -766,7 +766,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.11"
+          "name": "refs/heads/release-line-0.3.12"
         },
         "secretRef": {
           "name": "github"
@@ -844,7 +844,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.11"
+          "name": "refs/heads/release-line-0.3.12"
         },
         "secretRef": {
           "name": "github"
