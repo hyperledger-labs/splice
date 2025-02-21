@@ -29,6 +29,8 @@ in pkgs.mkShell {
     getopt
     gh
     git
+    # Required for the runner-container-hooks submodule
+    git-lfs
     git-search-replace
     (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
     grpcurl
@@ -80,6 +82,8 @@ in pkgs.mkShell {
     python3Packages.requests_toolbelt
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
+    python3Packages.sphinxcontrib-openapi
+    python3Packages.sphinx-autobuild
     python3Packages.waitress
     python3.pkgs.sphinx-reredirects
     ripgrep
@@ -95,7 +99,6 @@ in pkgs.mkShell {
     toxiproxy
     unzip
     which
-    x86Pkgs.sphinx-autobuild
     zip
 
     # Package required to install daml studio

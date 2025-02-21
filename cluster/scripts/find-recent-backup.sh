@@ -119,17 +119,18 @@ function main() {
   local migration_id=$2
   local internal=$3
 
-  local is_sv=false
-  local full_instance="$namespace-validator-pg"
-  local expected_components="validator participant"
-  local stack
-  stack=$(get_stack_for_namespace_component "$namespace" "participant" "$internal")
-
   case "$namespace" in
       sv-1|sv-2|sv-3|sv-4)
           is_sv=true
           full_instance="$namespace-cn-apps-pg"
           expected_components="cn-apps sequencer participant mediator"
+          stack=$(get_stack_for_namespace_component "$namespace" "cn-apps" "$internal")
+          ;;
+      *)
+          is_sv=false
+          full_instance="$namespace-validator-pg"
+          expected_components="validator participant"
+          stack=$(get_stack_for_namespace_component "$namespace" "participant" "$internal")
           ;;
   esac
 
@@ -142,7 +143,7 @@ function main() {
     backup_run_id=$(latest_full_backup_run_id_gcloud "$namespace" "$migration_id" "$is_sv" "$expected_components" "$internal")
     echo "$backup_run_id"
   elif [ -z "$type" ]; then
-    _error "No postgres instance $full_instance found. Is the cluster deployed with split DB instances?"
+    _error "No postgres instance $full_instance found in stack ${stack}. Is the cluster deployed with split DB instances?"
   else
     _error "Unknown postgres type: $type"
   fi

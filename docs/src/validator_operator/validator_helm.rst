@@ -8,7 +8,7 @@
 Kubernetes-Based Deployment of a Validator node
 ===============================================
 
-This section describes how to deploy a standalone validator node in Kubernetes using Helm charts. The Helm charts deploy a validator node along with associated wallet and CNS UIs, and connect it to a target cluster.
+This section describes how to deploy a standalone validator node in Kubernetes using Helm charts. The Helm charts deploy a validator node along with associated wallet and CNS UIs, and connect it to a global synchronizer.
 
 .. _validator_prerequisites:
 
@@ -89,7 +89,7 @@ Ensure that your validator onboarding secret ``ONBOARDING_SECRET`` is set in the
 .. code-block:: bash
 
     kubectl create secret generic splice-app-validator-onboarding-validator \
-        "--from-literal=secret=${VALIDATOR_SECRET}" \
+        "--from-literal=secret=${ONBOARDING_SECRET}" \
         -n validator
 
 .. _helm-validator-auth:
@@ -158,8 +158,8 @@ Summing up, your OIDC provider setup must provide you with the following configu
 Name                    Value
 ----------------------- ---------------------------------------------------------------------------
 OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
-VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend
-VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend
+VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend.
+VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend.
 WALLET_UI_CLIENT_ID     The client id of your OIDC provider for the wallet UI.
 CNS_UI_CLIENT_ID        The client id of your OIDC provider for the CNS UI.
 ======================= ===========================================================================
@@ -250,8 +250,8 @@ OIDC_AUTHORITY_URL                 ``https://AUTH0_TENANT_NAME.us.auth0.com``
 OIDC_AUTHORITY_LEDGER_API_AUDIENCE The optional audience of your choice for Ledger API. e.g. ``https://ledger_api.example.com``
 VALIDATOR_CLIENT_ID                The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET            The client secret of the Auth0 app for the validator app backend
-WALLET_UI_CLIENT_ID                The client id of the Auth0 app for the wallet UI.
-CNS_UI_CLIENT_ID                   The client id of the Auth0 app for the CNS UI.
+WALLET_UI_CLIENT_ID                The client id of the Auth0 app for the wallet UI
+CNS_UI_CLIENT_ID                   The client id of the Auth0 app for the CNS UI
 ================================== ===========================================================================
 
 The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
@@ -262,8 +262,8 @@ You can obtain the client ID and secret of each Auth0 app from the settings page
 Configuring Authentication on your Validator
 ++++++++++++++++++++++++++++++++++++++++++++
 
-We are now going to configure your Validator node software based on the OIDC provider configuration values your exported to environment variables at the end of either :ref:`helm-validator-auth-requirements` or :ref:`helm-validator-auth0`.
-(Note that some authentication-related configuration steps are also included in :ref:`helm-validator-install`.)
+We are now going to configure your Validator node software based on the OIDC provider configuration values you exported to environment variables at the end of either :ref:`helm-validator-auth-requirements` or :ref:`helm-validator-auth0`.
+(Note that some authentication-related configuration steps are also included in :ref:`helm-validator-install`)
 
 The validator app backend requires the following secret.
 
@@ -316,11 +316,11 @@ If you are using the provided postgres helm chart, modify ``splice-node/examples
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-participant-values.yaml`` as follows:
 
-- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on the network you are connecting to (devnet/testnet/mainnet).
 
 To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-- Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, e.g., ``https://scan.sv-1.TARGET_CLUSTER.global.canton.network.sync.global``
+- Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|
   (This Scan instance will be used for obtaining additional Scan URLs for BFT Scan reads.)
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, set the ``audience`` field in the `splice-app-validator-ledger-api-auth` k8s secret with the audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
@@ -328,7 +328,7 @@ To configure the validator app, please modify the file ``splice-node/examples/sv
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-If you want to configure to only connect to a single trusted scan at ``TRUSTED_SCAN_URL`` but not obtaining additional Scan URLs for BFT Scan reads,
+If you want to only connect to a single trusted scan at ``TRUSTED_SCAN_URL`` but not obtain additional Scan URLs for BFT Scan reads,
 you can uncomment the following and set ``nonSvValidatorTrustSingleScan`` to ``true``.
 This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
 
@@ -337,9 +337,9 @@ This does mean that you depend on that single SV and if it is broken or maliciou
     :start-after: TRUSTED_SINGLE_SCAN_START
     :end-before: TRUSTED_SINGLE_SCAN_END
 
-If you want to configure to connect to the decentralized synchronizer via only a single trusted sequencer,
+If you want to connect to the decentralized synchronizer via only a single trusted sequencer,
 you can uncomment the following and set ``useSequencerConnectionsFromScan`` to ``false``. Also replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer,
-e.g., ``https://sequencer-MIGRATION_ID.sv-1.TARGET_CLUSTER.global.canton.network.sync.global``.
+e.g., |gsf_sequencer_url| for the sequencer operated by the GSF.
 This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
@@ -349,7 +349,7 @@ This does mean that you depend on that single SV and if it is broken or maliciou
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` as follows:
 
-- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on the network you are connecting to.
 - Replace ``SPONSOR_SV_URL`` with the URL of the SV that provided you your secret.
 - Replace ``YOUR_VALIDATOR_PARTY_HINT`` with the desired name for your
   validator operator party. It must be of the format
@@ -428,7 +428,7 @@ Services               Port         Routes
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of a Validator node ingress, we have
-provided a Helm chart that configures the above cluster according to the routes above, as detailed in the sections below.
+provided a Helm chart that configures ingress according to the routes above using Istio, as detailed in the sections below.
 
 
 Requirements
@@ -543,38 +543,22 @@ Once logged in one should see the transactions page.
 
 .. _helm_validator_testnet_cc_grant:
 
-(TestNet-only) Granting coin to the validator for traffic purchases
--------------------------------------------------------------------
+Granting coin to the validator for traffic purchases
+----------------------------------------------------
 
-On TestNet, your validator party will need an initial coin grant to be able to purchase traffic.
+On DevNet, your validator will automatically tap enough coin to purchase traffic.
+However, on TestNet and MainNet, your validator party will need an initial coin grant to be able to purchase traffic.
 After logging into the wallet UI in the previous section, note that the party ID is displayed in
 the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b7369e027544927703efcdf0f03cb15bd26ac53c784c627b63bdf8f041``).
 
 An SV (say your sponsor) will need to transfer coin to this party. They can do this through their wallet UI.
 
 .. todo::
-    * applies both to TestNet and MainNet
     * show error message that people will see while the traffic purchase fails due to insufficient funds;
       it is currentlye here: :ref:`error-insufficient-funds`
     * link to the option to disable automatic top-ups, and call out the option of using third-party traffic providers
     * explain liveness rewards being an alternative
 
-
-
-.. _helm-validator-ans-web-ui:
-
-Logging into the CNS UI
------------------------------
-
-You can open your browser at
-https://cns.validator.YOUR_HOSTNAME and login using the
-credentials for the user that you configured as
-``validatorWalletUser`` earlier. You will be able to register a name on the
-Canton Name Service.
-
-.. image:: images/ans_home.png
-  :width: 600
-  :alt: After logged in into the CNS UI
 
 
 Configuring automatic traffic purchases
@@ -622,6 +606,23 @@ Whenever the validator receives a transfer offer from `<senderPartyID>` to `<rec
 it will automatically accept it. Similarly to sweeps, party IDs must be known in order to
 apply this configuration.
 
+
+.. _helm-validator-ans-web-ui:
+
+Logging into the CNS UI
+-----------------------------
+
+You can open your browser at
+https://cns.validator.YOUR_HOSTNAME and login using the
+credentials for the user that you configured as
+``validatorWalletUser`` earlier. You will be able to register a name on the
+Canton Name Service.
+
+.. image:: images/ans_home.png
+  :width: 600
+  :alt: After logged in into the CNS UI
+
+
 .. _validator_participant_pruning:
 
 Participant Pruning
@@ -632,7 +633,7 @@ across :ref:`major upgrades <validator-upgrades>` though). However, this leads t
 gradually growing databases and can slow down certain queries, in
 particular, queries for the active contract set on the ledger API.
 
-To mitigate that it is possible to disable participant pruning which
+To mitigate that, it is possible to enable participant pruning which
 will remove all history beyond a specified retention point and only
 preserve the active contract set.
 
@@ -643,6 +644,17 @@ history in your wallet will never be pruned.
 Below you can see an example of the pruning config that you need to
 add to ``validator-values.yaml`` to retain only the history for the
 last 48h.
+
+Note that if your node is down for longer than the pruning
+window (48 hours in the example above), your node will most probably get corrupted,
+as the apps race catching up with the participant's attempts to keep pruning.
+It is therefore advisable to set the pruning window to a value that you are
+comfortable with in terms of guaranteeing uptime of your node. Setting it to
+30 days is in general a reasonable choice, as the sequencers currently are also
+pruned after 30 days, so you will not be able to catch up with the network after
+a longer downtime anyway (see :ref:`Disaster Recovery <validator_dr>` for disaster
+recovery guidelines).
+
 
 Refer to the Canton documentation for more details on participant pruning:
 

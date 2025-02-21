@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy
 
 import org.lfdecentralizedtrust.splice.config.{SpliceConfig, ParticipantClientConfig}
+import org.lfdecentralizedtrust.splice.sv.config.SvParticipantClientConfig
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
@@ -35,20 +36,35 @@ case class UseToxiproxy(
     proxies += (name -> proxy)
   }
 
+  def addLedgerApiProxy(
+      instanceName: String,
+      participantClient: SvParticipantClientConfig,
+      extraPortBump: Int,
+  ): SvParticipantClientConfig = {
+    val bump = portBump + extraPortBump
+    val lapiHost = participantClient.ledgerApi.clientConfig.address
+    val lapiPort = participantClient.ledgerApi.clientConfig.port
+    val upstream = s"${lapiHost}:${lapiPort}"
+    val listenPort = lapiPort + bump
+    addProxy(s"${instanceName}-ledger-api", s"localhost:${listenPort}", upstream)
+    participantClient.focus(_.ledgerApi.clientConfig).modify(c => c.copy(port = c.port + bump))
+  }
+
+  def addLedgerApiProxy(
+      instanceName: String,
+      participantClient: ParticipantClientConfig,
+      extraPortBump: Int,
+  ): ParticipantClientConfig = {
+    val bump = portBump + extraPortBump
+    val lapiHost = participantClient.ledgerApi.clientConfig.address
+    val lapiPort = participantClient.ledgerApi.clientConfig.port
+    val upstream = s"${lapiHost}:${lapiPort}"
+    val listenPort = lapiPort + bump
+    addProxy(s"${instanceName}-ledger-api", s"localhost:${listenPort}", upstream)
+    participantClient.focus(_.ledgerApi.clientConfig).modify(c => c.copy(port = c.port + bump))
+  }
+
   override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
-    def addLedgerApiProxy(
-        instanceName: String,
-        participantClient: ParticipantClientConfig,
-        extraPortBump: Int,
-    ): ParticipantClientConfig = {
-      val bump = portBump + extraPortBump
-      val lapiHost = participantClient.ledgerApi.clientConfig.address
-      val lapiPort = participantClient.ledgerApi.clientConfig.port
-      val upstream = s"${lapiHost}:${lapiPort}"
-      val listenPort = lapiPort + bump
-      addProxy(s"${instanceName}-ledger-api", s"localhost:${listenPort}", upstream)
-      participantClient.focus(_.ledgerApi.clientConfig).modify(c => c.copy(port = c.port + bump))
-    }
 
     def addScanAppHttpProxy(
         instanceName: String,

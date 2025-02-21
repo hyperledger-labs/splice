@@ -2,6 +2,7 @@
   "name": "sv-runbook",
   "main": "src/index.ts",
   "devDependencies": {
+    "@types/node-fetch": "^2.6.12",
     "@types/sinon": "^10.0.15",
     "sinon": "^15.0.4"
   },
@@ -18,6 +19,8 @@
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
-    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
+    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts",
+    "up": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiUp.ts",
+    "down": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiDown.ts"
   }
 }

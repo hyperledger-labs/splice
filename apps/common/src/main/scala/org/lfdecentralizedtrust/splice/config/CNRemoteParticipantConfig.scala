@@ -7,14 +7,9 @@ import org.apache.pekko.actor.ActorSystem
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
 
-/** Configuration to connect the console to a participant running remotely.
-  *
-  * @param adminApi the configuration to connect the console to the remote admin api
-  * @param ledgerApi the configuration to connect the console to the remote ledger api
-  */
-case class ParticipantClientConfig(
-    adminApi: ClientConfig,
-    ledgerApi: LedgerApiClientConfig,
+abstract class BaseParticipantClientConfig(
+    val adminApi: ClientConfig,
+    val ledgerApi: LedgerApiClientConfig,
 ) extends BaseParticipantConfig {
   override def clientAdminApi: ClientConfig = adminApi
   override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig
@@ -27,3 +22,13 @@ case class ParticipantClientConfig(
   def participantClientConfigWithAdminToken: RemoteParticipantConfig =
     RemoteParticipantConfig(adminApi, ledgerApi.clientConfig, ledgerApi.authConfig.adminToken)
 }
+
+/** Configuration to connect the console to a participant running remotely.
+  *
+  * @param adminApi the configuration to connect the console to the remote admin api
+  * @param ledgerApi the configuration to connect the console to the remote ledger api
+  */
+case class ParticipantClientConfig(
+    override val adminApi: ClientConfig,
+    override val ledgerApi: LedgerApiClientConfig,
+) extends BaseParticipantClientConfig(adminApi, ledgerApi)

@@ -8,6 +8,29 @@
 Release Notes
 =============
 
+0.3.12
+------
+
+* Docs
+
+  * Add :ref:`SV pruning <sv-pruning>` section.
+  * Add historical :ref:`backups <sv_backups>` section to the SV docs.
+  * Add historical :ref:`backups <validator-backups>` section to the Validator docs.
+
+* Performance
+
+  * Updated table definitions in Scan to improve performance of ``/transactions`` and ``/activities`` endpoints.
+    This requires a SQL migration that will run on app startup for ~15m on devnet and ~2m on mainnet according to our tests.
+
+* Deployment
+
+  * Add OCI annotations to provide standardized information attached to a Docker image. Details provided are image name, image version,
+    creation date, base image, repository, and commit hash.
+  * Fix an issue in the SV helm chart where the resource section was omitted if ``attachPvc`` was set to ``false``.
+    See https://github.com/digital-asset/decentralized-canton-sync/issues/299
+  * Add a new ``serviceAccountName`` value to all Splice Helm charts to allow specifying a custom service account for deployed pods.
+  * Increased the size of the caches and the mempool for CometBFT in an effort to try to improve it's performance under load
+
 0.3.11
 ------
 

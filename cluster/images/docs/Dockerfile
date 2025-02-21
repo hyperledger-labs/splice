@@ -7,6 +7,8 @@ FROM splice-app:${base_version}
 FROM nginx:stable
 ARG version
 
+LABEL org.opencontainers.image.base.name="nginx:stable"
+
 COPY --from=0 app/splice-node/docs/html /usr/share/nginx/html/
 COPY --from=0 app/LICENSE .
 COPY script.js /tmpl/script.js.tmpl

@@ -15,10 +15,9 @@
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
     "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts",
-    "preview": "ts-node ./pulumiPreview.ts",
-    "down": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiDown.ts",
-    "up": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiUp.ts",
-    "cancel": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiCancel.ts"
+    "preview": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiPreview.ts",
+    "down": "PULUMI_CONFIG_PASSPHRASE= ts-node ./runPulumiDown.ts",
+    "up": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiUp.ts"
   },
   "devDependencies": {
     "@types/sinon": "^10.0.15",

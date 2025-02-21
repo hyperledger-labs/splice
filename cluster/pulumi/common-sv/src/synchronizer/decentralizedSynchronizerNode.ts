@@ -100,11 +100,14 @@ abstract class InStackDecentralizedSynchronizerNode
     active: boolean,
     logLevel: LogLevel,
     driver: { type: 'cometbft'; host: Output<string>; port: number } | { type: 'cantonbft' },
+    version: CnChartVersion,
+    imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
     const sanitizedName = sanitizedForPostgres(this.name);
     const mediatorDbName = `${sanitizedName}_mediator`;
     const sequencerDbName = `${sanitizedName}_sequencer`;
+    this.version = version;
 
     const decentralizedSynchronizerValues: ChartValues = loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
@@ -160,6 +163,7 @@ abstract class InStackDecentralizedSynchronizerNode
                 volumeStorageClass: 'standard-rwo',
               }
             : undefined,
+          serviceAccountName: imagePullServiceAccountName,
         },
       },
       this.version,
@@ -223,6 +227,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
     onboardingName: string,
     logLevel: LogLevel,
     version: CnChartVersion,
+    imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
     super(migrationId, xns, version);
@@ -237,6 +242,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       version,
       cometbft.enableStateSync,
       cometbft.enableTimeoutCommit,
+      imagePullServiceAccountName,
       {
         ...opts,
         parent: this,
@@ -254,6 +260,8 @@ export class InStackCometBftDecentralizedSynchronizerNode
         host: pulumi.interpolate`${cometbftRelease.rpcServiceName}.${xns.logicalName}.svc.cluster.local`,
         port: 26657,
       },
+      version,
+      imagePullServiceAccountName,
       opts
     );
   }
@@ -271,6 +279,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
     active: boolean,
     logLevel: LogLevel,
     version: CnChartVersion,
+    imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
     super(migrationId, xns, version);
@@ -281,6 +290,8 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       {
         type: 'cantonbft',
       },
+      version,
+      imagePullServiceAccountName,
       opts
     );
   }

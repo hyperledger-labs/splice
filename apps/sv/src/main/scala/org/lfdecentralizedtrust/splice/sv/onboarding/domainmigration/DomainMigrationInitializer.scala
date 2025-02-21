@@ -445,6 +445,7 @@ class DomainMigrationInitializer(
                 .initialize(
                   synchronizerId,
                   localSynchronizerNode.sequencerConnection,
+                  localSynchronizerNode.mediatorSequencerAmplification,
                 ),
               logger,
             )

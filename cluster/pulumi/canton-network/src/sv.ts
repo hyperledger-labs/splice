@@ -99,20 +99,6 @@ export function installSvKeySecret(
   ];
 }
 
-export type SvOnboarding =
-  | { type: 'domain-migration' }
-  | {
-      type: 'found-dso';
-      sv1SvRewardWeightBps: number;
-      roundZeroDuration?: string;
-    }
-  | {
-      type: 'join-with-key';
-      keys: CnInput<SvIdKey>;
-      sponsorRelease: pulumi.Resource;
-      sponsorApiUrl: string;
-    };
-
 export type InstalledSv = {
   validatorApp: Resource;
   svApp: InstalledHelmChart;

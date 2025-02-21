@@ -995,7 +995,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-1",
+    "name": "k8s-imgpull-sv-1-sv-canton-migration-2",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1005,7 +1005,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-1",
+    "name": "k8s-imgpull-sv-1-sv-canton-migration-3",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1015,7 +1015,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-1",
+    "name": "k8s-imgpull-sv-1-sv-canton-migration-4",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1025,7 +1025,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-2",
+    "name": "k8s-imgpull-sv-2-sv-canton-migration-2",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1035,7 +1035,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-2",
+    "name": "k8s-imgpull-sv-2-sv-canton-migration-3",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1045,7 +1045,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-2",
+    "name": "k8s-imgpull-sv-2-sv-canton-migration-4",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1055,7 +1055,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-3",
+    "name": "k8s-imgpull-sv-3-sv-canton-migration-2",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1065,7 +1065,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-3",
+    "name": "k8s-imgpull-sv-3-sv-canton-migration-3",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1075,7 +1075,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-3",
+    "name": "k8s-imgpull-sv-3-sv-canton-migration-4",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1085,7 +1085,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-4",
+    "name": "k8s-imgpull-sv-4-sv-canton-migration-2",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1095,7 +1095,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-4",
+    "name": "k8s-imgpull-sv-4-sv-canton-migration-3",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1105,7 +1105,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-4",
+    "name": "k8s-imgpull-sv-4-sv-canton-migration-4",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1115,7 +1115,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv",
+    "name": "k8s-imgpull-sv-sv-canton-migration-2",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1125,7 +1125,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv",
+    "name": "k8s-imgpull-sv-sv-canton-migration-3",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1135,7 +1135,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv",
+    "name": "k8s-imgpull-sv-sv-canton-migration-4",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -1226,6 +1226,7 @@
         },
         "nodeName": "Digital-Asset-2",
         "peers": [],
+        "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
@@ -1341,141 +1342,6 @@
     "type": "gcp:sql/database:Database"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-1"
-      }
-    },
-    "name": "sv-1-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-1"
-      }
-    },
-    "name": "sv-1-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-1"
-      }
-    },
-    "name": "sv-1-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-1-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-1-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-1-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -1554,6 +1420,7 @@
             "secretName": "sequencer-4-pg-secrets"
           }
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2003,6 +1870,7 @@
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2205,6 +2073,132 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-2-docker-reg-cred",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-1-sv-canton-migration-2-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-2-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-1"
+      }
+    },
+    "name": "sv-1-sv-canton-migration-2",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-sv-canton-migration-2::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-3-docker-reg-cred",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-1-sv-canton-migration-3-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-3-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-1"
+      }
+    },
+    "name": "sv-1-sv-canton-migration-3",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-sv-canton-migration-3::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-4-docker-reg-cred",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-1-sv-canton-migration-4-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-4-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-1"
+      }
+    },
+    "name": "sv-1-sv-canton-migration-4",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-sv-canton-migration-4::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
         "labels": {
@@ -2347,6 +2341,7 @@
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
+        "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
@@ -2462,141 +2457,6 @@
     "type": "gcp:sql/database:Database"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-2"
-      }
-    },
-    "name": "sv-2-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-2"
-      }
-    },
-    "name": "sv-2-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-2"
-      }
-    },
-    "name": "sv-2-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-2"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-2-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-2"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-2-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-2"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-2-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -2675,6 +2535,7 @@
             "secretName": "sequencer-4-pg-secrets"
           }
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3124,6 +2985,7 @@
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3326,6 +3188,132 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-2-docker-reg-cred",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-2-sv-canton-migration-2-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-2-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-2"
+      }
+    },
+    "name": "sv-2-sv-canton-migration-2",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2-sv-canton-migration-2::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-3-docker-reg-cred",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-2-sv-canton-migration-3-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-3-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-2"
+      }
+    },
+    "name": "sv-2-sv-canton-migration-3",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2-sv-canton-migration-3::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-4-docker-reg-cred",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-2-sv-canton-migration-4-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-4-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-2"
+      }
+    },
+    "name": "sv-2-sv-canton-migration-4",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2-sv-canton-migration-4::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
         "labels": {
@@ -3468,6 +3456,7 @@
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
+        "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
@@ -3583,141 +3572,6 @@
     "type": "gcp:sql/database:Database"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-3"
-      }
-    },
-    "name": "sv-3-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-3"
-      }
-    },
-    "name": "sv-3-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-3"
-      }
-    },
-    "name": "sv-3-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-3"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-3-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-3"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-3-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-3"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-3-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -3796,6 +3650,7 @@
             "secretName": "sequencer-4-pg-secrets"
           }
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -4245,6 +4100,7 @@
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -4447,6 +4303,132 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-2-docker-reg-cred",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-3-sv-canton-migration-2-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-2-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-3"
+      }
+    },
+    "name": "sv-3-sv-canton-migration-2",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3-sv-canton-migration-2::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-3-docker-reg-cred",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-3-sv-canton-migration-3-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-3-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-3"
+      }
+    },
+    "name": "sv-3-sv-canton-migration-3",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3-sv-canton-migration-3::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-4-docker-reg-cred",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-3-sv-canton-migration-4-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-4-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-3"
+      }
+    },
+    "name": "sv-3-sv-canton-migration-4",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3-sv-canton-migration-4::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
         "labels": {
@@ -4589,6 +4571,7 @@
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
         ],
+        "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
@@ -4704,141 +4687,6 @@
     "type": "gcp:sql/database:Database"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-4"
-      }
-    },
-    "name": "sv-4-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-4"
-      }
-    },
-    "name": "sv-4-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv-4"
-      }
-    },
-    "name": "sv-4-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-4"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-4-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-4"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-4-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv-4"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-4-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -4917,6 +4765,7 @@
             "secretName": "sequencer-4-pg-secrets"
           }
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -5366,6 +5215,7 @@
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -5568,17 +5418,126 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
-      "kind": "Namespace",
+      "kind": "Secret",
       "metadata": {
-        "labels": {
-          "istio-injection": "enabled"
-        },
-        "name": "sv-4"
+        "name": "sv-canton-migration-2-docker-reg-cred",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-4-sv-canton-migration-2-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-2-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-4"
       }
     },
-    "name": "sv-4",
+    "name": "sv-4-sv-canton-migration-2",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4-sv-canton-migration-2::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-3-docker-reg-cred",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-4-sv-canton-migration-3-docker-reg-cred",
     "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-3-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-4"
+      }
+    },
+    "name": "sv-4-sv-canton-migration-3",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4-sv-canton-migration-3::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-4-docker-reg-cred",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-4-sv-canton-migration-4-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-4-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-4"
+      }
+    },
+    "name": "sv-4-sv-canton-migration-4",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4-sv-canton-migration-4::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
     "custom": true,
@@ -5613,6 +5572,248 @@
     "name": "sv-4",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
+        "name": "sv-4"
+      }
+    },
+    "name": "sv-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-1"
+      }
+    },
+    "name": "sv-canton-migration-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-2"
+      }
+    },
+    "name": "sv-canton-migration-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-3"
+      }
+    },
+    "name": "sv-canton-migration-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv-4"
+      }
+    },
+    "name": "sv-canton-migration-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv"
+      }
+    },
+    "name": "sv-canton-migration-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-1"
+      }
+    },
+    "name": "sv-canton-migration-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-2"
+      }
+    },
+    "name": "sv-canton-migration-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-3"
+      }
+    },
+    "name": "sv-canton-migration-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv-4"
+      }
+    },
+    "name": "sv-canton-migration-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv"
+      }
+    },
+    "name": "sv-canton-migration-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-1"
+      }
+    },
+    "name": "sv-canton-migration-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-2"
+      }
+    },
+    "name": "sv-canton-migration-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-3"
+      }
+    },
+    "name": "sv-canton-migration-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv-4"
+      }
+    },
+    "name": "sv-canton-migration-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv"
+      }
+    },
+    "name": "sv-canton-migration-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
   },
   {
     "custom": true,
@@ -5695,6 +5896,7 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "peers": [],
+        "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
@@ -5810,141 +6012,6 @@
     "type": "gcp:sql/database:Database"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv"
-      }
-    },
-    "name": "sv-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv"
-      }
-    },
-    "name": "sv-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "sv"
-      }
-    },
-    "name": "sv-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
-        "name": "docker-reg-cred",
-        "namespace": "sv"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -6023,6 +6090,7 @@
             "secretName": "sequencer-4-pg-secrets"
           }
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -6472,6 +6540,7 @@
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
         },
+        "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -6668,6 +6737,132 @@
     "name": "sv-sequencer-4-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-2-docker-reg-cred",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-sv-canton-migration-2-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-2-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-2",
+        "namespace": "sv"
+      }
+    },
+    "name": "sv-sv-canton-migration-2",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-sv-canton-migration-2::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-3-docker-reg-cred",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-sv-canton-migration-3-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-3-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-3",
+        "namespace": "sv"
+      }
+    },
+    "name": "sv-sv-canton-migration-3",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-sv-canton-migration-3::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "sv-canton-migration-4-docker-reg-cred",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "sv-sv-canton-migration-4-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "sv-canton-migration-4-docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton-migration-4",
+        "namespace": "sv"
+      }
+    },
+    "name": "sv-sv-canton-migration-4",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-sv-canton-migration-4::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
     "custom": true,

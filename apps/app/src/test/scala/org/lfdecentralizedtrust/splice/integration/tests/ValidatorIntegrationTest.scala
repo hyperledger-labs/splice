@@ -129,7 +129,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
       sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
-        NonNegativeFiniteDuration.ofSeconds(10),
+        NonNegativeFiniteDuration.ofSeconds(5),
       )
     }
   }

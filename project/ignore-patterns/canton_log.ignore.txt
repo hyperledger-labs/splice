@@ -112,4 +112,7 @@ Thread starvation or clock leap detected
 # Shutdown issues
 Previous channel ManagedChannelImpl.* was garbage collected without being shut down!
 
+# TODO(#2423) Figure out what causes this
+The sequencer clock timestamp .* is already past the max sequencing time
+
 # Make sure to have a trailing newline

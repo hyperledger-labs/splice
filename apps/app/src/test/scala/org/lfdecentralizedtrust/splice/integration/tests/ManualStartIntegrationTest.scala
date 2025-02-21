@@ -1,12 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.PositiveDurationSeconds
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.{
   MediatorId,
   Member,
@@ -170,6 +173,49 @@ class ManualStartIntegrationTest
               PositiveDurationSeconds.tryFromDuration(30.hours),
             )
           )
+        }
+
+        clue("SV1 and SV2 have configured amplification on the mediator sequencer connection") {
+          Seq(
+            mediatorAdminConnection("sv1", sv1Backend.config),
+            mediatorAdminConnection("sv2", sv2Backend.config),
+          ).map { mediatorConnection =>
+            val sequencerConnections =
+              mediatorConnection
+                .getSequencerConnections()
+                .futureValue
+                .value
+            sequencerConnections.connections.size shouldBe 1
+            sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
+            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+              PositiveInt.tryCreate(5),
+              NonNegativeFiniteDuration.ofSeconds(5),
+            )
+            // otherwise we get log warnings
+            mediatorConnection.close()
+          }
+        }
+
+        clue("SV1 and SV2 have configured amplification on the participant sequencer connection") {
+          Seq(
+            participantAdminConnection("sv1", sv1Backend.config),
+            participantAdminConnection("sv2", sv2Backend.config),
+          ).map { participantConnection =>
+            val sequencerConnections =
+              participantConnection
+                .lookupSynchronizerConnectionConfig(SynchronizerAlias.tryCreate("global"))
+                .futureValue
+                .value
+                .sequencerConnections
+            sequencerConnections.connections.size shouldBe 1
+            sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
+            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+              PositiveInt.tryCreate(5),
+              NonNegativeFiniteDuration.ofSeconds(5),
+            )
+            // otherwise we get log warnings
+            participantConnection.close()
+          }
         }
 
         // A most basic check to see whether the network is functional

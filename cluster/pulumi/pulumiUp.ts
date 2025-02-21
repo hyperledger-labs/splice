@@ -1,40 +1,48 @@
-import * as automation from '@pulumi/pulumi/automation';
+import { DeploySvRunbook } from 'splice-pulumi-common';
 import {
-  mustInstallValidator1,
   mustInstallSplitwell,
+  mustInstallValidator1,
 } from 'splice-pulumi-common-validator/src/validators';
+import { runSvCantonForAllMigrations } from 'sv-canton-pulumi-deployment/pulumi';
 
-import {
-  awaitAllOrThrowAllExceptions,
-  operation,
-  Operation,
-  PulumiAbortController,
-  stack,
-  upStack,
-} from './pulumi';
+import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
+import { upOperation, upStack } from './pulumiOperations';
 
-async function runCoreStacksUp() {
+const abortController = new PulumiAbortController();
+
+async function runAllStacksUp() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
-  const operations: Operation[] = [];
-  const abortController = new PulumiAbortController();
-  await upStack(mainStack, abortController).then(async () => {
-    if (mustInstallValidator1) {
-      const validator1 = await stack('validator1', 'validator1', true, {});
-      operations.push(upOperation(validator1, abortController));
-    }
-    if (mustInstallSplitwell) {
-      const splitwell = await stack('splitwell', 'splitwell', true, {});
-      operations.push(upOperation(splitwell, abortController));
-    }
-    await awaitAllOrThrowAllExceptions(operations);
+  let operations: Operation[] = [];
+  const mainStackUp = upStack(mainStack, abortController);
+  operations.push({
+    name: 'canton-network',
+    promise: mainStackUp,
   });
+  if (DeploySvRunbook) {
+    const svRunbook = await stack('sv-runbook', 'sv-runbook', true, {});
+    const svRunbookUp = upOperation(svRunbook, abortController);
+    operations.push(svRunbookUp);
+  }
+  const cantonStacks = runSvCantonForAllMigrations(
+    'up',
+    stack => {
+      return upStack(stack, abortController);
+    },
+    false
+  );
+  operations = operations.concat(cantonStacks);
+  if (mustInstallValidator1) {
+    const validator1 = await stack('validator1', 'validator1', true, {});
+    operations.push(upOperation(validator1, abortController));
+  }
+  if (mustInstallSplitwell) {
+    const splitwell = await stack('splitwell', 'splitwell', true, {});
+    operations.push(upOperation(splitwell, abortController));
+  }
+  return awaitAllOrThrowAllExceptions(operations);
 }
 
-function upOperation(stack: automation.Stack, abortController: PulumiAbortController): Operation {
-  return operation(`up-${stack.name}`, upStack(stack, abortController));
-}
-
-runCoreStacksUp().catch(e => {
-  console.error(e);
+runAllStacksUp().catch(() => {
+  console.error('Failed to run up');
   process.exit(1);
 });

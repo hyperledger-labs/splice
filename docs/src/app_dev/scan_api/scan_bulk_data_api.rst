@@ -39,7 +39,7 @@ Since the API exposes the underlying Daml transactions directly, there are a cou
   This means that you get direct access to all information in the transactions, and you need to familiarize yourself
   with the Daml code that underlies these events.
   Please see `Reference Documentation`_ for a refresher on how the Ledger changes through actions grouped in transactions,
-  and how UTXO contract states are created, spent (exercised) and archived in general. We'll discuss the specifics of the Daml models in more detail in the `Scan TxLog Script`_ section.
+  and how UTXO contract states are created, exercised and archived in general. We'll discuss the specifics of the Daml models in more detail in the `Scan TxLog Script`_ section.
 
 * The events need to be parsed in a flexible manner. Choices and optional fields can be added over time, and new templates and data types can be introduced.
   A parser should be able to ignore these kinds of changes, and not fail when they occur.
@@ -54,9 +54,26 @@ Since the API exposes the underlying Daml transactions directly, there are a cou
 
 Open API Specification
 ----------------------
-Please see the Scan `Open API specification <https://github.com/hyperledger-labs/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan-internal.yaml>`_.
-Look for APIs starting with `/v1/updates/ <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L511>`_
-and `/v0/state/ <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L603>`_, respectively for updates and ACS snapshots.
+The :ref:`scan_openapi` describes the Scan API in detail.
+The below table provides a quick overview of the endpoints that the Scan Bulk Data API consists of:
+
+.. list-table::
+   :widths: 10 30
+   :header-rows: 1
+
+   * - Endpoint
+     - Description
+   * - `POST /v1/updates <scan_openapi.html#post--v1-updates>`_
+     - Returns the update history
+   * - `GET /v0/updates/\{update_id\} <scan_openapi.html#get--v0-updates-update_id>`_
+     - Returns the update with the given update_id
+   * - `GET /v0/state/acs/snapshot-timestamp <scan_openapi.html#get--v0-state-acs-snapshot-timestamp>`_
+     - Returns the timestamp of the most recent snapshot
+   * - `POST /v0/state/acs <scan_openapi.html#post--v0-state-acs>`_
+     - Returns the ACS Snapshot for a given record time
+
+If you would rather read the yaml Open API specification file directly, this can be found in the Splice repository at
+`scan-internal.yaml <https://github.com/hyperledger-labs/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan-internal.yaml>`_.
 
 Example URLs for accessing the Scan Bulk Data API are:
 
@@ -76,13 +93,11 @@ An update can be one of two things:
   They will begin to appear in the update stream as the global synchronizer introduces rolling upgrades later in 2025 or early 2026;
   for this reason we'll omit further details for now, you can safely ignore reassignments and only handle transactions.
 
-`/v1/updates <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L511>`_
+`/v1/updates <scan_openapi.html#post--v1-updates>`_
 provides a JSON encoded version of the recorded update history. Once you have an ``update_id`` for a specific update, you can retrieve the details by using
-`/v1/updates/{update_id} <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L571>`_.
+`/v0/updates/\{update_id\} <scan_openapi.html#get--v0-updates-update_id>`_.
 
-The Open API spec for `/v1/updates <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L511>`_
-and `/v1/updates/{update_id} <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L571>`_
-describe the APIs in detail.
+.. _v1_updates:
 
 POST /v1/updates
 ^^^^^^^^^^^^^^^^
@@ -120,9 +135,10 @@ The response returns a list of transactions. Every transaction contains the foll
   or by using the ``/v0/dso-sequencers`` API at |gsf_scan_url|/api/scan/v0/dso-sequencers,
   which returns a ``migrationId`` per sequencer.
 * **synchronizer_id**: The instance ID of a Synchronizer (for example the ID of the Global Synchronizer).
-  When contract assignments migrate, they become unavailable for processing via the old instance of the synchronizer
+  When contracts get reassigned, they become unavailable for processing via the old instance of the synchronizer
   and become available via the new instance of the synchronizer.
-  Every contract is associated with a ``synchronizer_id``, which represents the (set of) synchronizer(s) it has been sequenced on.
+  Every contract is assigned to a ``synchronizer_id``, which represents the synchronizer that the stakeholders agreed
+  on to use for sequencing future transactions on this contract.
 * **update_id**: Uniquely identifies an update (globally unique across networks and synchronizers).
 * **record_time**: The time at which the update was sequenced.
   Within a given migration and synchronizer, the record time of updates is strictly monotonically increasing (and thus unique).
@@ -132,9 +148,9 @@ The response returns a list of transactions. Every transaction contains the foll
   To traverse the update tree, start with the ``root_event_ids`` in order, get event by ID from ``events_by_id``,
   traverse events in preorder, process ``child_event_ids`` recursively.
   Note: event ids are stored as a string of the format ``<update_id>:<event_index>``.
-  The event index is assigned locally by the participant, and different participants might assign different indices to the same event.
-  For this reason, the scan app creates common, deterministically computed event indices across all synchronizer nodes when
-  returning events through the scan API.
+  The event index exposed by scan is consistent cross all SVs for the same event.
+  Note that it differs from the event index that the ledger API exposes on an individual participant
+  as those can differ between different participants for the same event.
 * **events_by_id**: This object contains all events in the transaction update tree, indexed by their event ID.
 
 An example list of transactions response for the beginning of the network is shown below:
@@ -329,18 +345,29 @@ In general, processing the updates involves the following steps:
 ACS Snapshots
 ~~~~~~~~~~~~~
 
-The `Open API spec <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml>`_
-for `/v0/state/acs/snapshot-timestamp <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L603>`_
-and `/v0/state/acs <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L642>`_ describes the APIs in detail.
+The :ref:`scan_openapi` describes the relevant APIs for ACS Snapshots in detail, which are shown in the table below:
+
+.. list-table::
+   :widths: 10 30
+   :header-rows: 1
+
+   * - Endpoint
+     - Description
+   * - `GET /v0/state/acs/snapshot-timestamp <scan_openapi.html#get--v0-state-acs-snapshot-timestamp>`_
+     - Returns the timestamp of the most recent snapshot
+   * - `POST /v0/state/acs <scan_openapi.html#post--v0-state-acs>`_
+     - Returns the ACS Snapshot for a given record time
 
 The ACS snapshots are periodically taken and stored in the Scan App. This endpoint only provides the snapshots that have been periodically taken.
 You can compute the state at any point in time by starting from a periodic snapshot and
 then stream updates from the timestamp of that snapshot. We'll discuss this in more detail in the `Scan TxLog Script`_ section.
 
+.. _v0_state_acs_snapshot-timestamp:
+
 GET /v0/state/acs/snapshot-timestamp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The ``/v0/state/acs/snapshot-timestamp`` endpoint returns the timestamp of the most recent snapshot before the given date,
+The `/v0/state/acs/snapshot-timestamp <scan_openapi.html#get--v0-state-acs-snapshot-timestamp>`_ endpoint returns the timestamp of the most recent snapshot before the given date,
 for the given ``migration_id``. Specify ``migration_id = 0`` for the beginning of the network.
 The returned timestamp corresponds to the record time of the last transaction in the snapshot.
 
@@ -358,10 +385,12 @@ The response returns the timestamp of the most recent snapshot before the given 
      "record_time" : "2025-02-11T18:00:00Z"
    }
 
+.. _v0_state_acs:
+
 POST /v0/state/acs
 ^^^^^^^^^^^^^^^^^^
 
-The ``/v0/state/acs`` endpoint returns the ACS in creation date ascending order, paged, for a given migration id and record time.
+The `/v0/state/acs <scan_openapi.html#post--v0-state-acs>`_ endpoint returns the ACS in creation date ascending order, paged, for a given migration id and record time.
 Post an ``AcsRequest`` with a ``migration_id``, ``record_time`` and ``page_size`` to get a page of contracts.
 An optional ``templates`` field filters the ACS by a set of ``template_id``\ s.
 
@@ -420,6 +449,16 @@ An example response is shown below:
 
 The ``created_events`` object contains the created events in the ACS snapshot.
 A ``created_event`` is encoded exactly as explained in `Created Event`_.
+
+POST /v0/state/acs/force
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. note:: This is a **development environment only** endpoint, and is unavailable in production environments.
+
+During testing, the :ref:`last snapshot timestamp <v0_state_acs_snapshot-timestamp>` can be inconveniently old.
+A production app must be able to deal with this by using :ref:`v1_updates`, but an app's ability to deal with data in the snapshot is important too.
+Therefore, on properly-configured testing Scans, `/v0/state/acs/force <scan_openapi.html#post--v0-state-acs-force>`_ will cause Scan to immediately snapshot the ACS, returning the new snapshot time in the ``record_time`` property.
+But most environments will return an error, as this endpoint is disabled.
 
 Scan TxLog Script
 -----------------
@@ -534,7 +573,7 @@ If the ``exercised_event`` is consuming, the contract is removed from the ``acti
 
 .. note::
     To build up an ACS snapshot for any ``record_time``, first
-    get a periodic snapshot using the ``/v0/state/acs`` endpoint, store the ACS in a dictionary keyed by ``contract_id``
+    get a periodic snapshot using the `/v0/state/acs <scan_openapi.html#post--v0-state-acs>`_ endpoint, store the ACS in a dictionary keyed by ``contract_id``
     and then process the updates from the timestamp of that snapshot via the ``/v1/updates``, adding
     ``created_event``\ s to the dictionary under its ``contract_id`` key and
     remove the contract from the dictionary by ``contract_id`` if ``exercised_event``\ s are consuming.

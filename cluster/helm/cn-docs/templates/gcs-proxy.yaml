@@ -22,6 +22,7 @@ spec:
       labels:
         app: gcs-proxy
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
         - name: gcs-proxy
           image: "{{ .Values.imageRepo }}/gcs-proxy:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).gcs_proxy) }}"

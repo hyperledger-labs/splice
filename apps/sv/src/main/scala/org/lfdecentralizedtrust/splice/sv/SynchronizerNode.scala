@@ -7,6 +7,7 @@ import com.digitalasset.canton.networking.Endpoint
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvSequencerConfig}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 
 import java.time.Duration
 
@@ -16,6 +17,7 @@ abstract class SynchronizerNode(
     val sequencerExternalPublicUrl: String,
     val sequencerAvailabilityDelay: Duration,
     val sequencerConfig: SequencerConfig,
+    val mediatorSequencerAmplification: SubmissionRequestAmplification,
 ) {}
 
 sealed trait SequencerConfig {

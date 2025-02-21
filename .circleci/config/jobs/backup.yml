@@ -17,7 +17,7 @@ jobs:
         default: 3
       internal_stack:
         type: boolean
-        default: true
+        default: false
       checkout-branch:
         type: string
         default: "" # Default set to $CIRCLE_SHA1
@@ -136,7 +136,7 @@ jobs:
         type: string
       internal_stack:
         type: boolean
-        default: true
+        default: false
       silence_deployment_alerts:
         type: boolean
         default: false

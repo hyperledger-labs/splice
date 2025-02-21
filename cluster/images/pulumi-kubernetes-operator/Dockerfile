@@ -4,9 +4,10 @@
 # FROM https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/Dockerfile
 # used to control he underlyign pulumi version
 ARG pulumi_version
-
 FROM pulumi/pulumi:${pulumi_version}
 
+ARG pulumi_version
+LABEL org.opencontainers.image.base.name="pulumi/pulumi:${pulumi_version}"
 # TODO(tech-debt) Clean up workaround for broken k8s apt repo (`EXPKEYSIG 234654DA9A296436` error)
 RUN rm /etc/apt/sources.list.d/kubernetes.list
 

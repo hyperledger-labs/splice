@@ -8,14 +8,17 @@ import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   MediatorAdminCommands,
   MediatorAdministrationCommands,
+  SequencerConnectionAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{MediatorStatus, NodeStatus}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.sequencing.{
   SequencerConnection,
   SequencerConnectionValidation,
   SequencerConnections,
+  SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.topology.{SynchronizerId, MediatorId, NodeIdentity}
 import com.digitalasset.canton.tracing.TraceContext
@@ -55,11 +58,16 @@ class MediatorAdminConnection(
   def initialize(
       synchronizerId: SynchronizerId,
       sequencerConnection: SequencerConnection,
+      submissionRequestAmplification: SubmissionRequestAmplification,
   )(implicit traceContext: TraceContext): Future[Unit] =
     runCmd(
       MediatorAdministrationCommands.Initialize(
         synchronizerId,
-        SequencerConnections.single(sequencerConnection),
+        SequencerConnections.tryMany(
+          Seq(sequencerConnection),
+          PositiveInt.tryCreate(1),
+          submissionRequestAmplification,
+        ),
         SequencerConnectionValidation.ThresholdActive,
       )
     )
@@ -73,4 +81,28 @@ class MediatorAdminConnection(
       case NodeStatus.Success(_) => true
     }
   }
+
+  def getSequencerConnections()(implicit
+      traceContext: TraceContext
+  ): Future[Option[SequencerConnections]] =
+    runCmd(
+      SequencerConnectionAdminCommands.GetConnection()
+    )
+
+  def setSequencerConnection(
+      sequencerConnection: SequencerConnection,
+      submissionRequestAmplification: SubmissionRequestAmplification,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    runCmd(
+      SequencerConnectionAdminCommands.SetConnection(
+        SequencerConnections.tryMany(
+          Seq(sequencerConnection),
+          PositiveInt.tryCreate(1),
+          submissionRequestAmplification,
+        ),
+        SequencerConnectionValidation.ThresholdActive,
+      )
+    )
 }

@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { CHARTS_VERSION, CnChartVersion, parsedVersion } from '../artifacts';
 import { spliceEnvConfig } from './envConfig';
-import { config } from './index';
 
 export enum MigrationProvider {
   INTERNAL = 'internal',
@@ -14,14 +13,14 @@ export enum MigrationProvider {
 export const defaultActiveMigration = {
   id: 0,
   version: CHARTS_VERSION,
-  provider: MigrationProvider.INTERNAL,
+  provider: MigrationProvider.EXTERNAL,
   sequencer: {
     enableBftSequencer: false,
   },
 };
 
 // defined here to prevent cyclic dependency
-const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
+const artifactsRepository = spliceEnvConfig.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
 
 const migrationVersion = z
   .string()
@@ -44,7 +43,7 @@ export const MigrationInfoSchema = z
       .lt(10, 'Migration id must be less than or equal to 10 as we use in the cometbft ports.')
       .gte(0),
     version: migrationVersion,
-    provider: z.nativeEnum(MigrationProvider),
+    provider: z.nativeEnum(MigrationProvider).default(MigrationProvider.EXTERNAL),
     releaseReference: z.string().optional(),
     sequencer: z
       .object({

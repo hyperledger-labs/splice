@@ -14,7 +14,10 @@ import org.lfdecentralizedtrust.splice.auth.{
   AuthTokenSourceNone,
 }
 import org.lfdecentralizedtrust.splice.automation.AutomationService
-import org.lfdecentralizedtrust.splice.config.{ParticipantClientConfig, SharedSpliceAppParameters}
+import org.lfdecentralizedtrust.splice.config.{
+  BaseParticipantClientConfig,
+  SharedSpliceAppParameters,
+}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.util.{
   HasHealth,
@@ -66,7 +69,7 @@ import scala.util.control.NonFatal
 /** A running instance of a canton node. See Node for the subclass that provides the default initialization for most apps. */
 abstract class NodeBase[State <: AutoCloseable & HasHealth](
     serviceUser: String,
-    participantClient: ParticipantClientConfig,
+    participantClient: BaseParticipantClientConfig,
     parameters: SharedSpliceAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,

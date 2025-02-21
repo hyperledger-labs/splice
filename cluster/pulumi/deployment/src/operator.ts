@@ -23,7 +23,7 @@ const credentialsSecret = new k8s.core.v1.Secret('gke-credentials', {
   },
 });
 
-export const imagePullDeps = imagePullSecret(namespace, false, 'false');
+export const imagePullDeps = imagePullSecret(namespace);
 
 const secretName = (
   (imagePullDeps as pulumi.Resource[])

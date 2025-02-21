@@ -3,7 +3,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   exactNamespace,
-  imagePullSecret,
+  imagePullSecretWithNonDefaultServiceAccount,
   supportsSvRunbookReset,
 } from 'splice-pulumi-common';
 import {
@@ -31,10 +31,11 @@ export function installNode(
   const isFirstSv = nodeConfig.nodeName === sv1Config.nodeName;
   const isSvRunbook = nodeConfig.nodeName === svRunbookConfig.nodeName;
 
-  // namespace and image pull secret lifecycle managed by the main canton-network stack
+  // namespace lifecycle is managed by the main canton-network stack
   const xns = exactNamespace(nodeConfig.nodeName, true, true);
-  const imagePullDeps = imagePullSecret(xns, true);
 
+  const serviceAccountName = `sv-canton-migration-${migrationId}`;
+  const imagePullDeps = imagePullSecretWithNonDefaultServiceAccount(xns, serviceAccountName);
   return installCantonComponents(
     xns,
     migrationId,
@@ -70,6 +71,7 @@ export function installNode(
     },
     undefined,
     { dependsOn: imagePullDeps },
-    isSvRunbook ? supportsSvRunbookReset : undefined
+    isSvRunbook ? supportsSvRunbookReset : undefined,
+    serviceAccountName
   );
 }
