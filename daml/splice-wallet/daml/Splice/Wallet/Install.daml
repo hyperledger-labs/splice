@@ -409,7 +409,7 @@ template WalletAppInstall
           values = Map.fromList [
             -- For Amulet the registry URL needs to point to their local validator, so that the proper BFT reads are done.
             -- TODO (#17541): store that URL as part of the `WalletAppInstall` contract, so that it can be updated.
-            ("cnrc-1.global.sync/registryUrl", "https://user-validator-host/api/amulet-registry/")
+            ("tokenmetadatav1.org.lfdecentralizedtrust.splice/registryUrl", "https://user-validator-host/api/amulet-registry/")
             ]
 
     -- 2. fall back to enpdoints disclosed via ANS (if no user-specific one is available)

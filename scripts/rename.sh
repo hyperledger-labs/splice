@@ -1165,11 +1165,10 @@ function subcmd_cluster_ans_amulet() {
 
 subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml references'
 function subcmd_no_illegal_daml_references() {
-    # TODO (#17137): canton was excluded here, but is used in several token standard damls
     local illegal_words=(
       currency founder founding leader collective consortium
-      coin whitepaper
-      domain
+      coin cn whitepaper canton
+      domain global
       DsoReward
       'google'
       )
@@ -1183,8 +1182,7 @@ function subcmd_no_illegal_daml_references() {
     local illegal_patterns=(
       svc SVC Svc   # to avoid conflict with PerSvContracts
       '(?<![a-z])cc(?!(ept|essor|g[.]github))'
-      'cn(?!(rc|\-token\-standard|20))' # TODO (#17137): revisit, allows cnrc but not cn
-      '(?<!(cnrc-1\.))global' # TODO (#17137): revisit
+      'global(?!(ly))' # TODO (#17137): revisit
       CC
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
       # Allow only Dso as in DsoRules in comments
@@ -1202,7 +1200,7 @@ function subcmd_no_illegal_daml_references() {
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' (case sensitive, in code other than splitwell)"
-        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock' -g '!daml/token-standard'; then
+        if rg -P "$pattern" daml/ token-standard/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock' -g '!token-standard/README.md'; then
             echo "$pattern occurs in Daml code (other than splitwell), remove all references"
             exit 1
         fi

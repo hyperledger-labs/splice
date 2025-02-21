@@ -14,12 +14,12 @@ set -euo pipefail
 
 ignored_files=(
   'daml/splice-util/daml/Splice/Util.daml'
+  'token-standard/examples/splice-token-trading-test/daml/TradingApp.daml'
   'canton/')
 
 # TODO(#9466): also check for naked `Xyz_Fetch` choices
 
-# TODO (#17133): remove the exclude of cn20
-command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml' ':!cn20')
+command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml')
 echo "${command[@]}"
 for ignored_file in "${ignored_files[@]}"; do
   command+=(":!$ignored_file")
