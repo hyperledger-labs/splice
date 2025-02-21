@@ -47,7 +47,7 @@ testDvP = script do
         receiver
         amount
         instrumentId = amuletId
-        metadata = emptyMetadata
+        meta = emptyMetadata
         lock = None
   let aliceLeg = mkTransfer alice.primaryParty bob.primaryParty 100.0
   -- TODO (#17541):use another asset instead of Amulet for Bob, once we have a second asset available in our example

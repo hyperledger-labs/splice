@@ -59,7 +59,7 @@ setupTest = do
       amount = 10.0
       instrumentId = amuletInstrumentId app.dso
       lock = None
-      metadata = Metadata with
+      meta = Metadata with
         values = Map.fromList [("tokenmetadatav1.org.lfdecentralizedtrust.splice/correlation-id", "<test-UUID>")]
   let
     defaultTransferSpec = Api.Token.TransferInstructionV1.TransferSpecification with

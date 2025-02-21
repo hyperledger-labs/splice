@@ -40,7 +40,6 @@ data HoldingView = HoldingView
       -- ^ Size of the holding.
     lock : Optional Lock
       -- ^ Lock on the holding.
-    metadata : Metadata
+    meta : Metadata
       -- ^ Metadata.
   deriving (Eq, Show)
-

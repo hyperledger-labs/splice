@@ -25,7 +25,7 @@ data Transfer = Transfer with
       -- ^ The instrument identifier.
     lock : Optional Lock
       -- ^ Lock on the transfer.
-    metadata : Metadata
+    meta : Metadata
       -- ^ Metadata.
   deriving (Eq, Ord, Show)
 
