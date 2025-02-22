@@ -513,9 +513,16 @@ subcommands. A few highlights include the following:
 * `cncluster apply_sv` - Apply the sv-runbook Pulumi stack.
       * You need to provide a `target-domain-cluster` argument, for instance `scratcha` for scratchneta.
 * `cncluster apply_operator` - Apply the deployment Pulumi stack.
-      * To deploy it on a scratchnet, you need to set the following environment variables:
-          * `OPERATOR_IMAGE_VERSION`="X.X.X"
-          * `GOOGLE_CREDENTIALS`=$(cat "$HOME/.config/gcloud/application_default_credentials.json")
+      * To deploy it on a scratchnet as of release `X.X.X` (for a **stable** release), you need to follow these steps:
+          * cd into your scratchnet's deployment directory
+          * `export OPERATOR_IMAGE_VERSION=X.X.X`
+          * `export GOOGLE_CREDENTIALS=$(cat "$HOME/.config/gcloud/application_default_credentials.json")`
+          * `export SPLICE_ARTIFACTS_REPOSITORY=public`
+          * `echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> .envrc.vars`
+          * `git checkout -b <some_temp_branch>`
+          * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
+          * push `config.yaml` and `.envrc.vars` to the temporary branch
+          * `cncluster apply_operator`
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
