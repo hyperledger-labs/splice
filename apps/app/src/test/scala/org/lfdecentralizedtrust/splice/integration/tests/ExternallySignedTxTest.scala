@@ -8,13 +8,14 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.UUID
 import scala.collection.mutable
 import scala.sys.process.{Process, ProcessLogger}
 
-class ExternallySignedPartyOnboardingTest
+trait ExternallySignedTxTest
     extends IntegrationTest
     with HasExecutionContext
     with ExternallySignedPartyTestUtil
@@ -24,6 +25,10 @@ class ExternallySignedPartyOnboardingTest
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] = {
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
   }
+
+  def prepareAndSubmitTransfer(keyName: String, sender: PartyId, receiver: PartyId)(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Unit
 
   "a ccsp provider" should {
 
@@ -156,22 +161,7 @@ class ExternallySignedPartyOnboardingTest
 
       actAndCheck(
         "Prepare and submit transaction to create TransferCommand",
-        runProcess(
-          Seq(
-            "python",
-            "scripts/external-signing/external-signing.py",
-            "transfer-preapproval-send",
-            s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
-            s"--scan-url=http://localhost:${sv1ScanBackend.config.adminApi.port}",
-            s"--key-directory=${tempDirectory.path}",
-            s"--key-name=$keyName",
-            s"--sender-party-id=${partyId.toProtoPrimitive}",
-            s"--receiver-party-id=${partyId2.toProtoPrimitive}",
-            s"--amount=20.0",
-            s"--nonce=0",
-          ),
-          aliceValidatorBackend.token.value,
-        ),
+        prepareAndSubmitTransfer(keyName, partyId, partyId2),
       )(
         "DSO automation completes transfer",
         _ =>
@@ -182,7 +172,7 @@ class ExternallySignedPartyOnboardingTest
     }
   }
 
-  private def runProcess(args: Seq[String], token: String): Unit = {
+  protected def runProcess(args: Seq[String], token: String): Unit = {
     val readLines = mutable.Buffer[String]()
     val errorProcessor = ProcessLogger(line => readLines.append(line))
     val exitCode = Process(args, None, ("VALIDATOR_JWT_TOKEN", token)).!(errorProcessor)
@@ -191,5 +181,51 @@ class ExternallySignedPartyOnboardingTest
       readLines.foreach(logger.error(_)(TraceContext.empty))
       throw new RuntimeException(s"$args failed.")
     }
+  }
+}
+
+class ExternallySignedPartyOnboardingTest extends ExternallySignedTxTest {
+  override def prepareAndSubmitTransfer(keyName: String, sender: PartyId, receiver: PartyId)(
+      implicit env: SpliceTestConsoleEnvironment
+  ) = {
+    runProcess(
+      Seq(
+        "python",
+        "scripts/external-signing/external-signing.py",
+        "transfer-preapproval-send",
+        s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+        s"--scan-url=http://localhost:${sv1ScanBackend.config.adminApi.port}",
+        s"--key-directory=${tempDirectory.path}",
+        s"--key-name=$keyName",
+        s"--sender-party-id=${sender.toProtoPrimitive}",
+        s"--receiver-party-id=${receiver.toProtoPrimitive}",
+        s"--amount=20.0",
+        s"--nonce=0",
+      ),
+      aliceValidatorBackend.token.value,
+    )
+  }
+}
+
+class TokenStandardExternallySignedTxTest extends ExternallySignedTxTest {
+  override def prepareAndSubmitTransfer(keyName: String, sender: PartyId, receiver: PartyId)(
+      implicit env: SpliceTestConsoleEnvironment
+  ) = {
+    runProcess(
+      Seq(
+        "python",
+        "scripts/external-signing/external-signing.py",
+        "transfer-preapproval-send-token-standard",
+        s"--scan-url=http://localhost:${sv1ScanBackend.config.adminApi.port}",
+        s"--ledger-url=http://localhost:6201", // the port is not available anywhere in Scala so we hardcode it
+        s"--key-directory=${tempDirectory.path}",
+        s"--key-name=$keyName",
+        s"--sender-party-id=${sender.toProtoPrimitive}",
+        s"--receiver-party-id=${receiver.toProtoPrimitive}",
+        s"--amount=20.0",
+        s"--nonce=0",
+      ),
+      aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
+    )
   }
 }
