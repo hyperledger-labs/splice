@@ -25,7 +25,7 @@ class CCIFailureGithubIssue(FailureGithubIssue):
     commit_sha = repo.head.object.hexsha
     commit_sha_short = commit_sha[:7]
 
-    title = f"Pipeline {self.workflow.pipeline_number} : job {self.args.job_num} Failed :fire:"
+    title = f"Pipeline {self.workflow.pipeline_number} : workflow {self.args.gha_workflow_name} Failed :fire:"
     body = f"""
 [CircleCI Job]({circleci_url}).
 Branch: [{self.args.branch}]({branch_url})
