@@ -25,25 +25,22 @@ template AmuletAllocation
     interface instance Allocation for AmuletAllocation where
       view = allocation
 
-      allocation_withdrawImpl self extraArgs = do
-        potentiallyUnsafeArchive self -- TODO (#17541):revisit
+      allocation_withdrawImpl _self extraArgs = do
         let context = extraArgs.context
         openRoundCid <- getContextContractId @OpenMiningRound context "splice.lfdecentralizedtrust.org/open-round" -- TODO (#17541):define keys
         exercise lockedAmulet LockedAmulet_Unlock with openRoundCid
-        pure Allocation_WithdrawResult with meta = emptyMetadata
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
 
-      allocation_cancelImpl self extraArgs = do
-        potentiallyUnsafeArchive self -- TODO (#17541):revisit
+      allocation_cancelImpl _self extraArgs = do
         -- TODO (#17541):share code with withdraw
         let context = extraArgs.context
         openRoundCid <- getContextContractId @OpenMiningRound context "splice.lfdecentralizedtrust.org/open-round" -- TODO (#17541):define keys
         -- unfortunately we need a reference to a round to unlock the amulet,
         -- so even cancellation requires the settlement app to fetch a choice context
         exercise lockedAmulet LockedAmulet_Unlock with openRoundCid
-        pure Allocation_CancelResult with meta = emptyMetadata
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
 
-      allocation_executeTransferImpl self extraArgs = do
-        potentiallyUnsafeArchive self -- TODO (#17541):revisit
+      allocation_executeTransferImpl _self extraArgs = do
         let context = extraArgs.context
         -- extract payment context (TODO (#17541):consider how much validation is required)
         paymentContext <- paymentFromChoiceContext context
@@ -67,7 +64,7 @@ template AmuletAllocation
                     lock = None
                 ]
         _ <- exercisePaymentTransfer paymentContext transfer
-        pure Allocation_ExecuteTransferResult with meta = emptyMetadata
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
 
 
 -- | TODO (#17541):move to script support functions

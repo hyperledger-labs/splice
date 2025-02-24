@@ -2,18 +2,18 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | This module defines the interface for an `Allocation`, which reflects the allocation of
--- some amout of asset holdings to transfer them as part of an atomic on-ledger
+-- some amount of asset holdings to transfer them as part of an atomic on-ledger
 -- settlement requested by an app.
 --
 -- The expectation is for the registry app to implement this interface in their models, so that
--- apps can execute atomic on-ledger settlements of DvP's and other kinds of trades or payments
+-- apps can execute atomic on-ledger settlements of DvP and other kinds of trades or payments
 -- using instruments managed by that registry.
 module Splice.Api.Token.AllocationV1 where
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 (InstrumentId)
 
--- | A generic type to refer to data definined within an app.
+-- | A generic type to refer to data defined within an app.
 
 -- The interpretation of such a reference is app specific, but SHOULD be unambiguous within the context of the app.
 data Reference = Reference with
@@ -42,6 +42,8 @@ data SettlementInfo = SettlementInfo
       -- processing of all corporate actions falling strictly before the `allocateBefore` time.
     settleBefore : Time
       -- ^ Until when (exclusive) the executor is given time to execute the settlement.
+      --
+      -- SHOULD be strictly after `allocateBefore`.
   deriving (Show, Eq)
 
 -- | A specification of a transfer of holdings between two parties for the
@@ -69,6 +71,7 @@ data AllocationView = AllocationView with
       -- ^ The transfer for which the assets are being allocated.
   deriving (Show, Eq)
 
+
 -- Allocation
 ------------------------
 
@@ -77,63 +80,36 @@ allocationControllers : AllocationView -> [Party]
 allocationControllers AllocationView{..} =
   [settlement.executor, transferLeg.sender, transferLeg.receiver]
 
-data Allocation_ExecuteTransferResult = Allocation_ExecuteTransferResult
-  with
-    meta : Metadata
-      -- ^ Additional metadata specific to the result of the transfer, used for extensibility.
-  deriving (Show, Eq)
-
-data Allocation_CancelResult = Allocation_CancelResult
-  with
-    meta : Metadata
-      -- ^ Additional metadata specific to the result of the cancellation, used for extensibility.
-  deriving (Show, Eq)
-
-data Allocation_WithdrawResult = Allocation_WithdrawResult
-  with
-    meta : Metadata
-      -- ^ Additional metadata specific to the result of the withdraw, used for extensibility.
-  deriving (Show, Eq)
-
 -- | A contract representing an allocation of assets to a specific leg of a settlement.
 interface Allocation where
   viewtype AllocationView
 
-  allocation_executeTransferImpl : ContractId Allocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
-  allocation_cancelImpl : ContractId Allocation -> ExtraArgs -> Update Allocation_CancelResult
-  allocation_withdrawImpl : ContractId Allocation -> ExtraArgs -> Update Allocation_WithdrawResult
+  allocation_executeTransferImpl : ContractId Allocation -> ExtraArgs -> Update ChoiceExecutionMetadata
+  allocation_cancelImpl : ContractId Allocation -> ExtraArgs -> Update ChoiceExecutionMetadata
+  allocation_withdrawImpl : ContractId Allocation -> ExtraArgs -> Update ChoiceExecutionMetadata
 
-  nonconsuming choice Allocation_ExecuteTransfer : Allocation_ExecuteTransferResult
+  choice Allocation_ExecuteTransfer : ChoiceExecutionMetadata
     -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
     -- This choice SHOULD succeed provided the `settleBefore` deadline has not passed.
-    --
-    -- Note that this is a non-consuming choice to provide the implementation with maximal flexibility.
-    -- Implementations MUST ensure that the choice cannot be executed twice, e.g., by archiving the contract.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller allocationControllers (view this)
     do allocation_executeTransferImpl this self extraArgs
 
-  nonconsuming choice Allocation_Cancel : Allocation_CancelResult
+  choice Allocation_Cancel : ChoiceExecutionMetadata
     -- ^ Cancel the allocation. Used by the executor to release the allocated assets early in case the settlement
     -- is aborted or it has definitely failed.
-    --
-    -- Note that this is a non-consuming choice to provide the implementation with maximal flexibility.
-    -- Implementations SHOULD ensure that the choice cannot be executed twice, e.g., by archiving the contract.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller allocationControllers (view this)
     do allocation_cancelImpl this self extraArgs
 
-  nonconsuming choice Allocation_Withdraw : Allocation_WithdrawResult
+  choice Allocation_Withdraw : ChoiceExecutionMetadata
     -- ^ Withdraw the allocated assets. Used by the sender to withdraw the assets before settlement
     -- was completed. This SHOULD not fail settlement if the sender has still time to allocate the
     -- assets again (we are before the `allocateBefore` time).
-    --
-    -- Note that this is a non-consuming choice to provide the implementation with maximal flexibility.
-    -- Implementations SHOULD ensure that the choice cannot be executed twice, e.g., by archiving the contract.
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.

@@ -24,6 +24,8 @@ Major changes:
   The only token that makes use of this point is Amulet and we expect to remove that requirement later
   so it doesn't make sense to standardize. If you do need 24h delays for amulet, for now you need to
   use the non-standardized APIs for amulet as the standardized ones are limited to a 1min delay.
+* Made all choices of the `Allocation` interface consuming to simplify their implementation and
+  avoid the implementation bug of forgetting to archive the allocation.
 
 Polishing changes:
 
@@ -33,7 +35,7 @@ Polishing changes:
   record type `Reference` containing an optional contract id and a
   text id.
 * Switch `ChoiceContext` from a type synonym to a record.
-* Consistently use `meta` as the fieldname for fields holding metadata.
+* Consistently use `meta` as the field name for fields holding metadata.
 * Remove `TransferInstructionV1.TransferSpecification` in favor of `TransferInstructionV1.Transfer`
 * Rename `AllocationV1.Transfer` in favor of `AllocationV1.TransferLeg`
 * Remove `AIS_Failed` status from `AllocationInstruction` and
@@ -41,6 +43,7 @@ Polishing changes:
   `AllocationInstruction_Abort` choices.
 * Consistently add a `self` argument containing the contract id of the contract to all interface choices.
 * Inline the `pendingActions` field in both `TransferInstructionView` and `AllocationInstructionView` to represent them more directly
+* Use a shared `ChoiceExecutionMetadata` type for choices that only return metadata about their execution.
 
 
 ## Initial open source release of the standard proposal

@@ -93,10 +93,9 @@ interface TransferInstruction where
     --
     -- Implementors MUST ensure that the transfer does not complete in case this choice is exercised.
     -- Implementors SHOULD decide which actors are allowed to abort a transfer instruction,
-    -- and add corresponding checks to the implemntation of this choice.
+    -- and add corresponding checks to the implementation of this choice.
     --
-    -- At least the sender SHOULD be allowed to abort
-    -- a transfer instruction.
+    -- At least the sender SHOULD be allowed to abort a transfer instruction.
     with
       actor : Party
       -- ^ The party that aborts the transfer instruction.

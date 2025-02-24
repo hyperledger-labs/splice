@@ -24,7 +24,7 @@ data AllocationInstructionView = AllocationInstructionView with
       -- ^ The pending actions to be taken by different actors to create the allocation.
       --
       -- ^ This field can by used to report on the progress of registry specific
-      -- worklows that are required to prepare the allocation (e.g., confirmation of OFAC checks).
+      -- workflows that are required to prepare the allocation (e.g., confirmation of OFAC checks).
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., more detailed status information.
   deriving (Show, Eq)
@@ -64,7 +64,7 @@ interface AllocationInstruction where
     --
     -- Implementors MUST ensure that the no allocation is create in case this choice is exercised.
     -- Implementors SHOULD decide which actors are allowed to abort a allocation instruction,
-    -- and add corresponding checks to the implemntation of this choice.
+    -- and add corresponding checks to the implementation of this choice.
     --
     -- At least the sender SHOULD be allowed to abort an allocation instruction.
     with

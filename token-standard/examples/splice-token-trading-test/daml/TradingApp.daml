@@ -94,7 +94,7 @@ template OTCTrade
   where
     signatory venue, tradingParties transferLegs
 
-    choice OTCTrade_Settle : [Allocation_ExecuteTransferResult]
+    choice OTCTrade_Settle : [ChoiceExecutionMetadata]
       with
         allocationInstructions : [ContractId Allocation]
         extraArgss : [ExtraArgs]
