@@ -7,6 +7,8 @@
 -- drive the creation of allocations in a generic way across registries.
 module Splice.Api.Token.AllocationInstructionV1 where
 
+import DA.Map qualified as Map
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.AllocationV1
@@ -14,37 +16,64 @@ import Splice.Api.Token.AllocationV1
 -- AllocationInstruction
 ------------------------
 
--- | A read-only interface for tracking the status of an allocation instruction (i.e. a request to
--- a Registry to create an `Allocation`).
-interface AllocationInstruction where
-  viewtype AllocationInstructionView
-
--- | The status of an allocation instruction.
-data AllocationInstructionStatus
-  = AIS_PendingAction with
-      actor : Party
-        -- ^ The party that is expected to take the next action.
-      action : Text
-        -- ^ The action that the actor is expected to take.
-    -- ^ The allocation instruction is pending an action by some actor. This status can be used to report on
-    -- the status of registry specific worklows that are required to complete the allocation (e.g., confirmation of OFAC checks).
-  | AIS_Failed with
-      reason : Text
-        -- ^ Human-readable explanation of why the allocation instruction failed.
-    -- ^ The allocation instruction failed definitely with the specified reason.
-    -- This status can for example be used by registries to signal that the specific transfer
-    -- requested violates the rules of the registry.
-  deriving (Show, Eq)
-
 -- | View for `AllocationInstruction`.
 data AllocationInstructionView = AllocationInstructionView with
     allocation : AllocationView
       -- ^ The allocation that this instruction is for.
-    status : AllocationInstructionStatus
-      -- ^ The status of the allocation instruction.
+    pendingActions : Map.Map Party Text
+      -- ^ The pending actions to be taken by different actors to create the allocation.
+      --
+      -- ^ This field can by used to report on the progress of registry specific
+      -- worklows that are required to prepare the allocation (e.g., confirmation of OFAC checks).
     meta : Metadata
       -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., more detailed status information.
   deriving (Show, Eq)
+
+data AllocationInstruction_AllocateResult = AllocationInstruction_AllocateResult
+  with
+    allocation : ContractId Allocation
+      -- ^ The allocation that was created.
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of the allocation, used for extensibility.
+  deriving (Show, Eq)
+
+-- | An interface for tracking the status of an allocation instruction (i.e. a request to
+-- a Registry to create an `Allocation`).
+interface AllocationInstruction where
+  viewtype AllocationInstructionView
+
+  allocationInstruction_allocateImpl
+    : ContractId AllocationInstruction -> ExtraArgs -> Update AllocationInstruction_AllocateResult
+  allocationInstruction_abortImpl
+    : ContractId AllocationInstruction -> Party -> ExtraArgs -> Update ChoiceExecutionMetadata
+
+  choice AllocationInstruction_Allocate : AllocationInstruction_AllocateResult
+    -- ^ Final step used to create the allocation requested by the instruction.
+    --
+    -- Registries MUST use this choice to create the requested allocation, so that
+    -- wallets can use the transaction history to learn about it.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).allocation.transferLeg.instrumentId.admin
+    do
+      allocationInstruction_allocateImpl this self extraArgs
+
+  choice AllocationInstruction_Abort : ChoiceExecutionMetadata
+    -- ^ Abort the allocation instruction for the reason given in the extra argument's metadata.
+    --
+    -- Implementors MUST ensure that the no allocation is create in case this choice is exercised.
+    -- Implementors SHOULD decide which actors are allowed to abort a allocation instruction,
+    -- and add corresponding checks to the implemntation of this choice.
+    --
+    -- At least the sender SHOULD be allowed to abort an allocation instruction.
+    with
+      actor : Party
+      -- ^ The party that aborts the allocation instruction.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller actor
+    do allocationInstruction_abortImpl this self actor extraArgs
 
 
 -- AllocationFactory
