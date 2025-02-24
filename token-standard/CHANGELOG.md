@@ -34,6 +34,7 @@
 * Remove `AIS_Failed` status from `AllocationInstruction` and
   introduce explicit `AllocationInstruction_Allocate` and
   `AllocationInstruction_Abort` choices.
+* Consistently add a `self` argument containing the contract id of the contract to all interface choices.
 
 ## Initial open source release of the standard proposal
 

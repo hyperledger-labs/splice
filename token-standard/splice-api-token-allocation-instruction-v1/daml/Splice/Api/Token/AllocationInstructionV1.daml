@@ -62,7 +62,7 @@ data AllocationFactoryView = AllocationFactoryView with
 interface AllocationFactory where
   viewtype AllocationFactoryView
 
-  allocationFactory_allocateImpl : AllocationView -> [ContractId Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
+  allocationFactory_allocateImpl : ContractId AllocationFactory -> AllocationView -> [ContractId Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
 
   nonconsuming choice AllocationFactory_Allocate : AllocationFactory_AllocateResult
     -- ^ Generic choice for the sender's wallet to allocate the assets to a specific leg of a settlement.
@@ -79,7 +79,7 @@ interface AllocationFactory where
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
     controller allocation.transferLeg.sender
-    do allocationFactory_allocateImpl this allocation inputHoldings extraArgs
+    do allocationFactory_allocateImpl this self allocation inputHoldings extraArgs
 
 -- | A custom type to represent either an allocation or an allocation instruction.
 -- Used in favor of `Either` to improve the readability of the code.

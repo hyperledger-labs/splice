@@ -51,13 +51,13 @@ template ExternalPartyAmuletRules
       view = Api.Token.TransferInstructionV1.TransferFactoryView with
         admin = dso
 
-      transferFactory_transferImpl = transferImpl
+      transferFactory_transferImpl _self = transferImpl
 
     interface instance AllocationFactory for ExternalPartyAmuletRules where
       view = AllocationFactoryView with
         admin = dso
 
-      allocationFactory_allocateImpl allocation =
+      allocationFactory_allocateImpl _self allocation =
         sharedAllocateImpl allocation.transferLeg.sender allocation
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
