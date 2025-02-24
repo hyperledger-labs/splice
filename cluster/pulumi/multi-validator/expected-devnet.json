@@ -4352,7 +4352,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4415,7 +4415,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4478,7 +4478,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4541,7 +4541,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4604,7 +4604,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
