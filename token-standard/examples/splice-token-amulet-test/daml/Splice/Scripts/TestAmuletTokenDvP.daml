@@ -41,7 +41,7 @@ testDvP = script do
     user = alice.primaryParty
 
   let amuletId = InstrumentId app.dso "Amulet"
-  let mkTransfer sender receiver amount = Api.Token.AllocationV1.Transfer with
+  let mkTransfer sender receiver amount = Api.Token.AllocationV1.TransferLeg with
         sender
         receiver
         amount
@@ -53,7 +53,7 @@ testDvP = script do
 
   -- alice proposes trade with bob
   proposalCid <- submit alice.primaryParty $ exerciseCmd agreementCid TradingAgreement_ProposeTrade with
-    transfers = [aliceLeg, bobLeg]
+    transferLegs = [aliceLeg, bobLeg]
 
   -- bob accepts
   proposalCid <- submit bob.primaryParty $ exerciseCmd proposalCid OTCTradeProposal_Accept with
@@ -71,7 +71,7 @@ testDvP = script do
 
   -- Alice sees the allocation request in her wallet
   [aliceAlloc] <- getRequestedAllocations alice.primaryParty
-  aliceAlloc.transfer.amount === 100.0
+  aliceAlloc.transferLeg.amount === 100.0
 
   -- build choice context that would be provided over the off-ledger API
   (factoryCid, extraArgs, disclosures) <- getAmuletAllocationFactory_AllocateContext app alice
@@ -85,7 +85,7 @@ testDvP = script do
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- getRequestedAllocations bob.primaryParty
-  bobAlloc.transfer.amount === 20.0
+  bobAlloc.transferLeg.amount === 20.0
 
   -- build choice context that would be provided over the off-ledger API
   (factoryCid, extraArgs, disclosures) <- getAmuletAllocationFactory_AllocateContext app alice
@@ -104,7 +104,7 @@ testDvP = script do
   -- provider completes settlement
   allocations0 <- queryInterface @Allocation provider1.primaryParty
   let allocations =
-        sortOn (\(_, alloc) -> (alloc.transferId)) $
+        sortOn (\(_, alloc) -> (alloc.transferLegId)) $
         mapOptional (\(x, y) -> (,) x <$> y) allocations0
 
   -- and... *drumroll*... settle!
@@ -133,10 +133,10 @@ getRequestedAllocations p = do
   trace reqs $ pure ()
   let allocs = do
         (_reqCid, Some req) <- reqs
-        (tfId, tf) <- zip [0..length req.transfers] req.transfers
+        (tfId, tf) <- zip [0..length req.transferLegs] req.transferLegs
         guard (p == tf.sender)
         pure AllocationView with
           settlement = req.settlement
-          transferId = tfId
-          transfer = tf
+          transferLegId = tfId
+          transferLeg = tf
   pure allocs

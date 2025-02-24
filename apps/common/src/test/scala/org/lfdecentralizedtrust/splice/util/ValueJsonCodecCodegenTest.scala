@@ -142,21 +142,16 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       val sender = providerParty(1).toProtoPrimitive
       val receiver = providerParty(2).toProtoPrimitive
       val originalArgument: JavaApi.DamlRecord = new transferinstructionv1.TransferFactory_Transfer(
-        new transferinstructionv1.TransferSpecification(
-          new transferinstructionv1.Transfer(
-            sender,
-            receiver,
-            numeric(6.12947561),
-            new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-            Some(
-              new holdingv1.Lock(java.util.List.of(sender, receiver))
-            ).toJava,
-            someMetadata,
-          ),
+        new transferinstructionv1.Transfer(
+          sender,
+          receiver,
+          numeric(6.12947561),
+          new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
           /*executeBefore =*/ Instant.now().plusMillis(1000L),
           /*holdingCids =*/ List(validContractId(1), validContractId(2))
             .map(new holdingv1.Holding.ContractId(_))
             .asJava,
+          someMetadata,
         ),
         new metadatav1.ExtraArgs(
           someChoiceContext,

@@ -26,12 +26,11 @@ import Util.Disclosure
 -- Support code
 ----------------
 
-getAmuletTransferFactory_TransferContext : AmuletApp -> Api.Token.TransferInstructionV1.TransferSpecification -> Script (ContractId Api.Token.TransferInstructionV1.TransferFactory, ExtraArgs, Disclosures')
-getAmuletTransferFactory_TransferContext app transferSpecification = do
+getAmuletTransferFactory_TransferContext : AmuletApp -> Api.Token.TransferInstructionV1.Transfer -> Script (ContractId Api.Token.TransferInstructionV1.TransferFactory, ExtraArgs, Disclosures')
+getAmuletTransferFactory_TransferContext app transfer = do
   [(extAmuletRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
   let amuletFactory = toInterfaceContractId @Api.Token.TransferInstructionV1.TransferFactory extAmuletRulesCid
   extAmuletRules <- queryDisclosure' app.dso extAmuletRulesCid
-  let transfer = transferSpecification.transfer
   -- get the preaaproval for the receiver
   [(preapprovalCid, preapproval)] <- queryFilter @TransferPreapproval transfer.receiver (\preapproval -> preapproval.receiver == transfer.receiver)
   preapprovalDisc <- queryDisclosure' @TransferPreapproval app.dso preapprovalCid
@@ -39,7 +38,7 @@ getAmuletTransferFactory_TransferContext app transferSpecification = do
   (featuredDiscs, featuredContext) <- getFeaturedAppRightIfExists app preapproval.provider
   let providerUser = AmuletUser with primaryParty = preapproval.provider; userId = app.dsoUser.userId -- TODO(tech-debt): remove this hack by passing parties instead of users
   -- fetch amulet disclosures
-  amuletDiscs <- queryAmuletHoldingDisclosures app transferSpecification.holdingCids
+  amuletDiscs <- queryAmuletHoldingDisclosures app transfer.holdingCids
   -- massage choice context into shape
   (disclosures, extraArgs0) <- getAmuletTransferChoiceContext app providerUser
   let extraArgs = extraArgs0 with

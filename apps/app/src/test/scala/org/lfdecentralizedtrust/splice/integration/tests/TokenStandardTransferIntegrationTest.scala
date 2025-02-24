@@ -83,19 +83,16 @@ class TokenStandardTransferIntegrationTest
           )
         )
       val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
-        new transferinstructionv1.TransferSpecification(
-          new transferinstructionv1.Transfer(
-            sender.toProtoPrimitive,
-            receiver.toProtoPrimitive,
-            amount.bigDecimal,
-            new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-            java.util.Optional.empty(),
-            new metadatav1.Metadata(java.util.Map.of()),
-          ),
+        new transferinstructionv1.Transfer(
+          sender.toProtoPrimitive,
+          receiver.toProtoPrimitive,
+          amount.bigDecimal,
+          new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
           Instant.now().plus(10, ChronoUnit.MINUTES),
           senderHoldings
             .map(senderHolding => new holdingv1.Holding.ContractId(senderHolding.contractId))
             .asJava,
+          new metadatav1.Metadata(java.util.Map.of()),
         ),
         new metadatav1.ExtraArgs(
           new metadatav1.ChoiceContext(java.util.Map.of()),
@@ -112,7 +109,7 @@ class TokenStandardTransferIntegrationTest
       val commands = new transferinstructionv1.TransferFactory.ContractId(transferFactory.factoryId)
         .exerciseTransferFactory_Transfer(
           new transferinstructionv1.TransferFactory_Transfer(
-            choiceArgs.transferSpecification,
+            choiceArgs.transfer,
             new metadatav1.ExtraArgs(
               choiceContextData,
               new metadatav1.Metadata(java.util.Map.of()),

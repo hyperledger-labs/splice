@@ -57,7 +57,8 @@ template ExternalPartyAmuletRules
       view = AllocationFactoryView with
         admin = dso
 
-      allocationFactory_allocateImpl allocation = sharedAllocateImpl allocation.transfer.sender allocation
+      allocationFactory_allocateImpl allocation =
+        sharedAllocateImpl allocation.transferLeg.sender allocation
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
@@ -233,15 +234,14 @@ sharedAllocateImpl provider allocation holdings extraArgs = do
     allocationOrInstruction = AOI_Allocation with allocation = allocCid
     meta = emptyMetadata
 
-transferImpl : Api.Token.TransferInstructionV1.TransferSpecification -> ExtraArgs -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
-transferImpl transferSpec extraArgs = do
+transferImpl : Api.Token.TransferInstructionV1.Transfer -> ExtraArgs -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
+transferImpl transfer extraArgs = do
   -- TODO(#115): check issuer correspondence with transfer instrument
-  let transfer = transferSpec.transfer
-  let holdings = transferSpec.holdingCids
+  let holdings = transfer.holdingCids
   now <- getTime
-  require "Transfer must be executed before expiry" (now < transferSpec.executeBefore)
+  require "Transfer must be executed before expiry" (now < transfer.executeBefore)
   require "Holdings must be specified when transferring without a delegate"
-    (not $ null transferSpec.holdingCids)
+    (not $ null transfer.holdingCids)
   paymentContext <- paymentFromChoiceContext extraArgs.context
   let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
   preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context "splice.lfdecentralizedtrust.org/transfer-preapproval"

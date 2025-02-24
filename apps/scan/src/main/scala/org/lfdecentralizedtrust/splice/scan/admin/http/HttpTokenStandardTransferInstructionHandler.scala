@@ -55,7 +55,7 @@ class HttpTokenStandardTransferInstructionHandler(
                 .asRuntimeException()
             )
         }
-        receiver = PartyId.tryFromProtoPrimitive(transfer.transferSpecification.transfer.receiver)
+        receiver = PartyId.tryFromProtoPrimitive(transfer.transfer.receiver)
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
         amuletRules <- store.getAmuletRules()
         transferPreapproval <- store

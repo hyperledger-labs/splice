@@ -19,7 +19,7 @@ template AmuletAllocation
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
     allocation : AllocationView
   where
-    signatory allocationAppProvider allocation, allocation.transfer.sender
+    signatory allocationAppProvider allocation, allocation.transferLeg.sender
     observer allocation.settlement.executor
 
     interface instance Allocation for AmuletAllocation where
@@ -56,13 +56,13 @@ template AmuletAllocation
         let amuletCid = unlockResult.amuletSum.amulet
         -- execute transfer
         let transfer = Splice.AmuletRules.Transfer with
-              sender = allocation.transfer.sender
+              sender = allocation.transferLeg.sender
               provider = allocation.settlement.executor
               inputs = [InputAmulet amuletCid]
               outputs =
                 [ TransferOutput with
-                    receiver = allocation.transfer.receiver
-                    amount = allocation.transfer.amount
+                    receiver = allocation.transferLeg.receiver
+                    amount = allocation.transferLeg.amount
                     receiverFeeRatio = 0.0 -- The sender pays all fees.
                     lock = None
                 ]
@@ -107,7 +107,7 @@ getContextContractId context k = do
     Some cid -> pure cid
 
 allocationAppProvider : AllocationView -> Party
-allocationAppProvider AllocationView{..} = transfer.instrumentId.admin
+allocationAppProvider AllocationView{..} = transferLeg.instrumentId.admin
 
 -- | The extra allocation that is made to guard against the transfer fees changing
 -- between the time of locking the amulet and the time of executing the actual transfer.
@@ -117,8 +117,8 @@ feeReserveMultiplier = 3.0
 allocationToAmuletOutput : AllocationView -> TransferOutput
 allocationToAmuletOutput allocation =
   TransferOutput with
-    receiver = allocation.transfer.receiver
-    amount = allocation.transfer.amount
+    receiver = allocation.transferLeg.receiver
+    amount = allocation.transferLeg.amount
     receiverFeeRatio = 0.0  -- all fees are paid by the sender
     lock = None
 
@@ -126,18 +126,18 @@ fundAllocation : Party -> AllocationView -> PaymentTransferContext -> [TransferI
 fundAllocation provider allocation context inputs = do
   -- compute the transfer fees for the actual transfer that need to be covered
   let receiverOutput = allocationToAmuletOutput allocation
-  [expectedTransferFees] <- exerciseComputeFees context allocation.transfer.sender [receiverOutput]
+  [expectedTransferFees] <- exerciseComputeFees context allocation.transferLeg.sender [receiverOutput]
   -- approximate the holding fees for the locked amulet
   let approximateHoldingFees = 0.0 -- TODO (#17541):implement
   let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
   -- lock the amulet
   let transfer = Splice.AmuletRules.Transfer with
-        sender = allocation.transfer.sender
+        sender = allocation.transferLeg.sender
         provider
         outputs =
           [ TransferOutput with
-              receiver = allocation.transfer.sender
-              amount = allocation.transfer.amount + feesReserveAmount
+              receiver = allocation.transferLeg.sender
+              amount = allocation.transferLeg.amount + feesReserveAmount
               receiverFeeRatio = 0.0 -- locking fees are paid by the sender
               lock = Some TimeLock with
                 expiresAt = allocation.settlement.settleBefore

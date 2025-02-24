@@ -23,18 +23,6 @@ data Transfer = Transfer with
       -- ^ The amount to transfer.
     instrumentId : InstrumentId
       -- ^ The instrument identifier.
-    lock : Optional Lock
-      -- ^ Lock on the transfer.
-    meta : Metadata
-      -- ^ Metadata.
-  deriving (Eq, Ord, Show)
-
--- | A specification of how to execute transfer of holdings between two parties.
---
--- TODO(#106): having the two types is confusing: merge with `Transfer` above as part of removing its support for locking
-data TransferSpecification = TransferSpecification with
-    transfer : Transfer
-    -- ^ The transfer to execute.
 
     executeBefore : Time
       -- ^ Until when (exclusive) the transfer CAN be executed.
@@ -51,6 +39,9 @@ data TransferSpecification = TransferSpecification with
       -- If specified, then the transfer MUST not succeed if any of these
       -- holding contracts have already been archived. Thereby ensuring that the sender can
       -- use deliberate contention on holdings to prevent duplicate transfers.
+
+    meta : Metadata
+      -- ^ Metadata.
 
   deriving (Show, Eq)
 
@@ -80,7 +71,7 @@ interface TransferInstruction where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transferSpecification.transfer.instrumentId.admin
+    controller (view this).transfer.instrumentId.admin
     do
       transferInstruction_reportSuccessImpl this extraArgs
 
@@ -121,7 +112,7 @@ data PendingPreparatoryAction = PendingPreparatoryAction
 data TransferInstructionView = TransferInstructionView with
     status : TransferInstructionStatus
       -- ^ The status of the transfer instruction.
-    transferSpecification : TransferSpecification
+    transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
@@ -138,20 +129,20 @@ interface TransferFactory where
   viewtype TransferFactoryView
 
   transferFactory_transferImpl
-    : TransferSpecification -> ExtraArgs -> Update TransferFactory_TransferResult
+    : Transfer -> ExtraArgs -> Update TransferFactory_TransferResult
 
   -- Instruct the registry to execute a transfer, if possible, the registry SHOULD execute
   -- the transfer in a single atomic transaction. If that is not possible, then this choice
   -- MAY result in the creation of a transfer instruction that is pending further actions.
   nonconsuming choice TransferFactory_Transfer : TransferFactory_TransferResult
     with
-      transferSpecification : TransferSpecification
+      transfer : Transfer
         -- ^ The transfer to execute.
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
-    controller transferSpecification.transfer.sender
+    controller transfer.sender
     do
-      transferFactory_transferImpl this transferSpecification extraArgs
+      transferFactory_transferImpl this transfer extraArgs
 
 -- | View for `TransferFactory`.
 data TransferFactoryView = TransferFactoryView

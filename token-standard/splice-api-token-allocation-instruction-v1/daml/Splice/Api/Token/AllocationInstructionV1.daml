@@ -78,7 +78,7 @@ interface AllocationFactory where
         -- for registries that support automatic selection of holdings for allocations.
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
-    controller allocation.transfer.sender
+    controller allocation.transferLeg.sender
     do allocationFactory_allocateImpl this allocation inputHoldings extraArgs
 
 -- | A custom type to represent either an allocation or an allocation instruction.

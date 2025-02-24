@@ -44,8 +44,9 @@ data SettlementInfo = SettlementInfo
       -- ^ Until when (exclusive) the executor is given time to execute the settlement.
   deriving (Show, Eq)
 
--- | A specification of a transfer of holdings between two parties.
-data Transfer = Transfer with
+-- | A specification of a transfer of holdings between two parties for the
+-- purpose of a settlement, which often requires the atomic execution of multiple legs.
+data TransferLeg = TransferLeg with
     sender : Party
       -- ^ The sender of the transfer.
     receiver : Party
@@ -62,9 +63,9 @@ data Transfer = Transfer with
 data AllocationView = AllocationView with
     settlement : SettlementInfo
       -- ^ The settlement for whose execution the assets are being allocated.
-    transferId : Int
+    transferLegId : Int
       -- ^ The numeric id of the transfer within the settlement.
-    transfer : Transfer
+    transferLeg : TransferLeg
       -- ^ The transfer for which the assets are being allocated.
   deriving (Show, Eq)
 
@@ -73,7 +74,8 @@ data AllocationView = AllocationView with
 
 -- | The parties that control the allocation and its execution.
 allocationControllers : AllocationView -> [Party]
-allocationControllers AllocationView{..} = [settlement.executor, transfer.sender, transfer.receiver]
+allocationControllers AllocationView{..} =
+  [settlement.executor, transferLeg.sender, transferLeg.receiver]
 
 data Allocation_ExecuteTransferResult = Allocation_ExecuteTransferResult
   with
@@ -135,7 +137,7 @@ interface Allocation where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.sender
+    controller (view this).transferLeg.sender
     do allocation_withdrawImpl this self extraArgs
 
 

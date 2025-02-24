@@ -25,7 +25,7 @@ data TestSetup = TestSetup with
   bobAmuletCid : ContractId Amulet
   bobHoldingCid : ContractId Holding
   now : Time
-  defaultTransferSpec : Api.Token.TransferInstructionV1.TransferSpecification
+  defaultTransfer : Api.Token.TransferInstructionV1.Transfer
 
 setupTest : Script TestSetup
 setupTest = do
@@ -53,19 +53,15 @@ setupTest = do
 
   -- Define default transfer from Bob to Alice
   let
-    transfer = Api.Token.TransferInstructionV1.Transfer with
+    defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
       sender = bob.primaryParty
       receiver = alice.primaryParty
       amount = 10.0
       instrumentId = amuletInstrumentId app.dso
-      lock = None
-      meta = Metadata with
-        values = Map.fromList [("tokenmetadatav1.org.lfdecentralizedtrust.splice/correlation-id", "<test-UUID>")]
-  let
-    defaultTransferSpec = Api.Token.TransferInstructionV1.TransferSpecification with
-      transfer
       executeBefore = now `addRelTime` days 1
       holdingCids = [bobHoldingCid]
+      meta = Metadata with
+        values = Map.fromList [("tokenmetadatav1.org.lfdecentralizedtrust.splice/correlation-id", "<test-UUID>")]
 
   return TestSetup with ..
 
@@ -76,10 +72,10 @@ test_happy_path = script do
   let DefaultAppWithUsers{..} = defaultApp
 
   -- check that the default transfer can be executed
-  let transferSpecification = defaultTransferSpec
+  let transfer = defaultTransfer
 
   -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
-  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
 
   -- validate our expectations on the transfer context
   Map.size extraArgs.context.values === 4 -- amulet rules, open round, transfer pre-approval, featured app right
@@ -89,7 +85,7 @@ test_happy_path = script do
   submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
       extraArgs
-      transferSpecification
+      transfer
 
   -- there is a featured app reward for aliceValidator that created Alice's transfer preapproval
   [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
@@ -109,15 +105,15 @@ test_no_holdings = script do
   let DefaultAppWithUsers{..} = defaultApp
 
   -- Transfer fails if no holdings are specified
-  let transferSpecification = defaultTransferSpec with
+  let transfer = defaultTransfer with
         holdingCids = []
 
   -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
-  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
   submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
       extraArgs
-      transferSpecification
+      transfer
 
   pure ()
 
@@ -128,15 +124,15 @@ test_expired = script do
   let DefaultAppWithUsers{..} = defaultApp
 
   -- Transfer fails if expiry is in the past
-  let transferSpecification = defaultTransferSpec
-  setTime (transferSpecification.executeBefore `addRelTime` days 1)
+  let transfer = defaultTransfer
+  setTime (transfer.executeBefore `addRelTime` days 1)
 
   -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
-  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transferSpecification
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
   submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
       extraArgs
-      transferSpecification
+      transfer
 
   pure ()
 
