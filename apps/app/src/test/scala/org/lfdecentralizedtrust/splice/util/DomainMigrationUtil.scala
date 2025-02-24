@@ -30,11 +30,14 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
       dsoParty: PartyId,
   )(implicit traceContext: TraceContext, ec: ExecutionContext): Unit = {
 
-    val domainId = nodes.head.newParticipantConnection
-      .getDomainId(
-        nodes.head.newBackend.config.domains.global.alias
-      )
-      .futureValue
+    // also ensures domain is connected
+    val domainId = eventuallySucceeds()(
+      nodes.head.newParticipantConnection
+        .getDomainId(
+          nodes.head.newBackend.config.domains.global.alias
+        )
+        .futureValue
+    )
 
     forAllNodesAssert(nodes)("party hosting is replicated on the new global domain") {
       _.newParticipantConnection
