@@ -49,7 +49,20 @@ data Transfer = Transfer with
 -- TransferInstruction
 ------------------------
 
--- | A read-only interface for tracking the status of a transfer instruction,
+-- | View for `TransferInstruction`.
+data TransferInstructionView = TransferInstructionView with
+    transfer : Transfer
+      -- ^ The transfer specified by the transfer instruction.
+    pendingActions : Map.Map Party Text
+      -- ^ The pending actions to be taken by different actors to execute the transfer.
+      --
+      -- ^ This field can by used to report on the progress of registry specific
+      -- workflows that are required to execute the transfer (e.g., confirmation of OFAC checks).
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
+  deriving (Show, Eq)
+
+-- | An interface for tracking the status of a transfer instruction,
 -- i.e., a request to a registry app to execute a transfer.
 --
 -- Registries MAY evolve the transfer instruction in multiple steps. They
@@ -93,36 +106,8 @@ interface TransferInstruction where
     do transferInstruction_abortImpl this self actor extraArgs
 
 
--- | The status of a transfer instruction.
-data TransferInstructionStatus
-  = TIS_PendingPreparatoryAction PendingPreparatoryAction
-  deriving (Show, Eq)
-
-data PendingPreparatoryAction = PendingPreparatoryAction
-  with
-    actions : Map.Map Party Text
-      -- ^ The actions that different actors can or should take to advance the preparation of the transfer.
-      -- ^ The transfer instruction is pending actions by some actors on
-      -- registry-internal workflows. This status can be used to report on the
-      -- status of registry specific worklows that are required to prepare the
-      -- transfer (e.g., confirmation of OFAC checks).
-  deriving (Show, Eq)
-
--- | View for `TransferInstruction`.
-data TransferInstructionView = TransferInstructionView with
-    status : TransferInstructionStatus
-      -- ^ The status of the transfer instruction.
-    transfer : Transfer
-      -- ^ The transfer specified by the transfer instruction.
-    meta : Metadata
-      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
-  deriving (Show, Eq)
-
-data TransferFactory_TransferResult = TransferFactory_TransferResult with
-  optTransferInstructionCid : Optional (ContractId TransferInstruction)
-    -- ^ The contract ID of the transfer instruction, in case the transfer could not be executed atomically.
-  meta : Metadata
-    -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+-- Transfer Factory
+-------------------
 
 -- | A factory to transfer holdings between parties.
 interface TransferFactory where
@@ -143,6 +128,13 @@ interface TransferFactory where
     controller transfer.sender
     do
       transferFactory_transferImpl this self transfer extraArgs
+
+-- | Result of requesting a transfer.
+data TransferFactory_TransferResult = TransferFactory_TransferResult with
+  optTransferInstructionCid : Optional (ContractId TransferInstruction)
+    -- ^ The contract ID of the transfer instruction, in case the transfer could not be executed atomically.
+  meta : Metadata
+    -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
 
 -- | View for `TransferFactory`.
 data TransferFactoryView = TransferFactoryView
