@@ -42,7 +42,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd_name: Wait for SV app to be responsive
           cmd: |
-            succes=0
+            success=0
             # Wait up to 30 minutes for the sv app to be ready
             # (we're starting this job in parallel with the initial deployment)
             for i in {1..180}; do

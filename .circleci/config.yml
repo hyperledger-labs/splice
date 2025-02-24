@@ -2550,7 +2550,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd_name: Wait for SV app to be responsive
           cmd: |
-            succes=0
+            success=0
             # Wait up to 30 minutes for the sv app to be ready
             # (we're starting this job in parallel with the initial deployment)
             for i in {1..180}; do
@@ -4431,8 +4431,6 @@ jobs:
               # silence specific alerts that may fire due to reset downtime
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
-            # Always reset the runbook even if the flag is false to ensure that any config change is accounted for
-            export SPLICE_DEPLOY_SV_RUNBOOK=true
 
             if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
