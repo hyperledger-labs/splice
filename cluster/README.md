@@ -426,9 +426,9 @@ All other clusters are set up to use the **Release** artifacts by default, `SPLI
 
 ### Deploy a local build to a cluster
 1. Start from a clean slate: `make -C $REPO_ROOT clean`
+1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
    - Note that this step internally calls `sbt bundle` to build the most recent version of our apps.
      later steps don't call `sbt bundle` automatically, as it takes too long.
-1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes to the Development Artifactory Docker Registry.
    - If this fails, you may need to run `echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin` to login to the Artifactory docker registry for development.
@@ -436,17 +436,29 @@ All other clusters are set up to use the **Release** artifacts by default, `SPLI
    ensure that pulumi is set up: `make -C $REPO_ROOT cluster/build -j`
    - This step is handled automatically by `cncluster apply`. This uses locally built helm charts by default.
 1. Start with a working cluster and change to its deployment directory.
-1. Acquire the cluster lock `cncluster lock`.
+   - You need be authorized to the GCP project for the environment to be loaded successfully after `direnv allow .`.
+1. Try to acquire the cluster lock `cncluster lock` and go to a different scratchnet if it's already locked.
+   - If you want to lock the first available scratch cluster, you can do so with `deployment/lock-first-scratch.sh`
+     but you'll have to have entered all the scratchnet directories and authorized the environment with `direnv allow`
+     beforehand.
 1. Delete the existing cluster resources managed by pulumi: `cncluster reset`.
-   This should typically not be required as the cluster is reset upon unlocking it.
+   - This should typically not be required as the cluster is reset upon unlocking it.
+   - You may need to run `gcloud auth application-default login` for Pulumi to pick up the correct GCP token.
 1. Apply the Pulumi cluster configuration: `cncluster apply`.
+   - To successfully apply the configuration, you need some Artifactory- and Auth0-related environment
+     variables correctly exported by the `.envrc.private` file in the project root as described in
+     [the main README](../README.md#private_environment_variables).
+     In particular, the `ARTIFACTORY*`, `*CN_MANAGEMENT*`, `*SV_MANAGEMENT*` and `*VALIDATOR_MANAGEMENT*`
+     environment variables are always required.
    - Use `kubectl get pods -A` to observe creation of the four new SV App nodes.
    - You can also use the graphical `k9s` tool for this purpose, see its [docs here](https://k9scli.io/).
    - Some tips for handling deployment failures:
      - *Secrets not containing the right values*: decode the secret using something like
        `kubectl get secret -n sv-1 cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps -o 'jsonpath={.data.json-credentials}' | base64 -d`
        or use `k9s` to navigate to the secrets overview using `:secrets` and press `x` on the secret of interest.
-     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`. `cncluster reset` will also cancel and retry the reset on detecting a held Pulumi lock. See also the section on [Manual Cleanup for an Interrupted Deployment](#manual_cleanup_for_an_interrupted_deployment)
+     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`. `cncluster reset` will also cancel and retry the reset on detecting a held Pulumi lock. See also the section on [Manual Cleanup for an Interrupted Deployment](#manual_cleanup_for_an_interrupted_deployment).
+     - Cluster deployment can be flaky for a variety of infrastructural reasons; these flakes can often be solved
+       just by retrying `cncluster apply`.
      - See also the section on [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
 1. The Pulumi and Helm charts may now be edited and `cncluster apply`
    once again used to apply only the changes to the cluster.
