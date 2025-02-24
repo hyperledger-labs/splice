@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Docs
+
+  * Add documentation about :ref:`traffic`.
+
 0.3.12
 ------
 

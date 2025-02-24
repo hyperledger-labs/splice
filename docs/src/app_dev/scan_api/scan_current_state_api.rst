@@ -13,7 +13,9 @@ Alongside information about the :ref:`overall Splice network operations <scan_gl
 Validator Traffic Credits and Purchases
 ---------------------------------------
 
-Confirming Daml transactions on the distributed synchronizer costs Amulet, as a rule.
+Sequencing messages on the global synchronizer,
+which is an integral part of the Canton commit protocol for Daml transactions and validator operations more generally,
+costs :ref:`traffic fees <traffic>` purchased in Amulet.
 `/v0/domains/{domain_id}/members/{member_id}/traffic-status <scan_openapi.html#get--v0-domains-domain_id-members-member_id-traffic-status>`_ can be used to query the purchased and spent traffic credit.
 
 Here's an example response from querying for a member participant.

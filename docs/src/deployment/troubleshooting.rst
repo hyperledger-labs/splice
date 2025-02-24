@@ -66,11 +66,13 @@ In addition to that also check the version you are using and the network (dev/te
 Common Error Messages
 ---------------------
 
+.. _error-below-reserved-traffic-amount:
+
 Traffic balance below reserved amount
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A log of the form shown below indicates that your validator app
-has not been able to purchase any traffic. The validator blocks
+has not been able to :ref:`purchase any traffic <traffic_topup>`. The validator blocks
 transactions not required to purchase more traffic once the purchased
 traffic balance falls below a given number to
 avoid issues where the validator locks itself out by not having enough
@@ -90,7 +92,7 @@ Insufficient funds to buy configured traffic amount
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A log of the form shown below indicates that your validator app
-attempted to purchase traffic but does not have enough in the wallet
+attempted to :ref:`purchase traffic <traffic_topup>` but does not have enough in the wallet
 of the validator operator party. This is common on TestNet and MainNet
 for new nodes as they start out with a balance of 0 and only slowly
 accrue CC through validator liveness rewards. So often this just
