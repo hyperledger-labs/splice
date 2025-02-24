@@ -310,7 +310,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
             }
           }
           // Stop SV3 to make sure it does not produce
-          // UNAUTHORIZED_TOPOLOGY_TRANSACTION warnings, see #11639.
+          // TOPOLOGY_UNAUTHORIZED_TRANSACTION warnings, see #11639.
           sv3Backend.stop()
         }
       },
@@ -322,7 +322,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv4") -> Seq(None),
         )
-        // Wait for the decentralized namespace change to avoid triggering in UNAUTHORIZED_TOPOLOGY_TRANSACTION
+        // Wait for the decentralized namespace change to avoid triggering in TOPOLOGY_UNAUTHORIZED_TRANSACTION
         sv1Backend.participantClient.topology.decentralized_namespaces
           .list(
             filterStore = decentralizedSynchronizerId.filterString,
