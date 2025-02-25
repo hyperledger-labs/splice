@@ -546,7 +546,7 @@ Once logged in one should see the transactions page.
 Granting coin to the validator for traffic purchases
 ----------------------------------------------------
 
-On DevNet, your validator will automatically tap enough coin to purchase traffic.
+On DevNet, your validator will automatically tap enough coin to purchase :ref:`traffic <traffic>`.
 However, on TestNet and MainNet, your validator party will need an initial coin grant to be able to purchase traffic.
 After logging into the wallet UI in the previous section, note that the party ID is displayed in
 the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b7369e027544927703efcdf0f03cb15bd26ac53c784c627b63bdf8f041``).
@@ -560,18 +560,34 @@ An SV (say your sponsor) will need to transfer coin to this party. They can do t
     * explain liveness rewards being an alternative
 
 
+.. _helm_validator_topup:
 
 Configuring automatic traffic purchases
 ---------------------------------------
-Optionally you may want to configure your validator to automatically purchase traffic
+Optionally you may want to configure your validator to :ref:`automatically purchase traffic <traffic_topup>`
 on a pay-as-you-go basis with rate limiting.
-To do so, uncomment and fill in the following section in the validator-values.yaml file:
+This is currently enabled by default!
+To disable or tune to your needs, edit the following section in the validator-values.yaml file:
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
     :start-after: CONFIGURING_TOPUP_START
     :end-before: CONFIGURING_TOPUP_END
 
+On each successful top-up, the validator app purchases a `top-up amount` of roughly ``targetThroughput * minTopupInterval`` bytes of traffic
+(specific amount can vary due to rounding-up).
+The ``minTopupInterval`` allows validator operators to control the upper-bound frequency at which automated top-ups happen.
+If the top-up amount is below the synchronizer-wide ``minTopupAmount`` (see :ref:`traffic_parameters`),
+``minTopupInterval`` is automatically stretched so that at least ``minTopupAmount`` bytes of traffic are
+purchased while respecting the configured ``targetThroughput``.
+
+The next top-up gets triggered when all of the following conditions are met:
+
+- The available :ref:`extra traffic balance <traffic_accounting>` drops below the configured top-up amount
+  (i.e., below ``targetThroughput * minTopupInterval``).
+- At least ``minTopupInterval`` has elapsed since the last top-up.
+- The validator has sufficient CC in its wallet to buy the top-up amount worth on traffic
+  (except on DevNet, where the validator app will automatically tap enough coin to purchase traffic).
 
 Configuring sweeps and auto-accepts of transfer offers
 ------------------------------------------------------

@@ -85,7 +85,7 @@ Transfer offers are used to in a two-step workflow to transfer Canton Coin betwe
 Buying Traffic
 ~~~~~~~~~~~~~~
 
-Traffic on the :term:`CN Global Domain` is limited.
+Traffic on the :term:`CN Global Synchronizer` is limited.
 Every validator has a budget of traffic that they can use,
 and daml transactions submitted to the synchronizer consume this traffic.
 A certain amount of traffic is free, additional traffic has to be bought with Canton Coin.

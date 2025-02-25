@@ -278,6 +278,8 @@ jobs:
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
 
+            # requires sv1 sv-app to be up so we disable it for faster deployments
+            export DISABLE_COMETBFT_STATE_SYNC=true
             if [[ << parameters.skip_infra >> == true ]]; then
               cncluster ci_apply --skip-infra
             else

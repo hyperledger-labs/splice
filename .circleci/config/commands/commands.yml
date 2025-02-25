@@ -269,7 +269,9 @@ commands:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep PULUMI_VERSION \
-                              --keep NO_PROXY"
+                              --keep NO_PROXY \
+                              --keep CIRCLE_REPOSITORY_URL \
+                              --keep CIRCLE_SHA1"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: make docker-build -j

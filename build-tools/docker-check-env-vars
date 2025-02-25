@@ -1,0 +1,17 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+if ! (env-bool "CI"); then
+  exit 0
+fi
+
+if [ -z "${CIRCLE_REPOSITORY_URL:-}" ]; then
+  echo "CIRCLE_REPOSITORY_URL is not set"
+  exit 1
+fi
+
+if [ -z "${CIRCLE_SHA1:-}" ]; then
+  echo "CIRCLE_SHA1 is not set"
+  exit 1
+fi

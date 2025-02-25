@@ -458,7 +458,9 @@ commands:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep PULUMI_VERSION \
-                              --keep NO_PROXY"
+                              --keep NO_PROXY \
+                              --keep CIRCLE_REPOSITORY_URL \
+                              --keep CIRCLE_SHA1"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: make docker-build -j
@@ -2029,6 +2031,7 @@ jobs:
           gce_authenticate: true
           no_output_timeout: "20m"
           additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
+          cmd_retry_count: 5
           cmd: |
             cncluster activate
 
@@ -2049,6 +2052,7 @@ jobs:
                 cncluster wait << parameters.namespace_name >> validator-app ${ACTIVE_MIGRATION_ID}
                 ;;
             esac
+
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -2334,6 +2338,8 @@ jobs:
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
 
+            # requires sv1 sv-app to be up so we disable it for faster deployments
+            export DISABLE_COMETBFT_STATE_SYNC=true
             if [[ << parameters.skip_infra >> == true ]]; then
               cncluster ci_apply --skip-infra
             else
@@ -2546,7 +2552,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd_name: Wait for SV app to be responsive
           cmd: |
-            succes=0
+            success=0
             # Wait up to 30 minutes for the sv app to be ready
             # (we're starting this job in parallel with the initial deployment)
             for i in {1..180}; do
@@ -2866,6 +2872,8 @@ jobs:
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            # requires sv1 sv-app to be up so we disable it for faster deployments
+            echo "export DISABLE_COMETBFT_STATE_SYNC=true" >> "$file"
             # if the base version is a release version ensure we use the public repository
             if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
@@ -4427,8 +4435,6 @@ jobs:
               # silence specific alerts that may fire due to reset downtime
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
-            # Always reset the runbook even if the flag is false to ensure that any config change is accounted for
-            export SPLICE_DEPLOY_SV_RUNBOOK=true
 
             if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock

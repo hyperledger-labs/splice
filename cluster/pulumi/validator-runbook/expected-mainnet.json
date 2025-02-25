@@ -160,7 +160,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -274,6 +274,9 @@
           "hostname": "global.canton.network.digitalasset.com"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 3
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -283,7 +286,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "loopback",
     "provider": "",
@@ -486,7 +489,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "validator-participant-2",
     "provider": "",
@@ -566,7 +569,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -683,7 +686,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "validator",
     "provider": "",

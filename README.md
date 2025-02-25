@@ -87,13 +87,17 @@ clusters.)
 
 ## Setting up Your Development Environment
 
-1. Clone the repository using `git clonegit@github.com:DACH-NY/canton-network-node.git`.
+1. Clone the repository using `git clone git@github.com:DACH-NY/canton-network-node.git`.
 1. Submodules:
    - Initialize and update the configs submodule using `git submodule update --init cluster/configs`
-   - If you intend to deploy to clusters, also initialize and update the private configs
-     submodule using `git submodule update --init cluster/configs-private`. In this case,
+   - If you intend to deploy to any clusters, also initialize and update
+     the runners container hooks submodule using
+     `git submodule update --init .github/runners/runner-container-hooks`. In this case,
      you might want to set `git config submodule.recurse true` to make sure
      both submodules are updated automatically on `git pull` and similar operations.
+   - If you intend to deploy to cluster exposed internally (dev, test, mainnet in particular),
+     also initialize and update the private configs
+     submodule using `git submodule update --init cluster/configs-private`.
 1. Install [direnv](https://direnv.net/#basic-installation).
 1. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
 1. Enable support for nix flakes and the nix command by adding to the

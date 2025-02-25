@@ -17,6 +17,7 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   ansDomainPrefix,
+  DecentralizedSynchronizerUpgradeConfig,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import {
@@ -50,6 +51,10 @@ export async function installValidator1(
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
+      },
+      cometbftPorts: {
+        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive range
+        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
       },
     },
     activeVersion,

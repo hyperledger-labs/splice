@@ -43,8 +43,6 @@ jobs:
               # silence specific alerts that may fire due to reset downtime
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
-            # Always reset the runbook even if the flag is false to ensure that any config change is accounted for
-            export SPLICE_DEPLOY_SV_RUNBOOK=true
 
             if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock

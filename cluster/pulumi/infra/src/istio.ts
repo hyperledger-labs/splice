@@ -5,6 +5,7 @@ import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
   activeVersion,
+  DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   getDnsNames,
   HELM_MAX_HISTORY_SIZE,
@@ -386,6 +387,10 @@ function configureGateway(
         cantonHostname: getDnsNames().cantonDnsName,
         daHostname: getDnsNames().daDnsName,
         basename: clusterBasename,
+      },
+      cometbftPorts: {
+        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive
+        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
       },
       enableGcsProxy: true,
     },

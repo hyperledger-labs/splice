@@ -45,6 +45,9 @@
           "hostname": "global.canton.network.digitalasset.com"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 3
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -54,7 +57,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "loopback",
     "provider": "",

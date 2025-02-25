@@ -877,7 +877,7 @@ and you should see all peer SVs listed as peers (their human-friendly names will
 
 .. _sv-ui-global-domain:
 
-The SV UI also presents the status of your global domain node. To see it, click on the "Domain Node Status" tab.
+The SV UI also presents the status of your global synchronizer node. To see it, click on the "Domain Node Status" tab.
 
 .. _helm-scan-web-ui:
 

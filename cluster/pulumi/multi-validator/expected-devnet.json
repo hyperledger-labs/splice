@@ -155,6 +155,9 @@
           "hostname": "dev.global.canton.network.digitalasset.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 6
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -164,7 +167,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "loopback",
     "provider": "",
@@ -302,7 +305,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.12",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -727,7 +730,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.12",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1152,7 +1155,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.12",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1577,7 +1580,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.12",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -2002,7 +2005,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.3.12",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -2463,7 +2466,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.12",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -2841,7 +2844,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.12",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3219,7 +3222,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.12",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3597,7 +3600,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.12",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3975,7 +3978,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.11",
+                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.3.12",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -4349,7 +4352,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4371,7 +4374,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "postgres-0",
     "provider": "",
@@ -4412,7 +4415,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4434,7 +4437,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "postgres-1",
     "provider": "",
@@ -4475,7 +4478,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4497,7 +4500,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "postgres-2",
     "provider": "",
@@ -4538,7 +4541,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4560,7 +4563,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "postgres-3",
     "provider": "",
@@ -4601,7 +4604,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "300Gi"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
@@ -4623,7 +4626,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "postgres-4",
     "provider": "",

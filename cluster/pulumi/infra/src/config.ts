@@ -8,6 +8,7 @@ import {
   loadJsonFromFile,
   REPO_ROOT,
 } from 'splice-pulumi-common';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
@@ -43,9 +44,11 @@ function extractIpRanges(x: IpRangesDict): string[] {
 }
 
 export function loadIPRanges(): string[] {
-  const externalIPRangesJson = loadJsonFromFile(
-    `${svPrivateConfigsClusterDirectory}/allowed-ip-ranges.json`
-  );
+  const externalIpRanges = spliceConfig.pulumiProjectConfig.isExternalCluster
+    ? extractIpRanges(
+        loadJsonFromFile(`${svPrivateConfigsClusterDirectory}/allowed-ip-ranges.json`)
+      )
+    : [];
   const internalIPRangesJson = loadJsonFromFile(
     REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
   );
@@ -54,15 +57,13 @@ export function loadIPRanges(): string[] {
     infraConfig.ipWhitelisting.extraWhitelistedIngress.concat(daSupportNodeIpRanges);
 
   if (isDevNet) {
-    return extractIpRanges(externalIPRangesJson)
+    return externalIpRanges
       .concat(extractIpRanges(internalIPRangesJson.devnet))
       .concat(extraWhitelistedIps);
   } else if (isMainNet) {
-    return extractIpRanges(externalIPRangesJson).concat(
-      extractIpRanges(internalIPRangesJson.mainnet)
-    );
+    return externalIpRanges.concat(extractIpRanges(internalIPRangesJson.mainnet));
   } else {
-    return extractIpRanges(externalIPRangesJson)
+    return externalIpRanges
       .concat(extractIpRanges(internalIPRangesJson.testnet))
       .concat(extraWhitelistedIps);
   }
