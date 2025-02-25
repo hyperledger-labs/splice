@@ -961,7 +961,7 @@
         "nodeIdentifier": "Digital-Asset-2",
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingRoundZeroDuration": "1 h",
+        "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
         "participantAddress": "participant-1",
         "persistence": {
