@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.environment.{EnvironmentImpl, RetryProvid
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.{
   ResetDecentralizedNamespace,
-  ResetSequencerDomainStateThreshold,
+  ResetSequencerSynchronizerStateThreshold,
   UpdateHistorySanityCheckPlugin,
   WaitForPorts,
 }
