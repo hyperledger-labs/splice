@@ -2362,12 +2362,12 @@
           {
             "name": "Tradeweb-Markets",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -3253,12 +3253,12 @@
           {
             "name": "Tradeweb-Markets",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -4111,12 +4111,12 @@
           {
             "name": "Tradeweb-Markets",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -4969,12 +4969,12 @@
           {
             "name": "Tradeweb-Markets",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
