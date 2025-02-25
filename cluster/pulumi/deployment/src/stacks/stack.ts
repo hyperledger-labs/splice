@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { CLUSTER_BASENAME, config, isMainNet } from 'splice-pulumi-common';
 
+import { operatorConfig } from '../config';
 import { namespace } from '../namespace';
 import { operator } from '../operator';
 
@@ -113,7 +114,8 @@ export function createStackCR(
           // Do not resync the stack when the commit hash matches the last one
           continueResyncOnCommitMatch: false,
           // Do not destroy the stack when the CR is deleted
-          destroyOnFinalize: false,
+          destroyOnFinalize:
+            name == 'infra' ? false : operatorConfig?.destroyNonInfraStacksOnFinalize || false,
           // Enforce that the stack already exists
           useLocalStackOnly: true,
           // retry if the stack is locked by another operation
