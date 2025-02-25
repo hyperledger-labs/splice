@@ -1,6 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
+-- TODO(#17962): remove this workaround
 module Splice.AllocationRequestV1JavaCodegenWorkaround where
 
 import Splice.Api.Token.AllocationRequestV1 qualified as Api.Token.AllocationRequestV1
@@ -14,4 +15,6 @@ template AllocationRequestV1JavaCodegenWorkaround
     signatory dso
 
     interface instance Api.Token.AllocationRequestV1.AllocationRequest for AllocationRequestV1JavaCodegenWorkaround where
-      view = error ""
+      view = error "AllocationRequestV1JavaCodegenWorkaround.view not implemented"
+      allocationRequest_RejectImpl = error "AllocationRequestV1JavaCodegenWorkaround.allocationRequest_RejectImpl not implemented"
+      allocationRequest_WithdrawImpl = error "AllocationRequestV1JavaCodegenWorkaround.allocationRequest_WithdrawImpl not implemented"

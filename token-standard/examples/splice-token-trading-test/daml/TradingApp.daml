@@ -132,6 +132,16 @@ template OTCTrade
         transferLegs
         meta = emptyMetadata
 
+      allocationRequest_RejectImpl _self actor _extraArgs = do
+        -- Note: this corresponds to signalling early that one is going to fail to deliver one's assets.
+        -- A real trading app will likely demand punitive charges for this.
+        require "Actor is a sender" (any (actor ==) (map (.sender) transferLegs))
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
+
+      allocationRequest_WithdrawImpl _self _extraArgs =
+        -- just archiving the trade is enough
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
+
 
 tradingParties : [Api.Token.AllocationV1.TransferLeg] -> Set.Set Party
 tradingParties = foldl (\acc t -> Set.insert t.sender (Set.insert t.receiver acc)) Set.empty

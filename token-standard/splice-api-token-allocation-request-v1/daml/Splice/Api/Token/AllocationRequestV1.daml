@@ -13,6 +13,35 @@ import Splice.Api.Token.AllocationV1
 interface AllocationRequest where
   viewtype AllocationRequestView
 
+  allocationRequest_RejectImpl
+    : ContractId AllocationRequest -> Party -> ExtraArgs -> Update ChoiceExecutionMetadata
+  allocationRequest_WithdrawImpl
+    : ContractId AllocationRequest -> ExtraArgs -> Update ChoiceExecutionMetadata
+
+  choice AllocationRequest_Reject : ChoiceExecutionMetadata
+    -- ^ Reject an allocation request.
+    --
+    -- Implementations SHOULD allow any sender of a transfer leg to reject the allocation request,
+    -- and thereby signal that they are definitely not going to create a matching allocation for the settlement.
+    with
+      actor : Party -- ^ The party rejecting the allocation request.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller actor
+    do allocationRequest_RejectImpl this self actor extraArgs
+
+  choice AllocationRequest_Withdraw : ChoiceExecutionMetadata
+    -- ^ Withdraw an allocation request as the executor.
+    --
+    -- Used by executors to withdraw the allocation request if they are unable to execute it;
+    -- e.g., because a trade has been cancelled.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).settlement.executor
+    do allocationRequest_WithdrawImpl this self extraArgs
+
+
 -- | View of `AllocationRequest`.
 --
 -- Implementations SHOULD make sure that at least all senders of the transfer legs
@@ -29,5 +58,3 @@ data AllocationRequestView = AllocationRequestView with
     meta : Metadata
       -- ^ Additional metadata specific to the allocation request, used for extensibility.
   deriving (Show, Eq)
-
-
