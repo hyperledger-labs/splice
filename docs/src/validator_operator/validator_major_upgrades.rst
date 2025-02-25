@@ -34,7 +34,7 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 
 .. note::
   This process creates a new synchronizer instance. Because
-  synchronizer traffic balances are tracked per synchronizer instance this implies
+  :ref:`synchronizer traffic balances <traffic>` are tracked per synchronizer instance this implies
   that all validator traffic balances start at zero on this new instance. The
   remaining traffic on the old synchronizer instance cannot be used anymore once
   that instance is shut down, effectively resulting in a loss of that balance.

@@ -213,7 +213,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -431,6 +431,9 @@
           "hostname": "global.canton.network.digitalasset.com"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 3
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -440,7 +443,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "loopback",
     "provider": "",
@@ -510,7 +513,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "scan",
     "provider": "",
@@ -706,7 +709,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -867,7 +870,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-app",
     "provider": "",
@@ -989,7 +992,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1067,7 +1070,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1145,7 +1148,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1260,7 +1263,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "validator",
     "provider": "",

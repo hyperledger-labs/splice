@@ -198,6 +198,13 @@ function installDockerRunnerScaleSet(
                     mountPath: '/cache',
                   },
                 ],
+                ports: [
+                  {
+                    name: 'metrics',
+                    containerPort: 8000,
+                    protocol: 'TCP',
+                  },
+                ],
               },
               {
                 name: 'dind',
@@ -278,6 +285,10 @@ function installDockerRunnerScaleSet(
             // prevent eviction by the gke autoscaler
             annotations: {
               'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
+            labels: {
+              // We add a runner-pod label, so that we can easily select it for monitoring
+              'runner-pod': 'true',
             },
           },
         },
@@ -483,8 +494,9 @@ function installK8sRunnerScaleSet(
     }
   );
 
+  // TODO(#17841): use a release once 0.3.13 is out
   const runnerImage =
-    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.12';
+    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.13-snapshot.20250221.8384.0.v94412fc9';
 
   return new k8s.helm.v3.Release(
     name,
@@ -734,7 +746,6 @@ function installPodMonitor(runnersNamespace: Namespace) {
         selector: {
           matchExpressions: [
             {
-              // TODO(#16963): This does not work for docker runners
               key: 'runner-pod',
               operator: 'Exists',
             },

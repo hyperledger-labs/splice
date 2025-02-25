@@ -90,7 +90,7 @@ function subcmd_apply() {
                 shift
                 ;;
             --skip-infra)
-                skipInfra="yes"
+                POSITIONAL_ARGS+=("$1")
                 shift
                 ;;
             -*)
@@ -127,13 +127,7 @@ function subcmd_apply() {
             _warning "docker-image-reference-exists bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
         fi
 
-        if [ -z "${skipInfra:-}" ]; then
-            subcmd_pulumi cluster up --yes --skip-preview
-            _infra_up
-        else
-            _info "Skipping infra deployment"
-        fi
-        _pulumi_automation_run_up
+        _cluster_apply "${args[@]}"
     fi
 }
 

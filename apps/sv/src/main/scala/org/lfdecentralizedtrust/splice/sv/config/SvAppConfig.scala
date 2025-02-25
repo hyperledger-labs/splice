@@ -285,7 +285,7 @@ case class SvAppBackendConfig(
 object SvAppBackendConfig {
   val DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION = SubmissionRequestAmplification(
     PositiveInt.tryCreate(5),
-    NonNegativeFiniteDuration.ofSeconds(5),
+    NonNegativeFiniteDuration.ofSeconds(10),
   )
 }
 

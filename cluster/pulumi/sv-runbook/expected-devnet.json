@@ -198,7 +198,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "4"
+              "4",
+              "5"
             ]
           }
         },
@@ -213,7 +214,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -409,6 +410,9 @@
           "hostname": "dev.global.canton.network.digitalasset.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 6
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -418,7 +422,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "loopback",
     "provider": "",
@@ -487,7 +491,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "scan",
     "provider": "",
@@ -760,12 +764,12 @@
           {
             "name": "Tradeweb-Markets",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -858,7 +862,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "sv-app",
     "provider": "",
@@ -1278,7 +1282,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "validator",
     "provider": "",
