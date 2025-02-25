@@ -147,7 +147,8 @@ export function installCantonComponents(
           svConfig.onboardingName,
           logLevel,
           migrationInfo.version,
-          imagePullServiceAccountName
+          imagePullServiceAccountName,
+          opts
         );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,

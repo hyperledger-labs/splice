@@ -1,0 +1,11 @@
+infra:
+  ipWhitelisting:
+    extraWhitelistedIngress:
+      - "35.225.102.103/32" # CI GKE cluster for CCI
+synchronizerMigration:
+  active:
+    id: 0
+    provider: external
+    version: 0.3.12
+    releaseReference: "refs/tags/token-std-devnet"
+persistentSequencerHeapDumps: true
