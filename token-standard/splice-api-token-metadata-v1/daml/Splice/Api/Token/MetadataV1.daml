@@ -88,7 +88,6 @@ data ExtraArgs = ExtraArgs with
   deriving (Show, Eq)
 
 -- | A generic result for choices that do not need to return specific data.
--- TODO(#118): use this type in all choices that do not need to return specific data.
 data ChoiceExecutionMetadata = ChoiceExecutionMetadata with
     meta : Metadata
       -- ^ Additional metadata specific to the result of exercising the choice, used for extensibility.
