@@ -3,37 +3,41 @@
 
 package org.lfdecentralizedtrust.splice
 
+import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
-import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.{MetricsContext, MetricName}
+import com.digitalasset.canton.metrics.DeclarativeApiMetrics
 import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
+import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.metrics.{DbStorageHistograms, DbStorageMetrics}
 
 /** A shared trait to capture the commonalities across our amulet node metrics. */
-trait SpliceMetrics {
-
-  def metricsFactory: LabeledMetricsFactory
+trait SpliceMetrics extends BaseMetrics {
 
   def grpcClientMetrics: GrpcClientMetrics
 
-  def healthMetrics: HealthMetrics
-
-  def dbStorage: DbStorageMetrics
+  // Not used by splice
+  override def grpcMetrics: GrpcServerMetrics = ???
+  // Not used by splice
+  override def declarativeApiMetrics: DeclarativeApiMetrics = ???
 }
 
 abstract class BaseSpliceMetrics(
     nodeType: String,
-    val metricsFactory: LabeledMetricsFactory,
+    override val openTelemetryMetricsFactory: LabeledMetricsFactory,
     storageHistograms: DbStorageHistograms,
 ) extends SpliceMetrics {
+
+  override val prefix = MetricName(nodeType)
 
   private implicit val mc: MetricsContext = MetricsContext.Empty
 
   override def grpcClientMetrics: GrpcClientMetrics =
-    new DamlGrpcClientMetrics(metricsFactory, component = nodeType)
+    new DamlGrpcClientMetrics(openTelemetryMetricsFactory, component = nodeType)
 
-  override def healthMetrics: HealthMetrics = new HealthMetrics(metricsFactory)
+  override def healthMetrics: HealthMetrics = new HealthMetrics(openTelemetryMetricsFactory)
 
-  override def dbStorage: DbStorageMetrics =
-    new DbStorageMetrics(storageHistograms, metricsFactory)
+  override def storageMetrics: DbStorageMetrics =
+    new DbStorageMetrics(storageHistograms, openTelemetryMetricsFactory)
 }

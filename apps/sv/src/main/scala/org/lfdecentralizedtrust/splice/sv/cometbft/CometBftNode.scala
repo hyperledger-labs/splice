@@ -22,7 +22,7 @@ import com.digitalasset.canton.drivers.cometbft.{
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange.Kind.SetConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import scalapb.TimestampConverters
@@ -53,7 +53,7 @@ class CometBftNode(
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
       actualConfig <- cometBftClient.readNetworkConfig()
-      genesisSigner = CometBftRequestSigner.getGenesisSigner
+      genesisSigner = CometBftRequestSigner.GenesisSigner
       currentKeysSetToGenesisKeys <- areGenesisGovernanceKeysConfigured(
         owningSvNode,
         genesisSigner,
@@ -148,13 +148,13 @@ class CometBftNode(
         cometBftRequestSigner.Fingerprint,
       )
     }
-    val domainId = target.dsoRules.domain
+    val synchronizerId = target.dsoRules.domain
     val targetNodeStates = target.svNodeStates.values.map(_.payload).toSeq
     val keepsOurOwnGovernanceKey = targetNodeStates
       .find(state => state.svName == owningSvNode)
       .exists(state =>
         state.state.synchronizerNodes.asScala
-          .get(domainId.toProtoPrimitive)
+          .get(synchronizerId.toProtoPrimitive)
           .exists(config =>
             config.cometBft.governanceKeys.asScala.exists(_.pubKey == ourGovernanceKey.pubKey)
           )
@@ -164,7 +164,7 @@ class CometBftNode(
       // This works with two step key rotations: one to add the new key, and one to remove the old one.
       import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
       logger.info(
-        show"We ${owningSvNode.singleQuoted} are not reconciling with a target state that removes our governance key ${ourGovernanceKey.pubKey} on $domainId. Target: $targetNodeStates"
+        show"We ${owningSvNode.singleQuoted} are not reconciling with a target state that removes our governance key ${ourGovernanceKey.pubKey} on $synchronizerId. Target: $targetNodeStates"
       )
       Future.unit
     } else {
@@ -175,7 +175,7 @@ class CometBftNode(
           cometBftRequestSigner.Fingerprint,
           targetNodeStates,
           actualConfig,
-          domainId,
+          synchronizerId,
           logger,
         )
         // We minimize latency by issuing updates and deletes in parallel, which is safe as we expect <= 16 SV nodes
@@ -328,10 +328,10 @@ object CometBftNode {
       signingKeyId: String,
       targetNodeStates: Seq[daml.dso.svstate.SvNodeState],
       currentNetworkConfig: proto.cometbft.GetNetworkConfigResponse,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       logger: TracedLogger,
   )(implicit tc: TraceContext): NetworkConfigDiff = {
-    val targetConfig = svNodeStatesToNetworkConfig(targetNodeStates, domainId)
+    val targetConfig = svNodeStatesToNetworkConfig(targetNodeStates, synchronizerId)
     val actualOrPendingConfig =
       getActualOrPendingConfig(owningSvNode, currentNetworkConfig, logger)
 
@@ -473,21 +473,21 @@ object CometBftNode {
 
   private def svNodeStatesToNetworkConfig(
       svNodeStates: Seq[daml.dso.svstate.SvNodeState],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   ): immutable.Map[String, proto.cometbft.SvNodeConfig] =
     svNodeStates
       .flatMap(state =>
-        extractSynchronizerNodeConfig(state, domainId).map(synchronizerNode =>
+        extractSynchronizerNodeConfig(state, synchronizerId).map(synchronizerNode =>
           state.svName -> svNodeConfigToProto(synchronizerNode.cometBft)
         )
       )
       .toMap
   private def extractSynchronizerNodeConfig(
       nodeState: daml.dso.svstate.SvNodeState,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   ) = {
     // TODO(#4901): reconcile all configured CometBFT networks
-    nodeState.state.synchronizerNodes.asScala.get(domainId.toProtoPrimitive)
+    nodeState.state.synchronizerNodes.asScala.get(synchronizerId.toProtoPrimitive)
   }
 
   /** Used only for pretty-printing a summary. */
@@ -497,7 +497,7 @@ object CometBftNode {
       actualConfig: proto.cometbft.GetNetworkConfigResponse,
       svNodeStates: Seq[daml.dso.svstate.SvNodeState],
       changes: Seq[proto.cometbft.NetworkConfigChangeRequest],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   ) extends PrettyPrinting {
     implicit val prettyGetNetworkConfigResponse: Pretty[proto.cometbft.GetNetworkConfigResponse] =
       PrettyUtil.adHocPrettyInstance
@@ -510,8 +510,9 @@ object CometBftNode {
       PrettyUtil.adHocPrettyInstance
 
     private val targetConfig: Seq[(Shown, proto.cometbft.SvNodeConfig)] =
-      svNodeStatesToNetworkConfig(svNodeStates, domainId).view.map { case (memberId, config) =>
-        (memberId.singleQuoted, config)
+      svNodeStatesToNetworkConfig(svNodeStates, synchronizerId).view.map {
+        case (memberId, config) =>
+          (memberId.singleQuoted, config)
       }.toSeq
     override def pretty: Pretty[this.type] = {
       prettyOfClass(

@@ -3,18 +3,14 @@ package org.lfdecentralizedtrust.splice.util
 import com.auth0.client.auth.AuthAPI
 import com.auth0.client.mgmt.ManagementAPI
 import com.auth0.client.mgmt.filter.UserFilter
-import com.auth0.exception.Auth0Exception
 import com.auth0.json.mgmt.users.User
-import com.digitalasset.canton.BaseTest
 
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.typesafe.scalalogging.Logger
-import net.jodah.failsafe.FailsafeException
-import org.lfdecentralizedtrust.splice.util.Auth0Util.Auth0Retry
 
+import com.typesafe.scalalogging.Logger
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
@@ -33,7 +29,6 @@ class Auth0Util(
     managementApiClientId: String,
     managementApiClientSecret: String,
     override val loggerFactory: NamedLoggerFactory,
-    retry: Auth0Retry,
 ) extends NamedLogging {
   private val auth = new AuthAPI(domain, managementApiClientId, managementApiClientSecret)
   val api = new ManagementAPI(domain, requestManagementAPIToken())
@@ -70,88 +65,18 @@ class Auth0Util(
     auth.requestToken(s"${domain}/api/v2/").execute().getAccessToken()
   }
 
-  private def executeManagementApiRequest[T](req: com.auth0.net.Request[T]) =
-    retry.retryAuth0CallsForTests {
-      // Auth0 management API calls are rate limited, with limits much lower than
-      // the rate limits for the auth API calls.
-      // Here we simply assume a generic rate limit of 2 calls per second and
-      // wait before each management API call
-      Threading.sleep(500)
-      req.execute()
-    }
+  private def executeManagementApiRequest[T](req: com.auth0.net.Request[T]) = {
+    // Auth0 management API calls are rate limited, with limits much lower than
+    // the rate limits for the auth API calls.
+    // Here we simply assume a generic rate limit of 2 calls per second and
+    // wait before each management API call
+    Threading.sleep(500)
+    req.execute()
+  }
 
 }
 
 object Auth0Util {
-
-  trait Auth0Retry {
-    def retryAuth0CallsForTests[T](f: => T): T
-  }
-
-  trait WithAuth0Support {
-    this: BaseTest =>
-
-    def auth0UtilFromEnvVars(
-        tenant: String
-    ): Auth0Util = {
-      val (mgmtPrefix, domainPrefix) = tenant match {
-        // Used for preflight checks
-        case "dev" => ("AUTH0_CN", "SPLICE_OAUTH_DEV")
-        // Used for sv preflight checks
-        case "sv" => ("AUTH0_SV", "SPLICE_OAUTH_SV_TEST")
-        // Used for validator preflight checks
-        case "validator" => ("AUTH0_VALIDATOR", "SPLICE_OAUTH_VALIDATOR_TEST")
-        // Used locally
-        case "test" => ("AUTH0_TESTS", "SPLICE_OAUTH_TEST")
-        case _ => fail(s"Invalid tenant value: $tenant")
-      }
-      val domain = s"https://${readMandatoryEnvVar(s"${domainPrefix}_AUTHORITY")}";
-      val clientId = readMandatoryEnvVar(s"${mgmtPrefix}_MANAGEMENT_API_CLIENT_ID");
-      val clientSecret = readMandatoryEnvVar(s"${mgmtPrefix}_MANAGEMENT_API_CLIENT_SECRET");
-
-      new Auth0Util(
-        domain,
-        clientId,
-        clientSecret,
-        loggerFactory,
-        new Auth0Retry {
-          def handleExceptions(e: Throwable): Nothing = e match {
-            case auth0Exception: Auth0Exception => {
-              logger.debug("Auth0 exception raised, triggering retry...")
-              fail(auth0Exception)
-            }
-            case ioException: java.io.IOException => {
-              logger.debug("IOException raised, triggering retry...")
-              fail(ioException)
-            }
-            case ex: Throwable => throw ex // throw anything else
-          }
-
-          override def retryAuth0CallsForTests[T](f: => T): T = {
-            eventually() {
-              try {
-                f
-              } catch {
-                // the sync client wraps the exceptions because why not
-                case failsafe: FailsafeException => handleExceptions(failsafe.getCause)
-                case cause: Throwable => handleExceptions(cause)
-              }
-            }
-          }
-        },
-      )
-    }
-
-    private def readMandatoryEnvVar(name: String): String = {
-      sys.env.get(name) match {
-        case None => fail(s"Environment variable $name must be set")
-        case Some(s) if s.isEmpty => fail(s"Environment variable $name must be non-empty")
-        case Some(s) => s
-      }
-    }
-
-  }
-
   def getAuth0ClientCredential(
       clientId: String,
       audience: String,

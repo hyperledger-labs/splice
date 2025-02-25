@@ -23,7 +23,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
+import com.digitalasset.canton.lifecycle.LifeCycle.CloseableChannel
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -96,7 +96,7 @@ abstract class AppConnection(
     with FlagCloseableAsync
     with NamedLogging {
   private val channel = new CloseableChannel(
-    ClientChannelBuilder.createChannelToTrustedServer(config),
+    ClientChannelBuilder.createChannelBuilderToTrustedServer(config).build(),
     logger,
     s"$serviceName connection",
   )

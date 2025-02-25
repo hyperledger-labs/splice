@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.{
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.transaction.PartyToParticipant
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -34,7 +34,7 @@ class SponsorDsoPartyHosting(
 ) extends NamedLogging {
 
   def authorizeDsoPartyToParticipant(
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Instant] =
     for {
@@ -58,20 +58,20 @@ class SponsorDsoPartyHosting(
     }
 
   private def proposePartyHostingAndEnsureAuthorized(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       party: PartyId,
       newParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, DsoPartyMigrationFailure, TopologyResult[PartyToParticipant]] = {
-    validateProposalForNewSv(domainId, newParticipant).flatMap {
+    validateProposalForNewSv(synchronizerId, newParticipant).flatMap {
       case SponsorDsoPartyHosting.ValidAcceptedState(accepted) =>
         EitherT.right(Future.successful(accepted))
       case SponsorDsoPartyHosting.ValidProposal(proposal) =>
         EitherT(
           participantAdminConnection
             .ensurePartyToParticipantAdditionProposalWithSerial(
-              domainId,
+              synchronizerId,
               party,
               newParticipant,
               PositiveInt.tryCreate(proposal.base.serial.value - 1),
@@ -88,7 +88,7 @@ class SponsorDsoPartyHosting(
   }
 
   private def validateProposalForNewSv(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
   )(implicit tc: TraceContext): EitherT[
     Future,
@@ -96,11 +96,11 @@ class SponsorDsoPartyHosting(
     SponsorDsoPartyHosting.ValidProposalOrAcceptedState,
   ] = {
     val partyToParticipantAcceptedState =
-      participantAdminConnection.getPartyToParticipant(domainId, dsoParty)
+      participantAdminConnection.getPartyToParticipant(synchronizerId, dsoParty)
     OptionT(
       participantAdminConnection
         .listPartyToParticipant(
-          domainId.filterString,
+          synchronizerId.filterString,
           filterParty = dsoParty.filterString,
           proposals = AllProposals,
         )

@@ -1,14 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.PositiveDurationSeconds
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.{
   MediatorId,
   Member,
@@ -186,7 +187,10 @@ class ManualStartIntegrationTest
                 .value
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
-            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION
+            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+              PositiveInt.tryCreate(5),
+              NonNegativeFiniteDuration.ofSeconds(5),
+            )
             // otherwise we get log warnings
             mediatorConnection.close()
           }
@@ -199,13 +203,16 @@ class ManualStartIntegrationTest
           ).map { participantConnection =>
             val sequencerConnections =
               participantConnection
-                .lookupDomainConnectionConfig(DomainAlias.tryCreate("global"))
+                .lookupSynchronizerConnectionConfig(SynchronizerAlias.tryCreate("global"))
                 .futureValue
                 .value
                 .sequencerConnections
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
-            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION
+            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+              PositiveInt.tryCreate(5),
+              NonNegativeFiniteDuration.ofSeconds(5),
+            )
             // otherwise we get log warnings
             participantConnection.close()
           }

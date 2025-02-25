@@ -1,0 +1,33 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | This module defines the interface for an `AllocationRequest`, which is an interface that can
+-- be implemented by an app to request specific allocations from their users
+-- for the purpose of settling a DvP or a payment as part of an app's workflow.
+module Splice.Api.Token.AllocationRequestV1 where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV1
+
+-- | A request by an app for allocations to be created to enable the execution of a settlement.
+interface AllocationRequest where
+  viewtype AllocationRequestView
+
+-- | View of `AllocationRequest`.
+--
+-- Implementations SHOULD make sure that at least all senders of the transfer legs
+-- are observers of the implementing contract, so that their wallet can show
+-- the request to them.
+data AllocationRequestView = AllocationRequestView with
+    settlement : SettlementInfo
+      -- ^ Settlement for which the assets are requested to be allocated.
+    transferLegs : [TransferLeg]
+      -- Transfer legs that are requested to be allocated for the execution of the settlement.
+      --
+      -- This may or may not be a complete list of transfer legs that are part of the settlement,
+      -- depending on the confidentiality requirements of the app.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation request, used for extensibility.
+  deriving (Show, Eq)
+
+

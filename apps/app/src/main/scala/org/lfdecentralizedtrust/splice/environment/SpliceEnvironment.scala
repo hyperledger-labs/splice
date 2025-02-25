@@ -4,6 +4,14 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.syntax.either.*
+import com.digitalasset.canton.config.TestingConfigInternal
+import com.digitalasset.canton.console.ConsoleOutput
+import com.digitalasset.canton.environment.*
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.ParticipantNodeBootstrap
+import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
+import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.metrics.SpliceMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.ScanAppBootstrap
@@ -14,14 +22,6 @@ import org.lfdecentralizedtrust.splice.sv.SvAppBootstrap
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.validator.ValidatorAppBootstrap
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
-import com.digitalasset.canton.config.TestingConfigInternal
-import com.digitalasset.canton.console.{ConsoleOutput, GrpcAdminCommandRunner, HealthDumpGenerator}
-import com.digitalasset.canton.domain.mediator.MediatorNodeBootstrap
-import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrap
-import com.digitalasset.canton.environment.*
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.ParticipantNodeBootstrap
-import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
 
 trait SpliceEnvironment extends Environment {
 
@@ -195,12 +195,6 @@ class EnvironmentImpl(
       consoleOutput: ConsoleOutput
   ): SpliceConsoleEnvironment =
     new SpliceConsoleEnvironment(this, consoleOutput)
-
-  override protected def createHealthDumpGenerator(
-      commandRunner: GrpcAdminCommandRunner
-  ): HealthDumpGenerator[_] = {
-    new SpliceHealthDumpGenerator(this, commandRunner)
-  }
 
   override protected def participantNodeFactory
       : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap] =

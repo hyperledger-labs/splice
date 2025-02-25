@@ -181,7 +181,7 @@ object BuildCommon {
       Global / excludeLintKeys += `canton-community-app` / autoAPIMappings,
       Global / excludeLintKeys += `canton-community-app` / Compile / damlDarLfVersion,
       Global / excludeLintKeys += `canton-community-common` / autoAPIMappings,
-      Global / excludeLintKeys += `canton-community-domain` / autoAPIMappings,
+      Global / excludeLintKeys += `canton-community-synchronizer` / autoAPIMappings,
       Global / excludeLintKeys += `canton-community-participant` / autoAPIMappings,
       //      Global / excludeLintKeys += `demo` / autoAPIMappings,
       Global / excludeLintKeys += `canton-slick-fork` / autoAPIMappings,
@@ -232,6 +232,14 @@ object BuildCommon {
             "splice-wallet-test-daml/clean",
             "splitwell-daml/clean",
             "splitwell-test-daml/clean",
+            "splice-api-token-metadata-v1-daml/clean",
+            "splice-api-token-holding-v1-daml/clean",
+            "splice-api-token-transfer-instruction-v1-daml/clean",
+            "splice-api-token-allocation-v1-daml/clean",
+            "splice-api-token-allocation-request-v1-daml/clean",
+            "splice-api-token-allocation-instruction-v1-daml/clean",
+            "splice-token-trading-test-daml/clean",
+            "splice-token-amulet-test-daml/clean",
             "apps-frontends/clean",
             "cleanCnDars",
             "docs/clean",
@@ -318,6 +326,7 @@ object BuildCommon {
       .apply("canton-util-external", file("canton/daml-common-staging/util-external"))
       .dependsOn(
         `canton-pekko-fork`,
+        `canton-magnolify-addon`,
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-util-logging`,
         // Canton depends on the Daml code via a git submodule and the two
@@ -377,6 +386,15 @@ object BuildCommon {
           scopt,
           apache_commons_io % "test",
         ),
+      )
+  }
+
+  lazy val `canton-daml-adjustable-clock` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-daml-adjustable-clock", file("canton/daml-common-staging/adjustable-clock"))
+      .settings(
+        sharedCantonSettings
       )
   }
 
@@ -491,9 +509,10 @@ object BuildCommon {
       .dependsOn(
         `canton-community-app-base`,
         `canton-community-common` % "compile->compile;test->test",
-        `canton-community-domain`,
+        `canton-community-synchronizer`,
         `canton-community-participant`,
         `canton-community-integration-testing` % "test",
+        `canton-ledger-api-core` % "test->test",
       )
       .enablePlugins(DamlPlugin)
       .settings(
@@ -550,7 +569,7 @@ object BuildCommon {
     sbt.Project
       .apply("canton-community-app-base", file("canton/community/app-base"))
       .dependsOn(
-        `canton-community-domain`,
+        `canton-community-synchronizer`,
         `canton-community-participant`,
       )
       .settings(
@@ -585,6 +604,7 @@ object BuildCommon {
         `canton-ledger-common`,
         `canton-bindings-java`,
         `canton-community-admin-api`,
+        `canton-kms-driver-api`,
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -635,7 +655,7 @@ object BuildCommon {
           scalaVersion,
           sbtVersion,
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("stableProtocolVersions" -> List("32")),
+          BuildInfoKey("stableProtocolVersions" -> List("33")),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",
@@ -727,6 +747,7 @@ object BuildCommon {
       .dependsOn(
         `canton-blake2b`,
         `canton-pekko-fork` % "compile->compile;test->test",
+        `canton-magnolify-addon`,
         `canton-community-base`,
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-util-external` % "compile->compile;test->test",
@@ -841,10 +862,10 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-community-domain` = {
+  lazy val `canton-community-synchronizer` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-community-domain", file("canton/community/domain"))
+      .apply("canton-community-synchronizer", file("canton/community/synchronizer"))
       .dependsOn(
         `canton-community-common` % "compile->compile;test->test",
         `canton-community-admin-api` % "compile->compile;test->test",
@@ -954,15 +975,21 @@ object BuildCommon {
         Compile / damlCodeGeneration :=
           Seq(
             (
-              (Compile / baseDirectory).value,
+              (Compile / sourceDirectory).value / "daml" / "AdminWorkflows",
               (Compile / damlDarOutput).value / "AdminWorkflows-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
-            )
+            ),
+            (
+              (Compile / sourceDirectory).value / "daml" / "PartyReplication",
+              (Compile / damlDarOutput).value / "PartyReplication-current.dar",
+              "com.digitalasset.canton.participant.admin.workflows",
+            ),
           ),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
         Compile / damlBuildOrder := Seq(
-          "daml/daml.yaml"
+          "daml/AdminWorkflows/daml.yaml",
+          "daml/PartyReplication/daml.yaml",
         ),
         // TODO(#16168) Before creating the first stable release with backwards compatibility guarantees,
         //  make "AdminWorkflows.dar" stable again
@@ -1018,6 +1045,7 @@ object BuildCommon {
           cats,
           grpc_stub,
           mockito_scala % Test,
+          scalapb_runtime_grpc,
           scalatestMockito % Test,
           scalatest % Test,
           slick,
@@ -1052,6 +1080,26 @@ object BuildCommon {
       )
   }
 
+  lazy val `canton-magnolify-addon` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-magnloify-addon", file("canton/community/lib/magnolify"))
+      .settings(
+        sharedSettings,
+        libraryDependencies ++= Seq(
+          cats,
+          daml_nonempty,
+          magnolia,
+          magnolify_scalacheck,
+          magnolify_shared % Test,
+          scala_reflect,
+          scalacheck,
+          scalatest % Test,
+        ),
+      )
+
+  }
+
   lazy val `canton-daml-errors` = {
     import CantonDependencies._
     sbt.Project
@@ -1083,6 +1131,7 @@ object BuildCommon {
       .dependsOn(
         `canton-util-external`,
         `canton-daml-errors` % "compile->compile;test->test",
+        `canton-bindings-java` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
         `canton-util-logging`,
         `canton-ledger-api`,
@@ -1151,8 +1200,10 @@ object BuildCommon {
       .apply("canton-ledger-api-core", file("canton/community/ledger/ledger-api-core"))
       .dependsOn(
         `canton-ledger-common` % "compile->compile;test->test",
-        `canton-community-base`,
-        `canton-community-common`,
+        `canton-community-common` % "compile->compile;test->test",
+        `canton-daml-adjustable-clock` % "test->test",
+        `canton-daml-errors` % "test->test",
+        `canton-daml-tls` % "test->test",
       )
       .disablePlugins(
         WartRemover,
@@ -1160,7 +1211,6 @@ object BuildCommon {
       ) // to accommodate different daml repo coding style
       .settings(
         sharedCantonSettings,
-        removeTestSources,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         Compile / PB.targets := Seq(
@@ -1170,6 +1220,7 @@ object BuildCommon {
           auth0_java,
           auth0_jwks,
           circe_core,
+          daml_libs_scala_grpc_test_utils,
           daml_ports,
           daml_struct_spray_json,
           netty_boring_ssl,
@@ -1460,6 +1511,20 @@ object BuildCommon {
         ),
       )
   }
+
+  lazy val `canton-kms-driver-api` = project
+    .in(file("canton/community/kms-driver-api"))
+    .settings(
+      sharedCantonSettings,
+      libraryDependencies ++= {
+        import CantonDependencies.*
+        Seq(
+          pureconfig,
+          slf4j_api,
+          opentelemetry_api,
+        )
+      },
+    )
 
   import defs._
 

@@ -8,7 +8,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   MediatorAdminCommands,
   MediatorAdministrationCommands,
-  EnterpriseSequencerConnectionAdminCommands,
+  SequencerConnectionAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{MediatorStatus, NodeStatus}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
@@ -20,7 +20,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
   SubmissionRequestAmplification,
 }
-import com.digitalasset.canton.topology.{DomainId, MediatorId, NodeIdentity}
+import com.digitalasset.canton.topology.{SynchronizerId, MediatorId, NodeIdentity}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -56,19 +56,19 @@ class MediatorAdminConnection(
     getId().map(MediatorId(_))
 
   def initialize(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       sequencerConnection: SequencerConnection,
       submissionRequestAmplification: SubmissionRequestAmplification,
   )(implicit traceContext: TraceContext): Future[Unit] =
     runCmd(
       MediatorAdministrationCommands.Initialize(
-        domainId,
+        synchronizerId,
         SequencerConnections.tryMany(
           Seq(sequencerConnection),
           PositiveInt.tryCreate(1),
           submissionRequestAmplification,
         ),
-        SequencerConnectionValidation.StrictActive,
+        SequencerConnectionValidation.ThresholdActive,
       )
     )
 
@@ -86,7 +86,7 @@ class MediatorAdminConnection(
       traceContext: TraceContext
   ): Future[Option[SequencerConnections]] =
     runCmd(
-      EnterpriseSequencerConnectionAdminCommands.GetConnection()
+      SequencerConnectionAdminCommands.GetConnection()
     )
 
   def setSequencerConnection(
@@ -96,13 +96,13 @@ class MediatorAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
-      EnterpriseSequencerConnectionAdminCommands.SetConnection(
+      SequencerConnectionAdminCommands.SetConnection(
         SequencerConnections.tryMany(
           Seq(sequencerConnection),
           PositiveInt.tryCreate(1),
           submissionRequestAmplification,
         ),
-        SequencerConnectionValidation.StrictActive,
+        SequencerConnectionValidation.ThresholdActive,
       )
     )
 }

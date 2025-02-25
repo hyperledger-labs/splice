@@ -46,7 +46,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -257,7 +257,7 @@ class SingleScanConnection private[client] (
     ).map(_.map { scans =>
       if (scans.malformed.nonEmpty) {
         logger.warn(
-          s"Malformed scans found for domain ${scans.domainId}: ${scans.malformed.keys}. This likely indicates malicious SVs."
+          s"Malformed scans found for domain ${scans.synchronizerId}: ${scans.malformed.keys}. This likely indicates malicious SVs."
         )
       }
       scans
@@ -418,23 +418,23 @@ class SingleScanConnection private[client] (
       )
     )
 
-  def getSynchronizerIdentities(domainIdPrefix: String)(implicit
+  def getSynchronizerIdentities(synchronizerIdPrefix: String)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[HttpScanSoftDomainMigrationPocAppClient.SynchronizerIdentities] =
     runHttpCmd(
       config.adminApi.url,
-      HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerIdentities(domainIdPrefix),
+      HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerIdentities(synchronizerIdPrefix),
     )
 
-  def getSynchronizerBootstrappingTransactions(domainIdPrefix: String)(implicit
+  def getSynchronizerBootstrappingTransactions(synchronizerIdPrefix: String)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[HttpScanSoftDomainMigrationPocAppClient.SynchronizerBootstrappingTransactions] =
     runHttpCmd(
       config.adminApi.url,
       HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerBootstrappingTransactions(
-        domainIdPrefix
+        synchronizerIdPrefix
       ),
     )
 
@@ -477,7 +477,7 @@ class SingleScanConnection private[client] (
 
   override def getUpdatesBefore(
       migrationId: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       before: CantonTimestamp,
       atOrAfter: Option[CantonTimestamp],
       count: Int,
@@ -486,7 +486,7 @@ class SingleScanConnection private[client] (
       config.adminApi.url,
       HttpScanAppClient.GetUpdatesBefore(
         migrationId,
-        domainId,
+        synchronizerId,
         before,
         atOrAfter,
         count,

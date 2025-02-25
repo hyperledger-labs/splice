@@ -1,0 +1,17 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.AllocationRequestV1JavaCodegenWorkaround where
+
+import Splice.Api.Token.AllocationRequestV1 qualified as Api.Token.AllocationRequestV1
+
+-- The codegen doesn't generate Java classes/interfaces for RC5 unless it's used in daml,
+-- so we create this dummy template so it does get generated.
+template AllocationRequestV1JavaCodegenWorkaround
+  with
+    dso : Party
+  where
+    signatory dso
+
+    interface instance Api.Token.AllocationRequestV1.AllocationRequest for AllocationRequestV1JavaCodegenWorkaround where
+      view = error ""

@@ -8,7 +8,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -21,13 +21,13 @@ trait TrafficBalanceService {
   /** Lookup the amount of traffic reserved for top-ups on the given domain.
     * Returns None if no traffic reservation has been configured for the domain.
     */
-  def lookupReservedTraffic(domainId: DomainId): Future[Option[NonNegativeLong]]
+  def lookupReservedTraffic(synchronizerId: SynchronizerId): Future[Option[NonNegativeLong]]
 
   /** Lookup this member's available traffic balance on the given domain.
     * Returns None if no traffic state exists for this member.
     */
   def lookupAvailableTraffic(
-      domainId: DomainId
+      synchronizerId: SynchronizerId
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]]
 }
 
@@ -35,7 +35,7 @@ object TrafficBalanceService {
 
   private trait AvailableTrafficLookupService {
     def lookupAvailableTraffic(
-        domainId: DomainId
+        synchronizerId: SynchronizerId
     )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]]
   }
 
@@ -43,7 +43,7 @@ object TrafficBalanceService {
       participantAdminConnection: ParticipantAdminConnection
   ) extends AvailableTrafficLookupService {
     override def lookupAvailableTraffic(
-        domainId: DomainId
+        synchronizerId: SynchronizerId
     )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]] = {
       // Ideally we would just throw a NOT_FOUND error here if the traffic state does not exist
       // and have the caller retry it. However, currently the traffic state gets initialized in
@@ -58,7 +58,7 @@ object TrafficBalanceService {
       // check in this case.
       // TODO(#6644): Revisit this once Canton initializes the traffic state on sequencer connection.
       participantAdminConnection
-        .getParticipantTrafficState(domainId: DomainId)
+        .getParticipantTrafficState(synchronizerId: SynchronizerId)
         .transform {
           case Success(value) => Success(Some(value.extraTrafficRemainder))
           case Failure(e: StatusRuntimeException)
@@ -86,7 +86,7 @@ object TrafficBalanceService {
       new AtomicReference(None)
 
     override def lookupAvailableTraffic(
-        domainId: DomainId
+        synchronizerId: SynchronizerId
     )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]] = {
       val now = clock.now
       trafficBalanceCache.get() match {
@@ -96,7 +96,7 @@ object TrafficBalanceService {
           Future.successful(Some(trafficBalance))
         case _ =>
           for {
-            trafficBalanceO <- trafficLookupService.lookupAvailableTraffic(domainId)
+            trafficBalanceO <- trafficLookupService.lookupAvailableTraffic(synchronizerId)
           } yield trafficBalanceO.map(trafficBalance => {
             trafficBalanceCache.set(
               Some(CachedTrafficBalance(now.add(trafficBalanceCacheTTL.asJava), trafficBalance))
@@ -110,7 +110,7 @@ object TrafficBalanceService {
   }
 
   def apply(
-      lookupReservedTrafficForDomain: DomainId => Future[Option[NonNegativeLong]],
+      lookupReservedTrafficForDomain: SynchronizerId => Future[Option[NonNegativeLong]],
       participantAdminConnection: ParticipantAdminConnection,
       clock: Clock,
       trafficBalanceCacheTTL: NonNegativeFiniteDuration,
@@ -125,13 +125,15 @@ object TrafficBalanceService {
       loggerFactory,
     )
     new TrafficBalanceService {
-      override def lookupReservedTraffic(domainId: DomainId): Future[Option[NonNegativeLong]] =
-        lookupReservedTrafficForDomain(domainId)
+      override def lookupReservedTraffic(
+          synchronizerId: SynchronizerId
+      ): Future[Option[NonNegativeLong]] =
+        lookupReservedTrafficForDomain(synchronizerId)
 
       override def lookupAvailableTraffic(
-          domainId: DomainId
+          synchronizerId: SynchronizerId
       )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[Long]] =
-        trafficLookupService.lookupAvailableTraffic(domainId)
+        trafficLookupService.lookupAvailableTraffic(synchronizerId)
     }
   }
 

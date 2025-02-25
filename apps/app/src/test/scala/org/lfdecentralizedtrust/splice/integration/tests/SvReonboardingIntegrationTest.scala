@@ -8,7 +8,6 @@ import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
   ParticipantClientConfig,
-  SpliceDbConfig,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -30,7 +29,7 @@ import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, 
 import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ClientConfig, DbConfig}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 
@@ -104,7 +103,7 @@ class SvReonboardingIntegrationTest
                 sv4Config
                   .copy(
                     storage = sv4Config.storage match {
-                      case c: SpliceDbConfig.Postgres =>
+                      case c: DbConfig.Postgres =>
                         c.copy(
                           config = c.config
                             .withValue(
@@ -140,7 +139,7 @@ class SvReonboardingIntegrationTest
                       ),
                     ),
                     storage = referenceValidatorConfig.storage match {
-                      case c: SpliceDbConfig.Postgres =>
+                      case c: DbConfig.Postgres =>
                         c.copy(
                           config = c.config
                             .withValue(
@@ -272,7 +271,7 @@ class SvReonboardingIntegrationTest
         ).map(_.toProtoPrimitive)
 
         sv1Backend.appState.participantAdminConnection
-          .getMediatorDomainState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -283,7 +282,7 @@ class SvReonboardingIntegrationTest
           sv4MediatorId,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerDomainState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -343,7 +342,7 @@ class SvReonboardingIntegrationTest
               sv3Backend.participantClient.id,
             )
             sv1Backend.appState.participantAdminConnection
-              .getMediatorDomainState(decentralizedSynchronizerId)
+              .getMediatorSynchronizerState(decentralizedSynchronizerId)
               .futureValue
               .mapping
               .active
@@ -353,7 +352,7 @@ class SvReonboardingIntegrationTest
               sv3MediatorId,
             )
             sv1Backend.appState.participantAdminConnection
-              .getSequencerDomainState(decentralizedSynchronizerId)
+              .getSequencerSynchronizerState(decentralizedSynchronizerId)
               .futureValue
               .mapping
               .active
@@ -447,7 +446,7 @@ class SvReonboardingIntegrationTest
         val sv4SequencerIdNew =
           sv4ReonboardBackend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
         sv1Backend.appState.participantAdminConnection
-          .getMediatorDomainState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -458,7 +457,7 @@ class SvReonboardingIntegrationTest
           sv4MediatorIdNew,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerDomainState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active

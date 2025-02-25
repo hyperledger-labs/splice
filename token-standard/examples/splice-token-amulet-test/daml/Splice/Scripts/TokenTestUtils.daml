@@ -1,0 +1,105 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TokenTestUtils where
+
+import Daml.Script
+
+import DA.Map as Map
+
+import Splice.Scripts.Util
+import Splice.Amulet
+import Splice.AmuletAllocation
+import Splice.AmuletRules
+import Splice.ExternalPartyAmuletRules
+import Splice.Round
+
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
+import Splice.Api.Token.AllocationInstructionV1
+
+import Util.Disclosure
+
+
+-- Support code
+----------------
+
+getAmuletTransferFactory_TransferContext : AmuletApp -> Api.Token.TransferInstructionV1.Transfer -> Script (ContractId Api.Token.TransferInstructionV1.TransferFactory, ExtraArgs, Disclosures')
+getAmuletTransferFactory_TransferContext app transfer = do
+  [(extAmuletRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
+  let amuletFactory = toInterfaceContractId @Api.Token.TransferInstructionV1.TransferFactory extAmuletRulesCid
+  extAmuletRules <- queryDisclosure' app.dso extAmuletRulesCid
+  -- get the preaaproval for the receiver
+  [(preapprovalCid, preapproval)] <- queryFilter @TransferPreapproval transfer.receiver (\preapproval -> preapproval.receiver == transfer.receiver)
+  preapprovalDisc <- queryDisclosure' @TransferPreapproval app.dso preapprovalCid
+  -- get featured app right for pre-approval provider
+  (featuredDiscs, featuredContext) <- getFeaturedAppRightIfExists app preapproval.provider
+  let providerUser = AmuletUser with primaryParty = preapproval.provider; userId = app.dsoUser.userId -- TODO(tech-debt): remove this hack by passing parties instead of users
+  -- fetch amulet disclosures
+  amuletDiscs <- queryAmuletHoldingDisclosures app transfer.holdingCids
+  -- massage choice context into shape
+  (disclosures, extraArgs0) <- getAmuletTransferChoiceContext app providerUser
+  let extraArgs = extraArgs0 with
+        context = ChoiceContext with
+          values =
+            Map.union featuredContext.values $
+            Map.insert "splice.lfdecentralizedtrust.org/transfer-preapproval"
+              (AV_ContractId (coerceContractId preapprovalCid))
+            extraArgs0.context.values
+  pure (amuletFactory, extraArgs, extAmuletRules <> amuletDiscs <> preapprovalDisc <> disclosures <> featuredDiscs)
+
+getFeaturedAppRightIfExists : AmuletApp -> Party -> Script (Disclosures', ChoiceContext)
+getFeaturedAppRightIfExists app provider = do
+  appRights <- queryFilter @FeaturedAppRight app.dso (\appRight -> appRight.provider == provider)
+  case appRights of
+    [] -> pure (mempty, ChoiceContext with values=Map.empty)
+    (rightCid, _) :: _ -> do
+      rightDisc <- queryDisclosure' @FeaturedAppRight app.dso rightCid
+      let context = ChoiceContext with values=(Map.fromList [ ("splice.lfdecentralizedtrust.org/featured-app-right" , AV_ContractId (coerceContractId rightCid)) ])
+      pure (rightDisc, context)
+
+getAmuletAllocationFactory : AmuletApp -> Script (ContractId AllocationFactory, Disclosures')
+getAmuletAllocationFactory app = do
+  [(extAmuletRulesCid, _)] <- query @ExternalPartyAmuletRules app.dso
+  let amuletFactory = toInterfaceContractId @AllocationFactory extAmuletRulesCid
+  extAmuletRules <- queryDisclosure' app.dso extAmuletRulesCid
+  pure (amuletFactory, extAmuletRules)
+
+-- note: for Amulet the allocation workflow is the same for all allocations
+getAmuletAllocationFactory_AllocateContext : AmuletApp -> AmuletUser -> Script (ContractId AllocationFactory, ExtraArgs, Disclosures')
+getAmuletAllocationFactory_AllocateContext app user = do
+  (amuletFactory, extAmuletRules) <- getAmuletAllocationFactory app
+  (disclosures, extraArgs) <- getAmuletTransferChoiceContext app user
+  pure (amuletFactory, extraArgs, extAmuletRules <> disclosures)
+
+
+getAmuletAllocation_ExecuteTransferContext : AmuletApp -> AmuletUser -> ContractId Allocation -> Script (Disclosures', ExtraArgs)
+getAmuletAllocation_ExecuteTransferContext app venue allocCid = do
+  (disclosures, extraArgs) <- getAmuletTransferChoiceContext app venue
+  Some amuletAlloc <- queryContractId @AmuletAllocation venue.primaryParty (coerceContractId allocCid)
+  lockedAmulet <- queryDisclosure' @LockedAmulet app.dso amuletAlloc.lockedAmulet
+  pure (lockedAmulet <> disclosures, extraArgs)
+
+getAmuletTransferChoiceContext : AmuletApp -> AmuletUser -> Script (Disclosures', ExtraArgs)
+getAmuletTransferChoiceContext app provider1 = do
+  context0 <- getPaymentTransferContext app provider1
+  amuletRulesD <- queryDisclosure' @AmuletRules app.dso context0.amuletRules
+  openRoundD <- queryDisclosure' @OpenMiningRound app.dso context0.context.openMiningRound
+  let context = paymentToChoiceContext context0
+  let extraArgs = ExtraArgs with
+        context
+        meta = emptyMetadata
+  let disclosures = amuletRulesD <> openRoundD
+  pure (disclosures, extraArgs)
+
+queryAmuletDisclosures : AmuletApp -> [ContractId Amulet] -> Script Disclosures'
+queryAmuletDisclosures app amuletCids = do
+  discs <- forA amuletCids $ \amuletCid -> do
+    _ <- queryContractId @Amulet app.dso amuletCid
+    queryDisclosure' @Amulet app.dso amuletCid
+  pure $ mconcat discs
+
+queryAmuletHoldingDisclosures : AmuletApp -> [ContractId Api.Token.HoldingV1.Holding] -> Script Disclosures'
+queryAmuletHoldingDisclosures app = queryAmuletDisclosures app . map (fromInterfaceContractId @Amulet)

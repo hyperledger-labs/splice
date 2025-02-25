@@ -5,6 +5,17 @@ package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.google.protobuf.ByteString
+import io.circe.parser.*
+import io.grpc.Status.Code
+import io.grpc.{Status, StatusRuntimeException}
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingRequest
@@ -15,29 +26,17 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
+import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.transaction.SequencerDomainState
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import io.circe.parser.*
-import io.grpc.{Status, StatusRuntimeException}
-import io.grpc.Status.Code
-import io.opentelemetry.api.trace.Tracer
-import java.nio.charset.StandardCharsets
 
-import com.google.protobuf.ByteString
+import java.nio.charset.StandardCharsets
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -57,6 +56,7 @@ class HttpSvHandler(
     dsoPartyMigration: DsoPartyMigration,
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
+    isBftSequencer: Boolean,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -540,19 +540,22 @@ class HttpSvHandler(
   private def waitForNewSequencerObservedByExistingSequencer(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[CantonTimestamp] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-      sequenced <- retryProvider.getValueWithRetries(
+      _ <- retryProvider.getValueWithRetries(
         RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
         "sequencer_added_to_topology_state",
-        "New sequencer is observed in SequencerDomainState through existing sequencer",
+        "New sequencer is observed in SequencerSynchronizerState through existing sequencer",
         sequencerAdminConnection
-          .listSequencerDomainState(decentralizedSynchronizer, store.TimeQuery.Range(None, None))
+          .listSequencerSynchronizerState(
+            decentralizedSynchronizer,
+            store.TimeQuery.Range(None, None),
+          )
           .map { result =>
             result
               .sortBy(_.base.serial)
-              .foldLeft[Option[TopologyResult[SequencerDomainState]]](None) {
+              .foldLeft[Option[TopologyResult[SequencerSynchronizerState]]](None) {
                 case (_, newMapping) if !newMapping.mapping.allSequencers.contains(sequencerId) =>
                   None
                 case (None, newMapping) if newMapping.mapping.allSequencers.contains(sequencerId) =>
@@ -574,7 +577,27 @@ class HttpSvHandler(
           },
         logger,
       )
-    } yield CantonTimestamp.tryFromInstant(sequenced)
+      _ <-
+        if (isBftSequencer) {
+          retryProvider.waitUntil(
+            RetryFor.WaitingOnInitDependency,
+            "sequencer_ordering_topology",
+            s"Wait for $sequencerId to be in the ordering topology",
+            sequencerAdminConnection
+              .getSequencerOrderingTopology()
+              .map(topology =>
+                if (topology.sequencerIds.contains(sequencerId)) ()
+                else
+                  throw Status.NOT_FOUND
+                    .withDescription(
+                      s"Sequencer $sequencerId is not in the ordering topology $topology"
+                    )
+                    .asRuntimeException()
+              ),
+            logger,
+          )
+        } else Future.unit
+    } yield ()
   }
 
   private def getSequencerOnboardingState(
@@ -737,7 +760,7 @@ class HttpSvHandler(
       ) map (_.update)
       _ <- dsoStoreWithIngestion.connection
         .submit(Seq(svParty), Seq(dsoParty), cmds)
-        .withDomainId(dsoRules.domain)
+        .withSynchronizerId(dsoRules.domain)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()

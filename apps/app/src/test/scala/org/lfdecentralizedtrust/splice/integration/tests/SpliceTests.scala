@@ -1,12 +1,26 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.parallel.*
+import com.auth0.exception.Auth0Exception
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.metrics.api.{HistogramInventory, MetricsContext, MetricsInfoFilter}
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
-import com.daml.metrics.api.{HistogramInventory, MetricsContext, MetricsInfoFilter}
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
+import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
+import org.lfdecentralizedtrust.splice.console.*
+import org.lfdecentralizedtrust.splice.environment.{EnvironmentImpl, RetryProvider}
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.plugins.{
+  ResetDecentralizedNamespace,
+  ResetSequencerSynchronizerStateThreshold,
+  UpdateHistorySanityCheckPlugin,
+  WaitForPorts,
+}
+import org.lfdecentralizedtrust.splice.sv.config.{SvOnboardingConfig, SynchronizerFeesConfig}
+import org.lfdecentralizedtrust.splice.util.{Auth0Util, CommonAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
@@ -27,37 +41,24 @@ import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
 import io.opentelemetry.sdk.metrics.internal.state.MetricStorage
-import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
+import org.apache.pekko.Done
 import org.apache.pekko.http.scaladsl.Http
 import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
-import org.lfdecentralizedtrust.splice.auth.AuthUtil
-import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
-import org.lfdecentralizedtrust.splice.console.*
-import org.lfdecentralizedtrust.splice.environment.{EnvironmentImpl, RetryProvider}
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.plugins.{
-  ResetDecentralizedNamespace,
-  ResetSequencerDomainStateThreshold,
-  UpdateHistorySanityCheckPlugin,
-  WaitForPorts,
-}
-import org.lfdecentralizedtrust.splice.sv.config.{SvOnboardingConfig, SynchronizerFeesConfig}
-import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
 import org.scalactic.source
+import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.{MatchResult, Matcher}
-import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
+import scala.util.{Failure, Success, Try}
 import scala.util.chaining.scalaUtilChainingOps
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
 
 /** Analogue to Canton's CommunityTests */
 object SpliceTests extends LazyLogging {
@@ -141,6 +142,7 @@ object SpliceTests extends LazyLogging {
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val updateHistoryIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
+    registerPlugin(new WaitForPorts(extraPortsToWaitFor))
 
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
@@ -151,12 +153,12 @@ object SpliceTests extends LazyLogging {
         )
       )
     }
-    registerPlugin(new WaitForPorts(extraPortsToWaitFor))
+
     if (resetRequiredTopologyState) {
       registerPlugin(new ResetDecentralizedNamespace())
       // We MUST have the decentralized namespace reset before the reset of the sequencer domain state since
       // the latter expects that submitting the topology tx from only sv1 will succeed.
-      registerPlugin(new ResetSequencerDomainStateThreshold())
+      registerPlugin(new ResetSequencerSynchronizerStateThreshold())
     }
 
     override def environmentDefinition
@@ -176,16 +178,6 @@ object SpliceTests extends LazyLogging {
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val updateHistoryIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
 
-    if (runUpdateHistorySanityCheck) {
-      registerPlugin(
-        new UpdateHistorySanityCheckPlugin(
-          updateHistoryIgnoredRootCreates,
-          updateHistoryIgnoredRootExercises,
-          loggerFactory,
-        )
-      )
-    }
-
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 
     override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
@@ -202,11 +194,21 @@ object SpliceTests extends LazyLogging {
     protected lazy val resetRequiredTopologyState: Boolean = true
 
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
+
+    if (runUpdateHistorySanityCheck) {
+      registerPlugin(
+        new UpdateHistorySanityCheckPlugin(
+          updateHistoryIgnoredRootCreates,
+          updateHistoryIgnoredRootExercises,
+          loggerFactory,
+        )
+      )
+    }
     if (resetRequiredTopologyState) {
       // We MUST have the decentralized namespace reset before the reset of the sequencer domain state since
       // the latter expects that submitting the topology tx from only sv1 will succeed.
       registerPlugin(new ResetDecentralizedNamespace())
-      registerPlugin(new ResetSequencerDomainStateThreshold())
+      registerPlugin(new ResetSequencerSynchronizerStateThreshold())
     }
 
     override def environmentDefinition
@@ -472,20 +474,65 @@ object SpliceTests extends LazyLogging {
     def perTestCaseName(name: String)(implicit env: SpliceTestConsoleEnvironment) =
       s"${name}.unverified.$ansAcronym"
 
+    private def readMandatoryEnvVar(name: String): String = {
+      sys.env.get(name) match {
+        case None => fail(s"Environment variable $name must be set")
+        case Some(s) if s.isEmpty => fail(s"Environment variable $name must be non-empty")
+        case Some(s) => s
+      }
+    }
+
+    def auth0UtilFromEnvVars(tenant: String): Auth0Util = {
+      val (mgmtPrefix, domainPrefix) = tenant match {
+        // Used for preflight checks
+        case "dev" => ("AUTH0_CN", "SPLICE_OAUTH_DEV")
+        // Used for sv preflight checks
+        case "sv" => ("AUTH0_SV", "SPLICE_OAUTH_SV_TEST")
+        // Used for validator preflight checks
+        case "validator" => ("AUTH0_VALIDATOR", "SPLICE_OAUTH_VALIDATOR_TEST")
+        // Used locally
+        case "test" => ("AUTH0_TESTS", "SPLICE_OAUTH_TEST")
+        case _ => fail(s"Invalid tenant value: $tenant")
+      }
+      val domain = s"https://${readMandatoryEnvVar(s"${domainPrefix}_AUTHORITY")}";
+      val clientId = readMandatoryEnvVar(s"${mgmtPrefix}_MANAGEMENT_API_CLIENT_ID");
+      val clientSecret = readMandatoryEnvVar(s"${mgmtPrefix}_MANAGEMENT_API_CLIENT_SECRET");
+
+      retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret, loggerFactory))
+    }
+
+    def retryAuth0Calls[T](f: => T): T = {
+      eventually() {
+        try {
+          f
+        } catch {
+          case auth0Exception: Auth0Exception => {
+            logger.debug("Auth0 exception raised, triggering retry...")
+            fail(auth0Exception)
+          }
+          case ioException: java.io.IOException => {
+            logger.debug("IOException raised, triggering retry...")
+            fail(ioException)
+          }
+          case ex: Throwable => throw ex // throw anything else
+        }
+      }
+    }
+
     /** Overrides the retry policy for ALL grpc commands executed in the given block */
     def withCommandRetryPolicy[T](
         policy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean
     )(block: => T)(implicit env: SpliceTestConsoleEnvironment): T = {
-      val prevD = env.grpcDomainCommandRunner.retryPolicy
+      val prevD = env.grpcSequencerCommandRunner.retryPolicy
       val prevL = env.grpcLedgerCommandRunner.retryPolicy
       val prevA = env.grpcAdminCommandRunner.retryPolicy
       try {
-        env.grpcDomainCommandRunner.setRetryPolicy(policy)
+        env.grpcSequencerCommandRunner.setRetryPolicy(policy)
         env.grpcLedgerCommandRunner.setRetryPolicy(policy)
         env.grpcAdminCommandRunner.setRetryPolicy(policy)
         block
       } finally {
-        env.grpcDomainCommandRunner.setRetryPolicy(prevD)
+        env.grpcSequencerCommandRunner.setRetryPolicy(prevD)
         env.grpcLedgerCommandRunner.setRetryPolicy(prevL)
         env.grpcAdminCommandRunner.setRetryPolicy(prevA)
       }

@@ -25,16 +25,26 @@ auth:
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
 
 # CONFIGURING_TOPUP_START
-# Configuring a validator's traffic top-up loop;
-# see documentation for more detailed information.
-topup:
-  # set to false in order to disable automatic traffic top-ups
-  enabled: true
-  # target throughput in bytes / second of sequenced traffic; targetThroughput=0 <=> enabled=false
-  targetThroughput: 20000
-  # minTopupInterval - minimum time interval that must elapse before the next top-up
-  minTopupInterval: "1m"
+# Configuring a validator's traffic top-up loop
+#
+# enabled - set to false in order to disable automatic traffic top-ups.
+# targetThroughput - target throughput in bytes / second of sequenced traffic. targetThroughput=0 <=> enabled=false
+# minTopupInterval - minimum time interval that must elapse before the next top-up.
+#
+# On each successful top-up, an amount of traffic roughly equivalent to `targetThroughput * minTopupInterval`
+# (possibly with some rounding-up), referred to as the top-up amount, is purchased. The `minTopupInterval` allows
+# validator operators to control the frequency at which automated top-ups happen. Note that the actual top-up amount
+# and top-up interval might be larger due to the DSO requiring a minimal top-up amount larger than `targetThroughput * minTopupInterval`.
+#
+# The next top-up gets triggered when:
+# - the available traffic amount drops below the configured top-up amount
+# - at least minTopupInterval has elapsed since the last one
+# - the validator has sufficient CC in its wallet to buy this much traffic (except on DevNet)
 # CONFIGURING_TOPUP_END
+topup:
+  enabled: true
+  targetThroughput: 20000
+  minTopupInterval: "1m"
 
 # This will disable the wallet HTTP server and wallet automations when set to false
 enableWallet: true

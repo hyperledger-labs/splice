@@ -117,6 +117,18 @@ object PackageIdResolver {
               case Package.SpliceValidatorLifecycle => DarResources.validatorLifecycle
               case Package.SpliceWallet => DarResources.wallet
               case Package.SpliceWalletPayments => DarResources.walletPayments
+              case Package.TokenStandard.TokenMetadata =>
+                DarResources.TokenStandard.tokenMetadata
+              case Package.TokenStandard.TokenHolding =>
+                DarResources.TokenStandard.tokenHolding
+              case Package.TokenStandard.TokenTransferInstruction =>
+                DarResources.TokenStandard.tokenTransferInstruction
+              case Package.TokenStandard.TokenAllocation =>
+                DarResources.TokenStandard.tokenAllocation
+              case Package.TokenStandard.TokenAllocationRequest =>
+                DarResources.TokenStandard.tokenAllocationRequest
+              case Package.TokenStandard.TokenAllocationInstruction =>
+                DarResources.TokenStandard.tokenAllocationInstruction
             }
         }
     }
@@ -189,6 +201,18 @@ object PackageIdResolver {
       case SpliceValidatorLifecycle => packageConfig.validatorLifecycle
       case SpliceWallet => packageConfig.wallet
       case SpliceWalletPayments => packageConfig.walletPayments
+      case TokenStandard.TokenMetadata =>
+        DarResources.TokenStandard.tokenMetadata.bootstrap.metadata.version.toString()
+      case TokenStandard.TokenHolding =>
+        DarResources.TokenStandard.tokenHolding.bootstrap.metadata.version.toString()
+      case TokenStandard.TokenTransferInstruction =>
+        DarResources.TokenStandard.tokenTransferInstruction.bootstrap.metadata.version.toString()
+      case TokenStandard.TokenAllocation =>
+        DarResources.TokenStandard.tokenAllocation.bootstrap.metadata.version.toString()
+      case TokenStandard.TokenAllocationRequest =>
+        DarResources.TokenStandard.tokenAllocationRequest.bootstrap.metadata.version.toString()
+      case TokenStandard.TokenAllocationInstruction =>
+        DarResources.TokenStandard.tokenAllocationInstruction.bootstrap.metadata.version.toString()
     }
     PackageVersion.assertFromString(version)
   }
@@ -216,6 +240,12 @@ object PackageIdResolver {
     "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
     "Splice.Wallet.ExternalParty" -> Package.SpliceWallet,
     "Splice.Wallet.TransferPreapproval" -> Package.SpliceWallet,
+    "Splice.Api.Token.MetadataV1" -> Package.TokenStandard.TokenMetadata,
+    "Splice.Api.Token.HoldingV1" -> Package.TokenStandard.TokenHolding,
+    "Splice.Api.Token.TransferInstructionV1" -> Package.TokenStandard.TokenTransferInstruction,
+    "Splice.Api.Token.AllocationV1" -> Package.TokenStandard.TokenAllocation,
+    "Splice.Api.Token.AllocationRequestV1" -> Package.TokenStandard.TokenAllocationRequest,
+    "Splice.Api.Token.AllocationInstructionV1" -> Package.TokenStandard.TokenAllocationInstruction,
   )
 
   sealed abstract class Package extends Product with Serializable {
@@ -230,6 +260,14 @@ object PackageIdResolver {
   }
 
   object Package {
+    object TokenStandard {
+      final case object TokenMetadata extends Package
+      final case object TokenHolding extends Package
+      final case object TokenTransferInstruction extends Package
+      final case object TokenAllocation extends Package
+      final case object TokenAllocationRequest extends Package
+      final case object TokenAllocationInstruction extends Package
+    }
     final case object SpliceAmulet extends Package
     final case object SpliceAmuletNameService extends Package
     final case object SpliceDsoGovernance extends Package

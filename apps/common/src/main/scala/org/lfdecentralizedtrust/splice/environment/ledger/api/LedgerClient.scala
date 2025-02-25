@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.auth.AuthToken
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
 import org.lfdecentralizedtrust.splice.util.DisclosedContracts
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Fingerprint
@@ -35,7 +35,7 @@ import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
@@ -186,20 +186,6 @@ private[environment] class LedgerClient(
         .serverStreaming(request, stub.getActiveContracts)
     )
 
-  def tryGetTransactionTreeByEventId(
-      parties: Seq[String],
-      id: String,
-  )(implicit traceContext: TraceContext): Future[com.daml.ledger.javaapi.data.TransactionTree] = {
-    val req =
-      lapi.update_service.GetTransactionByEventIdRequest(eventId = id, requestingParties = parties)
-    for {
-      stub <- withCredentialsAndTraceContext(updateServiceStub)
-      res <- stub.getTransactionTreeByEventId(req).map { resp =>
-        LedgerClient.lapiTreeToJavaTree(resp.getTransaction)
-      }
-    } yield res
-  }
-
   def updates(
       request: GetUpdatesRequest
   )(implicit tc: TraceContext): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] = {
@@ -213,7 +199,7 @@ private[environment] class LedgerClient(
   }
 
   def submitAndWait[Z](
-      domainId: String,
+      synchronizerId: String,
       applicationId: String,
       commandId: String,
       deduplicationConfig: DedupConfig,
@@ -225,7 +211,7 @@ private[environment] class LedgerClient(
       deadline: Option[NonNegativeFiniteDuration] = None,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Z] = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
       .setCommandId(commandId)
       .setApplicationId(applicationId)
       .addAllActAs(actAs.asJava)
@@ -264,7 +250,7 @@ private[environment] class LedgerClient(
   }
 
   def prepareSubmission(
-      domainId: Option[String],
+      synchronizerId: Option[String],
       applicationId: String,
       commandId: String,
       actAs: Seq[String],
@@ -284,7 +270,7 @@ private[environment] class LedgerClient(
           disclosedContracts = disclosedContracts.toLedgerApiDisclosedContracts.map(
             lapi.commands.DisclosedContract.fromJavaProto(_)
           ),
-          domainId = domainId.getOrElse(""),
+          synchronizerId = synchronizerId.getOrElse(""),
           applicationId = applicationId,
           commandId = commandId,
           actAs = actAs,
@@ -601,15 +587,17 @@ private[environment] class LedgerClient(
 
   def getConnectedDomains(
       party: PartyId
-  )(implicit tc: TraceContext): Future[Map[DomainAlias, DomainId]] = {
-    val req = lapi.state_service.GetConnectedDomainsRequest(
+  )(implicit tc: TraceContext): Future[Map[SynchronizerAlias, SynchronizerId]] = {
+    val req = lapi.state_service.GetConnectedSynchronizersRequest(
       party = party.toProtoPrimitive
     )
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
-      res <- stub.getConnectedDomains(req).map { resp =>
-        resp.connectedDomains.map { cd =>
-          DomainAlias.tryCreate(cd.domainAlias) -> DomainId.tryFromString(cd.domainId)
+      res <- stub.getConnectedSynchronizers(req).map { resp =>
+        resp.connectedSynchronizers.map { cd =>
+          SynchronizerAlias.tryCreate(cd.synchronizerAlias) -> SynchronizerId.tryFromString(
+            cd.synchronizerId
+          )
         }.toMap
       }
     } yield res
@@ -736,7 +724,7 @@ object LedgerClient {
 
   final case class GetTreeUpdatesResponse(
       update: TreeUpdate,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )
   def lapiTreeToJavaTree(
       tree: lapi.transaction.TransactionTree
@@ -756,10 +744,10 @@ object LedgerClient {
         case TU.TransactionTree(tree) =>
           val javaTree = lapiTreeToJavaTree(tree)
           val update = TransactionTreeUpdate(javaTree)
-          Some(GetTreeUpdatesResponse(update, DomainId.tryFromString(tree.domainId)))
+          Some(GetTreeUpdatesResponse(update, SynchronizerId.tryFromString(tree.synchronizerId)))
 
         case TU.Reassignment(x) =>
-          val domainIdP = x.event match {
+          val synchronizerIdP = x.event match {
             case lapi.reassignment.Reassignment.Event.Empty =>
               sys.error("uninitialized update service result (event)")
             case lapi.reassignment.Reassignment.Event.UnassignedEvent(unassign) => unassign.source
@@ -768,11 +756,13 @@ object LedgerClient {
           Some(
             GetTreeUpdatesResponse(
               ReassignmentUpdate(Reassignment.fromProto(x)),
-              DomainId.tryFromString(domainIdP),
+              SynchronizerId.tryFromString(synchronizerIdP),
             )
           )
 
         case TU.OffsetCheckpoint(_) => None
+
+        case TU.TopologyTransaction(_) => None
 
         case TU.Empty => sys.error("uninitialized update service result (update)")
       }
@@ -784,8 +774,8 @@ object LedgerClient {
   object ReassignmentCommand {
     final case class Unassign(
         contractId: ContractId[_],
-        source: DomainId,
-        target: DomainId,
+        source: SynchronizerId,
+        target: SynchronizerId,
     ) extends ReassignmentCommand {
       def toProto: lapi.reassignment_command.UnassignCommand =
         lapi.reassignment_command.UnassignCommand(
@@ -808,8 +798,8 @@ object LedgerClient {
 
     final case class Assign(
         unassignId: String,
-        source: DomainId,
-        target: DomainId,
+        source: SynchronizerId,
+        target: SynchronizerId,
     ) extends ReassignmentCommand {
       def toProto: lapi.reassignment_command.AssignCommand =
         lapi.reassignment_command.AssignCommand(

@@ -16,13 +16,12 @@ import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, 
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import slick.jdbc.JdbcProfile
-
-import scala.concurrent.Future
 
 class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
@@ -199,7 +198,7 @@ class DbMultiDomainAcsStoreTest
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[?] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = {
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

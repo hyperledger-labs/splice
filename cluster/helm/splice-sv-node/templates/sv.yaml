@@ -143,9 +143,17 @@ spec:
                 canton.sv-apps.sv.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
             {{- with .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
+              #TODO(#15343) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
                 canton.sv-apps.sv.local-synchronizer-node {
                   sequencer {
+                    {{- if .enableBftSequencer }}
+                    is-bft-sequencer = true
+                    external-peer-api-url-suffix =  {
+                      host = {{ .sequencerBftPublicUrlSuffix | quote }}
+                      port = 80
+                    }
+                    {{- end }}
                     admin-api {
                       address = {{ .sequencerAddress | quote }}
                       port = 5009

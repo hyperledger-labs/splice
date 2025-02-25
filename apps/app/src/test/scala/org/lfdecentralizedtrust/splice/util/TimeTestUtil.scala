@@ -136,7 +136,7 @@ trait TimeTestUtil extends TestCommon {
         .commands
         .asScala
         .toSeq,
-      domainId = Some(disclosure.assignedDomain),
+      synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       optTimeout = None,
     )

@@ -1,21 +1,27 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.{HistogramInventory, MetricName}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{CantonCommunityConfig, TestingConfigInternal}
-import com.digitalasset.canton.domain.mediator.{CommunityMediatorNodeConfig, MediatorNodeBootstrap}
-import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrap
-import com.digitalasset.canton.domain.sequencing.config.CommunitySequencerNodeConfig
 import com.digitalasset.canton.integration.CommunityConfigTransforms
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.participant.config.*
+import com.digitalasset.canton.participant.metrics.{ParticipantHistograms, ParticipantMetrics}
 import com.digitalasset.canton.participant.sync.SyncServiceError
 import com.digitalasset.canton.participant.{ParticipantNode, ParticipantNodeBootstrap}
+import com.digitalasset.canton.synchronizer.mediator.{
+  CommunityMediatorNodeConfig,
+  MediatorNodeBootstrap,
+}
+import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencer.config.CommunitySequencerNodeConfig
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, ConfigStubs, HasExecutionContext}
 import monocle.macros.syntax.lens.*
@@ -76,11 +82,22 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
     def mockParticipantAndNode: (ParticipantNodeBootstrap, ParticipantNode) = {
       val bootstrap = mock[ParticipantNodeBootstrap]
       val node = mock[ParticipantNode]
+      val metrics = new ParticipantMetrics(
+        new ParticipantHistograms(MetricName("test"))(new HistogramInventory),
+        new NoOpMetricsFactory,
+      )
+      val closeContext = CloseContext(mock[FlagCloseable])
       when(bootstrap.name).thenReturn(InstanceName.tryCreate("mockP"))
       when(bootstrap.start()).thenReturn(EitherT.pure[Future, String](()))
       when(bootstrap.getNode).thenReturn(Some(node))
-      when(node.reconnectDomainsIgnoreFailures()(any[TraceContext], any[ExecutionContext]))
-        .thenReturn(EitherT.pure[FutureUnlessShutdown, SyncServiceError](()))
+      when(
+        node.reconnectSynchronizersIgnoreFailures(any[Boolean])(
+          any[TraceContext],
+          any[ExecutionContext],
+        )
+      ).thenReturn(EitherT.pure[FutureUnlessShutdown, SyncServiceError](()))
+      when(bootstrap.metrics).thenReturn(metrics)
+      when(bootstrap.closeContext).thenReturn(closeContext)
       when(node.config).thenReturn(participant1Config)
       (bootstrap, node)
     }
@@ -138,54 +155,14 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
         Seq("s1", "s2").foreach(setupSequencerFactory(_, mockSequencer))
         Seq("m1", "m2").foreach(setupMediatorFactory(_, mockMediator))
 
-        environment.startAndReconnect(false) shouldBe Either.unit
+        environment.startAndReconnect() shouldBe Either.unit
         verify(pp.getNode.valueOrFail("node should be set"), times(2))
-          .reconnectDomainsIgnoreFailures()(any[TraceContext], any[ExecutionContext])
+          .reconnectSynchronizersIgnoreFailures(any[Boolean])(
+            any[TraceContext],
+            any[ExecutionContext],
+          )
 
       }
-
-      // TODO(i14048): reenable this test
-//      "auto-connect if requested" in new TestEnvironment {
-//
-//        override def config: CantonCommunityConfig =
-//          (CommunityConfigTransforms.updateAllDomainConfigs { case (_, config) =>
-//            config
-//              .focus(_.publicApi)
-//              .replace(CommunityPublicServerConfig(internalPort = Some(Port.tryCreate(42))))
-//          })(sampleConfig)
-//
-//        val (pp, pn) = mockParticipantAndNode
-//        val d1 = mockDomain
-//        val d2 = mockDomain
-//
-//        when(pp.isActive).thenReturn(true)
-//        when(d1.isActive).thenReturn(true)
-//        when(d2.isActive).thenReturn(false)
-//
-//        when(d1.config).thenReturn(
-//          config.domainsByString.get("d1").valueOrFail("where is my config?")
-//        )
-//        when(
-//          pn.autoConnectLocalDomain(any[DomainConnectionConfig])(
-//            any[TraceContext],
-//            any[ExecutionContext],
-//          )
-//        ).thenReturn(EitherTUtil.unitUS)
-//
-//        Seq("p1", "p2").foreach(setupParticipantFactory(_, pp))
-//        setupDomainFactory("d1", d1)
-//        setupDomainFactory("d2", d2)
-//
-//        clue("auto-start") {
-//          environment.startAndReconnect(true) shouldBe Either.unit
-//        }
-//
-//        verify(pn, times(2)).autoConnectLocalDomain(any[DomainConnectionConfig])(
-//          any[TraceContext],
-//          any[ExecutionContext],
-//        )
-//
-//      }
 
       "write ports file if desired" in new TestEnvironment {
 
@@ -210,7 +187,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
         Seq("m1", "m2").foreach(setupMediatorFactory(_, mockMediator))
 
         clue("write ports file") {
-          environment.startAndReconnect(false) shouldBe Either.unit
+          environment.startAndReconnect() shouldBe Either.unit
         }
         assert(f.exists())
 
@@ -229,7 +206,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
         Seq("s1", "s2").foreach(setupSequencerFactory(_, mySequencer))
         Seq("m1", "m2").foreach(setupMediatorFactory(_, myMediator))
 
-        environment.startAndReconnect(false) shouldBe Either.unit
+        environment.startAndReconnect() shouldBe Either.unit
       }
 
       "report exceptions" in new TestEnvironment {
@@ -239,7 +216,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
         Seq("s1", "s2").foreach(setupSequencerFactory(_, throw exception))
         Seq("m1", "m2").foreach(setupMediatorFactory(_, throw exception))
 
-        assertThrows[RuntimeException](environment.startAndReconnect(false))
+        assertThrows[RuntimeException](environment.startAndReconnect())
 
       }
     }

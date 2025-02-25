@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAmuletConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 
 import java.time.{Duration, Instant}
 import scala.jdk.CollectionConverters.*
@@ -38,7 +38,7 @@ trait ConfigScheduleUtil extends TestCommon {
       tickDuration: NonNegativeFiniteDuration,
       maxNumInputs: Int = 100,
       holdingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      nextDomainId: Option[DomainId] = None,
+      nextSynchronizerId: Option[SynchronizerId] = None,
   )(implicit
       env: SpliceTests.SpliceTestConsoleEnvironment
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
@@ -51,14 +51,14 @@ trait ConfigScheduleUtil extends TestCommon {
     defaultAmuletConfig(
       tickDuration,
       maxNumInputs,
-      DomainId.tryFromString(activeSynchronizerId),
+      SynchronizerId.tryFromString(activeSynchronizerId),
       domainFeesConfig.extraTrafficPrice.value,
       domainFeesConfig.minTopupAmount.value,
       domainFeesConfig.baseRateBurstAmount.value,
       domainFeesConfig.baseRateBurstWindow,
       domainFeesConfig.readVsWriteScalingFactor.value,
       holdingFee = holdingFee,
-      nextDomainId = nextDomainId,
+      nextSynchronizerId = nextSynchronizerId,
     )
   }
 

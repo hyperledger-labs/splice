@@ -14,11 +14,11 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
-import com.digitalasset.canton.config.DomainTimeTrackerConfig
+import com.digitalasset.canton.{SynchronizerAlias, SequencerAlias}
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnections,
@@ -46,22 +46,24 @@ class DomainConnector(
       RetryFor.WaitingOnInitDependency,
       "ensure_decentralized_synchronizer_registered",
       "decentralized synchronizer is already registered",
-      participantAdminConnection.lookupDomainConnectionConfig(config.domains.global.alias).flatMap {
-        case Some(_) =>
-          participantAdminConnection
-            .listConnectedDomain()
-            .map(
-              _.find(_.domainAlias == config.domains.global.alias).fold(
-                throw Status.FAILED_PRECONDITION
-                  .withDescription("Global Synchronizer not connected in the participant")
-                  .asRuntimeException()
-              )(_ => ())
-            )
-        case None =>
-          throw Status.NOT_FOUND
-            .withDescription("Global Synchronizer not registered in the participant")
-            .asRuntimeException()
-      },
+      participantAdminConnection
+        .lookupSynchronizerConnectionConfig(config.domains.global.alias)
+        .flatMap {
+          case Some(_) =>
+            participantAdminConnection
+              .listConnectedDomain()
+              .map(
+                _.find(_.synchronizerAlias == config.domains.global.alias).fold(
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription("Global Synchronizer not connected in the participant")
+                    .asRuntimeException()
+                )(_ => ())
+              )
+          case None =>
+            throw Status.NOT_FOUND
+              .withDescription("Global Synchronizer not registered in the participant")
+              .asRuntimeException()
+        },
       logger,
     )
   }
@@ -78,7 +80,7 @@ class DomainConnector(
 
   def getDecentralizedSynchronizerSequencerConnections(time: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Map[DomainAlias, SequencerConnections]] = {
+  ): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     config.domains.global.url match {
       case None =>
         waitForSequencerConnectionsFromScan(time)
@@ -106,13 +108,13 @@ class DomainConnector(
     )
 
   private def ensureDomainRegistered(
-      alias: DomainAlias,
+      alias: SynchronizerAlias,
       sequencerConnections: SequencerConnections,
   )(implicit tc: TraceContext): Future[Unit] = {
-    val domainConfig = DomainConnectionConfig(
+    val domainConfig = SynchronizerConnectionConfig(
       alias,
       sequencerConnections,
-      timeTracker = DomainTimeTrackerConfig(
+      timeTracker = SynchronizerTimeTrackerConfig(
         minObservationDuration = config.timeTrackerMinObservationDuration
       ),
     )
@@ -125,7 +127,7 @@ class DomainConnector(
 
   private def waitForSequencerConnectionsFromScan(
       time: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Map[DomainAlias, SequencerConnections]] = {
+  )(implicit tc: TraceContext): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     retryProvider.getValueWithRetries(
       // Short retries since usually a failure here is just a misconfiguration error.
       // The only case where this can happen is during a domain migration and even then
@@ -172,7 +174,7 @@ class DomainConnector(
       domainTime: CantonTimestamp
   )(implicit
       traceContext: TraceContext
-  ): Future[Map[DomainAlias, Seq[GrpcSequencerConnection]]] = {
+  ): Future[Map[SynchronizerAlias, Seq[GrpcSequencerConnection]]] = {
     for {
       domainSequencers <- scanConnection.listDsoSequencers()
       decentralizedSynchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
@@ -182,12 +184,12 @@ class DomainConnector(
           if (config.supportsSoftDomainMigrationPoc) true
           // This filter should be a noop since we only ever expect to have one synchronizer here without soft domain migrations
           // so this is just an extra safeguard.
-          else sequencers.domainId == decentralizedSynchronizerId
+          else sequencers.synchronizerId == decentralizedSynchronizerId
         )
       filteredSequencers.map { domainSequencer =>
         val alias = if (config.supportsSoftDomainMigrationPoc)
-          DomainAlias.tryCreate(
-            s"${config.domains.global.alias.unwrap}-${domainSequencer.domainId.uid.identifier.unwrap}"
+          SynchronizerAlias.tryCreate(
+            s"${config.domains.global.alias.unwrap}-${domainSequencer.synchronizerId.uid.identifier.unwrap}"
           )
         else config.domains.global.alias
         alias ->
@@ -225,7 +227,7 @@ class DomainConnector(
 
 object DomainConnector {
   final case class DomainConnection(
-      alias: DomainAlias,
+      alias: SynchronizerAlias,
       connections: Seq[GrpcSequencerConnection],
   )
 }

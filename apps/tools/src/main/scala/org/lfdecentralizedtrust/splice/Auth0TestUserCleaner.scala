@@ -5,9 +5,9 @@ package org.lfdecentralizedtrust.splice.tools
 
 import com.auth0.client.mgmt.filter.UserFilter
 import com.auth0.exception.Auth0Exception
-
-import java.time.{ZoneId, ZonedDateTime}
+import java.time.{ZonedDateTime, ZoneId}
 import java.time.format.DateTimeFormatter
+
 import org.lfdecentralizedtrust.splice.util.Auth0Util
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -95,15 +95,7 @@ object Auth0TestUserCleaner {
       clientSecret: String,
       loggerFactory: NamedLoggerFactory,
   )(implicit tc: TraceContext) = {
-    val auth0Util = new Auth0Util(
-      domain,
-      clientId,
-      clientSecret,
-      loggerFactory,
-      new Auth0Util.Auth0Retry {
-        override def retryAuth0CallsForTests[T](f: => T): T = retryAuth0Calls(f)
-      },
-    )
+    val auth0Util = retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret, loggerFactory))
 
     println(s"Deleting auth0 test users older than $maxUserAge day(s)...")
     removeTestUsers(auth0Util)

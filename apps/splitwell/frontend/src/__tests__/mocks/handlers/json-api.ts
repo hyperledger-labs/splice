@@ -33,9 +33,9 @@ export const exerciseCreateInviteResponse = {
     effectiveAt: '2025-01-14T11:13:49.525283Z',
     offset: 15885,
     eventsById: {
-      '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:0': {
+      '0': {
         ExercisedTreeEvent: {
-          eventId: '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:0',
+          nodeId: 0,
           contractId:
             '00f9d9790be8adcc7e9e75f4d4471e64689e4bc3617b64c08a65d28d5fc603d735ca1012205a365b6c64ec687ad0f4e175bc76a21a7754be4d0b86e3198b4093d1106a12e3',
           templateId:
@@ -54,17 +54,15 @@ export const exerciseCreateInviteResponse = {
           witnessParties: [
             'alice__wallet__user::12202486f977b9d49bbd77ba8a3624b4d13c211372977ce5726bb5e93fa094be7e09',
           ],
-          childEventIds: [
-            '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:2',
-          ],
+          lastDescendedId: 3,
           exerciseResult:
             '00afbc44a381f3a1d6b2ec5bb41a828accd50ecdab184bc4398df5444207f4496dca1012201d20d6e5c0bb9f2c6096faa4e187f1f4afbe4d60a21f602064aa871469464802',
           packageName: 'splitwell',
         },
       },
-      '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:2': {
+      '2': {
         ExercisedTreeEvent: {
-          eventId: '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:2',
+          nodeId: 2,
           contractId:
             '00b478d6ff2fa3fac22f899bc99f8541cd43c6dcab949de810f79879903bf6f332ca101220ca0bb6d9574a7af5dad52388b6f0a48f0eea15cb06c38a908c94b08e45c3bb7d',
           templateId:
@@ -79,18 +77,16 @@ export const exerciseCreateInviteResponse = {
           witnessParties: [
             'alice__wallet__user::12202486f977b9d49bbd77ba8a3624b4d13c211372977ce5726bb5e93fa094be7e09',
           ],
-          childEventIds: [
-            '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:3',
-          ],
+          lastDescendedId: [3],
           exerciseResult:
             '00afbc44a381f3a1d6b2ec5bb41a828accd50ecdab184bc4398df5444207f4496dca1012201d20d6e5c0bb9f2c6096faa4e187f1f4afbe4d60a21f602064aa871469464802',
           packageName: 'splitwell',
         },
       },
-      '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:3': {
+      '3': {
         CreatedTreeEvent: {
           value: {
-            eventId: '#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:3',
+            nodeId: 3,
             contractId:
               '00afbc44a381f3a1d6b2ec5bb41a828accd50ecdab184bc4398df5444207f4496dca1012201d20d6e5c0bb9f2c6096faa4e187f1f4afbe4d60a21f602064aa871469464802',
             templateId:
@@ -128,7 +124,6 @@ export const exerciseCreateInviteResponse = {
         },
       },
     },
-    rootEventIds: ['#1220d958bc9e4063238be2ee103fa4251d10e049164be14a212bc4bd06223824633a:0'],
     domainId: 'splitwell::1220dd6efb42b441d7a82bc0320a73f181e7da8f7f889703361fed95aa01820c124e',
     traceContext: {
       traceparent: '00-31d873d33da296b8bb10123a98487752-636ddcf35e52d4ac-01',

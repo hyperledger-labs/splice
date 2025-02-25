@@ -13,8 +13,8 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
-import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -119,7 +119,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     // check that alice's validator connects to all DSO sequencers.
     // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
     eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.seconds) {
-      val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.domains
+      val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.synchronizers
         .config(
           aliceValidatorBackend.config.domains.global.alias
         )
@@ -129,7 +129,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
       sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
-        ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,
+        NonNegativeFiniteDuration.ofSeconds(5),
       )
     }
   }

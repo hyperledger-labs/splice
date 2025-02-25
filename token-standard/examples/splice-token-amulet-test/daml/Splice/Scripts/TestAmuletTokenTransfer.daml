@@ -1,0 +1,151 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAmuletTokenTransfer where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Daml.Script
+
+import DA.Assert ((===))
+import qualified DA.Map as Map
+import DA.Time
+
+import Splice.Scripts.Util
+import Splice.Scripts.TokenTestUtils
+import Splice.Amulet
+import Splice.AmuletRules
+
+import Util.Disclosure
+
+data TestSetup = TestSetup with
+  defaultApp : DefaultAppWithUsers
+  bobAmuletCid : ContractId Amulet
+  bobHoldingCid : ContractId Holding
+  now : Time
+  defaultTransfer : Api.Token.TransferInstructionV1.Transfer
+
+setupTest : Script TestSetup
+setupTest = do
+  defaultApp@DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- Alice creates a transfer pre-approval. This contract can be used to execute an instant transfer
+  -- from Bob to Alice (it needs to be disclosed as part of transfer initiation).
+  now <- getTime
+  let expiresAt = (now `addRelTime` days 30)
+  createTransferPreapproval alice.primaryParty aliceValidator.primaryParty app.dso expiresAt
+
+  -- feature the alice's validator party, to check that they get featured app rewards
+  featureApp app aliceValidator
+
+  -- Bob taps coin to send to Alice.
+  tap app bob 50.0
+
+  -- Check initial balance setup
+  checkBalance app alice 1.0
+  checkBalance app bob 51.0
+
+  -- Grab the contract-id of Bob's holding
+  [(bobAmuletCid, _)] <- query @Amulet bob.primaryParty
+  let bobHoldingCid = toInterfaceContractId @Holding bobAmuletCid
+
+  -- Define default transfer from Bob to Alice
+  let
+    defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
+      sender = bob.primaryParty
+      receiver = alice.primaryParty
+      amount = 10.0
+      instrumentId = amuletInstrumentId app.dso
+      executeBefore = now `addRelTime` days 1
+      holdingCids = [bobHoldingCid]
+      meta = Metadata with
+        values = Map.fromList [("tokenmetadatav1.org.lfdecentralizedtrust.splice/correlation-id", "<test-UUID>")]
+
+  return TestSetup with ..
+
+
+test_happy_path : Script ()
+test_happy_path = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- check that the default transfer can be executed
+  let transfer = defaultTransfer
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
+
+  -- validate our expectations on the transfer context
+  Map.size extraArgs.context.values === 4 -- amulet rules, open round, transfer pre-approval, featured app right
+  Map.size disclosedContracts.disclosures === 6  -- the above plus the referenced holding contract
+
+  -- Trigger an atomic, single-transaction transfer
+  submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
+    with
+      extraArgs
+      transfer
+
+  -- there is a featured app reward for aliceValidator that created Alice's transfer preapproval
+  [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
+  aliceValidatorCoupon.featured === True
+  aliceValidatorCoupon.amount === 1.13
+
+  -- check ledger state
+  checkBalance app alice 11.0
+  checkBalance app bob 41.0
+
+  pure ()
+
+
+test_no_holdings : Script ()
+test_no_holdings = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- Transfer fails if no holdings are specified
+  let transfer = defaultTransfer with
+        holdingCids = []
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
+  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
+    with
+      extraArgs
+      transfer
+
+  pure ()
+
+
+test_expired : Script ()
+test_expired = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  -- Transfer fails if expiry is in the past
+  let transfer = defaultTransfer
+  setTime (transfer.executeBefore `addRelTime` days 1)
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
+  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
+    with
+      extraArgs
+      transfer
+
+  pure ()
+
+-- testing utilities
+--------------------
+
+createTransferPreapproval : Party -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
+createTransferPreapproval receiver provider dso expiresAt = do
+  now <- getTime
+  submitMulti [receiver, provider, dso] [] $ createCmd TransferPreapproval with
+      receiver
+      provider
+      dso
+      validFrom = now
+      lastRenewedAt = now
+      expiresAt

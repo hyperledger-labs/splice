@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -6,23 +6,35 @@ syntax = "proto3";
 package com.digitalasset.canton.topology.admin.v30;
 
 import "com/digitalasset/canton/protocol/v30/topology.proto";
+import "com/digitalasset/canton/topology/admin/v30/common.proto";
+import "google/protobuf/duration.proto";
 
 /**
  * Write operations on the local topology manager.
  *
- * Both, participant and domain run a local topology manager exposing the same write interface.
+ * Participants, mediators, and sequencers run a local topology manager exposing the same write interface.
  */
 service TopologyManagerWriteService {
   rpc Authorize(AuthorizeRequest) returns (AuthorizeResponse);
 
   rpc AddTransactions(AddTransactionsRequest) returns (AddTransactionsResponse);
 
-  rpc ImportTopologySnapshot(ImportTopologySnapshotRequest) returns (ImportTopologySnapshotResponse);
+  rpc ImportTopologySnapshot(stream ImportTopologySnapshotRequest) returns (ImportTopologySnapshotResponse);
 
   rpc SignTransactions(SignTransactionsRequest) returns (SignTransactionsResponse);
 
-  // RPC to generate topology transactions that can be signed
+  /** RPC to generate topology transactions that can be signed */
   rpc GenerateTransactions(GenerateTransactionsRequest) returns (GenerateTransactionsResponse);
+
+  /** Creates a temporary topology store.
+   * Trying to create a store with the same name results in an error.
+   */
+  rpc CreateTemporaryTopologyStore(CreateTemporaryTopologyStoreRequest) returns (CreateTemporaryTopologyStoreResponse);
+
+  /** Drops a temporary topology store.
+   * Trying to drop a temporary store that does not exist results in an error.
+   */
+  rpc DropTemporaryTopologyStore(DropTemporaryTopologyStoreRequest) returns (DropTemporaryTopologyStoreResponse);
 }
 
 message GenerateTransactionsRequest {
@@ -41,7 +53,7 @@ message GenerateTransactionsRequest {
     com.digitalasset.canton.protocol.v30.TopologyMapping mapping = 3;
 
     // Target store
-    string store = 4;
+    StoreId store = 4;
   }
   // transaction proposals for which to generate topology transactions
   repeated Proposal proposals = 1;
@@ -104,14 +116,17 @@ message AuthorizeRequest {
 
   /**
    * The store that is used as the underlying source for executing this request.
-   * If `store` is a domain store, the resulting topology transaction will only be available on the respective domain.
+   * If `store` is a synchronizer store, the resulting topology transaction will only be available on the respective synchronizer.
    * If `store` is the authorized store, the resulting topology transaction may or may not be synchronized automatically
-   * to all domains that the node is currently connected to or will be connected to in the future.
+   * to all synchronizers that the node is currently connected to or will be connected to in the future.
    *
-   * Selecting a specific domain store might be necessary, if the transaction to authorize by hash or the previous
-   * generation of the submitted proposal is only available on the domain store and not in the authorized store.
+   * Selecting a specific synchronizers store might be necessary, if the transaction to authorize by hash or the previous
+   * generation of the submitted proposal is only available on the synchronizers store and not in the authorized store.
    */
-  string store = 6;
+  StoreId store = 6;
+
+  /** Optional timeout to wait for the transaction to become effective in the store. */
+  google.protobuf.Duration wait_to_become_effective = 7;
 }
 
 message AuthorizeResponse {
@@ -130,14 +145,17 @@ message AddTransactionsRequest {
 
   /**
    * The store that is used as the underlying source for executing this request.
-   * If `store` is a domain store, the resulting topology transaction will only be available on the respective domain.
+   * If `store` is a synchronizers store, the resulting topology transaction will only be available on the respective synchronizers.
    * If `store` is the authorized store, the resulting topology transaction may or may not be synchronized automatically
-   * to all domains that the node is currently connected to or will be connected to in the future.
+   * to all synchronizers that the node is currently connected to or will be connected to in the future.
    *
-   * Selecting a specific domain store might be necessary, if the transaction to authorize by hash or the previous
-   * generation of the submitted proposal is only available on the domain store and not in the authorized store.
+   * Selecting a specific synchronizers store might be necessary, if the transaction to authorize by hash or the previous
+   * generation of the submitted proposal is only available on the synchronizers store and not in the authorized store.
    */
-  string store = 3;
+  StoreId store = 3;
+
+  /** Optional timeout to wait for the transaction to become effective in the store. */
+  google.protobuf.Duration wait_to_become_effective = 7;
 }
 message AddTransactionsResponse {}
 
@@ -146,7 +164,9 @@ message AddTransactionsResponse {}
  */
 message ImportTopologySnapshotRequest {
   bytes topology_snapshot = 1;
-  string store = 2;
+  StoreId store = 2;
+  /** Optional timeout to wait for the transaction to become effective in the store. */
+  google.protobuf.Duration wait_to_become_effective = 3;
 }
 message ImportTopologySnapshotResponse {}
 
@@ -163,7 +183,7 @@ message SignTransactionsRequest {
   repeated string signed_by = 2;
 
   // Target store
-  string store = 3;
+  StoreId store = 3;
 
   /** Force specific changes even if dangerous */
   repeated ForceFlag force_flags = 4;
@@ -173,6 +193,25 @@ message SignTransactionsResponse {
   /** The transaction with the additional signatures from this node */
   repeated com.digitalasset.canton.protocol.v30.SignedTopologyTransaction transactions = 1;
 }
+
+message CreateTemporaryTopologyStoreRequest {
+  /** The name of the topology store */
+  string name = 1;
+  /** The protocol version that should be used by the store */
+  uint32 protocol_version = 2;
+}
+
+message CreateTemporaryTopologyStoreResponse {
+  /** The identifier of the topology store that should be used as a store filter string */
+  StoreId.Temporary store_id = 1;
+}
+
+message DropTemporaryTopologyStoreRequest {
+  /** The identifier of the topology store that should be dropped */
+  StoreId.Temporary store_id = 1;
+}
+
+message DropTemporaryTopologyStoreResponse {}
 
 enum ForceFlag {
   FORCE_FLAG_UNSPECIFIED = 0;

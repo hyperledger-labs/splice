@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as http}
 import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommand
 import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
+import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.tracing.TraceContext

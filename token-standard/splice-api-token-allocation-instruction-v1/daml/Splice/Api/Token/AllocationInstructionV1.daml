@@ -1,0 +1,126 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Interfaces to enable wallets to instruct the registry to create allocations.
+--
+-- The interfaces are meant to be implemented by registries to enable wallets to
+-- drive the creation of allocations in a generic way across registries.
+module Splice.Api.Token.AllocationInstructionV1 where
+
+import DA.Map qualified as Map
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.AllocationV1
+
+-- AllocationInstruction
+------------------------
+
+-- | View for `AllocationInstruction`.
+data AllocationInstructionView = AllocationInstructionView with
+    allocation : AllocationView
+      -- ^ The allocation that this instruction is for.
+    pendingActions : Map.Map Party Text
+      -- ^ The pending actions to be taken by different actors to create the allocation.
+      --
+      -- ^ This field can by used to report on the progress of registry specific
+      -- workflows that are required to prepare the allocation (e.g., confirmation of OFAC checks).
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., more detailed status information.
+  deriving (Show, Eq)
+
+data AllocationInstruction_AllocateResult = AllocationInstruction_AllocateResult
+  with
+    allocation : ContractId Allocation
+      -- ^ The allocation that was created.
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of the allocation, used for extensibility.
+  deriving (Show, Eq)
+
+-- | An interface for tracking the status of an allocation instruction (i.e. a request to
+-- a Registry to create an `Allocation`).
+interface AllocationInstruction where
+  viewtype AllocationInstructionView
+
+  allocationInstruction_allocateImpl
+    : ContractId AllocationInstruction -> ExtraArgs -> Update AllocationInstruction_AllocateResult
+  allocationInstruction_abortImpl
+    : ContractId AllocationInstruction -> Party -> ExtraArgs -> Update ChoiceExecutionMetadata
+
+  choice AllocationInstruction_Allocate : AllocationInstruction_AllocateResult
+    -- ^ Final step used to create the allocation requested by the instruction.
+    --
+    -- Registries MUST use this choice to create the requested allocation, so that
+    -- wallets can use the transaction history to learn about it.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).allocation.transferLeg.instrumentId.admin
+    do
+      allocationInstruction_allocateImpl this self extraArgs
+
+  choice AllocationInstruction_Abort : ChoiceExecutionMetadata
+    -- ^ Abort the allocation instruction for the reason given in the extra argument's metadata.
+    --
+    -- Implementors MUST ensure that the no allocation is create in case this choice is exercised.
+    -- Implementors SHOULD decide which actors are allowed to abort a allocation instruction,
+    -- and add corresponding checks to the implementation of this choice.
+    --
+    -- At least the sender SHOULD be allowed to abort an allocation instruction.
+    with
+      actor : Party
+      -- ^ The party that aborts the allocation instruction.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller actor
+    do allocationInstruction_abortImpl this self actor extraArgs
+
+
+-- AllocationFactory
+--------------------
+
+-- | View for `AllocationFactory`.
+data AllocationFactoryView = AllocationFactoryView with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instruments
+      -- for which this allocation factory can be used.
+  deriving (Show, Eq)
+
+-- | Contracts implementing `AllocationFactory` are retrieved from the registry app and are
+-- used by the wallet to create allocation instructions (or allocations directly).
+interface AllocationFactory where
+  viewtype AllocationFactoryView
+
+  allocationFactory_allocateImpl : ContractId AllocationFactory -> AllocationView -> [ContractId Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
+
+  nonconsuming choice AllocationFactory_Allocate : AllocationFactory_AllocateResult
+    -- ^ Generic choice for the sender's wallet to allocate the assets to a specific leg of a settlement.
+    -- It depends on the registry whether this results in the allocation being created directly
+    -- or in an allocation instruction being created instead.
+    with
+      allocation : AllocationView
+        -- ^ The target allocation which should be instructed.
+      inputHoldings : [ContractId Holding]
+        -- ^ The holdings that SHOULD be used to fund the allocation.
+        --
+        -- MAY be empty for registries that do not represent their holdings on-ledger; or
+        -- for registries that support automatic selection of holdings for allocations.
+      extraArgs : ExtraArgs
+        -- ^ Additional choice arguments.
+    controller allocation.transferLeg.sender
+    do allocationFactory_allocateImpl this self allocation inputHoldings extraArgs
+
+-- | A custom type to represent either an allocation or an allocation instruction.
+-- Used in favor of `Either` to improve the readability of the code.
+data AllocationOrInstruction
+  = AOI_Allocation with allocation : ContractId Allocation
+  | AOI_Instruction with instruction : ContractId AllocationInstruction
+  deriving (Show, Eq)
+
+data AllocationFactory_AllocateResult = AllocationFactory_AllocateResult
+  with
+    allocationOrInstruction : AllocationOrInstruction
+      -- ^ The output allocation or allocation instruction.
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of the allocation, used for extensibility.
+  deriving (Show, Eq)

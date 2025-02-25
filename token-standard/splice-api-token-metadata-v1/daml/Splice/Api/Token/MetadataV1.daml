@@ -1,0 +1,119 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Types and interfaces for retrieving metadata about tokens.
+module Splice.Api.Token.MetadataV1 where
+
+import DA.Action (unless)
+import DA.Map as Map
+import DA.Text as Text
+import DA.Time (RelTime)
+
+-- | A type to conveniently pass Daml values between the backend of an app to
+-- its Daml code used for submitting commands of this app.
+data AnyValue =
+    AV_Text Text
+  | AV_Int Int
+  | AV_Decimal Decimal
+  | AV_Bool Bool
+  | AV_Date Date
+  | AV_Time Time
+  | AV_RelTime RelTime
+  | AV_Party Party
+  | AV_ContractId AnyContractId
+  | AV_List [AnyValue]
+  | AV_Map (Map Text AnyValue)
+  deriving (Show, Eq)
+
+-- | Interface used to represent arbitrary contracts.
+-- Note that this is not expected to be implemented by any template,
+-- so it should only be used in the form `ContractId AnyContract` and through `coerceContractId`
+-- but not through any of the interface functions like`fetchFromInterface` that check whether the template actually implements the interface.
+interface AnyContract where viewtype AnyContractView
+data AnyContractView = AnyContractView
+  with
+    dummyUnitField : ()
+
+-- | Some contract id. Use `coerceContractId` to convert from and to this type.
+type AnyContractId = ContractId AnyContract
+
+-- | A type for passing extra data from an app's backends to the choices of that app
+-- exercised in commands submitted by app users.
+data ChoiceContext = ChoiceContext with
+    values : Map Text AnyValue
+  deriving (Show, Eq)
+
+-- | Machine-readable metadata intended for communicating additional information
+-- using well-known keys between systems. This is mainly used to allow for the post-hoc
+-- expansion of the information associated with contracts and choice arguments and results.
+--
+-- Modeled after by k8s support for annotations, see
+-- https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+--
+-- Implementors SHOULD follow the same conventions for allocating keys as used by k8s; i.e.,
+-- they SHOULD be prefixed using the DNS name of the app defining the key.
+--
+-- Side note: aim to keep the metadata small, as on-ledger data is costly.
+data Metadata = Metadata with
+    values : Map Text Text
+  deriving (Eq,Ord, Show)
+
+-- | Empty metadata.
+emptyMetadata : Metadata
+emptyMetadata = Metadata with values = mempty
+
+-- | Easy way to enforce metadata limits within choices.
+--
+-- We consciously do not enforce the limits in 'ensure' clauses as that makes them harder to
+-- change on an upgrade, as lowering the limits may make existing data unreadable.
+enforceMetadataLimits : Metadata -> Update ()
+enforceMetadataLimits (Metadata m) = do
+  let numEntries = size m
+  unless (numEntries <= 128) $ fail $ "Metadata has too many entries " <> show numEntries <> ": max 128"
+  let totalSize = sum [Text.length k + Text.length v | (k, v) <- Map.toList m]
+  unless (totalSize <= 8192) $ fail $ "Metadata is too large " <> show totalSize <> ": max 8192 chars"
+
+-- | A common type for passing both the choice context and the metadata to a choice.
+data ExtraArgs = ExtraArgs with
+    context : ChoiceContext
+    -- ^ Extra arguments to be passed to the implementation of an interface choice.
+    -- These are provided via an off-ledger API by the app implementing the interface.
+    meta : Metadata
+    -- ^ Additional metadata to pass in.
+    --
+    -- In contrast to the `extraArgs`, these are provided by the caller of the choice.
+    -- The expectation is that the meaning of metadata fields will be agreed on
+    -- in later standards, or on a case-by-case basis between the caller and the
+    -- implementer of the interface.
+  deriving (Show, Eq)
+
+-- | A generic result for choices that do not need to return specific data.
+data ChoiceExecutionMetadata = ChoiceExecutionMetadata with
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of exercising the choice, used for extensibility.
+  deriving (Show, Eq)
+
+
+-- | Installation of a registry app by an app user organization, e.g., an
+-- investor. Used to provide app-user specific metadata and URLs for off-ledger
+-- API endpoints.
+interface RegistryAppInstall where viewtype RegistryAppInstallView
+
+-- | View for `RegistryAppInstall`.
+data RegistryAppInstallView = RegistryAppInstallView
+  with
+    appUser : Party
+      -- ^ Party using the registry app.
+      --
+      -- For example, an investor using the registry app to manage their holdings
+      -- of financial instruments administered by the registry app.
+    instrumentAdmin : Party
+      -- ^ The party representing the registry app that administers the instrument.
+      --
+      -- There SHOULD be a `RegistryAppInstall` for every `admin` party referenced
+      -- in an `InstrumentId` of an app user's `Holding`.
+    meta : Metadata
+      -- ^ Registry app installation metadata that is specific to the app user.
+      -- Used in particular to provide the URL for the registry app's off-ledger API.
+  deriving (Eq, Show)
+

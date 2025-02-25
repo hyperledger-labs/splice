@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -11,12 +11,14 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
 }
 import com.digitalasset.canton.admin.api.client.data.*
 import com.digitalasset.canton.admin.api.client.data.topology.*
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{Fingerprint, Hash}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.BaseQuery
-import com.digitalasset.canton.topology.admin.grpc.TopologyStore.Domain
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
+import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.admin.v30.*
 import com.digitalasset.canton.topology.admin.v30.AuthorizeRequest.Type.{Proposal, TransactionHash}
@@ -33,7 +35,8 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyMapping,
   TopologyTransaction,
 }
-import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.util.GrpcStreamingUtils
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.google.protobuf.ByteString
 import com.google.protobuf.timestamp.Timestamp
 import io.grpc.Context.CancellableContext
@@ -208,19 +211,19 @@ object TopologyAdminCommands {
         response.results.traverse(ListPartyToKeyMappingResult.fromProtoV30).leftMap(_.toString)
     }
 
-    final case class ListDomainTrustCertificate(
+    final case class ListSynchronizerTrustCertificate(
         query: BaseQuery,
         filterUid: String,
     ) extends BaseCommand[
-          v30.ListDomainTrustCertificateRequest,
-          v30.ListDomainTrustCertificateResponse,
-          Seq[ListDomainTrustCertificateResult],
+          v30.ListSynchronizerTrustCertificateRequest,
+          v30.ListSynchronizerTrustCertificateResponse,
+          Seq[ListSynchronizerTrustCertificateResult],
         ] {
 
       override protected def createRequest()
-          : Either[String, v30.ListDomainTrustCertificateRequest] =
+          : Either[String, v30.ListSynchronizerTrustCertificateRequest] =
         Right(
-          new v30.ListDomainTrustCertificateRequest(
+          new v30.ListSynchronizerTrustCertificateRequest(
             baseQuery = Some(query.toProtoV1),
             filterUid = filterUid,
           )
@@ -228,29 +231,31 @@ object TopologyAdminCommands {
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListDomainTrustCertificateRequest,
-      ): Future[v30.ListDomainTrustCertificateResponse] =
-        service.listDomainTrustCertificate(request)
+          request: v30.ListSynchronizerTrustCertificateRequest,
+      ): Future[v30.ListSynchronizerTrustCertificateResponse] =
+        service.listSynchronizerTrustCertificate(request)
 
       override protected def handleResponse(
-          response: v30.ListDomainTrustCertificateResponse
-      ): Either[String, Seq[ListDomainTrustCertificateResult]] =
-        response.results.traverse(ListDomainTrustCertificateResult.fromProtoV30).leftMap(_.toString)
+          response: v30.ListSynchronizerTrustCertificateResponse
+      ): Either[String, Seq[ListSynchronizerTrustCertificateResult]] =
+        response.results
+          .traverse(ListSynchronizerTrustCertificateResult.fromProtoV30)
+          .leftMap(_.toString)
     }
 
-    final case class ListParticipantDomainPermission(
+    final case class ListParticipantSynchronizerPermission(
         query: BaseQuery,
         filterUid: String,
     ) extends BaseCommand[
-          v30.ListParticipantDomainPermissionRequest,
-          v30.ListParticipantDomainPermissionResponse,
-          Seq[ListParticipantDomainPermissionResult],
+          v30.ListParticipantSynchronizerPermissionRequest,
+          v30.ListParticipantSynchronizerPermissionResponse,
+          Seq[ListParticipantSynchronizerPermissionResult],
         ] {
 
       override protected def createRequest()
-          : Either[String, v30.ListParticipantDomainPermissionRequest] =
+          : Either[String, v30.ListParticipantSynchronizerPermissionRequest] =
         Right(
-          new v30.ListParticipantDomainPermissionRequest(
+          new v30.ListParticipantSynchronizerPermissionRequest(
             baseQuery = Some(query.toProtoV1),
             filterUid = filterUid,
           )
@@ -258,15 +263,15 @@ object TopologyAdminCommands {
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListParticipantDomainPermissionRequest,
-      ): Future[v30.ListParticipantDomainPermissionResponse] =
-        service.listParticipantDomainPermission(request)
+          request: v30.ListParticipantSynchronizerPermissionRequest,
+      ): Future[v30.ListParticipantSynchronizerPermissionResponse] =
+        service.listParticipantSynchronizerPermission(request)
 
       override protected def handleResponse(
-          response: v30.ListParticipantDomainPermissionResponse
-      ): Either[String, Seq[ListParticipantDomainPermissionResult]] =
+          response: v30.ListParticipantSynchronizerPermissionResponse
+      ): Either[String, Seq[ListParticipantSynchronizerPermissionResult]] =
         response.results
-          .traverse(ListParticipantDomainPermissionResult.fromProtoV30)
+          .traverse(ListParticipantSynchronizerPermissionResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
@@ -365,102 +370,105 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class DomainParametersState(
+    final case class SynchronizerParametersState(
         query: BaseQuery,
-        filterDomain: String,
+        filterSynchronizerId: String,
     ) extends BaseCommand[
-          v30.ListDomainParametersStateRequest,
-          v30.ListDomainParametersStateResponse,
-          Seq[ListDomainParametersStateResult],
+          v30.ListSynchronizerParametersStateRequest,
+          v30.ListSynchronizerParametersStateResponse,
+          Seq[ListSynchronizerParametersStateResult],
         ] {
 
-      override protected def createRequest(): Either[String, v30.ListDomainParametersStateRequest] =
+      override protected def createRequest()
+          : Either[String, v30.ListSynchronizerParametersStateRequest] =
         Right(
-          new v30.ListDomainParametersStateRequest(
+          new v30.ListSynchronizerParametersStateRequest(
             baseQuery = Some(query.toProtoV1),
-            filterDomain = filterDomain,
+            filterSynchronizerId = filterSynchronizerId,
           )
         )
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListDomainParametersStateRequest,
-      ): Future[v30.ListDomainParametersStateResponse] =
-        service.listDomainParametersState(request)
+          request: v30.ListSynchronizerParametersStateRequest,
+      ): Future[v30.ListSynchronizerParametersStateResponse] =
+        service.listSynchronizerParametersState(request)
 
       override protected def handleResponse(
-          response: v30.ListDomainParametersStateResponse
-      ): Either[String, Seq[ListDomainParametersStateResult]] =
+          response: v30.ListSynchronizerParametersStateResponse
+      ): Either[String, Seq[ListSynchronizerParametersStateResult]] =
         response.results
-          .traverse(ListDomainParametersStateResult.fromProtoV30)
+          .traverse(ListSynchronizerParametersStateResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
-    final case class MediatorDomainState(
+    final case class MediatorSynchronizerState(
         query: BaseQuery,
-        filterDomain: String,
+        filterSynchronizerId: String,
     ) extends BaseCommand[
-          v30.ListMediatorDomainStateRequest,
-          v30.ListMediatorDomainStateResponse,
-          Seq[ListMediatorDomainStateResult],
+          v30.ListMediatorSynchronizerStateRequest,
+          v30.ListMediatorSynchronizerStateResponse,
+          Seq[ListMediatorSynchronizerStateResult],
         ] {
 
-      override protected def createRequest(): Either[String, v30.ListMediatorDomainStateRequest] =
+      override protected def createRequest()
+          : Either[String, v30.ListMediatorSynchronizerStateRequest] =
         Right(
-          v30.ListMediatorDomainStateRequest(
+          v30.ListMediatorSynchronizerStateRequest(
             baseQuery = Some(query.toProtoV1),
-            filterDomain = filterDomain,
+            filterSynchronizerId = filterSynchronizerId,
           )
         )
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListMediatorDomainStateRequest,
-      ): Future[v30.ListMediatorDomainStateResponse] =
-        service.listMediatorDomainState(request)
+          request: v30.ListMediatorSynchronizerStateRequest,
+      ): Future[v30.ListMediatorSynchronizerStateResponse] =
+        service.listMediatorSynchronizerState(request)
 
       override protected def handleResponse(
-          response: v30.ListMediatorDomainStateResponse
-      ): Either[String, Seq[ListMediatorDomainStateResult]] =
+          response: v30.ListMediatorSynchronizerStateResponse
+      ): Either[String, Seq[ListMediatorSynchronizerStateResult]] =
         response.results
-          .traverse(ListMediatorDomainStateResult.fromProtoV30)
+          .traverse(ListMediatorSynchronizerStateResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
-    final case class SequencerDomainState(
+    final case class SequencerSynchronizerState(
         query: BaseQuery,
-        filterDomain: String,
+        filterSynchronizerId: String,
     ) extends BaseCommand[
-          v30.ListSequencerDomainStateRequest,
-          v30.ListSequencerDomainStateResponse,
-          Seq[ListSequencerDomainStateResult],
+          v30.ListSequencerSynchronizerStateRequest,
+          v30.ListSequencerSynchronizerStateResponse,
+          Seq[ListSequencerSynchronizerStateResult],
         ] {
 
-      override protected def createRequest(): Either[String, v30.ListSequencerDomainStateRequest] =
+      override protected def createRequest()
+          : Either[String, v30.ListSequencerSynchronizerStateRequest] =
         Right(
-          new v30.ListSequencerDomainStateRequest(
+          new v30.ListSequencerSynchronizerStateRequest(
             baseQuery = Some(query.toProtoV1),
-            filterDomain = filterDomain,
+            filterSynchronizerId = filterSynchronizerId,
           )
         )
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListSequencerDomainStateRequest,
-      ): Future[v30.ListSequencerDomainStateResponse] =
-        service.listSequencerDomainState(request)
+          request: v30.ListSequencerSynchronizerStateRequest,
+      ): Future[v30.ListSequencerSynchronizerStateResponse] =
+        service.listSequencerSynchronizerState(request)
 
       override protected def handleResponse(
-          response: v30.ListSequencerDomainStateResponse
-      ): Either[String, Seq[ListSequencerDomainStateResult]] =
+          response: v30.ListSequencerSynchronizerStateResponse
+      ): Either[String, Seq[ListSequencerSynchronizerStateResult]] =
         response.results
-          .traverse(ListSequencerDomainStateResult.fromProtoV30)
+          .traverse(ListSequencerSynchronizerStateResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
     final case class PurgeTopologyTransaction(
         query: BaseQuery,
-        filterDomain: String,
+        filterSynchronizerId: String,
     ) extends BaseCommand[
           v30.ListPurgeTopologyTransactionRequest,
           v30.ListPurgeTopologyTransactionResponse,
@@ -472,7 +480,7 @@ object TopologyAdminCommands {
         Right(
           new v30.ListPurgeTopologyTransactionRequest(
             baseQuery = Some(query.toProtoV1),
-            filterDomain = filterDomain,
+            filterSynchronizerId = filterSynchronizerId,
           )
         )
 
@@ -544,13 +552,14 @@ object TopologyAdminCommands {
           }
     }
     final case class ExportTopologySnapshot(
+        observer: StreamObserver[ExportTopologySnapshotResponse],
         query: BaseQuery,
         excludeMappings: Seq[String],
         filterNamespace: String,
     ) extends BaseCommand[
           v30.ExportTopologySnapshotRequest,
-          v30.ExportTopologySnapshotResponse,
-          ByteString,
+          CancellableContext,
+          CancellableContext,
         ] {
       override protected def createRequest(): Either[String, v30.ExportTopologySnapshotRequest] =
         Right(
@@ -564,17 +573,23 @@ object TopologyAdminCommands {
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ExportTopologySnapshotRequest,
-      ): Future[v30.ExportTopologySnapshotResponse] = service.exportTopologySnapshot(request)
+      ): Future[CancellableContext] = {
+        val context = Context.current().withCancellation()
+        context.run(() => service.exportTopologySnapshot(request, observer))
+        Future.successful(context)
+      }
 
       override protected def handleResponse(
-          response: v30.ExportTopologySnapshotResponse
-      ): Either[String, ByteString] =
-        Right(response.result)
+          response: CancellableContext
+      ): Either[String, CancellableContext] =
+        Right(response)
+
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
 
     final case class GenesisState(
         observer: StreamObserver[GenesisStateResponse],
-        filterDomainStore: Option[String],
+        filterSynchronizerStore: Option[String],
         timestamp: Option[CantonTimestamp],
     ) extends BaseCommand[
           v30.GenesisStateRequest,
@@ -582,11 +597,11 @@ object TopologyAdminCommands {
           CancellableContext,
         ] {
       override protected def createRequest(): Either[String, v30.GenesisStateRequest] = {
-        val domainStore = filterDomainStore.traverse(DomainId.fromString)
-        domainStore.flatMap(domainId =>
+        val synchronizerStore = filterSynchronizerStore.traverse(SynchronizerId.fromString)
+        synchronizerStore.flatMap(synchronizerId =>
           Right(
             v30.GenesisStateRequest(
-              domainId.map(Domain.apply).map(_.toProto),
+              synchronizerId.map(Synchronizer.apply).map(_.toProtoV30),
               timestamp.map(_.toProtoTimestamp),
             )
           )
@@ -621,7 +636,7 @@ object TopologyAdminCommands {
     }
 
     final case class ListParties(
-        filterDomain: String,
+        filterSynchronizerId: String,
         filterParty: String,
         filterParticipant: String,
         asOf: Option[Instant],
@@ -633,7 +648,7 @@ object TopologyAdminCommands {
       override protected def createRequest(): Either[String, v30.ListPartiesRequest] =
         Right(
           v30.ListPartiesRequest(
-            filterDomain = filterDomain,
+            filterSynchronizerId = filterSynchronizerId,
             filterParty = filterParty,
             filterParticipant = filterParticipant,
             asOf = asOf.map(ts => Timestamp(ts.getEpochSecond)),
@@ -658,7 +673,7 @@ object TopologyAdminCommands {
     }
 
     final case class ListKeyOwners(
-        filterDomain: String,
+        filterSynchronizerId: String,
         filterKeyOwnerType: Option[MemberCode],
         filterKeyOwnerUid: String,
         asOf: Option[Instant],
@@ -670,7 +685,7 @@ object TopologyAdminCommands {
       override protected def createRequest(): Either[String, v30.ListKeyOwnersRequest] =
         Right(
           v30.ListKeyOwnersRequest(
-            filterDomain = filterDomain,
+            filterSynchronizerId = filterSynchronizerId,
             filterKeyOwnerType = filterKeyOwnerType.map(_.toProtoPrimitive).getOrElse(""),
             filterKeyOwnerUid = filterKeyOwnerUid,
             asOf = asOf.map(ts => Timestamp(ts.getEpochSecond)),
@@ -710,13 +725,15 @@ object TopologyAdminCommands {
         transactions: Seq[GenericSignedTopologyTransaction],
         store: String,
         forceChanges: ForceFlags,
+        waitToBecomeEffective: Option[NonNegativeDuration],
     ) extends BaseWriteCommand[AddTransactionsRequest, AddTransactionsResponse, Unit] {
       override protected def createRequest(): Either[String, AddTransactionsRequest] =
         Right(
           AddTransactionsRequest(
             transactions.map(_.toProtoV30),
             forceChanges = forceChanges.toProtoV30,
-            store,
+            Some(TopologyStoreId.tryFromString(store).toProtoV30),
+            waitToBecomeEffective.map(_.asNonNegativeFiniteApproximation.toProtoPrimitive),
           )
         )
       override protected def submitRequest(
@@ -731,6 +748,7 @@ object TopologyAdminCommands {
     final case class ImportTopologySnapshot(
         topologySnapshot: ByteString,
         store: String,
+        waitToBecomeEffective: Option[NonNegativeDuration],
     ) extends BaseWriteCommand[
           ImportTopologySnapshotRequest,
           ImportTopologySnapshotResponse,
@@ -740,13 +758,24 @@ object TopologyAdminCommands {
         Right(
           ImportTopologySnapshotRequest(
             topologySnapshot,
-            store,
+            Some(TopologyStoreId.tryFromString(store).toProtoV30),
+            waitToBecomeEffective.map(_.asNonNegativeFiniteApproximation.toProtoPrimitive),
           )
         )
       override protected def submitRequest(
           service: TopologyManagerWriteServiceStub,
           request: ImportTopologySnapshotRequest,
-      ): Future[ImportTopologySnapshotResponse] = service.importTopologySnapshot(request)
+      ): Future[ImportTopologySnapshotResponse] =
+        GrpcStreamingUtils.streamToServer(
+          service.importTopologySnapshot,
+          bytes =>
+            ImportTopologySnapshotRequest(
+              ByteString.copyFrom(bytes),
+              Some(TopologyStoreId.tryFromString(store).toProtoV30),
+              waitToBecomeEffective.map(_.toProtoPrimitive),
+            ),
+          topologySnapshot,
+        )
       override protected def handleResponse(
           response: ImportTopologySnapshotResponse
       ): Either[String, Unit] = Either.unit
@@ -765,7 +794,7 @@ object TopologyAdminCommands {
           SignTransactionsRequest(
             transactions.map(_.toProtoV30),
             signedBy.map(_.toProtoPrimitive),
-            store,
+            Some(TopologyStoreId.tryFromString(store).toProtoV30),
             forceFlags.toProtoV30,
           )
         )
@@ -810,7 +839,7 @@ object TopologyAdminCommands {
             for {
               parsedTopologyTransaction <-
                 TopologyTransaction
-                  .fromByteString(ProtocolVersionValidation.NoValidation)(serializedTransaction)
+                  .fromByteString(ProtocolVersionValidation.NoValidation, serializedTransaction)
                   .leftMap(_.message)
               // We don't really need the hash from the response here because we can re-build it from the deserialized
               // topology transaction. But users of the API without access to this code wouldn't be able to do that,
@@ -836,7 +865,7 @@ object TopologyAdminCommands {
             change.toProto,
             serial.map(_.value).getOrElse(0),
             Some(mapping.toProtoV30),
-            store,
+            Some(TopologyStoreId.tryFromString(store).toProtoV30),
           )
       }
     }
@@ -849,6 +878,7 @@ object TopologyAdminCommands {
         mustFullyAuthorize: Boolean,
         forceChanges: ForceFlags,
         store: String,
+        waitToBecomeEffective: Option[NonNegativeDuration],
     ) extends BaseWriteCommand[
           AuthorizeRequest,
           AuthorizeResponse,
@@ -867,7 +897,9 @@ object TopologyAdminCommands {
           mustFullyAuthorize = mustFullyAuthorize,
           forceChanges = forceChanges.toProtoV30,
           signedBy = signedBy.map(_.toProtoPrimitive),
-          store,
+          store = Some(TopologyStoreId.tryFromString(store).toProtoV30),
+          waitToBecomeEffective =
+            waitToBecomeEffective.map(_.asNonNegativeFiniteApproximation.toProtoPrimitive),
         )
       )
       override protected def submitRequest(
@@ -900,8 +932,18 @@ object TopologyAdminCommands {
           change: TopologyChangeOp = TopologyChangeOp.Replace,
           mustFullyAuthorize: Boolean = false,
           forceChanges: ForceFlags = ForceFlags.none,
+          waitToBecomeEffective: Option[NonNegativeDuration],
       ): Propose[M] =
-        Propose(Right(mapping), signedBy, change, serial, mustFullyAuthorize, forceChanges, store)
+        Propose(
+          Right(mapping),
+          signedBy,
+          change,
+          serial,
+          mustFullyAuthorize,
+          forceChanges,
+          store,
+          waitToBecomeEffective,
+        )
 
     }
 
@@ -910,6 +952,7 @@ object TopologyAdminCommands {
         mustFullyAuthorize: Boolean,
         signedBy: Seq[Fingerprint],
         store: String,
+        waitToBecomeEffective: Option[NonNegativeDuration] = None,
     ) extends BaseWriteCommand[
           AuthorizeRequest,
           AuthorizeResponse,
@@ -922,7 +965,8 @@ object TopologyAdminCommands {
           mustFullyAuthorize = mustFullyAuthorize,
           forceChanges = Seq.empty,
           signedBy = signedBy.map(_.toProtoPrimitive),
-          store = store,
+          store = Some(TopologyStoreId.tryFromString(store).toProtoV30),
+          waitToBecomeEffective.map(_.asNonNegativeFiniteApproximation.toProtoPrimitive),
         )
       )
 
@@ -947,6 +991,59 @@ object TopologyAdminCommands {
             )
         )
     }
+
+    final case class CreateTemporaryStore(name: String, protocolVersion: ProtocolVersion)
+        extends BaseWriteCommand[
+          v30.CreateTemporaryTopologyStoreRequest,
+          v30.CreateTemporaryTopologyStoreResponse,
+          TopologyStoreId.Temporary,
+        ] {
+      override protected def createRequest()
+          : Either[String, v30.CreateTemporaryTopologyStoreRequest] = Right(
+        v30.CreateTemporaryTopologyStoreRequest(name, protocolVersion.toProtoPrimitive)
+      )
+
+      override protected def submitRequest(
+          service: TopologyManagerWriteServiceStub,
+          request: CreateTemporaryTopologyStoreRequest,
+      ): Future[CreateTemporaryTopologyStoreResponse] =
+        service.createTemporaryTopologyStore(request)
+
+      override protected def handleResponse(
+          response: CreateTemporaryTopologyStoreResponse
+      ): Either[String, TopologyStoreId.Temporary] =
+        ProtoConverter
+          .parseRequired(
+            TopologyStoreId.Temporary.fromProtoV30,
+            "store_id",
+            response.storeId,
+          )
+          .leftMap(_.toString)
+    }
+
+    final case class DropTemporaryStore(temporaryStoreId: TopologyStoreId.Temporary)
+        extends BaseWriteCommand[
+          v30.DropTemporaryTopologyStoreRequest,
+          v30.DropTemporaryTopologyStoreResponse,
+          Unit,
+        ] {
+      override protected def createRequest()
+          : Either[String, v30.DropTemporaryTopologyStoreRequest] = Right(
+        v30.DropTemporaryTopologyStoreRequest(Some(temporaryStoreId.toProtoV30.getTemporary))
+      )
+
+      override protected def submitRequest(
+          service: TopologyManagerWriteServiceStub,
+          request: DropTemporaryTopologyStoreRequest,
+      ): Future[DropTemporaryTopologyStoreResponse] =
+        service.dropTemporaryTopologyStore(request)
+
+      override protected def handleResponse(
+          response: DropTemporaryTopologyStoreResponse
+      ): Either[String, Unit] =
+        Right(())
+    }
+
   }
 
   object Init {

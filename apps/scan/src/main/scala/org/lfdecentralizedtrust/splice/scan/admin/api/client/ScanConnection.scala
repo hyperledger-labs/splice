@@ -46,7 +46,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.apache.pekko.stream.Materializer
@@ -373,7 +373,7 @@ object ScanConnection {
         .map(_.payload.round.number)}, and following open rounds: ${sortedOpenMiningRounds.map(_.payload.round.number)}"
   }
 
-  type GetAmuletRulesDomain = () => TraceContext => Future[DomainId]
+  type GetAmuletRulesDomain = () => TraceContext => Future[SynchronizerId]
 }
 
 /** Connection to the admin API of CC Scan usable for version and availability checks

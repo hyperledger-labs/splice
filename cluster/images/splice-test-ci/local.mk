@@ -6,12 +6,7 @@ dir := $(call current_dir)
 rpc-script := $(dir)/target/gha-runner-rpc.py
 rpc-source := ${REPO_ROOT}/.github/runners/runner-container-hooks/packages/k8s-workflow/gha-runner-rpc.py
 
-target-dir := $(dir)/target
-
-$(dir)/$(docker-build): $(target-dir) $(dir)/target/LICENSE $(rpc-script)
-
-$(target-dir):
-	mkdir -p $(target-dir)
+$(dir)/$(docker-build): $(dir)/target/LICENSE $(rpc-script)
 
 $(dir)/target/LICENSE: LICENSE
 	cp $< $@

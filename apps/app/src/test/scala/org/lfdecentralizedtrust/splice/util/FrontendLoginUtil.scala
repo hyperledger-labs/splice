@@ -1,13 +1,12 @@
 package org.lfdecentralizedtrust.splice.util
 
-import org.lfdecentralizedtrust.splice.integration.tests.{FrontendTestCommon, SpliceTests}
+import org.lfdecentralizedtrust.splice.integration.tests.{SpliceTests, FrontendTestCommon}
 import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 import org.openqa.selenium.WebDriver
 
 import scala.util.Using
 
-trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
+trait FrontendLoginUtil { self: FrontendTestCommon =>
 
   protected def login(port: Int, ledgerApiUser: String, hostname: String = "localhost")(implicit
       webDriver: WebDriver
@@ -82,7 +81,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       afterLoginChecks: (Auth0User, PartyId, WebDriverType) => A
   )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): A = {
     val auth0 = auth0UtilFromEnvVars("test")
-    Using.resource(auth0.createUser()) { user =>
+    Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
       logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
       if (!onboardThroughWalletUI) {
         aliceValidatorBackend.onboardUser(user.id)

@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil.{LocalMediatorConfig, Loca
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
@@ -45,7 +45,7 @@ class SynchronizerNodeReconciler(
   private val dsoParty = dsoStore.key.dsoParty
 
   private def setConfig(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       rulesAndState: DsoRulesWithSvNodeState,
       nodeConfig: SynchronizerNodeConfig,
   )(implicit tc: TraceContext) = {
@@ -53,7 +53,7 @@ class SynchronizerNodeReconciler(
     val cmd = rulesAndState.dsoRules.exercise(
       _.exerciseDsoRules_SetSynchronizerNodeConfig(
         svParty.toProtoPrimitive,
-        domainId.toProtoPrimitive,
+        synchronizerId.toProtoPrimitive,
         nodeConfig,
         rulesAndState.svNodeState.contractId,
       )
@@ -66,7 +66,7 @@ class SynchronizerNodeReconciler(
 
   def reconcileSynchronizerNodeConfigIfRequired(
       synchronizerNode: Option[SynchronizerNode],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       state: SynchronizerNodeState,
       migrationId: Long,
   )(implicit
@@ -80,12 +80,12 @@ class SynchronizerNodeReconciler(
       nodeState = rulesAndState.svNodeState.payload
       // TODO(#4901): do not use default, but reconcile all configured domains
       synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala
-        .get(domainId.toProtoPrimitive)
+        .get(synchronizerId.toProtoPrimitive)
       sequencerConfig = synchronizerNodeConfig.flatMap(_.sequencer.toScala)
       mediatorConfig = synchronizerNodeConfig.flatMap(_.mediator.toScala)
       existingScanConfig = synchronizerNodeConfig.flatMap(_.scan.toScala).toJava
       existingSequencerConfig = sequencerConfig.map(c =>
-        LocalSequencerConfig(c.sequencerId, c.url, c.migrationId)
+        LocalSequencerConfig(c.sequencerId, c.url, c.migrationId, c.peerUrl.toScala)
       )
       existingMediatorConfig = mediatorConfig.map(c => LocalMediatorConfig(c.mediatorId))
       existingLegacySequencerConfig = synchronizerNodeConfig.flatMap(
@@ -142,6 +142,7 @@ class SynchronizerNodeReconciler(
                   case SynchronizerNodeState.Onboarding =>
                     None
                 }).toJava,
+                c.peerUrl.toJava,
               )
             }.toJava,
             localMediatorConfig
@@ -154,7 +155,7 @@ class SynchronizerNodeReconciler(
             existingScanConfig,
             updatedSequencerConfigUpdate.getOrElse(existingLegacySequencerConfig).toJava,
           )
-          setConfig(domainId, rulesAndState, nodeConfig)
+          setConfig(synchronizerId, rulesAndState, nodeConfig)
         } else {
           logger.info(s"Not setting domain node config because it is the same as the existing one.")
           Future.unit
@@ -178,8 +179,7 @@ class SynchronizerNodeReconciler(
     if (
       existingSequencerConfigOpt.exists { existingSequencerConfig =>
         sequencerConfigOpt.exists(sequencerConfig =>
-          existingSequencerConfig.migrationId != sequencerConfig.migrationId
-            &&
+          existingSequencerConfig.migrationId != sequencerConfig.migrationId &&
             existingSequencerConfig.url == sequencerConfig.url
         )
       }

@@ -1,7 +1,13 @@
 package org.lfdecentralizedtrust.splice.store
 
+import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
+import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Bytes
+import com.google.rpc.status.Status
+import com.google.rpc.status.Status.toJavaProto
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -9,15 +15,8 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
-import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
-import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.util.MonadUtil
-import com.google.rpc.status.Status
-import com.google.rpc.status.Status.toJavaProto
 
-import cats.syntax.traverse.*
 import java.time.Instant
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -95,7 +94,8 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               events = Seq(
                 new CreatedEvent(
                   /*witnessParties*/ Seq(party1).asJava,
-                  /*eventId*/ "someEventId",
+                  /*offset = */ 32,
+                  /*nodeId = */ 53,
                   /*templateId*/ id1,
                   /*packageName*/ "somePackageName",
                   /*contractId*/ contractId,
@@ -112,7 +112,8 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                 ),
                 new ExercisedEvent(
                   /*witnessParties*/ Seq(party1).asJava,
-                  /*eventId*/ "otherEventId",
+                  /*offset = */ 32,
+                  /*nodeId = */ 52,
                   /*templateId*/ id1,
                   /*packageName*/ dummyPackageName,
                   /*interfaceId*/ Some(id1).toJava,
@@ -121,11 +122,11 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*choiceArgument*/ someValue,
                   /*actingParties*/ List(party1).asJava,
                   /*consuming*/ false,
-                  /*childEventIds*/ List("someEventId").asJava,
+                  /*lastDescendedNodeId*/ Integer.valueOf(52),
                   /*exerciseResult*/ someValue,
                 ),
               ),
-              domainId = domain1,
+              synchronizerId = domain1,
               effectiveAt = effectiveAt,
               recordTime = recordTime,
               workflowId = "SomeWorkflowId",

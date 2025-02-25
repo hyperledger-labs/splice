@@ -39,6 +39,7 @@ images := \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app
+sequencer-image := cluster/images/canton-sequencer
 splice-ui-image := cluster/images/splice-web-ui
 images_file := cluster/images/.images
 
@@ -46,7 +47,7 @@ ifdef CI
     # never use the cache in CI on the master branch
     cache_opt := --no-cache
     platform_opt := --platform=linux/amd64,linux/arm64
-    repo = $$(sed -E  "s/^git@(.*)\:(.*).git/https:\/\/\1\/\2/g" <<< $(CIRCLE_REPOSITORY_URL))
+    repo = $(CIRCLE_PROJECT_REPONAME)
     commit_sha = $(CIRCLE_SHA1)
 else
     # Local builds (which may be on an M1) are explicitly constrained
@@ -112,7 +113,6 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 
 %/$(docker-build): %/$(docker-local-image-tag) %/Dockerfile
 	docker-check-multi-arch
-	docker-check-env-vars
 	mkdir -pv $(@D)
 	@echo docker build triggered because these files changed: $?
 	docker buildx build $(platform_opt) \

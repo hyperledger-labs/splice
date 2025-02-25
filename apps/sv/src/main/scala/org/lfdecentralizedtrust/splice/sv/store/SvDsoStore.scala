@@ -46,7 +46,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -208,7 +208,7 @@ trait SvDsoStore
 
   def listAppRewardCouponsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit
       tc: TraceContext
@@ -216,13 +216,13 @@ trait SvDsoStore
 
   def sumAppRewardCouponsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit
       tc: TraceContext
   ): Future[AppRewardCouponsSum]
 
   def listAppRewardCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -230,7 +230,7 @@ trait SvDsoStore
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
-      roundDomain: DomainId,
+      roundDomain: SynchronizerId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[
@@ -240,11 +240,11 @@ trait SvDsoStore
 
   def sumValidatorRewardCouponsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[BigDecimal]
 
   def listValidatorRewardCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -252,7 +252,7 @@ trait SvDsoStore
 
   def listValidatorFaucetCouponsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[
@@ -263,7 +263,7 @@ trait SvDsoStore
 
   def listValidatorLivenessActivityRecordsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[
@@ -274,16 +274,16 @@ trait SvDsoStore
 
   def countValidatorFaucetCouponsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
   def countValidatorLivenessActivityRecordsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
   def listValidatorFaucetCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -292,7 +292,7 @@ trait SvDsoStore
   ]
 
   def listValidatorLivenessActivityRecordsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -304,7 +304,7 @@ trait SvDsoStore
 
   def listSvRewardCouponsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[
@@ -318,7 +318,7 @@ trait SvDsoStore
     */
   def listClosedRounds(
       roundNumbers: Set[Long],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound]]
@@ -326,11 +326,11 @@ trait SvDsoStore
 
   def sumSvRewardCouponWeightsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
   def listSvRewardCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -346,7 +346,7 @@ trait SvDsoStore
   ]
 
   final def getExpiredRewards(
-      domain: DomainId,
+      domain: SynchronizerId,
       enableExpireValidatorFaucet: Boolean,
       totalCouponsLimit: Limit = PageLimit.tryCreate(100),
   )(implicit
@@ -681,8 +681,8 @@ trait SvDsoStore
       )
     } yield unclaimedRewards map (_.contract)
 
-  def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Limit)(implicit
-      tc: TraceContext
+  def listMemberTrafficContracts(memberId: Member, synchronizerId: SynchronizerId, limit: Limit)(
+      implicit tc: TraceContext
   ): Future[
     Seq[Contract[
       splice.decentralizedsynchronizer.MemberTraffic.ContractId,
@@ -744,7 +744,7 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]]
 
-  def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+  def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Future[Long]
 
@@ -1212,7 +1212,7 @@ object SvDsoStore {
               _ => None,
               Some(_),
             ),
-          memberTrafficDomain = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
+          memberTrafficDomain = Some(SynchronizerId.tryFromString(contract.payload.synchronizerId)),
           totalTrafficPurchased = Some(contract.payload.totalPurchased),
         )
       },

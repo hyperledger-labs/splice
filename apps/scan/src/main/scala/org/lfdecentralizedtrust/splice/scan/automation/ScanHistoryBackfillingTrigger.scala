@@ -121,7 +121,7 @@ class ScanHistoryBackfillingTrigger(
             _ <- store.updateHistory
               .initializeBackfilling(
                 treeUpdate.migrationId,
-                treeUpdate.update.domainId,
+                treeUpdate.update.synchronizerId,
                 treeUpdate.update.update.updateId,
                 complete = true,
               )
@@ -142,14 +142,14 @@ class ScanHistoryBackfillingTrigger(
             // Note that this will also delete the import updates because they have a record time of 0,
             // which is good because we want to remove them.
             _ <- store.updateHistory.deleteUpdatesBefore(
-              domainId = treeUpdate.update.domainId,
+              synchronizerId = treeUpdate.update.synchronizerId,
               migrationId = treeUpdate.migrationId,
               recordTime = treeUpdate.update.update.recordTime,
             )
             _ <- store.updateHistory
               .initializeBackfilling(
                 treeUpdate.migrationId,
-                treeUpdate.update.domainId,
+                treeUpdate.update.synchronizerId,
                 treeUpdate.update.update.updateId,
                 complete = false,
               )

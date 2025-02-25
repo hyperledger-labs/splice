@@ -15,7 +15,7 @@ import SpliceTests.BracketSynchronous.*
 import org.lfdecentralizedtrust.splice.util.{MultiDomainTestUtil, SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 
 import org.slf4j.event.Level
 import scala.concurrent.duration.DurationInt
@@ -43,7 +43,7 @@ class SplitwellUpgradeIntegrationTest
 
   "splitwell with upgraded domain" should {
     "report both domains" in { implicit env =>
-      val splitwellDomains = splitwellBackend.getSplitwellDomainIds()
+      val splitwellDomains = splitwellBackend.getSplitwellSynchronizerIds()
       splitwellDomains.preferred.uid.identifier shouldBe "splitwellUpgrade"
       splitwellDomains.others.map(_.uid.identifier) shouldBe Seq("splitwell")
     }
@@ -117,13 +117,13 @@ class SplitwellUpgradeIntegrationTest
                   alice,
                   contracts.map(_.id.contractId).toSet,
                 )
-            val splitwellUpgradeDomainId =
-              aliceValidatorBackend.participantClient.domains.id_of(splitwellUpgradeAlias)
-            val splitwellDomainId =
-              aliceValidatorBackend.participantClient.domains.id_of(splitwellAlias)
-            contractDomains should contain theSameElementsAs Map[String, DomainId](
-              newInstall.id.contractId -> splitwellUpgradeDomainId,
-              install.id.contractId -> splitwellDomainId,
+            val splitwellUpgradeSynchronizerId =
+              aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellUpgradeAlias)
+            val splitwellSynchronizerId =
+              aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellAlias)
+            contractDomains should contain theSameElementsAs Map[String, SynchronizerId](
+              newInstall.id.contractId -> splitwellUpgradeSynchronizerId,
+              install.id.contractId -> splitwellSynchronizerId,
             )
           },
         )
@@ -152,26 +152,24 @@ class SplitwellUpgradeIntegrationTest
         _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
       )
       val acceptedInvite = bobSplitwellClient.acceptInvite(invite)
-      val splitwellDomainId = aliceValidatorBackend.participantClient.domains.id_of(splitwellAlias)
-      val splitwellUpgradeDomainId =
-        aliceValidatorBackend.participantClient.domains.id_of(splitwellUpgradeAlias)
-
-      eventually() {
-        val contractDomains =
-          splitwellBackend.participantClient.ledger_api_extensions.acs.lookup_contract_domain(
-            splitwellBackend.getProviderPartyId(),
-            Set(
-              group.contract.contractId.contractId,
-              invite.contract.contractId.contractId,
-              acceptedInvite.contractId,
-            ),
-          )
-        contractDomains shouldBe Seq[String](
-          group.contract.contractId.contractId,
-          invite.contract.contractId.contractId,
-          acceptedInvite.contractId,
-        ).map(cid => cid -> splitwellDomainId).toMap
-      }
+      val splitwellSynchronizerId =
+        aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellAlias)
+      val splitwellUpgradeSynchronizerId =
+        aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellUpgradeAlias)
+      val contractDomains =
+        splitwellBackend.participantClient.ledger_api_extensions.acs.lookup_contract_domain(
+          splitwellBackend.getProviderPartyId(),
+          Set(
+            group.contract.contractId.contractId,
+            invite.contract.contractId.contractId,
+            acceptedInvite.contractId,
+          ),
+        )
+      contractDomains shouldBe Seq[String](
+        group.contract.contractId.contractId,
+        invite.contract.contractId.contractId,
+        acceptedInvite.contractId,
+      ).map(cid => cid -> splitwellSynchronizerId).toMap
       bracket(
         connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient, alice),
         disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
@@ -201,7 +199,7 @@ class SplitwellUpgradeIntegrationTest
                 group.contract.contractId.contractId,
                 invite.contract.contractId.contractId,
                 acceptedInvite.contractId,
-              ).map(cid => cid -> splitwellUpgradeDomainId).toMap
+              ).map(cid => cid -> splitwellUpgradeSynchronizerId).toMap
             },
           )
         }

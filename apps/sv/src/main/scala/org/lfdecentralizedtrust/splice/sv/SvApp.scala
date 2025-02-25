@@ -72,7 +72,7 @@ import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, Te
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CommunityCryptoConfig,
-  CommunityCryptoProvider,
+  CryptoProvider,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
@@ -81,8 +81,7 @@ import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsy
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.circe.Json
@@ -192,43 +191,48 @@ class SvApp(
     )
 
     val localSynchronizerNode = config.localSynchronizerNode
-      .map(config =>
+      .map(svSynchronizerConfig =>
         new LocalSynchronizerNode(
           participantAdminConnection,
           new SequencerAdminConnection(
-            config.sequencer.adminApi,
+            svSynchronizerConfig.sequencer.adminApi,
             amuletAppParameters.loggingConfig.api,
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
           ),
           new MediatorAdminConnection(
-            config.mediator.adminApi,
+            svSynchronizerConfig.mediator.adminApi,
             amuletAppParameters.loggingConfig.api,
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
           ),
-          config.parameters
-            .toStaticDomainParameters(
-              CommunityCryptoConfig(provider = CommunityCryptoProvider.Jce),
-              ProtocolVersion.v32,
+          svSynchronizerConfig.parameters
+            .toStaticSynchronizerParameters(
+              CommunityCryptoConfig(provider = CryptoProvider.Jce),
+              ProtocolVersion.v33,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
             ),
-          config.sequencer.internalApi,
-          config.sequencer.externalPublicApiUrl,
-          config.sequencer.sequencerAvailabilityDelay.asJava,
-          config.sequencer.pruning,
-          config.mediator.sequencerRequestAmplification,
+          svSynchronizerConfig.sequencer.internalApi,
+          svSynchronizerConfig.sequencer.externalPublicApiUrl,
+          svSynchronizerConfig.sequencer.sequencerAvailabilityDelay.asJava,
+          svSynchronizerConfig.sequencer.pruning,
+          svSynchronizerConfig.mediator.sequencerRequestAmplification,
           loggerFactory,
           retryProvider,
+          SequencerConfig.fromConfig(
+            svSynchronizerConfig.sequencer,
+            cometBftConfig,
+          ),
         )
       )
     val extraSynchronizerNodes = config.synchronizerNodes.view.mapValues { c =>
       ExtraSynchronizerNode.fromConfig(
         c,
+        config.cometBftConfig,
         amuletAppParameters.loggingConfig.api,
         loggerFactory,
         metrics.grpcClientMetrics,
@@ -531,6 +535,7 @@ class SvApp(
         ),
         cometBftClient,
         loggerFactory,
+        config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
       )
 
       adminHandler = new HttpSvAdminHandler(
@@ -718,7 +723,7 @@ class SvApp(
 
   private def expectConfiguredValidatorOnboardings(
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[List[Unit]] = {
     if (
@@ -744,7 +749,7 @@ class SvApp(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[Unit] =
     retryProvider.retry(
@@ -842,7 +847,7 @@ object SvApp {
       secret: ValidatorOnboardingSecret,
       expiresIn: NonNegativeFiniteDuration,
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
       clock: Clock,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
@@ -879,7 +884,7 @@ object SvApp {
                       ),
                     deduplicationOffset = offset,
                   )
-                  .withDomainId(domainId = decentralizedSynchronizer)
+                  .withSynchronizerId(synchronizerId = decentralizedSynchronizer)
                   .yieldUnit()
               } yield {
                 logger.info("Created new ValidatorOnboarding contract.")

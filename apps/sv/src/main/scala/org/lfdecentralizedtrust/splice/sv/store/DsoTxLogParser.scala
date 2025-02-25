@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
 import org.lfdecentralizedtrust.splice.util.ExerciseNode
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.immutable
@@ -34,8 +34,8 @@ class DsoTxLogParser(
 
   import DsoTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
-      tc: TraceContext
+  private def parseTree(tree: TransactionTree, synchronizerId: SynchronizerId, root: TreeEvent)(
+      implicit tc: TraceContext
   ): State = {
 
     root match {
@@ -43,7 +43,7 @@ class DsoTxLogParser(
         exercised match {
           case DsoRulesCloseVoteRequest(node) =>
             State.fromCloseVoteRequest(node)
-          case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
+          case _ => parseTrees(tree, synchronizerId, tree.getChildNodeIds(exercised).asScala.toList)
         }
 
       case _: CreatedEvent => State.empty
@@ -53,21 +53,29 @@ class DsoTxLogParser(
     }
   }
 
-  private def parseTrees(tree: TransactionTree, domainId: DomainId, rootsEventIds: List[String])(
-      implicit tc: TraceContext
+  private def parseTrees(
+      tree: TransactionTree,
+      synchronizerId: SynchronizerId,
+      rootsEventIds: List[Integer],
+  )(implicit
+      tc: TraceContext
   ): State = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
-    roots.foldMap(parseTree(tree, domainId, _))
+    roots.foldMap(parseTree(tree, synchronizerId, _))
   }
 
-  override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+  override def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
-    val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
+    val ret = parseTrees(tx, domain, tx.getRootNodeIds.asScala.toList).entries
     ret
   }
 
-  override def error(offset: Long, eventId: String, domainId: DomainId): Option[TxLogEntry] =
+  override def error(
+      offset: Long,
+      eventId: String,
+      synchronizerId: SynchronizerId,
+  ): Option[TxLogEntry] =
     Some(
       ErrorTxLogEntry()
     )

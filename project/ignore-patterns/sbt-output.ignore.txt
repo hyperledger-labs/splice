@@ -82,7 +82,7 @@ stderr: Finishing shakeRun .*exception: AsyncCancelled
 # compiling daml-errors can be safely ignored
 .*compiling.*daml-errors.*
 
-# using daml3-script
+# using daml-script
 .*\[install-dependencies\]
 You are using an unreleased and unstable version of daml-script intended for daml3. This will break without warning.
 
@@ -117,5 +117,11 @@ WARNING: Failed to fetch secret, retrying in 10 seconds
 .*No want/action statements, nothing to do
 
 .*The geckodriver version cannot be discovered.*
+
+# Produced by TS codegen
+Generating daml-prim-DA-Exception-AssertionFailed
+Generating daml-prim-DA-Exception-PreconditionFailed
+Generating daml-prim-DA-Exception-ArithmeticError
+Generating daml-prim-DA-Exception-GeneralError
 
 # Make sure to have a trailing newline

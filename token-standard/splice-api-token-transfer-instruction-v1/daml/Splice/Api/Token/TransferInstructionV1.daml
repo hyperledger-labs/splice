@@ -1,0 +1,143 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | The on-ledger API for initiating transfers of holdings between parties.
+--
+-- Can be used to implement "free of payment" settlement for securities, cash, or other assets,
+-- where the payment leg is not linked atomically to the transfer of the asset; e.g. because the
+-- payment leg is settled off ledger.
+module Splice.Api.Token.TransferInstructionV1 where
+
+import qualified DA.Map as Map
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+
+-- | A specification of a transfer of holdings between two parties.
+data Transfer = Transfer with
+    sender : Party
+      -- ^ The sender of the transfer.
+    receiver : Party
+      -- ^ The receiver of the transfer.
+    amount : Decimal
+      -- ^ The amount to transfer.
+    instrumentId : InstrumentId
+      -- ^ The instrument identifier.
+
+    executeBefore : Time
+      -- ^ Until when (exclusive) the transfer CAN be executed.
+      --
+      -- The registry MUST NOT allow execution of a resulting transfer instruction after this time.
+      -- Thereby enabling the sender to enforce a deadline on how long the transfer instruction
+      -- can be pending; and to safely retry creating a new transfer instruction after this deadline.
+
+    holdingCids : [ContractId Holding]
+      -- ^ The holding contracts that should be used to fund the transfer.
+      --
+      -- MAY be empty if the registry supports automatic selection of holdings for transfers.
+      --
+      -- If specified, then the transfer MUST not succeed if any of these
+      -- holding contracts have already been archived. Thereby ensuring that the sender can
+      -- use deliberate contention on holdings to prevent duplicate transfers.
+
+    meta : Metadata
+      -- ^ Metadata.
+
+  deriving (Show, Eq)
+
+
+-- TransferInstruction
+------------------------
+
+-- | View for `TransferInstruction`.
+data TransferInstructionView = TransferInstructionView with
+    transfer : Transfer
+      -- ^ The transfer specified by the transfer instruction.
+    pendingActions : Map.Map Party Text
+      -- ^ The pending actions to be taken by different actors to execute the transfer.
+      --
+      -- ^ This field can by used to report on the progress of registry specific
+      -- workflows that are required to execute the transfer (e.g., confirmation of OFAC checks).
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
+  deriving (Show, Eq)
+
+-- | An interface for tracking the status of a transfer instruction,
+-- i.e., a request to a registry app to execute a transfer.
+--
+-- Registries MAY evolve the transfer instruction in multiple steps. They
+-- MUST though ensure that the final archival of the transfer instruction happens
+-- via the choices on this interface, so that the sender can determine whether the instruction
+-- ultimately succeeded or failed.
+interface TransferInstruction where
+  viewtype TransferInstructionView
+
+  transferInstruction_reportSuccessImpl : ContractId TransferInstruction -> ExtraArgs -> Update ChoiceExecutionMetadata
+  transferInstruction_abortImpl : ContractId TransferInstruction -> Party -> ExtraArgs -> Update ChoiceExecutionMetadata
+
+  choice TransferInstruction_ReportSuccess : ChoiceExecutionMetadata
+    -- ^ Report that the transfer instruction was successfully executed
+    -- by a registry-internal workflow.
+    --
+    -- This choice is provided to enable wallets to parse the transaction history via the
+    -- choices on this interface.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).transfer.instrumentId.admin
+    do
+      transferInstruction_reportSuccessImpl this self extraArgs
+
+  choice TransferInstruction_Abort : ChoiceExecutionMetadata
+    -- ^ Abort the transfer instruction for the reason given in the extra argument's metadata.
+    --
+    -- Implementors MUST ensure that the transfer does not complete in case this choice is exercised.
+    -- Implementors SHOULD decide which actors are allowed to abort a transfer instruction,
+    -- and add corresponding checks to the implementation of this choice.
+    --
+    -- At least the sender SHOULD be allowed to abort a transfer instruction.
+    with
+      actor : Party
+      -- ^ The party that aborts the transfer instruction.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller actor
+    do transferInstruction_abortImpl this self actor extraArgs
+
+
+-- Transfer Factory
+-------------------
+
+-- | A factory to transfer holdings between parties.
+interface TransferFactory where
+  viewtype TransferFactoryView
+
+  transferFactory_transferImpl
+    : ContractId TransferFactory -> Transfer -> ExtraArgs -> Update TransferFactory_TransferResult
+
+  -- Instruct the registry to execute a transfer, if possible, the registry SHOULD execute
+  -- the transfer in a single atomic transaction. If that is not possible, then this choice
+  -- MAY result in the creation of a transfer instruction that is pending further actions.
+  nonconsuming choice TransferFactory_Transfer : TransferFactory_TransferResult
+    with
+      transfer : Transfer
+        -- ^ The transfer to execute.
+      extraArgs : ExtraArgs
+        -- ^ The extra arguments to pass to the transfer implementation.
+    controller transfer.sender
+    do
+      transferFactory_transferImpl this self transfer extraArgs
+
+-- | Result of requesting a transfer.
+data TransferFactory_TransferResult = TransferFactory_TransferResult with
+  optTransferInstructionCid : Optional (ContractId TransferInstruction)
+    -- ^ The contract ID of the transfer instruction, in case the transfer could not be executed atomically.
+  meta : Metadata
+    -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+
+-- | View for `TransferFactory`.
+data TransferFactoryView = TransferFactoryView
+  with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instruments for
+      -- which this transfer factory can be used.

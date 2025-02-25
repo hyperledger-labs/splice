@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.{TopologyStoreId}
 import com.digitalasset.canton.tracing.Spanning
 import io.grpc.Status
@@ -42,13 +42,13 @@ class HttpSvSoftDomainMigrationPocHandler(
 
   override def reconcileSynchronizerDamlState(
       respond: SvSoftDomainMigrationPocResource.ReconcileSynchronizerDamlStateResponse.type
-  )(domainIdPrefix: String)(
+  )(synchronizerIdPrefix: String)(
       extracted: TracedUser
   ): Future[SvSoftDomainMigrationPocResource.ReconcileSynchronizerDamlStateResponse] = {
     implicit val TracedUser(_, traceContext) = extracted
-    val domainId = DomainId(
+    val synchronizerId = SynchronizerId(
       UniqueIdentifier.tryCreate(
-        domainIdPrefix,
+        synchronizerIdPrefix,
         dsoStore.key.dsoParty.uid.namespace,
       )
     )
@@ -61,16 +61,16 @@ class HttpSvSoftDomainMigrationPocHandler(
       logger,
     )
     val node = synchronizerNodes
-      .get(domainIdPrefix)
+      .get(synchronizerIdPrefix)
       .getOrElse(
         throw Status.NOT_FOUND
-          .withDescription(s"No synchronizer node for $domainIdPrefix configured")
+          .withDescription(s"No synchronizer node for $synchronizerIdPrefix configured")
           .asRuntimeException()
       )
     synchronizerNodeReconciler
       .reconcileSynchronizerNodeConfigIfRequired(
         Some(node),
-        domainId,
+        synchronizerId,
         SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately,
         migrationId,
       )
@@ -79,13 +79,13 @@ class HttpSvSoftDomainMigrationPocHandler(
 
   override def signDsoPartyToParticipant(
       respond: SvSoftDomainMigrationPocResource.SignDsoPartyToParticipantResponse.type
-  )(domainIdPrefix: String)(
+  )(synchronizerIdPrefix: String)(
       extracted: TracedUser
   ): Future[SvSoftDomainMigrationPocResource.SignDsoPartyToParticipantResponse] = {
     implicit val TracedUser(_, traceContext) = extracted
-    val domainId = DomainId(
+    val synchronizerId = SynchronizerId(
       UniqueIdentifier.tryCreate(
-        domainIdPrefix,
+        synchronizerIdPrefix,
         dsoStore.key.dsoParty.uid.namespace,
       )
     )
@@ -102,7 +102,7 @@ class HttpSvSoftDomainMigrationPocHandler(
         "sign_dso_party_to_participant",
         "sign_dso_party_to_participant",
         participantAdminConnection.proposeInitialPartyToParticipant(
-          TopologyStoreId.DomainStore(domainId),
+          TopologyStoreId.SynchronizerStore(synchronizerId),
           dsoStore.key.dsoParty,
           participantIds,
           isProposal = true,

@@ -612,14 +612,14 @@ object RetryProvider {
                       statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                         "An error occurred. Please contact the operator and inquire about the request"
                       ) ||
-                        // This can happen if the party allocation has not yet been propagated to the new domain.
+                        // This can happen if the party allocation has not yet been propagated to the new synchronizer.
                         statusCode == Status.Code.INVALID_ARGUMENT &&
-                        raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
+                        raw"No participant of the party .* has confirmation permission on both synchronizers at respective timestamps".r
                           .findFirstMatchIn(description)
                           .isDefined ||
-                        // This can happen if the party allocation has not yet been propagated to the new domain.
+                        // This can happen if the party allocation has not yet been propagated to the new synchronizer.
                         statusCode == Status.Code.INVALID_ARGUMENT &&
-                        raw"The following parties are not active on the target domain".r
+                        raw"The following stakeholders are not active on the target synchronizer".r
                           .findFirstMatchIn(description)
                           .isDefined || // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
@@ -633,9 +633,9 @@ object RetryProvider {
                           description.contains(
                             SequencerErrors.MaxSequencingTimeTooFar.id
                           )) ||
-                        // This can occur when we try to get the domain time while still being disconnected from the domain
+                        // This can occur when we try to get the synchronizer time while still being disconnected from the synchronizer
                         statusCode == Status.Code.INVALID_ARGUMENT &&
-                        raw"Time tracker for domain .* not found".r
+                        raw"Time tracker for synchronizer .* not found".r
                           .findFirstMatchIn(description)
                           .isDefined || // This can occur if the party has not yet been propagated to the ledger API server
                         statusCode == Status.Code.INVALID_ARGUMENT &&
