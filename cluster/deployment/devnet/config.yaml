@@ -34,3 +34,12 @@ synchronizerMigration:
 pulumiProjectConfig:
   default:
     isExternalCluster: true
+monitoring:
+  alerting:
+    enableNoDataAlerts: true
+    alerts:
+      cometbft:
+        expectedMaxBlocksPerSecond: 5
+      loadTester:
+        # DevNet fluctuates a bit more than our internal clusters so we alert only when it drops below 0.9
+        minRate: 0.9

@@ -23,3 +23,12 @@ synchronizerMigration:
     version: 0.3.13-snapshot.20250224.8390.0.v5f7d491c
     releaseReference: "refs/tags/cilr"
 persistentSequencerHeapDumps: true
+monitoring:
+  alerting:
+    enableNoDataAlerts: true
+    alerts:
+      trafficWaste:
+        kilobytes: 50
+        overMinutes: 30
+      cometbft:
+        expectedMaxBlocksPerSecond: 7

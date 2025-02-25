@@ -14,16 +14,11 @@ import {
   COMETBFT_RETAIN_BLOCKS,
   config,
   ENABLE_COMETBFT_PRUNING,
-  ENABLE_NO_DATA_ALERTS,
-  EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
-  LOAD_TESTER_MIN_RATE,
   publicPrometheusRemoteWrite,
   REPO_ROOT,
-  WASTED_TRAFFIC_ALERT_ALERT_TIME_RANGE_MINS,
-  WASTED_TRAFFIC_ALERT_THRESHOLD_KB,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
@@ -39,6 +34,7 @@ import {
   slackToken,
   supportTeamEmail,
 } from './alertings';
+import { monitoringConfig } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
 
@@ -746,7 +742,10 @@ function substituteSlackNotificationTemplate(file: string) {
 }
 
 function defaultAlertSubstitutions(alert: string): string {
-  return alert.replaceAll('$NODATA', ENABLE_NO_DATA_ALERTS ? 'Alerting' : 'OK');
+  return alert.replaceAll(
+    '$NODATA',
+    monitoringConfig.alerting.enableNoDataAlerts ? 'Alerting' : 'OK'
+  );
 }
 
 function createGrafanaAlerting(namespace: Input<string>) {
@@ -769,13 +768,19 @@ function createGrafanaAlerting(namespace: Input<string>) {
           ...{
             'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
             'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml')
-              .replace('$LOAD_TESTER_MIN_RATE', LOAD_TESTER_MIN_RATE)
+              .replace(
+                '$LOAD_TESTER_MIN_RATE',
+                monitoringConfig.alerting.alerts.loadTester.minRate.toString()
+              )
               .replaceAll(
                 '$NODATA',
                 config.envFlag('K6_ENABLE_LOAD_GENERATOR') ? 'Alerting' : 'OK'
               ),
             'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
-              .replaceAll('$EXPECTED_MAX_BLOCK_RATE_PER_SECOND', EXPECTED_MAX_BLOCK_RATE_PER_SECOND)
+              .replaceAll(
+                '$EXPECTED_MAX_BLOCK_RATE_PER_SECOND',
+                monitoringConfig.alerting.alerts.cometbft.expectedMaxBlocksPerSecond.toString()
+              )
               .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
@@ -788,12 +793,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
-                '$WASTED_TRAFFIC_ALERT_THRESHOLD_KB',
-                WASTED_TRAFFIC_ALERT_THRESHOLD_KB.toString()
+                '$WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES',
+                (monitoringConfig.alerting.alerts.trafficWaste.kilobytes * 1024).toString()
               )
               .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
-                WASTED_TRAFFIC_ALERT_ALERT_TIME_RANGE_MINS.toString()
+                monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

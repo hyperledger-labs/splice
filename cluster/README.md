@@ -979,13 +979,9 @@ To edit an alert follow the following steps:
 ###### CometBFT maximum block rate
 
 This alert triggers when the block rate of CometBFT exceeds a certain threshold. The alert is configured to trigger
-when the block rate exceeds **EXPECTED_MAX_BLOCK_RATE_PER_SECOND** blocks per second.
+when the block rate exceeds **expectedMaxBlocksPerSecond** blocks per second.
 
-This variable is optional and can be configured per cluster in the .envrc.vars file:
-
-```
-export EXPECTED_MAX_BLOCK_RATE_PER_SECOND="3.5" (default value)
-```
+This variable is optional and can be configured per cluster in the config.yaml file:
 
 #### JVM debug information
 

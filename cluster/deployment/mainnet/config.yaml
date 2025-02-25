@@ -11,3 +11,6 @@ synchronizerMigration:
 pulumiProjectConfig:
   default:
     isExternalCluster: true
+monitoring:
+  alerting:
+    enableNoDataAlerts: true
