@@ -39,7 +39,9 @@ publish () {
 
 artifactory_url="https://digitalasset.jfrog.io/artifactory"
 repo="canton-network-helm"
-if [[ "$chart" == *-dirty.tgz ]]; then
+if [ -n "${PUBLISH_PUBLIC_ARTIFACTS:-}" ]; then
+  repo="canton-network-helm"
+elif [[ "$chart" == *-dirty.tgz ]]; then
   repo="canton-network-helm-dev"
 else
   if [ -n "${CIRCLE_BRANCH:-}" ]; then

@@ -261,6 +261,10 @@ commands:
             sudo systemctl restart docker
 
   docker_build:
+    parameters:
+      is_public:
+        type: boolean
+        default: false
     steps:
       - run_bash_command_in_nix:
          cmd_name: Build docker images
@@ -272,7 +276,12 @@ commands:
                               --keep NO_PROXY"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
-         cmd: make docker-build -j
+         cmd: |
+           if [[ << parameters.is_public >> == true ]]; then
+             echo "Publishing to public docker repo"
+             export PUBLISH_PUBLIC_ARTIFACTS=true
+           fi
+           make docker-build -j
   docker_login_artifactory:
     steps:
       - run:
