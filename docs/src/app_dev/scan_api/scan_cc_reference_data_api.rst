@@ -16,7 +16,7 @@ DSO party ID
 The DSO party ID is unique to every Splice network, and is a signatory or observer of most core Splice Daml templates.
 Therefore, you need to know it to correlate a Daml contract with a particular Splice network, or to construct a contract payload from scratch.
 
-There's a simple way to retrieve the DSO party ID from Scan, with the `/v0/dso-party-id <|gsf_scan_url|/api/scan/v0/dso-party-id>`_ endpoint.
+There's a simple way to retrieve the DSO party ID from Scan, with the `/v0/dso-party-id <scan_openapi.html#get--v0-dso-party-id>`_ endpoint.
 Here's an example response:
 
 .. code-block:: json

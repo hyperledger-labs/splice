@@ -132,8 +132,7 @@ The response returns a list of transactions. Every transaction contains the foll
 
 * **migration_id** : This ID increments with every hard synchronizer migration. A hard synchronizer migration is performed for every significant Canton version upgrade.
   The current migration ID can be inquired from an SV,
-  or by using the ``/v0/dso-sequencers`` API at |gsf_scan_url|/api/scan/v0/dso-sequencers,
-  which returns a ``migrationId`` per sequencer.
+  or by :ref:`Listing_all_SV_Sequencers`\ , which returns a ``migrationId`` per sequencer.
 * **synchronizer_id**: The instance ID of a Synchronizer (for example the ID of the Global Synchronizer).
   When contracts get reassigned, they become unavailable for processing via the old instance of the synchronizer
   and become available via the new instance of the synchronizer.

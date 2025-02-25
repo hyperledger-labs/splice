@@ -16,7 +16,7 @@ Amulet Summaries
 While it's possible to figure total Amulet balance from the :ref:`scan_bulk_data_api`, figuring the effect of holding fees can be tricky for a new Splice app unfamiliar with the on-ledger data model of Amulet.
 
 With a valid time from :ref:`v0_state_acs_snapshot-timestamp`, knowing the latest migration ID, and one or more party IDs to look up Amulet holdings for, Scan will gather Amulet statistics for each matching party and yield them.
-Here's an example payload passed to `/v0/holdings/summary <|gsf_scan_url|/api/scan/v0/holdings/summary>`_ on a test network:
+Here's an example payload passed to `/v0/holdings/summary <scan_openapi.html#post--v0-holdings-summary>`_ on a test network:
 
 .. code-block:: json
 
@@ -59,7 +59,7 @@ Note that the first summary above isn't the first of the ``owner_party_ids`` arg
 Detailed Amulet Holdings
 ------------------------
 
-For more information about Amulet on the ledger, use `/v0/holdings/state <|gsf_scan_url|/api/scan/v0/holdings/state>`_ instead.
+For more information about Amulet on the ledger, use `/v0/holdings/state <scan_openapi.html#post--v0-holdings-state>`_ instead.
 Repeating the request for `Amulet Summaries`_ above, but adding in the separately-introduced and required ``page_size`` parameter as this API is paginated, Scan would yield something like
 
 .. code-block:: json
@@ -104,10 +104,10 @@ This response is in the same format as :ref:`v0_state_acs` but is restricted to 
 Looking up ANS Entries
 ----------------------
 
-`/v0/ans-entries/by-party <|gsf_scan_url|/api/scan/v0/ans-entries/by-party>`_ and `/v0/ans-entries/by-name <|gsf_scan_url|/api/scan/v0/ans-entries/by-name>`_ are quick ways to look up ANS entries, by owner party ID and entry name, respectively, without searching the ACS.
-They share a response format in common with `/v0/ans-entries <|gsf_scan_url|/api/scan/v0/ans-entries>`_, which searches by name *prefix* rather than exact name.
+`/v0/ans-entries/by-party <scan_openapi.html#get--v0-ans-entries-by-party-party>`_ and `/v0/ans-entries/by-name <scan_openapi.html#get--v0-ans-entries-by-name-name>`_ are quick ways to look up ANS entries, by owner party ID and entry name, respectively, without searching the ACS.
+They share a response format in common with `/v0/ans-entries <scan_openapi.html#get--v0-ans-entries>`_, which searches by name *prefix* rather than exact name.
 
-For example, with a test of `/v0/ans-entries?name_prefix=dso&page_size=5 <|gsf_scan_url|/api/scan/v0/ans-entries?name_prefix=dso&page_size=5>`_, Scan responds with something like
+For example, with a test of ``/v0/ans-entries?name_prefix=dso&page_size=5``, Scan responds with something like
 
 .. code-block:: json
 

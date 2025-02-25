@@ -13,7 +13,7 @@ Scan provides endpoints to query about the ongoing operations of the Global Sync
 Validator Liveness
 ------------------
 
-Rather than :ref:`Listing_all_Validators`, which can yield a large number of irrelevant records, `/v0/validators/validator-faucets?validator_ids=... <|gsf_scan_url|/api/scan/v0/validators/validator-faucets?validator_ids=...>`_ yields only liveness information about the specified validators.
+Rather than :ref:`Listing_all_Validators`, which can yield a large number of irrelevant records, `/v0/validators/validator-faucets?validator_ids=... <scan_openapi.html#get--v0-validators-validator-faucets>`_ yields only liveness information about the specified validators.
 
 For example, querying for a few validators might yield
 

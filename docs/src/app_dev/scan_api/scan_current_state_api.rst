@@ -40,7 +40,7 @@ Open Mining Rounds
 ------------------
 
 Amulet activity and traffic are associated with rounds, which determine how rewards are allocated.
-To check on the current rounds available for traffic or with rewards currently in process, check `/v0/open-and-issuing-mining-rounds <|gsf_scan_url|/api/scan/v0/open-and-issuing-mining-rounds>`_
+To check on the current rounds available for traffic or with rewards currently in process, check `/v0/open-and-issuing-mining-rounds <scan_openapi.html#post--v0-open-and-issuing-mining-rounds>`_.
 
 This endpoint features a parameter for more efficient polling; see the ``MaybeCachedContractWithStateMap`` OpenAPI specification for more details.
 The initial request is always empty:
@@ -125,5 +125,5 @@ For followup polling requests, you'll want to pass the keys from the previously-
 Closed Mining Rounds
 --------------------
 
-`/v0/closed-rounds <|gsf_scan_url|/api/scan/v0/closed-rounds>`_ is more niche than `Open Mining Rounds`_; it usually yields an empty response.
+`/v0/closed-rounds <scan_openapi.html#get--v0-closed-rounds>`_ is more niche than `Open Mining Rounds`_; it usually yields an empty response.
 However, it can yield some ``ClosedMiningRound`` Daml contracts if there are unclaimed rewards for that round, or a final confirmation for the round closure hasn't been created yet; as validators operate asynchronously around the Daml ledger to complete these operations, this can be briefly true, but ideally for as short a time as possible.
