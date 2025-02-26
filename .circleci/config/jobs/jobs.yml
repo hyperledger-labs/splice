@@ -183,7 +183,9 @@ jobs:
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY \
-           --keep CIRCLE_BRANCH"
+           --keep CIRCLE_BRANCH \
+           --keep CIRCLE_REPOSITORY_URL \
+           --keep CIRCLE_SHA1"
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
