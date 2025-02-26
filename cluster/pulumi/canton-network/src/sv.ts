@@ -16,6 +16,7 @@ import {
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
+  DecentralizedSynchronizerUpgradeConfig,
   DEFAULT_AUDIENCE,
   ExactNamespace,
   exactNamespace,
@@ -119,6 +120,10 @@ export async function installSvNode(
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
+      },
+      cometbftPorts: {
+        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive range
+        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
       },
     },
     activeVersion,

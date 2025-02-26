@@ -13,7 +13,7 @@ export enum MigrationProvider {
 export const defaultActiveMigration = {
   id: 0,
   version: CHARTS_VERSION,
-  provider: MigrationProvider.INTERNAL,
+  provider: MigrationProvider.EXTERNAL,
 };
 
 // defined here to prevent cyclic dependency
@@ -40,7 +40,7 @@ export const MigrationInfoSchema = z
       .lt(10, 'Migration id must be less than or equal to 10 as we use in the cometbft ports.')
       .gte(0),
     version: migrationVersion,
-    provider: z.nativeEnum(MigrationProvider),
+    provider: z.nativeEnum(MigrationProvider).default(MigrationProvider.EXTERNAL),
     releaseReference: z.string().optional(),
   })
   .strict();

@@ -63,6 +63,7 @@ parameters:
         backup-status-testnet,
         backup-status-mainnet,
         purge-unused-dbs-cidaily,
+        bump-configs,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -457,7 +458,9 @@ commands:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep PULUMI_VERSION \
-                              --keep NO_PROXY"
+                              --keep NO_PROXY \
+                              --keep CIRCLE_REPOSITORY_URL \
+                              --keep CIRCLE_SHA1"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: make docker-build -j
@@ -1888,7 +1891,7 @@ jobs:
         default: 3
       internal_stack:
         type: boolean
-        default: true
+        default: false
       checkout-branch:
         type: string
         default: "" # Default set to $CIRCLE_SHA1
@@ -2007,7 +2010,7 @@ jobs:
         type: string
       internal_stack:
         type: boolean
-        default: true
+        default: false
       silence_deployment_alerts:
         type: boolean
         default: false
@@ -2028,6 +2031,7 @@ jobs:
           gce_authenticate: true
           no_output_timeout: "20m"
           additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
+          cmd_retry_count: 5
           cmd: |
             cncluster activate
 
@@ -2048,6 +2052,7 @@ jobs:
                 cncluster wait << parameters.namespace_name >> validator-app ${ACTIVE_MIGRATION_ID}
                 ;;
             esac
+
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -2122,7 +2127,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -2212,7 +2217,7 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -2325,7 +2330,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -2333,6 +2338,8 @@ jobs:
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
 
+            # requires sv1 sv-app to be up so we disable it for faster deployments
+            export DISABLE_COMETBFT_STATE_SYNC=true
             if [[ << parameters.skip_infra >> == true ]]; then
               cncluster ci_apply --skip-infra
             else
@@ -2545,7 +2552,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd_name: Wait for SV app to be responsive
           cmd: |
-            succes=0
+            success=0
             # Wait up to 30 minutes for the sv app to be ready
             # (we're starting this job in parallel with the initial deployment)
             for i in {1..180}; do
@@ -2633,7 +2640,7 @@ jobs:
         default: ""
       deploy_retry_count:
         type: integer
-        default: 10
+        default: 2
       send_notifications:
         type: boolean
         default: true
@@ -2856,6 +2863,7 @@ jobs:
             fi
             BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
+            #TODO(#15759) - remove the internal param after HDM base version is >= 0.3.12
             cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
@@ -2864,6 +2872,8 @@ jobs:
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            # requires sv1 sv-app to be up so we disable it for faster deployments
+            echo "export DISABLE_COMETBFT_STATE_SYNC=true" >> "$file"
             # if the base version is a release version ensure we use the public repository
             if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
@@ -2954,9 +2964,9 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
-            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
-            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true
@@ -3227,6 +3237,19 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
+  bump_configs:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Bump configs
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
+            .circleci/cn-scripts/bump-configs.sh
+
   update_pipeline_schedule:
     docker:
       - image: cimg/base:2024.01
@@ -3459,20 +3482,14 @@ jobs:
       max_pipeline_age_secs:
         type: integer
         default: 28800  # limit search to pipelines that are 8 hours old
-      only_if_running:
-        # if set to false, will cancel if a relevant pipeline is found, regardless of its current status
-        type: boolean
-        default: true
+      extra_seconds_after_finish:
+        type: integer
+        default: 0
     steps:
       - checkout_with_retry
       - run:
           name: "Cancel if previous pipeline"
           command: |
-            if [[ << parameters.only_if_running >> == true ]]; then
-              action="cancel_self"
-            else
-              action="cancel_self_if_found"
-            fi
             .circleci/wait_for_or_cancel_pipelines.sh \
               --current_pipeline_number << pipeline.number >> \
               --workflow_names "<< parameters.workflow_names >>" \
@@ -3480,7 +3497,8 @@ jobs:
               --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
               --branch_ignores "<< parameters.branch_ignores >>" \
               --max_age_seconds << parameters.max_pipeline_age_secs >> \
-              $action
+              --extra_seconds_after_finish << parameters.extra_seconds_after_finish >> \
+              cancel_self
 
   cancel_previous_pipelines:
     executor: self_hosted
@@ -4417,8 +4435,6 @@ jobs:
               # silence specific alerts that may fire due to reset downtime
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
-            # Always reset the runbook even if the flag is false to ensure that any config change is accounted for
-            export SPLICE_DEPLOY_SV_RUNBOOK=true
 
             if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
               cncluster ci_reset_unlock
@@ -4683,9 +4699,19 @@ workflows:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
-      # TODO(#15988): In this job we currently also save the nix cache. Before we retire it,
+      # Note that in the build_oss job we currently also save the nix cache. Before we retire it,
       # make sure to enable saving the nix cache in some other job instead.
       - build_oss:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+
+  bump_configs:
+    when:
+      equal: [ bump-configs, << pipeline.parameters.run-job >> ]
+    jobs:
+      - bump_configs:
           <<: *notify-fail
           context:
             - artifactory
@@ -4831,11 +4857,11 @@ workflows:
           context:
             - artifactory
             - slack-context
-          # Skip healthchecks for 60 minutes after starting an sv/validator node restore from backup.
-          # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
-          max_pipeline_age_secs: 3600
           workflow_names: "restore_sv_cidaily restore_validator_cidaily"
-          only_if_running: false
+          max_pipeline_age_secs: 7200 # search pipelines that are 2h old
+          # Skip healthchecks for 30 minutes after finishing an sv/validator node restore from backup.
+          # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
+          extra_seconds_after_finish: 1800
       - preflight_check:
           filters:
             branches:

@@ -190,49 +190,9 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-validator1",
+    "name": "k8s-imgpull-validator1-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "role": "roles/cloudkms.admin"
-    },
-    "name": "kms-testzrh-validator1-roles/cloudkms.admin-iam",
-    "provider": "",
-    "type": "gcp:projects/iAMMember:IAMMember"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "role": "roles/cloudkms.cryptoOperator"
-    },
-    "name": "kms-testzrh-validator1-roles/cloudkms.cryptoOperator-iam",
-    "provider": "",
-    "type": "gcp:projects/iAMMember:IAMMember"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "accountId": "kms-testzrh-validator1",
-      "description": "Service account for KMS (managed by Pulumi)",
-      "displayName": "Participant KMS Service Account"
-    },
-    "name": "kms-testzrh-validator1-sa",
-    "provider": "",
-    "type": "gcp:serviceaccount/account:Account"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "kms-testzrh-validator1",
-    "provider": "",
-    "type": "cn:gcp:ServiceAccount"
   },
   {
     "custom": true,
@@ -369,6 +329,46 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "role": "roles/cloudkms.admin"
+    },
+    "name": "testzrh-validator1-kms-roles/cloudkms.admin-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/cloudkms.cryptoOperator"
+    },
+    "name": "testzrh-validator1-kms-roles/cloudkms.cryptoOperator-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "testzrh-validator1-kms",
+      "description": "(managed by Pulumi)",
+      "displayName": "KMS Service Account (testzrh validator1)"
+    },
+    "name": "testzrh-validator1-kms-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "testzrh-validator1-kms",
+    "provider": "",
+    "type": "cn:gcp:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -452,7 +452,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -495,7 +495,7 @@
       }
     },
     "name": "validator1-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-validator1::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-validator1-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -505,9 +505,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "validator1"
       },
@@ -562,6 +559,9 @@
           "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 2
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -571,7 +571,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -679,7 +679,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "validator1-participant-1",
     "provider": "",
@@ -804,7 +804,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -997,7 +997,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

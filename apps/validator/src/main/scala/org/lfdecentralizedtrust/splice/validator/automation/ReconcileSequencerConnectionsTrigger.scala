@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -37,6 +38,7 @@ class ReconcileSequencerConnectionsTrigger(
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
     supportsSoftDomainMigrationPoc: Boolean,
+    initialSynchronizerTimeO: Option[CantonTimestamp],
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -68,8 +70,19 @@ class ReconcileSequencerConnectionsTrigger(
             }
       _ <- maybeDomainTime match {
         case Some(domainTime) =>
+          val maxDomainTime = initialSynchronizerTimeO match {
+            case Some(initialSynchronizerTime) if domainTime < initialSynchronizerTime =>
+              // Without this we can end up in situations where we first use a higher time to connect to
+              // the synchronizer based on clock.now and then travel back in time as we get a
+              // synchronizer connection. That doesn't really make any sense so we take the max.
+              logger.info(
+                s"Synchronizer time is $domainTime but initial timestamp used to determine synchronizer connections was $initialSynchronizerTime which is higher, using $initialSynchronizerTime instead"
+              )
+              initialSynchronizerTime
+            case _ => domainTime
+          }
           for {
-            sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(domainTime)
+            sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(maxDomainTime)
             _ <- sequencerConnections.toList.traverse_ { case (alias, connections) =>
               val sequencerConnectionConfig = NonEmpty.from(connections) match {
                 case None =>

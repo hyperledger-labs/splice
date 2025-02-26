@@ -132,7 +132,7 @@
       }
     },
     "name": "cluster-ingress-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-cluster-ingress::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-cluster-ingress-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -142,9 +142,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "cluster-ingress"
       },
@@ -216,7 +213,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -384,7 +381,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-cluster-ingress",
+    "name": "k8s-imgpull-cluster-ingress-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -394,7 +391,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv",
+    "name": "k8s-imgpull-sv-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -434,6 +431,9 @@
           "hostname": "global.canton.network.digitalasset.com"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 3
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -443,7 +443,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "loopback",
     "provider": "",
@@ -513,7 +513,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "scan",
     "provider": "",
@@ -709,7 +709,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -751,7 +751,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 280000
           },
           {
             "name": "Digital-Asset-1",
@@ -868,7 +868,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-app",
     "provider": "",
@@ -891,7 +891,7 @@
       }
     },
     "name": "sv-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -901,9 +901,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "sv"
       },
@@ -993,7 +990,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1071,7 +1068,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1149,7 +1146,7 @@
           }
         ]
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1264,7 +1261,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.3.9"
+      "version": "0.3.10"
     },
     "name": "validator",
     "provider": "",

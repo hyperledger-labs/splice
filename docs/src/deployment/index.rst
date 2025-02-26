@@ -8,6 +8,7 @@ Operations
 
 .. toctree::
 
+    traffic.rst
     observability/index.rst
     configuration.rst
     troubleshooting.rst

@@ -66,11 +66,13 @@ In addition to that also check the version you are using and the network (dev/te
 Common Error Messages
 ---------------------
 
+.. _error-below-reserved-traffic-amount:
+
 Traffic balance below reserved amount
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A log of the form shown below indicates that your validator app
-has not been able to purchase any traffic. The validator blocks
+has not been able to :ref:`purchase any traffic <traffic_topup>`. The validator blocks
 transactions not required to purchase more traffic once the purchased
 traffic balance falls below a given number to
 avoid issues where the validator locks itself out by not having enough
@@ -90,7 +92,7 @@ Insufficient funds to buy configured traffic amount
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A log of the form shown below indicates that your validator app
-attempted to purchase traffic but does not have enough in the wallet
+attempted to :ref:`purchase traffic <traffic_topup>` but does not have enough in the wallet
 of the validator operator party. This is common on TestNet and MainNet
 for new nodes as they start out with a balance of 0 and only slowly
 accrue CC through validator liveness rewards. So often this just
@@ -129,3 +131,29 @@ details on why the request got rejected.
 .. code:: bash
 
     2025-02-14T11:32:00.304Z [⋮] INFO - o.l.s.v.ValidatorApp:validator=validator_backend (50836441bf579035d64a56f776566cbf) - The operation 'Get user 7D95xiEUxju4IUXFQgyUrwHMMuZO0g2F@clients' failed with a retryable error (full stack trace omitted): UNAUTHENTICATED: An error occurred. Please contact the operator and inquire about the request efd009557dec03da74dd29b723949cd6 with tid efd009557dec03da74dd29b723949cd6
+
+Node has identity X, but identifier Y was expected
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A log of the form below in the validator or SV app indicates that you
+tried to change the identifier used for your participant (or for SVs
+sequencer, mediator) after it was already initialized.  Note that for
+validators the node identifier defaults to your ``validatorPartyHint``
+so changing that also produces this error. For SVs it defaults to the
+SV name.  If this is a new node, the easiest option is to reset your
+node by dropping the respective databases of the participant and
+validator or for SVs sequencer, participant, mediator, validator, sv
+and scan app. After you dropped the databases bring up your node
+again.
+
+.. warning:: This deletes all data on your node and you cannot
+             recover it. Only run this on fresh nodes that never
+             successfully initialized.
+
+
+If this is not a new node, change
+the values back to what you had before.
+
+.. code:: bash
+
+    │Caused by: io.grpc.StatusRuntimeException: INTERNAL: Node has identity a-b-c-1::122098ffcd99..., but identifier a-b-1 was expected.                │

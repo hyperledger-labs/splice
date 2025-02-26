@@ -1,7 +1,8 @@
 import * as automation from '@pulumi/pulumi/automation';
 import { runSvCantonForAllMigrations } from 'sv-canton-pulumi-deployment/pulumi';
 
-import { awaitAllOrThrowAllExceptions, operation, Operation, stack } from './pulumi';
+import { awaitAllOrThrowAllExceptions, Operation, stack } from './pulumi';
+import { operation } from './pulumiOperations';
 
 export async function runStacksCancel(): Promise<void> {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
@@ -9,6 +10,7 @@ export async function runStacksCancel(): Promise<void> {
   let operations: Operation[] = [];
   operations.push(cancelOperation(mainStack));
   const cantonStacksOperations = runSvCantonForAllMigrations(
+    'cancel',
     stack => {
       return stack.cancel();
     },

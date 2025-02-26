@@ -165,8 +165,7 @@ function installDockerRunnerScaleSet(
               {
                 name: 'runner',
                 image:
-                  // TODO(#15988): use a release once 0.3.10 is out
-                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.10-snapshot.20250130.8177.0.v73bb0744',
+                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.12',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -197,6 +196,13 @@ function installDockerRunnerScaleSet(
                   {
                     name: 'cache',
                     mountPath: '/cache',
+                  },
+                ],
+                ports: [
+                  {
+                    name: 'metrics',
+                    containerPort: 8000,
+                    protocol: 'TCP',
                   },
                 ],
               },
@@ -279,6 +285,10 @@ function installDockerRunnerScaleSet(
             // prevent eviction by the gke autoscaler
             annotations: {
               'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
+            labels: {
+              // We add a runner-pod label, so that we can easily select it for monitoring
+              'runner-pod': 'true',
             },
           },
         },
@@ -409,6 +419,15 @@ function installK8sRunnerScaleSet(
       data: {
         'pod.yaml': yaml.dump({
           spec: {
+            hostAliases: [
+              {
+                ip: '127.0.0.1',
+                hostnames: [
+                  // Used by the BFT integration tests
+                  'sequencer-p2p-0.localhost',
+                ],
+              },
+            ],
             volumes: [
               {
                 name: 'cache',
@@ -475,9 +494,9 @@ function installK8sRunnerScaleSet(
     }
   );
 
-  // TODO(#15988): use a release once 0.3.12 is out
+  // TODO(#17841): use a release once 0.3.13 is out
   const runnerImage =
-    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.12-snapshot.20250213.8303.0.v242e36d9';
+    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.13-snapshot.20250221.8384.0.v94412fc9';
 
   return new k8s.helm.v3.Release(
     name,
@@ -727,7 +746,6 @@ function installPodMonitor(runnersNamespace: Namespace) {
         selector: {
           matchExpressions: [
             {
-              // TODO(#15988): This does not work for docker runners
               key: 'runner-pod',
               operator: 'Exists',
             },
@@ -765,7 +783,7 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         // Note that the user needs admin rights on the repo for this to work, since the controller and
         // listeners use the actions/runners/registration-token endpoint to create a temporary token
         // for registration, and this endpoint seems to require admin rights.
-        // TODO(#15988): The recommended thing to do is use a GitHub App. See here for a guide
+        // TODO(#17842): The recommended thing to do is use a GitHub App. See here for a guide
         // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
         github_token: spliceEnvConfig.requireEnv('GITHUB_RUNNERS_ACCESS_TOKEN'),
       },

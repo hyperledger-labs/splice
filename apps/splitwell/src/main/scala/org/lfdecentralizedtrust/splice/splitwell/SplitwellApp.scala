@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
   SpliceLedgerClient,
   SpliceLedgerConnection,
   Node,
@@ -67,7 +68,7 @@ class SplitwellApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends Node[SplitwellApp.State](
+) extends Node[SplitwellApp.State, Unit](
       config.providerUser,
       config.participantClient,
       amuletAppParameters,
@@ -81,9 +82,15 @@ class SplitwellApp(
 
   override def packages: Seq[DarResource] = super.packages ++ DarResources.splitwell.all
 
+  override def preInitializeAfterLedgerConnection(
+      connection: BaseLedgerConnection,
+      ledgerClient: SpliceLedgerClient,
+  )(implicit traceContext: TraceContext) = Future.unit
+
   override def initialize(
       ledgerClient: SpliceLedgerClient,
       partyId: PartyId,
+      preInitializeState: Unit,
   )(implicit traceContext: TraceContext): Future[SplitwellApp.State] = for {
     scanConnection <- appInitStep(s"Get scan connection") {
       ScanConnection.singleCached(

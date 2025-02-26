@@ -24,7 +24,6 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
   SubmissionRequestAmplification,
 }
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -34,7 +33,6 @@ class DomainConnector(
     config: ValidatorAppBackendConfig,
     participantAdminConnection: ParticipantAdminConnection,
     scanConnection: BftScanConnection,
-    clock: Clock,
     migrationId: Long,
     retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
@@ -68,22 +66,22 @@ class DomainConnector(
     )
   }
 
-  def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig()(implicit
-      tc: TraceContext
+  def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(time: CantonTimestamp)(
+      implicit tc: TraceContext
   ): Future[Unit] = {
-    getDecentralizedSynchronizerSequencerConnections.flatMap(
+    getDecentralizedSynchronizerSequencerConnections(time).flatMap(
       _.toList.traverse_ { case (alias, connections) =>
         ensureDomainRegistered(alias, connections)
       }
     )
   }
 
-  def getDecentralizedSynchronizerSequencerConnections(implicit
+  def getDecentralizedSynchronizerSequencerConnections(time: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[Map[DomainAlias, SequencerConnections]] = {
     config.domains.global.url match {
       case None =>
-        waitForSequencerConnectionsFromScan()
+        waitForSequencerConnectionsFromScan(time)
       case Some(url) =>
         if (config.supportsSoftDomainMigrationPoc) {
           // TODO (#13301) Make this work by making the config more flexible.
@@ -126,6 +124,7 @@ class DomainConnector(
   }
 
   private def waitForSequencerConnectionsFromScan(
+      time: CantonTimestamp
   )(implicit tc: TraceContext): Future[Map[DomainAlias, SequencerConnections]] = {
     retryProvider.getValueWithRetries(
       // Short retries since usually a failure here is just a misconfiguration error.
@@ -135,7 +134,7 @@ class DomainConnector(
       RetryFor.ClientCalls,
       "scan_sequencer_connections",
       "non-empty sequencer connections from scan",
-      getSequencerConnectionsFromScan(clock.now)
+      getSequencerConnectionsFromScan(time)
         .map { connections =>
           if (connections.isEmpty) {
             throw Status.NOT_FOUND

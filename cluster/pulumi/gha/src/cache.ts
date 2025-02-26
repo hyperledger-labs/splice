@@ -3,8 +3,6 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
-// TODO(#15988): consider sharing the NFS drive between CCI and GHA runners
-
 export function createCachePvc(
   runnersNamespace: k8s.core.v1.Namespace,
   cachePvcName: string

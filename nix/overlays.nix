@@ -62,7 +62,7 @@
     doCheck = false;
   });
   geckodriver = super.geckodriver.overrideAttrs (old: rec {
-    version = "0.35.0";
+    version = "0.36.0";
     src = super.fetchFromGitHub {
       owner = "mozilla";
       repo = "geckodriver";

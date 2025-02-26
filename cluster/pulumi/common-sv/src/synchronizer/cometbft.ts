@@ -68,6 +68,7 @@ export function installCometBftNode(
   version: CnChartVersion = activeVersion,
   enableStateSync: boolean = !disableCometBftStateSync,
   enableTimeoutCommit: boolean = false,
+  imagePullServiceAccountName?: string,
   opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
@@ -140,6 +141,7 @@ export function installCometBftNode(
       volumeSize: clusterSmallDisk ? '240Gi' : svConfig?.cometbft?.volumeSize,
     },
     extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
+    serviceAccountName: imagePullServiceAccountName,
   });
   const svIdentifier = nodeConfigs.selfSvNodeName;
   const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;

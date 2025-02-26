@@ -1,11 +1,7 @@
 import { config } from 'splice-pulumi-common/src/config';
 
-import {
-  awaitAllOrThrowAllExceptions,
-  downStack,
-  Operation,
-  PulumiAbortController,
-} from '../pulumi';
+import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController } from '../pulumi';
+import { downStack } from '../pulumiOperations';
 import { runSvCantonForAllMigrations } from './pulumi';
 
 // used in CI clusters that run HDM to ensure everything is cleaned up
@@ -19,6 +15,7 @@ export function startDownOperationsForCantonStacks(
   abortController: PulumiAbortController
 ): Operation[] {
   return runSvCantonForAllMigrations(
+    'down',
     stack => {
       return downStack(stack, abortController);
     },

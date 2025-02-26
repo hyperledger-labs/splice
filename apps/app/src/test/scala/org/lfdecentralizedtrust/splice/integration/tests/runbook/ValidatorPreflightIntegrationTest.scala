@@ -11,6 +11,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 
 import java.net.URI
 import scala.collection.mutable
@@ -30,7 +31,8 @@ abstract class ValidatorPreflightIntegrationTestBase
     with PreflightIntegrationTestUtil
     with AnsFrontendTestUtil
     with WalletFrontendTestUtil
-    with SplitwellFrontendTestUtil {
+    with SplitwellFrontendTestUtil
+    with WithAuth0Support {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
@@ -58,7 +60,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     super.beforeEach();
 
     def addUser(name: String) = {
-      val user = retryAuth0Calls(auth0.createUser())
+      val user = auth0.createUser()
       logger.debug(
         s"Created user $name: email ${user.email}, password ${user.password}, id: ${user.id}"
       )
@@ -72,7 +74,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   override def afterEach() = {
     try super.afterEach()
-    finally auth0Users.values.map(user => retryAuth0Calls(user.close))
+    finally auth0Users.values.map(user => user.close)
   }
 
   override def beforeAll() = {

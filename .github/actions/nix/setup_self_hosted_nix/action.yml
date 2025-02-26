@@ -1,6 +1,4 @@
 
-# TODO(#15988): Consider if we can use [install-nix](https://github.com/marketplace/actions/install-nix) instead
-
 name: 'Setup self-hosted Nix'
 description: 'Setup self-hosted Nix'
 inputs:
@@ -56,8 +54,6 @@ runs:
             # 1. It doesn't work on CircleCI (sethostname is not allowed)
             # 2. We don't plan to build anything, so the risk is fairly low
             mkdir -p ~/.config/nix
-            # TODO(#15988): In the CCI verion of this we had a include_binary_cache argument, but
-            # it seems to always be set to true, so for now we're hard-coding this to true here.
             if [ true ]; then
               cat <<EOF > ~/.config/nix/nix.conf
               sandbox = false
