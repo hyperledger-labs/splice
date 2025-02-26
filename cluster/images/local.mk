@@ -119,7 +119,6 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 		--label "org.opencontainers.image.ref.name=$$(basename $$(dirname $(@D)))" \
 		--label "org.opencontainers.image.version=$(shell get-snapshot-version)" \
 		--label "org.opencontainers.image.source=$(repo)" \
-		--label "org.opencontainers.image.created=$$(date +%FT%T.%3NZ)" \
 		--label "org.opencontainers.image.revision=$(commit_sha)" \
 		--iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
 

@@ -730,42 +730,22 @@ class SvApp(
       sys.error("Expected onboarding secrets must be unique! Check your SV app config.")
     }
     Future.traverse(config.expectedValidatorOnboardings)(c =>
-      expectConfiguredValidatorOnboarding(
-        c.secret,
-        c.expiresIn,
-        svStoreWithIngestion,
-        decentralizedSynchronizer,
-        clock,
-      )
-    )
-  }
-
-  private def expectConfiguredValidatorOnboarding(
-      secret: String,
-      expiresIn: NonNegativeFiniteDuration,
-      svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: DomainId,
-      clock: Clock,
-  )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.retry(
-      RetryFor.WaitingOnInitDependency,
-      "created_validator_onboarding_contract",
-      "Create ValidatorOnboarding contract for preconfigured secret",
       SvApp
         .prepareValidatorOnboarding(
-          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, secret),
-          expiresIn,
+          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, c.secret),
+          c.expiresIn,
           svStoreWithIngestion,
           decentralizedSynchronizer,
           clock,
           logger,
+          retryProvider,
         )
         .map {
           case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
           case Right(()) => ()
-        },
-      logger,
+        }
     )
+  }
 
   private def ensureAmuletPriceVoteHasAmuletPrice(
       defaultAmuletPriceVote: BigDecimal,
@@ -845,6 +825,7 @@ object SvApp {
       decentralizedSynchronizer: DomainId,
       clock: Clock,
       logger: TracedLogger,
+      retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svStore = svStoreWithIngestion.store
     val svParty = svStore.key.svParty
@@ -868,19 +849,24 @@ object SvApp {
               )
             case QueryResult(_, None) =>
               for {
-                _ <- svStoreWithIngestion.connection
-                  .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
-                  .withDedup(
-                    commandId = SpliceLedgerConnection
-                      .CommandId(
-                        "org.lfdecentralizedtrust.splice.sv.expectValidatorOnboarding",
-                        Seq(svParty),
-                        secret.secret, // not a leak as this gets hashed before it's used
-                      ),
-                    deduplicationOffset = offset,
-                  )
-                  .withDomainId(domainId = decentralizedSynchronizer)
-                  .yieldUnit()
+                _ <- retryProvider.retryForClientCalls(
+                  "prepare_validator_onboarding",
+                  "Create a validator onboarding contract with a secret",
+                  svStoreWithIngestion.connection
+                    .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
+                    .withDedup(
+                      commandId = SpliceLedgerConnection
+                        .CommandId(
+                          "org.lfdecentralizedtrust.splice.sv.expectValidatorOnboarding",
+                          Seq(svParty),
+                          secret.secret, // not a leak as this gets hashed before it's used
+                        ),
+                      deduplicationOffset = offset,
+                    )
+                    .withDomainId(domainId = decentralizedSynchronizer)
+                    .yieldUnit(),
+                  logger,
+                )
               } yield {
                 logger.info("Created new ValidatorOnboarding contract.")
                 Right(())
