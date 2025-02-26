@@ -40,26 +40,15 @@ export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 export const GCP_ZONE = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
-export const EXPECTED_MAX_BLOCK_RATE_PER_SECOND =
-  config.optionalEnv('EXPECTED_MAX_BLOCK_RATE_PER_SECOND') || '3.5';
-
 export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING', false);
 
 export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
   : 0;
 
-export const LOAD_TESTER_MIN_RATE = config.optionalEnv('LOAD_TESTER_MIN_RATE') || '0.95';
-
-// Wasted traffic alert fires when the value exceeds WASTED_TRAFFIC_ALERT_THRESHOLD_KB over WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS
-export const WASTED_TRAFFIC_ALERT_THRESHOLD_KB = 1;
-export const WASTED_TRAFFIC_ALERT_ALERT_TIME_RANGE_MINS = 5;
-
 export type LogLevel = 'INFO' | 'DEBUG';
 
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
-
-export const ENABLE_NO_DATA_ALERTS = config.envFlag('ENABLE_NO_DATA_ALERTS', false);
 
 export const daSupportApprovedIdentities: ApprovedSvIdentity[] = approveDaSupportSvNode
   ? [

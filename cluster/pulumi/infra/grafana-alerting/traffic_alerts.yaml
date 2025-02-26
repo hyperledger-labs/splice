@@ -7,51 +7,23 @@ groups:
     rules:
       - uid: adw5rd048zf9ca
         title: Wasted Traffic
-        condition: C
+        condition: wasted_traffic_threshold
         data:
-          - refId: A
+          - refId: wasted_traffic
             relativeTimeRange:
               from: 600
               to: 0
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum by (namespace, job, member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm])) / 1000
+              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
               maxDataPoints: 43200
               range: false
-              refId: A
-          - refId: B
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params: []
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - B
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
-              datasource:
-                type: __expr__
-                uid: __expr__
-              expression: A
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: last
-              refId: B
-              type: reduce
-          - refId: C
+              refId: wasted_traffic
+          - refId: wasted_traffic_threshold
             relativeTimeRange:
               from: 600
               to: 0
@@ -60,7 +32,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - $WASTED_TRAFFIC_ALERT_THRESHOLD_KB
+                      - $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES
                     type: gt
                   operator:
                     type: and
@@ -74,10 +46,10 @@ groups:
               datasource:
                 type: __expr__
                 uid: __expr__
-              expression: B
+              expression: wasted_traffic
               intervalMs: 1000
               maxDataPoints: 43200
-              refId: C
+              refId: wasted_traffic_threshold
               type: threshold
         dashboardUid: fdnphvrryfq4gf
         panelId: 6
@@ -87,8 +59,8 @@ groups:
         annotations:
           __dashboardUid__: fdnphvrryfq4gf
           __panelId__: "6"
-          description: The rate of traffic wasted by sequencer {{ index $labels "job" }} in namespace {{ index $labels "namespace" }} for member {{ index $labels "member" }} exceeded $WASTED_TRAFFIC_ALERT_THRESHOLD_KB kB over $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS mins
+          description: The rate of traffic wasted by member {{ $labels.member }} exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm
           severity: critical
-          summary: Traffic wasted by {{ index $labels "namespace" }} sequencer for {{ index $labels "member" }} exceeded threshold
+          summary: Traffic wasted by {{ $labels.member }} exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES }}b over $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm)
         labels: {}
         isPaused: false

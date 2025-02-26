@@ -23,3 +23,14 @@ pulumiProjectConfig:
 ## ex:
 #  canton-network:
 #    installDataOnly: true
+monitoring:
+  alerting:
+    enableNoDataAlerts: false
+    alerts:
+      trafficWaste:
+        kilobytes: 1
+        overMinutes: 5
+      cometbft:
+        expectedMaxBlocksPerSecond: 3.5
+      loadTester:
+        minRate: 0.95
