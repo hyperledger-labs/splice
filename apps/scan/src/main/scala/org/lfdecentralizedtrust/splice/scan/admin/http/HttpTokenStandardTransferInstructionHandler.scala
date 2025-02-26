@@ -86,18 +86,18 @@ class HttpTokenStandardTransferInstructionHandler(
           definitions.FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
             definitions.ChoiceContext(
-              // TODO (#17517): this will be updated to have a ChoiceContextData data so it can be to/from json'd
               choiceContextData = Some(
                 io.circe.parser
                   .parse(
                     new metadatav1.ChoiceContext(
+                      "splice.lfdecentralizedtrust.org/amulet",
                       Map(
                         "splice.lfdecentralizedtrust.org/amulet-rules" -> amuletRules.contractId.contractId,
                         "splice.lfdecentralizedtrust.org/open-round" -> newestOpenRound.contractId.contractId,
                         "splice.lfdecentralizedtrust.org/transfer-preapproval" -> transferPreapproval.contractId.contractId,
                       ).map[String, metadatav1.AnyValue] { case (k, v) =>
                         k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
-                      }.asJava
+                      }.asJava,
                     ).toJson
                   )
                   .getOrElse(

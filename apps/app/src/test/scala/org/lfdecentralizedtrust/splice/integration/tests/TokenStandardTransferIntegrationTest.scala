@@ -95,7 +95,10 @@ class TokenStandardTransferIntegrationTest
           new metadatav1.Metadata(java.util.Map.of()),
         ),
         new metadatav1.ExtraArgs(
-          new metadatav1.ChoiceContext(java.util.Map.of()),
+          new metadatav1.ChoiceContext(
+            "splice.lfdecentralizedtrust.org/amulet",
+            java.util.Map.of(),
+          ),
           new metadatav1.Metadata(java.util.Map.of()),
         ),
       )

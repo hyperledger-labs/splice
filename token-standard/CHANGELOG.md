@@ -44,6 +44,7 @@ Polishing changes:
 * Consistently add a `self` argument containing the contract id of the contract to all interface choices.
 * Inline the `pendingActions` field in both `TransferInstructionView` and `AllocationInstructionView` to represent them more directly
 * Use a shared `ChoiceExecutionMetadata` type for choices that only return metadata about their execution.
+* Added a `name` field to `ChoiceContext`.
 
 
 ## Initial open source release of the standard proposal

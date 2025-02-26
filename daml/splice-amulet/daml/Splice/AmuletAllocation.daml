@@ -70,6 +70,7 @@ template AmuletAllocation
 -- | TODO (#17541):move to script support functions
 paymentToChoiceContext : PaymentTransferContext -> ChoiceContext
 paymentToChoiceContext context = ChoiceContext with
+  name = "splice.lfdecentralizedtrust.org/amulet"
   values = Map.fromList
     [ ("splice.lfdecentralizedtrust.org/amulet-rules", AV_ContractId $ coerceContractId context.amuletRules)
     , ("splice.lfdecentralizedtrust.org/open-round", AV_ContractId $ coerceContractId context.context.openMiningRound)

@@ -224,7 +224,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
     "av_list" -> new anyvalue.AV_List(allSimpleValuesMap.values.toList.asJava),
     "av_map" -> new anyvalue.AV_Map(allSimpleValuesMap.asJava),
   )
-  private lazy val someChoiceContext = new metadatav1.ChoiceContext(allAnyValuesMap.asJava)
+  private lazy val someChoiceContext =
+    new metadatav1.ChoiceContext("splice.lfdecentralizedtrust.org/amulet", allAnyValuesMap.asJava)
   private lazy val someMetadata =
     new metadatav1.Metadata(Map("any" -> "thing", "goes" -> "here").asJava)
 
