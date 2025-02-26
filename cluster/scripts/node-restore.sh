@@ -297,28 +297,30 @@ function wait_cloudsql_restore() {
   local -i i=0
   _info "Waiting for restore of $component to finish..."
 
-  # Sleeping for 30 here becasue it's possible we are being rate limited
+  # Sleeping for 30 here because it's possible we are being rate limited
   retry_sleep_time=30
-  while true; do
+  should_not_retry=0
+  while [[ $should_not_retry = 0 ]]; do
+
     # Using conditional execution to prevent automatic exit
     if ! gcloud_output=$(gcloud sql operations list --instance="$cloudsql_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json 2>&1); then
       _error "Error fetching SQL operations: $gcloud_output" >&2
       sleep "$retry_sleep_time"
-      continue
+      continue 1
     fi
 
     if ! echo "$gcloud_output" | jq empty &>/dev/null; then
       _error "Error: Invalid JSON output from gcloud command"
       _error "Output was: $gcloud_output"
       sleep "$retry_sleep_time"
-      continue
+      continue 1
     fi
 
     num_running=$(echo "$gcloud_output" | jq length)
 
     if [ "$num_running" == 0 ]; then
       _info "Restore of instance $component done"
-      break
+      should_not_retry=1
     else
       ((i++)) && ((i > 300)) && _error "Timed out waiting for backup restore of $component"
       sleep "$retry_sleep_time"
