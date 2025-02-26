@@ -14,3 +14,8 @@ data-dependencies:
 - ../splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
 build-options:
   - --target=2.1
+codegen:
+  java:
+    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceApiTokenAllocationInstructionV1
+    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
