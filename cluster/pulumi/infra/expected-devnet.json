@@ -1965,6 +1965,66 @@
               "port": 26496,
               "protocol": "TCP",
               "targetPort": 26496
+            },
+            {
+              "name": "cometbft-5-0-gw",
+              "port": 26506,
+              "protocol": "TCP",
+              "targetPort": 26506
+            },
+            {
+              "name": "cometbft-5-1-gw",
+              "port": 26516,
+              "protocol": "TCP",
+              "targetPort": 26516
+            },
+            {
+              "name": "cometbft-5-2-gw",
+              "port": 26526,
+              "protocol": "TCP",
+              "targetPort": 26526
+            },
+            {
+              "name": "cometbft-5-3-gw",
+              "port": 26536,
+              "protocol": "TCP",
+              "targetPort": 26536
+            },
+            {
+              "name": "cometbft-5-4-gw",
+              "port": 26546,
+              "protocol": "TCP",
+              "targetPort": 26546
+            },
+            {
+              "name": "cometbft-5-5-gw",
+              "port": 26556,
+              "protocol": "TCP",
+              "targetPort": 26556
+            },
+            {
+              "name": "cometbft-5-6-gw",
+              "port": 26566,
+              "protocol": "TCP",
+              "targetPort": 26566
+            },
+            {
+              "name": "cometbft-5-7-gw",
+              "port": 26576,
+              "protocol": "TCP",
+              "targetPort": 26576
+            },
+            {
+              "name": "cometbft-5-8-gw",
+              "port": 26586,
+              "protocol": "TCP",
+              "targetPort": 26586
+            },
+            {
+              "name": "cometbft-5-9-gw",
+              "port": 26596,
+              "protocol": "TCP",
+              "targetPort": 26596
             }
           ]
         },
