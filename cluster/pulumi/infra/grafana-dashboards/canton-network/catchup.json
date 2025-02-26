@@ -18,9 +18,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1787,
+  "id": 1972,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -53,6 +52,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -119,6 +119,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -176,6 +177,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -242,6 +244,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -281,6 +284,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -347,6 +351,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -399,6 +404,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -465,6 +471,7 @@
           "sort": "asc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -504,6 +511,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -570,6 +578,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -609,6 +618,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -675,6 +685,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -683,7 +694,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "increase(daml_sequencer_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",member!~\"SEQ::.*\",member=~\"$member\"}[10m]) / (1000000 * 60 * 10)",
+          "expr": "delta(daml_sequencer_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",member!~\"SEQ::.*\",member=~\"$member\"}[10m]) / (1000000 * 60 * 10)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -727,6 +738,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -777,7 +789,6 @@
         "x": 0,
         "y": 42
       },
-      "hideTimeOverride": false,
       "id": 11,
       "options": {
         "legend": {
@@ -791,7 +802,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -834,6 +845,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -884,7 +896,6 @@
         "x": 0,
         "y": 49
       },
-      "hideTimeOverride": false,
       "id": 7,
       "options": {
         "legend": {
@@ -898,7 +909,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -941,6 +952,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -991,7 +1003,6 @@
         "x": 0,
         "y": 56
       },
-      "hideTimeOverride": false,
       "id": 6,
       "options": {
         "legend": {
@@ -1005,7 +1016,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1077,8 +1088,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1176,8 +1186,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1275,8 +1284,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1342,8 +1350,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1446,8 +1453,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1501,34 +1507,28 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "30s",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
           "text": "Prometheus",
           "value": "prometheus"
         },
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "DS",
         "options": [],
         "query": "prometheus",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "type": "datasource"
       },
       {
         "current": {
-          "selected": false,
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -1538,7 +1538,6 @@
           "uid": "prometheus"
         },
         "definition": "label_values(daml_sequencer_client_handler_delay,namespace)",
-        "hide": 0,
         "includeAll": true,
         "label": "Namespace",
         "multi": true,
@@ -1550,16 +1549,11 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -1569,9 +1563,7 @@
           "uid": "prometheus"
         },
         "definition": "label_values(daml_sequencer_client_handler_delay{namespace=~\"$namespace\"},job)",
-        "hide": 0,
         "includeAll": true,
-        "label": "",
         "multi": true,
         "name": "migration",
         "options": [],
@@ -1582,19 +1574,17 @@
         },
         "refresh": 2,
         "regex": "/global-domain-(?<value>\\d)-sequencer/g",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": false,
           "text": [
-            "All"
+            "PAR::Global-Synchronizer-Foundation::1220ba8e4660..."
           ],
           "value": [
-            "$__all"
+            "PAR::Global-Synchronizer-Foundation::1220ba8e4660..."
           ]
         },
         "datasource": {
@@ -1602,7 +1592,6 @@
           "uid": "prometheus"
         },
         "definition": "label_values(daml_sequencer_block_acknowledgments_micros,member)",
-        "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "member",
@@ -1614,20 +1603,18 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-3h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 4,
+  "version": 1,
   "weekStart": ""
 }

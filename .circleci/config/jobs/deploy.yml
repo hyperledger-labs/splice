@@ -67,7 +67,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -157,7 +157,7 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -270,7 +270,7 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster update_config active << parameters.global_domain_active_migration_id >> internal
+            cncluster update_config active << parameters.global_domain_active_migration_id >>
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -278,6 +278,8 @@ jobs:
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
 
+            # requires sv1 sv-app to be up so we disable it for faster deployments
+            export DISABLE_COMETBFT_STATE_SYNC=true
             if [[ << parameters.skip_infra >> == true ]]; then
               cncluster ci_apply --skip-infra
             else

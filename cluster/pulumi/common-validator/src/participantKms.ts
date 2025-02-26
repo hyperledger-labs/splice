@@ -7,7 +7,7 @@ import {
   KmsConfig,
   loadYamlFromFile,
   REPO_ROOT,
-  ServiceAccount,
+  GcpServiceAccount,
 } from 'splice-pulumi-common';
 
 export type ParticipantKmsHelmResources = {
@@ -18,10 +18,10 @@ export type ParticipantKmsHelmResources = {
 };
 
 const createKmsServiceAccount = (xns: ExactNamespace) => {
-  const kmsServiceAccount = new ServiceAccount(`kms-${CLUSTER_BASENAME}-${xns.logicalName}`, {
-    accountId: `kms-${CLUSTER_BASENAME}-${xns.logicalName}`,
-    displayName: 'Participant KMS Service Account',
-    description: 'Service account for KMS (managed by Pulumi)',
+  const kmsServiceAccount = new GcpServiceAccount(`${CLUSTER_BASENAME}-${xns.logicalName}-kms`, {
+    accountId: `${CLUSTER_BASENAME}-${xns.logicalName}-kms`,
+    displayName: `KMS Service Account (${CLUSTER_BASENAME} ${xns.logicalName})`,
+    description: '(managed by Pulumi)',
     roles: ['roles/cloudkms.admin', 'roles/cloudkms.cryptoOperator'],
   });
 

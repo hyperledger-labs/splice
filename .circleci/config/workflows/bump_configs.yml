@@ -1,0 +1,10 @@
+workflow:
+  bump_configs:
+    when:
+      equal: [ bump-configs, << pipeline.parameters.run-job >> ]
+    jobs:
+      - bump_configs:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context

@@ -8,6 +8,14 @@ Glossary
 
 .. glossary::
 
+    ACS
+
+      :term:`Active Contract Set`
+
+    Active Contract Set
+
+      The set of contracts that are currently active on the ledger as per the view of a given participant.
+
     Amulet
 
       The generic name for the code and the logic implementing Canton Coin.
@@ -45,22 +53,21 @@ Glossary
       Across all layers of Splice, ``f`` corresponds to slighly less than 1/3 of the total number of SVs
       (``floor((n-1)/3)``, to be exact).
 
-    CN Global Domain
+    CN Global Synchronizer
 
       * global synchronization domain
       * can host small apps directly on domain
       * acts as shared synchronization domain to intermediate between different apps' domains
       * run by super validator collective with BFT
-      * domain usage costs domain fees which are paid in Canton Coin by the
+      * domain usage costs :term:`synchronizer fees` which are paid in Canton Coin by the
         operator of each validator
 
     Canton Coin
 
       * currency issued by super validator collective
-      * used for domain fees
-      * fees in USD
+      * used for :term:`synchronizer fees`
       * coins accrue holding fees that pay for the coin's usage of DSO storage space
-      * all cc transactions are public
+      * all CC transactions are public
       * supports locked coins that can be unlocked by lock holder
       * support transfers single sender, multi-receiver transfers
       * transfers cost admin fees and produce app reward for receiver and
@@ -79,7 +86,7 @@ Glossary
 
       * One node in the CN
       * In addition to CN Validator components, also consists of canton sequencer, canton mediator, sv app and scan app
-      * sv app for admin operations of the :term:`CN Global Domain`
+      * sv app for admin operations of the :term:`CN Global Synchronizer`
       * scan app for providing publicly visible data
 
     CN Wallet
@@ -107,8 +114,11 @@ Glossary
 
       * abbreviation for :term:`Global Synchronizer Foundation`
 
-
     Splice
 
       * The name of the HyperLedger lab project that will host the code for Amulet, DSO governance,
         Amulet Name Service, SV nodes, and validator nodes.
+
+    Synchronizer fees
+
+      :ref:`traffic`

@@ -26,6 +26,7 @@ spec:
         app: {{ $appIdentifier }}
         migration: {{ .Values.migration.id | quote }}
     spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
         - name: sv-app
           image: "{{ .Values.imageRepo }}/sv-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).sv_app) }}"
@@ -322,9 +323,9 @@ spec:
             - name: domain-upgrade-dump-volume
               mountPath: /domain-upgrade-dump
           {{- end }}
+          {{- end }}
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
-          {{- end }}
           {{- end }}
       initContainers:
         - name: {{ .Release.Name }}-init

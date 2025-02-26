@@ -17,7 +17,7 @@ jobs:
         default: 3
       internal_stack:
         type: boolean
-        default: true
+        default: false
       checkout-branch:
         type: string
         default: "" # Default set to $CIRCLE_SHA1
@@ -136,7 +136,7 @@ jobs:
         type: string
       internal_stack:
         type: boolean
-        default: true
+        default: false
       silence_deployment_alerts:
         type: boolean
         default: false
@@ -157,6 +157,7 @@ jobs:
           gce_authenticate: true
           no_output_timeout: "20m"
           additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
+          cmd_retry_count: 5
           cmd: |
             cncluster activate
 
@@ -177,6 +178,7 @@ jobs:
                 cncluster wait << parameters.namespace_name >> validator-app ${ACTIVE_MIGRATION_ID}
                 ;;
             esac
+
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:

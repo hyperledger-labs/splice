@@ -184,7 +184,7 @@
       }
     },
     "name": "docs-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-docs::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-docs-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -194,9 +194,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "docs"
       },
@@ -262,7 +259,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "docs-docs",
     "provider": "",
@@ -297,7 +294,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-docs",
+    "name": "k8s-imgpull-docs-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -307,7 +304,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-1",
+    "name": "k8s-imgpull-sv-1-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -568,7 +565,7 @@
       }
     },
     "name": "sv-1-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -578,9 +575,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "sv-1"
       },
@@ -657,7 +651,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -702,6 +696,9 @@
           "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
+        "cometbftPorts": {
+          "domains": 2
+        },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
@@ -711,7 +708,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -793,7 +790,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -861,7 +858,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 280000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -964,7 +961,7 @@
         "nodeIdentifier": "Digital-Asset-2",
         "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingRoundZeroDuration": "1 h",
+        "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
         "participantAddress": "participant-1",
         "persistence": {
@@ -995,7 +992,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1113,7 +1110,7 @@
           }
         }
       },
-      "version": "0.3.10"
+      "version": "0.3.11"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

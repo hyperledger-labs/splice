@@ -42,7 +42,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd_name: Wait for SV app to be responsive
           cmd: |
-            succes=0
+            success=0
             # Wait up to 30 minutes for the sv app to be ready
             # (we're starting this job in parallel with the initial deployment)
             for i in {1..180}; do
@@ -130,7 +130,7 @@ jobs:
         default: ""
       deploy_retry_count:
         type: integer
-        default: 10
+        default: 2
       send_notifications:
         type: boolean
         default: true
@@ -353,6 +353,7 @@ jobs:
             fi
             BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
+            #TODO(#15759) - remove the internal param after HDM base version is >= 0.3.12
             cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
@@ -361,6 +362,8 @@ jobs:
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            # requires sv1 sv-app to be up so we disable it for faster deployments
+            echo "export DISABLE_COMETBFT_STATE_SYNC=true" >> "$file"
             # if the base version is a release version ensure we use the public repository
             if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
@@ -451,9 +454,9 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
-            cncluster update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
-            cncluster update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
             git add **/config.yaml || true

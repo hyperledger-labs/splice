@@ -273,7 +273,7 @@ function restore_component() {
     type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
-        restore_pvc_postgres "$namespace" "$component" "$run_id"
+        restore_pvc_postgres "$namespace" "$instance" "$run_id"
         ;;
       "canton:cloud:postgres")
         restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id" "$internal" "$restore_cluster"
@@ -297,14 +297,31 @@ function wait_cloudsql_restore() {
   local -i i=0
   _info "Waiting for restore of $component to finish..."
 
+  # Sleeping for 30 here becasue it's possible we are being rate limited
+  retry_sleep_time=30
   while true; do
-    num_running=$(gcloud sql operations list --instance="$cloudsql_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json | jq length)
+    # Using conditional execution to prevent automatic exit
+    if ! gcloud_output=$(gcloud sql operations list --instance="$cloudsql_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json 2>&1); then
+      _error "Error fetching SQL operations: $gcloud_output" >&2
+      sleep "$retry_sleep_time"
+      continue
+    fi
+
+    if ! echo "$gcloud_output" | jq empty &>/dev/null; then
+      _error "Error: Invalid JSON output from gcloud command"
+      _error "Output was: $gcloud_output"
+      sleep "$retry_sleep_time"
+      continue
+    fi
+
+    num_running=$(echo "$gcloud_output" | jq length)
+
     if [ "$num_running" == 0 ]; then
       _info "Restore of instance $component done"
       break
     else
-      (( i++ ))&& (( i > 300 )) &&_error "Timed out waiting for backup restore of $component"
-      sleep 5
+      ((i++)) && ((i > 300)) && _error "Timed out waiting for backup restore of $component"
+      sleep "$retry_sleep_time"
       _info "still waiting..."
     fi
   done

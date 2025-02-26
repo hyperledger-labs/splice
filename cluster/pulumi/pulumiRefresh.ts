@@ -1,14 +1,7 @@
-import * as automation from '@pulumi/pulumi/automation';
 import { runSvCantonForAllMigrations } from 'sv-canton-pulumi-deployment/pulumi';
 
-import {
-  awaitAllOrThrowAllExceptions,
-  Operation,
-  operation,
-  PulumiAbortController,
-  refreshStack,
-  stack,
-} from './pulumi';
+import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
+import { refreshOperation, refreshStack } from './pulumiOperations';
 
 const abortController = new PulumiAbortController();
 
@@ -32,6 +25,7 @@ export async function runStacksRefresh(): Promise<void> {
   operations.push(refreshOperation(deploymentStack, abortController));
   operations = operations.concat(
     runSvCantonForAllMigrations(
+      'refresh',
       stack => {
         return refreshStack(stack, abortController);
       },
@@ -40,13 +34,6 @@ export async function runStacksRefresh(): Promise<void> {
     )
   );
   await awaitAllOrThrowAllExceptions(operations);
-}
-
-function refreshOperation(
-  stack: automation.Stack,
-  abortController: PulumiAbortController
-): Operation {
-  return operation(`refresh-${stack.name}`, refreshStack(stack, abortController));
 }
 
 runStacksRefresh().catch(e => {

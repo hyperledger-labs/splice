@@ -3,6 +3,7 @@ import { runSvCantonForAllMigrations } from './pulumi';
 
 awaitAllOrThrowAllExceptions(
   runSvCantonForAllMigrations(
+    'preview',
     async (stack, migration, sv) => {
       await ensureStackSettingsAreUpToDate(stack);
       const preview = await stack.preview({

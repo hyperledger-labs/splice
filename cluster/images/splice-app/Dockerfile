@@ -8,6 +8,8 @@ ARG TARGETPLATFORM
 
 FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS build
 
+LABEL org.opencontainers.image.base.name="debian:bookworm-slim"
+
 COPY --from=xx / /
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM

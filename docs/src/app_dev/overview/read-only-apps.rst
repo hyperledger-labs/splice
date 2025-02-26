@@ -15,7 +15,7 @@ An example of a Read-Only App would be a block explorer, i.e., an online tool th
 for historical information in a blockchain.
 
 One application that provides publicly accessible visibility to the ledger is the Scan App of the Super Validators.
-A Read-Only App can query the :ref:`app_dev_scan_api`. to build new capabilities on top.
+A Read-Only App can query the :ref:`app_dev_scan_api` to build new capabilities on top.
 
 To read from the Scan API, you can use the :ref:`Scan Proxy endpoints <app_dev_validator_api>` provided by your own
 Validator App. These should be the preferred approach to querying Scan, as it queries enough Scans as to

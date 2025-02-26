@@ -173,7 +173,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-splitwell",
+    "name": "k8s-imgpull-splitwell-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -399,7 +399,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -452,7 +452,7 @@
       }
     },
     "name": "splitwell-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-splitwell::undefined_id",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-splitwell-default::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -462,9 +462,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "annotations": {
-          "pulumi.com/patchForce": "true"
-        },
         "name": "docker-reg-cred",
         "namespace": "splitwell"
       },
@@ -528,7 +525,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -609,7 +606,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "splitwell-participant-4",
     "provider": "",
@@ -739,7 +736,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -994,7 +991,7 @@
         "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

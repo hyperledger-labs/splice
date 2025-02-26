@@ -81,7 +81,6 @@
     - [Participating in a hard domain migration or in a disaster recovery](#participating-in-a-hard-domain-migration)
       - [Via the Pulumi operator](#via-the-pulumi-operator)
         - [Troubleshooting external stacks](#troubleshooting-external-stacks)
-      - [Manual steps](#manual-steps)
       - [Checking the readiness of partners](#checking-the-readiness-of-partners)
       - [New domain readiness checks](#new-domain-readiness-checks)
       - [Switching back to the old domain](#switching-back-to-the-old-domain)
@@ -426,9 +425,9 @@ All other clusters are set up to use the **Release** artifacts by default, `SPLI
 
 ### Deploy a local build to a cluster
 1. Start from a clean slate: `make -C $REPO_ROOT clean`
+1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
    - Note that this step internally calls `sbt bundle` to build the most recent version of our apps.
      later steps don't call `sbt bundle` automatically, as it takes too long.
-1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes to the Development Artifactory Docker Registry.
    - If this fails, you may need to run `echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin` to login to the Artifactory docker registry for development.
@@ -436,17 +435,29 @@ All other clusters are set up to use the **Release** artifacts by default, `SPLI
    ensure that pulumi is set up: `make -C $REPO_ROOT cluster/build -j`
    - This step is handled automatically by `cncluster apply`. This uses locally built helm charts by default.
 1. Start with a working cluster and change to its deployment directory.
-1. Acquire the cluster lock `cncluster lock`.
+   - You need be authorized to the GCP project for the environment to be loaded successfully after `direnv allow .`.
+1. Try to acquire the cluster lock `cncluster lock` and go to a different scratchnet if it's already locked.
+   - If you want to lock the first available scratch cluster, you can do so with `deployment/lock-first-scratch.sh`
+     but you'll have to have entered all the scratchnet directories and authorized the environment with `direnv allow`
+     beforehand.
 1. Delete the existing cluster resources managed by pulumi: `cncluster reset`.
-   This should typically not be required as the cluster is reset upon unlocking it.
+   - This should typically not be required as the cluster is reset upon unlocking it.
+   - You may need to run `gcloud auth application-default login` for Pulumi to pick up the correct GCP token.
 1. Apply the Pulumi cluster configuration: `cncluster apply`.
+   - To successfully apply the configuration, you need some Artifactory- and Auth0-related environment
+     variables correctly exported by the `.envrc.private` file in the project root as described in
+     [the main README](../README.md#private_environment_variables).
+     In particular, the `ARTIFACTORY*`, `*CN_MANAGEMENT*`, `*SV_MANAGEMENT*` and `*VALIDATOR_MANAGEMENT*`
+     environment variables are always required.
    - Use `kubectl get pods -A` to observe creation of the four new SV App nodes.
    - You can also use the graphical `k9s` tool for this purpose, see its [docs here](https://k9scli.io/).
    - Some tips for handling deployment failures:
      - *Secrets not containing the right values*: decode the secret using something like
        `kubectl get secret -n sv-1 cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps -o 'jsonpath={.data.json-credentials}' | base64 -d`
        or use `k9s` to navigate to the secrets overview using `:secrets` and press `x` on the secret of interest.
-     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`. `cncluster reset` will also cancel and retry the reset on detecting a held Pulumi lock. See also the section on [Manual Cleanup for an Interrupted Deployment](#manual_cleanup_for_an_interrupted_deployment)
+     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`. `cncluster reset` will also cancel and retry the reset on detecting a held Pulumi lock. See also the section on [Manual Cleanup for an Interrupted Deployment](#manual_cleanup_for_an_interrupted_deployment).
+     - Cluster deployment can be flaky for a variety of infrastructural reasons; these flakes can often be solved
+       just by retrying `cncluster apply`.
      - See also the section on [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
 1. The Pulumi and Helm charts may now be edited and `cncluster apply`
    once again used to apply only the changes to the cluster.
@@ -513,9 +524,16 @@ subcommands. A few highlights include the following:
 * `cncluster apply_sv` - Apply the sv-runbook Pulumi stack.
       * You need to provide a `target-domain-cluster` argument, for instance `scratcha` for scratchneta.
 * `cncluster apply_operator` - Apply the deployment Pulumi stack.
-      * To deploy it on a scratchnet, you need to set the following environment variables:
-          * `OPERATOR_IMAGE_VERSION`="X.X.X"
-          * `GOOGLE_CREDENTIALS`=$(cat "$HOME/.config/gcloud/application_default_credentials.json")
+      * To deploy it on a scratchnet as of release `X.X.X` (for a **stable** release), you need to follow these steps:
+          * cd into your scratchnet's deployment directory
+          * `export OPERATOR_IMAGE_VERSION=X.X.X`
+          * `export GOOGLE_CREDENTIALS=$(cat "$HOME/.config/gcloud/application_default_credentials.json")`
+          * `export SPLICE_ARTIFACTS_REPOSITORY=public`
+          * `echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> .envrc.vars`
+          * `git checkout -b <some_temp_branch>`
+          * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
+          * push `config.yaml` and `.envrc.vars` to the temporary branch
+          * `cncluster apply_operator`
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
@@ -960,13 +978,9 @@ To edit an alert follow the following steps:
 ###### CometBFT maximum block rate
 
 This alert triggers when the block rate of CometBFT exceeds a certain threshold. The alert is configured to trigger
-when the block rate exceeds **EXPECTED_MAX_BLOCK_RATE_PER_SECOND** blocks per second.
+when the block rate exceeds **expectedMaxBlocksPerSecond** blocks per second.
 
-This variable is optional and can be configured per cluster in the .envrc.vars file:
-
-```
-export EXPECTED_MAX_BLOCK_RATE_PER_SECOND="3.5" (default value)
-```
+This variable is optional and can be configured per cluster in the config.yaml file:
 
 #### JVM debug information
 
@@ -1324,6 +1338,11 @@ all changes that you consume before applying this command.
 git submodule update --remote
 ```
 
+On a daily basis, PRs are created for the production release line branches that bump this submodule.
+But, as mentioned above, please review all changes before approving and merging that PR.
+To trigger a bump earlier than the daily automation, you may also trigger the `bump-configs` workflow
+in CircleCI (on the main branch), which will create that bump PR.
+
 ## TLS Certificate Provisioning
 
 Certificates are issued and renewed in the cluster automatically by
@@ -1632,44 +1651,6 @@ If you (then) see error logs like:
 error: constructing secrets manager of type "passphrase": constructing secrets manager: passphrase must be set with PULUMI_CONFIG_PASSPHRASE or PULUMI_CONFIG_PASSPHRASE_FILE environment variables
 ```
 You need to commit the new Pulumi files generated by the manual refresh following the steps above.
-
-#### Manual steps
-
-**Deprecated!**
-Don't use for production clusters!
-If this is the case: Please nevertheless complete all steps from the [operator-based runbook](#via-the-pulumi-operator) that are not related to "prepare" or "migrate".
-
-1. Checkout the deployment branch of the cluster undergoing the migration:
-   `git branch -D deployment/<cluster>` (to avoid accidentally using an old state)
-   followed by `git fetch && git checkout deployment/<cluster>`.
-1. Change into the deployment directory of the cluster undergoing the migration.
-1. Run `git fetch --tags -f` to make sure that we'll be using the correct version.
-   To check, run `get-snapshot-version` and compare the result with
-   `curl "https://${GCP_CLUSTER_HOSTNAME}/version"` - they should be the same.
-   You might need to set `CI_IGNORE_DIRTY_REPO` to `true` for `get-snapshot-version` (and the subsequent steps) to work,
-   in case you have made local changes to the repo (that you can confirm are harmless).
-1. The `cncluster` commands below can use helm charts published to artifactory.
-   If you want to use local charts instead you can pass `local` instead of a version string (`local` is also the default).
-   If you will be using local charts you'll want to run `make -C $REPO_ROOT cluster/clean` and `make -C $REPO_ROOT cluster/build` to rebuild your local charts to the target version.
-1. **Prepare:** Run `cncluster hard_domain_migration_prepare` to deploy the new Canton and CometBFT nodes for all our SVs.
-   Note that this command contains multiple `pulumi up` steps (one for the main deployment, one for the runbook SV),
-   each with a preview that you should check and must confirm.
-   Once the pulumi steps have completed successfully and you can confirm that the cluster is (still) healthy
-   (no alerts, health check failures etc.), report to our partners that you have completed this step (setting a good example).
-1. **Migrate:** Run `cncluster hard_domain_migration_migrate` to set up our apps for migrating.
-   Note that this command contains multiple `pulumi up` steps
-   (one for the main deployment, one for the runbook SV, one for the runbook validator),
-   each with a preview that you should check and must confirm.
-   The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain,
-   so be prepared to rerun this command until it succeeds.
-   (Check the logs of failing pods to be sure that there is no other problem.)
-   For more fine-grained control, you can append `core`, `sv` or `validator` to the command to tell it to change only one of these things,
-   followed by `pulumi up` parameters such as `--yes --skip-preview`.
-   To get a sense for how many SVs still need to finish their post-migration init before the new synchronizer becomes operational,
-   you can filter participant logs for `Persisted.*DomainParametersState`
-   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
-   and inspect the (number of) signatures on the latest of those entries
-   (you need slightly over 2/3 of SVs to sign this).
 
 #### Checking the readiness of partners
 

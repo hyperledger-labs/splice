@@ -5,11 +5,10 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.PositiveDurationSeconds
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.{
   MediatorId,
   Member,
@@ -187,10 +186,7 @@ class ManualStartIntegrationTest
                 .value
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
-            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
-              PositiveInt.tryCreate(5),
-              NonNegativeFiniteDuration.ofSeconds(5),
-            )
+            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION
             // otherwise we get log warnings
             mediatorConnection.close()
           }
@@ -209,10 +205,7 @@ class ManualStartIntegrationTest
                 .sequencerConnections
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
-            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
-              PositiveInt.tryCreate(5),
-              NonNegativeFiniteDuration.ofSeconds(5),
-            )
+            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION
             // otherwise we get log warnings
             participantConnection.close()
           }

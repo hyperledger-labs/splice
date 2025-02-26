@@ -13,7 +13,7 @@ const roleToPulumiName = (role: Role): string => {
   }
 };
 
-export class ServiceAccount extends pulumi.ComponentResource {
+export class GcpServiceAccount extends pulumi.ComponentResource {
   name: pulumi.Output<string>;
 
   constructor(

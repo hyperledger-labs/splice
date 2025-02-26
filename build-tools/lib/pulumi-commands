@@ -90,7 +90,7 @@ function subcmd_apply() {
                 shift
                 ;;
             --skip-infra)
-                skipInfra="yes"
+                POSITIONAL_ARGS+=("$1")
                 shift
                 ;;
             -*)
@@ -127,13 +127,7 @@ function subcmd_apply() {
             _warning "docker-image-reference-exists bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
         fi
 
-        if [ -z "${skipInfra:-}" ]; then
-            subcmd_pulumi cluster up --yes --skip-preview
-            _infra_up
-        else
-            _info "Skipping infra deployment"
-        fi
-        _pulumi_automation_run_up
+        _cluster_apply "${args[@]}"
     fi
 }
 
@@ -212,43 +206,6 @@ function subcmd_prefresh() {
         _prompt_to_confirm
     fi
     _cluster_must_exist
-
-    stacks="multi-validator sv-runbook validator-runbook infra"
-
-    refresh_stack() {
-        stack="$1"
-        _info "Refreshing $1 stack"
-        _uses_pulumi_stack "$stack"
-
-        RETCODE=0
-        ERRFILE="./.tmp_ERRFILE"
-        ERRMSG=""
-        touch "$ERRFILE"
-
-        subcmd_pulumi "$1" refresh --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
-        }
-
-        rm -rf "$ERRFILE"
-
-        if [ "$RETCODE" -ne 0 ] && [ "${CLUSTER_LOCK_REAPER_RUN:-}" == "true" ]; then
-            case "${ERRMSG}" in
-                *"stack is currently locked"*)
-                    echo "Stack $stack is locked, cancelling lock before retrying"
-                    subcmd_pulumi "$stack" cancel --yes
-                    refresh_stack "$stack"
-                    ;;
-                *)
-                    _error "Failed refreshing stack $stack, aborting"
-                    exit 1
-                    ;;
-            esac
-        fi
-   }
-
-    for stack in $stacks; do
-      refresh_stack "$stack"
-    done
-
     _pulumi_automation_run_refresh
 }
 
@@ -267,7 +224,7 @@ function subcmd_apply_sv(){
 
     subcmd_install_data_export_bucket_key
 
-    subcmd_pulumi sv-runbook up --yes --skip-preview --show-sames "${args[@]}"
+    _pulumi_automation_run_up "sv-runbook"
 }
 
 ###
@@ -321,7 +278,7 @@ function subcmd_ci_apply_sv() {
 
     subcmd_install_data_export_bucket_key
 
-    subcmd_pulumi sv-runbook up --yes --skip-preview "${args[@]}"
+    _pulumi_automation_run_up "sv-runbook"
 }
 
 ###
@@ -332,12 +289,8 @@ function subcmd_pdown_sv(){
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
-    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
-    # Take down the sv-canton stack first. Taking down the sv-runbook stack deletes the namespace.
-    subcmd_pulumi_down_canton
 
-    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=false
-    subcmd_pulumi sv-runbook down --yes --skip-preview
+    _pulumi_automation_run_down "sv-runbook"
 }
 
 ###
@@ -350,12 +303,7 @@ function subcmd_ci_pdown_sv(){
         _error "This subcommand is available to CI jobs only."
     fi
 
-    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=true
-    # Take down the sv-canton stack first. Taking down the sv-runbook stack deletes the namespace.
-    subcmd_pulumi_down_canton
-
-    export SPLICE_DEPLOY_ONLY_SV_RUNBOOK=false
-    subcmd_pulumi sv-runbook down --yes --skip-preview
+    _pulumi_automation_run_down "sv-runbook"
 }
 
 ###
@@ -551,7 +499,7 @@ function subcmd_pulumi_preview_canton() {
 }
 
 ###
-subcommand_whitelist[pulumi_down_canton]="Preview the changes for the sv-canton migrations"
+subcommand_whitelist[pulumi_down_canton]="Down the sv-canton migrations"
 
 function subcmd_pulumi_down_canton() {
   _info "Resetting sv-canton stacks"
@@ -565,19 +513,4 @@ subcommand_whitelist[pulumi_up_canton]="Up the sv-canton migrations"
 function subcmd_pulumi_up_canton() {
   _info "Updating sv-canton stacks"
   _pulumi_automation_run_up "sv-canton"
-}
-
-###
-subcommand_whitelist[pulumi_cancel_canton]="Cancel the pulumi operations on sv-canton migrations"
-
-function subcmd_pulumi_cancel_canton() {
-  _info "Canceling sv-canton stacks"
-  _pulumi_automation_run_cancel "sv-canton"
-}
-
-subcommand_whitelist[pulumi_refresh_automation]="Refresh stacks managed through automation"
-
-function subcmd_pulumi_refresh_automation() {
-  _info "Refreshing stacks"
-  _pulumi_automation_run_refresh
 }

@@ -85,7 +85,7 @@ Participant identities
 
   .. TODO(#7746): remove "once activated"
 
-- In general, participant identities *can't* be reused on the same global domain,
+- In general, participant identities *can't* be reused on the same global synchronizer,
   i.e., without the network being reset/redeployed.
 
 - Loss of control over a participant namespace implies loss of control over the coin balances for all parties hosted under that namespace.
@@ -95,7 +95,7 @@ Participant identities
 CometBFT node identities
 ++++++++++++++++++++++++
 
-- Used within the CometBFT network spanned by SVs for operating the global domain.
+- Used within the CometBFT network spanned by SVs for operating the global synchronizer.
   See :ref:`cometbft-identity`.
 
 - The CometBFT validator key is used in CometBFT quorums (>⅔ of SVs),
@@ -135,3 +135,137 @@ The following steps are required to update the reward weight of an SV:
 
 #. Make sure that the changed reward is also reflected on `the configs repository <https://github.com/global-synchronizer-foundation/configs>`_.
    Otherwise, the old value would become effective again in the event of an onboarding and reonboarding.
+
+.. _sv-determining-traffic-parameters:
+
+Determining good synchronizer traffic parameters
+------------------------------------------------
+
+SVs are responsible for deciding on suitable :ref:`synchronizer traffic parameters <traffic_parameters>`.
+In the following we describe ways for determining good values for some of these parameters.
+
+Determining the cost of a single CC transfer
+++++++++++++++++++++++++++++++++++++++++++++
+
+As per Canton Improvement Proposal `cip-0042 <https://github.com/global-synchronizer-foundation/cips>`_,
+the ``extraTrafficPrice`` should be set so that the cost of a standard CC transfer is 1 USD.
+Actual traffic costs change depending on factors such as the size of the DSO (number of SVs) and the Canton protocol version
+(so can change also on major upgrades).
+It is therefore recommended for SVs to measure current costs periodically and adjust traffic parameters accordingly.
+
+One way to determine the current :ref:`traffic consumption <traffic_accounting>` (in bytes)
+of a CC transfer is to initiate a CC transfer and observe sequencer logs corresponding to it.
+Based on the assumption that TestNet has the same configuration and DSO size as MainNet,
+it is sufficient to conduct this measurement on TestNet.
+The suggested specific steps are as follows:
+
+.. this was on TestNet on Feb 24, from validator1 to splitwell
+
+1. Pick two non-SV validators that you control - one will host the sending party the other the receiving party.
+   They must be different to not skew the measurement results.
+   Control of the recipient is required only to accept the transfer.
+2. Initiate a CC transfer from a party hosted on the chosen sender validator to
+   a single receiver party hosted on the chosen receiver validator.
+   Accept the transfer on the receiver side.
+3. Inspect your `validator-app` logs on the `sender` side to confirm that the final transaction of the transfer was
+   (a) not batched together with another coin operation and
+   (b) had a single coin input.
+   You can confirm both of these conditions by looking at the matching log entry of the form:
+
+   .. parsed-literal::
+
+     executing batch AmuletOperationBatch(
+       nonMergeOperations = AmuletOperation(
+         from = tid:80afc8ae63defcb7a636d2cd23e38c0d,
+         op = CO_CompleteAcceptedTransfer(ContractId(00ebc78671f4b5f688d8245a1e0c6c72f378c0c90c7ca574a3c3a615489f3ca15dca1012208d8f9eb3ffe0d0a05b207e2bc3fb3f3e7d31c0b594eaefcfd486411386de775c)),
+         priority = Low
+       ),
+       priority = Low
+     ) with inputs Vector(InputAmulet(ContractId(002ace5687dc7f82cb0ca80d2b349a39b1127ffd01db2cd7172053fef88308e6faca1012202646cd3cbb31c78314c3ef22657d4ba6f7f096e90167dcd0d71eba565fa35844)))
+
+   Use  the ``trace-id`` from this log enty's metadata
+   (**not** the ``tid`` in view here but from the dedicated ``trace-id`` field on the log entry JSON)
+   to confirm that this log entry matches your transfer
+   (by searching your logs by the ``trace-id`` to find for entries that contain the full ``AcceptedTransferOffer``, for example).
+   Note in this example that (a) there is a single operation in the executed bach and (b) the operation has a single input.
+   If this is not true for the transfer you initiated, go back to step 2 and initiate a new transfer,
+   as batching or multi-input transfers will skew the measurement results.
+4. Search your `validator-app` logs on the `sender` for the ``trace-id`` visible in the previous step.
+   The goal is to tie the action here to a ``trace-id`` on the Canton side.
+   Search for a log entry of the following form:
+
+   .. parsed-literal::
+
+     Request (tid:43fd8ad332ca637b0c7c1509b2bdf715) com.daml.ledger.api.v2.CommandService/SubmitAndWaitForTransactionTree to participant-1:5001: sending request
+
+   The ``tid`` in this log entry is the ``trace-id`` that you're looking for.
+   It will be different from the ``trace-id`` in the log entry metadata
+   (that you used to link this log entry to the transfer operation visible above).
+
+5. Search your SV's `sequencer` logs for the ``trace-id`` from the previous step.
+   You want to use a log filter along the lines of (all rules here should be concatenated with logical "AND"s):
+
+   .. parsed-literal::
+
+     resource.labels.container_name="sequencer"
+     jsonPayload.logger_name="c.d.c.s.t.TrafficConsumedManager:sequencer=sequencer"
+     jsonPayload."trace-id"="43fd8ad332ca637b0c7c1509b2bdf715"
+
+
+6. The resulting log lines contain traffic consumption information about the sender and receiver participants,
+   but also about all SV participants.
+   (SV participants are stakeholders to all CC transfers.)
+   To determine only the traffic consumption of the sender and receiver participants,
+   you must filter for the participant IDs of the sender and receiver.
+   A simple approach to achieve the correct filtering is to
+   filter for parts of the party suffixes of the sender and receiver parties,
+   as the suffix (namespace) of a party will typically be identical to that of the participants hosting the party.
+   Filtering the resulting log lines for the participant IDs corresponding to the sender and receiver,
+   you should get log lines similar to the following:
+
+   .. parsed-literal::
+
+     Consumed 16147 for PAR::sender::...
+     Consumed 711 for PAR::receiver::...
+     Consumed 1450 for PAR::sender::...
+
+7. Sum up the numbers in the log lines to get the total traffic consumed for the last leg of a CC transfer.
+   In this example, the total traffic consumed would be 17597 bytes for the sender and 711 bytes for the receiver.
+
+8. Divide 1 MB by the total traffic consumed for the sender to get the fee that this CC transfer should have incurred in USD
+   as per cip-0042.
+   In the example given here the cost should have been configured at ``1,000,000 / 6344 = 56.83`` USD / MB,
+   i.e., ``extraTrafficPrice = 56.83``.
+
+Considerations around the read scaling factor
++++++++++++++++++++++++++++++++++++++++++++++
+
+For determining a good value for the ``readVsWriteScalingFactor``, consider the following constraints:
+
+Lower bound
+^^^^^^^^^^^
+
+The price charged for read traffic should cover the cost for Internet egress and compute incurred for the delivery of messages.
+Consider the following example calculation:
+
+- Based on a review of egress cost across major cloud providers, let's assume an average cost of 0.10 USD / GB.
+- Let's assume that compute costs will be covered by 10x the egress costs, so 1 USD / GB for compute and 1.1 USD / GB in total.
+- Validators read from sequencers in a :term:`BFT` manner, so that, with ``n`` SVs and under normal conditions,
+  ``2f+1 = 2 * floor((n-1)/3) + 1`` sequencers will deliver the same message to the same (validator) recipient.
+  Let the synchronizer size be ``n = 16`` SVs; then the read amplification factor is 11
+  and the cost of message delivery to a single recipient 12.1 USD / GB.
+- Let the current ``extraTrafficPrice`` be 60.0 USD / MB, i.e., 60,000 USD / GB.
+- The ``readVsWriteScalingFactor`` should be set to a factor of at least ``12.1 / 60,000`` to cover the cost,
+  which is around 2 basis points; i.e., ``readVsWriteScalingFactor >= 2``.
+
+Note that for simplicity we assumed here that all recipients are validator participants that use sequencers in the default BFT manner.
+This calculation furthermore assumes that messages must be delivered to recipients only once -
+an assumption that holds as long as validators and SVs are non-faulty and recipients are not currently recovering from a backup
+(which necessitates a replay of some messages).
+
+Upper bound
+^^^^^^^^^^^
+
+The delivery of messages is clearly less expensive than their ordering and persistence,
+so the ``readVsWriteScalingFactor`` should be clearly below 100%.
+That said: There is no good reason to significantly overcharge for message delivery.
