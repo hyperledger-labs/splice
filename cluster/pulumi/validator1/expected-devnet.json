@@ -414,7 +414,7 @@
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "4"
+            "activeMigrationId": "5"
           },
           "splitwell": true
         },
@@ -562,7 +562,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-5",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -633,7 +633,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 5
           }
         },
         "participantAdminUserNameFrom": {
@@ -644,7 +644,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_5",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -659,7 +659,7 @@
       },
       "version": "0.3.12"
     },
-    "name": "validator1-participant-4",
+    "name": "validator1-participant-5",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -916,8 +916,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
-          "migrating": false
+          "id": 5,
+          "legacyId": 4,
+          "migrating": true
         },
         "nodeIdentifier": "validator1",
         "onboardingSecretFrom": {
@@ -927,7 +928,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,

@@ -398,7 +398,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-5",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -442,7 +442,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 5
           }
         },
         "participantAdminUserNameFrom": {
@@ -453,7 +453,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_5",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -469,7 +469,7 @@
       },
       "version": "0.3.12"
     },
-    "name": "validator-participant-4",
+    "name": "validator-participant-5",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -618,10 +618,11 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "4"
+          "id": "5",
+          "migrating": true
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",
