@@ -310,6 +310,7 @@ class HttpSvHandler(
                 dsoRules.domain,
                 clock,
                 logger,
+                retryProvider,
               )
           }
           .flatMap {
