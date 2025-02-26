@@ -18,12 +18,12 @@ import Splice.Api.Token.HoldingV1 (InstrumentId)
 -- The interpretation of such a reference is app specific, but SHOULD be unambiguous within the context of the app.
 data Reference = Reference with
     id : Text
-    -- ^ The key that identifies the data. Can be set to the empty string if the contract-id is provided and is sufficient.
+      -- ^ The key that identifies the data. Can be set to the empty string if the contract-id is provided and is sufficient.
     cid : Optional AnyContractId
-    -- ^ Optional contract-id to use for referring to contracts.
-    --
-    -- This field is there for technical reasons, as contract-ids cannot be converted to text from within Daml,
-    -- which is due to their full textual representation being only known after transactions have been prepared.
+      -- ^ Optional contract-id to use for referring to contracts.
+      --
+      -- This field is there for technical reasons, as contract-ids cannot be converted to text from within Daml,
+      -- which is due to their full textual representation being only known after transactions have been prepared.
   deriving (Show, Eq)
 
 -- | The minimal set of information about a settlement that an app would like to execute.
@@ -115,5 +115,3 @@ interface Allocation where
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).transferLeg.sender
     do allocation_withdrawImpl this self extraArgs
-
-

@@ -69,7 +69,7 @@ interface AllocationInstruction where
     -- At least the sender SHOULD be allowed to abort an allocation instruction.
     with
       actor : Party
-      -- ^ The party that aborts the allocation instruction.
+        -- ^ The party that aborts the allocation instruction.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller actor

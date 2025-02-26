@@ -81,15 +81,15 @@ enforceMetadataLimits (Metadata m) = do
 -- | A common type for passing both the choice context and the metadata to a choice.
 data ExtraArgs = ExtraArgs with
     context : ChoiceContext
-    -- ^ Extra arguments to be passed to the implementation of an interface choice.
-    -- These are provided via an off-ledger API by the app implementing the interface.
+      -- ^ Extra arguments to be passed to the implementation of an interface choice.
+      -- These are provided via an off-ledger API by the app implementing the interface.
     meta : Metadata
-    -- ^ Additional metadata to pass in.
-    --
-    -- In contrast to the `extraArgs`, these are provided by the caller of the choice.
-    -- The expectation is that the meaning of metadata fields will be agreed on
-    -- in later standards, or on a case-by-case basis between the caller and the
-    -- implementer of the interface.
+      -- ^ Additional metadata to pass in.
+      --
+      -- In contrast to the `extraArgs`, these are provided by the caller of the choice.
+      -- The expectation is that the meaning of metadata fields will be agreed on
+      -- in later standards, or on a case-by-case basis between the caller and the
+      -- implementer of the interface.
   deriving (Show, Eq)
 
 -- | A generic result for choices that do not need to return specific data.

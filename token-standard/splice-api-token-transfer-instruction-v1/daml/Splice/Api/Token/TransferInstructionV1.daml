@@ -98,7 +98,7 @@ interface TransferInstruction where
     -- At least the sender SHOULD be allowed to abort a transfer instruction.
     with
       actor : Party
-      -- ^ The party that aborts the transfer instruction.
+        -- ^ The party that aborts the transfer instruction.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller actor
