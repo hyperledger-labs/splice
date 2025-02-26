@@ -37,7 +37,7 @@ def parse_args() -> FailureArgs:
     parser.add_argument('--gha_run_id', default=os.environ.get('GITHUB_RUN_ID'))
     parser.add_argument('--gha_workflow_name', default=os.environ.get('GITHUB_WORKFLOW'))
     parser.add_argument('--job_name', default=os.environ.get('GITHUB_JOB'))
-    parser.add_argument('--branch', default=os.environ.get('GITHUB_HEAD_REF'))
+    parser.add_argument('--branch', default=os.environ.get('GITHUB_HEAD_REF') or os.environ.get('GITHUB_REF'))
   else:
     parser.add_argument('--pipeline_id', default=os.environ.get('CIRCLE_PIPELINE_ID'))
     parser.add_argument('--workflow_id', default=os.environ.get('CIRCLE_WORKFLOW_ID'))
