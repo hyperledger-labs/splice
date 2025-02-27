@@ -132,7 +132,7 @@ template OTCTrade
         transferLegs
         meta = emptyMetadata
 
-      allocationRequest_RejectImpl _self actor _extraArgs = do
+      allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
         -- Note: this corresponds to signalling early that one is going to fail to deliver one's assets.
         -- A real trading app will likely demand punitive charges for this.
         require "Actor is a sender" (any (actor ==) (map (.sender) transferLegs))

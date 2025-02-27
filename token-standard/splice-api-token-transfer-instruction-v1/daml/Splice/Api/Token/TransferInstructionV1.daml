@@ -72,8 +72,8 @@ data TransferInstructionView = TransferInstructionView with
 interface TransferInstruction where
   viewtype TransferInstructionView
 
-  transferInstruction_reportSuccessImpl : ContractId TransferInstruction -> ExtraArgs -> Update ChoiceExecutionMetadata
-  transferInstruction_abortImpl : ContractId TransferInstruction -> Party -> ExtraArgs -> Update ChoiceExecutionMetadata
+  transferInstruction_reportSuccessImpl : ContractId TransferInstruction -> TransferInstruction_ReportSuccess -> Update ChoiceExecutionMetadata
+  transferInstruction_abortImpl : ContractId TransferInstruction -> TransferInstruction_Abort -> Update ChoiceExecutionMetadata
 
   choice TransferInstruction_ReportSuccess : ChoiceExecutionMetadata
     -- ^ Report that the transfer instruction was successfully executed
@@ -86,7 +86,7 @@ interface TransferInstruction where
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).transfer.instrumentId.admin
     do
-      transferInstruction_reportSuccessImpl this self extraArgs
+      transferInstruction_reportSuccessImpl this self arg
 
   choice TransferInstruction_Abort : ChoiceExecutionMetadata
     -- ^ Abort the transfer instruction for the reason given in the extra argument's metadata.
@@ -102,7 +102,7 @@ interface TransferInstruction where
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller actor
-    do transferInstruction_abortImpl this self actor extraArgs
+    do transferInstruction_abortImpl this self arg
 
 
 -- Transfer Factory
@@ -112,8 +112,7 @@ interface TransferInstruction where
 interface TransferFactory where
   viewtype TransferFactoryView
 
-  transferFactory_transferImpl
-    : ContractId TransferFactory -> Party -> Transfer -> ExtraArgs -> Update TransferFactory_TransferResult
+  transferFactory_transferImpl : ContractId TransferFactory -> TransferFactory_Transfer -> Update TransferFactory_TransferResult
 
   -- Instruct the registry to execute a transfer, if possible, the registry SHOULD execute
   -- the transfer in a single atomic transaction. If that is not possible, then this choice
@@ -134,7 +133,7 @@ interface TransferFactory where
         -- ^ The extra arguments to pass to the transfer implementation.
     controller transfer.sender
     do
-      transferFactory_transferImpl this self expectedAdmin transfer extraArgs
+      transferFactory_transferImpl this self arg
 
 -- | Result of requesting a transfer.
 data TransferFactory_TransferResult = TransferFactory_TransferResult with

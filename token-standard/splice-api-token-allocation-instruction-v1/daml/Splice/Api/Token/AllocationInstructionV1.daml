@@ -42,10 +42,8 @@ data AllocationInstruction_AllocateResult = AllocationInstruction_AllocateResult
 interface AllocationInstruction where
   viewtype AllocationInstructionView
 
-  allocationInstruction_allocateImpl
-    : ContractId AllocationInstruction -> ExtraArgs -> Update AllocationInstruction_AllocateResult
-  allocationInstruction_abortImpl
-    : ContractId AllocationInstruction -> Party -> ExtraArgs -> Update ChoiceExecutionMetadata
+  allocationInstruction_allocateImpl : ContractId AllocationInstruction -> AllocationInstruction_Allocate -> Update AllocationInstruction_AllocateResult
+  allocationInstruction_abortImpl : ContractId AllocationInstruction -> AllocationInstruction_Abort -> Update ChoiceExecutionMetadata
 
   choice AllocationInstruction_Allocate : AllocationInstruction_AllocateResult
     -- ^ Final step used to create the allocation requested by the instruction.
@@ -57,7 +55,7 @@ interface AllocationInstruction where
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).allocation.transferLeg.instrumentId.admin
     do
-      allocationInstruction_allocateImpl this self extraArgs
+      allocationInstruction_allocateImpl this self arg
 
   choice AllocationInstruction_Abort : ChoiceExecutionMetadata
     -- ^ Abort the allocation instruction for the reason given in the extra argument's metadata.
@@ -73,7 +71,7 @@ interface AllocationInstruction where
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller actor
-    do allocationInstruction_abortImpl this self actor extraArgs
+    do allocationInstruction_abortImpl this self arg
 
 
 -- AllocationFactory
@@ -91,7 +89,7 @@ data AllocationFactoryView = AllocationFactoryView with
 interface AllocationFactory where
   viewtype AllocationFactoryView
 
-  allocationFactory_allocateImpl : ContractId AllocationFactory -> Party -> AllocationView -> [ContractId Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
+  allocationFactory_allocateImpl : ContractId AllocationFactory -> AllocationFactory_Allocate -> Update AllocationFactory_AllocateResult
 
   nonconsuming choice AllocationFactory_Allocate : AllocationFactory_AllocateResult
     -- ^ Generic choice for the sender's wallet to allocate the assets to a specific leg of a settlement.
@@ -116,7 +114,7 @@ interface AllocationFactory where
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
     controller allocation.transferLeg.sender
-    do allocationFactory_allocateImpl this self expectedAdmin allocation inputHoldings extraArgs
+    do allocationFactory_allocateImpl this self arg
 
 -- | A custom type to represent either an allocation or an allocation instruction.
 -- Used in favor of `Either` to improve the readability of the code.

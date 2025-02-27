@@ -30,9 +30,9 @@ template AmuletAllocation
     interface instance Allocation for AmuletAllocation where
       view = allocation
 
-      allocation_withdrawImpl _self extraArgs = unlockAmuletAllocation this extraArgs
-      allocation_cancelImpl _self extraArgs = unlockAmuletAllocation this extraArgs
-      allocation_executeTransferImpl _self extraArgs = transferAmuletAllocation this extraArgs
+      allocation_withdrawImpl _self Allocation_Withdraw{..} = unlockAmuletAllocation this extraArgs
+      allocation_cancelImpl _self Allocation_Cancel{..} = unlockAmuletAllocation this extraArgs
+      allocation_executeTransferImpl _self Allocation_ExecuteTransfer{..} = transferAmuletAllocation this extraArgs
 
 
 -- Allocation funding/creation

@@ -47,7 +47,7 @@ Polishing changes:
 * Added a `name` field to `ChoiceContext`.
 * Add `expectedAdmin` field to `AllocationFactory_Allocate` and `TransferFactory_Transfer` to allow safely executing those choices even if
   the explicitly disclosed factory contracts were read from a not fully trusted off-ledger API.
-
+* Change all interface choice implementation functions to have the signature `ContractId Interface -> ChoiceArgument -> Update ChoiceResult`.
 
 ## Initial open source release of the standard proposal
 

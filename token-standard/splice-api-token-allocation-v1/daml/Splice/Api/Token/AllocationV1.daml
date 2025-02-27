@@ -84,9 +84,9 @@ allocationControllers AllocationView{..} =
 interface Allocation where
   viewtype AllocationView
 
-  allocation_executeTransferImpl : ContractId Allocation -> ExtraArgs -> Update ChoiceExecutionMetadata
-  allocation_cancelImpl : ContractId Allocation -> ExtraArgs -> Update ChoiceExecutionMetadata
-  allocation_withdrawImpl : ContractId Allocation -> ExtraArgs -> Update ChoiceExecutionMetadata
+  allocation_executeTransferImpl : ContractId Allocation -> Allocation_ExecuteTransfer -> Update ChoiceExecutionMetadata
+  allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update ChoiceExecutionMetadata
+  allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update ChoiceExecutionMetadata
 
   choice Allocation_ExecuteTransfer : ChoiceExecutionMetadata
     -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
@@ -95,7 +95,7 @@ interface Allocation where
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller allocationControllers (view this)
-    do allocation_executeTransferImpl this self extraArgs
+    do allocation_executeTransferImpl this self arg
 
   choice Allocation_Cancel : ChoiceExecutionMetadata
     -- ^ Cancel the allocation. Used by the executor to release the allocated assets early in case the settlement
@@ -104,7 +104,7 @@ interface Allocation where
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller allocationControllers (view this)
-    do allocation_cancelImpl this self extraArgs
+    do allocation_cancelImpl this self arg
 
   choice Allocation_Withdraw : ChoiceExecutionMetadata
     -- ^ Withdraw the allocated assets. Used by the sender to withdraw the assets before settlement
@@ -114,4 +114,4 @@ interface Allocation where
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).transferLeg.sender
-    do allocation_withdrawImpl this self extraArgs
+    do allocation_withdrawImpl this self arg
