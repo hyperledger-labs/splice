@@ -11,9 +11,17 @@ Release Notes
 Upcoming
 --------
 
+0.3.13
+------
+
 * Docs
 
   * Add documentation about :ref:`traffic`.
+
+* Config changes
+
+  * Increased the time before a participant retries a sequencer submission back to 10 seconds (from 5 seconds). This ensures we're not too aggressive in
+    retrying, thus leading to traffic waste.
 
 0.3.12
 ------
