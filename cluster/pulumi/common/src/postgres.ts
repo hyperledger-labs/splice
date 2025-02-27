@@ -112,7 +112,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
 
     this.address = this.pgSvc.privateIpAddress;
 
-    const pgDB = new gcp.sql.Database(
+    new gcp.sql.Database(
       `${this.namespace.logicalName}-db-${this.instanceName}-cantonnet`,
       {
         instance: this.pgSvc.name,
@@ -143,7 +143,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       },
       {
         parent: this,
-        deletedWith: pgDB,
+        deletedWith: this.pgSvc,
         dependsOn: [passwordSecret],
         protect: disableProtection ? false : protectCloudSql,
         aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
