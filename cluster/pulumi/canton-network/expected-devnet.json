@@ -1072,7 +1072,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1942,7 +1942,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -1999,7 +1999,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -2203,7 +2203,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -2501,7 +2501,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -2607,7 +2607,7 @@
           }
         }
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -2834,7 +2834,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -2891,7 +2891,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -3095,7 +3095,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -3367,7 +3367,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -3466,7 +3466,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -3693,7 +3693,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -3750,7 +3750,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -3954,7 +3954,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -4226,7 +4226,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -4325,7 +4325,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -4552,7 +4552,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -4609,7 +4609,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -4813,7 +4813,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -5085,7 +5085,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -5184,7 +5184,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",
