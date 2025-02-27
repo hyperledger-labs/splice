@@ -130,6 +130,7 @@ class HttpSvAdminHandler(
               dsoRules.domain,
               clock,
               logger,
+              retryProvider,
             )
         }
         .flatMap {
