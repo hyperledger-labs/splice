@@ -17,7 +17,10 @@ import qualified DA.Set as Set
 import DA.Traversable (forA)
 import DA.Time
 
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+
 import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig (AmuletConfig(..), TransferConfig(..), validAmuletConfig, defaultTransferPreapprovalFee)
 import qualified Splice.AmuletConfig as Unit
 import Splice.Schedule
@@ -1045,8 +1048,16 @@ exerciseAppTransfer AppTransferContext{..} transfer =
     transfer
     context = amuletTransferContext openMiningRound featuredAppRight
 
+-- TODO(#14942): replace usages of this function with `exerciseCheckedPaymentTransfer`
 exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
 exercisePaymentTransfer PaymentTransferContext{..} transfer =
+  exercise amuletRules AmuletRules_Transfer with
+    transfer
+    context
+
+exerciseCheckedPaymentTransfer : Party -> PaymentTransferContext -> Transfer -> Update TransferResult
+exerciseCheckedPaymentTransfer dso PaymentTransferContext{..} transfer = do
+  _ <- fetchChecked (ForDso with dso) amuletRules
   exercise amuletRules AmuletRules_Transfer with
     transfer
     context
@@ -1416,3 +1427,31 @@ splitAndBurn sender amount inputs context dso = do
         sender
         (BalanceChange (-amuletAsOfRoundZero) (- (amulet.amount.ratePerRound.rate)))
         transferResult.summary.balanceChanges
+
+
+-- Token standard context parsing
+---------------------------------
+
+paymentFromChoiceContext : Party -> Api.Token.MetadataV1.ChoiceContext -> Update PaymentTransferContext
+paymentFromChoiceContext dso context = do
+  -- extract context contracts
+  amuletRulesCid <- getContextContractId @AmuletRules context amuletRulesContextKey
+  openRoundCid <- getContextContractId @OpenMiningRound context openRoundContextKey
+  optFeaturedAppRightCid <- lookupContextContractId @FeaturedAppRight context featuredAppRightContextKey
+  -- check the AmuletRules contract's DSO party, which in turn ensures that all other contracts use the same DSO party
+  _ <- fetchChecked (ForDso with dso) amuletRulesCid
+  pure PaymentTransferContext with
+    amuletRules = amuletRulesCid
+    context = TransferContext with
+      openMiningRound = openRoundCid
+      issuingMiningRounds = mempty
+      featuredAppRight = optFeaturedAppRightCid
+      validatorRights = mempty
+
+-- | Used when we want to ignore a featured app right, even if it is present in the context.
+unfeaturedPaymentContextFromChoiceContext : Party -> Api.Token.MetadataV1.ChoiceContext -> Update PaymentTransferContext
+unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
+  PaymentTransferContext{..} <- paymentFromChoiceContext dso choiceContext
+  pure PaymentTransferContext with
+    amuletRules
+    context = context with featuredAppRight = None

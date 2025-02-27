@@ -16,6 +16,7 @@ import DA.Time
 import Splice.Scripts.Util
 import Splice.Scripts.TokenTestUtils
 import Splice.Amulet
+import Splice.Amulet.TokenApiUtils (amuletInstrumentId)
 import Splice.AmuletRules
 
 import Util.Disclosure
@@ -61,7 +62,7 @@ setupTest = do
       executeBefore = now `addRelTime` days 1
       holdingCids = [bobHoldingCid]
       meta = Metadata with
-        values = Map.fromList [("tokenmetadatav1.org.lfdecentralizedtrust.splice/correlation-id", "<test-UUID>")]
+        values = Map.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
 
   return TestSetup with ..
 

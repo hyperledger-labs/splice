@@ -329,10 +329,6 @@ requireAmuletExpiredForAllOpenRounds roundCid amulet = do
   -- definitely not be used as an input to transfer anymore.
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
 
--- | Shared definition of the instrument-id used for amulets.
-amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
-amuletInstrumentId dso =
-  Api.Token.HoldingV1.InstrumentId with admin = dso; id = "Amulet"
 
 
 -- instances

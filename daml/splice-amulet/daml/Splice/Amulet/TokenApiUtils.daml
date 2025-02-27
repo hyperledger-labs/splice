@@ -9,10 +9,16 @@ import DA.Action (unless)
 import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 
 
 splicePrefix : Text
 splicePrefix = "splice.lfdecentralizedtrust.org/"
+
+-- | Shared definition of the instrument-id used for amulets.
+amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
+amuletInstrumentId dso =
+  Api.Token.HoldingV1.InstrumentId with admin = dso; id = "Amulet"
 
 
 -- Metadata keys
@@ -48,8 +54,8 @@ validateAmuletChoiceContext context = do
   unless (context.name == amuletChoiceContextName) $
     fail $ "Expected choice context for: " <> amuletChoiceContextName <> ", got: " <> context.name
 
-getValidatedAmuletContext : ExtraArgs -> Update ChoiceContext
-getValidatedAmuletContext extraArgs = do
+getAmuletContext : ExtraArgs -> Update ChoiceContext
+getAmuletContext extraArgs = do
   let context = extraArgs.context
   validateAmuletChoiceContext context
   pure context
