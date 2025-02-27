@@ -142,6 +142,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       val sender = providerParty(1).toProtoPrimitive
       val receiver = providerParty(2).toProtoPrimitive
       val originalArgument: JavaApi.DamlRecord = new transferinstructionv1.TransferFactory_Transfer(
+        dsoParty.toProtoPrimitive,
         new transferinstructionv1.Transfer(
           sender,
           receiver,

@@ -83,6 +83,7 @@ class TokenStandardTransferIntegrationTest
           )
         )
       val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
+        dsoParty.toProtoPrimitive,
         new transferinstructionv1.Transfer(
           sender.toProtoPrimitive,
           receiver.toProtoPrimitive,
@@ -112,6 +113,7 @@ class TokenStandardTransferIntegrationTest
       val commands = new transferinstructionv1.TransferFactory.ContractId(transferFactory.factoryId)
         .exerciseTransferFactory_Transfer(
           new transferinstructionv1.TransferFactory_Transfer(
+            choiceArgs.expectedAdmin,
             choiceArgs.transfer,
             new metadatav1.ExtraArgs(
               choiceContextData,

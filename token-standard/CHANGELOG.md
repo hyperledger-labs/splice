@@ -45,6 +45,8 @@ Polishing changes:
 * Inline the `pendingActions` field in both `TransferInstructionView` and `AllocationInstructionView` to represent them more directly
 * Use a shared `ChoiceExecutionMetadata` type for choices that only return metadata about their execution.
 * Added a `name` field to `ChoiceContext`.
+* Add `expectedAdmin` field to `AllocationFactory_Allocate` and `TransferFactory_Transfer` to allow safely executing those choices even if
+  the explicitly disclosed factory contracts were read from a not fully trusted off-ledger API.
 
 
 ## Initial open source release of the standard proposal

@@ -53,14 +53,14 @@ template ExternalPartyAmuletRules
       view = Api.Token.TransferInstructionV1.TransferFactoryView with
         admin = dso
 
-      transferFactory_transferImpl _self = transferImpl
+      transferFactory_transferImpl = transferImpl this
 
     interface instance AllocationFactory for ExternalPartyAmuletRules where
       view = AllocationFactoryView with
         admin = dso
 
-      allocationFactory_allocateImpl _self allocation =
-        sharedAllocateImpl allocation.transferLeg.sender allocation
+      allocationFactory_allocateImpl self expectedAdmin allocation =
+        sharedAllocateImpl this self expectedAdmin allocation.transferLeg.sender allocation
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
@@ -227,8 +227,9 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
 -- Token standard support
 -------------------------
 
-sharedAllocateImpl : Party -> Api.Token.AllocationV1.AllocationView -> [ContractId Api.Token.HoldingV1.Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
-sharedAllocateImpl provider allocation holdings extraArgs = do
+sharedAllocateImpl : ExternalPartyAmuletRules -> ContractId AllocationFactory -> Party -> Party -> Api.Token.AllocationV1.AllocationView -> [ContractId Api.Token.HoldingV1.Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
+sharedAllocateImpl this _self expectedAdmin provider allocation holdings extraArgs = do
+  require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show this.dso) (expectedAdmin == this.dso)
   context <- getValidatedAmuletContext extraArgs
   paymentContext <- paymentFromChoiceContext context
   let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
@@ -237,8 +238,9 @@ sharedAllocateImpl provider allocation holdings extraArgs = do
     allocationOrInstruction = AOI_Allocation with allocation = allocCid
     meta = emptyMetadata
 
-transferImpl : Api.Token.TransferInstructionV1.Transfer -> ExtraArgs -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
-transferImpl transfer extraArgs = do
+transferImpl : ExternalPartyAmuletRules -> ContractId Api.Token.TransferInstructionV1.TransferFactory -> Party -> Api.Token.TransferInstructionV1.Transfer -> ExtraArgs -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
+transferImpl this _self expectedAdmin transfer extraArgs = do
+  require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show this.dso) (expectedAdmin == this.dso)
   context <- getValidatedAmuletContext extraArgs
   -- TODO(#115): check issuer correspondence with transfer instrument
   let holdings = transfer.holdingCids

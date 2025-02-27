@@ -7,7 +7,7 @@ set -euo pipefail
 
 source "${TOOLS_LIB}/libcli.source"
 
-if rg -P 'Impl this (?!self)' -g '!scripts'
+if rg -P 'Impl this (?!(self|_self))' -g '!scripts'
 then
     _error "Interface choices should always pass self"
 fi

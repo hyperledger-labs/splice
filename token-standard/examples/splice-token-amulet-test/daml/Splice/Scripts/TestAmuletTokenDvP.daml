@@ -76,9 +76,17 @@ testDvP = script do
   -- build choice context that would be provided over the off-ledger API
   (factoryCid, extraArgs, disclosures) <- getAmuletAllocationFactory_AllocateContext app alice
 
-  -- alice accepts allocation request directly via her wallet
   amulets <- queryFilter @Amulet alice.primaryParty (\amulet -> amulet.owner == alice.primaryParty)
+  -- alice tries to accept with wrong admin party which fails
+  submitWithDisclosuresMustFail' alice.primaryParty disclosures $ exerciseCmd factoryCid AllocationFactory_Allocate with
+    expectedAdmin = alice.primaryParty
+    allocation = aliceAlloc
+    inputHoldings = map (toInterfaceContractId . fst) amulets
+    extraArgs
+
+  -- alice accepts allocation request directly via her wallet
   submitWithDisclosures' alice.primaryParty disclosures $ exerciseCmd factoryCid AllocationFactory_Allocate with
+    expectedAdmin = app.dso
     allocation = aliceAlloc
     inputHoldings = map (toInterfaceContractId . fst) amulets
     extraArgs
@@ -94,6 +102,7 @@ testDvP = script do
 
   -- bob accepts allocation request using their wallet
   submitWithDisclosures' bob.primaryParty disclosures $ exerciseCmd factoryCid AllocationFactory_Allocate with
+    expectedAdmin = app.dso
     allocation = bobAlloc
     inputHoldings = map (toInterfaceContractId . fst) amulets
     extraArgs

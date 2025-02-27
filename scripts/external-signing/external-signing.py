@@ -364,7 +364,8 @@ async def handle_transfer_preapproval_send_token_standard(args, scan_client: Sca
         f"{(datetime.now() + timedelta(hours=24)).isoformat()}Z"
     )
 
-    choice_args = { "transfer": {"sender": args.sender_party_id,
+    choice_args = { "expectedAdmin": dso_party,
+                    "transfer": {"sender": args.sender_party_id,
                                  "receiver": args.receiver_party_id,
                                  "amount": args.amount,
                                  "instrumentId": {"admin": dso_party, "id": "Amulet"},

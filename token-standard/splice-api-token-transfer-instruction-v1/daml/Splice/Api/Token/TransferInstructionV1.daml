@@ -113,20 +113,28 @@ interface TransferFactory where
   viewtype TransferFactoryView
 
   transferFactory_transferImpl
-    : ContractId TransferFactory -> Transfer -> ExtraArgs -> Update TransferFactory_TransferResult
+    : ContractId TransferFactory -> Party -> Transfer -> ExtraArgs -> Update TransferFactory_TransferResult
 
   -- Instruct the registry to execute a transfer, if possible, the registry SHOULD execute
   -- the transfer in a single atomic transaction. If that is not possible, then this choice
   -- MAY result in the creation of a transfer instruction that is pending further actions.
   nonconsuming choice TransferFactory_Transfer : TransferFactory_TransferResult
     with
+      expectedAdmin : Party
+        -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+        -- the admin of the factory.
+        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- their own participant. That way they can ensure that it is safe to exercise a choice
+        -- on a factory contract acquired from an untrusted source *provided*
+        -- all vetted Daml packages only contain interface implementations
+        -- that check the expected admin party.
       transfer : Transfer
         -- ^ The transfer to execute.
       extraArgs : ExtraArgs
         -- ^ The extra arguments to pass to the transfer implementation.
     controller transfer.sender
     do
-      transferFactory_transferImpl this self transfer extraArgs
+      transferFactory_transferImpl this self expectedAdmin transfer extraArgs
 
 -- | Result of requesting a transfer.
 data TransferFactory_TransferResult = TransferFactory_TransferResult with

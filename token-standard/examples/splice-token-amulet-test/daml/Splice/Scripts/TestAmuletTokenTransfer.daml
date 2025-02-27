@@ -84,6 +84,7 @@ test_happy_path = script do
   -- Trigger an atomic, single-transaction transfer
   submitWithDisclosures' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
+      expectedAdmin = app.dso
       extraArgs
       transfer
 
@@ -112,6 +113,7 @@ test_no_holdings = script do
   (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
   submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
+      expectedAdmin = app.dso
       extraArgs
       transfer
 
@@ -131,6 +133,26 @@ test_expired = script do
   (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
   submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
     with
+      expectedAdmin = app.dso
+      extraArgs
+      transfer
+
+  pure ()
+
+test_wrong_admin : Script ()
+test_wrong_admin = script do
+  TestSetup {..} <- setupTest
+  let DefaultAppWithUsers{..} = defaultApp
+
+  let transfer = defaultTransfer
+
+  -- Wallet app calls endpoint to get context by providing the transfer it wants to execute.
+  (factoryCid, extraArgs, disclosedContracts) <- getAmuletTransferFactory_TransferContext app transfer
+
+  -- Set the wrong admin
+  submitWithDisclosuresMustFail' bob.primaryParty disclosedContracts $ exerciseCmd factoryCid Api.Token.TransferInstructionV1.TransferFactory_Transfer
+    with
+      expectedAdmin = bob.primaryParty
       extraArgs
       transfer
 
