@@ -92,9 +92,9 @@ class HttpTokenStandardTransferInstructionHandler(
                     new metadatav1.ChoiceContext(
                       "splice.lfdecentralizedtrust.org/amulet",
                       Map(
-                        "splice.lfdecentralizedtrust.org/amulet-rules" -> amuletRules.contractId.contractId,
-                        "splice.lfdecentralizedtrust.org/open-round" -> newestOpenRound.contractId.contractId,
-                        "splice.lfdecentralizedtrust.org/transfer-preapproval" -> transferPreapproval.contractId.contractId,
+                        "amulet-rules" -> amuletRules.contractId.contractId,
+                        "open-round" -> newestOpenRound.contractId.contractId,
+                        "transfer-preapproval" -> transferPreapproval.contractId.contractId,
                       ).map[String, metadatav1.AnyValue] { case (k, v) =>
                         k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
                       }.asJava,

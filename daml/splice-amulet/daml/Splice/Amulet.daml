@@ -11,6 +11,8 @@ import DA.Map as Map
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 
+import Splice.Amulet.TokenApiUtils
+
 import Splice.Expiry
 import Splice.Fees
 import Splice.Round
@@ -102,8 +104,8 @@ template Amulet
         meta = Api.Token.MetadataV1.Metadata
           with
             values = Map.fromList [
-              ("splice.lfdecentralizedtrust.org/created-in-round", show amount.createdAt),
-              ("splice.lfdecentralizedtrust.org/rate-per-round", show amount.ratePerRound)
+              (createdInRoundMetaKey, show amount.createdAt),
+              (ratePerRoundMetaKey, show amount.ratePerRound)
               ]
 
 template LockedAmulet
@@ -123,8 +125,8 @@ template LockedAmulet
         meta = Api.Token.MetadataV1.Metadata
           with
             values = Map.fromList [
-              ("splice.lfdecentralizedtrust.org/created-in-round", show amulet.amount.createdAt),
-              ("splice.lfdecentralizedtrust.org/rate-per-round", show amulet.amount.ratePerRound)
+              (createdInRoundMetaKey, show amulet.amount.createdAt),
+              (ratePerRoundMetaKey, show amulet.amount.ratePerRound)
               ]
 
 

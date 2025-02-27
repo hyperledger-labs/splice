@@ -9,6 +9,8 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationV1 qualified as Api.Token.AllocationV1
 import Splice.Api.Token.AllocationInstructionV1
+
+import Splice.Amulet.TokenApiUtils
 import Splice.AmuletAllocation
 import Splice.AmuletRules
 import Splice.Types
@@ -227,7 +229,8 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
 
 sharedAllocateImpl : Party -> Api.Token.AllocationV1.AllocationView -> [ContractId Api.Token.HoldingV1.Holding] -> ExtraArgs -> Update AllocationFactory_AllocateResult
 sharedAllocateImpl provider allocation holdings extraArgs = do
-  paymentContext <- paymentFromChoiceContext extraArgs.context
+  context <- getValidatedAmuletContext extraArgs
+  paymentContext <- paymentFromChoiceContext context
   let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
   allocCid <- fundAllocation provider allocation paymentContext transferInputs
   pure AllocationFactory_AllocateResult with
@@ -236,15 +239,16 @@ sharedAllocateImpl provider allocation holdings extraArgs = do
 
 transferImpl : Api.Token.TransferInstructionV1.Transfer -> ExtraArgs -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
 transferImpl transfer extraArgs = do
+  context <- getValidatedAmuletContext extraArgs
   -- TODO(#115): check issuer correspondence with transfer instrument
   let holdings = transfer.holdingCids
   now <- getTime
   require "Transfer must be executed before expiry" (now < transfer.executeBefore)
   require "Holdings must be specified when transferring without a delegate"
     (not $ null transfer.holdingCids)
-  paymentContext <- paymentFromChoiceContext extraArgs.context
+  paymentContext <- paymentFromChoiceContext context
   let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
-  preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context "splice.lfdecentralizedtrust.org/transfer-preapproval"
+  preapprovalCid <- getContextContractId @TransferPreapproval context transferPreapprovalContextKey
   preapproval <- fetchChecked (ForOwner with dso = transfer.instrumentId.admin; owner = transfer.receiver) preapprovalCid
   require "Preapproval receiver matches transfer receiver" (preapproval.receiver == transfer.receiver)
   _ <- exercise preapprovalCid TransferPreapproval_Send
