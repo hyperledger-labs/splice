@@ -25,14 +25,13 @@ jointly with the examples in `examples/`. Examples of particular interest are:
 
 There is not yet a stable release containing the token
 standard. However, documentation is published at
-https://token-std-dev.global.canton.network.digitalasset.com/ updated
+https://docs.token-std-dev.global.canton.network.digitalasset.com/ updated
 weekly and you can see the latest snapshot version at the top.
 
 Amulet implements the token standard so can be used for testing token
 standard APIs if you do not have access to another token.
 
-You can use the [localnet
-instructions](https://token-std-dev.global.canton.network.digitalasset.com/app_dev/testing/localnet.html)
+You can use the [localnet instructions](https://docs.token-std-dev.global.canton.network.digitalasset.com/app_dev/testing/localnet.html)
 to spin up a local network to test your application against.
 
 ### token-std-devnet
@@ -58,7 +57,7 @@ additional IP reach out to Digital Asset directly.
 This cluster will be reset every Monday with announcements sent in
 slack. You must reset your node fully, i.e., drop all databases and
 update to the new version mentioned in the
-[docs](https://token-std-dev.global.canton.network.digitalasset.com/). No
+[docs](https://docs.token-std-dev.global.canton.network.digitalasset.com/). No
 data is preserved across these resets.
 
 Once DevNet upgrades to a version including the token standard this cluster will be retired in favor of using DevNet or TestNet for testing.
