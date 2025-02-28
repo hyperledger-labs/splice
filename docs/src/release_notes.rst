@@ -17,6 +17,7 @@ Upcoming
 * Docs
 
   * Add documentation about :ref:`traffic`.
+  * Enable commenting on doc pages.
 
 * Config changes
 
