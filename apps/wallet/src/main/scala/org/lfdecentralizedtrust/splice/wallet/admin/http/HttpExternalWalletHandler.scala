@@ -152,7 +152,7 @@ class HttpExternalWalletHandler(
   )(tuser: TracedUser): Future[r0.CreateBuyTrafficRequestResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createBuyTrafficRequest") { _ => _ =>
-      val domainId = Codec.tryDecode(Codec.DomainId)(request.domainId)
+      val synchronizerId = Codec.tryDecode(Codec.SynchronizerId)(request.domainId)
       val receivingValidator = Codec.tryDecode(Codec.Party)(request.receivingValidatorPartyId)
       val trafficAmount = PositiveLong
         .create(request.trafficAmount)
@@ -165,7 +165,7 @@ class HttpExternalWalletHandler(
         userWalletStore <- getUserStore(user)
         participantId <- participantAdminConnection
           .getPartyToParticipant(
-            domainId,
+            synchronizerId,
             receivingValidator,
           )
           .transform(
@@ -177,7 +177,7 @@ class HttpExternalWalletHandler(
                   if ex.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
                 throw io.grpc.Status.INVALID_ARGUMENT
                   .withDescription(
-                    s"Could not find participant hosting ${receivingValidator} on domain ${domainId}"
+                    s"Could not find participant hosting ${receivingValidator} on domain ${synchronizerId}"
                   )
                   .asRuntimeException()
               case other => other
@@ -187,7 +187,7 @@ class HttpExternalWalletHandler(
             case Seq() =>
               throw io.grpc.Status.INVALID_ARGUMENT
                 .withDescription(
-                  s"Could not find participant hosting ${receivingValidator} on domain ${domainId}"
+                  s"Could not find participant hosting ${receivingValidator} on domain ${synchronizerId}"
                 )
                 .asRuntimeException()
             case Seq(participantId) => participantId
@@ -222,7 +222,7 @@ class HttpExternalWalletHandler(
                       installCid
                         .exerciseWalletAppInstall_CreateBuyTrafficRequest(
                           participantId.toProtoPrimitive,
-                          domainId.toProtoPrimitive,
+                          synchronizerId.toProtoPrimitive,
                           domainMigrationId,
                           trafficAmount.value,
                           expiresAt.toInstant,

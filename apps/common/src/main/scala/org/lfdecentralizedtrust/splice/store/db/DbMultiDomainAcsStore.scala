@@ -27,17 +27,17 @@ import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   Contract,
   ContractWithState,
+  LegacyOffset,
   QualifiedName,
   TemplateJsonDecoder,
   Trees,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M, String3}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.showPretty
 
@@ -62,6 +62,7 @@ import io.circe.Json
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
 final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
@@ -89,8 +90,8 @@ final class DbMultiDomainAcsStore[TXE](
     with StoreErrors
     with NamedLogging
     with LimitHelpers {
-  import MultiDomainAcsStore.*
   import DbMultiDomainAcsStore.*
+  import MultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
 
   override lazy val storeName = storeDescriptor.name
@@ -296,7 +297,7 @@ final class DbMultiDomainAcsStore[TXE](
 
   override def listContractsOnDomain[C, TCid <: ContractId[_], T](
       companion: C,
-      domain: DomainId,
+      domain: SynchronizerId,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
@@ -322,7 +323,7 @@ final class DbMultiDomainAcsStore[TXE](
   }
 
   override def listAssignedContractsNotOnDomainN(
-      excludedDomain: DomainId,
+      excludedDomain: SynchronizerId,
       companions: Seq[ConstrainedTemplate],
       limit: notOnDomainsTotalLimit.type,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
@@ -487,7 +488,7 @@ final class DbMultiDomainAcsStore[TXE](
           "listIncompleteReassignments",
         )
     } yield rows
-      .map(row => row._1 -> new ReassignmentId(DomainId.tryFromString(row._2), row._3))
+      .map(row => row._1 -> new ReassignmentId(SynchronizerId.tryFromString(row._2), row._3))
       .groupBy(_._1)
       .map { case (key, values) =>
         new ContractId(key) -> NonEmpty
@@ -570,8 +571,8 @@ final class DbMultiDomainAcsStore[TXE](
           .getOrRaise(
             new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
           )
-          .map(_.map(ApiOffset.assertFromStringToLong(_)))
-        _ <- cleanUpDataAfterDomainMigration(newStoreId)
+          .map(_.map(LegacyOffset.Api.assertFromStringToLong))
+        _ <- FutureUnlessShutdown.outcomeF(cleanUpDataAfterDomainMigration(newStoreId))
 
         alreadyIngestedAcs = lastIngestedOffset.isDefined
         acsSizeInDb <-
@@ -587,7 +588,7 @@ final class DbMultiDomainAcsStore[TXE](
               )
               .getOrElse(0)
           } else {
-            Future.successful(0)
+            FutureUnlessShutdown.pure(0)
           }
       } yield {
         // Note: IngestionSink.initialize() may be called multiple times for the same store instance,
@@ -619,7 +620,7 @@ final class DbMultiDomainAcsStore[TXE](
     private def updateOffset(offset: Long): DBIOAction[Unit, NoStream, Effect.Write] = {
       sql"""
         update store_last_ingested_offsets
-        set last_ingested_offset = ${lengthLimited(ApiOffset.fromLong(offset))}
+        set last_ingested_offset = ${lengthLimited(LegacyOffset.Api.fromLong(offset))}
         where store_id = $storeId and migration_id = $domainMigrationId
       """.asUpdate.andThen(DBIO.successful(()))
     }
@@ -632,7 +633,7 @@ final class DbMultiDomainAcsStore[TXE](
       """
         .as[Option[String]]
         .head
-        .map(_.map(ApiOffset.assertFromStringToLong(_)))
+        .map(_.map(LegacyOffset.Api.assertFromStringToLong(_)))
 
     /** Runs the given action to update the database with changes caused at the given offset.
       * The resulting action is guaranteed to be idempotent, even if the given action is not.
@@ -709,45 +710,43 @@ final class DbMultiDomainAcsStore[TXE](
                       _ <- doIngestAcsInsert(
                         offset,
                         ac.createdEvent,
-                        stateRowDataFromActiveContract(ac.domainId, ac.reassignmentCounter),
+                        stateRowDataFromActiveContract(ac.synchronizerId, ac.reassignmentCounter),
+                        summaryState,
+                      )
+                    } yield ()
+                  } ++ todoIncompleteOut.map { evt =>
+                    for {
+                      _ <- doIngestAcsInsert(
+                        offset,
+                        evt.createdEvent,
+                        stateRowDataFromUnassign(evt.reassignmentEvent),
+                        summaryState,
+                      )
+                      _ <- doRegisterIncompleteReassignment(
+                        evt.createdEvent.getContractId,
+                        evt.reassignmentEvent.source,
+                        evt.reassignmentEvent.unassignId,
+                        isAssignment = false,
+                        summaryState,
+                      )
+                    } yield ()
+                  } ++ todoIncompleteIn.map { evt =>
+                    for {
+                      _ <- doIngestAcsInsert(
+                        offset,
+                        evt.reassignmentEvent.createdEvent,
+                        stateRowDataFromAssign(evt.reassignmentEvent),
+                        summaryState,
+                      )
+                      _ <- doRegisterIncompleteReassignment(
+                        evt.reassignmentEvent.createdEvent.getContractId,
+                        evt.reassignmentEvent.source,
+                        evt.reassignmentEvent.unassignId,
+                        isAssignment = true,
                         summaryState,
                       )
                     } yield ()
                   }
-                    ++ todoIncompleteOut.map { evt =>
-                      for {
-                        _ <- doIngestAcsInsert(
-                          offset,
-                          evt.createdEvent,
-                          stateRowDataFromUnassign(evt.reassignmentEvent),
-                          summaryState,
-                        )
-                        _ <- doRegisterIncompleteReassignment(
-                          evt.createdEvent.getContractId,
-                          evt.reassignmentEvent.source,
-                          evt.reassignmentEvent.unassignId,
-                          isAssignment = false,
-                          summaryState,
-                        )
-                      } yield ()
-                    }
-                    ++ todoIncompleteIn.map { evt =>
-                      for {
-                        _ <- doIngestAcsInsert(
-                          offset,
-                          evt.reassignmentEvent.createdEvent,
-                          stateRowDataFromAssign(evt.reassignmentEvent),
-                          summaryState,
-                        )
-                        _ <- doRegisterIncompleteReassignment(
-                          evt.reassignmentEvent.createdEvent.getContractId,
-                          evt.reassignmentEvent.source,
-                          evt.reassignmentEvent.unassignId,
-                          isAssignment = true,
-                          summaryState,
-                        )
-                      } yield ()
-                    }
                 ),
             ),
             "ingestAcs",
@@ -778,7 +777,7 @@ final class DbMultiDomainAcsStore[TXE](
       }
     }
 
-    override def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
+    override def ingestUpdate(domain: SynchronizerId, transfer: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
       transfer match {
@@ -947,7 +946,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
 
     private def ingestTransactionTree(
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         offset: Long,
         tree: TransactionTree,
     )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
@@ -986,7 +985,7 @@ final class DbMultiDomainAcsStore[TXE](
         .map(_._2)
       val txLogEntries =
         if (!tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
-          txLogConfig.parser.parse(tree, domainId, logger)
+          txLogConfig.parser.parse(tree, synchronizerId, logger)
         else Seq.empty // do not parse events imported from acs
 
       for {
@@ -1009,7 +1008,7 @@ final class DbMultiDomainAcsStore[TXE](
                               doIngestAcsInsert(
                                 offset,
                                 createdEvent,
-                                stateRowDataFromActiveContract(domainId, 0L),
+                                stateRowDataFromActiveContract(synchronizerId, 0L),
                                 summary,
                               )
                             )
@@ -1017,16 +1016,15 @@ final class DbMultiDomainAcsStore[TXE](
                       } yield ()
                     case Delete(exercisedEvent) =>
                       doDeleteContract(exercisedEvent, summary)
-                  }
-                    ++ txLogEntries.map(txe =>
-                      doIngestTxLogInsert(
-                        domainId,
-                        offset,
-                        CantonTimestamp.assertFromInstant(tree.getRecordTime),
-                        txe,
-                        summary,
-                      )
+                  } ++ txLogEntries.map(txe =>
+                    doIngestTxLogInsert(
+                      synchronizerId,
+                      offset,
+                      CantonTimestamp.assertFromInstant(tree.getRecordTime),
+                      txe,
+                      summary,
                     )
+                  )
                 ),
             ),
             "ingestTransactionTree",
@@ -1049,10 +1047,10 @@ final class DbMultiDomainAcsStore[TXE](
           """).as[Int].head.map(_ > 0)
 
     private def stateRowDataFromActiveContract(
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         reassignmentCounter: Long,
     ) = ContractStateRowData(
-      assignedDomain = Some(domainId),
+      assignedDomain = Some(synchronizerId),
       reassignmentCounter = reassignmentCounter,
       reassignmentTargetDomain = None,
       reassignmentSourceDomain = None,
@@ -1150,13 +1148,13 @@ final class DbMultiDomainAcsStore[TXE](
     }
 
     private def doIngestTxLogInsert(
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         offset: Long,
         recordTime: CantonTimestamp,
         txe: TXE,
         summary: MutableIngestionSummary,
     ) = {
-      val safeOffset = lengthLimited(ApiOffset.fromLong(offset))
+      val safeOffset = lengthLimited(LegacyOffset.Api.fromLong(offset))
       val (entryType, entryData) = txLogConfig.encodeEntry(txe)
       // Note: lengthLimited() uses String2066 which throws an exception if the string is longer than 2066 characters.
       // Here we use String256M to support larger TxLogEntry payloads.
@@ -1169,7 +1167,7 @@ final class DbMultiDomainAcsStore[TXE](
       (sql"""
       insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id,
       entry_type, entry_data #$indexColumnNames)
-      values ($storeId, $domainMigrationId, $safeOffset, $recordTime, $domainId,
+      values ($storeId, $domainMigrationId, $safeOffset, $recordTime, $synchronizerId,
               $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
     """).toActionBuilder.asUpdate
     }
@@ -1225,7 +1223,7 @@ final class DbMultiDomainAcsStore[TXE](
 
     private def doSetContractStateActive(
         contractId: String,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         reassignmentCounter: Long,
         summary: MutableIngestionSummary,
     ) = {
@@ -1234,7 +1232,7 @@ final class DbMultiDomainAcsStore[TXE](
         ContractStateEvent(
           new ContractId(contractId),
           reassignmentCounter,
-          StoreContractState.Assigned(domainId),
+          StoreContractState.Assigned(synchronizerId),
         )
       )
       // Only overwrite the current contract state if existing row is "older", i.e., it has
@@ -1245,7 +1243,7 @@ final class DbMultiDomainAcsStore[TXE](
         update #$acsTableName
             set
                 state_number = default, -- generates a new identity value
-                assigned_domain = $domainId,
+                assigned_domain = $synchronizerId,
                 reassignment_counter = $reassignmentCounter,
                 reassignment_target_domain = NULL,
                 reassignment_source_domain = NULL,
@@ -1259,7 +1257,7 @@ final class DbMultiDomainAcsStore[TXE](
 
     private def doRegisterIncompleteReassignment(
         contractId: String,
-        source: DomainId,
+        source: SynchronizerId,
         unassignId: String,
         isAssignment: Boolean,
         summary: MutableIngestionSummary,
@@ -1459,7 +1457,11 @@ object DbMultiDomainAcsStore {
     )
   }
 
-  case class TxLogEvent(eventId: String, domainId: DomainId, acsContractId: Option[ContractId[?]])
+  case class TxLogEvent(
+      eventId: String,
+      synchronizerId: SynchronizerId,
+      acsContractId: Option[ContractId[?]],
+  )
 
   /** Like [[IngestionSummary]], but with all fields mutable to simplify collecting the content from helper methods */
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -1482,7 +1484,7 @@ object DbMultiDomainAcsStore {
 
     def toIngestionSummary(
         updateId: Option[String],
-        synchronizerId: Option[DomainId],
+        synchronizerId: Option[SynchronizerId],
         offset: Long,
         recordTime: Option[CantonTimestamp],
         newAcsSize: Int,

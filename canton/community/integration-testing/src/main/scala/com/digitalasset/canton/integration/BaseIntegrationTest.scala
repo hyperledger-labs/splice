@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -7,12 +7,12 @@ import com.daml.metrics.Timed
 import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{
-  config,
   BaseTest,
   ProtocolVersionChecksFixtureAnyWordSpec,
   RepeatableTestSuiteTest,
+  config,
 }
 import org.scalactic.source
 import org.scalactic.source.Position
@@ -35,8 +35,8 @@ import scala.jdk.CollectionConverters.*
   * Code blocks interacting with the environment are provided a [[TestEnvironment]] instance. [[TestEnvironment]] provides all implicits and commands to
   * interact with the environment as if you were operating in the canton console. For convenience you will want to mark this value as an `implicit`
   * and import the instances members into your scope (see `withSetup` and tests in the below example).
-  * [[TestEnvironment]] also includes [[CommonTestAliases]] which will give you references to domains and participants commonly used in our tests.
-  * If your test attempts to use a participant or domain which is not configured in your environment it will immediately fail.
+  * [[TestEnvironment]] also includes [[CommonTestAliases]] which will give you references to synchronizers and participants commonly used in our tests.
+  * If your test attempts to use a participant or synchronizer which is not configured in your environment it will immediately fail.
   *
   * By default sbt will attempt to run many tests concurrently. This can be problematic as starting
   * many canton environments concurrently is very resource intensive. We use [[ConcurrentEnvironmentLimiter]] to limit
@@ -109,14 +109,14 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
       sender: ParticipantReference,
       receiver: ParticipantReference,
       timeoutMillis: Long = 20000,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
       id: String = "",
   ): Assertion =
     withClue(s"${sender.name} was unable to ping ${receiver.name} within ${timeoutMillis}ms:") {
       sender.health.maybe_ping(
         receiver.id,
         config.NonNegativeDuration.ofMillis(timeoutMillis),
-        domainId = domainId,
+        synchronizerId = synchronizerId,
         id = id,
       ) shouldBe defined
     }

@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.migration.{AcsExporter, DarExporter}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -29,7 +29,7 @@ class DomainMigrationDumpGenerator(
 
   def generateDomainDump(
       migrationId: Long,
-      domain: DomainId,
+      domain: SynchronizerId,
   )(implicit tc: TraceContext): Future[DomainMigrationDump] = {
     for {
       (acsSnapshot, acsTimestamp) <- acsExporter
@@ -63,7 +63,7 @@ class DomainMigrationDumpGenerator(
 
   def getDomainDataSnapshot(
       timestamp: Instant,
-      domain: DomainId,
+      domain: SynchronizerId,
       migrationId: Long,
       force: Boolean,
   )(implicit

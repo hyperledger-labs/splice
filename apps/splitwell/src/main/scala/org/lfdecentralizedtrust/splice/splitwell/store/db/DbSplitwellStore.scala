@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -72,12 +72,13 @@ class DbSplitwellStore(
       ] = SplitwellStore.contractFilter(key)
 
   import multiDomainAcsStore.waitUntilAcsIngested
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   private def storeId: Int = multiDomainAcsStore.storeId
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def lookupInstallWithOffset(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       user: PartyId,
   )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
@@ -91,7 +92,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellInstall.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and assigned_domain = $domainId
+              )} and assigned_domain = $synchronizerId
               and install_user = ${user}""",
             orderLimit = sql"limit 1",
           ).headOption,
@@ -261,17 +262,17 @@ class DbSplitwellStore(
 
   override def listTransferrableGroups()(implicit
       tc: TraceContext
-  ): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]] = for {
+  ): Future[Map[SynchronizerId, Seq[splitwellCodegen.Group.ContractId]]] = for {
     // find all groups still on 'others' domains
     othersGroups <- Future
       .traverse(domainConfig.splitwell.others) { otherDomain =>
         for {
-          otherDomainId <- domains.waitForDomainConnection(otherDomain.alias)
+          otherSynchronizerId <- domains.waitForDomainConnection(otherDomain.alias)
           groups <- multiDomainAcsStore.listContractsOnDomain(
             splitwellCodegen.Group.COMPANION,
-            otherDomainId,
+            otherSynchronizerId,
           )
-        } yield otherDomainId -> groups
+        } yield otherSynchronizerId -> groups
       }
       .map(_.view.filter(_._2.nonEmpty).toMap)
     allGroupMembers = othersGroups.view
@@ -357,7 +358,7 @@ class DbSplitwellStore(
   }
 
   override def lookupSplitwellRules(
-      domainId: DomainId
+      synchronizerId: SynchronizerId
   )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[
       splitwellCodegen.SplitwellRules.ContractId,
@@ -374,7 +375,7 @@ class DbSplitwellStore(
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellRules.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and assigned_domain = $domainId
+              )} and assigned_domain = $synchronizerId
               """,
           ).headOption,
           "lookupSplitwellRules",

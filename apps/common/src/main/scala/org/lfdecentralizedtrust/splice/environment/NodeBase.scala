@@ -97,7 +97,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
       loggerFactory,
       parameters.processingTimeouts,
       futureSupervisor,
-      nodeMetrics.metricsFactory,
+      nodeMetrics.openTelemetryMetricsFactory,
     )
 
   override val timeouts = parameters.processingTimeouts
@@ -106,7 +106,8 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   protected def isInitialized = isInitializedVar.get()
 
-  protected def packages = DarResources.amulet.all
+  protected def packages =
+    DarResources.amulet.all ++ DarResources.TokenStandard.allPackageResources.flatMap(_.all)
 
   lazy private val packageSignatures = {
     ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)
@@ -136,7 +137,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
       override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
         implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
-        import parameters.loggingConfig.api.*
+        import parameters.monitoringConfig.logging.api.*
         val logPayload = messagePayloads
         val pathLimited = request.uri.path.toString
           .limit(maxMethodLength)

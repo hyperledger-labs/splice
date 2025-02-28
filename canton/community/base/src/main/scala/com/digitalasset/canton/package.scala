@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset
@@ -10,6 +10,7 @@ import com.digitalasset.daml.lf.data.{IdString, Ref, Time}
 import com.digitalasset.daml.lf.transaction.{ContractStateMachine, Versioned}
 import com.digitalasset.daml.lf.value.Value
 import com.google.protobuf.ByteString
+import scalapb.GeneratedMessage
 
 package object canton {
 
@@ -43,6 +44,18 @@ package object canton {
   // Ledger transaction id
   type LedgerTransactionId = Ref.TransactionId
   val LedgerTransactionId: Ref.TransactionId.type = Ref.TransactionId
+
+  // Application Id
+  type LfApplicationId = Ref.ApplicationId
+  val LfApplicationId: Ref.ApplicationId.type = Ref.ApplicationId
+
+  // Command Id
+  type LfCommandId = Ref.CommandId
+  val LfCommandId: Ref.CommandId.type = Ref.CommandId
+
+  // Submission Id
+  type LfSubmissionId = Ref.SubmissionId
+  val LfSubmissionId: Ref.SubmissionId.type = Ref.SubmissionId
 
   // Exercise choice name
   type LfChoiceName = Ref.ChoiceName
@@ -126,6 +139,19 @@ package object canton {
 
   /** Wrap a method call with this method to document that the caller is sure that the callee's preconditions are met. */
   def checked[A](x: => A): A = x
+
+  /** We should not call `toByteString` directly on a proto message. Rather, we should use the versioning tooling
+    * which ensures that the correct version of the proto message is used (based on the protocol version).
+    * However, in some cases (e.g., when we are sure that the message is not versioned), we can invoke this method
+    * directly.
+    */
+  @SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
+  def checkedToByteString(proto: GeneratedMessage): ByteString = proto.toByteString
+
+  implicit class RichGeneratedMessage(val message: GeneratedMessage) extends AnyVal {
+    @SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
+    def checkedToByteString: ByteString = message.toByteString
+  }
 
   implicit val lfPartyOrdering: Ordering[LfPartyId] =
     IdString.`Party order instance`.toScalaOrdering

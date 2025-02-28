@@ -39,7 +39,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencing.protocol.{SequencerErrors, TrafficState}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -90,7 +90,7 @@ class TopupMemberTrafficTrigger(
       // be sufficient to complete any unassign commands.
       // However for other apps that might switch over later or have much larger ACS,
       // we likely want to still allow purchasing traffic for the old synchronizer.
-      activeSynchronizerId = DomainId.tryFromString(
+      activeSynchronizerId = SynchronizerId.tryFromString(
         decentralizedSynchronizerConfig.activeSynchronizer
       )
       currentTrafficState <- participantAdminConnection.getParticipantTrafficState(
@@ -168,7 +168,7 @@ class TopupMemberTrafficTrigger(
     for {
       currentTopupState <- store
         .lookupValidatorTopUpStateWithOffset(
-          DomainId.tryFromString(task.topupState.payload.synchronizerId)
+          SynchronizerId.tryFromString(task.topupState.payload.synchronizerId)
         )
         .map(_.value)
     } yield currentTopupState.fold(false)(
@@ -213,7 +213,7 @@ class TopupMemberTrafficTrigger(
   }
 
   private def getOrCreateValidatorTopupState(
-      activeSynchronizerId: DomainId
+      activeSynchronizerId: SynchronizerId
   )(implicit
       traceContext: TraceContext
   ): Future[Contract[ValidatorTopUpState.ContractId, ValidatorTopUpState]] = {
@@ -246,7 +246,7 @@ class TopupMemberTrafficTrigger(
               ),
               DedupOffset(dedupOffset),
             )
-            .withDomainId(activeSynchronizerId)
+            .withSynchronizerId(activeSynchronizerId)
             .yieldResult()
             .flatMap(ev =>
               // topping up is tied to the domain in scope here, which was

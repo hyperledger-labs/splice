@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import com.digitalasset.canton.{BaseTest, drivers as proto}
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import monocle.Monocle.toAppliedFocusOps
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -23,9 +23,9 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
   private val owningSvNodeNr = 1
   private val owningSvNodeId = mkSvNodeId(owningSvNodeNr)
   private val chainId = "dummy-chain-id"
-  private val dummyDsoDomainId = DomainId.tryFromString("domain1::domain")
+  private val dummyDsoSynchronizerId = SynchronizerId.tryFromString("domain1::domain")
 
-  private val cometBftRequestSigner = CometBftRequestSigner.getGenesisSigner
+  private val cometBftRequestSigner = CometBftRequestSigner.GenesisSigner
 
   private def mkCometBftNodeName(svNodeNr: Int) = "cometBftNode" + svNodeNr.toString
 
@@ -100,7 +100,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
         mkSvNodeId(svNodeNr),
         new daml.dso.svstate.NodeState(
           Map(
-            dummyDsoDomainId.toProtoPrimitive -> new SynchronizerNodeConfig(
+            dummyDsoSynchronizerId.toProtoPrimitive -> new SynchronizerNodeConfig(
               new CometBftConfig(
                 Map(
                   mkCometBftNodeName(svNodeNr) -> new CometBftNodeConfig(
@@ -155,7 +155,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
           targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")
         ),
         networkConfig,
-        dummyDsoDomainId,
+        dummyDsoSynchronizerId,
         logger,
       )
       .requests
@@ -327,7 +327,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
             Seq(10 -> "key-10")
           ),
           networkConfig,
-          dummyDsoDomainId,
+          dummyDsoSynchronizerId,
           logger,
         )
         .requests

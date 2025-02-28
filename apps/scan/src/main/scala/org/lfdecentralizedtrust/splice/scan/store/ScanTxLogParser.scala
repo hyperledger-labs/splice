@@ -5,12 +5,16 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import cats.Monoid
 import cats.syntax.foldable.*
-import com.daml.ledger.javaapi.data.{TreeEvent, *}
+import com.daml.ledger.javaapi.data.*
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
+import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   AmuletCreateSummary,
   AmuletExpireSummary,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferResult
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
@@ -20,25 +24,19 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletru
   TransferCommandResultFailure,
   TransferCommandResultSuccess,
 }
-import splice.wallet.subscriptions as sws
 import org.lfdecentralizedtrust.splice.codegen.java.splice.fees.ExpiringAmount
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as sws
 import org.lfdecentralizedtrust.splice.history.*
-import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.*
+import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
-import org.lfdecentralizedtrust.splice.util.{Codec, ExerciseNode}
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.dollarsToCC
 import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.ApiOffset
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
+import org.lfdecentralizedtrust.splice.util.{Codec, EventId, ExerciseNode, LegacyOffset}
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
-import com.digitalasset.canton.topology.DomainId
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -49,20 +47,24 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
-      tc: TraceContext
+  private def parseTree(tree: TransactionTree, synchronizerId: SynchronizerId, root: TreeEvent)(
+      implicit tc: TraceContext
   ): State = {
     // TODO(#2930) add more checks on the nodes, at least that the DSO party is correct
     root match {
       case exercised: ExercisedEvent =>
+        val eventId = EventId.prefixedFromUpdateIdAndNodeId(
+          tree.getUpdateId,
+          exercised.getNodeId,
+        )
         exercised match {
           case Transfer(node) =>
-            State.fromTransfer(tree, exercised, domainId, node)
+            State.fromTransfer(tree, exercised, synchronizerId, node)
           case Tap(node) =>
             State.fromAmuletCreateSummary(
               tree,
               exercised,
-              domainId,
+              synchronizerId,
               node.result.value.amuletSum,
               TransactionType.Tap,
             )
@@ -70,22 +72,22 @@ class ScanTxLogParser(
             State.fromAmuletCreateSummary(
               tree,
               exercised,
-              domainId,
+              synchronizerId,
               node.result.value.amuletSum,
               TransactionType.Mint,
             )
           case AmuletRules_BuyMemberTraffic(node) =>
-            State.fromBuyMemberTraffic(exercised, domainId, node)
+            State.fromBuyMemberTraffic(eventId, synchronizerId, node)
           case AmuletRules_CreateExternalPartySetupProposal(node) =>
-            State.fromCreateExternalPartySetupProposal(exercised, domainId, node)
+            State.fromCreateExternalPartySetupProposal(eventId, synchronizerId, node)
           case AmuletRules_CreateTransferPreapproval(node) =>
-            State.fromCreateTransferPreapproval(exercised, domainId, node)
+            State.fromCreateTransferPreapproval(eventId, synchronizerId, node)
           case TransferPreapproval_Renew(node) =>
-            State.fromRenewTransferPreapproval(exercised, domainId, node)
+            State.fromRenewTransferPreapproval(eventId, synchronizerId, node)
           case AmuletExpire(node) =>
-            State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
+            State.fromAmuletExpireSummary(eventId, synchronizerId, node.result.value.expireSum)
           case LockedAmuletExpireAmulet(node) =>
-            State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
+            State.fromAmuletExpireSummary(eventId, synchronizerId, node.result.value.expireSum)
           // We track the sum of locked/unlocked so this is a noop.
           case LockedAmuletUnlock(_) =>
             State.empty
@@ -96,7 +98,7 @@ class ScanTxLogParser(
             fromAnsEntryPaymentCollection(
               tree,
               exercised,
-              domainId,
+              synchronizerId,
               sws.SubscriptionInitialPayment.COMPANION,
               sws.SubscriptionInitialPayment.CHOICE_SubscriptionInitialPayment_Collect,
             )(_.amulet)
@@ -104,7 +106,7 @@ class ScanTxLogParser(
             fromAnsEntryPaymentCollection(
               tree,
               exercised,
-              domainId,
+              synchronizerId,
               sws.SubscriptionPayment.COMPANION,
               sws.SubscriptionPayment.CHOICE_SubscriptionPayment_Collect,
             )(_.amulet)
@@ -113,24 +115,36 @@ class ScanTxLogParser(
               s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
             )
           case DsoRulesCloseVoteRequest(node) =>
-            State.fromCloseVoteRequest(exercised.getEventId, node)
+            State.fromCloseVoteRequest(eventId, node)
           case ExternalPartyAmuletRules_CreateTransferCommand(node) =>
-            State.fromCreateTransferCommand(exercised.getEventId, node)
+            State.fromCreateTransferCommand(eventId, node)
           case TransferCommand_Send(node) =>
-            State.fromTransferCommand_Send(exercised, node)
+            State.fromTransferCommand_Send(eventId, exercised, node)
           case TransferCommand_Withdraw(node) =>
-            State.fromTransferCommand_Withdraw(exercised, node)
+            State.fromTransferCommand_Withdraw(eventId, exercised, node)
           case TransferCommand_Expire(node) =>
-            State.fromTransferCommand_Expire(exercised, node)
-          case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
+            State.fromTransferCommand_Expire(eventId, exercised, node)
+          case _ =>
+            parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+            )
         }
 
       case created: CreatedEvent =>
         created match {
           case OpenMiningRoundCreate(round) =>
-            State.fromOpenMiningRoundCreate(root, domainId, round)
+            State.fromOpenMiningRoundCreate(
+              EventId.prefixedFromUpdateIdAndNodeId(
+                tree.getUpdateId,
+                root.getNodeId,
+              ),
+              synchronizerId,
+              round,
+            )
           case ClosedMiningRoundCreate(round) =>
-            State.fromClosedMiningRoundCreate(tree, root, domainId, round)
+            State.fromClosedMiningRoundCreate(tree, root, synchronizerId, round)
           case AmuletCreate(_) =>
             throw new RuntimeException(
               s"Unexpected amulet create event for amulet ${created.getContractId} in transaction ${tree.getUpdateId}"
@@ -147,21 +161,29 @@ class ScanTxLogParser(
     }
   }
 
-  private def parseTrees(tree: TransactionTree, domainId: DomainId, rootsEventIds: List[String])(
-      implicit tc: TraceContext
+  private def parseTrees(
+      tree: TransactionTree,
+      synchronizerId: SynchronizerId,
+      rootsNodeIds: List[Integer],
+  )(implicit
+      tc: TraceContext
   ): State = {
-    val roots = rootsEventIds.map(tree.getEventsById.get(_))
-    roots.foldMap(parseTree(tree, domainId, _))
+    val roots = rootsNodeIds.map(tree.getEventsById.get(_))
+    roots.foldMap(parseTree(tree, synchronizerId, _))
   }
 
-  override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+  override def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
-    val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
+    val ret = parseTrees(tx, domain, tx.getRootNodeIds.asScala.toList).entries
     ret
   }
 
-  override def error(offset: Long, eventId: String, domainId: DomainId): Option[TxLogEntry] =
+  override def error(
+      offset: Long,
+      eventId: String,
+      synchronizerId: SynchronizerId,
+  ): Option[TxLogEntry] =
     Some(
       ErrorTxLogEntry(
         eventId = eventId
@@ -171,7 +193,7 @@ class ScanTxLogParser(
   private def fromAnsEntryPaymentCollection[Marker, Res](
       tree: TransactionTree,
       exercised: ExercisedEvent,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       paymentCollectionTemplate: codegen.ContractCompanion[?, ?, Marker],
       paymentCollectionChoice: codegen.Choice[Marker, ?, Res],
   )(
@@ -188,12 +210,12 @@ class ScanTxLogParser(
           )
         }
 
-    val stateFromPaymentCollection = parseTree(tree, domainId, paymentCollectionEvent)
+    val stateFromPaymentCollection = parseTree(tree, synchronizerId, paymentCollectionEvent)
     State.fromCollectEntryPayment(
       tree,
       exercised,
       producedAmulet,
-      domainId,
+      synchronizerId,
       stateFromPaymentCollection,
     )
   }
@@ -207,7 +229,7 @@ object ScanTxLogParser {
     def appended(other: State): State = State(
       entries = entries.appendedAll(other.entries)
     )
-    def append(entry: TxLogEntry) = State(entries = entries :+ entry)
+    private def append(entry: TxLogEntry) = State(entries = entries :+ entry)
   }
 
   private object State {
@@ -218,9 +240,9 @@ object ScanTxLogParser {
     def empty: State = State(immutable.Queue.empty)
 
     implicit val stateMonoid: Monoid[State] = new Monoid[State] {
-      override val empty = State(immutable.Queue.empty)
+      override val empty: State = State(immutable.Queue.empty)
 
-      override def combine(a: State, b: State) =
+      override def combine(a: State, b: State): State =
         a.appended(b)
     }
 
@@ -241,17 +263,18 @@ object ScanTxLogParser {
     def fromAmuletCreateSummary(
         tx: TransactionTree,
         event: TreeEvent,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         acsum: AmuletCreateSummary[_ <: codegen.ContractId[AmuletCreate.T]],
         activityType: TransactionType,
     ): State = {
       val amulet = getAmuletFromSummary(tx, acsum)
+      val eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId)
       val activityEntry: TransactionTxLogEntry = activityType match {
         case TransactionType.Tap =>
           TapTxLogEntry(
-            offset = ApiOffset.fromLong(tx.getOffset),
-            eventId = event.getEventId,
-            domainId = domainId,
+            offset = LegacyOffset.Api.fromLong(tx.getOffset),
+            eventId = eventId,
+            domainId = synchronizerId,
             date = Some(tx.getEffectiveAt),
             amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
             amuletAmount = amulet.amount.initialAmount,
@@ -260,9 +283,9 @@ object ScanTxLogParser {
           )
         case TransactionType.Mint =>
           MintTxLogEntry(
-            offset = ApiOffset.fromLong(tx.getOffset),
-            eventId = event.getEventId,
-            domainId = domainId,
+            offset = LegacyOffset.Api.fromLong(tx.getOffset),
+            eventId = eventId,
+            domainId = synchronizerId,
             date = Some(tx.getEffectiveAt),
             amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
             amuletAmount = amulet.amount.initialAmount,
@@ -277,20 +300,19 @@ object ScanTxLogParser {
 
       State(
         ScanTxLogParser.entryFromAmulet(
-          event.getEventId(),
-          domainId,
+          eventId,
+          synchronizerId,
           amulet,
         )
       ).append(activityEntry)
     }
 
-    def rewardsEntriesFromTransferSummary(
+    private def rewardsEntriesFromTransferSummary(
         sender: PartyId,
         summary: splice.amuletrules.TransferSummary,
-        event: TreeEvent,
         round: Long,
-        domainId: DomainId,
-        rootEventId: Option[String] = None,
+        synchronizerId: SynchronizerId,
+        rootEventId: String,
     ): State = {
       val appRewards = summary.inputAppRewardAmount
       val validatorRewards = summary.inputValidatorRewardAmount
@@ -300,8 +322,8 @@ object ScanTxLogParser {
         if (appRewards.compareTo(BigDecimal(0.0)) > 0) {
           val entry =
             AppRewardTxLogEntry(
-              eventId = rootEventId.getOrElse(event.getEventId()),
-              domainId = domainId,
+              eventId = rootEventId,
+              domainId = synchronizerId,
               round = round,
               party = sender,
               amount = appRewards,
@@ -315,8 +337,8 @@ object ScanTxLogParser {
         if (validatorRewards.compareTo(BigDecimal(0.0)) > 0) {
           val entry =
             ValidatorRewardTxLogEntry(
-              eventId = rootEventId.getOrElse(event.getEventId()),
-              domainId = domainId,
+              eventId = rootEventId,
+              domainId = synchronizerId,
               round = round,
               party = sender,
               amount = validatorRewards,
@@ -330,8 +352,8 @@ object ScanTxLogParser {
         if (svRewards.compareTo(BigDecimal(0.0)) > 0) {
           val entry =
             SvRewardTxLogEntry(
-              eventId = rootEventId.getOrElse(event.getEventId()),
-              domainId = domainId,
+              eventId = rootEventId,
+              domainId = synchronizerId,
               round = round,
               party = sender,
               amount = svRewards,
@@ -347,7 +369,7 @@ object ScanTxLogParser {
     def fromTransfer(
         tx: TransactionTree,
         event: ExercisedEvent,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         rootEventId: Option[String] = None,
     ): State = {
@@ -359,20 +381,20 @@ object ScanTxLogParser {
             .asRuntimeException()
         )
       val round = node.result.value.round
+      val eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId)
       val rewardEntries =
         rewardsEntriesFromTransferSummary(
           sender,
           node.result.value.summary,
-          event,
           round.number,
-          domainId,
-          rootEventId,
+          synchronizerId,
+          rootEventId.getOrElse(eventId),
         )
 
       val balanceChangeEntry = State(
         BalanceChangeTxLogEntry(
-          eventId = rootEventId.getOrElse(event.getEventId()),
-          domainId = domainId,
+          eventId = rootEventId.getOrElse(eventId),
+          domainId = synchronizerId,
           round = round.number,
           changeToInitialAmountAsOfRoundZero =
             node.result.value.summary.balanceChanges.values.asScala
@@ -392,7 +414,7 @@ object ScanTxLogParser {
       )
 
       val activityEntry = State(
-        transferTxLogEntry(tx, event, domainId, node)
+        transferTxLogEntry(tx, event, synchronizerId, node)
       )
 
       rewardEntries
@@ -400,10 +422,10 @@ object ScanTxLogParser {
         .appended(activityEntry)
     }
 
-    def transferTxLogEntry(
+    private def transferTxLogEntry(
         tx: TransactionTree,
         event: TreeEvent,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
     ): TransferTxLogEntry = {
       val amuletPrice = node.result.value.summary.amuletPrice
@@ -411,9 +433,9 @@ object ScanTxLogParser {
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
 
       new TransferTxLogEntry(
-        offset = ApiOffset.fromLong(tx.getOffset),
-        eventId = event.getEventId,
-        domainId = domainId,
+        offset = LegacyOffset.Api.fromLong(tx.getOffset),
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
+        domainId = synchronizerId,
         date = Some(tx.getEffectiveAt),
         provider = PartyId.tryFromProtoPrimitive(node.argument.value.transfer.provider),
         sender = Some(sender),
@@ -434,14 +456,14 @@ object ScanTxLogParser {
     }
 
     def fromAmuletExpireSummary(
-        event: TreeEvent,
-        domainId: DomainId,
+        eventId: String,
+        synchronizerId: SynchronizerId,
         cxsum: AmuletExpireSummary,
     ): State = {
       State(
         BalanceChangeTxLogEntry(
-          eventId = event.getEventId(),
-          domainId = domainId,
+          eventId = eventId,
+          domainId = synchronizerId,
           round = cxsum.round.number,
           changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
           changeToHoldingFeesRate = cxsum.changeToHoldingFeesRate,
@@ -456,8 +478,8 @@ object ScanTxLogParser {
     }
 
     def fromBuyMemberTraffic(
-        event: ExercisedEvent,
-        domainId: DomainId,
+        eventId: String,
+        synchronizerId: SynchronizerId,
         node: ExerciseNode[AmuletRules_BuyMemberTraffic.Arg, AmuletRules_BuyMemberTraffic.Res],
     ): State = {
       val validatorParty = Codec
@@ -473,8 +495,8 @@ object ScanTxLogParser {
       val trafficPurchased = node.argument.value.trafficAmount
       val ccSpent = node.result.value.amuletPaid
       val buyExtraTrafficEntry = ExtraTrafficPurchaseTxLogEntry(
-        eventId = event.getEventId(),
-        domainId = domainId,
+        eventId = eventId,
+        domainId = synchronizerId,
         round = round.number,
         validator = validatorParty,
         trafficPurchased = trafficPurchased,
@@ -483,8 +505,8 @@ object ScanTxLogParser {
 
       val balanceChangeEntry = State(
         BalanceChangeTxLogEntry(
-          eventId = event.getEventId(),
-          domainId = domainId,
+          eventId = eventId,
+          domainId = synchronizerId,
           round = round.number,
           changeToInitialAmountAsOfRoundZero =
             node.result.value.summary.balanceChanges.values.asScala
@@ -507,10 +529,9 @@ object ScanTxLogParser {
       val rewardEntries = rewardsEntriesFromTransferSummary(
         validatorParty,
         node.result.value.summary,
-        event,
         round.number,
-        domainId,
-        Some(event.getEventId()),
+        synchronizerId,
+        eventId,
       )
 
       State(buyExtraTrafficEntry)
@@ -520,8 +541,8 @@ object ScanTxLogParser {
     }
 
     def fromCreateExternalPartySetupProposal(
-        event: ExercisedEvent,
-        domainId: DomainId,
+        eventId: String,
+        synchronizerId: SynchronizerId,
         node: ExerciseNode[
           AmuletRules_CreateExternalPartySetupProposal.Arg,
           AmuletRules_CreateExternalPartySetupProposal.Res,
@@ -537,12 +558,17 @@ object ScanTxLogParser {
             .asRuntimeException()
         )
       val transferResult = node.result.value.transferResult
-      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
+      fromTransferPreapprovalPurchase(
+        eventId,
+        synchronizerId,
+        validatorParty,
+        transferResult,
+      )
     }
 
     def fromCreateTransferPreapproval(
-        event: ExercisedEvent,
-        domainId: DomainId,
+        eventId: String,
+        synchronizerId: SynchronizerId,
         node: ExerciseNode[
           AmuletRules_CreateTransferPreapproval.Arg,
           AmuletRules_CreateTransferPreapproval.Res,
@@ -558,12 +584,17 @@ object ScanTxLogParser {
             .asRuntimeException()
         )
       val transferResult = node.result.value.transferResult
-      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
+      fromTransferPreapprovalPurchase(
+        eventId,
+        synchronizerId,
+        validatorParty,
+        transferResult,
+      )
     }
 
     def fromRenewTransferPreapproval(
-        event: ExercisedEvent,
-        domainId: DomainId,
+        eventId: String,
+        synchronizerId: SynchronizerId,
         node: ExerciseNode[
           TransferPreapproval_Renew.Arg,
           TransferPreapproval_Renew.Res,
@@ -579,20 +610,25 @@ object ScanTxLogParser {
             .asRuntimeException()
         )
       val transferResult = node.result.value.transferResult
-      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
+      fromTransferPreapprovalPurchase(
+        eventId,
+        synchronizerId,
+        validatorParty,
+        transferResult,
+      )
     }
 
     private def fromTransferPreapprovalPurchase(
-        event: ExercisedEvent,
-        domainId: DomainId,
+        eventId: String,
+        synchronizerId: SynchronizerId,
         validatorParty: PartyId,
         transferResult: TransferResult,
     ) = {
       val round = transferResult.round
       val balanceChangeEntry = State(
         BalanceChangeTxLogEntry(
-          eventId = event.getEventId,
-          domainId = domainId,
+          eventId = eventId,
+          domainId = synchronizerId,
           round = round.number,
           changeToInitialAmountAsOfRoundZero = transferResult.summary.balanceChanges.values.asScala
             .map(bc => BigDecimal(bc.changeToInitialAmountAsOfRoundZero))
@@ -619,10 +655,9 @@ object ScanTxLogParser {
       val rewardEntries = rewardsEntriesFromTransferSummary(
         validatorParty,
         transferResult.summary,
-        event,
         round.number,
-        domainId,
-        Some(event.getEventId),
+        synchronizerId,
+        eventId,
       )
 
       balanceChangeEntry.appended(rewardEntries)
@@ -632,7 +667,7 @@ object ScanTxLogParser {
         tx: TransactionTree,
         event: ExercisedEvent,
         producedAmulet: codegen.ContractId[AmuletCreate.T],
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         stateFromPaymentCollection: State,
     ): State = {
       val amuletArchiveEvent = tx
@@ -644,18 +679,18 @@ object ScanTxLogParser {
           tx,
           amuletArchiveEvent,
           producedAmulet,
-          domainId,
-          Some(event.getEventId()),
+          synchronizerId,
+          EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         )
       stateFromPaymentCollection.appended(stateFromBurntAmulet)
     }
 
-    def fromAmuletArchiveEvent(
+    private def fromAmuletArchiveEvent(
         tx: TransactionTree,
         event: TreeEvent,
         producedAmulet: codegen.ContractId[AmuletCreate.T],
-        domainId: DomainId,
-        rootEventId: Option[String] = None,
+        synchronizerId: SynchronizerId,
+        rootEventId: String,
     ): State = {
       val burntAmulet = tx
         .findCreation(AmuletCreate.companion, producedAmulet)
@@ -663,7 +698,8 @@ object ScanTxLogParser {
         .getOrElse(
           throw new RuntimeException(
             s"The amulet contract ${event.getContractId} " +
-              s"referenced by the amulet archive event ${event.getEventId} " +
+              s"referenced by the amulet archive event ${EventId
+                  .prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId)} " +
               s"was not found in transaction ${tx.getUpdateId}"
           )
         )
@@ -672,8 +708,8 @@ object ScanTxLogParser {
       val holdingFees = -burntAmulet.amount.ratePerRound.rate
       State(
         BalanceChangeTxLogEntry(
-          eventId = rootEventId.getOrElse(event.getEventId()),
-          domainId = domainId,
+          eventId = rootEventId,
+          domainId = synchronizerId,
           round = burntAmulet.amount.createdAt.number,
           changeToInitialAmountAsOfRoundZero = amountAO0,
           changeToHoldingFeesRate = holdingFees,
@@ -688,15 +724,15 @@ object ScanTxLogParser {
     }
 
     def fromOpenMiningRoundCreate(
-        event: TreeEvent,
-        domainId: DomainId,
+        eventId: String,
+        synchronizerId: SynchronizerId,
         round: OpenMiningRoundCreate.ContractType,
     ): State = {
       val config = round.payload.transferConfigUsd
       val amuletPrice = round.payload.amuletPrice
       val newEntry = OpenMiningRoundTxLogEntry(
-        eventId = event.getEventId(),
-        domainId = domainId,
+        eventId = eventId,
+        domainId = synchronizerId,
         round = round.payload.round.number,
         amuletCreateFee = dollarsToCC(config.createFee.fee, amuletPrice),
         holdingFee = dollarsToCC(config.holdingFee.rate, amuletPrice),
@@ -721,12 +757,12 @@ object ScanTxLogParser {
     def fromClosedMiningRoundCreate(
         tx: TransactionTree,
         event: TreeEvent,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         round: ClosedMiningRoundCreate.ContractType,
     ): State = {
       val newEntry = ClosedMiningRoundTxLogEntry(
-        eventId = event.getEventId(),
-        domainId = domainId,
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
+        domainId = synchronizerId,
         round = round.payload.round.number,
         effectiveAt = Some(tx.getEffectiveAt),
       )
@@ -769,13 +805,14 @@ object ScanTxLogParser {
     }
 
     def fromTransferCommand_Send(
+        eventId: String,
         exercised: ExercisedEvent,
         node: ExerciseNode[TransferCommand_Send.Arg, TransferCommand_Send.Res],
     ): State = {
       State(
         immutable.Queue(
           TransferCommandTxLogEntry(
-            eventId = exercised.getEventId,
+            eventId = eventId,
             contractId = exercised.getContractId,
             sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
             nonce = node.result.value.nonce,
@@ -795,13 +832,14 @@ object ScanTxLogParser {
     }
 
     def fromTransferCommand_Withdraw(
+        eventId: String,
         exercised: ExercisedEvent,
         node: ExerciseNode[TransferCommand_Withdraw.Arg, TransferCommand_Withdraw.Res],
     ): State = {
       State(
         immutable.Queue(
           TransferCommandTxLogEntry(
-            eventId = exercised.getEventId,
+            eventId = eventId,
             contractId = exercised.getContractId,
             sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
             nonce = node.result.value.nonce,
@@ -812,13 +850,14 @@ object ScanTxLogParser {
     }
 
     def fromTransferCommand_Expire(
+        eventId: String,
         exercised: ExercisedEvent,
         node: ExerciseNode[TransferCommand_Expire.Arg, TransferCommand_Expire.Res],
     ): State = {
       State(
         immutable.Queue(
           TransferCommandTxLogEntry(
-            eventId = exercised.getEventId,
+            eventId = eventId,
             contractId = exercised.getContractId,
             sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
             nonce = node.result.value.nonce,
@@ -831,14 +870,14 @@ object ScanTxLogParser {
 
   private def entryFromAmulet(
       eventId: String,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       amulet: splice.amulet.Amulet,
   ): TxLogEntry = {
     val amount = amulet.amount
     val amountAO0 = amountAsOfRoundZero(amount)
     BalanceChangeTxLogEntry(
       eventId = eventId,
-      domainId = domainId,
+      domainId = synchronizerId,
       round = amount.createdAt.number,
       changeToInitialAmountAsOfRoundZero = amountAO0,
       changeToHoldingFeesRate = amount.ratePerRound.rate,

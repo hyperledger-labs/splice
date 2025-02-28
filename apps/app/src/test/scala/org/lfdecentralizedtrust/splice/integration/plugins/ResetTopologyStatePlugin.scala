@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import io.grpc
 import io.grpc.StatusRuntimeException
 import scala.util.control.NonFatal
@@ -20,7 +20,7 @@ abstract class ResetTopologyStatePlugin
 
   protected def resetTopologyState(
       env: SpliceTests.SpliceTestConsoleEnvironment,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       sv1: SvAppBackendReference,
   ): Unit
 
@@ -47,15 +47,15 @@ abstract class ResetTopologyStatePlugin
 
   private def attemptToResetTopologyState(env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
     val sv1 = env.svs.local.find(_.name == "sv1").value
-    val connectedDomain = sv1.participantClientWithAdminToken.domains
+    val connectedDomain = sv1.participantClientWithAdminToken.synchronizers
       .list_connected()
-      .find(_.domainAlias == sv1.config.domains.global.alias)
+      .find(_.synchronizerAlias == sv1.config.domains.global.alias)
       .getOrElse(
         throw new IllegalStateException(
           "Failed to reset environment as SV1 is not connected to global domain"
         )
       )
-    val domainId = connectedDomain.domainId
+    val synchronizerId = connectedDomain.synchronizerId
 
     def resetTopologyStateRetries(retries: Int): Unit = {
       if (retries > MAX_RETRIES) {
@@ -65,7 +65,7 @@ abstract class ResetTopologyStatePlugin
         sys.exit(1)
       }
       try {
-        resetTopologyState(env, domainId, sv1)
+        resetTopologyState(env, synchronizerId, sv1)
       } catch {
         case _: CommandFailure =>
           logger.info(

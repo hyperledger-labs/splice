@@ -39,46 +39,46 @@ class RecordTimeToleranceTimeBasedIntegrationTest
       })
       .withManualStart
 
-  "ReconcileDynamicDomainParametersTrigger can change submissionTimeRecordTimeTolerance" in {
+  "ReconcileDynamicSynchronizerParametersTrigger can change submissionTimeRecordTimeTolerance" in {
     implicit env =>
       // Note: This test must run against a fresh Canton instance. Ideally we'd achieve this using withCanton
       // but that does not work with simtime as we try to access the remote clock before Canton is started
       // even with manualStart. On CI this is achieved by splitting it into a dedicated job.
       sv1Backend.startSync()
 
-      val connectedDomain = sv1Backend.participantClient.domains
+      val connectedDomain = sv1Backend.participantClient.synchronizers
         .list_connected()
-        .find(_.domainAlias == sv1Backend.config.domains.global.alias)
+        .find(_.synchronizerAlias == sv1Backend.config.domains.global.alias)
         .value
-      val domainId = connectedDomain.domainId
-      sv1Backend.participantClient.topology.domain_parameters
-        .get_dynamic_domain_parameters(domainId)
+      val synchronizerId = connectedDomain.synchronizerId
+      sv1Backend.participantClient.topology.synchronizer_parameters
+        .get_dynamic_synchronizer_parameters(synchronizerId)
         .submissionTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofMinutes(1)
-      sv1Backend.participantClient.topology.domain_parameters
-        .get_dynamic_domain_parameters(domainId)
+      sv1Backend.participantClient.topology.synchronizer_parameters
+        .get_dynamic_synchronizer_parameters(synchronizerId)
         .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofMinutes(2)
       sv1Backend.stop()
       sv1LocalBackend.startSync()
       eventually() {
-        sv1Backend.participantClient.topology.domain_parameters
-          .get_dynamic_domain_parameters(domainId)
+        sv1Backend.participantClient.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(synchronizerId)
           .submissionTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofMinutes(1)
-        sv1Backend.participantClient.topology.domain_parameters
-          .get_dynamic_domain_parameters(domainId)
+        sv1Backend.participantClient.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(synchronizerId)
           .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofHours(48)
       }
       // We go slightly above 48h as time is not actually completely still in simtime, the microseconds still advance.
       advanceTime(Duration.ofHours(49))
       eventually() {
-        sv1Backend.participantClient.topology.domain_parameters
-          .get_dynamic_domain_parameters(domainId)
+        sv1Backend.participantClient.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(synchronizerId)
           .submissionTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofHours(24)
-        sv1Backend.participantClient.topology.domain_parameters
-          .get_dynamic_domain_parameters(domainId)
+        sv1Backend.participantClient.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(synchronizerId)
           .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofHours(48)
       }
-      val txs = sv1Backend.participantClient.topology.domain_parameters
-        .list(filterStore = domainId.filterString, timeQuery = TimeQuery.Range(None, None))
+      val txs = sv1Backend.participantClient.topology.synchronizer_parameters
+        .list(filterStore = synchronizerId.filterString, timeQuery = TimeQuery.Range(None, None))
       txs should have length (3)
       sv1LocalBackend.stop()
   }

@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
@@ -12,7 +12,7 @@ import java.time.Instant
 class AmuletConfigScheduleTest extends AnyWordSpec with BaseTest {
 
   private val dummyTickDuration = NonNegativeFiniteDuration.ofMinutes(10)
-  private val dummyDomainId = DomainId.tryFromString(
+  private val dummySynchronizerId = SynchronizerId.tryFromString(
     "global::122084763882fa4111e288caf832fd9e83b666acf8f167a09fc63344d2df9bcf72a7"
   )
   private def mkConfig(
@@ -21,7 +21,7 @@ class AmuletConfigScheduleTest extends AnyWordSpec with BaseTest {
     SpliceUtil.defaultAmuletConfig(
       dummyTickDuration,
       maxNumInputs,
-      dummyDomainId,
+      dummySynchronizerId,
     )
 
   private val schedule1 = AmuletConfigSchedule(mkConfig(0), Seq.empty)

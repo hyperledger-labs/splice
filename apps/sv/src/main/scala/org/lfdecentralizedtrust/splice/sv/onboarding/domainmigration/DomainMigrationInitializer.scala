@@ -53,11 +53,11 @@ import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInit
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -115,7 +115,7 @@ class DomainMigrationInitializer(
 
   def migrateDomain(): Future[
     (
-        DomainId,
+        SynchronizerId,
         DsoPartyHosting,
         SvSvStore,
         SvSvAutomationService,
@@ -135,7 +135,7 @@ class DomainMigrationInitializer(
     val dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
     for {
       _ <- migrateToNewSynchronizerNode(migrationDump)
-      decentralizedSynchronizerId = migrationDump.nodeIdentities.domainId
+      decentralizedSynchronizerId = migrationDump.nodeIdentities.synchronizerId
       _ <- dsoPartyHosting.waitForDsoPartyToParticipantAuthorization(
         decentralizedSynchronizerId,
         ParticipantId(migrationDump.nodeIdentities.participant.id.uid),
@@ -242,7 +242,7 @@ class DomainMigrationInitializer(
   private def migrateToNewSynchronizerNode(
       domainMigrationDump: DomainMigrationDump
   ): Future[Unit] = {
-    val domainAlias = domainMigrationDump.nodeIdentities.domainAlias
+    val synchronizerAlias = domainMigrationDump.nodeIdentities.synchronizerAlias
     for {
       _ <- initializeSynchronizerNode(
         domainMigrationDump.nodeIdentities,
@@ -253,18 +253,18 @@ class DomainMigrationInitializer(
       _ <- domainDataRestorer.connectDomainAndRestoreData(
         readOnlyConnection,
         config.ledgerApiUser,
-        domainAlias,
-        domainMigrationDump.nodeIdentities.domainId,
+        synchronizerAlias,
+        domainMigrationDump.nodeIdentities.synchronizerId,
         SequencerConnections.single(localSynchronizerNode.sequencerConnection),
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
       )
       _ <- participantAdminConnection
         .ensureDomainParameters(
-          domainMigrationDump.nodeIdentities.domainId,
+          domainMigrationDump.nodeIdentities.synchronizerId,
           // TODO(#8761) hard code for now
           _.tryUpdate(confirmationRequestsMaxRate =
-            DynamicDomainParameters.defaultConfirmationRequestsMaxRate
+            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
           ),
         )
       _ = logger.info("resumed domain")
@@ -292,7 +292,7 @@ class DomainMigrationInitializer(
         genesisState,
       )
       _ <- initializeMediator(
-        nodeIdentities.domainId,
+        nodeIdentities.synchronizerId,
         synchronizerNodeInitiaizer,
         nodeIdentities.mediator,
       )
@@ -302,10 +302,10 @@ class DomainMigrationInitializer(
         "mediator synced topology",
         for {
           sequencerTopology <- localSynchronizerNode.sequencerAdminConnection.listAllTransactions(
-            TopologyStoreId.DomainStore(nodeIdentities.domainId)
+            TopologyStoreId.SynchronizerStore(nodeIdentities.synchronizerId)
           )
           mediatorTopology <- mediatorAdminConnection.listAllTransactions(
-            TopologyStoreId.DomainStore(nodeIdentities.domainId)
+            TopologyStoreId.SynchronizerStore(nodeIdentities.synchronizerId)
           )
         } yield {
           if (sequencerTopology.size != mediatorTopology.size) {
@@ -420,7 +420,7 @@ class DomainMigrationInitializer(
   }
 
   private def initializeMediator(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       synchronizerNodeInitiaizer: SynchronizerNodeInitializer,
       identity: NodeIdentitiesDump,
   ) = {
@@ -443,7 +443,7 @@ class DomainMigrationInitializer(
               s"Initialize the mediator ${identity.id}",
               mediatorAdminConnection
                 .initialize(
-                  domainId,
+                  synchronizerId,
                   localSynchronizerNode.sequencerConnection,
                   localSynchronizerNode.mediatorSequencerAmplification,
                 ),

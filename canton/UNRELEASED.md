@@ -3,7 +3,236 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+- DarService and Package service on the admin-api have been cleaned up:
+  - Before, a DAR was referred through a hash over the zip file. Now, the DAR ID is the main package ID.
+  - Renamed all `hash` arguments to `darId`.
+  - Added name and version of DAR and package entries to the admin API commands.
+  - Renamed the field `source description` to `description` and stored it with the DAR, not the packages.
+  - Renamed the command `list_contents` to `get_content` to disambiguate with `list` (both for packages and DARs).
+  - Added a new command `packages.list_references` to support listing which DARs are referencing a particular
+    package.
+
+## Until 2025-02-12 (Exclusive)
+- Added the concept of temporary topology stores. A temporary topology store is not connected to any synchronizer store 
+  and therefore does not automatically submit transactions to synchronizers. Temporary topology stores can be used
+  for the synchronizer bootstrapping ceremony to not "pollute" the synchronizer owners' authorized stores. Another use
+  case is to upload a topology snapshot and inspect the snapshot via the usual topology read service endpoints.
+  - Temporary topology stores can be managed via the services `TopologyManagerWriteService.CreateTemporaryTopologyStore` and `TopologyManagerWriteService.DropTemporaryTopologyStore`.
+  - **BREAKING CHANGE**: The `string store` parameters in the `TopologyManagerWriteService` have been changed to `StoreId store`.
+
+## Until 2025-01-29 (Exclusive)
+- Added a buffer for serving events that is limited by an upper bound for memory consumption:
+    ```hocon
+        canton.sequencers.<sequencer>.sequencer.block.writer {
+          type = high-throughput // NB: this is required for the writer config to be parsed properly
+
+          // maximum memory the buffered events will occupy
+          buffered-events-max-memory = 2MiB // Default value
+          // batch size for warming up the events buffer at the start of the sequencer until the buffer is full
+          buffered-events-preload-batch-size = 50 // Default value
+        }
+    ```
+  - The previous setting `canton.sequencers.<sequencer>.sequencer.block.writer.max-buffered-events-size` has been removed and has no effect anymore
+- The sequencer's payload cache configuration changed slightly to disambiguate the memory-limit config from a number-of-elements config:
+    ```hocon
+    canton.sequencers.<sequencer>.parameters.caching {
+      sequencer-payload-cache {
+        expire-after-access = "1 minute" // Default value
+        maximum-memory = 200MiB // Default value
+      }
+    }
+    ```
+  - The previous setting `canton.sequencers.<sequencer>.parameters.caching.sequencer-payload-cache.maximum-size` has been removed and has no effect anymore.
+
+## Until 2025-01-22 (Exclusive)
+- Changed the console User.isActive to isDeactivated to align with the Ledger API
+- Added new prototype for declarative api
+- Added metric `daml.mediator.approved-requests.total` to count the number of approved confirmation requests
+- Topology related error codes have been renamed to contain the prefix `TOPOLOGY_`:
+  - Simple additions of prefix
+    - `SECRET_KEY_NOT_IN_STORE` -> `TOPOLOGY_SECRET_KEY_NOT_IN_STORE`
+    - `SERIAL_MISMATCH` -> `TOPOLOGY_SERIAL_MISMATCH`
+    - `INVALID_SYNCHRONIZER` -> `TOPOLOGY_INVALID_SYNCHRONIZER`
+    - `NO_APPROPRIATE_SIGNING_KEY_IN_STORE` -> `TOPOLOGY_NO_APPROPRIATE_SIGNING_KEY_IN_STORE`
+    - `NO_CORRESPONDING_ACTIVE_TX_TO_REVOKE` -> `TOPOLOGY_NO_CORRESPONDING_ACTIVE_TX_TO_REVOKE`
+    - `REMOVING_LAST_KEY_MUST_BE_FORCED` -> `TOPOLOGY_REMOVING_LAST_KEY_MUST_BE_FORCED`
+    - `DANGEROUS_COMMAND_REQUIRES_FORCE_ALIEN_MEMBER` -> `TOPOLOGY_DANGEROUS_COMMAND_REQUIRES_FORCE_ALIEN_MEMBER`
+    - `REMOVING_KEY_DANGLING_TRANSACTIONS_MUST_BE_FORCED` -> `TOPOLOGY_REMOVING_KEY_DANGLING_TRANSACTIONS_MUST_BE_FORCED`
+    - `INCREASE_OF_SUBMISSION_TIME_TOLERANCE` -> `TOPOLOGY_INCREASE_OF_SUBMISSION_TIME_TOLERANCE`
+    - `INSUFFICIENT_KEYS` -> `TOPOLOGY_INSUFFICIENT_KEYS`
+    - `UNKNOWN_MEMBERS` -> `TOPOLOGY_UNKNOWN_MEMBERS`
+    - `UNKNOWN_PARTIES` -> `TOPOLOGY_UNKNOWN_PARTIES`
+    - `ILLEGAL_REMOVAL_OF_SYNCHRONIZER_TRUST_CERTIFICATE` -> `TOPOLOGY_ILLEGAL_REMOVAL_OF_SYNCHRONIZER_TRUST_CERTIFICATE`
+    - `PARTICIPANT_ONBOARDING_REFUSED` -> `TOPOLOGY_PARTICIPANT_ONBOARDING_REFUSED`
+    - `MEDIATORS_ALREADY_IN_OTHER_GROUPS` -> `TOPOLOGY_MEDIATORS_ALREADY_IN_OTHER_GROUPS`
+    - `MEMBER_CANNOT_REJOIN_SYNCHRONIZER` -> `TOPOLOGY_MEMBER_CANNOT_REJOIN_SYNCHRONIZER`
+    - `NAMESPACE_ALREADY_IN_USE` -> `TOPOLOGY_NAMESPACE_ALREADY_IN_USE`
+    - `DANGEROUS_VETTING_COMMAND_REQUIRES_FORCE_FLAG` -> `TOPOLOGY_DANGEROUS_VETTING_COMMAND_REQUIRES_FORCE_FLAG`
+    - `DEPENDENCIES_NOT_VETTED` -> `TOPOLOGY_DEPENDENCIES_NOT_VETTED`
+    - `CANNOT_VET_DUE_TO_MISSING_PACKAGES` -> `TOPOLOGY_CANNOT_VET_DUE_TO_MISSING_PACKAGES`
+  - Additional minor renaming
+    - `INVALID_TOPOLOGY_TX_SIGNATURE_ERROR` -> `TOPOLOGY_INVALID_TOPOLOGY_TX_SIGNATURE`
+    - `DUPLICATE_TOPOLOGY_TRANSACTION` -> `TOPOLOGY_DUPLICATE_TRANSACTION`
+    - `UNAUTHORIZED_TOPOLOGY_TRANSACTION` -> `TOPOLOGY_UNAUTHORIZED_TRANSACTION`
+    - `INVALID_TOPOLOGY_MAPPING` -> `TOPOLOGY_INVALID_MAPPING`
+    - `INCONSISTENT_TOPOLOGY_SNAPSHOT` -> `TOPOLOGY_INCONSISTENT_SNAPSHOT`
+    - `MISSING_TOPOLOGY_MAPPING` -> `TOPOLOGY_MISSING_MAPPING`
+- Added the last_descendant_node_id field in the exercised event of the ledger api. This field specifies the upper
+  boundary of the node ids of the events in the same transaction that appeared as a result of the exercised event.
+- Removed the child_node_ids and the root_node_ids fields from the exercised event of the ledger api. After this change
+  it will be possible to check that an event is child of another or a root event through the descendant relationship
+  using the last_descendant_node_id field.
+
+## Until 2025-01-15 (Exclusive)
+
+- Renamed request/response protobuf messages of the inspection, pruning, resource management services from `Endpoint.Request` to `EndpointRequest` and respectively for the response types.
+- Renamed the node_index field of events in the index db to node_id.
+- Changes to defaults in ResourceLimits:
+  - The fields `max_inflight_validation_requests` and `max_submission_rate` are now declared as `optional uint32`,
+    which also means that absent values are not encoded anymore as negative values, but as absent values.
+    Negative values will result in a parsing error and a rejected request.
+- Moved the `canton.monitoring.log-query-cost` option to `canton.monitoring.logging.query-cost`
+- Changed the `signedBy` parameter of the console command `topology.party_to_participant_mapping.propose` from `Optional`
+  to `Seq`.
+
+## Until 2025-01-10 (Exclusive)
+
+### Initial Topology Snapshot Validation
+The initial topology snapshot, both for initializing a new domain and for onboarding a new member,
+is now validated by the node importing the snapshot.
+
+In case the snapshot might contain legacy OTK topology transactions with missing signatures for newly added signing keys,
+the nodes may permit such transactions by overriding the following setting:
+
+```
+canton.sequencers.mySequencer.topology.insecure-ignore-missing-extra-key-signatures-in-initial-snapshot = true
+
+canton.participants.myParticipant.topology.insecure-ignore-missing-extra-key-signatures-in-initial-snapshot = true
+
+canton.mediators.myMediator.topology.insecure-ignore-missing-extra-key-signatures-in-initial-snapshot = true
+```
+
+## Until 2025-01-04 (Exclusive)
+- The event_id field has been removed from the Event messages of the lapi since now the event id consists of the offset
+  and the node id which are already present in the events.
+- The events_by_id field in the TransactionTree message has been converted from a map<string, TreeEvent> to a
+  map<int32, TreeEvent> with values the node ids of the events.
+- Accordingly, the root_event_ids has been renamed to root_node_ids to hold the node ids of the root events.
+
+## Until 2025-01-03 (Exclusive)
+
+- We introduced contract key prefetching / bulk loading to improve workloads that fetch many contract keys.
+- Domain renaming
+    - domain id -> synchronizer id
+    - domain alias -> synchronizer alias
+    - domain projects (e.g., community-domain) -> synchronizer projects
+
+## Until 2024-12-20 (Exclusive)
+- The GetTransactionByEventId and the GetTransactionTreeByEventId endpoints of the lapi update service have been
+  replaced by the GetTransactionByOffset and the GetTransactionTreeByOffset respectively.
+    - As a consequence, the GetTransactionByEventIdRequest has been replaced by the GetTransactionByOffsetRequest message.
+    - The GetTransactionByOffsetRequest contains the offset of the transaction or the transaction tree to be fetched and
+      the requesting parties.
+    - The json endpoints have been adapted accordingly
+
+## Until 2024-12-17 (Exclusive)
+
+### Refactored domain connectivity service
+Refactored domain connectivity service to have endpoints with limited responsibilities:
+
+- Add: ReconnectDomain to be able to reconnect to a registered domain
+- Add: DisconnectAllDomains to disconnect from all connected domains
+- Change: RegisterDomain does not allow to fully connect to a domain anymore (only registration and potentially handshake): if you want to connect to a domain, use the other endpoint
+- Change: ConnectDomain takes a domain config so that it can be used to connect to a domain for the first time
+- Rename: ListConfiguredDomains to ListRegisteredDomains for consistency (and in general: configure(d) -> register(ed))
+
+### Memory check during node startup
+A memory check has been introduced when starting the node. This check compares the memory allocated to the container with the -Xmx JVM option.
+The goal is to ensure that the container has sufficient memory to run the application.
+To configure the memory check behavior, add one of the following to your configuration:
+
+```
+canton.parameters.startup-memory-check-config.reporting-level = warn  // Default behavior: Logs a warning.
+canton.parameters.startup-memory-check-config.reporting-level = crash // Terminates the node if the check fails.
+canton.parameters.startup-memory-check-config.reporting-level = ignore // Skips the memory check entirely.
+```
+
+## Until 2024-12-03 (Exclusive)
+
+- Removed parameters `sequencer.writer.event-write-batch-max-duration` and `sequencer.writer.payload-write-batch-max-duration` as these are not used anymore.
+- Introduced parameter `sequencer.writer.event-write-max-concurrency` (default: 2) to configure the maximum number of events batches that can be written at a time.
+- [Breaking Change]: `TopologyManagerReadService.ExportTopologySnapshot` and `TopologyManagerWriteService.ImportTopologySnapshot` are now streaming services for exporting and importing a topology snapshot respectively.
+
+## Until 2024-12-02 (Exclusive)
+
+### Integer event ids in ledger api
+- Added offset (int64) and node-id (int32) fields in all the event types in the ledger api.
+  The following messages have the additional fields:
+  - CreatedEvent
+  - ArchivedEvent
+  - ExercisedEvent
+- Accordingly the java bindings and json schema were augmented to include the new fields.
+
+## Until 2024-11-28 (Exclusive)
+- Deduplication Offset extension to accept participant begin
+
+  Before, only absolute offsets were allowed to define the deduplication periods by offset. After the change
+  participant-begin offsets are also supported for defining deduplication periods. The participant-begin deduplication
+  period (defined as zero value in API) is only valid to be used if the participant was not pruned yet. Otherwise, as in
+  the other cases where the deduplication offset is earlier than the last pruned offset, an error informing that
+  deduplication period starts too early will be returned.
+
+## Until 2024-11-27 (Exclusive)
+- Index DB schema changed in a non-backwards compatible fashion.
+
+  The offset-related fields (e.g. ledger_offset, ledger_end) that were previously stored as `VARCHAR(4000)` for H2 and
+    `text` for Postgres are now stored as `BIGINT` (for both db types).
+  - If the offset column can take the value of the participant begin then the column should be null-able and null should
+    be stored as the offset value (i.e. no zero values are used to represent the participant begin).
+  - Only exception to
+    it is the deduplication_offset of the lapi_command_completions which will take the zero value when the participant
+    begin must be stored as deduplication offset, since null is used to signify the absence of this field.
+- Changed DeduplicationPeriod's offset field type to `int64` in participant_transaction.proto in a non-backwards
+  compatible fashion.
+
+  The type of the offset field changed from `bytes` to `int64` to be compatible with the newly introduced intefer offset type.
+
+## Until 2024-11-16 (Exclusive)
+
+- [Breaking Change] renamed configuration parameter `session-key-cache-config` to `session-encryption-key-cache`.
+- `sequencer_authentication_service` RPCs return failures as gRPC errors instead of a dedicated failure message with status OK.
+
+## Until 2024-11-13 (Exclusive)
+- display_name is no longer a part of Party data, so is removed from party allocation and update requests in the ledger api and daml script
+- `PartyNameManagement` service was removed from the ledger api
+
 ## Until 2024-11-09 (Exclusive)
+
+- When a Grpc channel is open or closed on the Ledger API, a message is logged at a debug level:
+```
+[..] DEBUG c.d.c.p.a.GrpcConnectionLogger:participant=participant - Grpc connection open: {io.grpc.Grpc.TRANSPORT_ATTR_LOCAL_ADDR=/127.0.0.1:5001, io.grpc.internal.GrpcAttributes.securityLevel=NONE, io.grpc.Grpc.TRANSPORT_ATTR_REMOTE_ADDR=/127.0.0.1:49944}
+[..] DEBUG c.d.c.p.a.GrpcConnectionLogger:participant=participant - Grpc connection closed: {io.grpc.Grpc.TRANSPORT_ATTR_LOCAL_ADDR=/127.0.0.1:5001, io.grpc.internal.GrpcAttributes.securityLevel=NONE, io.grpc.Grpc.TRANSPORT_ATTR_REMOTE_ADDR=/127.0.0.1:49944}
+```
+- The keep alive behavior of the Ledger API can be configured through
+```
+canton.participants.participant.ledger-api.keep-alive-server.*
+```
+- The default values of the keep alive configuration for the ledger api has been set to
+```
+time: 10m
+timeout: 20s
+permitKeepAliveTime: 10s
+permitKeepAliveWithoutCalls: false
+```
+- The effective settings are reported by the Participant Node at the initialization time with a logline:
+```
+2024-10-31 18:09:34,258 [canton-env-ec-35] INFO  c.d.c.p.a.LedgerApiService:participant=participant - Listening on localhost:5001 over plain text with LedgerApiKeepAliveServerConfig(10m,20s,10s,true).
+```
+- New parameter value for `permitKeepAliveWithoutCalls` has been introduced to all keep alive configurations.
+When set, it allows the clients to send keep alive signals outside any ongoing grpc call.
+- Identical implementations `EnterpriseCantonStatus` and `CommunityCantonStatus` have been merged into a single class `CantonStatus`.
+
+- A participant will now crash in exceptional cases during transaction validation instead of remaining in a failed state
 
 ## Until 2024-10-31 (Exclusive)
 
@@ -460,7 +689,6 @@ Likely to happen in any replicated participant setup with frequent vetting attem
 ##### Recommendation
 
 Users are advised to upgrade to the next minor release (3.2) during their maintenance window.
-
 
 
 #### (24-015, Minor): Pointwise flat transaction Ledger API queries can unexpectedly return TRANSACTION_NOT_FOUND

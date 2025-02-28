@@ -25,7 +25,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -60,7 +60,7 @@ class PublishScanConfigTrigger(
         store,
         store.key.svParty,
       )
-      domainId = rulesAndState.dsoRules.domain
+      synchronizerId = rulesAndState.dsoRules.domain
       damlScanConfig = new daml.dso.decentralizedsynchronizer.ScanConfig(
         scanConfig.publicUrl.toString
       )
@@ -106,7 +106,7 @@ class PublishScanConfigTrigger(
       synchronizerNodeConfig,
       damlScanConfig,
       // TODO(#4906): this domain-id is likely the wrong one to use in a soft-domain migration context
-      domainId,
+      synchronizerId,
     )).value
       .map(_.toList)
 
@@ -136,7 +136,7 @@ object PublishScanConfigTrigger {
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeState,
       synchronizerNodeConfig: Option[SynchronizerNodeConfig],
       scanConfig: daml.dso.decentralizedsynchronizer.ScanConfig,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   ) extends PrettyPrinting {
 
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*

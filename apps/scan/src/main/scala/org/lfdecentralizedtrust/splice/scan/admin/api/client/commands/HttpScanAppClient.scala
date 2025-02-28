@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
 import org.lfdecentralizedtrust.splice.http.v0.external.scan as externalHttp
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0 as tokenStandardHttp
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
@@ -49,9 +50,17 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{
+  SynchronizerId,
+  Member,
+  ParticipantId,
+  PartyId,
+  SequencerId,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0.definitions.GetFactoryRequest
 
 import java.util.Base64
 import java.time.Instant
@@ -83,6 +92,18 @@ object HttpScanAppClient {
         mat: Materializer,
     ): Client =
       externalHttp.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+  }
+
+  abstract class TokenStandardBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = tokenStandardHttp.Client
+
+    override def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      tokenStandardHttp.Client.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -703,7 +724,7 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetMemberTrafficStatus(domainId: DomainId, memberId: Member)
+  case class GetMemberTrafficStatus(synchronizerId: SynchronizerId, memberId: Member)
       extends ExternalBaseCommand[
         externalHttp.GetMemberTrafficStatusResponse,
         definitions.MemberTrafficStatus,
@@ -716,14 +737,18 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], externalHttp.GetMemberTrafficStatusResponse] =
-      client.getMemberTrafficStatus(domainId.toProtoPrimitive, memberId.toProtoPrimitive, headers)
+      client.getMemberTrafficStatus(
+        synchronizerId.toProtoPrimitive,
+        memberId.toProtoPrimitive,
+        headers,
+      )
 
     override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case externalHttp.GetMemberTrafficStatusResponse.OK(response) => Right(response.trafficStatus)
     }
   }
 
-  case class GetPartyToParticipant(domainId: DomainId, partyId: PartyId)
+  case class GetPartyToParticipant(synchronizerId: SynchronizerId, partyId: PartyId)
       extends ExternalBaseCommand[
         externalHttp.GetPartyToParticipantResponse,
         ParticipantId,
@@ -736,7 +761,11 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], externalHttp.GetPartyToParticipantResponse] =
-      client.getPartyToParticipant(domainId.toProtoPrimitive, partyId.toProtoPrimitive, headers)
+      client.getPartyToParticipant(
+        synchronizerId.toProtoPrimitive,
+        partyId.toProtoPrimitive,
+        headers,
+      )
 
     override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case externalHttp.GetPartyToParticipantResponse.OK(response) =>
@@ -765,7 +794,7 @@ object HttpScanAppClient {
       case http.ListDsoSequencersResponse.OK(response) =>
         response.domainSequencers.traverse { domain =>
           // TODO (#9309): malicious scans can make these decoding fail
-          Codec.decode(Codec.DomainId)(domain.domainId).flatMap { domainId =>
+          Codec.decode(Codec.SynchronizerId)(domain.domainId).flatMap { synchronizerId =>
             domain.sequencers
               .traverse { s =>
                 Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
@@ -779,14 +808,14 @@ object HttpScanAppClient {
                 }
               }
               .map { sequencers =>
-                DomainSequencers(domainId, sequencers)
+                DomainSequencers(synchronizerId, sequencers)
               }
           }
         }
     }
   }
 
-  final case class DomainSequencers(domainId: DomainId, sequencers: Seq[DsoSequencer])
+  final case class DomainSequencers(synchronizerId: SynchronizerId, sequencers: Seq[DsoSequencer])
 
   final case class DsoSequencer(
       migrationId: Long,
@@ -815,20 +844,20 @@ object HttpScanAppClient {
       case http.ListDsoScansResponse.OK(response) =>
         response.scans.traverse { domain =>
           // TODO (#9309): malicious scans can make this decoding fail
-          Codec.decode(Codec.DomainId)(domain.domainId).map { domainId =>
+          Codec.decode(Codec.SynchronizerId)(domain.domainId).map { synchronizerId =>
             // all SVs validate the Uri, so this should only fail to parse for malicious SVs.
             val (malformed, scanList) =
               domain.scans.partitionMap(scan =>
                 Try(Uri(scan.publicUrl)).toEither
                   .bimap(scan.publicUrl -> _, url => DsoScan(url, scan.svName))
               )
-            DomainScans(domainId, scanList, malformed.toMap)
+            DomainScans(synchronizerId, scanList, malformed.toMap)
           }
         }
     }
   }
   final case class DomainScans(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       scans: Seq[DsoScan],
       malformed: Map[String, Throwable],
   )
@@ -1251,15 +1280,15 @@ object HttpScanAppClient {
       case http.GetMigrationInfoResponse.OK(response) =>
         for {
           recordTimeRange <- response.recordTimeRange
-            .foldLeft[Either[String, Map[DomainId, DomainRecordTimeRange]]](
+            .foldLeft[Either[String, Map[SynchronizerId, DomainRecordTimeRange]]](
               Right(Map.empty)
             )((res, row) =>
               for {
                 result <- res
-                domainId <- Codec.decode(Codec.DomainId)(row.synchronizerId)
+                synchronizerId <- Codec.decode(Codec.SynchronizerId)(row.synchronizerId)
                 min <- CantonTimestamp.fromInstant(row.min.toInstant)
                 max <- CantonTimestamp.fromInstant(row.max.toInstant)
-              } yield result + (domainId -> DomainRecordTimeRange(min, max))
+              } yield result + (synchronizerId -> DomainRecordTimeRange(min, max))
             )
         } yield Some(
           SourceMigrationInfo(
@@ -1275,7 +1304,7 @@ object HttpScanAppClient {
 
   case class GetUpdatesBefore(
       migrationId: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       before: CantonTimestamp,
       atOrAfter: Option[CantonTimestamp],
       count: Int,
@@ -1294,7 +1323,7 @@ object HttpScanAppClient {
         definitions
           .GetUpdatesBeforeRequest(
             migrationId,
-            domainId.toProtoPrimitive,
+            synchronizerId.toProtoPrimitive,
             before.toInstant.atOffset(java.time.ZoneOffset.UTC),
             atOrAfter.map(_.toInstant.atOffset(java.time.ZoneOffset.UTC)),
             count,
@@ -1310,6 +1339,39 @@ object HttpScanAppClient {
             ProtobufJsonScanHttpEncodings.httpToLapiUpdate(http).update
           )
         )
+    }
+  }
+
+  case class GetTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)
+      extends TokenStandardBaseCommand[
+        tokenStandardHttp.GetTransferFactoryResponse,
+        tokenStandardHttp.definitions.FactoryWithChoiceContext,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], tokenStandardHttp.GetTransferFactoryResponse] = {
+      val json = choiceArgs.toJson
+      val circeChoiceArgs = io.circe.parser
+        .parse(json)
+        .getOrElse(
+          throw new RuntimeException(
+            s"Failed to parse a just-encoded json: $json. This is not supposed to happen."
+          )
+        )
+      client.getTransferFactory(GetFactoryRequest(circeChoiceArgs, Some(true)), headers)
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      tokenStandardHttp.GetTransferFactoryResponse,
+      Either[String, tokenStandardHttp.definitions.FactoryWithChoiceContext],
+    ] = { case tokenStandardHttp.GetTransferFactoryResponse.OK(factory) =>
+      Right(factory)
     }
   }
 }

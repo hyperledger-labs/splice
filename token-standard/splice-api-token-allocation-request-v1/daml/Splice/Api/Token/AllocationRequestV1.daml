@@ -1,0 +1,60 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | This module defines the interface for an `AllocationRequest`, which is an interface that can
+-- be implemented by an app to request specific allocations from their users
+-- for the purpose of settling a DvP or a payment as part of an app's workflow.
+module Splice.Api.Token.AllocationRequestV1 where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV1
+
+-- | A request by an app for allocations to be created to enable the execution of a settlement.
+interface AllocationRequest where
+  viewtype AllocationRequestView
+
+  allocationRequest_RejectImpl
+    : ContractId AllocationRequest -> AllocationRequest_Reject -> Update ChoiceExecutionMetadata
+  allocationRequest_WithdrawImpl
+    : ContractId AllocationRequest -> AllocationRequest_Withdraw -> Update ChoiceExecutionMetadata
+
+  choice AllocationRequest_Reject : ChoiceExecutionMetadata
+    -- ^ Reject an allocation request.
+    --
+    -- Implementations SHOULD allow any sender of a transfer leg to reject the allocation request,
+    -- and thereby signal that they are definitely not going to create a matching allocation for the settlement.
+    with
+      actor : Party -- ^ The party rejecting the allocation request.
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller actor
+    do allocationRequest_RejectImpl this self arg
+
+  choice AllocationRequest_Withdraw : ChoiceExecutionMetadata
+    -- ^ Withdraw an allocation request as the executor.
+    --
+    -- Used by executors to withdraw the allocation request if they are unable to execute it;
+    -- e.g., because a trade has been cancelled.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).settlement.executor
+    do allocationRequest_WithdrawImpl this self arg
+
+
+-- | View of `AllocationRequest`.
+--
+-- Implementations SHOULD make sure that at least all senders of the transfer legs
+-- are observers of the implementing contract, so that their wallet can show
+-- the request to them.
+data AllocationRequestView = AllocationRequestView with
+    settlement : SettlementInfo
+      -- ^ Settlement for which the assets are requested to be allocated.
+    transferLegs : [TransferLeg]
+      -- Transfer legs that are requested to be allocated for the execution of the settlement.
+      --
+      -- This may or may not be a complete list of transfer legs that are part of the settlement,
+      -- depending on the confidentiality requirements of the app.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation request, used for extensibility.
+  deriving (Show, Eq)

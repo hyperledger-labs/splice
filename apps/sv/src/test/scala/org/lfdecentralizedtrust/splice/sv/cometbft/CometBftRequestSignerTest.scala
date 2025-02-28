@@ -19,7 +19,7 @@ class CometBftRequestSignerTest extends AnyWordSpec with BaseTest {
 
   "Signing requests" should {
 
-    val cometBftRequestSigner = CometBftRequestSigner.getGenesisSigner
+    val cometBftRequestSigner = CometBftRequestSigner.GenesisSigner
 
     val request = NetworkConfigChangeRequest(
       "id",
@@ -56,10 +56,6 @@ class CometBftRequestSignerTest extends AnyWordSpec with BaseTest {
       Base64.getEncoder.encodeToString(
         requestSignature
       ) shouldBe "OtG+Fsd8uhq3EERZdvywEADUW980isxCerhABRvlE7frCnbO10FZvEF84BaSSga1/eqmcN7lHpm2QeVDrEWXCg=="
-    }
-
-    "match public keys keys" in {
-      cometBftRequestSigner.PubKeyBytes shouldBe cometBftRequestSigner.PubKeyBytesFromPrivateKey
     }
 
     "validate the correct signature for the request" in {

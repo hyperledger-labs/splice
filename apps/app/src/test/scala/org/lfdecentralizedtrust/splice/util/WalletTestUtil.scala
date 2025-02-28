@@ -29,7 +29,7 @@ import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWall
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import org.scalatest.Assertion
 
 import java.time.Duration
@@ -291,7 +291,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       update = acceptedPayment.contractId.exerciseAcceptedAppPayment_Collect(
         appTc
       ),
-      domainId = Some(disclosure.assignedDomain),
+      synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -314,7 +314,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       actAs = Seq(userParty),
       readAs = Seq(),
       update = acceptedPayment.exerciseAcceptedAppPayment_Reject(appTc),
-      domainId = Some(disclosure.assignedDomain),
+      synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -345,7 +345,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         update = acceptedPayment.contractId.exerciseSubscriptionInitialPayment_Collect(
           appTc
         ),
-        domainId = Some(disclosure.assignedDomain),
+        synchronizerId = Some(disclosure.assignedDomain),
         disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       )
       .exerciseResult
@@ -370,7 +370,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       update = acceptedPayment.exerciseSubscriptionInitialPayment_Reject(
         appTc
       ),
-      domainId = Some(disclosure.assignedDomain),
+      synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -396,7 +396,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       update = payment.contractId.exerciseSubscriptionPayment_Collect(
         appTc
       ),
-      domainId = Some(disclosure.assignedDomain),
+      synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -420,7 +420,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       update = payment.exerciseSubscriptionPayment_Reject(
         appTc
       ),
-      domainId = Some(disclosure.assignedDomain),
+      synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -431,7 +431,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       userId: String,
       actor: PartyId,
       subscriptionIdleState: subsCodegen.SubscriptionIdleState.ContractId,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
   ): Unit = {
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
@@ -440,7 +440,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       update = subscriptionIdleState.exerciseSubscriptionIdleState_ExpireSubscription(
         actor.toProtoPrimitive
       ),
-      domainId = domainId,
+      synchronizerId = synchronizerId,
       disclosedContracts = Seq.empty,
     )
   }
@@ -522,7 +522,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       userParty: PartyId,
       receiverAmounts: Seq[paymentCodegen.ReceiverAmount],
       expirationTime: Duration = Duration.ofMinutes(5),
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
       description: String = "description",
   )(implicit env: SpliceTestConsoleEnvironment): (
       paymentCodegen.AppPaymentRequest.ContractId,
@@ -548,7 +548,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = signatories.distinct,
         readAs = Seq.empty,
         update = paymentRequest.create,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
       )
       paymentCodegen.AppPaymentRequest.COMPANION.toContractId(result.contractId)
     }
@@ -563,7 +563,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       amount: BigDecimal = defaultPaymentAmount.amount,
       unit: paymentCodegen.Unit = defaultPaymentAmount.unit,
       expirationTime: Duration = Duration.ofMinutes(5),
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
       description: String = "description",
   )(implicit env: SpliceTestConsoleEnvironment): (
       paymentCodegen.AppPaymentRequest.ContractId,
@@ -580,7 +580,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         userParty,
         receiverAmounts,
         expirationTime,
-        domainId,
+        synchronizerId,
         description,
       )
     )
@@ -654,7 +654,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       paymentInterval: Duration = defaultSubscriptionInterval,
       paymentDuration: Duration = defaultSubscriptionDuration,
       description: String = "description",
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -678,7 +678,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(userParty, receiverParty, providerParty).distinct,
         readAs = Seq.empty,
         update = subscriptionRequest.create,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
       )
     }
     subscriptionRequest
@@ -691,7 +691,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       amount: paymentCodegen.PaymentAmount = defaultPaymentAmount,
       paymentInterval: Duration = defaultSubscriptionInterval,
       paymentDuration: Duration = defaultSubscriptionDuration,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
       description: String = "description",
   )(implicit
       env: SpliceTestConsoleEnvironment
@@ -708,7 +708,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = subscriptionRequest.create,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
       )
     }
     subscriptionRequest
@@ -721,7 +721,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       amount: paymentCodegen.PaymentAmount = defaultSubscriptionAmount,
       paymentInterval: Duration = defaultSubscriptionInterval,
       paymentDuration: Duration = defaultSubscriptionDuration,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
       description: String = "description",
   )(implicit
       env: SpliceTestConsoleEnvironment
@@ -739,7 +739,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = subscription.create,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
       )
       subsCodegen.Subscription.COMPANION.toContractId(result.contractId)
     }
@@ -758,7 +758,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = state.create,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
       )
     }
   }
@@ -784,7 +784,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = update,
-        domainId = Some(disclosure.assignedDomain),
+        synchronizerId = Some(disclosure.assignedDomain),
         disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       )
       (
@@ -835,7 +835,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       participantClient: ParticipantClientReference,
       receiver: PartyId,
       amount: BigDecimal,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): Unit = {
@@ -851,7 +851,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         amount.bigDecimal,
         tc.latestOpenMiningRound.contract.contractId,
       ),
-      domainId = domainId orElse (tc.amuletRules.state match {
+      synchronizerId = synchronizerId orElse (tc.amuletRules.state match {
         case ContractState.InFlight => None
         case ContractState.Assigned(domain) => Some(domain)
       }),
@@ -863,7 +863,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       participantClient: ParticipantClientReference,
       receiver: PartyId,
       amount: BigDecimal,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): Unit = {
@@ -879,7 +879,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         amount.bigDecimal,
         tc.latestOpenMiningRound.contract.contractId,
       ),
-      domainId = domainId orElse (tc.amuletRules.state match {
+      synchronizerId = synchronizerId orElse (tc.amuletRules.state match {
         case ContractState.InFlight => None
         case ContractState.Assigned(domain) => Some(domain)
       }),
@@ -894,7 +894,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       amount: BigDecimal = BigDecimal(10),
       round: Long = 0,
       holdingFee: BigDecimal = BigDecimal(0.01),
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): amuletCodegen.Amulet.ContractId = {
@@ -914,7 +914,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         actAs = Seq(dsoParty, owner),
         readAs = Seq.empty,
         update = amulet,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
       )
     created.contractId
   }
@@ -925,7 +925,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       userId: String,
       owner: PartyId,
       amulet: amuletCodegen.Amulet.ContractId,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): Unit = {
@@ -936,7 +936,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       update = amulet.exerciseArchive(
         new org.lfdecentralizedtrust.splice.codegen.java.da.internal.template.Archive()
       ),
-      domainId = domainId,
+      synchronizerId = synchronizerId,
     )
   }
 

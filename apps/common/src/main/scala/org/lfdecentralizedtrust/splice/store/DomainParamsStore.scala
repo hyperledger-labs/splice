@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.transaction.DomainParametersState
+import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -99,7 +99,7 @@ final class DomainParamsStore(
 
   def ingestDomainParams(
       params: TopologyAdminConnection.TopologyResult[
-        DomainParametersState
+        SynchronizerParametersState
       ]
   )(implicit tc: TraceContext): Future[Unit] = Future {
     val unpaused = isDomainUnpaused(params)
@@ -127,7 +127,7 @@ final class DomainParamsStore(
   }
 
   private def isDomainUnpaused(
-      params: TopologyAdminConnection.TopologyResult[DomainParametersState]
+      params: TopologyAdminConnection.TopologyResult[SynchronizerParametersState]
   ) = params.mapping.parameters.confirmationRequestsMaxRate > NonNegativeInt.zero
 
   override def close(): Unit = {
@@ -138,7 +138,7 @@ final class DomainParamsStore(
 object DomainParamsStore {
 
   private final case class State(
-      lastParams: Option[TopologyAdminConnection.TopologyResult[DomainParametersState]],
+      lastParams: Option[TopologyAdminConnection.TopologyResult[SynchronizerParametersState]],
       domainUnpausedPromise: Option[Promise[Unit]],
   )
 
@@ -150,9 +150,9 @@ object DomainParamsStore {
       metricsFactory.gauge(
         MetricInfo(
           name = prefix :+ "confirmation-requests-max-rate",
-          summary = "DynamicDomainParameters.confirmationRequestsMaxRate",
+          summary = "DynamicSynchronizerParameters.confirmationRequestsMaxRate",
           description =
-            "Last known value of DynamicDomainParameters.confirmationRequestsMaxRate on the configured global domain.",
+            "Last known value of DynamicSynchronizerParameters.confirmationRequestsMaxRate on the configured global domain.",
           qualification = Traffic,
         ),
         -1,

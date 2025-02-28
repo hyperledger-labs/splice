@@ -1,0 +1,117 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | This module defines the interface for an `Allocation`, which reflects the allocation of
+-- some amount of asset holdings to transfer them as part of an atomic on-ledger
+-- settlement requested by an app.
+--
+-- The expectation is for the registry app to implement this interface in their models, so that
+-- apps can execute atomic on-ledger settlements of DvP and other kinds of trades or payments
+-- using instruments managed by that registry.
+module Splice.Api.Token.AllocationV1 where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 (InstrumentId)
+
+-- | A generic type to refer to data defined within an app.
+
+-- The interpretation of such a reference is app specific, but SHOULD be unambiguous within the context of the app.
+data Reference = Reference with
+    id : Text
+      -- ^ The key that identifies the data. Can be set to the empty string if the contract-id is provided and is sufficient.
+    cid : Optional AnyContractId
+      -- ^ Optional contract-id to use for referring to contracts.
+      --
+      -- This field is there for technical reasons, as contract-ids cannot be converted to text from within Daml,
+      -- which is due to their full textual representation being only known after transactions have been prepared.
+  deriving (Show, Eq)
+
+-- | The minimal set of information about a settlement that an app would like to execute.
+data SettlementInfo = SettlementInfo
+  with
+    executor : Party
+      -- ^ The party that is responsible for executing the settlement.
+    settlementRef : Reference
+      -- ^ Reference to the settlement that app would like to execute.
+    requestedAt : Time
+      -- ^ When the settlement was requested. Provided for display and debugging purposes.
+    allocateBefore : Time
+      -- ^ Until when (exclusive) the senders are given time to allocate their assets.
+      -- This field has a particular relevance with respect to instrument versioning / corporate
+      -- actions, in that the settlement pertains to the instrument version resulting from the
+      -- processing of all corporate actions falling strictly before the `allocateBefore` time.
+    settleBefore : Time
+      -- ^ Until when (exclusive) the executor is given time to execute the settlement.
+      --
+      -- SHOULD be strictly after `allocateBefore`.
+  deriving (Show, Eq)
+
+-- | A specification of a transfer of holdings between two parties for the
+-- purpose of a settlement, which often requires the atomic execution of multiple legs.
+data TransferLeg = TransferLeg with
+    sender : Party
+      -- ^ The sender of the transfer.
+    receiver : Party
+      -- ^ The receiver of the transfer.
+    amount : Decimal
+      -- ^ The amount to transfer.
+    instrumentId : InstrumentId
+      -- ^ The instrument identifier.
+    meta : Metadata
+      -- ^ Metadata.
+  deriving (Eq, Ord, Show)
+
+-- | An allocation of assets to a specific leg of a settlement.
+data AllocationView = AllocationView with
+    settlement : SettlementInfo
+      -- ^ The settlement for whose execution the assets are being allocated.
+    transferLegId : Int
+      -- ^ The numeric id of the transfer within the settlement.
+    transferLeg : TransferLeg
+      -- ^ The transfer for which the assets are being allocated.
+  deriving (Show, Eq)
+
+
+-- Allocation
+------------------------
+
+-- | The parties that control the allocation and its execution.
+allocationControllers : AllocationView -> [Party]
+allocationControllers AllocationView{..} =
+  [settlement.executor, transferLeg.sender, transferLeg.receiver]
+
+-- | A contract representing an allocation of assets to a specific leg of a settlement.
+interface Allocation where
+  viewtype AllocationView
+
+  allocation_executeTransferImpl : ContractId Allocation -> Allocation_ExecuteTransfer -> Update ChoiceExecutionMetadata
+  allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update ChoiceExecutionMetadata
+  allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update ChoiceExecutionMetadata
+
+  choice Allocation_ExecuteTransfer : ChoiceExecutionMetadata
+    -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
+    -- This choice SHOULD succeed provided the `settleBefore` deadline has not passed.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller allocationControllers (view this)
+    do allocation_executeTransferImpl this self arg
+
+  choice Allocation_Cancel : ChoiceExecutionMetadata
+    -- ^ Cancel the allocation. Used by the executor to release the allocated assets early in case the settlement
+    -- is aborted or it has definitely failed.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller allocationControllers (view this)
+    do allocation_cancelImpl this self arg
+
+  choice Allocation_Withdraw : ChoiceExecutionMetadata
+    -- ^ Withdraw the allocated assets. Used by the sender to withdraw the assets before settlement
+    -- was completed. This SHOULD not fail settlement if the sender has still time to allocate the
+    -- assets again (we are before the `allocateBefore` time).
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).transferLeg.sender
+    do allocation_withdrawImpl this self arg

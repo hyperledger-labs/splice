@@ -38,6 +38,7 @@ export abstract class PackageIdResolver {
     }
     return `${parts[1]}:${parts[2]}`;
   }
+
   abstract resolveTemplateId(templateId: string): Promise<string>;
 
   async resolveTemplateOrInterface<T extends object, K>(
@@ -66,6 +67,7 @@ export class LedgerApiClient {
   private userId: string;
   private packageIdResolver: PackageIdResolver;
   private headers: Headers;
+
   constructor(
     jsonApiUrl: string,
     token: string,
@@ -79,6 +81,7 @@ export class LedgerApiClient {
     this.userId = userId;
     this.packageIdResolver = packageIdResolver;
   }
+
   async getPrimaryParty(): Promise<string> {
     const user = await callWithLogging(
       ANS_LEDGER_NAME,
@@ -140,10 +143,10 @@ export class LedgerApiClient {
       disclosedContracts: disclosedContracts.map(c => ({
         contractId: c.contractId,
         createdEventBlob: c.createdEventBlob,
-        domainId: '',
+        synchronizerId: '',
         templateId: c.templateId,
       })),
-      domainId: domainId || '',
+      synchronizerId: domainId || '',
       packageIdSelectionPreference: [],
     };
 
@@ -178,7 +181,9 @@ export class LedgerApiClient {
       });
 
     const tree = responseBody.transactionTree;
-    const rootEvent = tree.eventsById[tree.rootEventIds[0]];
+    const eventIds = Object.keys(tree.eventsById).map(Number);
+    const rootEventId = Math.min(...eventIds);
+    const rootEvent = tree.eventsById[rootEventId];
     const exerciseResult = choice.resultDecoder.runWithException(
       rootEvent.ExercisedTreeEvent.exerciseResult
     );

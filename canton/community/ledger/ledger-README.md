@@ -29,7 +29,7 @@ The Ledger API Server exposes basic metrics for all gRPC services and some addit
 <table>
 <thead><tr><td>Metric Name</td><td>Description</td></tr>
 <tbody>
-<tr><td><pre>LedgerApi.com.daml.ledger.api.v2.$SERVICE.$METHOD</pre></td><td>A <i>meter</i> that tracks the number of calls to the respective service and method.
+<tr><td><pre>LedgerApi.com.daml.ledger.api.v1.$SERVICE.$METHOD</pre></td><td>A <i>meter</i> that tracks the number of calls to the respective service and method.
 <tr><td><pre>CommandSubmission.failedCommandInterpretations</pre></td><td>A <i>meter</i> that tracks the failed command interpretations.
 <tr><td><pre>CommandSubmission.submittedTransactions</pre></td><td>A <i>timer</i> that tracks the commands submitted to the backing ledger.
 </tbody>

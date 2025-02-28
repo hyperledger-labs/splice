@@ -24,7 +24,7 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.data.DeduplicationPeriod
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -61,7 +61,7 @@ trait LedgerApiExtensions {
         def submitJava(
             actAs: Seq[PartyId],
             commands: Seq[javaapi.data.Command],
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             commandId: String = "",
             optTimeout: Option[NonNegativeDuration] = Some(ledgerApi.timeouts.ledgerCommand),
             deduplicationPeriod: Option[DeduplicationPeriod] = None,
@@ -86,7 +86,7 @@ trait LedgerApiExtensions {
                 submissionId = submissionId,
                 minLedgerTimeAbs = minLedgerTimeAbs,
                 disclosedContracts = disclosedContracts.map(DisclosedContract.fromJavaProto(_)),
-                domainId = domainId,
+                synchronizerId = synchronizerId,
                 applicationId = applicationId,
                 packageIdSelectionPreference = Seq.empty,
               )
@@ -94,7 +94,7 @@ trait LedgerApiExtensions {
           }
           JavaTransactionTree.fromProto(
             TransactionTree.toJavaProto(
-              ledgerApi.optionallyAwait(tx, tx.updateId, tx.domainId, optTimeout)
+              ledgerApi.optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
             )
           )
         }
@@ -105,13 +105,13 @@ trait LedgerApiExtensions {
             readAs: Seq[PartyId],
             update: Update[T],
             commandId: Option[String] = None,
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): T = {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            domainId = domainId,
+            synchronizerId = synchronizerId,
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
@@ -134,13 +134,13 @@ trait LedgerApiExtensions {
             readAs: Seq[PartyId],
             update: Update[Exercised[TCid]],
             commandId: Option[String] = None,
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): Contract[TCid, T] = {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            domainId = domainId,
+            synchronizerId = synchronizerId,
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
@@ -276,10 +276,12 @@ trait LedgerApiExtensions {
         def lookup_contract_domain(
             partyId: PartyId,
             contractIds: Set[String],
-        ): Map[String, DomainId] = {
+        ): Map[String, SynchronizerId] = {
           val contracts = ledgerApi.ledger_api.state.acs.active_contracts_of_party(partyId)
           contracts.view
-            .map(c => c.getCreatedEvent.contractId -> DomainId.tryFromString(c.domainId))
+            .map(c =>
+              c.getCreatedEvent.contractId -> SynchronizerId.tryFromString(c.synchronizerId)
+            )
             .filter({ case (c, _) => contractIds.contains(c) })
             .toMap
         }

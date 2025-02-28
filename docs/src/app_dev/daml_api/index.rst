@@ -12,6 +12,7 @@ API docs for daml packages
 
 
 .. toctree::
+   :maxdepth: 1
 
    ../api/splice-amulet/index
    ../api/splice-amulet-name-service/index
@@ -20,3 +21,9 @@ API docs for daml packages
    ../api/splice-validator-lifecycle/index
    ../api/splice-wallet/index
    ../api/splice-wallet-payments/index
+   ../api/splice-api-token-metadata-v1/index
+   ../api/splice-api-token-holding-v1/index
+   ../api/splice-api-token-transfer-instruction-v1/index
+   ../api/splice-api-token-allocation-request-v1/index
+   ../api/splice-api-token-allocation-instruction-v1/index
+   ../api/splice-api-token-allocation-v1/index

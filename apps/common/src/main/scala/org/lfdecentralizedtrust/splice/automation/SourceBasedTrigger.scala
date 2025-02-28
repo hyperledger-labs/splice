@@ -67,13 +67,13 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
             s"Starting source processing loop with parallelism ${context.config.parallelism}"
           )
           val (killSwitch: UniqueKillSwitch, completed0: Future[Done]) = PekkoUtil.runSupervised(
-            logger.error("Fatally failed to handle task", _),
             source
               .mapAsync(1) { task => waitForResumePromise.future.map(_ => task) }
               .viaMat(KillSwitches.single)(Keep.right)
               .toMat(Sink.foreachAsync[T](context.config.parallelism)(go))(
                 Keep.both
               ),
+            errorLogMessagePrefix = "Fatally failed to handle task",
           )
           val completed = completed0.transform(
             context.retryProvider

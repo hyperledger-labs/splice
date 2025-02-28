@@ -3,9 +3,24 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
+import com.digitalasset.canton.caching.ScaffeineCache
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.{
+  AsyncCloseable,
+  AsyncOrSyncCloseable,
+  CloseContext,
+  FlagCloseableAsync,
+  SyncCloseable,
+}
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.github.blemale.scaffeine.Scaffeine
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
@@ -13,17 +28,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommand,
   TransferCommandCounter,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
-  DsoRules_CloseVoteRequestResult,
-  VoteRequest,
-}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
@@ -37,6 +52,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   TxLogEntry,
   VoteRequestTxLogEntry,
 }
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
@@ -57,23 +73,7 @@ import org.lfdecentralizedtrust.splice.util.{
   QualifiedName,
   TemplateJsonDecoder,
 }
-import com.digitalasset.canton.caching.CaffeineCache
-import com.digitalasset.canton.caching.CaffeineCache.FutureAsyncCacheLoader
-import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.SyncCloseable
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.lifecycle.FlagCloseableAsync
-import com.digitalasset.canton.lifecycle.AsyncCloseable
-import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
-import com.github.benmanes.caffeine.cache as caffeine
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import io.grpc.Status
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -124,6 +124,7 @@ class DbScanStore(
     with RetryProvider.Has
     with DbVotesStoreQueryBuilder {
 
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
   import multiDomainAcsStore.waitUntilAcsIngested
 
   override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
@@ -552,20 +553,18 @@ class DbScanStore(
       } yield result
     }
 
-  private val totalAmuletBalanceCache
-      : CaffeineCache.AsyncLoadingCaffeineCache[DbScanStore.CacheKey, DbScanStore.CacheValue] = {
+  private val totalAmuletBalanceCache: ScaffeineCache.TunnelledAsyncLoadingCache[
+    Future,
+    DbScanStore.CacheKey,
+    DbScanStore.CacheValue,
+  ] = {
     implicit val tc = TraceContext.empty
-    new CaffeineCache.AsyncLoadingCaffeineCache(
-      caffeine.Caffeine
-        .newBuilder()
-        .maximumSize(1000)
-        .buildAsync(
-          new FutureAsyncCacheLoader[DbScanStore.CacheKey, DbScanStore.CacheValue](key =>
-            getUncachedTotalAmuletBalance(key)
-          )
-        ),
-      storeMetrics.cache,
-    )
+    ScaffeineCache.buildAsync[Future, DbScanStore.CacheKey, DbScanStore.CacheValue](
+      Scaffeine()
+        .maximumSize(1000),
+      key => getUncachedTotalAmuletBalance(key),
+      metrics = Some(storeMetrics.cache),
+    )(logger, "amuletBalanceCache")
   }
   // TODO(#11312) remove when amulet expiry works again
   def getTotalAmuletBalance(asOfEndOfRound: Long): Future[BigDecimal] = {
@@ -823,8 +822,8 @@ class DbScanStore(
     }
   }
 
-  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
-      tc: TraceContext
+  override def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long] = waitUntilAcsIngested {
     for {
       sum <- storage
@@ -838,7 +837,7 @@ class DbScanStore(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
-                and member_traffic_domain = ${lengthLimited(domainId.toProtoPrimitive)}
+                and member_traffic_domain = ${lengthLimited(synchronizerId.toProtoPrimitive)}
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",
         )

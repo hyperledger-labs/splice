@@ -65,7 +65,7 @@ import org.lfdecentralizedtrust.splice.history.{
   TransferPreapproval_Renew,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
-import org.lfdecentralizedtrust.splice.util.{ExerciseNode, ExerciseNodeCompanion}
+import org.lfdecentralizedtrust.splice.util.{EventId, ExerciseNode, ExerciseNodeCompanion}
 import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -76,13 +76,12 @@ import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.ActiveContract
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.{
   BalanceChangeTransactionSubtype,
   NotificationTransactionSubtype,
   TransferTransactionSubtype,
 }
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
@@ -91,8 +90,8 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, root: TreeEvent, domainId: DomainId)(implicit
-      tc: TraceContext
+  private def parseTree(tree: TransactionTree, root: TreeEvent, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Eval[State] = {
     import Eval.{now, defer}
     root match {
@@ -132,7 +131,7 @@ class UserWalletTxLogParser(
                           Either[InvalidTransferReason, Seq[ExercisedEvent]],
                       )
                     ],
-                    exercised.getChildEventIds.asScala.map(tree.getEventsById.asScala),
+                    tree.getChildNodeIds(exercised).asScala.map(tree.getEventsById.asScala),
                   )
                 )({
                   case ((result, nextChildEvents), r) => {
@@ -209,14 +208,14 @@ class UserWalletTxLogParser(
                       case r: ITR_InsufficientFunds =>
                         s"ITR_InsufficientFunds: missing ${r.missingAmount} CC"
                       case r: ITR_UnknownSynchronizer =>
-                        s"ITR_UnknownSynchronizer: domainId ${r.synchronizerId}"
+                        s"ITR_UnknownSynchronizer: synchronizerId ${r.synchronizerId}"
                       case r: ITR_InsufficientTopupAmount =>
                         s"ITR_InsufficientTopupAmount: requested ${r.requestedTopupAmount}, minimum required ${r.minTopupAmount}"
                       case r: ITR_Other => s"ITR_Other: ${r.description}"
                       case _ => throw new RuntimeException(s"Invalid reason $reason")
                     }
                     // Necessary because COO_Error does not produce any child event
-                    val syntheticEventId = s"${root.getEventId}_err_$idx"
+                    val syntheticEventId = s"${tree.getUpdateId}:${root.getNodeId}_err_$idx"
                     op match {
                       case _: CO_CompleteAcceptedTransfer =>
                         State.fromNotification(
@@ -250,11 +249,11 @@ class UserWalletTxLogParser(
               // Tag wallet automation (amulet merging, reward collection) as such, to distinguish from
               // explicit self-transfers
               case ((_, _: COO_MergeTransferInputs, Right(Seq(childEvent))), _) =>
-                defer(parseTree(tree, childEvent, domainId))
+                defer(parseTree(tree, childEvent, synchronizerId))
                   .map(_.setTransferSubtype(TransferTransactionSubtype.WalletAutomation))
               // All other successful operations are handled by parsing their subtree
               case ((_, _, Right(childEvents)), _) =>
-                childEvents.foldMap(parseTree(tree, _, domainId))
+                childEvents.foldMap(parseTree(tree, _, synchronizerId))
               // The above cases should be exhaustive
               case ((op, outcome, child), _) =>
                 throw new RuntimeException(
@@ -313,8 +312,8 @@ class UserWalletTxLogParser(
               stateFromChildren <- defer {
                 parseTrees(
                   tree,
-                  exercised.getChildEventIds.asScala.toList,
-                  domainId,
+                  tree.getChildNodeIds(exercised).asScala.toList,
+                  synchronizerId,
                 )
               }.map(_.setTransferSubtype(TransferTransactionSubtype.P2PPaymentCompleted))
             } yield stateFromOfferCompletion.appended(stateFromChildren)
@@ -368,8 +367,8 @@ class UserWalletTxLogParser(
               stateFromChildren <- defer {
                 parseTrees(
                   tree,
-                  exercised.getChildEventIds.asScala.toList,
-                  domainId,
+                  tree.getChildNodeIds(exercised).asScala.toList,
+                  synchronizerId,
                 )
               }
             } yield stateFromRequestCompletion.appended(stateFromChildren)
@@ -403,8 +402,8 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildEventIds.asScala.toList,
-                domainId,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
               )
             }.map(_.setTransferSubtype(TransferTransactionSubtype.AppPaymentAccepted))
 
@@ -413,8 +412,8 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildEventIds.asScala.toList,
-                domainId,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
               )
             }.map(_.mergeBalanceChangesIntoTransfer(TransferTransactionSubtype.AppPaymentCollected))
 
@@ -447,8 +446,8 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildEventIds.asScala.toList,
-                domainId,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
               )
             }.map(
               _.setTransferSubtype(TransferTransactionSubtype.SubscriptionInitialPaymentAccepted)
@@ -459,8 +458,8 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildEventIds.asScala.toList,
-                domainId,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
@@ -492,8 +491,8 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildEventIds.asScala.toList,
-                domainId,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
               )
             }.map(_.setTransferSubtype(TransferTransactionSubtype.SubscriptionPaymentAccepted))
 
@@ -502,7 +501,7 @@ class UserWalletTxLogParser(
             now(
               State.fromNotification(
                 tree,
-                exercised.getEventId,
+                EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
                 NotificationTransactionSubtype.SubscriptionExpired,
                 s"Expired by ${node.argument.value.actor} because the last subscription payment was missed",
               )
@@ -513,8 +512,8 @@ class UserWalletTxLogParser(
             defer {
               parseTrees(
                 tree,
-                exercised.getChildEventIds.asScala.toList,
-                domainId,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
@@ -637,7 +636,7 @@ class UserWalletTxLogParser(
             fromAnsEntryPaymentCollection(
               tree,
               exercised,
-              domainId,
+              synchronizerId,
               TransferTransactionSubtype.InitialEntryPaymentCollection,
               SubscriptionInitialPayment_Collect,
             )(_.amulet)
@@ -646,7 +645,7 @@ class UserWalletTxLogParser(
             fromAnsEntryPaymentCollection(
               tree,
               exercised,
-              domainId,
+              synchronizerId,
               TransferTransactionSubtype.EntryRenewalPaymentCollection,
               SubscriptionPayment_Collect,
             )(_.amulet)
@@ -676,7 +675,9 @@ class UserWalletTxLogParser(
             )
 
           case _ =>
-            defer { parseTrees(tree, exercised.getChildEventIds.asScala.toList, domainId) }
+            defer {
+              parseTrees(tree, tree.getChildNodeIds(exercised).asScala.toList, synchronizerId)
+            }
         }
 
       case created: CreatedEvent =>
@@ -696,28 +697,36 @@ class UserWalletTxLogParser(
         sys.error("The above match should be exhaustive")
     }
   }
-  private def parseTrees(tree: TransactionTree, rootsEventIds: List[String], domainId: DomainId)(
-      implicit tc: TraceContext
+  private def parseTrees(
+      tree: TransactionTree,
+      rootsEventIds: List[Integer],
+      synchronizerId: SynchronizerId,
+  )(implicit
+      tc: TraceContext
   ): Eval[State] = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
-    roots.foldMap(parseTree(tree, _, domainId))
+    roots.foldMap(parseTree(tree, _, synchronizerId))
   }
 
-  override def tryParse(tx: TransactionTree, domainId: DomainId)(implicit
+  override def tryParse(tx: TransactionTree, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
-    parseTrees(tx, tx.getRootEventIds.asScala.toList, domainId).value
+    parseTrees(tx, tx.getRootNodeIds.asScala.toList, synchronizerId).value
       .filterByParty(endUserParty)
       .entries
   }
 
-  override def error(offset: Long, eventId: String, domainId: DomainId): Option[TxLogEntry] =
+  override def error(
+      offset: Long,
+      eventId: String,
+      synchronizerId: SynchronizerId,
+  ): Option[TxLogEntry] =
     Some(UnknownTxLogEntry(eventId))
 
   private def fromAnsEntryPaymentCollection(
       tree: TransactionTree,
       exercised: ExercisedEvent,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       transactionSubtype: TransferTransactionSubtype,
       paymentCollection: ExerciseNodeCompanion,
   )(
@@ -736,7 +745,7 @@ class UserWalletTxLogParser(
         }
 
     defer(
-      parseTree(tree, paymentCollectionEvent, domainId).map { stateFromPaymentCollection =>
+      parseTree(tree, paymentCollectionEvent, synchronizerId).map { stateFromPaymentCollection =>
         State.fromCollectEntryPayment(
           tree,
           exercised,
@@ -878,7 +887,7 @@ object UserWalletTxLogParser {
         transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
       val newEntry = BalanceChangeTxLogEntry(
-        eventId = event.getEventId,
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         subtype = Some(transactionSubtype.toProto),
         date = Some(tx.getEffectiveAt),
         amount = BigDecimal(0),
@@ -1003,7 +1012,7 @@ object UserWalletTxLogParser {
       val receivers = parseReceivers(node.argument.value, node.result.value)
       val transferEntry =
         TransferTxLogEntry(
-          eventId = event.getEventId,
+          eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
           subtype = Some(transactionSubtype.toProto),
           date = Some(tx.getEffectiveAt),
           provider = node.argument.value.transfer.provider,
@@ -1094,7 +1103,7 @@ object UserWalletTxLogParser {
       val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
       val newEntry = TransferTxLogEntry(
-        eventId = event.getEventId,
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         subtype = Some(TransferTransactionSubtype.ExtraTrafficPurchase.toProto),
         date = Some(tx.getEffectiveAt),
         provider = sender,
@@ -1173,7 +1182,7 @@ object UserWalletTxLogParser {
       val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
       val newEntry = TransferTxLogEntry(
-        eventId = event.getEventId,
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         subtype = Some(transferSubtype.toProto),
         date = Some(tx.getEffectiveAt),
         provider = provider,
@@ -1205,7 +1214,7 @@ object UserWalletTxLogParser {
       stateFromPaymentCollection
         .appended(stateFromBurntAmulet)
         .mergeBalanceChangesIntoTransfer(transactionSubtype)
-        .setEventId(event.getEventId)
+        .setEventId(EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId))
     }
 
     /** State from a choice that returns a `MintSummary`.
@@ -1224,7 +1233,7 @@ object UserWalletTxLogParser {
       val amuletCid = acsum.amulet
       val amulet = getAmuletCreateEvent(tx, amuletCid)
       val newEntry = BalanceChangeTxLogEntry(
-        eventId = event.getEventId,
+        eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         subtype = Some(transactionSubtype.toProto),
         date = Some(tx.getEffectiveAt),
         amount = amulet.amount.initialAmount,
@@ -1250,27 +1259,6 @@ object UserWalletTxLogParser {
       )
       State(
         entries = immutable.Queue(newEntry)
-      )
-    }
-
-    def fromAcsAmulet(
-        ac: ActiveContract,
-        activeAmulet: AmuletCreate.ContractType,
-    ): (DomainId, Option[ContractId[?]], TxLogEntry) = {
-      (
-        ac.domainId,
-        Some(new codegen.ContractId(ac.createdEvent.getContractId)),
-        BalanceChangeTxLogEntry(
-          eventId = ac.createdEvent.getEventId,
-          subtype = Some(BalanceChangeTransactionSubtype.Mint.toProto),
-          receiver = activeAmulet.payload.owner,
-          amount = activeAmulet.payload.amount.initialAmount,
-          // We know the round in which the amulet was created (activeAmulet.payload.amount.createdAt),
-          // but we don't know when that round was open (let alone when exactly the amulet was created),
-          // and what the amulet price was at that time.
-          date = Some(Instant.EPOCH),
-          amuletPrice = BigDecimal(1),
-        ),
       )
     }
 

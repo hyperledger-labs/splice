@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, SpliceUtil, Contract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -119,7 +119,7 @@ object MiningRoundsStore {
       oldest: OpenMiningRoundContract,
       middle: OpenMiningRoundContract,
       newest: OpenMiningRoundContract,
-      domain: DomainId,
+      domain: SynchronizerId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(

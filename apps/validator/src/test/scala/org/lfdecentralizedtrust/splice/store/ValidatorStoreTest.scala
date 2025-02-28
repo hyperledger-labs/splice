@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 
 import java.time.Instant
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
@@ -20,12 +20,13 @@ import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
 
 import scala.concurrent.Future
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
@@ -302,7 +303,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def validatorTopUpState(domainId: DomainId) = {
+  private def validatorTopUpState(synchronizerId: SynchronizerId) = {
     val templateId = topUpCodegen.ValidatorTopUpState.TEMPLATE_ID_WITH_PACKAGE_ID
     val sequencerMemberId = "sequencerMemberId"
     val lastPurchasedAt = Instant.EPOCH
@@ -310,7 +311,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       dsoParty.toProtoPrimitive,
       validator.toProtoPrimitive,
       sequencerMemberId,
-      domainId.toProtoPrimitive,
+      synchronizerId.toProtoPrimitive,
       domainMigrationId,
       lastPurchasedAt,
     )
@@ -340,10 +341,10 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   protected def mkStore(): Future[ValidatorStore]
 
   lazy val domain = dummyDomain.toProtoPrimitive
-  lazy val domainAlias = DomainAlias.tryCreate(domain)
+  lazy val synchronizerAlias = SynchronizerAlias.tryCreate(domain)
   lazy val domainConfig = ValidatorSynchronizerConfig(
     global = ValidatorDecentralizedSynchronizerConfig(
-      domainAlias
+      synchronizerAlias
     )
   )
 }
@@ -381,15 +382,12 @@ class DbValidatorStoreTest
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(domainAlias -> dummyDomain)
+        Map(synchronizerAlias -> dummyDomain)
       )
     } yield store
   }
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[?] =
-    for {
-      _ <- resetAllAppTables(storage)
-    } yield ()
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
 }

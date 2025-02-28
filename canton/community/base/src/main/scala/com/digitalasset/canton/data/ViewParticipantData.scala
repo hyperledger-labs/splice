@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -219,7 +219,13 @@ final case class ViewParticipantData private (
         }
         RootAction(cmd, actors, failed, packagePreference)
 
-      case FetchActionDescription(inputContractId, actors, byKey, templateId, interfaceId) =>
+      case fetch @ FetchActionDescription(
+            inputContractId,
+            actors,
+            byKey,
+            templateId,
+            interfaceId,
+          ) =>
         val inputContract = coreInputs.getOrElse(
           inputContractId,
           throw InvalidViewParticipantData(
@@ -239,7 +245,7 @@ final case class ViewParticipantData private (
         } else {
           LfFetchCommand(templateId = templateId, interfaceId = interfaceId, coid = inputContractId)
         }
-        RootAction(cmd, actors, failed = false, packageIdPreference = Set.empty)
+        RootAction(cmd, actors, failed = false, packageIdPreference = fetch.packagePreference)
 
       case LookupByKeyActionDescription(LfVersioned(_version, key)) =>
         val LfVersioned(_, keyResolution) = resolvedKeys.getOrElse(
@@ -329,13 +335,13 @@ final case class ViewParticipantData private (
 }
 
 object ViewParticipantData
-    extends HasMemoizedProtocolVersionedWithContextCompanion[ViewParticipantData, HashOps] {
+    extends VersioningCompanionContextMemoization[ViewParticipantData, HashOps] {
   override val name: String = "ViewParticipantData"
 
-  val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ViewParticipantData)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ViewParticipantData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
