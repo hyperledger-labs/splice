@@ -8,7 +8,7 @@ synchronizerMigration:
   active:
     id: 0
     provider: external
-    version: 0.4.0-snapshot.20250225.8428.0.v199e3a26
+    version: 0.4.0-snapshot.20250227.8479.0.v89f53ff1
     releaseReference: "refs/tags/token-std-devnet"
 persistentSequencerHeapDumps: true
 pulumiProjectConfig:
