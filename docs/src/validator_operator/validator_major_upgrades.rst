@@ -158,3 +158,28 @@ If the migration dump has been created, proceed with the following steps:
   ``-m <migration ID>``, but omit the ``-M``.
 
 
+.. _validator-upgrade-failure-cleanup:
+
+Cleanup in the event of failure
+-------------------------------
+
+In rare occasions, where the upgrade is not successful but the validator app manages to start ingesting from the new migration id,
+the app's database might contain data of the failed migration id that should be removed.
+To check whether any such data has been stored, you can query your validator app's database
+with the following query:
+
+.. code-block:: sql
+
+    select *
+    from update_history_last_ingested_offsets
+    where history_id = (select distinct history_id from update_history_last_ingested_offsets)
+      and migration_id = ?;
+
+Replace the migration_id parameter with the migration_id for which the upgrade procedure just failed.
+
+If no rows are returned by the query, that means that nothing was ingested and thus
+the app's database does not contain any invalid data.
+
+If a row is returned, that means that data was ingested that should be purged.
+The easiest way is to restore the backup that was taken as part of the upgrade process (as per :ref:`validator-backups`)
+for the validator app and drop the database of the failed migration id for the participant.

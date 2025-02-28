@@ -235,3 +235,29 @@ Specifically, coordinated tests involve:
 
 We recommend to perform at least one coordinated test on TestNet, with the exact same configuration and versions that will be used for the upgrade on MainNet,
 before scheduling a MainNet upgrade with downtime.
+
+.. _sv-upgrade-failure-cleanup:
+
+Cleanup in the event of failure
+-------------------------------
+
+In rare occasions, where the upgrade is not successful but the apps manage to start ingesting from the new migration id,
+the apps' databases might contain data of the failed migration id that should be removed.
+To check whether any such data has been stored, you can query all of the apps' databases
+(that is: validator, scan and sv apps) with the following query:
+
+.. code-block:: sql
+
+    select *
+    from update_history_last_ingested_offsets
+    where history_id = (select distinct history_id from update_history_last_ingested_offsets)
+      and migration_id = ?;
+
+Replace the migration_id parameter with the migration_id for which the upgrade procedure just failed.
+
+If no rows are returned by the query in any of the apps' databases, that means that nothing was ingested and thus
+the app databases do not contain any invalid data.
+
+If a row is returned, that means that data was ingested that should be purged.
+The easiest way is to restore the backup that was taken as part of the upgrade process (as per :ref:`sv_backups`)
+for the validator, scan and SV apps and drop the databases of the failed migration id for sequencer, mediator and participant.
