@@ -4,7 +4,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{ConfigScheduleUtil, JavaDecodeUtil as DecodeUtil}
-import com.digitalasset.canton.time.EnrichedDurations.*
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*

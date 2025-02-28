@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConn
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
@@ -178,13 +178,13 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       )
       _ <- storeA0.initializeBackfilling(
         0,
-        DomainId.tryFromString(tx1.getDomainId),
+        SynchronizerId.tryFromString(tx1.getSynchronizerId),
         tx1.getUpdateId,
         complete = true,
       )
       _ <- storeB2.initializeBackfilling(
         2,
-        DomainId.tryFromString(tx2.getDomainId),
+        SynchronizerId.tryFromString(tx2.getSynchronizerId),
         tx2.getUpdateId,
         complete = false,
       )
@@ -194,7 +194,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
   private def backfillAll(
       source: UpdateHistory,
       destination: UpdateHistory,
-      excludeBefore: Map[DomainId, CantonTimestamp],
+      excludeBefore: Map[SynchronizerId, CantonTimestamp],
   ): Future[Boolean] = {
     val connection = new TestBackfillingScanConnection(
       source,
@@ -225,7 +225,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
     */
   class TestBackfillingScanConnection(
       history: UpdateHistory,
-      excludeBefore: Map[DomainId, CantonTimestamp],
+      excludeBefore: Map[SynchronizerId, CantonTimestamp],
       override val logger: TracedLogger,
   ) extends BackfillingScanConnection {
     override def timeouts = com.digitalasset.canton.config.DefaultProcessingTimeouts.testing
@@ -242,7 +242,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
             .flatMap { case (k, v) =>
               excludeBefore
                 .get(k)
-                .fold[Option[(DomainId, DomainRecordTimeRange)]](None)(m =>
+                .fold[Option[(SynchronizerId, DomainRecordTimeRange)]](None)(m =>
                   if (v.max < m)
                     None
                   else
@@ -269,7 +269,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
 
     override def getUpdatesBefore(
         migrationId: Long,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         before: CantonTimestamp,
         atOrAfter: Option[CantonTimestamp],
         count: Int,
@@ -277,14 +277,14 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       history
         .getUpdatesBefore(
           migrationId,
-          domainId,
+          synchronizerId,
           before,
           atOrAfter,
           PageLimit.tryCreate(count),
         )(tc)
         .map(
           _.map(_.update).filter(u =>
-            excludeBefore.get(domainId).fold(false)(b => u.update.recordTime >= b)
+            excludeBefore.get(synchronizerId).fold(false)(b => u.update.recordTime >= b)
           )
         )
   }

@@ -4,9 +4,21 @@
 {-# LANGUAGE MultiWayIf #-}
 module Splice.ExternalPartyAmuletRules where
 
+import DA.Time (RelTime, subTime)
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
+import Splice.Api.Token.AllocationInstructionV1 as Api.Token.AllocationInstructionV1
+
+import Splice.Amulet.TokenApiUtils
+import Splice.AmuletAllocation
 import Splice.AmuletRules
+import Splice.Expiry
+import Splice.Fees
+import Splice.Round
 import Splice.Types
 import Splice.Util
+
 
 import DA.Exception
 
@@ -40,6 +52,18 @@ template ExternalPartyAmuletRules
            expiresAt
            nonce
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
+
+    interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
+      view = Api.Token.TransferInstructionV1.TransferFactoryView with
+        admin = dso
+
+      transferFactory_transferImpl self arg = amulet_transferFactory_transferImpl this self arg
+
+    interface instance AllocationFactory for ExternalPartyAmuletRules where
+      view = AllocationFactoryView with
+        admin = dso
+
+      allocationFactory_allocateImpl self arg = amulet_allocationFactory_allocateImpl this self arg
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
@@ -201,3 +225,162 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
     sender : Party -- Returned to simplify tx log parsing
     nonce : Int -- Returned to simplify tx log parsing
   deriving (Show, Eq)
+
+
+-- Token standard transfer factory
+----------------------------------
+
+amulet_transferFactory_transferImpl
+  : ExternalPartyAmuletRules
+  -> ContractId Api.Token.TransferInstructionV1.TransferFactory
+  -> Api.Token.TransferInstructionV1.TransferFactory_Transfer
+  -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
+amulet_transferFactory_transferImpl this _self arg = do
+  let Api.Token.TransferInstructionV1.TransferFactory_Transfer {expectedAdmin, transfer, extraArgs} = arg
+  let dso = this.dso
+  -- validate call to factory and retrieve context
+  require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show this.dso) (expectedAdmin == dso)
+  context <- getAmuletContext extraArgs
+  paymentContext <- paymentFromChoiceContext dso context
+
+  -- == validate each field of the transfer specification ==
+  -- sender: nothing to validate
+  -- receiver: validate that it approves the preapproval
+  preapprovalCid <- getContextContractId @TransferPreapproval context transferPreapprovalContextKey
+  preapproval <- fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
+  require "Preapproval receiver matches transfer receiver" (preapproval.receiver == transfer.receiver)
+  -- amount:
+  require "Amount must be positive" (transfer.amount > 0.0)
+  -- instrumentId:
+  let expectedInstrumentId = amuletInstrumentId this.dso
+  require
+    ("Expected instrumentId " <> show expectedInstrumentId <> " matches actual instrumentId " <> show transfer.instrumentId)
+    (expectedInstrumentId == transfer.instrumentId)
+  -- executeBefore:
+  now <- getTime
+  require "Transfer must be executed before expiry" (now < transfer.executeBefore)
+  -- holdingCids: note that their detailed validation is done in the transfer itself
+  let holdings = transfer.holdingCids
+  require "At least one holding must be provided" (not $ null transfer.holdingCids)
+
+  -- execute transfer
+  _ <- exercise preapprovalCid TransferPreapproval_Send
+    with
+      sender = transfer.sender
+      context = paymentContext
+      inputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
+      amount = transfer.amount
+
+  -- return result
+  pure Api.Token.TransferInstructionV1.TransferFactory_TransferResult with
+    optTransferInstructionCid = None
+    meta = emptyMetadata
+
+
+-- Token standard allocation factory
+------------------------------------
+
+-- | The extra allocation that is made to guard against the transfer fees changing
+-- between the time of locking the amulet and the time of executing the actual transfer.
+feeReserveMultiplier : Decimal
+feeReserveMultiplier = 4.0
+
+amulet_allocationFactory_allocateImpl
+  : ExternalPartyAmuletRules
+  -> ContractId AllocationFactory
+  -> AllocationFactory_Allocate
+  -> Update AllocationFactory_AllocateResult
+amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
+  let dso = externalAmuletRules.dso
+  let AllocationFactory_Allocate {expectedAdmin, allocation, inputHoldings, extraArgs} = arg
+  -- validate call to factory and retrieve context
+  require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show dso) (expectedAdmin == dso)
+  context <- getAmuletContext extraArgs
+
+  -- We are using an unfeatured payment context, as the locking to self should not be featured.
+  -- Ideally we could feature the 'settlement.executor', but at this point we don't have the
+  -- necessary authorization from them.
+  --
+  -- The latter transfer that happens as part of the settlement will feature the 'settlement.executor',
+  -- which is what we want: incentivize successful settlements.
+  paymentContext <- unfeaturedPaymentContextFromChoiceContext dso context
+
+  -- == validate each field of the requested allocation
+  let settlement = allocation.settlement
+  let transferLeg = allocation.transferLeg
+
+  -- NOTE: this dependency on getTime should be avoided in other implementations, and replaced
+  -- with inequalities against the sequencing time. It is part of the Amulet implementation,
+  -- as its holding fees currently require the current time to estimate the fees. However,
+  -- that is planned to be changed, so we recommend not copying the very strict checks below,
+  -- which are in principle not necessary.
+  now <- getTime
+
+  -- settlement.executor: no check
+  -- settlement.settlementRef: no check
+  -- settlement.requestedAt:
+  require "Requested at must be in the past" (settlement.requestedAt <= now)
+  -- settlement.allocateBefore:
+  require "Allocate before must be in the future" (now <= settlement.allocateBefore)
+  -- settlement.settleBefore:
+  require "settlement.allocateBefore <= settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
+
+  -- transferLegId: no check
+
+  -- transferLeg.sender: no check
+  -- transferLeg.receiver: nothing to check
+  -- transferLeg.amount
+  require "Transfer amount must be positive" (transferLeg.amount > 0.0)
+  -- transferLeg.instrumentId
+  require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentId dso)
+  -- transferLeg.meta: no check
+
+  -- inputHoldings:
+  require "At least one input holding must be provided" (not $ null inputHoldings)
+
+  -- == create allocation
+  -- over-approximate fees that will be due on the actual transfer
+  let receiverOutputForActualTransfer = allocationToAmuletOutput allocation
+  [expectedTransferFees] <- exerciseComputeFees paymentContext transferLeg.sender [receiverOutputForActualTransfer]
+  openRound <- fetchChecked (ForDso with dso) paymentContext.context.openMiningRound
+  let lockDuration = settlement.settleBefore `subTime` now
+  let approximateHoldingFees = holdingFeesForDuration lockDuration openRound
+  let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
+
+  -- lock the amulet
+  let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- inputHoldings ]
+  let transfer = Splice.AmuletRules.Transfer with
+        sender = transferLeg.sender
+        provider = transferLeg.sender -- we do not have a separate app provider
+        outputs =
+          [ TransferOutput with
+              receiver = transferLeg.sender
+              amount = transferLeg.amount + feesReserveAmount
+              receiverFeeRatio = 0.0 -- locking fees are paid by the sender
+              lock = Some TimeLock with
+                expiresAt = settlement.settleBefore
+                holders = [dso]
+          ]
+        inputs = transferInputs
+
+  result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
+
+  -- create the amulet allocation
+  let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
+  allocCid <- toInterfaceContractId <$> create AmuletAllocation with
+    allocation
+    lockedAmulet
+
+  -- finaly done: return the result
+  pure AllocationFactory_AllocateResult with
+    allocationOrInstruction = AOI_Allocation with allocation = allocCid
+    meta = emptyMetadata
+
+
+holdingFeesForDuration : RelTime -> OpenMiningRound -> Decimal
+holdingFeesForDuration duration openRound =
+    holdingFeesUsd / amuletPerUsd
+  where
+    holdingFeesPerDayUsd = ratePerRoundToRatePerDay openRound.transferConfigUsd.holdingFee openRound.tickDuration
+    holdingFeesUsd = chargeRatePerDay holdingFeesPerDayUsd duration
+    amuletPerUsd = openRound.amuletPrice

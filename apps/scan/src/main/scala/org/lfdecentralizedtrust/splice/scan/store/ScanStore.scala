@@ -39,7 +39,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -94,7 +94,7 @@ trait ScanStore
       )
     )
 
-  /** Returns all items extracted by `f` from the DsoRules ensuring that they're sorted by domainId,
+  /** Returns all items extracted by `f` from the DsoRules ensuring that they're sorted by synchronizerId,
     * so that the order is deterministic.
     */
   def listFromSvNodeStates[T](
@@ -115,9 +115,9 @@ trait ScanStore
   def listDsoScans()(implicit tc: TraceContext): Future[Vector[(String, Vector[ScanInfo])]] = {
     listFromSvNodeStates { nodeState =>
       for {
-        (domainId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
+        (synchronizerId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
         scan <- domainConfig.scan.toScala
-      } yield domainId -> ScanInfo(scan.publicUrl, nodeState.svName)
+      } yield synchronizerId -> ScanInfo(scan.publicUrl, nodeState.svName)
     }
   }
   def getAmuletRules()(implicit
@@ -134,7 +134,7 @@ trait ScanStore
 
   def getDecentralizedSynchronizerId()(implicit
       tc: TraceContext
-  ): Future[DomainId] =
+  ): Future[SynchronizerId] =
     getAmuletRulesWithState()
       .flatMap(
         _.state.fold(
@@ -215,7 +215,7 @@ trait ScanStore
         .baseRateTrafficLimits
     )
 
-  def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+  def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Future[Long]
 
@@ -419,7 +419,8 @@ object ScanStore {
                 _ => None,
                 Some(_),
               ),
-            memberTrafficDomain = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
+            memberTrafficDomain =
+              Some(SynchronizerId.tryFromString(contract.payload.synchronizerId)),
             totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
         },

@@ -1,28 +1,32 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
 
+import cats.implicits.toBifunctorOps
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.commands.{
   Commands as ProtoCommands,
   DisclosedContract as ProtoDisclosedContract,
 }
-import com.digitalasset.canton.ledger.api.domain.DisclosedContract
+import com.digitalasset.canton.ledger.api.DisclosedContract
 import com.digitalasset.canton.ledger.api.validation.FieldValidator.{
   requireContractId,
-  requireDomainId,
+  requireSynchronizerId,
 }
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidArgument
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
+import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.AuthenticateFatContractInstance
 import com.digitalasset.canton.util.OptionUtil
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.transaction.TransactionCoder
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.StatusRuntimeException
 
 import scala.collection.mutable
 
-class ValidateDisclosedContracts {
+class ValidateDisclosedContracts(authenticateFatContractInstance: AuthenticateFatContractInstance) {
+
   def apply(commands: ProtoCommands)(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, ImmArray[DisclosedContract]] =
@@ -74,9 +78,9 @@ class ValidateDisclosedContracts {
           disclosedContract.contractId,
           "DisclosedContract.contract_id",
         )
-        domainIdO <- OptionUtil
-          .emptyStringAsNone(disclosedContract.domainId)
-          .map(requireDomainId(_, "DisclosedContract.domain_id").map(Some(_)))
+        synchronizerIdO <- OptionUtil
+          .emptyStringAsNone(disclosedContract.synchronizerId)
+          .map(requireSynchronizerId(_, "DisclosedContract.synchronizer_id").map(Some(_)))
           .getOrElse(Right(None))
         fatContractInstance <- TransactionCoder
           .decodeFatContractInstance(disclosedContract.createdEventBlob)
@@ -98,8 +102,18 @@ class ValidateDisclosedContracts {
             s"Mismatch between DisclosedContract.template_id ($validatedTemplateId) and template_id from decoded DisclosedContract.created_event_blob (${fatContractInstance.templateId})"
           ),
         )
+        _ <- authenticateFatContractInstance(fatContractInstance).leftMap { error =>
+          invalidArgument(
+            s"Contract authentication failed for attached disclosed contract with id (${disclosedContract.contractId}): $error"
+          )
+        }
       } yield DisclosedContract(
         fatContractInstance = fatContractInstance,
-        domainIdO = domainIdO,
+        synchronizerIdO = synchronizerIdO,
       )
+}
+
+object ValidateDisclosedContracts {
+  @VisibleForTesting
+  val WithContractIdVerificationDisabled = new ValidateDisclosedContracts(_ => Right(()))
 }

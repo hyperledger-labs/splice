@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -25,9 +25,6 @@ trait MediatorConfirmationRequest extends UnsignedProtocolMessage {
       case (_, ViewConfirmationParameters(informees, _)) =>
         informees
     }.toSet
-
-  /** Determines whether the mediator may disclose informees as part of its result message. */
-  def informeesArePublic: Boolean
 
   /** Returns the hash that all [[com.digitalasset.canton.protocol.messages.RootHashMessage]]s of the request batch should contain.
     */

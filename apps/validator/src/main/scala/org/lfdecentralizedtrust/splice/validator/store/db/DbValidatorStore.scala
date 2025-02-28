@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.validator.store.db
 
-import cats.implicits.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   ExternalPartySetupProposal,
@@ -35,7 +34,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -88,6 +87,7 @@ class DbValidatorStore(
       ] = ValidatorStore.contractFilter(key, domainMigrationId)
 
   import multiDomainAcsStore.waitUntilAcsIngested
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   private def storeId: Int = multiDomainAcsStore.storeId
   override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
@@ -351,7 +351,7 @@ class DbValidatorStore(
   }
 
   override def lookupValidatorTopUpStateWithOffset(
-      domainId: DomainId
+      synchronizerId: SynchronizerId
   )(implicit traceContext: TraceContext): Future[QueryResult[Option[Contract[
     topupCodegen.ValidatorTopUpState.ContractId,
     topupCodegen.ValidatorTopUpState,
@@ -367,7 +367,7 @@ class DbValidatorStore(
             template_id_qualified_name = ${QualifiedName(
                 topupCodegen.ValidatorTopUpState.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
-              and traffic_domain_id = $domainId
+              and traffic_domain_id = $synchronizerId
             """,
             sql"limit 1",
           ).headOption,

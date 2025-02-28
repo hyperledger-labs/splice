@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
 import better.files.File.apply
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
@@ -124,7 +124,7 @@ class DisasterRecoveryIntegrationTest
                         ),
                         domains = SvSynchronizerConfig(global =
                           SvDecentralizedSynchronizerConfig(
-                            alias = DomainAlias.tryCreate("global"),
+                            alias = SynchronizerAlias.tryCreate("global"),
                             // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
                             url = Some(s"http://localhost:28${sv}08"),
                           )
@@ -147,7 +147,7 @@ class DisasterRecoveryIntegrationTest
                     scanClient = TrustSingle(url = "http://127.0.0.1:28012"),
                     domains = ValidatorSynchronizerConfig(global =
                       ValidatorDecentralizedSynchronizerConfig(
-                        alias = DomainAlias.tryCreate("global"),
+                        alias = SynchronizerAlias.tryCreate("global"),
                         url = Some("http://localhost:28108"),
                       )
                     ),
@@ -171,7 +171,7 @@ class DisasterRecoveryIntegrationTest
                     scanClient = TrustSingle(url = "http://127.0.0.1:28012"),
                     domains = ValidatorSynchronizerConfig(global =
                       ValidatorDecentralizedSynchronizerConfig(
-                        alias = DomainAlias.tryCreate("global"),
+                        alias = SynchronizerAlias.tryCreate("global"),
                         url = Some("http://localhost:28108"),
                       )
                     ),
@@ -213,7 +213,7 @@ class DisasterRecoveryIntegrationTest
             val newConfig = validatorConfig.copy(
               domains = ValidatorSynchronizerConfig(global =
                 ValidatorDecentralizedSynchronizerConfig(
-                  alias = DomainAlias.tryCreate("global"),
+                  alias = SynchronizerAlias.tryCreate("global"),
                   url = Some("http://localhost:27108"),
                 )
               )

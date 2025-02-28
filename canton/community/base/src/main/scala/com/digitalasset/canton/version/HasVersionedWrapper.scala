@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -25,6 +25,8 @@ import scala.collection.immutable
   * but we often specify the typed alias [[com.digitalasset.canton.version.VersionedMessage]]
   * instead.
   */
+// In the versioning framework, such calls are legitimate
+@SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
 trait HasVersionedWrapper[ValueClass] extends HasVersionedToByteString {
   self: ValueClass =>
 
@@ -40,13 +42,13 @@ trait HasVersionedWrapper[ValueClass] extends HasVersionedToByteString {
     companionObj.supportedProtoVersions.converters
       .collectFirst {
         case (protoVersion, supportedVersion) if version >= supportedVersion.fromInclusive =>
-          VersionedMessage(supportedVersion.serializer(self), protoVersion.v)
+          VersionedMessage(supportedVersion.serializer(self).toByteString, protoVersion.v)
       }
       .getOrElse(serializeToHighestVersion)
 
   private def serializeToHighestVersion: VersionedMessage[ValueClass] =
     VersionedMessage(
-      companionObj.supportedProtoVersions.higherConverter.serializer(self),
+      companionObj.supportedProtoVersions.higherConverter.serializer(self).toByteString,
       companionObj.supportedProtoVersions.higherProtoVersion.v,
     )
 
@@ -89,7 +91,7 @@ trait HasVersionedMessageCompanionCommon[ValueClass] {
   case class ProtoCodec(
       fromInclusive: ProtocolVersion,
       deserializer: Deserializer,
-      serializer: Serializer,
+      serializer: ValueClass => scalapb.GeneratedMessage,
   )
 
   case class SupportedProtoVersions private (

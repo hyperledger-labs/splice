@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -6,7 +6,10 @@ package com.digitalasset.canton.data
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.data.ActionDescription.ExerciseActionDescription
+import com.digitalasset.canton.data.ActionDescription.{
+  ExerciseActionDescription,
+  FetchActionDescription,
+}
 import com.digitalasset.canton.data.TransactionView.{
   InvalidView,
   WithPath,
@@ -185,7 +188,7 @@ final case class TransactionView private (
         subviews.unblindedElements.foldLeft(viewParticipantData.resolvedKeysWithMaintainers) {
           (acc, subview) =>
             val subviewGki = subview.globalKeyInputs
-            MapsUtil.mergeWith(acc, subviewGki)((accRes, _subviewRes) => accRes)
+            MapsUtil.mergeWith(acc, subviewGki)((accRes, _) => accRes)
         }
     }
 
@@ -318,18 +321,17 @@ final case class TransactionView private (
 }
 
 object TransactionView
-    extends HasProtocolVersionedWithContextCompanion[
+    extends VersioningCompanionContext[
       TransactionView,
       (HashOps, ProtocolVersion),
     ] {
   override def name: String = "TransactionView"
-  override def supportedProtoVersions: SupportedProtoVersions =
-    SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ViewNode)(
-        supportedProtoVersion(_)(fromProtoV30),
-        _.toProtoV30.toByteString,
-      )
+  override def versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ViewNode)(
+      supportedProtoVersion(_)(fromProtoV30),
+      _.toProtoV30,
     )
+  )
 
   private def tryCreate(
       viewCommonData: MerkleTree[ViewCommonData],
@@ -415,11 +417,11 @@ object TransactionView
     for {
       commonData <- MerkleTree.fromProtoOptionV30(
         protoView.viewCommonData,
-        ViewCommonData.fromByteString(expectedProtocolVersion)(hashOps),
+        ViewCommonData.fromByteString(expectedProtocolVersion, hashOps),
       )
       participantData <- MerkleTree.fromProtoOptionV30(
         protoView.viewParticipantData,
-        ViewParticipantData.fromByteString(expectedProtocolVersion)(hashOps),
+        ViewParticipantData.fromByteString(expectedProtocolVersion, hashOps),
       )
       subViews <- TransactionSubviews.fromProtoV30(context, protoView.subviews)
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
@@ -445,14 +447,23 @@ object TransactionView
     def validateExercise(
         parentExercise: ExerciseActionDescription,
         childExercises: Seq[WithPath[ExerciseActionDescription]],
+        childFetches: Seq[WithPath[FetchActionDescription]],
     ): Either[String, Unit] = {
       val parentPackages = parentExercise.packagePreference
-      childExercises
-        .map(_.map(_.packagePreference.removedAll(parentPackages).headOption))
-        .collectFirst { case WithPath(p, Some(k)) =>
-          s"Detected unexpected exercise package preference: $k at $p"
-        }
-        .toLeft(())
+      for {
+        _ <- childExercises
+          .map(_.map(_.packagePreference.removedAll(parentPackages).headOption))
+          .collectFirst { case WithPath(p, Some(k)) =>
+            s"Detected unexpected exercise package preference: $k at $p"
+          }
+          .toLeft(())
+        _ <- childFetches
+          .map(_.map(_.packagePreference.removedAll(parentPackages).headOption))
+          .collectFirst { case WithPath(p, Some(k)) =>
+            s"Detected unexpected fetch package preference: $k at $p"
+          }
+          .toLeft(())
+      } yield ()
     }
 
     parentData.actionDescription match {
@@ -461,6 +472,9 @@ object TransactionView
           ead,
           childData.map(_.map(_.actionDescription)).collect {
             case WithPath(p, e: ExerciseActionDescription) => WithPath(p, e)
+          },
+          childData.map(_.map(_.actionDescription)).collect {
+            case WithPath(p, e: FetchActionDescription) => WithPath(p, e)
           },
         )
       case _ => Either.unit

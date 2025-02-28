@@ -15,8 +15,8 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.{SynchronizerAlias, SequencerAlias}
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnections,
@@ -33,7 +33,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class LocalSequencerConnectionsTrigger(
     baseContext: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
-    decentralizedSynchronizerAlias: DomainAlias,
+    decentralizedSynchronizerAlias: SynchronizerAlias,
     store: SvDsoStore,
     sequencerInternalConfig: ClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification,
@@ -51,9 +51,9 @@ class LocalSequencerConnectionsTrigger(
     for {
       rulesAndState <- store.getDsoRulesWithSvNodeState(svParty)
       // TODO(#4906): double-check that the right domain-ids are used in the right place to make this work with soft-domain migration
-      domainId <- participantAdminConnection.getDomainId(decentralizedSynchronizerAlias)
+      synchronizerId <- participantAdminConnection.getSynchronizerId(decentralizedSynchronizerAlias)
       domainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
-        domainId,
+        synchronizerId,
         maxDomainTimeLag = context.config.pollingInterval,
       )
       decentralizedSynchronizerId <- store.getAmuletRulesDomain()(traceContext)
@@ -68,7 +68,7 @@ class LocalSequencerConnectionsTrigger(
         )
         Future.unit
       } { publishedSequencerInfo =>
-        participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
+        participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           decentralizedSynchronizerAlias,
           setLocalSequencerConnection(
             publishedSequencerInfo,
@@ -84,7 +84,9 @@ class LocalSequencerConnectionsTrigger(
       publishedSequencerInfo: SequencerConfig,
       internalSequencerClientConfig: ClientConfig,
       domainTime: Instant,
-  )(implicit traceContext: TraceContext): DomainConnectionConfig => Option[DomainConnectionConfig] =
+  )(implicit
+      traceContext: TraceContext
+  ): SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig] =
     conf =>
       conf.sequencerConnections.default match {
         case _: GrpcSequencerConnection
@@ -108,12 +110,12 @@ class LocalSequencerConnectionsTrigger(
           )
           if (conf.sequencerConnections == newConnections) {
             logger.trace(
-              "already set DomainConnectionConfig.sequencerConnections to the local sequencer only."
+              "already set SynchronizerConnectionConfig.sequencerConnections to the local sequencer only."
             )
             None
           } else {
             logger.info(
-              "setting DomainConnectionConfig.sequencerConnections to the local sequencer only."
+              "setting SynchronizerConnectionConfig.sequencerConnections to the local sequencer only."
             )
             Some(
               conf.copy(

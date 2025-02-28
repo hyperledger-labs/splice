@@ -19,7 +19,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.{SynchronizerAlias, HasActorSystem, HasExecutionContext}
 
 import scala.concurrent.duration.*
 
@@ -146,15 +146,15 @@ class UpdateHistoryIntegrationTest
       "alice sees balance update on splitwell domain",
       _ =>
         inside(aliceSplitwellClient.listBalanceUpdates(key)) { case Seq(update) =>
-          val domainId = aliceValidatorBackend.participantClient.domains.id_of(
-            DomainAlias.tryCreate("splitwell")
+          val synchronizerId = aliceValidatorBackend.participantClient.synchronizers.id_of(
+            SynchronizerAlias.tryCreate("splitwell")
           )
           aliceValidatorBackend.participantClient.ledger_api_extensions.acs
             .lookup_contract_domain(
               aliceUserParty,
               Set(update.contractId.contractId),
             ) shouldBe Map(
-            update.contractId.contractId -> domainId
+            update.contractId.contractId -> synchronizerId
           )
         },
     )

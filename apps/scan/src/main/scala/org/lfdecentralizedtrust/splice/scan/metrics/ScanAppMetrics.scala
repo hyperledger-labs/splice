@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.BaseSpliceMetrics
 import com.digitalasset.canton.metrics.DbStorageHistograms
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
 
-/** Modelled after [[com.digitalasset.canton.domain.metrics.DomainMetrics]].
+/** Modelled after [[com.digitalasset.canton.synchronizer.metrics.DomainMetrics]].
   *
   * This is only a bare-bones implementation so the code compiles so far.
   */

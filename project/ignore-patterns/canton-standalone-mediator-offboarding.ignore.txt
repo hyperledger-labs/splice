@@ -9,4 +9,4 @@ INCORRECT_EVENT_COST.*: Missing or incorrect event cost provided by member
 
 
 # Caused by svs being off-boarded
-UNAUTHORIZED_TOPOLOGY_TRANSACTION
+TOPOLOGY_UNAUTHORIZED_TRANSACTION

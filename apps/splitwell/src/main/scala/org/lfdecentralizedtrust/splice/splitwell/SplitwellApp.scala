@@ -3,11 +3,23 @@
 
 package org.lfdecentralizedtrust.splice.splitwell
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.LifeCycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
@@ -33,18 +45,6 @@ import org.lfdecentralizedtrust.splice.splitwell.metrics.SplitwellAppMetrics
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.util.HasHealth
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.{Lifecycle}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
-import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -192,7 +192,7 @@ class SplitwellApp(
     (domains.preferred +: domains.others).toList.traverse_(createSplitwellRules(_, automation))
 
   private def createSplitwellRules(
-      domain: DomainId,
+      domain: SynchronizerId,
       automation: SplitwellAutomationService,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider.waitUntil(
@@ -209,7 +209,7 @@ class SplitwellApp(
                 automation.store.key.providerParty.toProtoPrimitive
               ).create,
             )
-            .withDomainId(domain)
+            .withSynchronizerId(domain)
             .withDedup(
               SpliceLedgerConnection.CommandId(
                 "org.lfdecentralizedtrust.splice.splitwell.createSplitwellRules",
@@ -245,7 +245,7 @@ object SplitwellApp {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
-      Lifecycle.close(
+      LifeCycle.close(
         automation,
         storage,
         store,

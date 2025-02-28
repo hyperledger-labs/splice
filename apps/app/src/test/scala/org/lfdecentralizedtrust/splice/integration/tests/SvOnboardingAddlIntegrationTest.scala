@@ -189,7 +189,7 @@ class SvOnboardingAddlIntegrationTest
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>
         val svParty = svBackend.getDsoInfo().svParty
         val decentralizedSynchronizer = svBackend.config.domains.global.alias
-        val sequencerConnections = svBackend.participantClient.domains
+        val sequencerConnections = svBackend.participantClient.synchronizers
           .config(decentralizedSynchronizer)
           .value
           .sequencerConnections
@@ -238,7 +238,7 @@ class SvOnboardingAddlIntegrationTest
       val (sv2Party, _) = actAndCheck(
         "allocate sv2 party",
         sv2Backend.participantClientWithAdminToken.ledger_api.parties
-          .allocate(sv2Backend.config.ledgerApiUser, sv2Backend.config.ledgerApiUser)
+          .allocate(sv2Backend.config.ledgerApiUser)
           .party,
       )(
         "sv1 sees sv2 party",
@@ -406,7 +406,7 @@ class SvOnboardingAddlIntegrationTest
 
       inside(
         sv1Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.list(
-          domain = decentralizedSynchronizerId,
+          synchronizerId = decentralizedSynchronizerId,
           filterParty = dsoParty.toProtoPrimitive,
         )
       ) { case Seq(mapping) =>
@@ -429,7 +429,7 @@ class SvOnboardingAddlIntegrationTest
             _.errorMessage should (include(
               s"INVALID_ARGUMENT/An error occurred. Please contact the operator and inquire about the request"
             ) or include(
-              s"Not connected to a domain on which this participant can submit for all submitters"
+              s"NO_SYNCHRONIZER_ON_WHICH_ALL_SUBMITTERS_CAN_SUBMIT"
             )),
           )
         }

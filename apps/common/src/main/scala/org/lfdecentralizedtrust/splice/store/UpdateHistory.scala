@@ -30,15 +30,16 @@ import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   DomainRecordTimeRange,
+  EventId,
+  LegacyOffset,
   ValueJsonCodecProtobuf as ProtobufCodec,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -46,12 +47,14 @@ import slick.jdbc.{GetResult, JdbcProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
+import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import slick.jdbc.canton.SQLActionBuilder
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
 class UpdateHistory(
     storage: DbStorage,
@@ -221,7 +224,7 @@ class UpdateHistory(
             .getOrRaise(
               new RuntimeException(s"No row for $newHistoryId found, which was just inserted!")
             )
-            .map(_.map(ApiOffset.assertFromStringToLong(_)))
+            .map(_.map(LegacyOffset.Api.assertFromStringToLong))
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
         } yield {
@@ -267,7 +270,7 @@ class UpdateHistory(
         Future.unit
       }
 
-      override def ingestUpdate(domain: DomainId, update: TreeUpdate)(implicit
+      override def ingestUpdate(domain: SynchronizerId, update: TreeUpdate)(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
         val offset: Long = update match {
@@ -317,7 +320,7 @@ class UpdateHistory(
       private def updateOffset(offset: Long): DBIOAction[?, NoStream, Effect.Write] =
         sqlu"""
         update update_history_last_ingested_offsets
-        set last_ingested_offset = ${lengthLimited(ApiOffset.fromLong(offset))}
+        set last_ingested_offset = ${lengthLimited(LegacyOffset.Api.fromLong(offset))}
         where history_id = $historyId and migration_id = $domainMigrationId
       """
 
@@ -329,7 +332,7 @@ class UpdateHistory(
       """
           .as[Option[String]]
           .head
-          .map(_.map(ApiOffset.assertFromStringToLong(_)))
+          .map(_.map(LegacyOffset.Api.assertFromStringToLong))
     }
 
   private def ingestUpdate_(
@@ -363,7 +366,7 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(reassignment.offset))
+    val safeParticipantOffset = lengthLimited(LegacyOffset.Api.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
     oMetrics.foreach(_.UpdateHistory.unassignments.mark())
@@ -392,10 +395,12 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(reassignment.offset))
+    val safeParticipantOffset = lengthLimited(LegacyOffset.Api.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.createdEvent.getContractId)
-    val safeEventId = lengthLimited(event.createdEvent.getEventId)
+    val safeEventId = lengthLimited(
+      EventId.prefixedFromUpdateIdAndNodeId(reassignment.updateId, event.createdEvent.getNodeId)
+    )
     val templateId = event.createdEvent.getTemplateId
     val templateIdModuleName = lengthLimited(templateId.getModuleName)
     val templateIdEntityName = lengthLimited(templateId.getEntityName)
@@ -447,9 +452,14 @@ class UpdateHistory(
       DBIOAction.seq[Effect.Write](
         tree.getEventsById.values().asScala.toSeq.map {
           case created: CreatedEvent =>
-            insertCreateEventRow(created, updateRowId)
+            insertCreateEventRow(tree.getUpdateId, created, updateRowId)
           case exercised: ExercisedEvent =>
-            insertExerciseEventRow(exercised, updateRowId)
+            insertExerciseEventRow(
+              tree.getUpdateId,
+              exercised,
+              updateRowId,
+              tree.getChildNodeIds(exercised).asScala.toSeq.map(_.intValue()),
+            )
           case _ =>
             throw new RuntimeException("Unsupported event type")
         }*
@@ -463,10 +473,12 @@ class UpdateHistory(
   ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
     val safeUpdateId = lengthLimited(tree.getUpdateId)
     val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
-    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(tree.getOffset))
-    val safeDomainId = lengthLimited(tree.getDomainId)
+    val safeParticipantOffset = lengthLimited(LegacyOffset.Api.fromLong(tree.getOffset))
+    val safeSynchronizerId = lengthLimited(tree.getSynchronizerId)
     val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
-    val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
+    val safeRootEventIds = tree.getRootNodeIds.asScala.toSeq
+      .map(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, _))
+      .map(lengthLimited)
     val safeWorkflowId = lengthLimited(tree.getWorkflowId)
     val safeCommandId = lengthLimited(tree.getCommandId)
 
@@ -478,7 +490,7 @@ class UpdateHistory(
       )
       values (
         $historyId, $safeUpdateId, $safeRecordTime,
-        $safeParticipantOffset, $safeDomainId, $migrationId,
+        $safeParticipantOffset, $safeSynchronizerId, $migrationId,
         $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId
       )
       returning row_id
@@ -486,10 +498,13 @@ class UpdateHistory(
   }
 
   private def insertCreateEventRow(
+      updateId: String,
       event: CreatedEvent,
       updateRowId: Long,
   ): DBIOAction[?, NoStream, Effect.Write] = {
-    val safeEventId = lengthLimited(event.getEventId)
+    val safeEventId = lengthLimited(
+      EventId.prefixedFromUpdateIdAndNodeId(updateId, event.getNodeId)
+    )
     val safeContractId = lengthLimited(event.getContractId)
     val templateId = event.getTemplateId
     val templateIdModuleName = lengthLimited(templateId.getModuleName)
@@ -523,13 +538,19 @@ class UpdateHistory(
   }
 
   private def insertExerciseEventRow(
+      updateId: String,
       event: ExercisedEvent,
       updateRowId: Long,
+      childNodeids: Seq[Int],
   ): DBIOAction[?, NoStream, Effect.Write] = {
-    val safeEventId = lengthLimited(event.getEventId)
+    val safeEventId = lengthLimited(
+      EventId.prefixedFromUpdateIdAndNodeId(updateId, event.getNodeId)
+    )
     val safeChoice = lengthLimited(event.getChoice)
     val safeContractId = lengthLimited(event.getContractId)
-    val safeChildEventIds = event.getChildEventIds.asScala.toSeq.map(lengthLimited)
+    val safeChildEventIds = childNodeids
+      .map(EventId.prefixedFromUpdateIdAndNodeId(updateId, _))
+      .map(lengthLimited)
     val templateId = event.getTemplateId
     val templateIdModuleName = lengthLimited(templateId.getModuleName)
     val templateIdEntityName = lengthLimited(templateId.getEntityName)
@@ -546,7 +567,10 @@ class UpdateHistory(
       event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
     val interfaceIdPackageId =
       event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
-
+    import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.emptyTraceContext
+    logger.debug(
+      s"Ingesting event  ${safeEventId} with children ${safeChildEventIds} and original last descendent ${event.getLastDescendantNodeId}"
+    )
     sqlu"""
       insert into update_history_exercises(
         history_id, event_id, update_row_id,
@@ -694,15 +718,15 @@ class UpdateHistory(
   /** Deletes all updates on the given domain with a record time before the given time.
     */
   def deleteUpdatesBefore(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       migrationId: Long,
       recordTime: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Unit] = {
     logger.info(
-      s"Deleting updates before $recordTime on domain $domainId from store $storeName with id $historyId"
+      s"Deleting updates before $recordTime on domain $synchronizerId from store $storeName with id $historyId"
     )
     val filterCondition = sql"""
-      domain_id = $domainId and
+      domain_id = $synchronizerId and
       migration_id = $migrationId and
       history_id = $historyId and
       record_time < $recordTime"""
@@ -764,7 +788,7 @@ class UpdateHistory(
 
   private def beforeFilters(
       migrationId: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       beforeRecordTime: CantonTimestamp,
       atOrAfterRecordTimeO: Option[CantonTimestamp],
   ): NonEmptyList[SQLActionBuilder] = {
@@ -773,14 +797,14 @@ class UpdateHistory(
         NonEmptyList.of(
           // Uses `> CantonTimestamp.MinValue` to exclude import updates
           sql"""migration_id = $migrationId and
-                domain_id = $domainId and
+                domain_id = $synchronizerId and
                 record_time < $beforeRecordTime and
                 record_time > ${CantonTimestamp.MinValue}"""
         )
       case Some(atOrAfterRecordTime) =>
         NonEmptyList.of(
           sql"""migration_id = $migrationId and
-                domain_id = $domainId and
+                domain_id = $synchronizerId and
                 record_time < $beforeRecordTime and
                 record_time >= ${atOrAfterRecordTime}
                 """
@@ -957,12 +981,12 @@ class UpdateHistory(
 
   def getUpdatesBefore(
       migrationId: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       beforeRecordTime: CantonTimestamp,
       atOrAfterRecordTime: Option[CantonTimestamp],
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-    val filters = beforeFilters(migrationId, domainId, beforeRecordTime, atOrAfterRecordTime)
+    val filters = beforeFilters(migrationId, synchronizerId, beforeRecordTime, atOrAfterRecordTime)
     val orderBy = sql"record_time desc"
     for {
       txs <- getTxUpdates(filters, orderBy, limit)
@@ -1128,35 +1152,45 @@ class UpdateHistory(
   ): LedgerClient.GetTreeUpdatesResponse = {
 
     val createEventsById = createRows
-      .map(row => row.eventId -> row.toCreatedEvent)
-      .toMap
-    val exerciseEventsById = exerciseRows
       .map(row =>
-        row.eventId -> new ExercisedEvent(
-          /*witnessParties = */ java.util.Collections.emptyList(),
-          /*eventId = */ row.eventId,
-          /*templateId = */ tid(
-            row.templatePackageId,
-            row.templateModuleName,
-            row.templateEntityName,
-          ),
-          /*packageName = */ row.packageName.getOrElse(missingString),
-          /*interfaceId = */ tid(
-            row.interfacePackageId,
-            row.interfaceModuleName,
-            row.interfaceEntityName,
-          ).toJava,
-          /*contractId = */ row.contractId,
-          /*choice = */ row.choice,
-          /*choiceArgument = */ ProtobufCodec.deserializeValue(row.argument),
-          /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
-          /*consuming = */ row.consuming,
-          /*childEventIds = */ row.childEventIds.asJava,
-          /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
-        )
+        Integer.valueOf(EventId.nodeIdFromEventId(row.eventId)) -> row.toCreatedEvent.event
       )
       .toMap
-    val rootEventsIds = updateRow.rootEventIds
+    // TODO(#17370) - remove this conversion as it's costly
+    val nodesWithChildren = exerciseRows
+      .map(exercise =>
+        EventId.nodeIdFromEventId(exercise.eventId) -> exercise.childEventIds
+          .map(EventId.nodeIdFromEventId)
+      )
+      .toMap
+    val exerciseEventsById = exerciseRows.map { row =>
+      val nodeId = EventId.nodeIdFromEventId(row.eventId)
+      Integer.valueOf(nodeId) -> new ExercisedEvent(
+        /*witnessParties = */ java.util.Collections.emptyList(),
+        /*offset = */ 0, // not populated
+        /*nodeId = */ nodeId,
+        /*templateId = */ tid(
+          row.templatePackageId,
+          row.templateModuleName,
+          row.templateEntityName,
+        ),
+        /*packageName = */ row.packageName.getOrElse(missingString),
+        /*interfaceId = */ tid(
+          row.interfacePackageId,
+          row.interfaceModuleName,
+          row.interfaceEntityName,
+        ).toJava,
+        /*contractId = */ row.contractId,
+        /*choice = */ row.choice,
+        /*choiceArgument = */ ProtobufCodec.deserializeValue(row.argument),
+        /*actingParties = */ row.actingParties.getOrElse(missingStringSeq).asJava,
+        /*consuming = */ row.consuming,
+        /*lastDescendedNodeId = */ Integer.valueOf(
+          EventId.lastDescendedNodeFromChildNodeIds(nodeId, nodesWithChildren)
+        ),
+        /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
+      )
+    }.toMap
     val eventsById = createEventsById ++ exerciseEventsById
 
     LedgerClient.GetTreeUpdatesResponse(
@@ -1166,16 +1200,14 @@ class UpdateHistory(
           /*commandId = */ updateRow.commandId.getOrElse(missingString),
           /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
-          /*offset = */ ApiOffset.assertFromStringToLong(updateRow.participantOffset),
+          /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
           /*eventsById = */ eventsById.asJava,
-
-          /*rootEventIds = */ rootEventsIds.asJava,
-          /*domainId = */ updateRow.domainId,
+          /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
         )
       ),
-      domainId = DomainId.tryFromString(updateRow.domainId),
+      synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
     )
   }
 
@@ -1191,11 +1223,12 @@ class UpdateHistory(
           event = Assign(
             submitter = row.submitter,
             source = row.sourceDomain,
-            target = row.domainId,
+            target = row.synchronizerId,
             unassignId = row.reassignmentId,
             createdEvent = new CreatedEvent(
               /*witnessParties = */ java.util.Collections.emptyList(),
-              /*eventId = */ row.eventId,
+              /*offset = */ 0, // not populated
+              /*nodeId = */ EventId.nodeIdFromEventId(row.eventId),
               /*templateId = */ tid(
                 row.templatePackageId,
                 row.templateModuleName,
@@ -1216,7 +1249,7 @@ class UpdateHistory(
           ),
         )
       ),
-      row.domainId,
+      row.synchronizerId,
     )
   }
 
@@ -1231,7 +1264,7 @@ class UpdateHistory(
           recordTime = row.recordTime,
           event = Unassign(
             submitter = row.submitter,
-            source = row.domainId,
+            source = row.synchronizerId,
             target = row.targetDomain,
             unassignId = row.reassignmentId,
             counter = row.reassignmentCounter,
@@ -1239,7 +1272,7 @@ class UpdateHistory(
           ),
         )
       ),
-      row.domainId,
+      row.synchronizerId,
     )
   }
 
@@ -1294,11 +1327,11 @@ class UpdateHistory(
         (
           <<[String],
           <<[CantonTimestamp],
-          ApiOffset.assertFromStringToLong(<<[String]),
-          <<[DomainId],
+          LegacyOffset.Api.assertFromStringToLong(<<[String]),
+          <<[SynchronizerId],
           <<[Long],
           <<[Long],
-          <<[DomainId],
+          <<[SynchronizerId],
           <<[String],
           <<[PartyId],
           <<[String],
@@ -1323,11 +1356,11 @@ class UpdateHistory(
         (
           <<[String],
           <<[CantonTimestamp],
-          ApiOffset.assertFromStringToLong(<<[String]),
-          <<[DomainId],
+          LegacyOffset.Api.assertFromStringToLong(<<[String]),
+          <<[SynchronizerId],
           <<[Long],
           <<[Long],
-          <<[DomainId],
+          <<[SynchronizerId],
           <<[String],
           <<[PartyId],
           <<[String],
@@ -1339,7 +1372,7 @@ class UpdateHistory(
     */
   def getRecordTimeRange(
       migrationId: Long
-  )(implicit tc: TraceContext): Future[Map[DomainId, DomainRecordTimeRange]] = {
+  )(implicit tc: TraceContext): Future[Map[SynchronizerId, DomainRecordTimeRange]] = {
     // This query is rather tricky, there are two parts we need to tackle:
     // 1. get the list of distinct domain ids
     // 2. for each of them get the min and max record time
@@ -1347,7 +1380,7 @@ class UpdateHistory(
     // To get the list of domain ids we simulate a loose index scan as describe in https://wiki.postgresql.org/wiki/Loose_indexscan.
     // We then exploit a lateral join to get the record time range as described in https://www.timescale.com/blog/select-the-most-recent-record-of-many-items-with-postgresql/.
     // This relies on the number of domain ids being reasonably small to perform well which is a valid assumption.
-    def range(table: String): Future[Map[DomainId, DomainRecordTimeRange]] = {
+    def range(table: String): Future[Map[SynchronizerId, DomainRecordTimeRange]] = {
       storage
         .query(
           sql"""
@@ -1363,7 +1396,7 @@ class UpdateHistory(
             on true
             where domain_id is not null
            """
-            .as[(DomainId, Option[CantonTimestamp], Option[CantonTimestamp])],
+            .as[(SynchronizerId, Option[CantonTimestamp], Option[CantonTimestamp])],
           s"getRecordTimeRange.$table",
         )
         .map(row =>
@@ -1470,24 +1503,24 @@ class UpdateHistory(
 
   def initializeBackfilling(
       joiningMigrationId: Long,
-      joiningDomainId: DomainId,
+      joiningSynchronizerId: SynchronizerId,
       joiningUpdateId: String,
       complete: Boolean,
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
     logger.info(
-      s"Initializing backfilling for history $historyId with joiningMigrationId=$joiningMigrationId, joiningDomainId=$joiningDomainId, joiningUpdateId=$joiningUpdateId, and complete=$complete"
+      s"Initializing backfilling for history $historyId with joiningMigrationId=$joiningMigrationId, joiningSynchronizerId=$joiningSynchronizerId, joiningUpdateId=$joiningUpdateId, and complete=$complete"
     )
     val safeUpdateId = lengthLimited(joiningUpdateId)
     storage
       .update(
         sqlu"""
           insert into update_history_backfilling (history_id, joining_migration_id, joining_domain_id, joining_update_id, complete)
-          values ($historyId, $joiningMigrationId, $joiningDomainId, $safeUpdateId, $complete)
+          values ($historyId, $joiningMigrationId, $joiningSynchronizerId, $safeUpdateId, $complete)
           on conflict (history_id) do update set
             joining_migration_id = $joiningMigrationId,
-            joining_domain_id = $joiningDomainId,
+            joining_domain_id = $joiningSynchronizerId,
             joining_update_id = $safeUpdateId,
             complete = $complete
         """,
@@ -1521,13 +1554,13 @@ class UpdateHistory(
 
       override def items(
           migrationId: Long,
-          domainId: DomainId,
+          synchronizerId: SynchronizerId,
           before: CantonTimestamp,
           count: Int,
       )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
         getUpdatesBefore(
           migrationId = migrationId,
-          domainId = domainId,
+          synchronizerId = synchronizerId,
           beforeRecordTime = before,
           atOrAfterRecordTime = None,
           limit = PageLimit.tryCreate(count),
@@ -1556,7 +1589,7 @@ class UpdateHistory(
 
       override def insert(
           migrationId: Long,
-          domainId: DomainId,
+          synchronizerId: SynchronizerId,
           items: Seq[LedgerClient.GetTreeUpdatesResponse],
       )(implicit
           tc: TraceContext
@@ -1590,7 +1623,7 @@ class UpdateHistory(
                where
                  history_id = $historyId and
                  migration_id = $migrationId and
-                 domain_id = $domainId and
+                 domain_id = $synchronizerId and
                  record_time = $headItemRecordTime
              )
            """.as[Boolean].head
@@ -1646,7 +1679,7 @@ object UpdateHistory {
       updateId: String,
       recordTime: CantonTimestamp,
       participantOffset: String,
-      domainId: String,
+      synchronizerId: String,
       migrationId: Long,
       effectiveAt: CantonTimestamp,
       rootEventIds: Seq[String],
@@ -1673,7 +1706,7 @@ object UpdateHistory {
         companion: Contract.Companion.Template[TCId, T]
     ): Contract[TCId, T] = {
       Contract
-        .fromCreatedEvent(companion)(this.toCreatedEvent)
+        .fromCreatedEvent(companion)(this.toCreatedEvent.event)
         .getOrElse(
           throw new IllegalStateException(
             s"Stored a contract that cannot be decoded as ${companion.TEMPLATE_ID}: $this"
@@ -1681,25 +1714,29 @@ object UpdateHistory {
         )
     }
 
-    def toCreatedEvent: CreatedEvent = {
-      new CreatedEvent(
-        /*witnessParties = */ java.util.Collections.emptyList(),
-        /*eventId = */ eventId,
-        /*templateId = */ tid(
-          templatePackageId,
-          templateModuleName,
-          templateEntityName,
+    def toCreatedEvent: SpliceCreatedEvent = {
+      SpliceCreatedEvent(
+        eventId,
+        new CreatedEvent(
+          /*witnessParties = */ java.util.Collections.emptyList(),
+          /*offset = */ 0, // not populated
+          /*nodeId = */ EventId.nodeIdFromEventId(eventId),
+          /*templateId = */ tid(
+            templatePackageId,
+            templateModuleName,
+            templateEntityName,
+          ),
+          /* packageName = */ packageName,
+          /*contractId = */ contractId,
+          /*arguments = */ ProtobufCodec.deserializeValue(createArguments).asRecord().get(),
+          /*createdEventBlob = */ ByteString.EMPTY,
+          /*interfaceViews = */ java.util.Collections.emptyMap(),
+          /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
+          /*contractKey = */ contractKey.map(ProtobufCodec.deserializeValue).toJava,
+          /*signatories = */ signatories.getOrElse(missingStringSeq).asJava,
+          /*observers = */ observers.getOrElse(missingStringSeq).asJava,
+          /*createdAt = */ createdAt.toInstant,
         ),
-        /* packageName = */ packageName,
-        /*contractId = */ contractId,
-        /*arguments = */ ProtobufCodec.deserializeValue(createArguments).asRecord().get(),
-        /*createdEventBlob = */ ByteString.EMPTY,
-        /*interfaceViews = */ java.util.Collections.emptyMap(),
-        /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-        /*contractKey = */ contractKey.map(ProtobufCodec.deserializeValue).toJava,
-        /*signatories = */ signatories.getOrElse(missingStringSeq).asJava,
-        /*observers = */ observers.getOrElse(missingStringSeq).asJava,
-        /*createdAt = */ createdAt.toInstant,
       )
     }
   }
@@ -1752,10 +1789,10 @@ object UpdateHistory {
       updateId: String,
       recordTime: CantonTimestamp,
       participantOffset: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       migrationId: Long,
       reassignmentCounter: Long,
-      sourceDomain: DomainId,
+      sourceDomain: SynchronizerId,
       reassignmentId: String,
       submitter: PartyId,
       contractId: String,
@@ -1775,10 +1812,10 @@ object UpdateHistory {
       updateId: String,
       recordTime: CantonTimestamp,
       participantOffset: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       migrationId: Long,
       reassignmentCounter: Long,
-      targetDomain: DomainId,
+      targetDomain: SynchronizerId,
       reassignmentId: String,
       submitter: PartyId,
       contractId: String,
@@ -1815,6 +1852,6 @@ object TreeUpdateWithMigrationId {
     new TreeUpdateWithMigrationId(update, migrationId)
 
   implicit val ordering: Ordering[TreeUpdateWithMigrationId] = Ordering.by(x =>
-    (x.migrationId, x.update.update.recordTime, x.update.domainId.toProtoPrimitive)
+    (x.migrationId, x.update.update.recordTime, x.update.synchronizerId.toProtoPrimitive)
   )
 }

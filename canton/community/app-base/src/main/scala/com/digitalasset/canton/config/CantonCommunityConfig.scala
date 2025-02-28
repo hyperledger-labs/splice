@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
@@ -8,18 +8,22 @@ import cats.syntax.functor.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.domain.mediator.{CommunityMediatorNodeConfig, RemoteMediatorConfig}
-import com.digitalasset.canton.domain.sequencing.config.{
-  CommunitySequencerNodeConfig,
-  RemoteSequencerConfig,
-}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{
   CommunityParticipantConfig,
   RemoteParticipantConfig,
 }
+import com.digitalasset.canton.synchronizer.config.PublicServerConfig
+import com.digitalasset.canton.synchronizer.mediator.{
+  CommunityMediatorNodeConfig,
+  RemoteMediatorConfig,
+}
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  CommunitySequencerNodeConfig,
+  RemoteSequencerConfig,
+}
 import com.digitalasset.canton.tracing.TraceContext
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigValue}
 import monocle.macros.syntax.lens.*
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.{ConfigReader, ConfigWriter}
@@ -71,30 +75,81 @@ object CantonCommunityConfig {
   import pureconfig.generic.semiauto.*
   import CantonConfig.*
 
-  // Implemented as a def so we can pass the ErrorLoggingContext to be used during parsing
-  @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
+  import BaseCantonConfig.Readers.dbParamsReader
+
+  implicit val h2Reader: ConfigReader[DbConfig.H2] =
+    deriveReader[DbConfig.H2]
+  implicit val postgresReader: ConfigReader[DbConfig.Postgres] =
+    deriveReader[DbConfig.Postgres]
+  implicit val dbConfigReader: ConfigReader[DbConfig] =
+    deriveReader[DbConfig]
+
+  @nowarn("cat=unused")
   private implicit val cantonCommunityConfigReader: ConfigReader[CantonCommunityConfig] = {
     import ConfigReaders.*
     import DeprecatedConfigUtils.*
-
+    import CantonConfig.ConfigReaders.Crypto.*
+    import BaseCantonConfig.Readers.*
+    implicit val driverKmsConfigReader: ConfigReader[CommunityKmsConfig.Driver] =
+      deriveReader[CommunityKmsConfig.Driver]
+    implicit val kmsConfigReader: ConfigReader[CommunityKmsConfig] =
+      deriveReader[CommunityKmsConfig]
+    implicit val communityCryptoReader: ConfigReader[CommunityCryptoConfig] =
+      deriveReader[CommunityCryptoConfig]
+    implicit val memoryReader: ConfigReader[StorageConfig.Memory] =
+      deriveReader[StorageConfig.Memory]
+    implicit val communityStorageConfigReader: ConfigReader[StorageConfig] =
+      deriveReader[StorageConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
       deriveReader[CommunityParticipantConfig]
-    implicit val communitySequencerNodeConfigReader: ConfigReader[CommunitySequencerNodeConfig] =
+
+    implicit val communitySequencerNodeConfigReader: ConfigReader[CommunitySequencerNodeConfig] = {
+      implicit val communityPublicServerConfigReader: ConfigReader[PublicServerConfig] =
+        deriveReader[PublicServerConfig]
       deriveReader[CommunitySequencerNodeConfig]
+    }
     implicit val communityMediatorNodeConfigReader: ConfigReader[CommunityMediatorNodeConfig] =
       deriveReader[CommunityMediatorNodeConfig]
-
     deriveReader[CantonCommunityConfig]
   }
 
+  private val writers = new CantonConfig.ConfigWriters(confidential = true)
+  import writers.*
+  import BaseCantonConfig.Writers.*
+  import writers.Crypto.*
+
+  implicit val memoryWriter: ConfigWriter[StorageConfig.Memory] =
+    deriveWriter[StorageConfig.Memory]
+  implicit val h2Writer: ConfigWriter[DbConfig.H2] =
+    writers.confidentialWriter[DbConfig.H2](x =>
+      x.copy(config = DbConfig.hideConfidential(x.config))
+    )
+  implicit val postgresWriter: ConfigWriter[DbConfig.Postgres] =
+    confidentialWriter[DbConfig.Postgres](x => x.copy(config = DbConfig.hideConfidential(x.config)))
+  implicit val dbConfigWriter: ConfigWriter[DbConfig] =
+    deriveWriter[DbConfig]
+
+  implicit val communityStorageConfigWriter: ConfigWriter[StorageConfig] =
+    deriveWriter[StorageConfig]
   @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
   private lazy implicit val cantonCommunityConfigWriter: ConfigWriter[CantonCommunityConfig] = {
-    val writers = new CantonConfig.ConfigWriters(confidential = true)
-    import writers.*
+    implicit val driverKmsConfigWriter: ConfigWriter[CommunityKmsConfig.Driver] =
+      ConfigWriter.fromFunction { driverConfig =>
+        implicit val driverConfigWriter: ConfigWriter[ConfigValue] =
+          writers.Crypto.driverConfigWriter(driverConfig)
+        deriveWriter[CommunityKmsConfig.Driver].to(driverConfig)
+      }
+    implicit val kmsConfigWriter: ConfigWriter[CommunityKmsConfig] =
+      deriveWriter[CommunityKmsConfig]
+    implicit val communityCryptoWriter: ConfigWriter[CommunityCryptoConfig] =
+      deriveWriter[CommunityCryptoConfig]
     implicit val communityParticipantConfigWriter: ConfigWriter[CommunityParticipantConfig] =
       deriveWriter[CommunityParticipantConfig]
-    implicit val communitySequencerNodeConfigWriter: ConfigWriter[CommunitySequencerNodeConfig] =
+    implicit val communitySequencerNodeConfigWriter: ConfigWriter[CommunitySequencerNodeConfig] = {
+      implicit val communityPublicServerConfigWriter: ConfigWriter[PublicServerConfig] =
+        deriveWriter[PublicServerConfig]
       deriveWriter[CommunitySequencerNodeConfig]
+    }
     implicit val communityMediatorNodeConfigWriter: ConfigWriter[CommunityMediatorNodeConfig] =
       deriveWriter[CommunityMediatorNodeConfig]
 

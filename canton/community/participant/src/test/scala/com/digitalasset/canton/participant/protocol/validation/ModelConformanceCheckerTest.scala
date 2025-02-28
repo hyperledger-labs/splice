@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -20,7 +20,7 @@ import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFa
 import com.digitalasset.canton.participant.protocol.validation.ModelConformanceChecker.*
 import com.digitalasset.canton.participant.protocol.validation.ModelConformanceCheckerTest.HashReInterpretationCounter
 import com.digitalasset.canton.participant.protocol.{
-  SerializableContractAuthenticator,
+  ContractAuthenticator,
   TransactionProcessingSteps,
 }
 import com.digitalasset.canton.participant.store.ContractLookupAndVerification
@@ -44,13 +44,13 @@ import com.digitalasset.canton.{
   LfPackageName,
   LfPackageVersion,
   LfPartyId,
-  RequestCounter,
 }
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName}
 import com.digitalasset.daml.lf.engine.Error as LfError
 import com.digitalasset.daml.lf.language.Ast.{Expr, GenPackage, PackageMetadata}
 import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.transaction.FatContractInstance
 import org.scalatest.wordspec.AsyncWordSpec
 import pprint.Tree
 
@@ -73,12 +73,12 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       @unused _contract: SerializableContract,
       @unused _getEngineAbortStatus: GetEngineAbortStatus,
       @unused _context: TraceContext,
-  ): EitherT[Future, ContractValidationFailure, Unit] = EitherT.pure(())
+  ): EitherT[FutureUnlessShutdown, ContractValidationFailure, Unit] = EitherT.pure(())
 
   private def reinterpretExample(
       example: ExampleTransaction,
       usedPackages: Set[PackageId] = Set.empty,
-  ): HasReinterpret with HashReInterpretationCounter = new HasReinterpret
+  ): HasReinterpret & HashReInterpretationCounter = new HasReinterpret
     with HashReInterpretationCounter {
 
     override def reinterpret(
@@ -92,7 +92,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
         expectFailure: Boolean,
         getEngineAbortStatus: GetEngineAbortStatus,
     )(implicit traceContext: TraceContext): EitherT[
-      Future,
+      FutureUnlessShutdown,
       DAMLe.ReinterpretationError,
       ReInterpretationResult,
     ] = {
@@ -111,7 +111,13 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
         }.value
 
       EitherT.rightT(
-        ReInterpretationResult(reinterpretedTx, metadata, keyResolver, usedPackages, false)
+        ReInterpretationResult(
+          reinterpretedTx,
+          metadata,
+          keyResolver,
+          usedPackages,
+          usesLedgerTime = false,
+        )
       )
     }
   }
@@ -128,7 +134,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
         expectFailure: Boolean,
         getEngineAbortStatus: GetEngineAbortStatus,
     )(implicit traceContext: TraceContext): EitherT[
-      Future,
+      FutureUnlessShutdown,
       DAMLe.ReinterpretationError,
       ReInterpretationResult,
     ] = fail("Reinterpret should not be called by this test case.")
@@ -149,14 +155,16 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
   val transactionTreeFactory: TransactionTreeFactoryImpl =
     TransactionTreeFactoryImpl(
       ExampleTransactionFactory.submittingParticipant,
-      factory.domainId,
+      factory.synchronizerId,
       testedProtocolVersion,
       factory.cryptoOps,
       loggerFactory,
     )
 
-  object dummyAuthenticator extends SerializableContractAuthenticator {
-    override def authenticate(contract: SerializableContract): Either[String, Unit] = Either.unit
+  object dummyAuthenticator extends ContractAuthenticator {
+    override def authenticateSerializable(contract: SerializableContract): Either[String, Unit] =
+      Either.unit
+    override def authenticateFat(contract: FatContractInstance): Either[String, Unit] = Either.unit
     override def verifyMetadata(
         contract: SerializableContract,
         metadata: ContractMetadata,
@@ -173,7 +181,6 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       .reInterpret(
         view,
         keyResolver,
-        RequestCounter(0),
         commonData.ledgerTime,
         commonData.submissionTime,
         getEngineAbortStatus = () => EngineAbortStatus.notAborted,
@@ -193,7 +200,6 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       .check(
         rootViewTrees,
         keyResolvers,
-        RequestCounter(0),
         ips,
         commonData,
         getEngineAbortStatus = () => EngineAbortStatus.notAborted,
@@ -206,8 +212,14 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
   val packageVersion: LfPackageVersion = LfPackageVersion.assertFromString("1.0.0")
   val packageMetadata: PackageMetadata = PackageMetadata(packageName, packageVersion, None)
   val genPackage: GenPackage[Expr] =
-    GenPackage(Map.empty, Set.empty, LanguageVersion.default, packageMetadata, true)
-  val packageResolver: PackageResolver = _ => _ => Future.successful(Some(genPackage))
+    GenPackage(
+      Map.empty,
+      Set.empty,
+      LanguageVersion.default,
+      packageMetadata,
+      isUtilityPackage = true,
+    )
+  val packageResolver: PackageResolver = _ => _ => FutureUnlessShutdown.pure(Some(genPackage))
 
   def buildUnderTest(reinterpretCommand: HasReinterpret): ModelConformanceChecker =
     new ModelConformanceChecker(
@@ -358,7 +370,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
             expectFailure: Boolean,
             getEngineAbortStatus: GetEngineAbortStatus,
         )(implicit traceContext: TraceContext): EitherT[
-          Future,
+          FutureUnlessShutdown,
           DAMLe.ReinterpretationError,
           ReInterpretationResult,
         ] = EitherT.leftT(error)
@@ -425,7 +437,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
               expectFailure: Boolean,
               getEngineAbortStatus: GetEngineAbortStatus,
           )(implicit traceContext: TraceContext): EitherT[
-            Future,
+            FutureUnlessShutdown,
             DAMLe.ReinterpretationError,
             ReInterpretationResult,
           ] = EitherT.pure(
@@ -434,7 +446,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
               subviewMissing.metadata,
               subviewMissing.keyResolver,
               Set.empty,
-              true,
+              usesLedgerTime = true,
             )
           )
         })
@@ -510,7 +522,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
                 expectFailure: Boolean,
                 getEngineAbortStatus: GetEngineAbortStatus,
             )(implicit traceContext: TraceContext): EitherT[
-              Future,
+              FutureUnlessShutdown,
               DAMLe.ReinterpretationError,
               ReInterpretationResult,
             ] = EitherT.fromEither(Left(engineError))

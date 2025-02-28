@@ -119,7 +119,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     // check that alice's validator connects to all DSO sequencers.
     // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
     eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.seconds) {
-      val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.domains
+      val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.synchronizers
         .config(
           aliceValidatorBackend.config.domains.global.alias
         )

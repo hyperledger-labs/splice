@@ -99,7 +99,7 @@ class PackageVetting(
     for {
       // While uploadDarFile is idempotent the logs are fairly noisy (which is useful in other places)
       // so we do an explicit check here to only upload if it's not already there.
-      darO <- participantAdminConnection.lookupDar(resource.darHash)
+      darO <- participantAdminConnection.lookupDar(resource.packageId)
       _ <- darO match {
         case None =>
           participantAdminConnection.uploadDarFile(

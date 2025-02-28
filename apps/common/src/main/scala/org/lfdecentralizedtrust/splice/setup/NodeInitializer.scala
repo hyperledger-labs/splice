@@ -240,23 +240,21 @@ class NodeInitializer(
       _ <- importAuthorizedStoreSnapshot(dump.authorizedStoreSnapshot)
       _ <-
         if (expectedId != dump.id) {
-          connection.listMyKeys().flatMap { keys =>
-            NonEmpty.from(keys) match {
-              case None =>
-                Future.failed(
-                  Status.INTERNAL
-                    .withDescription(
-                      "Node is bootstrapping from dump but list of keys is empty"
-                    )
-                    .asRuntimeException
-                )
-              case Some(keysNE) =>
-                connection.ensureInitialOwnerToKeyMapping(
-                  expectedId.member,
-                  keysNE.map(_.publicKey),
-                  RetryFor.Automation,
-                )
-            }
+          connection.listOwnerToKeyMapping(dump.id.member).flatMap {
+            case Seq(mapping) =>
+              connection.ensureInitialOwnerToKeyMapping(
+                expectedId.member,
+                mapping.mapping.keys,
+                RetryFor.Automation,
+              )
+            case mappings =>
+              Future.failed(
+                Status.INTERNAL
+                  .withDescription(
+                    s"Expected exactly one OwnerToKeyMapping for old node id ${dump.id} but got $mappings"
+                  )
+                  .asRuntimeException
+              )
           }
         } else Future.unit
     } yield ()

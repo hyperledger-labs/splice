@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 import com.digitalasset.canton.lifecycle.RunOnShutdown
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.lifecycle.SyncCloseable
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.util.ShowUtil.*
 
@@ -64,11 +64,11 @@ class RestartDsoDelegateBasedAutomationTrigger(
   private var epochStateVar: Option[EpochState] = None
 
   private def closeRetryProvider(): Unit =
-    epochStateVar.foreach(epochState => Lifecycle.close(epochState.retryProvider)(logger))
+    epochStateVar.foreach(epochState => LifeCycle.close(epochState.retryProvider)(logger))
 
   private def closeService(): Unit =
     epochStateVar.foreach(epochState =>
-      Lifecycle.close(epochState.dsoDelegateBasedAutomation)(logger)
+      LifeCycle.close(epochState.dsoDelegateBasedAutomation)(logger)
     )
 
   def epochState: Option[EpochState] = epochStateVar

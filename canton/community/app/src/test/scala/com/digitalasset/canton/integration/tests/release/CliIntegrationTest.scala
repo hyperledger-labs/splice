@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.tests.release
@@ -42,6 +42,8 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
     "WARN  org.jline - Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)"
   private lazy val jsonTtyWarning =
     "\"message\":\"Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)\",\"logger_name\":\"org.jline\",\"thread_name\":\"main\",\"level\":\"WARN\""
+  private lazy val commitmentCatchUpWarning =
+    "\"message\":\"The participant has activated ACS catchup mode to combat computation problem\",\"logger_name\":\"c.d.c.p.p.AcsCommitmentProcessor\",\"level\":\"WARN\""
 
   // Message printed out by the bootstrap script if Canton is started successfully
   private lazy val successMsg = "The last emperor is always the worst."
@@ -70,20 +72,6 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
     "successfully start and exit after using a run script" in { processLogger =>
       s"$cantonBin run $resourceDir/scripts/run.canton --config $simpleConf --verbose --no-tty" ! processLogger
       checkOutput(processLogger, shouldContain = Seq(successMsg), shouldSucceed = false)
-    }
-
-    // TODO(#14048) re-enable once auto-connect-local is extended to x-nodes
-    "successfully start and auto-connect to local domains" ignore { processLogger =>
-      s"""$cantonBin daemon
-           |--config $cacheTurnOff
-           |--bootstrap $resourceDir/scripts/startup.canton
-           |-C canton.parameters.manual-start=no
-           |--auto-connect-local
-           |--config $simpleConf --verbose --no-tty""".stripMargin ! processLogger
-      checkOutput(
-        processLogger,
-        shouldContain = Seq("connected: list(true, true)", successMsg),
-      )
     }
 
     "print out the Canton version when using the --version flag" in { processLogger =>
@@ -364,6 +352,8 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
       "last-errors",
       // slow ExecutionContextMonitor warnings
       "WARN  c.d.c.c.ExecutionContextMonitor - Execution context",
+      // slow participants might activate ACS commitment catch-up mode
+      commitmentCatchUpWarning,
     )
     val log = filters
       .foldLeft(logger.output()) { case (log, filter) =>

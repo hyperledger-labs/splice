@@ -16,15 +16,15 @@ import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   Contract,
   ContractWithState,
+  LegacyOffset,
   QualifiedName,
   TemplateJsonDecoder,
 }
 import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import io.circe.Json
 import io.grpc.Status
 import slick.jdbc.canton.SQLActionBuilder
@@ -86,10 +86,10 @@ trait AcsQueries extends AcsJdbcTypes {
     GetResult { prs =>
       AcsQueries.SelectFromContractStateResult(
         prs.<<[Long],
-        prs.<<[Option[DomainId]],
+        prs.<<[Option[SynchronizerId]],
         prs.<<[Long],
-        prs.<<[Option[DomainId]],
-        prs.<<[Option[DomainId]],
+        prs.<<[Option[SynchronizerId]],
+        prs.<<[Option[SynchronizerId]],
         prs.<<[Option[PartyId]],
         prs.<<[Option[String]],
       )
@@ -143,7 +143,7 @@ trait AcsQueries extends AcsJdbcTypes {
     val storeIdFromAcsRow = pp.<<[Option[Int]]
     val migrationIdFromAcsRow = pp.<<[Option[Long]]
     AcsQueries.SelectFromAcsTableResultWithOffset(
-      ApiOffset.assertFromStringToLong(pp.<<[String]),
+      LegacyOffset.Api.assertFromStringToLong(pp.<<[String]),
       for {
         storeId <- storeIdFromAcsRow
         migration_id <- migrationIdFromAcsRow
@@ -208,7 +208,7 @@ trait AcsQueries extends AcsJdbcTypes {
       val storeIdFromAcsRow = pp.<<[Option[Int]]
       val migrationIdFromAcsRow = pp.<<[Option[Long]]
       AcsQueries.SelectFromAcsTableResultWithStateAndOffset(
-        ApiOffset.assertFromStringToLong(pp.<<[String]),
+        LegacyOffset.Api.assertFromStringToLong(pp.<<[String]),
         for {
           storeId <- storeIdFromAcsRow
           migrationId <- migrationIdFromAcsRow
@@ -354,10 +354,10 @@ object AcsQueries {
 
   case class SelectFromContractStateResult(
       stateNumber: Long,
-      assignedDomain: Option[DomainId],
+      assignedDomain: Option[SynchronizerId],
       reassignmentCounter: Long,
-      reassignmentTargetDomain: Option[DomainId],
-      reassignmentSourceDomain: Option[DomainId],
+      reassignmentTargetDomain: Option[SynchronizerId],
+      reassignmentSourceDomain: Option[SynchronizerId],
       reassignmentSubmitter: Option[PartyId],
       reassignmentUnassignId: Option[String],
   )

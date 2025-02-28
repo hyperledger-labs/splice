@@ -2047,7 +2047,7 @@ class State:
             case TemplateQualifiedNames.dso_bootstrap:
                 pass
             case _:
-                self._fail(transaction, f"Unexpected root CreatedEvent: {event}")
+                self._fail(transaction, f"Unexpected root CreatedEvent: {event} for transaction: {transaction}")
         return HandleTransactionResult.empty()
 
     def handle_receive_sv_reward_coupon(self, transaction, event):

@@ -1,0 +1,45 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Types and interfaces for retrieving an investor's holdings.
+module Splice.Api.Token.HoldingV1 where
+
+import Splice.Api.Token.MetadataV1
+
+-- | A globally unique identifier for instruments.
+data InstrumentId = InstrumentId
+  with
+    admin : Party
+      -- ^ The party representing the registry app that administers the instrument.
+    id : Text
+      -- ^ The identifier used for the instrument by the instrument admin.
+      --
+      -- This identifier MUST be unique and unambiguous per instrument admin.
+  deriving (Eq, Ord, Show)
+
+-- | Details of a lock.
+data Lock = Lock
+  with
+    holders : [Party]
+      -- ^ Parties which are locking the contract.
+      -- This should  be a `Set` rather than a `List`, but the latter is easier to represent
+      -- in the JSON encoding. Should be deduplicated in the implementing template.
+  deriving (Eq, Ord, Show)
+
+-- | Holding interface.
+interface Holding where viewtype HoldingView
+
+-- | View for `Holding`.
+data HoldingView = HoldingView
+  with
+    owner : Party
+      -- ^ Owner of the holding.
+    instrumentId : InstrumentId
+      -- ^ Instrument being held.
+    amount : Decimal
+      -- ^ Size of the holding.
+    lock : Optional Lock
+      -- ^ Lock on the holding.
+    meta : Metadata
+      -- ^ Metadata.
+  deriving (Eq, Show)

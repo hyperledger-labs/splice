@@ -21,12 +21,14 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.external.scan.ScanResource as ExternalScanResource
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource as InternalScanResource
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.splice.http.v0.scan_soft_domain_migration_poc.ScanSoftDomainMigrationPocResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpExternalScanHandler,
   HttpScanHandler,
   HttpScanSoftDomainMigrationPocHandler,
+  HttpTokenStandardTransferInstructionHandler,
 }
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
@@ -42,7 +44,7 @@ import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -227,6 +229,12 @@ class ScanApp(
         loggerFactory,
       )
 
+      tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(
+        store,
+        clock,
+        loggerFactory,
+      )
+
       softDomainMigrationPocHandler =
         if (config.supportsSoftDomainMigrationPoc)
           Seq(
@@ -253,6 +261,10 @@ class ScanApp(
                 concat(
                   (InternalScanResource.routes(internalHandler, _ => provide(traceContext)) +:
                     ExternalScanResource.routes(externalHandler, _ => provide(traceContext)) +:
+                    TokenStandardTransferInstructionResource.routes(
+                      tokenStandardTransferInstructionHandler,
+                      _ => provide(traceContext),
+                    ) +:
                     softDomainMigrationPocHandler.map(handler =>
                       ScanSoftDomainMigrationPocResource.routes(handler, _ => provide(traceContext))
                     ))*
@@ -296,7 +308,7 @@ object ScanApp {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
-      Lifecycle.close(
+      LifeCycle.close(
         automation,
         store,
         storage,

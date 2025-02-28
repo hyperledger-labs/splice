@@ -59,6 +59,7 @@ import org.apache.pekko.stream.Materializer
 
 import java.time.Instant
 import java.util.Base64
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -164,11 +165,11 @@ class HttpValidatorAdminHandler(
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.getValidatorDomainDataSnapshot") { _ => _ =>
       for {
-        domainId <- getAmuletRulesDomain()(tracedContext)
+        synchronizerId <- getAmuletRulesDomain()(tracedContext)
         res <- dumpGenerator
           .getDomainDataSnapshot(
             Instant.parse(timestamp),
-            domainId,
+            synchronizerId,
             // TODO(#9731): get migration id from scan instead of configuring here
             migrationId getOrElse (config.domainMigrationId + 1),
             force.getOrElse(false),
@@ -191,7 +192,7 @@ class HttpValidatorAdminHandler(
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.getDecentralizedSynchronizerConnectionConfig") { _ => _ =>
       for {
-        connectionConfig <- participantAdminConnection.getDomainConnectionConfig(
+        connectionConfig <- participantAdminConnection.getSynchronizerConnectionConfig(
           config.domains.global.alias
         )
       } yield v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse.OK(
@@ -285,6 +286,7 @@ class HttpValidatorAdminHandler(
     }
   }
 
+  @nowarn("msg=deprecated")
   private def decodeSignedTopologyTx(
       publicKey: SigningPublicKey,
       topologyTx: definitions.SignedTopologyTx,
@@ -314,11 +316,12 @@ class HttpValidatorAdminHandler(
             ),
           signedBy = publicKey.fingerprint,
           signingAlgorithmSpec = None,
+          signatureDelegation = None,
         ),
       ),
       isProposal = true,
     )(
-      SignedTopologyTransaction.supportedProtoVersions
+      SignedTopologyTransaction.versioningTable
         .protocolVersionRepresentativeFor(ProtocolVersion.dev)
     )
 
@@ -391,7 +394,7 @@ class HttpValidatorAdminHandler(
               )
             }
           // now wait for the topology transactions to be broadcast to the domain.
-          domainId <- getAmuletRulesDomain()(tracedContext)
+          synchronizerId <- getAmuletRulesDomain()(tracedContext)
           _ <- retryProvider.retry(
             RetryFor.Automation,
             "broadcast_party_to_key_mapping",
@@ -399,7 +402,7 @@ class HttpValidatorAdminHandler(
             participantAdminConnection
               .listPartyToKey(
                 filterParty = Some(partyId),
-                filterStore = TopologyStoreId.DomainStore(domainId),
+                filterStore = TopologyStoreId.SynchronizerStore(synchronizerId),
               )
               .map { txs =>
                 txs.headOption.getOrElse(
@@ -556,7 +559,7 @@ class HttpValidatorAdminHandler(
     requireWalletEnabled { _ =>
       val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
       for {
-        domainId <- getAmuletRulesDomain()(tracedContext)
+        synchronizerId <- getAmuletRulesDomain()(tracedContext)
         result <- store.lookupExternalPartySetupProposalByUserPartyWithOffset(userParty).flatMap {
           case QueryResult(_, Some(externalPartySetupProposal)) => {
             if (externalPartySetupProposal.contract.contractId.contractId != body.contractId)
@@ -580,7 +583,7 @@ class HttpValidatorAdminHandler(
                 .toSeq
               storeWithIngestion.connection
                 .prepareSubmission(
-                  Some(domainId),
+                  Some(synchronizerId),
                   Seq(userParty),
                   Seq(userParty),
                   commands,
@@ -722,7 +725,7 @@ class HttpValidatorAdminHandler(
       val senderParty = PartyId.tryFromProtoPrimitive(body.senderPartyId)
       val receiverParty = PartyId.tryFromProtoPrimitive(body.receiverPartyId)
       for {
-        domainId <- getAmuletRulesDomain()(tracedContext)
+        synchronizerId <- getAmuletRulesDomain()(tracedContext)
         // This check is just to make it fail early. The actual preapproval is fixed when the automation
         // executes the transfer but we want the user to get feedback during the prepare step already.
         _ <- scanConnection.lookupTransferPreapprovalByParty(receiverParty).map { preapprovalO =>
@@ -757,7 +760,7 @@ class HttpValidatorAdminHandler(
           .toSeq
         r <- storeWithIngestion.connection
           .prepareSubmission(
-            Some(domainId),
+            Some(synchronizerId),
             Seq(senderParty),
             Seq(senderParty),
             commands,

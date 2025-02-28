@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   TreasuryConfig,
   WalletSweepConfig,
 }
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 
@@ -77,7 +77,7 @@ final case class BuyExtraTrafficConfig(
 )
 
 case class ValidatorDecentralizedSynchronizerConfig(
-    alias: DomainAlias,
+    alias: SynchronizerAlias,
     /** An optional statically specified URL for a sequencer to use to connect to the domain.
       * By default (when a URL is not specified), the list of sequencer URLs will be read from Scan.
       */
@@ -108,7 +108,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `SynchronizerConfig`
 case class ValidatorExtraSynchronizerConfig(
-    alias: DomainAlias,
+    alias: SynchronizerAlias,
     url: String,
 )
 
@@ -139,8 +139,8 @@ final case class ParticipantPruningConfig(
 )
 
 case class ValidatorAppBackendConfig(
-    override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: SpliceDbConfig,
+    override val adminApi: AdminServerConfig = AdminServerConfig(),
+    override val storage: DbConfig,
     ledgerApiUser: String,
     // The hint to be used for the validator operator's party ID
     // Must be None for SV validators, Some(hint) for non-SV validators

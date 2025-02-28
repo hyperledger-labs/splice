@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, external}
 import org.lfdecentralizedtrust.splice.http.v0.external.scan.ScanResource
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
@@ -29,7 +29,7 @@ class HttpExternalScanHandler(
 
   override def getMemberTrafficStatus(
       respond: ScanResource.GetMemberTrafficStatusResponse.type
-  )(domainId: String, memberId: String)(
+  )(synchronizerId: String, memberId: String)(
       extracted: TraceContext
   ): Future[ScanResource.GetMemberTrafficStatusResponse] = {
     implicit val tc = extracted
@@ -42,7 +42,7 @@ class HttpExternalScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode member ID: $error")
             )
         }
-        domain <- DomainId.fromString(domainId) match {
+        domain <- SynchronizerId.fromString(synchronizerId) match {
           case Right(domain) => Future.successful(domain)
           case Left(error) =>
             Future.failed(
@@ -65,13 +65,13 @@ class HttpExternalScanHandler(
   }
 
   override def getPartyToParticipant(respond: ScanResource.GetPartyToParticipantResponse.type)(
-      domainId: String,
+      synchronizerId: String,
       partyId: String,
   )(extracted: TraceContext): Future[ScanResource.GetPartyToParticipantResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
       for {
-        domain <- DomainId.fromString(domainId) match {
+        domain <- SynchronizerId.fromString(synchronizerId) match {
           case Right(domain) => Future.successful(domain)
           case Left(error) =>
             Future.failed(

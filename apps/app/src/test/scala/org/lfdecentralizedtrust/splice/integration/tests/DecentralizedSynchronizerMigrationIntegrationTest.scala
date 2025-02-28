@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
@@ -169,7 +169,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
-                      alias = DomainAlias.tryCreate("global"),
+                      alias = SynchronizerAlias.tryCreate("global"),
                       url = Some("http://localhost:27108"),
                     )
                   ),
@@ -203,7 +203,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
-                      alias = DomainAlias.tryCreate("global"),
+                      alias = SynchronizerAlias.tryCreate("global"),
                       url = None,
                     )
                   ),
@@ -242,7 +242,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
-                      alias = DomainAlias.tryCreate("global"),
+                      alias = SynchronizerAlias.tryCreate("global"),
                       url = Some("http://localhost:27108"),
                     )
                   ),
@@ -324,7 +324,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   domains = SplitwellSynchronizerConfig(
                     splitwell = SplitwellDomains(
                       preferred = SynchronizerConfig(
-                        alias = DomainAlias.tryCreate("global")
+                        alias = SynchronizerAlias.tryCreate("global")
                       ),
                       others = Seq.empty,
                     )
@@ -368,8 +368,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           ConfigTransforms.bumpSomeSvAppCantonDomainPortsBy(
             22_000,
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
-          )
-          compose
+          ) compose
           ConfigTransforms
             .bumpSomeScanAppPortsBy(22_000, Seq("sv1ScanLocal")) compose
           ConfigTransforms
@@ -452,8 +451,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     clue("All sequencers are registered") {
       eventually() {
         inside(sv1ScanBackend.listDsoSequencers()) {
-          case Seq(DomainSequencers(domainId, sequencers)) =>
-            domainId shouldBe decentralizedSynchronizerId
+          case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+            synchronizerId shouldBe decentralizedSynchronizerId
             sequencers should have size 4
             sequencers.foreach { sequencer =>
               sequencer.migrationId shouldBe 0
@@ -625,7 +624,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           val testDsoParty = dsoParty(env)
           val dsoPartyDecentralizedNamespace = testDsoParty.uid.namespace
           val domainDynamicParams =
-            sv1Backend.participantClientWithAdminToken.topology.domain_parameters
+            sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
               .list(
                 decentralizedSynchronizerId.filterString
               )
@@ -771,7 +770,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               withClueAndLog("domain is unpaused on the new node") {
                 eventuallySucceeds() {
                   upgradeSynchronizerNode1.newParticipantConnection
-                    .getDomainParametersState(
+                    .getSynchronizerParametersState(
                       decentralizedSynchronizerId
                     )
                     .futureValue
@@ -794,7 +793,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .owners
                   .forgetNE should have size 4
                 upgradeSynchronizerNode1.oldParticipantConnection
-                  .getDomainParametersState(
+                  .getSynchronizerParametersState(
                     decentralizedSynchronizerId
                   )
                   .futureValue
@@ -889,11 +888,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       .signBytes(
                         HexString.parseToByteString(prepareSend.txHash).value,
                         externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
+                        usage = SigningKeyUsage.ProtocolOnly,
                       )
                       .value
+                      .toProtoV30
                       .signature
                   ),
-                  HexString.toHexString(externalPartyOnboarding.publicKey.key),
+                  publicKeyAsHexString(externalPartyOnboarding.publicKey),
                 ),
               )(
                 "validator automation completes transfer",
@@ -911,8 +912,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             clue(s"scan should expose sequencers in both pre-upgrade or upgraded domain") {
               eventually() {
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
-                  case Seq(DomainSequencers(domainId, sequencers)) =>
-                    domainId shouldBe decentralizedSynchronizerId
+                  case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+                    synchronizerId shouldBe decentralizedSynchronizerId
                     sequencers.foreach { sequencer =>
                       if (sequencer.migrationId != 0 && sequencer.migrationId != 1)
                         throw new RuntimeException(
@@ -1126,8 +1127,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 clue(s"scan should expose sequencers in upgraded domain only for sv1") {
                   eventually() {
                     inside(sv1ScanLocalBackend.listDsoSequencers()) {
-                      case Seq(DomainSequencers(domainId, sequencers)) =>
-                        domainId shouldBe decentralizedSynchronizerId
+                      case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+                        synchronizerId shouldBe decentralizedSynchronizerId
                         sequencers.map { sequencer =>
                           (sequencer.migrationId, sequencer.url)
                         }.toSet shouldBe Set(
@@ -1202,10 +1203,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private def getSequencerUrlSet(
       participantConnection: ParticipantClientReference,
-      domainAlias: DomainAlias,
+      synchronizerAlias: SynchronizerAlias,
   ): Set[String] = {
-    val sequencerConnections = participantConnection.domains
-      .config(domainAlias)
+    val sequencerConnections = participantConnection.synchronizers
+      .config(synchronizerAlias)
       .value
       .sequencerConnections
     (for {

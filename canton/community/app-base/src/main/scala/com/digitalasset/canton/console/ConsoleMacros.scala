@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -62,8 +62,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.{
 }
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.BinaryFileUtil
-import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
@@ -73,6 +72,7 @@ import io.circe.syntax.*
 
 import java.io.File as JFile
 import java.time.Instant
+import scala.annotation.unused
 import scala.collection.mutable
 import scala.concurrent.duration.*
 
@@ -88,7 +88,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     @Help.Description(
       "Return the list field names of the given object. Helpful function when inspecting the return result."
     )
-    def object_args[T: TypeTag](obj: T): List[String] = type_args[T]
+    def object_args[T: TypeTag](@unused obj: T): List[String] = type_args[T]
 
     @Help.Summary("Reflective inspection of type arguments, handy to inspect case class types")
     @Help.Description(
@@ -174,8 +174,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         else p.uid.toProtoPrimitive
 
         def partyIdToParticipant(p: ListPartiesResult) = p.participants.headOption.map {
-          participantDomains =>
-            (p.party.filterString, participantReference(participantDomains.participant))
+          participantSynchronizers =>
+            (p.party.filterString, participantReference(participantSynchronizers.participant))
         }
 
         val partyAndParticipants =
@@ -269,7 +269,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |adding the resulting contract instances to Canton participants via `participant.repair.add`.
         |Obtain the `contractData` by invoking `.toContractData` on the `WrappedCreatedEvent` returned by the
         |corresponding `participant.ledger_api.acs.of_party` or `of_all` call. The `ledgerTime` parameter should be
-        |chosen to be a time meaningful to the domain on which you plan to subsequently invoke `participant.repair.add`
+        |chosen to be a time meaningful to the synchronizer on which you plan to subsequently invoke `participant.repair.add`
         |on and will be retained alongside the contract instance by the `participant.repair.add` invocation."""
     )
     def contract_data_to_instance(contractData: ContractData, ledgerTime: Instant)(implicit
@@ -339,7 +339,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def recompute_contract_ids(
         participant: LocalParticipantReference,
         acs: Seq[SerializableContract],
-        protocolVersion: ProtocolVersion,
     ): (Seq[SerializableContract], Map[LfContractId, LfContractId]) = {
       val contractIdMappings = mutable.Map.empty[LfContractId, LfContractId]
       // We assume ACS events are in order
@@ -411,7 +410,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           LedgerCreateTime(createdAt),
           metadata,
           rawContract,
-          cantonContractIdVersion,
         )
         .valueOr(err => throw new RuntimeException(err))
       cantonContractIdVersion.fromDiscriminator(discriminator, unicum)
@@ -643,7 +641,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       env.updateFeatureSet(flag, include = true)
   }
 
-  @Help.Summary("Functions to bootstrap/setup decentralized namespaces or full domains")
+  @Help.Summary("Functions to bootstrap/setup decentralized namespaces or full synchronizers")
   @Help.Group("Bootstrap")
   object bootstrap extends Helpful {
 
@@ -674,9 +672,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         .map { owner =>
           val existingDnsO =
             owner.topology.transactions
-              .findLatestByMappingHash[DecentralizedNamespaceDefinition](
+              .find_latest_by_mapping_hash[DecentralizedNamespaceDefinition](
                 DecentralizedNamespaceDefinition.uniqueKey(expectedDNS),
-                filterStore = AuthorizedStore.filterName,
+                filterStore = store,
                 includeProposals = true,
               )
               .map(_.transaction)
@@ -694,7 +692,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       // otherwise there is no chance for success
       if (proposedOrExisting.distinctBy(_.hash).sizeIs != 1) {
         throw new IllegalStateException(
-          s"Proposed or previously existing transactions disagree on the founding of the domain's decentralized namespace:\n$proposedOrExisting"
+          s"Proposed or previously existing transactions disagree on the founding of the synchronizer's decentralized namespace:\n$proposedOrExisting"
         )
       }
 
@@ -717,57 +715,37 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       (decentralizedNamespaceDefinition.mapping.namespace, foundingTransactions)
     }
 
-    private def expected_namespace(
-        owners: Seq[InstanceReference]
-    ): Either[String, Option[Namespace]] = {
-      val expectedNamespace =
-        DecentralizedNamespaceDefinition.computeNamespace(
-          owners.map(_.namespace).toSet
-        )
-      val recordedNamespaces =
-        owners.map(
-          _.topology.transactions
-            .findLatestByMappingHash[DecentralizedNamespaceDefinition](
-              DecentralizedNamespaceDefinition.uniqueKey(expectedNamespace),
-              filterStore = AuthorizedStore.filterName,
-              includeProposals = true,
-            )
-            .map(_.mapping.namespace)
-        )
-
-      recordedNamespaces.distinct match {
-        case Seq(namespaceO) => Right(namespaceO)
-        case otherwise =>
-          Left(s"the domain owners do not agree on the decentralizedNamespace: $otherwise")
-      }
-    }
-
-    private def in_domain(
+    /** Checks that either all given sequencers and mediators already have been initialized for
+      * the expected synchronizer (returns Right(Some(_)), or none have been initialized at all (returns Right(None)).
+      * In any other case (nodes have already been initialized for another synchronizer or some nodes
+      * have been initialized but others not), this method returns a Left(error).
+      */
+    private def in_synchronizer(
         sequencers: NonEmpty[Seq[SequencerReference]],
         mediators: NonEmpty[Seq[MediatorReference]],
-    )(domainId: DomainId): Either[String, Option[DomainId]] = {
-      def isNotInitializedOrSuccessWithDomain(
+    )(synchronizerId: SynchronizerId): Either[String, Option[SynchronizerId]] = {
+      def isNotInitializedOrSuccessWithSynchronizer(
           instance: InstanceReference
-      ): Either[String, Boolean /* isInitializedWithDomain */ ] =
+      ): Either[String, Boolean /* isInitializedWithSynchronizer */ ] =
         instance.health.status match {
           case nonFailure if nonFailure.isActive.contains(false) =>
             Left(s"${instance.id.member} is currently not active")
           case NodeStatus.Success(status: SequencerStatus) =>
-            // sequencer is already fully initialized for this domain
+            // sequencer is already fully initialized for this synchronizer
             Either.cond(
-              status.domainId == domainId,
+              status.synchronizerId == synchronizerId,
               true,
-              s"${instance.id.member} has already been initialized for domain ${status.domainId} instead of $domainId.",
+              s"${instance.id.member} has already been initialized for synchronizer ${status.synchronizerId} instead of $synchronizerId.",
             )
           case NodeStatus.Success(status: MediatorStatus) =>
-            // mediator is already fully initialized for this domain
+            // mediator is already fully initialized for this synchronizer
             Either.cond(
-              status.domainId == domainId,
+              status.synchronizerId == synchronizerId,
               true,
-              s"${instance.id.member} has already been initialized for domain ${status.domainId} instead of $domainId",
+              s"${instance.id.member} has already been initialized for synchronizer ${status.synchronizerId} instead of $synchronizerId",
             )
           case NodeStatus.NotInitialized(true, _) =>
-            // the node is not yet initialized for this domain
+            // the node is not yet initialized for this synchronizer
             Right(false)
           case NodeStatus.Failure(msg) =>
             Left(s"Error obtaining status for ${instance.id.member}: $msg")
@@ -777,87 +755,99 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         }
 
       val alreadyFullyInitialized =
-        (sequencers ++ mediators).forgetNE.toSeq.traverse(isNotInitializedOrSuccessWithDomain(_))
+        (sequencers ++ mediators).forgetNE.toSeq
+          .traverse(isNotInitializedOrSuccessWithSynchronizer(_))
       alreadyFullyInitialized
-        .map(nodesOnDomainOrNotInitialized =>
+        .map(nodesOnSynchronizerOrNotInitialized =>
           // any false in the result means, that some nodes haven't been initialized yet
-          if (nodesOnDomainOrNotInitialized.forall(identity)) Some(domainId)
+          if (nodesOnSynchronizerOrNotInitialized.forall(identity)) Some(synchronizerId)
           else None
         )
     }
 
-    private def no_domain(nodes: NonEmpty[Seq[InstanceReference]]): Either[String, Unit] =
-      Either.cond(
-        !nodes.exists(_.health.initialized()),
-        (),
-        "the domain has not yet been bootstrapped but some sequencers or mediators are already part of one",
-      )
-
-    private def check_domain_bootstrap_status(
+    private def check_synchronizer_bootstrap_status(
         name: String,
         owners: Seq[InstanceReference],
         sequencers: Seq[SequencerReference],
         mediators: Seq[MediatorReference],
-    ): Either[String, Option[DomainId]] =
+    ): Either[String, Option[SynchronizerId]] =
       for {
-        neOwners <- NonEmpty.from(owners.distinct).toRight("you need at least one domain owner")
+        neOwners <- NonEmpty
+          .from(owners.distinct)
+          .toRight("you need at least one synchronizer owner")
         neSequencers <- NonEmpty
           .from(sequencers.distinct)
           .toRight("you need at least one sequencer")
         neMediators <- NonEmpty.from(mediators.distinct).toRight("you need at least one mediator")
         nodes = neOwners ++ neSequencers ++ neMediators
         _ = Either.cond(nodes.forall(_.health.is_running()), (), "all nodes must be running")
-        ns <- expected_namespace(neOwners)
-        expectedId = ns.map(ns => DomainId(UniqueIdentifier.tryCreate(name, ns.toProtoPrimitive)))
-        actualIdIfAllNodesAreInitialized <- expectedId.fold(
-          no_domain(neSequencers ++ neMediators).map[Option[DomainId]](_ => None)
-        )(in_domain(neSequencers, neMediators))
+        ns =
+          DecentralizedNamespaceDefinition.computeNamespace(
+            owners.map(_.namespace).toSet
+          )
+        expectedId = SynchronizerId(UniqueIdentifier.tryCreate(name, ns.toProtoPrimitive))
+        actualIdIfAllNodesAreInitialized <- in_synchronizer(neSequencers, neMediators)(expectedId)
       } yield actualIdIfAllNodesAreInitialized
 
     private def run_bootstrap(
-        domainName: String,
-        staticDomainParameters: data.StaticDomainParameters,
-        domainOwners: Seq[InstanceReference],
-        domainThreshold: PositiveInt,
+        synchronizerName: String,
+        staticSynchronizerParameters: data.StaticSynchronizerParameters,
+        synchronizerOwners: Seq[InstanceReference],
+        synchronizerThreshold: PositiveInt,
         sequencers: Seq[SequencerReference],
         mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
         mediatorRequestAmplification: SubmissionRequestAmplification,
-    ): DomainId = {
-      val (decentralizedNamespace, foundingTxs) =
-        bootstrap.decentralized_namespace(
-          domainOwners,
-          domainThreshold,
-          store = AuthorizedStore.filterName,
-        )
-
-      val domainId = DomainId(
-        UniqueIdentifier.tryCreate(domainName, decentralizedNamespace.toProtoPrimitive)
+    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {
+      val synchronizerNamespace =
+        DecentralizedNamespaceDefinition.computeNamespace(synchronizerOwners.map(_.namespace).toSet)
+      val synchronizerId = SynchronizerId(
+        UniqueIdentifier.tryCreate(synchronizerName, synchronizerNamespace)
       )
 
+      val tempStoreForBootstrap = synchronizerOwners
+        .map(
+          _.topology.create_temporary_topology_store(
+            s"$synchronizerName-setup",
+            staticSynchronizerParameters.protocolVersion,
+          )
+        )
+        .headOption
+        .getOrElse(consoleEnvironment.raiseError("No synchronizer owners specified."))
+
       val mediators = mediatorsToSequencers.keys.toSeq
-      val seqMedIdentityTxs =
-        (sequencers ++ mediators).flatMap(_.topology.transactions.identity_transactions())
-      domainOwners.foreach(
+      val identityTransactions =
+        (sequencers ++ mediators ++ synchronizerOwners).flatMap(
+          _.topology.transactions.identity_transactions()
+        )
+      synchronizerOwners.foreach(
         _.topology.transactions.load(
-          seqMedIdentityTxs,
-          store = AuthorizedStore.filterName,
+          identityTransactions,
+          store = tempStoreForBootstrap.filterString,
           ForceFlag.AlienMember,
         )
       )
 
-      val domainGenesisTxs = domainOwners.flatMap(
-        _.topology.domain_bootstrap.generate_genesis_topology(
-          domainId,
-          domainOwners.map(_.id.member),
+      val (_, foundingTxs) =
+        bootstrap.decentralized_namespace(
+          synchronizerOwners,
+          synchronizerThreshold,
+          store = tempStoreForBootstrap.filterString,
+        )
+
+      val synchronizerGenesisTxs = synchronizerOwners.flatMap(
+        _.topology.synchronizer_bootstrap.generate_genesis_topology(
+          synchronizerId,
+          synchronizerOwners.map(_.id.member),
           sequencers.map(_.id),
           mediators.map(_.id),
+          store = tempStoreForBootstrap.filterString,
         )
       )
 
-      val initialTopologyState = (foundingTxs ++ seqMedIdentityTxs ++ domainGenesisTxs)
+      val initialTopologyState = (identityTransactions ++ foundingTxs ++ synchronizerGenesisTxs)
         .mapFilter(_.selectOp[TopologyChangeOp.Replace])
+        .distinct
 
-      // TODO(#12390) replace this merge / active with proper tooling and checks that things are really fully authorized
       val orderingMap =
         Seq(
           NamespaceDelegation.code,
@@ -873,7 +863,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           // combine signatures of transactions with the same hash
           _.reduceLeft[PositiveSignedTopologyTransaction] { (a, b) =>
             a.addSignatures(b.signatures.toSeq)
-          }.copy(isProposal = false)
+          }.updateIsProposal(isProposal = false)
         )
         .toSeq
         .sortBy(tx => orderingMap(tx.mapping.code))
@@ -881,25 +871,28 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       val storedTopologySnapshot = StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
         merged.map(stored =>
           StoredTopologyTransaction(
-            SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-            EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
-            None,
-            stored,
+            sequenced = SequencedTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+            validFrom = EffectiveTime(SignedTopologyTransaction.InitialTopologySequencingTime),
+            validUntil = None,
+            transaction = stored,
+            rejectionReason = None,
           )
         )
-      ).toByteString(staticDomainParameters.protocolVersion)
+      ).toByteString(staticSynchronizerParameters.protocolVersion)
 
       sequencers
         .filterNot(_.health.initialized())
         .foreach(x =>
-          x.setup.assign_from_genesis_state(storedTopologySnapshot, staticDomainParameters).discard
+          x.setup
+            .assign_from_genesis_state(storedTopologySnapshot, staticSynchronizerParameters)
+            .discard
         )
 
       mediatorsToSequencers
         .filter(!_._1.health.initialized())
         .foreach { case (mediator, mediatorSequencers) =>
           mediator.setup.assign(
-            domainId,
+            synchronizerId,
             SequencerConnections.tryMany(
               mediatorSequencers
                 .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
@@ -913,75 +906,88 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           )
         }
 
-      domainId
+      synchronizerOwners.foreach(
+        _.topology.drop_temporary_topology_store(tempStoreForBootstrap)
+      )
+
+      synchronizerId
     }
 
     @Help.Summary(
-      """Bootstraps a new domain with the given static domain parameters and members. Any participants as domain owners
-        |must still manually connect to the domain afterwards."""
+      "Bootstraps a new synchronizer."
     )
-    def domain(
-        domainName: String,
+    @Help.Description(
+      """Bootstraps a new synchronizer with the given static synchronizer parameters and members.
+        |Any participants as synchronizer owners must still manually connect to the synchronizer afterwards.
+        """
+    )
+    def synchronizer(
+        synchronizerName: String,
         sequencers: Seq[SequencerReference],
         mediators: Seq[MediatorReference],
-        domainOwners: Seq[InstanceReference],
-        domainThreshold: PositiveInt,
-        staticDomainParameters: data.StaticDomainParameters,
+        synchronizerOwners: Seq[InstanceReference],
+        synchronizerThreshold: PositiveInt,
+        staticSynchronizerParameters: data.StaticSynchronizerParameters,
         mediatorRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
-    ): DomainId =
-      domain(
-        domainName,
+    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId =
+      synchronizer(
+        synchronizerName,
         sequencers,
         mediators.map(_ -> sequencers).toMap,
-        domainOwners,
-        domainThreshold,
-        staticDomainParameters,
+        synchronizerOwners,
+        synchronizerThreshold,
+        staticSynchronizerParameters,
         mediatorRequestAmplification,
       )
 
     @Help.Summary(
-      """Bootstraps a new domain with the given static domain parameters and members. Any participants as domain owners
-        |must still manually connect to the domain afterwards."""
+      "Bootstraps a new synchronizer."
     )
-    def domain(
-        domainName: String,
+    @Help.Description(
+      """Bootstraps a new synchronizer with the given static synchronizer parameters and members.
+        |Any participants as synchronizer owners must still manually connect to the synchronizer afterwards.
+        """
+    )
+    def synchronizer(
+        synchronizerName: String,
         sequencers: Seq[SequencerReference],
         mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
-        domainOwners: Seq[InstanceReference],
-        domainThreshold: PositiveInt,
-        staticDomainParameters: data.StaticDomainParameters,
+        synchronizerOwners: Seq[InstanceReference],
+        synchronizerThreshold: PositiveInt,
+        staticSynchronizerParameters: data.StaticSynchronizerParameters,
         mediatorRequestAmplification: SubmissionRequestAmplification,
-    ): DomainId = {
+    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {
       // skip over HA sequencers
       val uniqueSequencers =
         sequencers.groupBy(_.id).flatMap(_._2.headOption.toList).toList
-      val domainOwnersOrDefault = if (domainOwners.isEmpty) sequencers else domainOwners
+      val synchronizerOwnersOrDefault =
+        if (synchronizerOwners.isEmpty) sequencers else synchronizerOwners
       val mediators = mediatorsToSequencers.keys.toSeq
 
-      check_domain_bootstrap_status(
-        domainName,
-        domainOwnersOrDefault,
+      check_synchronizer_bootstrap_status(
+        synchronizerName,
+        synchronizerOwnersOrDefault,
         uniqueSequencers,
         mediators,
       ) match {
-        case Right(Some(domainId)) =>
-          logger.info(s"Domain $domainName has already been bootstrapped with ID $domainId")
-          domainId
+        case Right(Some(synchronizerId)) =>
+          logger.info(
+            s"Synchronizer $synchronizerName has already been bootstrapped with ID $synchronizerId"
+          )
+          synchronizerId
         case Right(None) =>
           run_bootstrap(
-            domainName,
-            staticDomainParameters,
-            domainOwnersOrDefault,
-            domainThreshold,
+            synchronizerName,
+            staticSynchronizerParameters,
+            synchronizerOwnersOrDefault,
+            synchronizerThreshold,
             uniqueSequencers,
             mediatorsToSequencers,
             mediatorRequestAmplification,
           )
         case Left(error) =>
-          val message = s"The domain cannot be bootstrapped: $error"
-          logger.error(message)
-          sys.error(message)
+          consoleEnvironment.raiseError(s"The synchronizer cannot be bootstrapped: $error")
       }
     }
   }
@@ -997,11 +1003,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         | Writes to files the contracts that cause the mismatch and the transactions that activated them.
         | Assumes that the console is connected to both participants that observed the mismatch.
         | The commands outputs an error if the counter-participant sent several commitments for the same interval end
-        | and domain, because, e.g., it executed a repair command in the meantime and it cannot retrieve the data for the
+        | and synchronizer, because, e.g., it executed a repair command in the meantime and it cannot retrieve the data for the
         | given commitment anymore.
         | The arguments are:
-        | - domain: The domain where the mismatch occurred
-        | - mismatchTimestamp: The domain timestamp of the commitment mismatch. Needs to correspond to a commitment tick.
+        | - synchronizerId: The synchronizer where the mismatch occurred
+        | - mismatchTimestamp: The synchronizer timestamp of the commitment mismatch. Needs to correspond to a commitment tick.
         | - targetParticipant: The participant that reported the mismatch and wants to fix it on its side.
         | - counterParticipant: The counter participant that sent the mismatching commitment, and with which we interact
         |   to retrieve the mismatching contracts.
@@ -1020,7 +1026,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         | Optional argument. If not given, the default file name on the console is used.""".stripMargin
     )
     def inspect_acs_commitment_mismatch(
-        domain: DomainId,
+        synchronizerId: SynchronizerId,
         mismatchTimestamp: CantonTimestamp,
         targetParticipant: ParticipantReference,
         // TODO(#20583) Pass only the ParticipantId and change to participant-to-participant communication when available.
@@ -1030,12 +1036,13 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         binaryOutputFile: Option[String] = None,
         readableOutputFile: Option[String] = None,
     ): Unit = {
+
       // TODO(#9557) 0. If integrityChecks is true, check that, at the given mismatch timestamp, the target
       //  participant's own commitment and received counterCommitment indeed mismatch
       //  We read these commitment from the target participant's store using R5 endpoints
 
       // TODO(#9557) 1. Downloading the shared contract metadata from counter-participant:
-      //  counterParticipant.commitments.open_commitment(...)
+      // val counterParticipantCmtMetadata = counterParticipant.commitments.open_commitment(...)
 
       // TODO(#9557) 2. If integrityChecks is true, check that the contract metadata sent matches the counter commitment
       //  by uploading the contract metadata to the target participant.
@@ -1044,17 +1051,32 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       //  hierarchical commitments. In this case, we can perform the check as the last step, after we retrieve the
       //  contract payloads from the counter-participant.
 
-      // TODO(#9557) 3. Identify mismatching contracts by checking the counterParticipant's contracts metadata
+      // TODO(#9557) 3. Download the shared contract metadata from target participant
+      // val targetParticipantCmtMetadata = targetParticipant.commitments.open_commitment()
+
+      // TODO(#9557) 4. Identify mismatching contracts by checking the counterParticipant's contracts metadata
       //  against the ACS contracts of the target participant:
-      //  targetParticipant.commitments.active_contracts_mismatches(...)
+      // CommitmentContractMetadata.compare(targetParticipantCmtMetadata, counterParticipantCmtMetadata)
+
       // TODO(#20583) Investigate fetching the ACS snapshot via LAPI without the contract payload. LAPI has longer lived data
       //  and allows for party filtering.
 
-      // TODO(#9557) 4. Request contract payloads from the counterParticipant for shared contracts that cause mismatches
+      // TODO(#9557) 5. Identify mismatch reasons from the target participant for shared contracts that cause mismatches
+      // targetParticipant.commitments.inspect_commitment_contract()
+
+      // TODO(#9557) 6. Request mismatch reasons contract payloads from the counterParticipant for shared contracts that cause mismatches
+      // counterParticipant.commitments.inspect_commitment_contract()
+
+      // TODO(#9557) 7. Compile the data in 4 and 5 into mismatch reasons and write them to the binary output file:
+      // counterParticipant.commitments.inspect_commitment_contract()
+
+      // mismatch reason lives only in console macros
+
+      // TODO(#9557) 8. Request contract payloads from the counterParticipant for shared contracts that cause mismatches
       //   and write them to the binary output file:
       //   counterParticipant.commitments.download_contract_reconciliation_payloads(...)
 
-      // TODO(#9557) 5. Write user-readable data in the readable output file regarding mismatching contracts ids
+      // TODO(#9557) 9. Write user-readable data in the readable output file regarding mismatching contracts ids
     }
   }
 }
@@ -1089,11 +1111,11 @@ object DebuggingHelpers extends LazyLogging {
 
   private def get_active_contracts_helper(
       ref: ParticipantReference,
-      lookup: DomainAlias => Seq[(Boolean, SerializableContract)],
+      lookup: SynchronizerAlias => Seq[(Boolean, SerializableContract)],
   ): (Map[String, String], Map[String, TemplateId]) = {
-    val syncAcs = ref.domains
+    val syncAcs = ref.synchronizers
       .list_connected()
-      .map(_.domainAlias)
+      .map(_.synchronizerAlias)
       .flatMap(lookup)
       .collect {
         case (active, sc) if active =>

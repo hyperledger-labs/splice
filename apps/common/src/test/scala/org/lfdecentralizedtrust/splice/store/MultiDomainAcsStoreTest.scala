@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, IndexColumnValue}
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.digitalasset.canton.util.MonadUtil
 
 import java.util.concurrent.atomic.AtomicReference
@@ -77,7 +77,7 @@ abstract class MultiDomainAcsStoreTest[
     }
 
   protected def assertList(
-      expected: (C, Option[DomainId])*
+      expected: (C, Option[SynchronizerId])*
   )(implicit store: MultiDomainAcsStore) = {
     val expected_ = expected.map {
       case (c, None) => ContractWithState(c, ContractState.InFlight)
@@ -177,9 +177,9 @@ abstract class MultiDomainAcsStoreTest[
       ),
     )
 
-  protected val d1: DomainId = DomainId.tryFromString("domain1::domain")
-  protected val d2: DomainId = DomainId.tryFromString("domain2::domain")
-  protected val d3: DomainId = DomainId.tryFromString("domain3::domain")
+  protected val d1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
+  protected val d2: SynchronizerId = SynchronizerId.tryFromString("domain2::domain")
+  protected val d3: SynchronizerId = SynchronizerId.tryFromString("domain3::domain")
 
   "MultiDomainAcsStore" should {
     "ingestion initialization is idempotent" in {

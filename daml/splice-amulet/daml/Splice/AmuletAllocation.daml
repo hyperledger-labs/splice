@@ -1,0 +1,82 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.AmuletAllocation (
+  AmuletAllocation(..),
+
+  allocationToAmuletOutput,
+
+  ) where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV1
+
+import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Types
+import Splice.Util
+
+-- | Amulet allocated in locked form to a trade.
+template AmuletAllocation
+  with
+    lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
+    allocation : AllocationView
+  where
+    signatory allocationInstrumentAdmin allocation, allocation.transferLeg.sender
+    observer allocation.settlement.executor
+
+    interface instance Allocation for AmuletAllocation where
+      view = allocation
+
+      allocation_withdrawImpl _self Allocation_Withdraw{..} = unlockAmuletAllocation this extraArgs
+      allocation_cancelImpl _self Allocation_Cancel{..} = unlockAmuletAllocation this extraArgs
+      allocation_executeTransferImpl _self Allocation_ExecuteTransfer{..} = transferAmuletAllocation this extraArgs
+
+allocationInstrumentAdmin : AllocationView -> Party
+allocationInstrumentAdmin AllocationView{..} = transferLeg.instrumentId.admin
+
+
+
+-- Allocation usage
+-------------------
+
+allocationToAmuletOutput : AllocationView -> TransferOutput
+allocationToAmuletOutput allocation =
+  TransferOutput with
+    receiver = allocation.transferLeg.receiver
+    amount = allocation.transferLeg.amount
+    receiverFeeRatio = 0.0  -- all fees are paid by the sender
+    lock = None
+
+
+transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update ChoiceExecutionMetadata
+transferAmuletAllocation AmuletAllocation{..} extraArgs = do
+  let dso = allocationInstrumentAdmin allocation
+  -- extract context
+  context <- getAmuletContext extraArgs
+  paymentContext <- paymentFromChoiceContext dso context
+  let openRoundCid = paymentContext.context.openMiningRound
+  -- unlock amulet
+  unlockResult <- exercise lockedAmulet LockedAmulet_Unlock with openRoundCid
+  let amuletCid = unlockResult.amuletSum.amulet
+  -- execute transfer
+  let transfer = Splice.AmuletRules.Transfer with
+        sender = allocation.transferLeg.sender
+        provider = allocation.settlement.executor
+        inputs = [InputAmulet amuletCid]
+        outputs = [ allocationToAmuletOutput allocation ]
+  _ <- exerciseCheckedPaymentTransfer dso paymentContext transfer
+  pure ChoiceExecutionMetadata with meta = emptyMetadata
+
+unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update ChoiceExecutionMetadata
+unlockAmuletAllocation amuletAllocation extraArgs = do
+  context <- getAmuletContext extraArgs
+  openRoundCid <- getContextContractId @OpenMiningRound context openRoundContextKey
+  -- prudent engineering: check the DSO party
+  let dso = allocationInstrumentAdmin (amuletAllocation.allocation)
+  _ <- fetchChecked (ForDso with dso) openRoundCid
+  exercise amuletAllocation.lockedAmulet LockedAmulet_Unlock with openRoundCid
+  pure ChoiceExecutionMetadata with meta = emptyMetadata
+

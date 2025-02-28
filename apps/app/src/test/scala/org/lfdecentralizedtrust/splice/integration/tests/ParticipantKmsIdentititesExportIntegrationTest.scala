@@ -9,9 +9,12 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
+import org.scalatest.Ignore
 
 import java.nio.file.{Path, Paths}
 
+// TODO(#17677) Reenable once Canton fixes their compatibility issues
+@Ignore
 class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with StandaloneCanton {
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")

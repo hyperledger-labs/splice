@@ -1,5 +1,12 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.CryptoProvider
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.HexString
+import com.digitalasset.canton.version.ProtocolVersion
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   ExternalPartySetupProposal,
   TransferPreapproval,
@@ -10,21 +17,16 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   SignedTopologyTx,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
-import com.digitalasset.canton.config.CommunityCryptoProvider
-import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.HexString
-import com.digitalasset.canton.version.ProtocolVersion
 
 import java.util.UUID
 
 trait ExternallySignedPartyTestUtil extends TestCommon {
+
   def onboardExternalParty(
       validatorBackend: ValidatorAppBackendReference,
       partyHint: Option[String] = None,
   ): OnboardingResult = {
-    val signingPublicKey =
+    val generatedKey: SigningPublicKey =
       validatorBackend.participantClient.keys.secret
         .generate_signing_key(
           UUID.randomUUID().toString,
@@ -33,13 +35,16 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         )
     val truePartyHint = partyHint.getOrElse(UUID.randomUUID().toString)
     val signingKeyPairByteString = validatorBackend.participantClient.keys.secret
-      .download(signingPublicKey.fingerprint, ProtocolVersion.dev)
-    val privateKey =
-      CryptoKeyPair.fromTrustedByteString(signingKeyPairByteString).value.privateKey
+      .download(generatedKey.fingerprint, ProtocolVersion.dev)
+    val keyPair =
+      CryptoKeyPair.fromTrustedByteString(signingKeyPairByteString).value
+    val privateKey = keyPair.privateKey
+    val subjectPublicKeyInfo = extractSubjectPublicKeyInfoFrom(keyPair)
+
     val listOfTransactionsAndHashes = validatorBackend
       .generateExternalPartyTopology(
         truePartyHint,
-        HexString.toHexString(signingPublicKey.key),
+        publicKeyAsHexString(subjectPublicKeyInfo),
       )
       .topologyTxs
     val signedTopologyTxs = listOfTransactionsAndHashes.map { tx =>
@@ -50,8 +55,10 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
             .sign(
               hash = Hash.fromHexString(tx.hash).value,
               signingKey = privateKey.asInstanceOf[SigningPrivateKey],
+              usage = SigningKeyUsage.ProtocolOnly,
             )
             .value
+            .toProtoV30
             .signature
         ),
       )
@@ -59,25 +66,52 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
 
     validatorBackend.submitExternalPartyTopology(
       signedTopologyTxs,
-      HexString.toHexString(signingPublicKey.key),
+      publicKeyAsHexString(subjectPublicKeyInfo),
     )
 
     OnboardingResult(
-      PartyId.tryCreate(truePartyHint, signingPublicKey.fingerprint),
-      signingPublicKey,
+      PartyId.tryCreate(truePartyHint, generatedKey.fingerprint),
+      generatedKey,
       privateKey,
     )
   }
 
+  def publicKeyAsHexString(keyPair: CryptoKeyPair[PublicKey, PrivateKey]): String = {
+    publicKeyAsHexString(extractSubjectPublicKeyInfoFrom(keyPair))
+  }
+
+  def publicKeyAsHexString(publicKey: PublicKey): String = {
+    publicKeyAsHexString(extractSubjectPublicKeyInfoFrom(publicKey))
+  }
+
+  def publicKeyAsHexString(subjectPublicKeyInfo: SubjectPublicKeyInfo): String = {
+    HexString.toHexString(subjectPublicKeyInfo.getPublicKeyData.getBytes)
+  }
+
+  def extractSubjectPublicKeyInfoFrom(
+      keyPair: CryptoKeyPair[PublicKey, PrivateKey]
+  ): SubjectPublicKeyInfo = {
+    extractSubjectPublicKeyInfoFrom(keyPair.publicKey)
+  }
+
+  def extractSubjectPublicKeyInfoFrom(
+      publicKey: PublicKey
+  ): SubjectPublicKeyInfo = {
+    SubjectPublicKeyInfo
+      .getInstance(
+        publicKey.toProtoPublicKeyV30.getSigningPublicKey.publicKey.toByteArray
+      )
+  }
+
   // The parameters here are just defaults so don't really matter
   val crypto = new JcePureCrypto(
-    CommunityCryptoProvider.Jce.symmetric.default,
-    CommunityCryptoProvider.Jce.signingAlgorithms.default,
-    CommunityCryptoProvider.Jce.signingAlgorithms.supported,
-    CommunityCryptoProvider.Jce.encryptionAlgorithms.default,
-    CommunityCryptoProvider.Jce.encryptionAlgorithms.supported,
-    CommunityCryptoProvider.Jce.hash.default,
-    CommunityCryptoProvider.Jce.pbkdf.value.default,
+    CryptoProvider.Jce.symmetric.default,
+    CryptoProvider.Jce.signingAlgorithms.default,
+    CryptoProvider.Jce.signingAlgorithms.supported,
+    CryptoProvider.Jce.encryptionAlgorithms.default,
+    CryptoProvider.Jce.encryptionAlgorithms.supported,
+    CryptoProvider.Jce.hash.default,
+    CryptoProvider.Jce.pbkdf.value.default,
     loggerFactory,
   )
 
@@ -173,11 +207,13 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
             .signBytes(
               HexString.parseToByteString(preparedTx.txHash).value,
               externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
+              usage = SigningKeyUsage.ProtocolOnly,
             )
             .value
+            .toProtoV30
             .signature
         ),
-        HexString.toHexString(externalPartyOnboarding.publicKey.key),
+        publicKeyAsHexString(externalPartyOnboarding.publicKey),
       ),
     )(
       s"acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party} submitted",

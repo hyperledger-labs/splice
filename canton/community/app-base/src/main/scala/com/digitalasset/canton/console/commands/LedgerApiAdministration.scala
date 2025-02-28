@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -10,22 +10,23 @@ import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, StandardJWTPayload}
 import com.daml.ledger.api.v2.admin.command_inspection_service.CommandState
 import com.daml.ledger.api.v2.admin.package_management_service.PackageDetails
 import com.daml.ledger.api.v2.admin.party_management_service.PartyDetails as ProtoPartyDetails
-import com.daml.ledger.api.v2.commands.{Command, DisclosedContract}
+import com.daml.ledger.api.v2.commands.{Command, DisclosedContract, PrefetchContractKey}
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
-  ExecuteSubmissionResponse as ExecuteResponseProto,
   HashingSchemeVersion,
-  PrepareSubmissionResponse as PrepareResponseProto,
   PreparedTransaction,
+  ExecuteSubmissionResponse as ExecuteResponseProto,
+  PrepareSubmissionResponse as PrepareResponseProto,
 }
 import com.daml.ledger.api.v2.reassignment.Reassignment as ReassignmentProto
 import com.daml.ledger.api.v2.state_service.{
   ActiveContract,
   GetActiveContractsResponse,
-  GetConnectedDomainsResponse,
+  GetConnectedSynchronizersResponse,
 }
+import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction as TopoplogyTransactionProto
 import com.daml.ledger.api.v2.transaction.{
   Transaction as TransactionV2,
   TransactionTree as TransactionTreeProto,
@@ -34,11 +35,13 @@ import com.daml.ledger.api.v2.transaction_filter.{
   Filters,
   TransactionFilter as TransactionFilterProto,
 }
+import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi as javab
 import com.daml.ledger.javaapi.data.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
   Reassignment,
+  TopologyTransaction,
   Transaction,
   TransactionFilter,
   TransactionTree,
@@ -72,19 +75,15 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
-import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.api.domain.{
-  IdentityProviderConfig,
-  IdentityProviderId,
-  JwksUrl,
-}
+import com.digitalasset.canton.ledger.api.util.TransactionTreeOps.TransactionTreeOps
+import com.digitalasset.canton.ledger.api.{IdentityProviderConfig, IdentityProviderId, JwksUrl}
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.networking.grpc.{GrpcError, RecordingStreamObserver}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.platform.apiserver.execution.CommandStatus
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.{LfPackageId, LfPartyId, config}
@@ -122,7 +121,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
   def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
-      txDomainId: String,
+      txSynchronizerId: String,
       optTimeout: Option[config.NonNegativeDuration],
   ): Tx
   def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
@@ -249,18 +248,18 @@ trait BaseLedgerApiAdministration extends NoTracing {
           verbose: Boolean = true,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateWrapper => Boolean = _ => true,
-          domainFilter: Option[DomainId] = None,
+          synchronizerFilter: Option[SynchronizerId] = None,
       ): Seq[UpdateWrapper] = check(FeatureFlag.Testing)({
 
-        val resultFilterWithDomain = domainFilter match {
-          case Some(domainId) =>
+        val resultFilterWithSynchronizer = synchronizerFilter match {
+          case Some(synchronizerId) =>
             (update: UpdateWrapper) =>
-              resultFilter(update) && update.domainId == domainId.toProtoPrimitive
+              resultFilter(update) && update.synchronizerId == synchronizerId.toProtoPrimitive
           case None => resultFilter
         }
 
         val observer =
-          new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilterWithDomain)
+          new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilterWithSynchronizer)
 
         val filter = TransactionFilterProto(partyIds.map(_.toLf -> Filters()).toMap)
         mkResult(
@@ -336,7 +335,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         """This function will subscribe on behalf of `parties` to the update tree stream and
           |notify various metrics:
           |The metric `<name>.<metricSuffix>` counts the number of update trees emitted.
-          |The metric `<name>.<metricSuffix>-tx-node-count` tracks the number of root events emitted as part of update trees.
+          |The metric `<name>.<metricSuffix>-tx-node-count` tracks the number of events emitted as part of update trees.
           |The metric `<name>.<metricSuffix>-tx-size` tracks the number of bytes emitted as part of update trees.
           |
           |To stop measuring, you need to close the returned `AutoCloseable`.
@@ -361,9 +360,11 @@ trait BaseLedgerApiAdministration extends NoTracing {
             override def onNext(tree: UpdateTreeWrapper): Unit = {
               val (s, serializedSize) = tree match {
                 case TransactionTreeWrapper(transactionTree) =>
-                  transactionTree.rootEventIds.size.toLong -> transactionTree.serializedSize
+                  transactionTree.rootNodeIds().size.toLong -> transactionTree.serializedSize
                 case reassignmentWrapper: ReassignmentWrapper =>
                   1L -> reassignmentWrapper.reassignment.serializedSize
+                case TopologyTransactionWrapper(topologyTransaction) =>
+                  topologyTransaction.events.size.toLong -> topologyTransaction.serializedSize
               }
               consoleMetrics.metric.mark(s)
               consoleMetrics.nodeCount.update(s)
@@ -417,6 +418,20 @@ trait BaseLedgerApiAdministration extends NoTracing {
             )
           )
         })
+
+      @Help.Summary("Get a transaction tree by its offset", FeatureFlag.Testing)
+      @Help.Description(
+        """Get a transaction tree from the update stream by its offset. Returns None if the transaction is not (yet)
+          |known at the participant or if the transaction has been pruned via `pruning.prune`."""
+      )
+      def by_offset(parties: Set[PartyId], offset: Long): Option[TransactionTreeProto] =
+        check(FeatureFlag.Testing)(consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.UpdateService.GetTransactionByOffset(parties.map(_.toLf), offset)(
+              consoleEnvironment.environment.executionContext
+            )
+          )
+        })
     }
 
     @Help.Summary("Interactive submission", FeatureFlag.Testing)
@@ -440,7 +455,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def prepare(
           actAs: Seq[PartyId],
           commands: Seq[Command],
-          domainId: Option[DomainId] = None,
+          synchronizerId: Option[SynchronizerId] = None,
           commandId: String = UUID.randomUUID().toString,
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
@@ -448,6 +463,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           applicationId: String = applicationId,
           userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
           verboseHashing: Boolean = false,
+          prefetchContractKeys: Seq[PrefetchContractKey] = Seq.empty,
       ): PrepareResponseProto =
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -458,10 +474,11 @@ trait BaseLedgerApiAdministration extends NoTracing {
               commandId,
               minLedgerTimeAbs,
               disclosedContracts,
-              domainId,
+              synchronizerId,
               applicationId,
               userPackageSelectionPreference,
               verboseHashing,
+              prefetchContractKeys,
             )
           )
         }
@@ -522,7 +539,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit(
           actAs: Seq[PartyId],
           commands: Seq[Command],
-          domainId: Option[DomainId] = None,
+          synchronizerId: Option[SynchronizerId] = None,
           workflowId: String = "",
           commandId: String = "",
           optTimeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
@@ -546,13 +563,13 @@ trait BaseLedgerApiAdministration extends NoTracing {
               submissionId,
               minLedgerTimeAbs,
               disclosedContracts,
-              domainId,
+              synchronizerId,
               applicationId,
               userPackageSelectionPreference,
             )
           )
         }
-        optionallyAwait(tx, tx.updateId, tx.domainId, optTimeout)
+        optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
       }
 
       @Help.Summary(
@@ -572,7 +589,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit_flat(
           actAs: Seq[PartyId],
           commands: Seq[Command],
-          domainId: Option[DomainId] = None,
+          synchronizerId: Option[SynchronizerId] = None,
           workflowId: String = "",
           commandId: String = "",
           optTimeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
@@ -596,13 +613,13 @@ trait BaseLedgerApiAdministration extends NoTracing {
               submissionId,
               minLedgerTimeAbs,
               disclosedContracts,
-              domainId,
+              synchronizerId,
               applicationId,
               userPackageSelectionPreference,
             )
           )
         }
-        optionallyAwait(tx, tx.updateId, tx.domainId, optTimeout)
+        optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
       }
 
       @Help.Summary("Submit command asynchronously", FeatureFlag.Testing)
@@ -613,7 +630,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit_async(
           actAs: Seq[PartyId],
           commands: Seq[Command],
-          domainId: Option[DomainId] = None,
+          synchronizerId: Option[SynchronizerId] = None,
           workflowId: String = "",
           commandId: String = "",
           deduplicationPeriod: Option[DeduplicationPeriod] = None,
@@ -636,7 +653,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               submissionId,
               minLedgerTimeAbs,
               disclosedContracts,
-              domainId,
+              synchronizerId,
               applicationId,
               userPackageSelectionPreference,
             )
@@ -689,8 +706,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit_assign(
           submitter: PartyId,
           unassignId: String,
-          source: DomainId,
-          target: DomainId,
+          source: SynchronizerId,
+          target: SynchronizerId,
           workflowId: String = "",
           applicationId: String = applicationId,
           submissionId: String = UUID.randomUUID().toString,
@@ -728,8 +745,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit_unassign(
           submitter: PartyId,
           contractId: LfContractId,
-          source: DomainId,
-          target: DomainId,
+          source: SynchronizerId,
+          target: SynchronizerId,
           workflowId: String = "",
           applicationId: String = applicationId,
           submissionId: String = UUID.randomUUID().toString,
@@ -763,8 +780,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit_reassign(
           submitter: PartyId,
           contractId: LfContractId,
-          source: DomainId,
-          target: DomainId,
+          source: SynchronizerId,
+          target: SynchronizerId,
           workflowId: String = "",
           applicationId: String = applicationId,
           submissionId: String = UUID.randomUUID().toString,
@@ -800,7 +817,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
       // for reassignments are available over the Ladger API.
       private def submitReassignment(
           submitter: PartyId,
-          waitForParticipants: Map[ParticipantReference, PartyId] = Map.empty,
+          waitForParticipants: Map[ParticipantReference, PartyId],
           timeout: config.NonNegativeDuration,
       )(submit: String => Unit): ReassignmentWrapper = {
         val commandId = UUID.randomUUID().toString
@@ -840,8 +857,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit_assign_async(
           submitter: PartyId,
           unassignId: String,
-          source: DomainId,
-          target: DomainId,
+          source: SynchronizerId,
+          target: SynchronizerId,
           workflowId: String = "",
           applicationId: String = applicationId,
           commandId: String = UUID.randomUUID().toString,
@@ -871,8 +888,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def submit_unassign_async(
           submitter: PartyId,
           contractId: LfContractId,
-          source: DomainId,
-          target: DomainId,
+          source: SynchronizerId,
+          target: SynchronizerId,
           workflowId: String = "",
           applicationId: String = applicationId,
           commandId: String = UUID.randomUUID().toString,
@@ -907,11 +924,11 @@ trait BaseLedgerApiAdministration extends NoTracing {
           )
         })
 
-      @Help.Summary("Read the current connected domains for a party", FeatureFlag.Testing)
-      def connected_domains(partyId: PartyId): GetConnectedDomainsResponse =
+      @Help.Summary("Read the current connected synchronizers for a party", FeatureFlag.Testing)
+      def connected_synchronizers(partyId: PartyId): GetConnectedSynchronizersResponse =
         check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
-            LedgerApiCommands.StateService.GetConnectedDomains(partyId.toLf)
+            LedgerApiCommands.StateService.GetConnectedSynchronizers(partyId.toLf)
           )
         })
 
@@ -957,6 +974,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             |- limit: limit (default set via canton.parameter.console)
             |- verbose: whether the resulting events should contain detailed type information
             |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
+            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
             |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
             |  must be no greater than the current ledger end offset and must be greater than or equal to the
             |  last pruning offset. If no offset is specified then the current participant end will be used.
@@ -970,6 +988,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -995,6 +1014,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                   Set(party.toLf),
                   limit,
                   filterTemplates,
+                  filterInterfaces,
                   activeAt,
                   verbose,
                   timeout.asFiniteApproximation,
@@ -1029,6 +1049,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1038,6 +1059,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1066,6 +1088,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1075,6 +1098,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1104,6 +1128,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1113,6 +1138,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1145,6 +1171,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             identityProviderId: String = "",
@@ -1175,6 +1202,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                             localParties.toSet,
                             limit,
                             filterTemplates,
+                            filterInterfaces,
                             activeAtOffsetO.getOrElse(end()),
                             verbose,
                             timeout.asFiniteApproximation,
@@ -1238,13 +1266,11 @@ trait BaseLedgerApiAdministration extends NoTracing {
       @Help.Description(
         """Allocates a new party on the ledger.
           party: a hint for generating the party identifier
-          displayName: a human-readable name of this party
           annotations: key-value pairs associated with this party and stored locally on this Ledger API server
           identityProviderId: identity provider id"""
       )
       def allocate(
           party: String,
-          displayName: String,
           annotations: Map[String, String] = Map.empty,
           identityProviderId: String = "",
       ): PartyDetails = {
@@ -1252,7 +1278,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ledgerApiCommand(
             LedgerApiCommands.PartyManagementService.AllocateParty(
               partyIdHint = party,
-              displayName = displayName,
               annotations = annotations,
               identityProviderId = identityProviderId,
             )
@@ -1366,7 +1391,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |controlling Canton specific behaviour.
           |In particular, a Dar uploaded using the ledger Api will not be available in the Dar store and can not be downloaded again.
           |Additionally, Dars uploaded using the ledger Api will be vetted, but the system will not wait
-          |for the Dars to be successfully registered with all connected domains. As such, if a Dar is uploaded and then
+          |for the Dars to be successfully registered with all connected synchronizers. As such, if a Dar is uploaded and then
           |used immediately thereafter, a command might bounce due to missing package vettings.""")
       def upload_dar(darPath: String): Unit = check(FeatureFlag.Testing) {
         consoleEnvironment.run {
@@ -1494,7 +1519,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         val config = check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.IdentityProviderConfigs.Update(
-              domain.IdentityProviderConfig(
+              IdentityProviderConfig(
                 IdentityProviderId.Id(Ref.LedgerString.assertFromString(identityProviderId)),
                 isDeactivated,
                 JwksUrl(jwksUrl),
@@ -1558,7 +1583,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           readAs: the set of parties this user is allowed to read as
           participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
           identityProviderAdmin: flag (default false) indicating if the user is allowed to manage users and parties assigned to the same identity provider
-          isActive: flag (default true) indicating if the user is active
+          isDeactivated: flag (default false) indicating if the user is active
           annotations: the set of key-value pairs linked to this user
           identityProviderId: identity provider id
           readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
@@ -1571,7 +1596,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           readAs: Set[PartyId] = Set(),
           participantAdmin: Boolean = false,
           identityProviderAdmin: Boolean = false,
-          isActive: Boolean = true,
+          isDeactivated: Boolean = false,
           annotations: Map[String, String] = Map.empty,
           identityProviderId: String = "",
           readAsAnyParty: Boolean = false,
@@ -1585,7 +1610,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               readAs = readAs.map(_.toLf),
               participantAdmin = participantAdmin,
               identityProviderAdmin = identityProviderAdmin,
-              isDeactivated = !isActive,
+              isDeactivated = isDeactivated,
               annotations = annotations,
               identityProviderId = identityProviderId,
               readAsAnyParty = readAsAnyParty,
@@ -1624,7 +1649,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               id = id,
               annotationsUpdate = Some(annotationsUpdate),
               primaryPartyUpdate = Some(modifiedUser.primaryParty),
-              isDeactivatedUpdate = Some(!modifiedUser.isActive),
+              isDeactivatedUpdate = Some(modifiedUser.isDeactivated),
               resourceVersionO = Some(rawUser.metadata.resourceVersion),
               identityProviderId = identityProviderId,
             )
@@ -1719,7 +1744,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
       ): Unit = {
         val withAllowedUpdatesReverted = modifiedUser.copy(
           primaryParty = srcUser.primaryParty,
-          isActive = srcUser.isActive,
+          isDeactivated = srcUser.isDeactivated,
           annotations = srcUser.annotations,
         )
         if (withAllowedUpdatesReverted != srcUser) {
@@ -1754,7 +1779,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           """)
         def grant(
             id: String,
-            actAs: Set[PartyId],
+            actAs: Set[PartyId] = Set(),
             readAs: Set[PartyId] = Set(),
             participantAdmin: Boolean = false,
             identityProviderAdmin: Boolean = false,
@@ -1787,7 +1812,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           """)
         def revoke(
             id: String,
-            actAs: Set[PartyId],
+            actAs: Set[PartyId] = Set(),
             readAs: Set[PartyId] = Set(),
             participantAdmin: Boolean = false,
             identityProviderAdmin: Boolean = false,
@@ -1911,7 +1936,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         def prepare(
             actAs: Seq[PartyId],
             commands: Seq[javab.data.Command],
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             commandId: String = "",
             minLedgerTimeAbs: Option[Instant] = None,
             readAs: Seq[PartyId] = Seq.empty,
@@ -1919,6 +1944,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             applicationId: String = applicationId,
             userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
             verboseHashing: Boolean = false,
+            prefetchContractKeys: Seq[javab.data.PrefetchContractKey] = Seq.empty,
         ): PrepareResponseProto =
           consoleEnvironment.run {
             ledgerApiCommand(
@@ -1929,10 +1955,11 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 commandId,
                 minLedgerTimeAbs,
                 disclosedContracts.map(c => DisclosedContract.fromJavaProto(c.toProto)),
-                domainId,
+                synchronizerId,
                 applicationId,
                 userPackageSelectionPreference,
                 verboseHashing,
+                prefetchContractKeys.map(k => PrefetchContractKey.fromJavaProto(k.toProto)),
               )
             )
           }
@@ -1959,7 +1986,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         def submit(
             actAs: Seq[PartyId],
             commands: Seq[javab.data.Command],
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             workflowId: String = "",
             commandId: String = "",
             optTimeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
@@ -1983,7 +2010,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 submissionId,
                 minLedgerTimeAbs,
                 disclosedContracts.map(c => DisclosedContract.fromJavaProto(c.toProto)),
-                domainId,
+                synchronizerId,
                 applicationId,
                 userPackageSelectionPreference,
               )
@@ -1991,7 +2018,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           }
           javab.data.TransactionTree.fromProto(
             TransactionTreeProto.toJavaProto(
-              optionallyAwait(tx, tx.updateId, tx.domainId, optTimeout)
+              optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
             )
           )
         }
@@ -2014,7 +2041,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         def submit_flat(
             actAs: Seq[PartyId],
             commands: Seq[javab.data.Command],
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             workflowId: String = "",
             commandId: String = "",
             optTimeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
@@ -2038,14 +2065,16 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 submissionId,
                 minLedgerTimeAbs,
                 disclosedContracts.map(c => DisclosedContract.fromJavaProto(c.toProto)),
-                domainId,
+                synchronizerId,
                 applicationId,
                 userPackageSelectionPreference,
               )
             )
           }
           javab.data.Transaction.fromProto(
-            TransactionV2.toJavaProto(optionallyAwait(tx, tx.updateId, tx.domainId, optTimeout))
+            TransactionV2.toJavaProto(
+              optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
+            )
           )
         }
 
@@ -2057,7 +2086,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         def submit_async(
             actAs: Seq[PartyId],
             commands: Seq[javab.data.Command],
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             workflowId: String = "",
             commandId: String = "",
             deduplicationPeriod: Option[DeduplicationPeriod] = None,
@@ -2070,7 +2099,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ledger_api.commands.submit_async(
             actAs,
             commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
-            domainId,
+            synchronizerId,
             workflowId,
             commandId,
             deduplicationPeriod,
@@ -2095,8 +2124,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
         def submit_unassign(
             submitter: PartyId,
             contractId: LfContractId,
-            source: DomainId,
-            target: DomainId,
+            source: SynchronizerId,
+            target: SynchronizerId,
             workflowId: String = "",
             applicationId: String = applicationId,
             submissionId: String = UUID.randomUUID().toString,
@@ -2134,8 +2163,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
         def submit_assign(
             submitter: PartyId,
             unassignId: String,
-            source: DomainId,
-            target: DomainId,
+            source: SynchronizerId,
+            target: SynchronizerId,
             workflowId: String = "",
             applicationId: String = applicationId,
             submissionId: String = UUID.randomUUID().toString,
@@ -2207,6 +2236,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
                   .pipe(ReassignmentProto.toJavaProto)
                   .pipe(Reassignment.fromProto)
                   .pipe(new GetUpdateTreesResponse(_))
+
+              case tt: TopologyTransactionWrapper =>
+                tt.topologyTransaction
+                  .pipe(TopoplogyTransactionProto.toJavaProto)
+                  .pipe(TopologyTransaction.fromProto)
+                  .pipe(new GetUpdateTreesResponse(_))
             }
         )
 
@@ -2254,6 +2289,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 reassignment.reassignment
                   .pipe(ReassignmentProto.toJavaProto)
                   .pipe(Reassignment.fromProto)
+                  .pipe(new GetUpdatesResponse(_))
+
+              case tt: TopologyTransactionWrapper =>
+                tt.topologyTransaction
+                  .pipe(TopoplogyTransactionProto.toJavaProto)
+                  .pipe(TopologyTransaction.fromProto)
                   .pipe(new GetUpdatesResponse(_))
             }
         )
@@ -2303,6 +2344,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
                   .pipe(ReassignmentProto.toJavaProto)
                   .pipe(Reassignment.fromProto)
                   .pipe(new GetUpdatesResponse(_))
+
+              case tt: TopologyTransactionWrapper =>
+                tt.topologyTransaction
+                  .pipe(TopoplogyTransactionProto.toJavaProto)
+                  .pipe(TopologyTransaction.fromProto)
+                  .pipe(new GetUpdatesResponse(_))
             }
         )
       }
@@ -2322,7 +2369,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           @Help.Description(
             """This function can be used for contracts with a code-generated Java model.
               |You can refine your search using the `filter` function argument.
-              |You can restrict search to a domain by specifying the optional domain id.
+              |You can restrict search to a synchronizer by specifying the optional synchronizer id.
               |The command will wait until the contract appears or throw an exception once it times out."""
           )
           def await[
@@ -2332,12 +2379,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ](companion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
               partyId: PartyId,
               predicate: TC => Boolean = (_: TC) => true,
-              domainFilter: Option[DomainId] = None,
+              synchronizerFilter: Option[SynchronizerId] = None,
               timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           ): TC = check(FeatureFlag.Testing)({
             val result = new AtomicReference[Option[TC]](None)
             ConsoleMacros.utils.retry_until_true(timeout) {
-              val tmp = filter(companion)(partyId, predicate, domainFilter)
+              val tmp = filter(companion)(partyId, predicate, synchronizerFilter)
               result.set(tmp.headOption)
               tmp.nonEmpty
             }
@@ -2357,7 +2404,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           @Help.Description(
             """To use this function, ensure a code-generated Java model for the target template exists.
               |You can refine your search using the `predicate` function argument.
-              |You can restrict search to a domain by specifying the optional domain id."""
+              |You can restrict search to a synchronizer by specifying the optional synchronizer id."""
           )
           def filter[
               TC <: javab.data.codegen.Contract[TCid, T],
@@ -2366,7 +2413,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ](templateCompanion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
               partyId: PartyId,
               predicate: TC => Boolean = (_: TC) => true,
-              domainFilter: Option[DomainId] = None,
+              synchronizerFilter: Option[SynchronizerId] = None,
           ): Seq[TC] = check(FeatureFlag.Testing) {
             val javaTemplateId = templateCompanion.getTemplateIdWithPackageId
             val templateId = TemplateId(
@@ -2375,15 +2422,15 @@ trait BaseLedgerApiAdministration extends NoTracing {
               javaTemplateId.getEntityName,
             )
 
-            def domainPredicate(entry: WrappedContractEntry) =
-              domainFilter match {
-                case Some(_domainId) => entry.domainId == domainFilter
+            def synchronizerPredicate(entry: WrappedContractEntry) =
+              synchronizerFilter match {
+                case Some(_synchronizerId) => entry.synchronizerId == synchronizerFilter
                 case None => true
               }
 
             ledger_api.state.acs
               .of_party(partyId, filterTemplates = Seq(templateId))
-              .collect { case entry if domainPredicate(entry) => entry.event }
+              .collect { case entry if synchronizerPredicate(entry) => entry.event }
               .flatMap { ev =>
                 JavaDecodeUtil
                   .decodeCreated(templateCompanion)(
@@ -2432,6 +2479,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
               case reassignmentW: ReassignmentWrapper =>
                 reassignmentW.reassignment.updateId == updateId
               case TransactionWrapper(transaction) => transaction.updateId == updateId
+              case tt: TopologyTransactionWrapper =>
+                tt.topologyTransaction.updateId == updateId
             },
             timeout = timeout,
           )
@@ -2509,29 +2558,29 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
 
   private[console] def involvedParticipants(
       transactionId: String,
-      txDomainId: String,
+      txSynchronizerId: String,
   ): Map[ParticipantReference, PartyId] = {
-    val txDomain = DomainId.tryFromString(txDomainId)
+    val txSynchronizer = SynchronizerId.tryFromString(txSynchronizerId)
     // TODO(#6317)
-    // There's a race condition here, in the unlikely circumstance that the party->participant mapping on the domain
+    // There's a race condition here, in the unlikely circumstance that the party->participant mapping on the synchronizer
     // changes during the command's execution. We'll have to live with it for the moment, as there's no convenient
     // way to get the record time of the transaction to pass to the parties.list call.
-    val domainPartiesAndParticipants =
+    val synchronizerPartiesAndParticipants =
       consoleEnvironment.participants.all.iterator
         .filter(x => x.health.is_running() && x.health.initialized() && x.name == name)
-        .flatMap(_.parties.list(filterDomain = txDomain.filterString))
+        .flatMap(_.parties.list(filterSynchronizerId = txSynchronizer.filterString))
         .toSet
 
-    val domainParties = domainPartiesAndParticipants.map(_.party)
+    val synchronizerParties = synchronizerPartiesAndParticipants.map(_.party)
     // WARNING! this logic will become highly problematic if we introduce witness blinding based on topology events
-    // Read the transaction under the authority of all parties on the domain, in order to get the witness_parties
+    // Read the transaction under the authority of all parties on the synchronizer, in order to get the witness_parties
     // to be all the actual witnesses of the transaction. There's no other convenient way to get the full witnesses,
     // as the Exercise events don't contain the informees of the Exercise action.
     val tree = ledger_api.updates
-      .by_id(domainParties, transactionId)
+      .by_id(synchronizerParties, transactionId)
       .getOrElse(
         throw new IllegalStateException(
-          s"Can't find transaction by ID: $transactionId. Queried parties: $domainParties"
+          s"Can't find transaction by ID: $transactionId. Queried parties: $synchronizerParties"
         )
       )
     val witnesses = tree.eventsById.values
@@ -2552,7 +2601,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
 
     // Map each involved participant to some party that witnessed the transaction (it doesn't matter which one)
-    domainPartiesAndParticipants.toList.foldMapK { cand =>
+    synchronizerPartiesAndParticipants.toList.foldMapK { cand =>
       if (witnesses.contains(cand.party)) {
         val involvedConsoleParticipants = cand.participants.mapFilter { pd =>
           for {
@@ -2560,7 +2609,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
               consoleEnvironment.participants.all
                 .filter(x => x.health.is_running() && x.health.initialized())
                 .find(identityIs(_, pd.participant))
-            _ <- pd.domains.find(_.domain == txDomain)
+            _ <- pd.synchronizers.find(_.synchronizerId == txSynchronizer)
           } yield participantReference
         }
         involvedConsoleParticipants
@@ -2573,13 +2622,13 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
   def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
-      txDomainId: String,
+      txSynchronizerId: String,
       optTimeout: Option[config.NonNegativeDuration],
   ): Tx =
     optTimeout match {
       case None => tx
       case Some(timeout) =>
-        val involved = involvedParticipants(txId, txDomainId)
+        val involved = involvedParticipants(txId, txSynchronizerId)
         logger.debug(show"Awaiting transaction ${txId.unquoted} at ${involved.keys.mkShow()}")
         awaitTransaction(txId, involved, timeout)
         tx

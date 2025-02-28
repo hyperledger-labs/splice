@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.serialization
@@ -13,9 +13,14 @@ import com.digitalasset.canton.ProtoDeserializationError.{
   StringConversionError,
   TimestampConversionError,
 }
+import com.digitalasset.canton.config.CantonRequireTypes.{
+  LengthLimitedString,
+  LengthLimitedStringCompanion,
+}
 import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeInt,
   NonNegativeLong,
+  PositiveDouble,
   PositiveInt,
   PositiveLong,
 }
@@ -123,6 +128,9 @@ object ProtoConverter {
       .create(l)
       .leftMap(ProtoDeserializationError.InvariantViolation(field, _))
 
+  def parsePositiveDouble(field: String, i: Double): ParsingResult[PositiveDouble] =
+    PositiveDouble.create(i).leftMap(ProtoDeserializationError.InvariantViolation(field, _))
+
   def parseNonNegativeInt(field: String, i: Int): ParsingResult[NonNegativeInt] =
     NonNegativeInt
       .create(i)
@@ -168,6 +176,11 @@ object ProtoConverter {
       to: String => Either[String, T]
   ): ParsingResult[T] =
     to(from).leftMap(StringConversionError.apply(_, field))
+
+  def parseLengthLimitedString[LLS <: LengthLimitedString](
+      companion: LengthLimitedStringCompanion[LLS],
+      s: String,
+  ): ParsingResult[LLS] = companion.create(s).leftMap(StringConversionError.apply(_, None))
 
   object InstantConverter extends ProtoConverter[Instant, Timestamp, ProtoDeserializationError] {
     override def toProtoPrimitive(value: Instant): Timestamp =

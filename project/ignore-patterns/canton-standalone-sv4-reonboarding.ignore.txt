@@ -9,6 +9,6 @@ Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:particip
 RequestRefused\(SenderUnknown\(.*MED::sv4SvReonboarding
 
 # Caused by svs being off-boarded
-UNAUTHORIZED_TOPOLOGY_TRANSACTION
+TOPOLOGY_UNAUTHORIZED_TRANSACTION
 
 SEQUENCER_SUBSCRIPTION_LOST

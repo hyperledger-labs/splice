@@ -39,7 +39,7 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
@@ -84,7 +84,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     */
   def lookupContractByIdOnDomain[C, TCid <: ContractId[_], T](
       companion: C
-  )(domain: DomainId, id: ContractId[_])(implicit
+  )(domain: SynchronizerId, id: ContractId[_])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -127,7 +127,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     */
   final def getContractByIdOnDomain[C, TCid <: ContractId[_], T](
       companion: C
-  )(domain: DomainId, id: ContractId[_])(implicit
+  )(domain: SynchronizerId, id: ContractId[_])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -168,7 +168,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     */
   def listContractsOnDomain[C, TCid <: ContractId[_], T](
       companion: C,
-      domain: DomainId,
+      domain: SynchronizerId,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
@@ -186,7 +186,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     * itself as the source of the sort key.
     */
   def listAssignedContractsNotOnDomainN(
-      excludedDomain: DomainId,
+      excludedDomain: SynchronizerId,
       companions: Seq[ConstrainedTemplate],
       limit: notOnDomainsTotalLimit.type = notOnDomainsTotalLimit,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
@@ -548,7 +548,7 @@ object MultiDomainAcsStore {
       type T <: Template
     }
 
-  final case class ReassignmentId(source: DomainId, id: String)
+  final case class ReassignmentId(source: SynchronizerId, id: String)
 
   object ReassignmentId {
     def fromAssign(in: ReassignmentEvent.Assign) =
@@ -560,24 +560,24 @@ object MultiDomainAcsStore {
   sealed abstract class ContractState extends PrettyPrinting with Product with Serializable {
     def isAssigned: Boolean
 
-    def fold[Z](assigned: DomainId => Z, inFlight: => Z): Z
+    def fold[Z](assigned: SynchronizerId => Z, inFlight: => Z): Z
   }
 
   object ContractState {
     case class Assigned(
-        domain: DomainId
+        domain: SynchronizerId
     ) extends ContractState {
       override def pretty: Pretty[this.type] =
         prettyOfClass(param("domain", _.domain))
       override def isAssigned = true
 
-      override def fold[Z](assigned: DomainId => Z, inFlight: => Z) = assigned(domain)
+      override def fold[Z](assigned: SynchronizerId => Z, inFlight: => Z) = assigned(domain)
     }
 
     case object InFlight extends ContractState {
       override def pretty: Pretty[this.type] = prettyOfObject[InFlight.type]
       override val isAssigned = false
-      override def fold[Z](assigned: DomainId => Z, inFlight: => Z) = inFlight
+      override def fold[Z](assigned: SynchronizerId => Z, inFlight: => Z) = inFlight
     }
   }
 
@@ -595,7 +595,7 @@ object MultiDomainAcsStore {
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
+    def ingestUpdate(domain: SynchronizerId, transfer: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit]
   }
@@ -616,7 +616,7 @@ object MultiDomainAcsStore {
 
     /** Observed activation (assign/create).
       */
-    final case class Assigned(domain: DomainId) extends StoreContractState {
+    final case class Assigned(domain: SynchronizerId) extends StoreContractState {
       override def pretty: Pretty[this.type] = prettyOfClass(
         param("domain", _.domain)
       )
@@ -646,7 +646,7 @@ object MultiDomainAcsStore {
       state: StoreContractState,
   ) extends PrettyPrinting {
 
-    def toAssigned: Option[DomainId] = state match {
+    def toAssigned: Option[SynchronizerId] = state match {
       case StoreContractState.Assigned(domain) => Some(domain)
       case StoreContractState.InFlight(_) | StoreContractState.Archived => None
     }

@@ -3,6 +3,16 @@
 
 package org.lfdecentralizedtrust.splice.console
 
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, ProcessingTimeout}
+import com.digitalasset.canton.console.{
+  CommandErrors,
+  ConsoleCommandResult,
+  StringErrorEitherToCommandResultExtensions,
+}
+import com.digitalasset.canton.lifecycle.LifeCycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.Spanning
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
@@ -14,16 +24,6 @@ import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.config.{ConsoleCommandTimeout, ProcessingTimeout}
-import com.digitalasset.canton.console.{
-  CommandErrors,
-  ConsoleCommandResult,
-  StringErrorEitherToCommandResultExtensions,
-}
-import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.Spanning
-import io.opentelemetry.api.trace.Tracer
 
 import javax.net.ssl.SSLContext
 import scala.concurrent.{ExecutionContextExecutor, Future, TimeoutException}
@@ -133,5 +133,5 @@ class ConsoleHttpCommandRunner(
     }
 
   override def close(): Unit =
-    Lifecycle.close(Lifecycle.toCloseableActorSystem(actorSystem, logger, timeouts))(logger)
+    LifeCycle.close(LifeCycle.toCloseableActorSystem(actorSystem, logger, timeouts))(logger)
 }

@@ -38,10 +38,11 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
 }
 import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.metrics.MetricValue
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.scalatest.Assertion
 
 trait UpdateHistoryTestUtil extends TestCommon {
+
   def updateHistoryFromParticipant(
       beginExclusive: Long,
       partyId: PartyId,
@@ -57,21 +58,21 @@ trait UpdateHistoryTestUtil extends TestCommon {
         endOffsetInclusive = Some(ledgerEnd),
         verbose = false,
       )
-      .map {
+      .collect {
         case TransactionTreeWrapper(protoTree) =>
           GetTreeUpdatesResponse(
             TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
-            DomainId.tryFromString(protoTree.domainId),
+            SynchronizerId.tryFromString(protoTree.synchronizerId),
           )
         case UnassignedWrapper(protoReassignment, protoUnassignEvent) =>
           GetTreeUpdatesResponse(
             ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
-            DomainId.tryFromString(protoUnassignEvent.source),
+            SynchronizerId.tryFromString(protoUnassignEvent.source),
           )
         case AssignedWrapper(protoReassignment, protoAssignEvent) =>
           GetTreeUpdatesResponse(
             ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
-            DomainId.tryFromString(protoAssignEvent.target),
+            SynchronizerId.tryFromString(protoAssignEvent.target),
           )
       }
   }
@@ -120,7 +121,11 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val actualUpdatesWithoutLostData =
       actualUpdates.map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInStoreIngestion))
     val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
-    actualUpdatesWithoutLostData should contain theSameElementsInOrderAs recordedUpdatesWithoutLostData
+    actualUpdatesWithoutLostData should have length recordedUpdatesWithoutLostData.size.longValue()
+    actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData).foreach {
+      case (actual, recorded) => actual shouldBe recorded
+    }
+    succeed
   }
 
   def compareHistoryViaLosslessScanApi(
@@ -190,15 +195,16 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     updatesFromScanApi should have length updatesFromHistory.size.toLong
 
-    def responseDomainId(update: GetTreeUpdatesResponse): String = update.domainId.toProtoPrimitive
-    val recordedUpdatesByDomainId = updatesFromScanApi.groupBy(responseDomainId)
-    val actualUpdatesByDomainId = updatesFromHistory.groupBy(responseDomainId)
+    def responseSynchronizerId(update: GetTreeUpdatesResponse): String =
+      update.synchronizerId.toProtoPrimitive
+    val recordedUpdatesBySynchronizerId = updatesFromScanApi.groupBy(responseSynchronizerId)
+    val actualUpdatesBySynchronizerId = updatesFromHistory.groupBy(responseSynchronizerId)
 
-    recordedUpdatesByDomainId.keySet should be(actualUpdatesByDomainId.keySet)
-    recordedUpdatesByDomainId.keySet.foreach { domainId =>
-      clue(s"Comparing updates for domain $domainId") {
-        val actualForDomain = actualUpdatesByDomainId.get(domainId).value
-        val recordedForDomain = recordedUpdatesByDomainId.get(domainId).value
+    recordedUpdatesBySynchronizerId.keySet should be(actualUpdatesBySynchronizerId.keySet)
+    recordedUpdatesBySynchronizerId.keySet.foreach { synchronizerId =>
+      clue(s"Comparing updates for domain $synchronizerId") {
+        val actualForDomain = actualUpdatesBySynchronizerId.get(synchronizerId).value
+        val recordedForDomain = recordedUpdatesBySynchronizerId.get(synchronizerId).value
         actualForDomain.length shouldBe recordedForDomain.length
         actualForDomain.zip(recordedForDomain).foreach { case (actual, recorded) =>
           actual shouldBe recorded

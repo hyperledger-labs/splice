@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.PositiveDurationSeconds
@@ -199,7 +199,7 @@ class ManualStartIntegrationTest
           ).map { participantConnection =>
             val sequencerConnections =
               participantConnection
-                .lookupDomainConnectionConfig(DomainAlias.tryCreate("global"))
+                .lookupSynchronizerConnectionConfig(SynchronizerAlias.tryCreate("global"))
                 .futureValue
                 .value
                 .sequencerConnections

@@ -8,6 +8,7 @@ module Splice.Util
   requireMatchingContract,
 
   HasCheckedFetch(..),
+  fetchChecked,
   fetchAndArchive,
   fetchReferenceData,
   fetchPublicReferenceData,

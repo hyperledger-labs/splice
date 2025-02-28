@@ -107,4 +107,12 @@ SoftDomainMigrationIntegrationTest.*The global domain global-domain-new.* is not
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
 
+.*The geckodriver version .* might not be compatible with the detected firefox version .*
+
+# TODO(#17311) Remove conversion from future with shutdown to future
+Splice unsafe shutdown future
+
+# TODO(#17605) Investigate this and fix it
+SignSynchronizerBootstrappingStateTrigger.*SoftDomainMigrationIntegrationTest.*NOT_FOUND: No SynchronizerParametersState state domain global-domain-new
+
 # Make sure to have a trailing newline

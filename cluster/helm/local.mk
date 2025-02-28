@@ -42,7 +42,6 @@ cluster/helm/write-digests:
 .PHONY: cluster/helm/write-app-charts
 cluster/helm/write-app-charts:
 	overwrite-if-changed '$(shell echo $(app_charts) | tr ' ' '\n')' $(APP_CHARTS_FILE)
-
 .PHONY: cluster/helm/copy_release_to_ghcr
 cluster/helm/copy_release_to_ghcr: cluster/helm/write-app-charts cluster/helm/write-version
 	./build-tools/copy_release_helm_charts_to_ghcr.sh -v $(shell cat cluster/helm/.version-tag) -f cluster/helm/.app-charts
