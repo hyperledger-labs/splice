@@ -2352,17 +2352,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 280000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
@@ -3244,17 +3239,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 280000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
@@ -4103,17 +4093,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 280000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
@@ -4962,17 +4947,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 280000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
