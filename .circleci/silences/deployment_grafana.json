@@ -34,6 +34,12 @@
         "isRegex": false
       },
       {
+        "name": "alertname",
+        "value": "Cometbft Consensus",
+        "isEqual": true,
+        "isRegex": false
+      },
+      {
         "name": "report_publisher",
         "value": ".*",
         "isEqual": true,
