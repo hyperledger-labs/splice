@@ -17,6 +17,7 @@ Upcoming
 * Docs
 
   * Add documentation about :ref:`traffic`.
+  * Add documentation about :ref:`computing total burnt coin <total_burn>`.
   * Enable commenting on doc pages.
 
 * Config changes

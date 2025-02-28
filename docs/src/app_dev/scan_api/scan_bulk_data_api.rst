@@ -576,3 +576,383 @@ If the ``exercised_event`` is consuming, the contract is removed from the ``acti
     and then process the updates from the timestamp of that snapshot via the ``/v1/updates``, adding
     ``created_event``\ s to the dictionary under its ``contract_id`` key and
     remove the contract from the dictionary by ``contract_id`` if ``exercised_event``\ s are consuming.
+
+
+.. _total_burn:
+
+Computing Total Burnt Canton Coin
+---------------------------------
+
+At a high level, there are several types of transactions in the network in which Canton Coin is burnt:
+- Coin being burnt for purchasing traffic on the synchronizer, and other fees collected as part of that transaction
+- Coin being burnt to account for accrued fees, charged as part of a Canton Coin transfer
+- Purchasing and renewing CNS entries
+- Fees paid for creating and renewing CC transfer pre-approvals
+
+Below we provide further technical details about the relevant transactions, and how to
+correctly account for the burnt Canton Coin in the network by parsing them.
+
+For sanity check of your computation, it is strongly advised that you assert that
+on any transaction for which you compute the burnt coin, the difference between the
+sum of coin (or coin equivalent, e.g. various rewards used directly as input to the transaction
+instead of coin contracts) in the input contracts and that of the output contracts is equal to the
+sum of the burnt coin computed from the fees. The Daml models governing the transaction may
+evolve over time, and such an assertion would help you catch cases where the model has
+changed and your computation is no longer precise.
+
+
+Coin Burnt for Purchasing Traffic on the Synchronizer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Traffic on the synchronizer is purchased by executing the ``AmuletRules_BuyMemberTraffic``
+choice on the ``Splice.AmuletRules:AmuletRules`` template. Coin is burnt in that transaction
+both for purchase of the traffic, as well as for other fees collected as part of that same transaction.
+
+Below is an example of an exercised event for purchasing traffic (with some irrelevant fields omitted):
+
+.. code-block:: json
+
+        "1220299075b2251a542c4ff0a6aec03dbd3e69041da7d85cd62be9d665f3a959cd25:1": {
+          "event_type": "exercised_event",
+          "event_id": "1220299075b2251a542c4ff0a6aec03dbd3e69041da7d85cd62be9d665f3a959cd25:1",
+          "contract_id": "00aec43c48f896adb70550e22a5bd44f290534058aa9fa1ba939aa17f622639d31ca101220b56087539ec11e1b7803b726e1d833ef9685dfdffb7570644b44d1074882e0fd",
+          "template_id": "979ec710c3ae3a05cb44edf8461a9b4d7dd2053add95664f94fc89e5f18df80f:Splice.AmuletRules:AmuletRules",
+          "package_name": "splice-amulet",
+          "choice": "AmuletRules_BuyMemberTraffic",
+          "choice_argument": {
+            "inputs": [
+              {
+                "tag": "InputAmulet",
+                "value": "0019bc6f3f9b53f1e4e3af43e47a35f3fe43507e861490c0b58656fc08a1408c32ca101220ed59a33d6a79962a0924a1ecae3f539c4003d808a0a564dada0437018adb8c6d"
+              },
+              {
+                "tag": "InputAmulet",
+                "value": "00b0acb28b679855d0cab28c662663ccfbb22e78873424ec49eddc18e81a4f5fe9ca10122053517786a087da1055ab0f2adf0d20b6d02238c13fee8d2a773e2dc0514976a9"
+              }
+            ],
+            "context": "<...>",
+            "provider": "<...>",
+            "memberId": "<...>",
+            "synchronizerId": "global-domain::1220e1e594cdb287aeac3e1e6d62e7d2db46b756a5d01656c26f1f1a151345bf2e53",
+            "migrationId": "1",
+            "trafficAmount": "1999800"
+          },
+          "child_event_ids": "<...>",
+          "exercise_result": {
+            "round": {
+              "number": "10470"
+            },
+            "summary": {
+              "inputAppRewardAmount": "0E-10",
+              "inputValidatorRewardAmount": "0E-10",
+              "inputSvRewardAmount": "0E-10",
+              "inputAmuletAmount": "224019632.4829619323",
+              "balanceChanges": "<...>",
+              "holdingFees": "0.0076103600",
+              "outputFees": [
+                "209.9976000000"
+              ],
+              "senderChangeFee": "6.0000000000",
+              "senderChangeAmount": "223995628.8753515723",
+              "amuletPrice": "0.0050000000",
+              "inputValidatorFaucetAmount": "0E-10"
+            },
+            "amuletPaid": "23997.6000000000",
+            "purchasedTraffic": "00f040b550e04734b36ca89f3d89f77192566bd3b41ead2435b94f9ab32d9eb013ca101220147966510802349805e611d2b88a289decd32ff9dc80268e0e8de5e84661e4f1",
+            "senderChangeAmulet": "004997a51da7d833e7122ddd0a10800857c0370a4cc28bcb5f4bc554ec79fb42ccca1012209b58a59bb36a8ad1667a23809bebbc090b9cd5a97612a59a0ad05f2edb129c63"
+          },
+          "consuming": false,
+          "acting_parties": [
+            "Cumberland-GasStation-1::12203f6faf84f106d90b87775def701c39734fe26ce5fb01892c73f45ce8fecc8e86"
+          ],
+          "interface_id": null
+        },
+
+
+To compute all the burnt Canton Coin in this transaction, you should sum up the following fields
+from the ``summary`` field in the ``exercise_result``:
+
+- `holdingFees`: Holding fees accrued on the input coin contracts (and charged as part of this transaction), if they were held for longer than a mining round.
+- `senderChangeFee`: Fees charged for creation of the coin contract holding the change to the sender.
+- `amuletPaid`: The amount of Canton Coin paid for purchasing the traffic credit.
+
+
+Coin Burnt in Canton Coin Transfers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Similarly to traffic purchases, also as part of Canton Coin transfer transactions, various
+fees are charged. Below is an example of an exercised event for a Canton Coin transfer (with some irrelevant fields omitted):
+
+.. code-block:: json
+
+        "1220f207fb8c58969e51c99af570f99302ad4f5adf513de0b70dc93e358371f25bc2:2": {
+          "event_type": "exercised_event",
+          "event_id": "1220f207fb8c58969e51c99af570f99302ad4f5adf513de0b70dc93e358371f25bc2:2",
+          "contract_id": "00aec43c48f896adb70550e22a5bd44f290534058aa9fa1ba939aa17f622639d31ca101220b56087539ec11e1b7803b726e1d833ef9685dfdffb7570644b44d1074882e0fd",
+          "template_id": "979ec710c3ae3a05cb44edf8461a9b4d7dd2053add95664f94fc89e5f18df80f:Splice.AmuletRules:AmuletRules",
+          "package_name": "splice-amulet",
+          "choice": "AmuletRules_Transfer",
+          "choice_argument": {
+            "transfer": {
+              "sender": "<...>",
+              "provider": "<...>",
+              "inputs": [
+                {
+                  "tag": "InputAmulet",
+                  "value": "0020459e63b92ded757b2d271ae527285d97a28edacd15e2ce9d4b9f209167190cca1012203226f23d0e205f4aa9ffbc9445b39c7a3a2d1ea5b94326adbcd94d7f2862a802"
+                }
+              ],
+              "outputs": [
+                {
+                  "receiver": "<...>",
+                  "receiverFeeRatio": "0E-10",
+                  "amount": "9600.2116486069",
+                  "lock": null
+                }
+              ]
+            },
+            "context": "<...>"
+          },
+          "child_event_ids": "<...>",
+          "exercise_result": {
+            "round": {
+              "number": "10468"
+            },
+            "summary": {
+              "inputAppRewardAmount": "0E-10",
+              "inputValidatorRewardAmount": "0E-10",
+              "inputSvRewardAmount": "0E-10",
+              "inputAmuletAmount": "223970271.6123234793",
+              "balanceChanges": "<...>",
+              "holdingFees": "0E-10",
+              "outputFees": [
+                "102.0021164861"
+              ],
+              "senderChangeFee": "6.0000000000",
+              "senderChangeAmount": "223960563.3985583863",
+              "amuletPrice": "0.0050000000",
+              "inputValidatorFaucetAmount": "0E-10"
+            },
+            "createdAmulets": [
+              {
+                "tag": "TransferResultAmulet",
+                "value": "0062dfd0dd4e814762c67c4f8264d9f752f1e3291535546bc33a7d1a5d748c9a6cca1012204a3e156db434b9b56af11b7d9b4dca8ba182baf6d161c2c35dac328e58bebe5a"
+              }
+            ],
+            "senderChangeAmulet": "0085965dcb855eb24cc28bdf455aa77c4a60d9ffbbc35d9ac43c64f6bf6667448aca10122018a84ec51c73894877b3897cb415b4569520a6ca32eb992fbf98e72155d62cf9"
+          },
+          "consuming": false,
+          "acting_parties": "<...>",
+          "interface_id": null
+        },
+
+
+Similarly to the case of traffic purchases above, to compute all the burnt Canton Coin in this
+transaction, you should sum up the following fields from the ``summary`` field in the ``exercise_result``:
+
+- `holdingFees`: Holding fees accrued on the input coin contracts (and charged as part of this transaction), if they were held for longer than a mining round.
+- `outputFees`: Fees charged per output coin contract in the transaction.
+- `senderChangeFee`: Fees charged for creation of the coin contract holding the change to the sender.
+
+Purchasing CNS Entries
+~~~~~~~~~~~~~~~~~~~~~~
+
+Canton Name Service (CNS) entries may be purchased on the network, and paid for by burning Canton Coin.
+Like other transactions, other fees are also charged as part of the transaction.
+
+Below is an example of the sub-transactions of the ``AnsEntryContext_CollectInitialEntryPayment``
+transactions, with some irrelevant fields omitted. Note that there is a similar transaction,
+``AnsEntryContext_CollectRenewalEntryPayment``, for renewing existing CNS entries.
+
+.. code-block:: json
+
+          "1220088866741e05b6ee333fad8fb505856ad78e836aa812afb1ca4a00deae5d50b3:7": {
+          "event_type": "exercised_event",
+          "event_id": "1220088866741e05b6ee333fad8fb505856ad78e836aa812afb1ca4a00deae5d50b3:7",
+          "contract_id": "00ec1e0685d269b19064c9ca45294f4d03024988d3d9e3e86e9fd9d4b8b35db8a3ca1012205aa122cbfb63e63310fcfd024daabea1c379d942261033ab34dd1bfc5405e6af",
+          "template_id": "4e3e0d9cdadf80f4bf8f3cd3660d5287c084c9a29f23c901aabce597d72fd467:Splice.Wallet.Subscriptions:SubscriptionInitialPayment",
+          "package_name": "splice-wallet-payments",
+          "choice": "SubscriptionInitialPayment_Collect",
+          "choice_argument": {
+            "transferContext": "<...>"
+          },
+          "child_event_ids": "<...>",
+          "exercise_result": {
+            "subscription": "<...>",
+            "subscriptionState": "<...>",
+            "amulet": "0064d6918d973d69c626a6d9020c625e30199309bcf36460a8e3a4cc0775b44738ca10122090b18bbdc6ac5da9338e547c3f1c310de27184877cb6c4b1daf91c77cfb3356b"
+          },
+          "consuming": true,
+          "acting_parties": "<...>",
+          "interface_id": null
+        },
+        "1220088866741e05b6ee333fad8fb505856ad78e836aa812afb1ca4a00deae5d50b3:17": {
+          "event_type": "created_event",
+          "event_id": "1220088866741e05b6ee333fad8fb505856ad78e836aa812afb1ca4a00deae5d50b3:17",
+          "contract_id": "0064d6918d973d69c626a6d9020c625e30199309bcf36460a8e3a4cc0775b44738ca10122090b18bbdc6ac5da9338e547c3f1c310de27184877cb6c4b1daf91c77cfb3356b",
+          "template_id": "4646d50cbdec6f088c98ae543da5c973d2d1be3363b9f32eb097d8fdc063ade7:Splice.Amulet:Amulet",
+          "package_name": "splice-amulet",
+          "create_arguments": {
+            "dso": "DSO::122062ff91be08e836bfdc34e0c76ecc786e0f7c0fe40528a220c5dc2ac5a5337961",
+            "owner": "<...>",
+            "amount": {
+              "initialAmount": "200.0000000000",
+              "createdAt": "<...>",
+              "ratePerRound": "<...>"
+            }
+          },
+          "created_at": "2025-02-27T18:35:36.389123Z",
+          "signatories": "<...>",
+          "observers": []
+        },
+        "1220088866741e05b6ee333fad8fb505856ad78e836aa812afb1ca4a00deae5d50b3:13": {
+          "event_type": "exercised_event",
+          "event_id": "1220088866741e05b6ee333fad8fb505856ad78e836aa812afb1ca4a00deae5d50b3:13",
+          "contract_id": "0062bacc032e3f6191070940cddec7b0d34fdf0f4d8ff49a2e28bbc51462ef9c35ca1012205bb34d8c4609b3172094908c35107e3d774517054efae35b8c6847f4487e95a7",
+          "template_id": "4646d50cbdec6f088c98ae543da5c973d2d1be3363b9f32eb097d8fdc063ade7:Splice.AmuletRules:AmuletRules",
+          "package_name": "splice-amulet",
+          "choice": "AmuletRules_Transfer",
+          "choice_argument": {
+            "transfer": {
+              "sender": "<...>",
+              "provider": "<...>",
+              "inputs": "<...>",
+              "outputs": "<...>"
+            },
+            "context": "<...>"
+          },
+          "child_event_ids": "<...>",
+          "exercise_result": {
+            "round": {
+              "number": "28"
+            },
+            "summary": {
+              "inputAppRewardAmount": "0E-10",
+              "inputValidatorRewardAmount": "0E-10",
+              "inputSvRewardAmount": "0E-10",
+              "inputAmuletAmount": "208.0000000000",
+              "balanceChanges": "<...>",
+              "holdingFees": "0E-10",
+              "outputFees": [
+                "8.0000000000"
+              ],
+              "senderChangeFee": "0E-10",
+              "senderChangeAmount": "0E-10",
+              "amuletPrice": "0.0050000000",
+              "inputValidatorFaucetAmount": "0E-10"
+            },
+            "createdAmulets": "<...>",
+            "senderChangeAmulet": null
+          },
+          "consuming": false,
+          "acting_parties": "<...>",
+          "interface_id": null
+        },
+
+The two sources of coin burn in this transaction are:
+
+- A temporary coin contract is created and immediately burnt as part of this transaction,
+  for the payment for the CNS itself. To find the amount burnt, look at the Amulet contract ID
+  in the ``exercise_result`` field of the ``SubscriptionInitialPayment_Collect`` choice
+  (the first sub-transaction in the example above), then find the corresponding ``create`` event
+  with the same contract ID (the second sub-transaction in the example above). The amount
+  in this coin contract is the amount burnt for the CNS entry (you should find a corresponding ``archive``
+  of the same contract ID in the transaction).
+
+- Fees collected as part of the ``transfer`` sub-transaction (the third sub-transaction in the example above),
+  similar to transfers explained in the "Coin Burnt in Canton Coin Transfers" above section.
+
+Note that in a separate, earlier, transaction, a coin was locked for this CNS entry, and further fees were charged then.
+However, that locking step is implemented as a ``transfer`` transaction, thus will be accounted for in the same way as
+other transfers.
+
+Fees Paid for Creating CC Transfer Pre-Approvals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When creating, or renewing a pre-approval for receiving Canton Coin transfers, fees are charged as part of the transaction.
+Note that pre-approval payments may exist in executions of the ``AmuletRules_CreateTransferPreapproval``,
+``AmuletRules_CreateExternalPartySetupProposal`` and ``TransferPreapproval_Renew`` choices.
+
+Below is an example of an exercised event for creating a pre-approval (with some irrelevant fields omitted):
+
+.. code-block:: json
+
+        "1220986fb3a857bc92ca570bc11d7b3b8579cb4afe0e0c2ac3ac920057f2d968b99f:0": {
+          "event_type": "exercised_event",
+          "event_id": "1220986fb3a857bc92ca570bc11d7b3b8579cb4afe0e0c2ac3ac920057f2d968b99f:0",
+          "contract_id": "0062bacc032e3f6191070940cddec7b0d34fdf0f4d8ff49a2e28bbc51462ef9c35ca1012205bb34d8c4609b3172094908c35107e3d774517054efae35b8c6847f4487e95a7",
+          "template_id": "4646d50cbdec6f088c98ae543da5c973d2d1be3363b9f32eb097d8fdc063ade7:Splice.AmuletRules:AmuletRules",
+          "package_name": "splice-amulet",
+          "choice": "AmuletRules_CreateTransferPreapproval",
+          "choice_argument": {
+            "context": {
+              "amuletRules": "0062bacc032e3f6191070940cddec7b0d34fdf0f4d8ff49a2e28bbc51462ef9c35ca1012205bb34d8c4609b3172094908c35107e3d774517054efae35b8c6847f4487e95a7",
+              "context": "<...>"
+            },
+            "inputs": [
+              {
+                "tag": "InputAmulet",
+                "value": "005b5fb07cdf97f2cc32190d0a5cc80176bb20161e581987848ac93c31a07d9932ca101220e3a7885db04643c34edb10fe11a0418810ba881d072c9b40a24a4106aa875a7d"
+              }
+            ],
+            "receiver": "<...>",
+            "provider": "<...>",
+            "expiresAt": "2025-05-28T19:19:09.285322Z"
+          },
+          "child_event_ids": "<...>",
+          "exercise_result": {
+            "transferPreapprovalCid": "00361db2d2b07253f64deaa7c8db4319625227c27b97143c1b279cdc6294d5cb97ca101220d1c8f06741b5b99477861410e4d4bc460a207af3ea7fa179e903c78846b227e2",
+            "transferResult": {
+              "round": {
+                "number": "32"
+              },
+              "summary": {
+                "inputAppRewardAmount": "0E-10",
+                "inputValidatorRewardAmount": "0E-10",
+                "inputSvRewardAmount": "0E-10",
+                "inputAmuletAmount": "253917.5244126799",
+                "balanceChanges": [
+                  [
+                    "digitalasset-validator1-1::1220e6ee4d3f5387c9210ce50a46b3c4906335bae0083bb1dcc2819d4b52e178ec7e",
+                    {
+                      "changeToInitialAmountAsOfRoundZero": "-61.3199997000",
+                      "changeToHoldingFeesRate": "0E-10"
+                    }
+                  ]
+                ],
+                "holdingFees": "0E-10",
+                "outputFees": [
+                  "6.0000000000"
+                ],
+                "senderChangeFee": "6.0000000000",
+                "senderChangeAmount": "253856.2044129799",
+                "amuletPrice": "0.0050000000",
+                "inputValidatorFaucetAmount": "0E-10"
+              },
+              "createdAmulets": "<...>",
+              "senderChangeAmulet": "00fe4c85fc36780c61281ffa37679a4580fe33df727e5614185e8aacde1bcd491eca101220b7e8a17df7ec6598d5b5d5b240513805cdbc31404b0fcef2309763237e7245d9"
+            },
+            "amuletPaid": "49.3199997000"
+          },
+          "consuming": false,
+          "acting_parties": "<...>",
+          "interface_id": null
+        },
+
+You can notice a similar structure to the previous cases, where certain fees are charged, plus
+an "amuletPaid" field that indicates the amount of Canton Coin burnt for creating the pre-approval.
+Accounting for the burnt coin in this transaction is therefore also similar to the previous cases.
+
+Note, however a subtle difference: In these transactions, as opposed to traffic purchases above,
+the `outputFee` is not included in `amuletPaid`, therefore needs to be added separately to the total burn.
+
+Note About Daml Versions
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Daml models evolve over time. The examples and text here are correct for the models in use on the network
+at the time of writing (February 2025), and were also correct since network genesis. However, as the models
+evolve, the structure of the transactions may change, and future transactions may need to be processed
+differently than described here. Specifically, at the time of writing, there is already a planned change
+where traffic purchases do not go through an intermediate ``transfer`` transaction, but are directly
+burning coin.
+
