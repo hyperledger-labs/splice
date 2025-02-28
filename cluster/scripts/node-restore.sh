@@ -292,7 +292,8 @@ function wait_cloudsql_restore() {
 
   local stack
   stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
-  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
+  instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
+  cloudsql_restore_instance_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
 
   local -i i=0
   _info "Waiting for restore of $component to finish..."
@@ -303,7 +304,7 @@ function wait_cloudsql_restore() {
   while [[ $should_not_retry = 0 ]]; do
 
     # Using conditional execution to prevent automatic exit
-    if ! gcloud_output=$(gcloud sql operations list --instance="$cloudsql_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json 2>&1); then
+    if ! gcloud_output=$(gcloud sql operations list --instance="$cloudsql_restore_instance_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json 2>&1); then
       _error "Error fetching SQL operations: $gcloud_output" >&2
       sleep "$retry_sleep_time"
       continue 1
