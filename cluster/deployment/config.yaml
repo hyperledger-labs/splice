@@ -18,6 +18,7 @@ pulumiProjectConfig:
     allowedArtifactories:
       - "public"
     isExternalCluster: false
+    hasPublicDocs: false
 ## in the form <pulumi-project>:
 ##                <settings>
 ## ex:

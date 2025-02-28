@@ -521,6 +521,7 @@
         },
         "enableGcsProxy": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "publicDocs": false,
         "tolerations": [
           {
             "effect": "NoSchedule",

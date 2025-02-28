@@ -6,6 +6,7 @@ const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
   allowedArtifactories: z.array(z.enum(['public', 'private'])),
   isExternalCluster: z.boolean(),
+  hasPublicDocs: z.boolean(),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
 export const ConfigSchema = z.object({
