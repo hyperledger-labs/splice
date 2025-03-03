@@ -58,6 +58,34 @@ abstract class UpdateHistoryTestBase
     )
   }
 
+  /** Ingests an import update for a transaction previously ingested using the [[create]] call */
+  protected def importUpdate(
+      tx: TransactionTree,
+      offset: Long,
+      store: UpdateHistory,
+  ) = {
+    val createEvent = tx.getEventsById.asScala.loneElement._2 match {
+      case created: CreatedEvent => created
+      case _ => throw new RuntimeException("Unexpected event type")
+    }
+    val party = PartyId.tryFromProtoPrimitive(
+      createEvent.getSignatories.asScala.loneElement
+    )
+    DomainSyntax(DomainId.tryFromString(tx.getDomainId)).create(
+      c = appRewardCoupon(
+        round = 0,
+        provider = party,
+        contractId = createEvent.getContractId,
+      ),
+      offset = offset,
+      txEffectiveAt = tx.getEffectiveAt,
+      createdEventSignatories = Seq(party),
+      recordTime = importUpdateRecordTime.toInstant,
+    )(
+      store
+    )
+  }
+
   protected def assign(
       domainTo: DomainId,
       domainFrom: DomainId,
@@ -144,6 +172,7 @@ abstract class UpdateHistoryTestBase
     i.toLong
   }
 
+  protected val importUpdateRecordTime: CantonTimestamp = CantonTimestamp.MinValue
   protected def time(i: Int): CantonTimestamp =
     CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong))
 

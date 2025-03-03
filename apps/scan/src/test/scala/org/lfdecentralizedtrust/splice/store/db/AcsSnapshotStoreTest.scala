@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreErrors, StoreTest,
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -681,6 +681,82 @@ class AcsSnapshotStoreTest
 
     }
 
+    "fix for corrupt snapshots" should {
+      "remove corrupt snapshots" in {
+        val firstMigration = 1L
+        val secondMigration = 2L
+        for {
+          // Initial migration
+          updateHistory1 <- mkUpdateHistory(firstMigration)
+          store1 = mkStore(updateHistory1)
+          update1 <- ingestCreate(
+            updateHistory1,
+            amuletRules(),
+            timestamp1.minusSeconds(1L),
+          )
+          _ <- store1.insertNewSnapshot(None, firstMigration, timestamp1)
+          snapshot1first <- store1.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
+          snapshot1second <- store1.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
+
+          _ = snapshot1first.map(_.snapshotRecordTime).value should be(timestamp1)
+          _ = snapshot1second should be(None)
+
+          // Second migration. This is missing the import update corresponding to the create above.
+          updateHistory2 <- mkUpdateHistory(secondMigration)
+          store2 = mkStore(updateHistory2)
+          _ <- ingestCreate(
+            updateHistory2,
+            amuletRules(),
+            timestamp2.minusSeconds(1L),
+          )
+          _ <- store2.insertNewSnapshot(None, secondMigration, timestamp2)
+          snapshot2first <- store2.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
+          snapshot2second <- store2.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
+
+          _ = snapshot2first.map(_.snapshotRecordTime).value should be(timestamp1)
+          _ = snapshot2second.map(_.snapshotRecordTime).value should be(timestamp2)
+          _ = snapshot2second.map(s => s.lastRowId - s.firstRowId).value should be(0)
+
+          // Mark backfilling as complete, but import update backfilling as not complete.
+          // This is the state affected SVs should be in.
+          _ <- updateHistory1.initializeBackfilling(
+            joiningMigrationId = firstMigration,
+            joiningDomainId = DomainId.tryFromString(update1.tree.getDomainId),
+            joiningUpdateId = update1.tree.getUpdateId,
+            complete = false,
+          )
+          _ <- updateHistory1.destinationHistory.markBackfillingComplete()
+
+          //  Re-initialize the store. This should delete the second snapshot.
+          updateHistory3 <- mkUpdateHistory(secondMigration)
+          store3 = mkStore(updateHistory3)
+          snapshot3first <- store3.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
+          snapshot3second <- store3.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
+
+          _ = snapshot3first.map(_.snapshotRecordTime).value should be(timestamp1)
+          _ = snapshot3second should be(None)
+
+          // Ingest some import update to simulate the import update backfilling and re-create the snapshot
+          _ <- ingestCreate(
+            updateHistory3,
+            amuletRules(),
+            CantonTimestamp.MinValue,
+          )
+          _ <- updateHistory1.destinationHistory.markImportUpdatesBackfillingComplete()
+          _ <- store3.insertNewSnapshot(None, secondMigration, timestamp2)
+
+          // Re-initialize the store. The second snapshot should now not be deleted.
+          updateHistory4 <- mkUpdateHistory(secondMigration)
+          store4 = mkStore(updateHistory4)
+          snapshot4first <- store4.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
+          snapshot4second <- store4.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
+        } yield {
+          snapshot4first.map(_.snapshotRecordTime).value should be(timestamp1)
+          snapshot4second.map(_.snapshotRecordTime).value should be(timestamp2)
+          snapshot4second.map(s => s.lastRowId - s.firstRowId).value should be(1)
+        }
+      }
+    }
   }
 
   private def mkUpdateHistory(
@@ -718,30 +794,33 @@ class AcsSnapshotStoreTest
       create: Contract[TCid, T],
       recordTime: CantonTimestamp,
       signatories: Seq[PartyId] = Seq(dsoParty),
-  ): Future[Unit] = {
-    updateHistory.ingestionSink.ingestUpdate(
-      dummyDomain,
-      TransactionTreeUpdate(
-        mkCreateTx(
-          nextOffset(),
-          Seq(create.copy(createdAt = recordTime.toInstant).asInstanceOf[Contract[TCid, T]]),
-          Instant.now(),
-          signatories,
-          dummyDomain,
-          "acs-snapshot-store-test",
-          recordTime.toInstant,
-          packageName = DarResources
-            .lookupPackageId(create.identifier.getPackageId)
-            .getOrElse(
-              throw new IllegalArgumentException(
-                s"No package found for template ${create.identifier}"
-              )
+  ): Future[TransactionTreeUpdate] = {
+    val update = TransactionTreeUpdate(
+      mkCreateTx(
+        nextOffset(),
+        Seq(create.copy(createdAt = recordTime.toInstant).asInstanceOf[Contract[TCid, T]]),
+        Instant.now(),
+        signatories,
+        dummyDomain,
+        "acs-snapshot-store-test",
+        recordTime.toInstant,
+        packageName = DarResources
+          .lookupPackageId(create.identifier.getPackageId)
+          .getOrElse(
+            throw new IllegalArgumentException(
+              s"No package found for template ${create.identifier}"
             )
-            .metadata
-            .name,
-        )
-      ),
+          )
+          .metadata
+          .name,
+      )
     )
+    updateHistory.ingestionSink
+      .ingestUpdate(
+        dummyDomain,
+        update,
+      )
+      .map(_ => update)
   }
 
   private def ingestArchive[TCid <: ContractId[T], T](

@@ -29,14 +29,12 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           .migrationInfo(0)
           .map(_.value.complete)
         // Check that the updates are the same
-        updatesA <- testData.sourceHistory.getUpdates(
+        updatesA <- testData.sourceHistory.getAllUpdates(
           None,
-          includeImportUpdates = true,
           PageLimit.tryCreate(1000),
         )
-        updatesB <- testData.destinationHistory.getUpdates(
+        updatesB <- testData.destinationHistory.getAllUpdates(
           None,
-          includeImportUpdates = true,
           PageLimit.tryCreate(1000),
         )
       } yield {
@@ -60,9 +58,8 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
         )
         migrationInfo0 <- testData.destinationHistory.sourceHistory
           .migrationInfo(0)
-        updatesB1 <- testData.destinationHistory.getUpdates(
+        updatesB1 <- testData.destinationHistory.getAllUpdates(
           None,
-          includeImportUpdates = true,
           PageLimit.tryCreate(1000),
         )
 
@@ -77,14 +74,12 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           .map(_.value.complete)
 
         // Check that the updates are the same
-        updatesA <- testData.sourceHistory.getUpdates(
+        updatesA <- testData.sourceHistory.getAllUpdates(
           None,
-          includeImportUpdates = true,
           PageLimit.tryCreate(1000),
         )
-        updatesB2 <- testData.destinationHistory.getUpdates(
+        updatesB2 <- testData.destinationHistory.getAllUpdates(
           None,
-          includeImportUpdates = true,
           PageLimit.tryCreate(1000),
         )
       } yield {
@@ -149,12 +144,44 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       // domain 1: 4 5
       // domain 2: . .
       _ <- initStore(storeA1)
+      _ <- create(
+        domain1,
+        validContractId(1),
+        validOffset(1),
+        party1,
+        storeA1,
+        importUpdateRecordTime,
+      )
       _ <- create(domain1, validContractId(4), validOffset(4), party1, storeA1, time(4))
       _ <- create(domain1, validContractId(5), validOffset(5), party1, storeA1, time(5))
       // Migration 2:
       // domain 1: .
       // domain 2: 6
       _ <- initStore(storeA2)
+      _ <- create(
+        domain1,
+        validContractId(1),
+        validOffset(1),
+        party1,
+        storeA2,
+        importUpdateRecordTime,
+      )
+      _ <- create(
+        domain1,
+        validContractId(4),
+        validOffset(4),
+        party1,
+        storeA2,
+        importUpdateRecordTime,
+      )
+      _ <- create(
+        domain1,
+        validContractId(5),
+        validOffset(5),
+        party1,
+        storeA2,
+        importUpdateRecordTime,
+      )
       _ <- create(domain2, validContractId(6), validOffset(6), party1, storeA2, time(6))
       // At this point, storeA2 joins and both continue with migration 2:
       // domain 1: 7 .
@@ -213,6 +240,14 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       logger.debug(s"backfill() iteration $i")
       backfiller.backfill().flatMap {
         case HistoryBackfilling.Outcome.MoreWorkAvailableNow => go(i + 1)
+        case HistoryBackfilling.Outcome.MoreWorkAvailableLater => Future.successful(false)
+        case HistoryBackfilling.Outcome.BackfillingIsComplete => goImportUpdates(1)
+      }
+    }
+    def goImportUpdates(i: Int): Future[Boolean] = {
+      logger.debug(s"backfillImportUpdates() iteration $i")
+      backfiller.backfillImportUpdates().flatMap {
+        case HistoryBackfilling.Outcome.MoreWorkAvailableNow => goImportUpdates(i + 1)
         case HistoryBackfilling.Outcome.MoreWorkAvailableLater => Future.successful(false)
         case HistoryBackfilling.Outcome.BackfillingIsComplete => Future.successful(true)
       }
@@ -287,5 +322,17 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
             excludeBefore.get(domainId).fold(false)(b => u.update.recordTime >= b)
           )
         )
+
+    override def getImportUpdates(migrationId: Long, afterUpdateId: String, count: Int)(implicit
+        tc: TraceContext
+    ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = history
+      .getImportUpdates(
+        migrationId,
+        afterUpdateId,
+        PageLimit.tryCreate(count),
+      )(tc)
+      .map(
+        _.map(_.update)
+      )
   }
 }
