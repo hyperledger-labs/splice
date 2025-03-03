@@ -30,3 +30,14 @@ workflow:
           context:
             - slack-context
             - canton-network-vpn
+
+  copy_mainnet_backup_to_bucket:
+    when:
+      equal: [ copy-mainnet-backup-to-bucket, << pipeline.parameters.run-job >> ]
+    jobs:
+      - copy_backup_to_bucket:
+          cluster: "mainnet-old"
+          before-date: << pipeline.parameters.before-date >>
+          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
+          context:
+            - slack-context
