@@ -1006,6 +1006,9 @@ The hostname can be found by describing the relevant pods that use the database 
 The password can be found in the `postgres-secrets` secret of the namespace:
 (e.g. using `kubectl get secret postgres-secrets -n sv-1 -o jsonpath='{.data.postgresPassword}' | base64 -d`).
 
+If `cncluster debug_shell` fails, use `kubectl describe pod -n default splice-debug` to find out why.
+A common problem is that the `splice-debug` image is missing for your local version.
+
 #### Inspecting daml transactions
 
 Daml transactions are too large to be logged in full, so they are truncated in the cluster logs.
@@ -2344,6 +2347,79 @@ diff --git a/apps/app/src/test/resources/simple-topology-canton.conf b/apps/app/
    Compare these numbers with the numbers from the cluster sequencer. The numbers should be identical.
 12. Check that there are no sketchy warnings or errors in the Canton logs in `log/canton.clog`
 13. Delete the export `rm -r /tmp/state-export`
+
+
+## Simulate a long-running cluster on a scratchnet
+
+This section describes how to set up a scratchnet where:
+
+1. the network was deployed using a chosen release version
+2. the network has completed one HDM
+3. one SV has joined at some arbitrary time after the HDM
+4. selected nodes have upgraded to the latest version from your local code
+
+Instructions:
+
+- Lock a scratchnet. The instructions below assume you have locked `scratchneta`.
+- Configure the version to deploy
+  The instructions below assume you use release 0.3.12.
+    - Add `export CHARTS_VERSION=0.3.12` to `cluster/deployment/scratchneta/.envrc.vars`
+    - Add `export OVERRIDE_VERSION=0.3.12` to `cluster/deployment/scratchneta/.envrc.vars`
+    - Change `export SPLICE_ARTIFACTS_REPOSITORY=private` in `cluster/deployment/scratchneta/.envrc.vars` to `export SPLICE_ARTIFACTS_REPOSITORY=public`
+    - Run `cncluster update_config active 0 0.3.12` (this will update `cluster/deployment/scratchneta/config.yaml`)
+    - See also section [Versions and Repositories](#versions-and-repositories).
+- Configure the number of SVs in the cluster.
+    - Add `export DSO_SIZE=1` to `cluster/deployment/scratchneta/.envrc.vars` to use a network with 1 SV
+- Deploy the cluster.
+    - Run `CNCLUSTER_SKIP_DOCKER_CHECK=1 cncluster apply`
+    - Use `CNCLUSTER_SKIP_DOCKER_CHECK` in case cncluster complains that your local version is not published, even though we don't use it.
+- Update the config to add staging nodes
+    - Run `cncluster update_config upgrade 1 0.3.12` (this will update `cluster/deployment/scratchneta/config.yaml`)
+- Deploy the staging nodes
+    - Run `CNCLUSTER_SKIP_DOCKER_CHECK=1 cncluster apply`
+    - This only works if the version does not change, otherwise `cncluster apply` will try to tweak the legacy nodes, and you will run into compatibility issue.
+      If you need to change the version together with the HDM, use individual `cncluster pulumi <stack> up` commands.
+- Trigger the HDM vote
+    - Run `cncluster vote_for_migration 1`
+- Wait for domain dumps to be written
+    - Logs should contain "Wrote domain migration dump" [entries](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-scratchanet%22%0A%22Wrote%20domain%20migration%20dump%22;cursorTimestamp=2025-02-26T13:14:08.215863743Z;duration=PT30M?project=da-cn-scratchnet&inv=1&invt=Abqmvg)
+- Wait for apps to catch up
+    - Logs should not contain any recent "Ingested Transaction" [entries](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-scratchanet%22%0A%22Ingested%20Transaction%22;duration=PT30M?project=da-cn-scratchnet&inv=1&invt=Abqmvg)
+- Configure the network to switch to the new migration
+    - Run `cncluster update_config_to_migrate` and inspect `cluster/deployment/scratchneta/config.yaml` to see what it did
+- Execute the migration
+    - Run `SPLICE_MIGRATION_ID=1 SPLICE_SV=? cncluster pulumi sv-canton up` for every deployed SV, using values `sv-1, sv-2, ...` for `?`.
+    - Run `cncluster pulumi canton-network up`
+    - Run `cncluster pulumi validator1 up`
+- Verify that we are running the new migration
+    - Open https://scan.sv-2.scratcha.network.canton.global/dso, check `migrationId` fields
+- Complete the migration
+    - Edit `cluster/deployment/scratchneta/config.yaml`, removing the `migratingFrom` entry from the active migration
+- Add a new SV
+    - Run `cncluster apply_sv`
+- Verify that the new SV is part of the DSO
+    - Open https://scan.sv-2.scratcha.network.canton.global/dso, search for `"svs"`
+- Verify that the new SV has completed long-running background processes
+    - Look for "This history won't need any further backfilling" [log entries](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-scratchanet%22%0A%22This%20history%20won't%20need%20any%20further%20backfilling%22%0Aresource.labels.namespace_name%3D%22sv%22;cursorTimestamp=2025-02-26T14:31:47.457160517Z;duration=PT1H?project=da-cn-scratchnet&inv=1&invt=Abqmvg).
+- Configure the network to use the local release
+    - Undo version changes in `cluster/deployment/scratchneta/.envrc.vars`:
+        - Modify `CHART_VERSION` to `CHART_VERSION=local`
+        - Modify `SPLICE_ARTIFACTS_REPOSITORY` back to `export SPLICE_ARTIFACTS_REPOSITORY=private`
+    - In `cluster/deployment/scratchneta/config.yaml`, remove the version key from the active synchronizerMigration
+- Publish a local release from your local code
+    - Check out the version you want to deploy.
+        - Run `git checkout my-branch`
+        - Do not use this for release line branches, those are published from CI
+    - Build and publish docker images
+        - This step must be run after changing CHART_VERSION
+        - Run `make -C $REPO_ROOT clean`
+        - Run `make -C $REPO_ROOT build`
+        - Run `make -C $REPO_ROOT docker-push -j`
+- Upgrade nodes as required
+    - Run `cncluster apply_sv`
+    - Run `SPLICE_MIGRATION_ID=1 SPLICE_SV=? cncluster pulumi sv-canton up` for every deployed SV, using values `sv-1, sv-2, ...` for `?`.
+    - Run `cncluster pulumi canton-network up`
+    - Run `cncluster pulumi validator1 up`
 
 
 ## Appendix: Kubernetes and Other Deployment Resources
