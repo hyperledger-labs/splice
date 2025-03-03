@@ -5,7 +5,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.{
-  SvUiIntegrationTestUtil,
+  SvUiPreflightIntegrationTestUtil,
   PreflightIntegrationTestUtil,
 }
 import org.lfdecentralizedtrust.splice.sv.util.AnsUtil
@@ -20,7 +20,7 @@ import org.scalatest.time.{Minute, Span}
 
 class SvReOnboardPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("validator", "sv")
-    with SvUiIntegrationTestUtil
+    with SvUiPreflightIntegrationTestUtil
     with SvFrontendTestUtil
     with PreflightIntegrationTestUtil
     with FrontendLoginUtil

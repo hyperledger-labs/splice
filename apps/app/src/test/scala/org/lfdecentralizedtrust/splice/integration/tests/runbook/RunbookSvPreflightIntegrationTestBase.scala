@@ -21,7 +21,7 @@ import scala.util.{Random, Try}
 abstract class RunbookSvPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with PreflightIntegrationTestUtil
-    with SvUiIntegrationTestUtil
+    with SvUiPreflightIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with AnsFrontendTestUtil
