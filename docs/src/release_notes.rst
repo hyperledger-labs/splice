@@ -11,6 +11,14 @@ Release Notes
 Upcoming
 --------
 
+* Deployment
+
+  * Change the port used by nginx in the UI docker images from 80 to 8080.
+
+    The services defined by the helm charts still expose port 80 by default, but now all of them are configurable through the helm values, eg: the validator helm chart has new values configured through `service.wallet.port` & `service.ans.port`.
+
+    The compose deployments contain an updated nginx.conf that now uses the new 8080 ports.
+
 0.3.13
 ------
 
