@@ -13,12 +13,13 @@ before_date=${1:-$(date +%Y-%m-%d)}
 namespace="sv-1"
 
 BACKUPS_BUCKET_NAME="cn-mainnet-backups"
-TARGET_DIR="gs://$BACKUPS_BUCKET_NAME/$GCP_CLUSTER_BASENAME/$run_id"
 
 
 _info "Finding latest backup before $before_date..."
 # TODO(#17852): for now, the instance ID is hardcoded to the participant from before the migration to ZRH
 run_id=$(gcloud sql backups list --instance sv-1-participant-0-pg-fc951b4 --format "value(description)" --filter "description:* and endTime < ${before_date} and status = SUCCESSFUL and type = ON_DEMAND" --sort-by=~endTime --limit 1)
+
+TARGET_DIR="gs://$BACKUPS_BUCKET_NAME/$GCP_CLUSTER_BASENAME/$run_id"
 
 _info "Found backup: $run_id"
 
