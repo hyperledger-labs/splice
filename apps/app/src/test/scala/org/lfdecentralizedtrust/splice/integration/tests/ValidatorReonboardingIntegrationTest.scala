@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorCantonIdentifierConfig,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, DbConfig}
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -91,7 +91,7 @@ class ValidatorReonboardingIntegrationTest
                 )
               ),
               participantClient = ParticipantClientConfig(
-                ClientConfig(port = Port.tryCreate(27502)),
+                FullClientConfig(port = Port.tryCreate(27502)),
                 defaultAliceValidatorConfig.participantClient.ledgerApi.copy(
                   clientConfig =
                     defaultAliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(

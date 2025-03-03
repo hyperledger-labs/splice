@@ -5,6 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.config
 
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.synchronizer.config.PublicServerConfig
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
@@ -21,7 +22,7 @@ final case class CommunitySequencerNodeConfig(
     override val publicApi: PublicServerConfig = PublicServerConfig(),
     override val adminApi: AdminServerConfig = AdminServerConfig(),
     override val storage: StorageConfig = StorageConfig.Memory(),
-    override val crypto: CommunityCryptoConfig = CommunityCryptoConfig(),
+    override val crypto: CryptoConfig = CryptoConfig(),
     override val sequencer: CommunitySequencerConfig = CommunitySequencerConfig.default,
     override val auditLogging: Boolean = false,
     override val timeTracker: SynchronizerTimeTrackerConfig = SynchronizerTimeTrackerConfig(),
@@ -46,16 +47,26 @@ final case class CommunitySequencerNodeConfig(
       monitoring,
       trafficConfig,
     )
-    with ConfigDefaults[DefaultPorts, CommunitySequencerNodeConfig] {
+    with ConfigDefaults[DefaultPorts, CommunitySequencerNodeConfig]
+    with CommunityOnlyCantonConfigValidation {
 
   override val nodeTypeName: String = "sequencer"
 
-  override def withDefaults(ports: DefaultPorts): CommunitySequencerNodeConfig =
+  override def withDefaults(
+      ports: DefaultPorts,
+      edition: CantonEdition,
+  ): CommunitySequencerNodeConfig =
     this
       .focus(_.publicApi.internalPort)
       .modify(ports.sequencerPublicApiPort.setDefaultPort)
       .focus(_.adminApi.internalPort)
       .modify(ports.sequencerAdminApiPort.setDefaultPort)
+}
+
+object CommunitySequencerNodeConfig {
+  implicit val communitySequencerNodeConfigCantonConfigValidator
+      : CantonConfigValidator[CommunitySequencerNodeConfig] =
+    CantonConfigValidatorDerivation[CommunitySequencerNodeConfig]
 }
 
 /** SequencerNodeInitConfig supports auto-init
@@ -64,3 +75,10 @@ final case class SequencerNodeInitConfig(
     identity: Option[InitConfigBase.Identity] = Some(InitConfigBase.Identity()),
     state: Option[StateConfig] = None,
 ) extends config.InitConfigBase
+    with UniformCantonConfigValidation
+
+object SequencerNodeInitConfig {
+  implicit val sequencerNodeInitConfigCantonConfigValidator
+      : CantonConfigValidator[SequencerNodeInitConfig] =
+    CantonConfigValidatorDerivation[SequencerNodeInitConfig]
+}

@@ -4,15 +4,15 @@
 package org.lfdecentralizedtrust.splice.config
 
 import org.apache.pekko.actor.ActorSystem
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.FullClientConfig
 import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
 
 abstract class BaseParticipantClientConfig(
-    val adminApi: ClientConfig,
+    val adminApi: FullClientConfig,
     val ledgerApi: LedgerApiClientConfig,
 ) extends BaseParticipantConfig {
-  override def clientAdminApi: ClientConfig = adminApi
-  override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig
+  override def clientAdminApi: FullClientConfig = adminApi
+  override def clientLedgerApi: FullClientConfig = ledgerApi.clientConfig
 
   def getParticipantClientConfig()(implicit actorSystem: ActorSystem): RemoteParticipantConfig = {
     val tokenStrO = ledgerApi.getToken().map(_.accessToken)
@@ -29,6 +29,6 @@ abstract class BaseParticipantClientConfig(
   * @param ledgerApi the configuration to connect the console to the remote ledger api
   */
 case class ParticipantClientConfig(
-    override val adminApi: ClientConfig,
+    override val adminApi: FullClientConfig,
     override val ledgerApi: LedgerApiClientConfig,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)

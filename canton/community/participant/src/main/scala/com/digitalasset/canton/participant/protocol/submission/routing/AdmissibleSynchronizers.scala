@@ -12,13 +12,10 @@ import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.sync.TransactionRoutingError
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.{
   TopologyErrors,
   UnableToQueryTopologySnapshot,
-}
-import com.digitalasset.canton.participant.sync.{
-  ConnectedSynchronizersLookup,
-  TransactionRoutingError,
 }
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
@@ -32,16 +29,19 @@ import scala.math.Ordered.orderingToOrdered
 
 private[routing] final class AdmissibleSynchronizers(
     localParticipantId: ParticipantId,
-    connectedSynchronizers: ConnectedSynchronizersLookup,
     protected val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
   /** Synchronizers that host both submitters and informees of the transaction:
-    * - submitters have to be hosted on the local participant
-    * - informees have to be hosted on some participant
-    * It is assumed that the participant is connected to all synchronizers in `connectedSynchronizers`
+    *   - submitters have to be hosted on the local participant
+    *   - informees have to be hosted on some participant It is assumed that the participant is
+    *     connected to all synchronizers in `connectedSynchronizers`
     */
-  def forParties(submitters: Set[LfPartyId], informees: Set[LfPartyId])(implicit
+  def forParties(
+      submitters: Set[LfPartyId],
+      informees: Set[LfPartyId],
+      synchronizerState: RoutingSynchronizerState,
+  )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, TransactionRoutingError, NonEmpty[Set[SynchronizerId]]] = {
@@ -74,9 +74,7 @@ private[routing] final class AdmissibleSynchronizers(
       SynchronizerId,
       Map[LfPartyId, PartyInfo],
     ]] =
-      connectedSynchronizers.snapshot.view
-        .mapValues(_.topologyClient.currentSnapshotApproximation)
-        .toVector
+      synchronizerState.topologySnapshots.toVector
         .parTraverseFilter(queryPartyTopologySnapshotClient)
         .map(_.toMap)
 

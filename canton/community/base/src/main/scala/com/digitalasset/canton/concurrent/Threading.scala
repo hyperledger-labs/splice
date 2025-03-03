@@ -21,8 +21,10 @@ import scala.concurrent.{ExecutionContextExecutor, blocking}
 object Threading {
 
   /** Creates a singled threaded scheduled executor.
-    * @param name used for created threads. Prefer dash separated names. `-{n}` will be appended.
-    * @param logger where uncaught exceptions are logged
+    * @param name
+    *   used for created threads. Prefer dash separated names. `-{n}` will be appended.
+    * @param logger
+    *   where uncaught exceptions are logged
     */
   def singleThreadScheduledExecutor(
       name: String,
@@ -38,8 +40,10 @@ object Threading {
   }
 
   /** Creates a singled threaded scheduled executor with maximum thread pool size = 1.
-    * @param name used for created threads. Prefer dash separated names.
-    * @param logger where uncaught exceptions are logged
+    * @param name
+    *   used for created threads. Prefer dash separated names.
+    * @param logger
+    *   where uncaught exceptions are logged
     */
   def singleThreadedExecutor(
       name: String,
@@ -60,8 +64,9 @@ object Threading {
     )
   }
 
-  /** @param exitOnFatal terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
-    *                    termination of specific threads.
+  /** @param exitOnFatal
+    *   terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
+    *   termination of specific threads.
     */
   private def threadFactory(
       name: String,
@@ -74,8 +79,9 @@ object Threading {
       .setDaemon(true)
       .build()
 
-  /** @param exitOnFatal terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
-    *                    termination of specific threads.
+  /** @param exitOnFatal
+    *   terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
+    *   termination of specific threads.
     */
   private def createUncaughtExceptionHandler(
       logger: Logger,
@@ -83,8 +89,9 @@ object Threading {
   ): Thread.UncaughtExceptionHandler =
     (t: Thread, e: Throwable) => createReporter(t.getName, logger, exitOnFatal)(e)
 
-  /** @param exitOnFatal terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
-    *                    termination of specific threads.
+  /** @param exitOnFatal
+    *   terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
+    *   termination of specific threads.
     */
   def createReporter(name: String, logger: Logger, exitOnFatal: Boolean)(
       throwable: Throwable
@@ -140,11 +147,12 @@ object Threading {
       detectNumberOfThreads(logger),
     )
 
-  /** Yields an `ExecutionContext` like `scala.concurrent.ExecutionContext.global`,
-    * except that it has its own thread pool.
+  /** Yields an `ExecutionContext` like `scala.concurrent.ExecutionContext.global`, except that it
+    * has its own thread pool.
     *
-    * @param exitOnFatal terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
-    *                    termination of specific threads.
+    * @param exitOnFatal
+    *   terminate the JVM on fatal errors. Enable this in production to prevent data corruption by
+    *   termination of specific threads.
     */
   @SuppressWarnings(Array("org.wartremover.warts.Null", "org.wartremover.warts.AsInstanceOf"))
   def newExecutionContext(
@@ -172,16 +180,12 @@ object Threading {
       .asInstanceOf[ForkJoinPool.ForkJoinWorkerThreadFactory]
 
     val forkJoinPool = createForkJoinPool(parallelism, threadFactory, handler, logger)
-    val executorService =
-      maybeMetrics.fold(forkJoinPool: ExecutorService)(
-        _.monitorExecutorService(name, forkJoinPool)
-      )
 
-    new ForkJoinIdlenessExecutorService(forkJoinPool, executorService, reporter, name)
+    new ForkJoinIdlenessExecutorService(forkJoinPool, forkJoinPool, reporter, name)
   }
 
-  /** Minimum parallelism of ForkJoinPool.
-    * Currently greater than one to work around a bug that prevents creation of new threads to compensate blocking tasks.
+  /** Minimum parallelism of ForkJoinPool. Currently greater than one to work around a bug that
+    * prevents creation of new threads to compensate blocking tasks.
     */
   val minParallelismForForkJoinPool = 3
 

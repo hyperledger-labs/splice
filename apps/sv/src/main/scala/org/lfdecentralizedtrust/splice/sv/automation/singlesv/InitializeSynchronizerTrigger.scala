@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import cats.syntax.traverseFilter.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.{CommunityCryptoConfig, CryptoProvider}
+import com.digitalasset.canton.config.{CryptoConfig, CryptoProvider}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -122,7 +122,6 @@ class InitializeSynchronizerTrigger(
 
   protected def completeTask(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      scanUrls <- getScanUrls()
       decentralizedNamespaceTxs <- getDecentralizedNamespaceDefinitionTransactions(
         participantAdminConnection
       )
@@ -150,7 +149,7 @@ class InitializeSynchronizerTrigger(
       )
       staticDomainParameters = node.parameters
         .toStaticSynchronizerParameters(
-          CommunityCryptoConfig(provider = CryptoProvider.Jce),
+          CryptoConfig(provider = CryptoProvider.Jce),
           ProtocolVersion.v33,
         )
         .valueOr(err =>

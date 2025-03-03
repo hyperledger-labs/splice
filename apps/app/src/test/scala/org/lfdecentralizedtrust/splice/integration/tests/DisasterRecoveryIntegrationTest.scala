@@ -5,7 +5,7 @@ import better.files.File.apply
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import io.circe.syntax.EncoderOps
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -160,7 +160,7 @@ class DisasterRecoveryIntegrationTest
                 aliceValidatorConf
                   .copy(
                     participantClient = ParticipantClientConfig(
-                      ClientConfig(port = Port.tryCreate(28502)),
+                      FullClientConfig(port = Port.tryCreate(28502)),
                       aliceValidatorConf.participantClient.ledgerApi.copy(
                         clientConfig =
                           aliceValidatorConf.participantClient.ledgerApi.clientConfig.copy(

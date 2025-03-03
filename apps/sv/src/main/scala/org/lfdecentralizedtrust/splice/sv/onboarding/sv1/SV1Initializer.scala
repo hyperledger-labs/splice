@@ -160,7 +160,7 @@ class SV1Initializer(
             Seq(
               new GrpcSequencerConnection(
                 NonEmpty.mk(Seq, LocalSynchronizerNode.toEndpoint(internalSequencerApi)),
-                transportSecurity = internalSequencerApi.tls.isDefined,
+                transportSecurity = internalSequencerApi.tlsConfig.isDefined,
                 customTrustCertificates = None,
                 SequencerAlias.Default,
               )

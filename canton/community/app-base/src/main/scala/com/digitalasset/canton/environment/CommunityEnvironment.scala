@@ -11,20 +11,20 @@ import com.digitalasset.canton.console.{
   ConsoleOutput,
   StandardConsoleOutput,
 }
-import com.digitalasset.canton.crypto.CommunityCryptoFactory
-import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
+import com.digitalasset.canton.crypto.kms.CommunityKmsFactory
+import com.digitalasset.canton.crypto.store.CommunityCryptoPrivateStoreFactory
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
+import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.resource.{
   CommunityDbMigrationsFactory,
   CommunityStorageFactory,
   DbMigrationsFactory,
 }
 import com.digitalasset.canton.synchronizer.mediator.{
-  CommunityMediatorNodeConfig,
   CommunityMediatorReplicaManager,
   MediatorNodeBootstrap,
-  MediatorNodeConfigCommon,
+  MediatorNodeConfig,
   MediatorNodeParameters,
 }
 import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
@@ -43,7 +43,7 @@ class CommunityEnvironment(
   override type Config = CantonCommunityConfig
 
   override protected val participantNodeFactory
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap] =
+      : ParticipantNodeBootstrap.Factory[LocalParticipantConfig, ParticipantNodeBootstrap] =
     ParticipantNodeBootstrap.CommunityParticipantFactory
 
   override type Console = CommunityConsoleEnvironment
@@ -79,8 +79,18 @@ class CommunityEnvironment(
     val bootstrapCommonArguments = nodeFactoryArguments
       .toCantonNodeBootstrapCommonArguments(
         new CommunityStorageFactory(sequencerConfig.storage),
-        new CommunityCryptoFactory(),
-        new CommunityCryptoPrivateStoreFactory(),
+        new CommunityCryptoPrivateStoreFactory(
+          nodeFactoryArguments.config.crypto.provider,
+          nodeFactoryArguments.config.crypto.kms,
+          CommunityKmsFactory,
+          nodeFactoryArguments.config.parameters.caching.kmsMetadataCache,
+          nodeFactoryArguments.config.crypto.privateKeyStore,
+          nodeFactoryArguments.parameters.nonStandardConfig,
+          nodeFactoryArguments.futureSupervisor,
+          nodeFactoryArguments.clock,
+          nodeFactoryArguments.executionContext,
+        ),
+        CommunityKmsFactory,
       )
       .valueOr(err =>
         throw new RuntimeException(s"Failed to create sequencer node $name: $err")
@@ -91,20 +101,30 @@ class CommunityEnvironment(
 
   override protected def createMediator(
       name: String,
-      mediatorConfig: CommunityMediatorNodeConfig,
+      mediatorConfig: MediatorNodeConfig,
   ): MediatorNodeBootstrap = {
 
     val factoryArguments = mediatorNodeFactoryArguments(name, mediatorConfig)
     val arguments = factoryArguments
       .toCantonNodeBootstrapCommonArguments(
         new CommunityStorageFactory(mediatorConfig.storage),
-        new CommunityCryptoFactory(),
-        new CommunityCryptoPrivateStoreFactory(),
+        new CommunityCryptoPrivateStoreFactory(
+          factoryArguments.config.crypto.provider,
+          factoryArguments.config.crypto.kms,
+          CommunityKmsFactory,
+          factoryArguments.config.parameters.caching.kmsMetadataCache,
+          factoryArguments.config.crypto.privateKeyStore,
+          factoryArguments.parameters.nonStandardConfig,
+          factoryArguments.futureSupervisor,
+          factoryArguments.clock,
+          factoryArguments.executionContext,
+        ),
+        CommunityKmsFactory,
       )
       .valueOr(err =>
         throw new RuntimeException(s"Failed to create mediator bootstrap: $err")
       ): CantonNodeBootstrapCommonArguments[
-      MediatorNodeConfigCommon,
+      MediatorNodeConfig,
       MediatorNodeParameters,
       MediatorMetrics,
     ]

@@ -10,7 +10,9 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery
+
 import java.time.Duration
 
 class RecordTimeToleranceTimeBasedIntegrationTest
@@ -78,7 +80,10 @@ class RecordTimeToleranceTimeBasedIntegrationTest
           .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofHours(48)
       }
       val txs = sv1Backend.participantClient.topology.synchronizer_parameters
-        .list(filterStore = synchronizerId.filterString, timeQuery = TimeQuery.Range(None, None))
+        .list(
+          store = TopologyStoreId.Synchronizer(synchronizerId),
+          timeQuery = TimeQuery.Range(None, None),
+        )
       txs should have length (3)
       sv1LocalBackend.stop()
   }

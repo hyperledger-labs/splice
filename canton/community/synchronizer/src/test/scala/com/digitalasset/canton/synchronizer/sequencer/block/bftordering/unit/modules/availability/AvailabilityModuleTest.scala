@@ -65,7 +65,7 @@ import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.Traced
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
-import org.slf4j.event.Level.WARN
+import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
@@ -85,7 +85,7 @@ class AvailabilityModuleTest extends AnyWordSpec with BftSequencerBaseTest {
   private val Node1To3Peers = (1 to 3).map(peer).toSet
   private val Node1To6Peers = (1 to 6).map(peer).toSet
   private val AnotherBatchId = BatchId.createForTesting("AnotherBatchId")
-  private val ABatch = OrderingRequestBatch(
+  private val ABatch = OrderingRequestBatch.create(
     Seq(Traced(OrderingRequest("tag", ByteString.EMPTY)))
   )
   private val ABatchId = BatchId.from(ABatch)
@@ -580,8 +580,35 @@ class AvailabilityModuleTest extends AnyWordSpec with BftSequencerBaseTest {
           RemoteDissemination.RemoteBatch.create(WrongBatchId, ABatch, from = Node1Peer)
         ),
         log => {
-          log.level shouldBe WARN
+          log.level shouldBe Level.WARN
           log.message should include("BatchId doesn't match digest")
+        },
+      )
+
+      disseminationProtocolState.disseminationProgress should be(empty)
+      disseminationProtocolState.batchesReadyForOrdering should be(empty)
+      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      verifyZeroInteractions(availabilityStore)
+    }
+
+    "not store if too many requests in a batch" in {
+      val disseminationProtocolState = new DisseminationProtocolState()
+
+      val availabilityStore = spy(new FakeAvailabilityStore[IgnoringUnitTestEnv])
+      val availability = createAvailability[IgnoringUnitTestEnv](
+        availabilityStore = availabilityStore,
+        disseminationProtocolState = disseminationProtocolState,
+        maxRequestsInBatch = 0,
+      )
+      loggerFactory.assertLogs(
+        availability.receive(
+          RemoteDissemination.RemoteBatch.create(ABatchId, ABatch, from = Node1Peer)
+        ),
+        log => {
+          log.level shouldBe Level.WARN
+          log.message should include(
+            "Batch BatchId(SHA-256:dce95db369d6...) from SEQ::ns::fake_node1 contains more requests (1) than allowed (0), skipping"
+          )
         },
       )
 
@@ -1233,12 +1260,43 @@ class AvailabilityModuleTest extends AnyWordSpec with BftSequencerBaseTest {
           RemoteOutputFetch.RemoteBatchDataFetched.create(Node1Peer, otherBatchId, ABatch)
         ),
         log => {
-          log.level shouldBe WARN
+          log.level shouldBe Level.WARN
           log.message should include("BatchId doesn't match digest")
         },
       )
 
       outputFetchProtocolState.localOutputMissingBatches should contain only otherBatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
+      outputFetchProtocolState.incomingBatchRequests should be(empty)
+      verifyZeroInteractions(availabilityStore)
+    }
+  }
+
+  "it receives OutputFetch.FetchedBatchStored but there are more requests than allowed" should {
+    "not store the batch" in {
+      val outputFetchProtocolState = new MainOutputFetchProtocolState()
+      val availabilityStore = spy(new FakeAvailabilityStore[IgnoringUnitTestEnv])
+
+      outputFetchProtocolState.localOutputMissingBatches.addOne(
+        ABatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
+      )
+      val availability = createAvailability[IgnoringUnitTestEnv](
+        outputFetchProtocolState = outputFetchProtocolState,
+        availabilityStore = availabilityStore,
+        maxRequestsInBatch = 0,
+      )
+      assertLogs(
+        availability.receive(
+          RemoteOutputFetch.RemoteBatchDataFetched.create(Node1Peer, ABatchId, ABatch)
+        ),
+        log => {
+          log.level shouldBe Level.WARN
+          log.message should include(
+            "Batch BatchId(SHA-256:dce95db369d6...) from SEQ::ns::fake_node1 contains more requests (1) than allowed (0), skipping"
+          )
+        },
+      )
+
+      outputFetchProtocolState.localOutputMissingBatches should contain only ABatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
       outputFetchProtocolState.incomingBatchRequests should be(empty)
       verifyZeroInteractions(availabilityStore)
     }
@@ -1458,7 +1516,7 @@ class AvailabilityModuleTest extends AnyWordSpec with BftSequencerBaseTest {
           ](None)
           implicit val timeCellContext
               : FakeTimerCellUnitTestContext[Availability.Message[FakeTimerCellUnitTestEnv]] =
-            FakeTimerCellUnitTestContext(timerCell)
+            new FakeTimerCellUnitTestContext(timerCell)
           val clock = new SimClock(loggerFactory = loggerFactory)
 
           // initially consensus requests a proposal and there is nothing to be ordered, then a message is sent to mempool
@@ -2387,7 +2445,7 @@ class AvailabilityModuleTest extends AnyWordSpec with BftSequencerBaseTest {
       assertLogs(
         context.runPipedMessages() shouldBe Seq(Availability.NoOp),
         (logEntry: LogEntry) => {
-          logEntry.level shouldBe WARN
+          logEntry.level shouldBe Level.INFO
           logEntry.message should include("Skipping message since we can't verify signature")
         },
       )
@@ -2404,6 +2462,7 @@ class AvailabilityModuleTest extends AnyWordSpec with BftSequencerBaseTest {
   private def createAvailability[E <: BaseIgnoringUnitTestEnv[E]](
       myId: SequencerId = Node0Peer,
       otherPeers: Set[SequencerId] = Set.empty,
+      maxRequestsInBatch: Short = BftBlockOrderer.DefaultMaxRequestsInBatch,
       maxBatchesPerProposal: Short = BftBlockOrderer.DefaultMaxBatchesPerProposal,
       mempool: ModuleRef[Mempool.Message] = fakeIgnoringModule,
       cryptoProvider: CryptoProvider[E] = fakeCryptoProvider[E],
@@ -2416,6 +2475,7 @@ class AvailabilityModuleTest extends AnyWordSpec with BftSequencerBaseTest {
       outputFetchProtocolState: MainOutputFetchProtocolState = new MainOutputFetchProtocolState(),
   )(implicit context: E#ActorContextT[Availability.Message[E]]): AvailabilityModule[E] = {
     val config = AvailabilityModuleConfig(
+      maxRequestsInBatch,
       maxBatchesPerProposal,
       BftBlockOrderer.DefaultOutputFetchTimeout,
     )

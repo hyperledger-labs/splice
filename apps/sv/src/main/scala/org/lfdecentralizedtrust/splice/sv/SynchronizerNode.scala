@@ -3,11 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.sv
 
-import com.digitalasset.canton.networking.Endpoint
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvSequencerConfig}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PEndpointConfig
+import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.time.Duration
 
@@ -46,9 +47,17 @@ object SequencerConfig {
 }
 
 final case class BftSequencerConfig(
-    peerUrl: Endpoint
+    peerUrl: P2PEndpointConfig
 ) extends SequencerConfig {
-  override def externalPeerUrl: Option[String] = Some(peerUrl.toString)
+  override def externalPeerUrl: Option[String] = Some(
+    Uri(
+      peerUrl.tlsConfig.filter(_.enabled).fold("http")(_ => "https"),
+      Uri.Authority(
+        Uri.Host(peerUrl.address),
+        peerUrl.port.unwrap,
+      ),
+    ).toString()
+  )
 }
 
 final case class CometBftSequencerConfig(

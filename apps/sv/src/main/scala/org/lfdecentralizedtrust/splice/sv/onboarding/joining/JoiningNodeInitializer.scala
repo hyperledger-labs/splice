@@ -5,7 +5,12 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
 import cats.data.OptionT
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
+import cats.implicits.{
+  catsSyntaxOptionId,
+  catsSyntaxTuple2Semigroupal,
+  catsSyntaxTuple4Semigroupal,
+  toTraverseOps,
+}
 import cats.syntax.foldable.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
@@ -952,7 +957,7 @@ class JoiningNodeInitializer(
         // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
         // we are in the middle of an DSO party migration so don't reconnect to the domain.
         proposals <- participantAdminConnection.listPartyToParticipant(
-          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).filterName,
+          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
           filterParty = dsoPartyId.filterString,
           filterParticipant = participantId.filterString,
           proposals = TopologyTransactionType.ProposalSignedByOwnKey,

@@ -42,7 +42,7 @@ class SpliceLedgerClient(
     with NamedLogging {
   private val client = {
     val clientChannelConfig = LedgerClientChannelConfiguration(
-      sslContext = config.tls.map(x => ClientChannelBuilder.sslContext(x)),
+      sslContext = config.tlsConfig.map(x => ClientChannelBuilder.sslContext(x)),
       // Hard-coding the maximum value (= 2GB).
       // If a limit is needed, because an application can't handle transactions at that size,
       // the participants should agree on a lower limit and enforce that through domain parameters.

@@ -3,7 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.console
 
-import com.digitalasset.canton.config.{ConsoleCommandTimeout, ProcessingTimeout}
+import com.digitalasset.canton.config.{
+  ConsoleCommandTimeout,
+  NonNegativeDuration,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,
@@ -35,6 +39,7 @@ class ConsoleHttpCommandRunner(
     environment: SpliceEnvironment,
     timeouts: ProcessingTimeout,
     commandTimeouts: ConsoleCommandTimeout,
+    requestTimeout: NonNegativeDuration,
 )(implicit tracer: Tracer, templateDecoder: TemplateJsonDecoder)
     extends NamedLogging
     with AutoCloseable
@@ -107,7 +112,7 @@ class ConsoleHttpCommandRunner(
       }
 
       implicit val httpClient: HttpClient =
-        buildHttpClient(HttpClient.HttpRequestParameters(commandTimeouts.requestTimeout))
+        buildHttpClient(HttpClient.HttpRequestParameters(requestTimeout))
 
       val url = clientConfig.url
       try {

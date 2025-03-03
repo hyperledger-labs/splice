@@ -262,7 +262,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
         threshold = PositiveInt.tryCreate(2),
       ).value shouldBe (())
     }
-    "complain about errors for ThresholdActive if threshold can not be reached" in {
+    "complain about errors for StrictActive if threshold can not be reached" in {
       val result = run(
         None,
         List(

@@ -20,9 +20,9 @@ import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.W
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningPublicKey, v30}
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
 import io.grpc.Status
@@ -216,7 +216,7 @@ private[validator] object ValidatorUtil {
           .map(mapping =>
             Proposal(
               mapping = mapping,
-              store = TopologyStoreId.AuthorizedStore.filterName,
+              store = TopologyStoreId.Authorized,
               serial = Some(PositiveInt.one),
             )
           )

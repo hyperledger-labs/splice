@@ -6,7 +6,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -14,6 +14,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -182,7 +183,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               bobValidatorConfig
                 .copy(
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(5902)),
+                    FullClientConfig(port = Port.tryCreate(5902)),
                     bobValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -208,7 +209,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     )
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27502)),
+                    FullClientConfig(port = Port.tryCreate(27502)),
                     aliceValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -247,7 +248,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     )
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27702)),
+                    FullClientConfig(port = Port.tryCreate(27702)),
                     splitwellValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         splitwellValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -313,7 +314,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     Some(Port.tryCreate(27113))
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27702)),
+                    FullClientConfig(port = Port.tryCreate(27702)),
                     splitwellBackendConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         splitwellBackendConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -346,7 +347,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 adminApi =
                   aliceSplitwellAppClientConfig.adminApi.copy(url = Uri("http://127.0.0.1:27113")),
                 participantClient = ParticipantClientConfig(
-                  ClientConfig(port = Port.tryCreate(27502)),
+                  FullClientConfig(port = Port.tryCreate(27502)),
                   aliceSplitwellAppClientConfig.participantClient.ledgerApi.copy(
                     clientConfig =
                       aliceSplitwellAppClientConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -626,7 +627,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           val domainDynamicParams =
             sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
               .list(
-                decentralizedSynchronizerId.filterString
+                store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId)
               )
               .headOption
               .value

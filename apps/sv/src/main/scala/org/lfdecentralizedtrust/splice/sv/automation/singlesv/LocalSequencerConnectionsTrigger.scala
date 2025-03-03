@@ -99,7 +99,7 @@ class LocalSequencerConnectionsTrigger(
           val localSequencerConnection =
             new GrpcSequencerConnection(
               NonEmpty.mk(Seq, localEndpoint),
-              transportSecurity = internalSequencerClientConfig.tls.isDefined,
+              transportSecurity = internalSequencerClientConfig.tlsConfig.isDefined,
               customTrustCertificates = None,
               SequencerAlias.Default,
             )

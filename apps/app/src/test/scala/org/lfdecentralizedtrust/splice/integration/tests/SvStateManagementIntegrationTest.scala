@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   TransferConfig,
@@ -325,7 +326,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         // Wait for the decentralized namespace change to avoid triggering in TOPOLOGY_UNAUTHORIZED_TRANSACTION
         sv1Backend.participantClient.topology.decentralized_namespaces
           .list(
-            filterStore = decentralizedSynchronizerId.filterString,
+            store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
             filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
           )
           .loneElement

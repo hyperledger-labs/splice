@@ -20,8 +20,8 @@ import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.protocol.{RequestId, RootHash}
 import com.digitalasset.canton.synchronizer.mediator.MediatorVerdict.MediatorApprove
 import com.digitalasset.canton.synchronizer.mediator.ResponseAggregation.ViewState
 import com.digitalasset.canton.topology.ParticipantId
@@ -35,13 +35,16 @@ import scala.concurrent.ExecutionContext
 
 /** Aggregates the responses for a request that the mediator has processed so far.
   *
-  * @param state               If the [[com.digitalasset.canton.protocol.messages.MediatorConfirmationRequest]] has been finalized,
-  *                            this will be a `Left` otherwise a `Right` which shows which transaction view hashes are not confirmed yet.
-  * @param requestTraceContext We retain the original trace context from the initial transaction confirmation request
-  *                            for raising timeouts to help with debugging. this ideally would be the same trace
-  *                            context throughout all responses could not be in a distributed setup so this is not
-  *                            validated anywhere. Intentionally supplied in a separate parameter list to avoid being
-  *                            included in equality checks.
+  * @param state
+  *   If the [[com.digitalasset.canton.protocol.messages.MediatorConfirmationRequest]] has been
+  *   finalized, this will be a `Left` otherwise a `Right` which shows which transaction view hashes
+  *   are not confirmed yet.
+  * @param requestTraceContext
+  *   We retain the original trace context from the initial transaction confirmation request for
+  *   raising timeouts to help with debugging. this ideally would be the same trace context
+  *   throughout all responses could not be in a distributed setup so this is not validated
+  *   anywhere. Intentionally supplied in a separate parameter list to avoid being included in
+  *   equality checks.
   */
 final case class ResponseAggregation[VKEY](
     override val requestId: RequestId,
@@ -81,22 +84,20 @@ final case class ResponseAggregation[VKEY](
     )
 
   /** Record the additional confirmation response received. */
-  override def validateAndProgress(
+  override protected[synchronizer] def validateAndProgressInternal(
       responseTimestamp: CantonTimestamp,
       response: ConfirmationResponse,
+      rootHash: RootHash,
+      sender: ParticipantId,
       topologySnapshot: TopologySnapshot,
   )(implicit
       loggingContext: NamedLoggingContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[Option[ResponseAggregation[VKEY]]] = {
     val ConfirmationResponse(
-      requestId,
-      sender,
       _viewPositionO,
       localVerdict,
-      rootHash,
       confirmingParties,
-      _synchronizerId,
     ) = response
     val viewKeyO = ViewKey[VKEY].keyOfResponse(response)
 
@@ -127,7 +128,7 @@ final case class ResponseAggregation[VKEY](
     }).value
   }
 
-  protected def progressView(
+  private def progressView(
       statesOfViews: Map[VKEY, ViewState],
       viewKeyAndParties: (VKEY, Set[LfPartyId]),
       sender: ParticipantId,
@@ -183,7 +184,7 @@ final case class ResponseAggregation[VKEY](
             )
           }
 
-          def updateQuorumsStateWithThresholdUpdate: Seq[Quorum] =
+          def updateQuorumsStateWithThresholdUpdate(): Seq[Quorum] =
             quorumsState.map { quorum =>
               val contribution = quorum.confirmers
                 .filter { case (pId, _) => newlyRespondedFullVotes.contains(pId) }
@@ -200,7 +201,7 @@ final case class ResponseAggregation[VKEY](
 
           val nextViewState = ViewState(
             consortiumVotingUpdated,
-            updateQuorumsStateWithThresholdUpdate,
+            updateQuorumsStateWithThresholdUpdate(),
             rejections,
           )
           val nextStatesOfViews = statesOfViews + (viewKey -> nextViewState)

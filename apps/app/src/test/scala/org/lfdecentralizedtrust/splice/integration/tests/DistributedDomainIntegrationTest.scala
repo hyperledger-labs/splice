@@ -17,6 +17,7 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.*
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -117,7 +118,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         sv1Backend.participantClient.synchronizers.id_of(decentralizedSynchronizer)
       val decentralizedNamespaces = sv1Backend.participantClient.topology.decentralized_namespaces
         .list(
-          filterStore = synchronizerId.filterString,
+          store = TopologyStoreId.Synchronizer(synchronizerId),
           filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
         )
       inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>

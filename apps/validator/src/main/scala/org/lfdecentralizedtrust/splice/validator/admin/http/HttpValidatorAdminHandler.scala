@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.daml.ledger.api.v2.interactive
@@ -381,7 +382,7 @@ class HttpValidatorAdminHandler(
           )
           _ <- participantAdminConnection
             .listPartyToParticipant(
-              filterStore = TopologyStoreId.AuthorizedStore.filterName,
+              store = TopologyStoreId.AuthorizedStore.some,
               filterParty = partyId.filterString,
             )
             .map { txs =>

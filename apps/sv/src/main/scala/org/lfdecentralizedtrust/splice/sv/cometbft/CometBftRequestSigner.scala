@@ -140,7 +140,7 @@ object CometBftRequestSigner {
       ByteString.copyFrom(publicKey),
       HashAlgorithm.Sha256,
     )
-    val fingerprint = Fingerprint.tryCreate(hash.toLengthLimitedHexString)
+    val fingerprint = Fingerprint.tryFromString(hash.toLengthLimitedHexString)
     fingerprint.toLengthLimitedString.toString()
   }
 

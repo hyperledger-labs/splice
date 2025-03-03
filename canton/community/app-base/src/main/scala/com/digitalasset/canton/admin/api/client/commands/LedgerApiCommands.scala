@@ -126,6 +126,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   InterfaceFilter,
   TemplateFilter,
   TransactionFilter,
+  UpdateFormat,
 }
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.UpdateServiceStub
 import com.daml.ledger.api.v2.update_service.{
@@ -154,9 +155,9 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.{
-  IdentityProviderConfig as ApiIdentityProviderConfig,
   IdentityProviderId,
   JwksUrl,
+  IdentityProviderConfig as ApiIdentityProviderConfig,
 }
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -1163,6 +1164,37 @@ object LedgerApiCommands {
           .map[UpdateWrapper](TransactionWrapper.apply)
           .orElse(response.update.reassignment.map(ReassignmentWrapper(_)))
           .orElse(response.update.topologyTransaction.map(TopologyTransactionWrapper(_)))
+    }
+
+    final case class SubscribeUpdates(
+        override val observer: StreamObserver[UpdateWrapper],
+        beginExclusive: Long,
+        endInclusive: Option[Long],
+        updateFormat: UpdateFormat,
+    )(override implicit val loggingContext: ErrorLoggingContext)
+        extends BaseCommand[GetUpdatesRequest, AutoCloseable, AutoCloseable]
+        with SubscribeBase[GetUpdatesRequest, GetUpdatesResponse, UpdateWrapper] {
+      override def doRequest(
+          service: UpdateServiceStub,
+          request: GetUpdatesRequest,
+          rawObserver: StreamObserver[GetUpdatesResponse],
+      ): Unit =
+        service.getUpdates(request, rawObserver)
+
+      override def extractResults(response: GetUpdatesResponse): IterableOnce[UpdateWrapper] =
+        response.update.transaction
+          .map[UpdateWrapper](TransactionWrapper.apply)
+          .orElse(response.update.reassignment.map(ReassignmentWrapper(_)))
+          .orElse(response.update.topologyTransaction.map(TopologyTransactionWrapper(_)))
+
+      override def createRequest(): Either[String, GetUpdatesRequest] = Right {
+        GetUpdatesRequest(
+          beginExclusive = beginExclusive,
+          endInclusive = endInclusive,
+          updateFormat = Some(updateFormat),
+        )
+      }
+
     }
 
     final case class GetTransactionById(parties: Set[LfPartyId], id: String)(implicit

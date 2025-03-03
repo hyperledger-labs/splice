@@ -60,7 +60,7 @@ Your detailed API event logging is turned on but you are doing quite a few concu
 Late processing \(or clock skew\) of batch with counter.*after sequencing
 
 # Shows up during global domain migration test, when the domain is frozen
-Failed to submit submission due to .*\(Overloaded\(Submission rate exceeds rate limit of 0/s\.\)\)
+ABORTED/SEQUENCER_OVERLOADED.*Submission rate exceeds rate limit of 0/s
 
 # This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
 .*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*

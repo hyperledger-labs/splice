@@ -51,7 +51,7 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{BinaryFileUtil, GrpcStreamingUtils, PathUtils}
+import com.digitalasset.canton.util.{BinaryFileUtil, GrpcStreamingUtils, OptionUtil, PathUtils}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{ReassignmentCounter, SequencerCounter, SynchronizerAlias, config}
 import com.google.protobuf.ByteString
@@ -164,36 +164,58 @@ object ParticipantAdminCommands {
       }
     }
 
-    final case class UploadDar(
+    final case class DarData(
         darPath: String,
-        vetAllPackages: Boolean,
-        synchronizeVetting: Boolean,
         description: String,
         expectedMainPackageId: String,
-        requestHeaders: Map[String, String],
-        logger: TracedLogger,
         // We sometimes want to upload DARs that are inside JARs, which is hard with just a path.
         darDataO: Option[ByteString] = None,
-    ) extends PackageCommand[v30.UploadDarRequest, v30.UploadDarResponse, String] {
-
+    )
+    final case class UploadDar(
+        dars: Seq[DarData],
+        vetAllPackages: Boolean,
+        synchronizeVetting: Boolean,
+        requestHeaders: Map[String, String],
+        logger: TracedLogger,
+    ) extends PackageCommand[v30.UploadDarRequest, v30.UploadDarResponse, Seq[String]] {
       override protected def createRequest(): Either[String, v30.UploadDarRequest] =
-        for {
-          _ <- Either.cond(darPath.nonEmpty, (), "Provided DAR path is empty")
-          filename = darPath
-          darData <- darDataO.fold(BinaryFileUtil.readByteStringFromFile(filename))(
-            Right(_)
+        dars
+          .traverse(dar =>
+            for {
+              _ <- Either.cond(dar.darPath.nonEmpty, (), "Provided DAR path is empty")
+              filenameAndDarData <- dar.darDataO.fold(loadDarData(dar.darPath))(darData =>
+                Right(Paths.get(dar.darPath).getFileName.toString -> darData)
+              )
+              (filename, darData) = filenameAndDarData
+              descriptionOrFilename =
+                if (dar.description.isEmpty)
+                  PathUtils.getFilenameWithoutExtension(Path.of(filename))
+                else dar.description
+              _ = logger.info(s"Sending upload doar for ${descriptionOrFilename}")(
+                TraceContext.empty
+              )
+            } yield v30.UploadDarRequest.UploadDarData(
+              darData,
+              Some(descriptionOrFilename),
+              OptionUtil.emptyStringAsNone(dar.expectedMainPackageId.trim),
+            )
           )
-          descriptionOrFilename =
-            if (description.isEmpty) PathUtils.getFilenameWithoutExtension(Path.of(filename))
-            else description
-        } yield v30.UploadDarRequest(
-          data = darData,
-          description = descriptionOrFilename,
-          vetAllPackages = vetAllPackages,
-          synchronizeVetting = synchronizeVetting,
-          expectedMainPackageId = expectedMainPackageId,
-        )
+          .map(
+            v30.UploadDarRequest(
+              _,
+              synchronizeVetting = synchronizeVetting,
+              vetAllPackages = vetAllPackages,
+            )
+          )
 
+      /** Reads the dar data from a path:
+        *   - If the path is a URL (`darPath` starts with http), it downloads the file to a
+        *     temporary file and reads the data from there.
+        *   - Otherwise, it reads the data from the file at the given path.
+        *
+        * @return
+        *   Name of the local file and the dar data.
+        */
       private def loadDarData(darPath: String): Either[String, (String, ByteString)] = if (
         darPath.startsWith("http")
       ) {
@@ -218,10 +240,29 @@ object ParticipantAdminCommands {
 
       override protected def handleResponse(
           response: v30.UploadDarResponse
-      ): Either[String, String] = Right(response.darId)
+      ): Either[String, Seq[String]] = Right(response.darIds)
 
       // file can be big. checking & vetting might take a while
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
+
+    object UploadDar {
+      def apply(
+          darPath: String,
+          vetAllPackages: Boolean,
+          synchronizeVetting: Boolean,
+          description: String,
+          expectedMainPackageId: String,
+          requestHeaders: Map[String, String],
+          logger: TracedLogger,
+          darDataO: Option[ByteString],
+      ): UploadDar = UploadDar(
+        Seq(DarData(darPath, description, expectedMainPackageId, darDataO)),
+        vetAllPackages,
+        synchronizeVetting,
+        requestHeaders,
+        logger,
+      )
 
     }
 
@@ -431,41 +472,39 @@ object ParticipantAdminCommands {
 
   object PartyManagement {
 
-    final case class StartPartyReplication(
-        id: Option[String],
+    final case class AddPartyAsync(
         party: PartyId,
-        sourceParticipant: ParticipantId,
         synchronizerId: SynchronizerId,
+        sourceParticipant: Option[ParticipantId],
+        serial: Option[PositiveInt],
     ) extends GrpcAdminCommand[
-          v30.StartPartyReplicationRequest,
-          v30.StartPartyReplicationResponse,
-          Unit,
+          v30.AddPartyAsyncRequest,
+          v30.AddPartyAsyncResponse,
+          String,
         ] {
       override type Svc = PartyManagementServiceStub
 
       override def createService(channel: ManagedChannel): PartyManagementServiceStub =
         v30.PartyManagementServiceGrpc.stub(channel)
 
-      override protected def createRequest(): Either[String, v30.StartPartyReplicationRequest] =
+      override protected def createRequest(): Either[String, v30.AddPartyAsyncRequest] =
         Right(
-          v30.StartPartyReplicationRequest(
-            id = id,
+          v30.AddPartyAsyncRequest(
             partyUid = party.uid.toProtoPrimitive,
-            sourceParticipantUid = sourceParticipant.uid.toProtoPrimitive,
             synchronizerId = synchronizerId.toProtoPrimitive,
+            sourceParticipantUid = sourceParticipant.fold("")(_.uid.toProtoPrimitive),
+            serial = serial.fold(0)(_.value),
           )
         )
 
       override protected def submitRequest(
           service: PartyManagementServiceStub,
-          request: v30.StartPartyReplicationRequest,
-      ): Future[v30.StartPartyReplicationResponse] =
-        service.startPartyReplication(request)
+          request: v30.AddPartyAsyncRequest,
+      ): Future[v30.AddPartyAsyncResponse] = service.addPartyAsync(request)
 
       override protected def handleResponse(
-          response: v30.StartPartyReplicationResponse
-      ): Either[String, Unit] =
-        Either.unit
+          response: v30.AddPartyAsyncResponse
+      ): Either[String, String] = Right(response.partyReplicationId)
     }
   }
 
@@ -1235,7 +1274,7 @@ object ParticipantAdminCommands {
     // TODO(#9557) R2 The code below should be sufficient
     final case class OpenCommitment(
         observer: StreamObserver[v30.OpenCommitmentResponse],
-        commitment: AcsCommitment.CommitmentType,
+        commitment: AcsCommitment.HashedCommitmentType,
         synchronizerId: SynchronizerId,
         computedForCounterParticipant: ParticipantId,
         toInclusive: CantonTimestamp,
@@ -1246,7 +1285,7 @@ object ParticipantAdminCommands {
         ] {
       override protected def createRequest() = Right(
         v30.OpenCommitmentRequest(
-          AcsCommitment.commitmentTypeToProto(commitment),
+          AcsCommitment.hashedCommitmentTypeToProto(commitment),
           synchronizerId.toProtoPrimitive,
           computedForCounterParticipant.toProtoPrimitive,
           Some(toInclusive.toProtoTimestamp),
@@ -1379,8 +1418,8 @@ object ParticipantAdminCommands {
     final case class ReceivedAcsCmt(
         receivedCmtPeriod: CommitmentPeriod,
         originCounterParticipant: ParticipantId,
-        receivedCommitment: Option[AcsCommitment.CommitmentType],
-        localCommitment: Option[AcsCommitment.CommitmentType],
+        receivedCommitment: Option[AcsCommitment.HashedCommitmentType],
+        localCommitment: Option[AcsCommitment.HashedCommitmentType],
         state: ReceivedCmtState,
     )
 
@@ -1420,19 +1459,17 @@ object ParticipantAdminCommands {
         participantId <- ParticipantId
           .fromProtoPrimitive(cmt.originCounterParticipantUid, "")
           .leftMap(_.toString)
+        receivedCommitmentO <- cmt.receivedCommitment.traverse(
+          AcsCommitment.hashedCommitmentTypeFromByteString(_).leftMap(_.toString)
+        )
+        ownCommitmentO <- cmt.ownCommitment.traverse(
+          AcsCommitment.hashedCommitmentTypeFromByteString(_).leftMap(_.toString)
+        )
       } yield ReceivedAcsCmt(
         period,
         participantId,
-        Option
-          .when(cmt.receivedCommitment.isDefined)(
-            cmt.receivedCommitment.map(AcsCommitment.commitmentTypeFromByteString)
-          )
-          .flatten,
-        Option
-          .when(cmt.ownCommitment.isDefined)(
-            cmt.ownCommitment.map(AcsCommitment.commitmentTypeFromByteString)
-          )
-          .flatten,
+        receivedCommitmentO,
+        ownCommitmentO,
         state,
       )
 
@@ -1496,8 +1533,8 @@ object ParticipantAdminCommands {
     final case class SentAcsCmt(
         receivedCmtPeriod: CommitmentPeriod,
         destCounterParticipant: ParticipantId,
-        sentCommitment: Option[AcsCommitment.CommitmentType],
-        receivedCommitment: Option[AcsCommitment.CommitmentType],
+        sentCommitment: Option[AcsCommitment.HashedCommitmentType],
+        receivedCommitment: Option[AcsCommitment.HashedCommitmentType],
         state: SentCmtState,
     )
 
@@ -1510,19 +1547,17 @@ object ParticipantAdminCommands {
         participantId <- ParticipantId
           .fromProtoPrimitive(cmt.destCounterParticipantUid, "")
           .leftMap(_.toString)
+        ownCommitmentO <- cmt.ownCommitment.traverse(
+          AcsCommitment.hashedCommitmentTypeFromByteString(_).leftMap(_.toString)
+        )
+        receivedCommitmentO <- cmt.receivedCommitment.traverse(
+          AcsCommitment.hashedCommitmentTypeFromByteString(_).leftMap(_.toString)
+        )
       } yield SentAcsCmt(
         period,
         participantId,
-        Option
-          .when(cmt.ownCommitment.isDefined)(
-            cmt.ownCommitment.map(AcsCommitment.commitmentTypeFromByteString)
-          )
-          .flatten,
-        Option
-          .when(cmt.receivedCommitment.isDefined)(
-            cmt.receivedCommitment.map(AcsCommitment.commitmentTypeFromByteString)
-          )
-          .flatten,
+        ownCommitmentO,
+        receivedCommitmentO,
         state,
       )
 

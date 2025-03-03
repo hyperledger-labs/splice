@@ -178,7 +178,7 @@ class SequencerNodeBootstrap(
       storeId: TopologyStoreId
   ): Option[SynchronizerTopologyClient] =
     storeId match {
-      case SynchronizerStore(synchronizerId, _) =>
+      case SynchronizerStore(synchronizerId) =>
         topologyClient.get.filter(_.synchronizerId == synchronizerId)
       case _ => None
     }
@@ -247,8 +247,8 @@ class SequencerNodeBootstrap(
       ret
     }
 
-    /** if node is not initialized, create a dynamic synchronizer server such that we can serve a health end-point until
-      * we are initialised
+    /** if node is not initialized, create a dynamic synchronizer server such that we can serve a
+      * health end-point until we are initialised
       */
     private def initSequencerNodeServer(): Unit =
       if (nonInitializedSequencerNodeServer.get().isEmpty) {

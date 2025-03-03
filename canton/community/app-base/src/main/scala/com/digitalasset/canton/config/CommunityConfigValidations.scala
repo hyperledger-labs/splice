@@ -4,12 +4,13 @@
 package com.digitalasset.canton.config
 
 import cats.data.Validated
+import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
-import com.digitalasset.canton.crypto.CryptoFactory
+import com.digitalasset.canton.crypto.CryptoSchemes
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
@@ -18,8 +19,14 @@ import com.digitalasset.canton.version.ProtocolVersion
 import java.net.URI
 
 private[config] trait ConfigValidations[C <: CantonConfig] {
-  final def validate(config: C): Validated[NonEmpty[Seq[String]], Unit] =
-    validations.traverse_(_(config))
+  final def validate[T >: C](config: C, edition: CantonEdition)(implicit
+      validator: CantonConfigValidator[T]
+  ): Validated[NonEmpty[Seq[String]], Unit] =
+    config
+      .validate[T](edition)
+      .toValidated
+      .leftMap(_.map(_.toString))
+      .combine(validations.traverse_(_(config)))
 
   protected val validations: List[C => Validated[NonEmpty[Seq[String]], Unit]]
 
@@ -72,8 +79,8 @@ object CommunityConfigValidations
       sessionSigningKeysOnlyWithKms,
     )
 
-  /** Group node configs by db access to find matching db storage configs.
-    * Overcomplicated types used are to work around that at this point nodes could have conflicting names so we can't just
+  /** Group node configs by db access to find matching db storage configs. Overcomplicated types
+    * used are to work around that at this point nodes could have conflicting names so we can't just
     * throw them all in a single map.
     */
   private[config] def extractNormalizedDbAccess[C <: CantonConfig](
@@ -256,26 +263,21 @@ object CommunityConfigValidations
           )
         case CryptoProvider.Kms if !sessionSigningKeysConfig.enabled => None
         case CryptoProvider.Kms =>
-          // If no allowed specifications are configured, all supported specifications of the current provider
-          // are allowed, so we must consider those as well.
-          val supportedAlgorithms = CryptoFactory
-            .selectAllowedSigningAlgorithmSpecs(cryptoConfig)
-            .map(_.forgetNE)
-            .getOrElse(Set.empty)
-          val supportedKeys = CryptoFactory
-            .selectAllowedSigningKeySpecs(cryptoConfig)
-            .map(_.forgetNE)
-            .getOrElse(Set.empty)
+          val schemesE = CryptoSchemes.fromConfig(cryptoConfig)
+          val supportedAlgoSpecs =
+            schemesE.map(_.signingAlgoSpecs.allowed.forgetNE).getOrElse(Set.empty)
+          val supportedKeySpecs =
+            schemesE.map(_.signingKeySpecs.allowed.forgetNE).getOrElse(Set.empty)
 
           // the signing algorithm spec configured for session keys is not supported
-          if (!supportedAlgorithms.contains(sessionSigningKeysConfig.signingAlgorithmSpec))
+          if (!supportedAlgoSpecs.contains(sessionSigningKeysConfig.signingAlgorithmSpec))
             Some(
               s"The selected signing algorithm specification, ${sessionSigningKeysConfig.signingAlgorithmSpec}, " +
                 s"for session signing keys is not supported. Supported algorithms " +
                 s"are: ${cryptoConfig.signing.algorithms.allowed}."
             )
           // the signing key spec configured for session keys is not supported
-          else if (!supportedKeys.contains(sessionSigningKeysConfig.signingKeySpec))
+          else if (!supportedKeySpecs.contains(sessionSigningKeysConfig.signingKeySpec))
             Some(
               s"The selected signing key specification, ${sessionSigningKeysConfig.signingKeySpec}, " +
                 s"for session signing keys is not supported. Supported algorithms " +

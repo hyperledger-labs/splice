@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.JoinWithKey
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, SvTestUtil}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.scalatest.time.{Minute, Span}
 
 class SvOnboardingViaNonFoundingSvIntegrationTest
@@ -165,7 +166,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             val decentralizedNamespaces =
               sv2Backend.participantClient.topology.decentralized_namespaces
                 .list(
-                  filterStore = decentralizedSynchronizerId.filterString,
+                  store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
                   filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
                 )
             inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>

@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.util.SvTestUtil
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import io.circe.Json
 import monocle.Monocle.toAppliedFocusOps
 
@@ -151,7 +152,7 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
       Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
         sv.participantClient.topology.decentralized_namespaces
           .list(
-            filterStore = decentralizedSynchronizerId.filterString,
+            store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
             filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
           )
           .loneElement

@@ -71,7 +71,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnbo
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
-  CommunityCryptoConfig,
+  CryptoConfig,
   CryptoProvider,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
@@ -210,7 +210,7 @@ class SvApp(
           ),
           svSynchronizerConfig.parameters
             .toStaticSynchronizerParameters(
-              CommunityCryptoConfig(provider = CryptoProvider.Jce),
+              CryptoConfig(provider = CryptoProvider.Jce),
               ProtocolVersion.v33,
             )
             .valueOr(err =>

@@ -6,11 +6,7 @@ package com.digitalasset.canton.integration
 import better.files.{File, Resource}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
-import com.digitalasset.canton.config.{
-  CantonCommunityConfig,
-  CommunityCryptoConfig,
-  TestingConfigInternal,
-}
+import com.digitalasset.canton.config.{CantonCommunityConfig, CryptoConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.TestConsoleOutput
 import com.digitalasset.canton.environment.{
   CommunityConsoleEnvironment,
@@ -69,13 +65,14 @@ final case class CommunityEnvironmentDefinition(
 object CommunityEnvironmentDefinition {
   lazy val defaultStaticSynchronizerParameters: StaticSynchronizerParameters =
     StaticSynchronizerParameters.defaults(
-      CommunityCryptoConfig(),
+      CryptoConfig(),
       BaseTest.testedProtocolVersion,
     )
 
   /** Read configuration from files
     *
-    * Use this method if your configuration files contain nested includes (which silently fail to include with fromResource)
+    * Use this method if your configuration files contain nested includes (which silently fail to
+    * include with fromResource)
     */
   def fromFiles(files: File*): CommunityEnvironmentDefinition = {
     val config = CantonCommunityConfig.parseAndLoadOrExit(files.map(_.toJava))

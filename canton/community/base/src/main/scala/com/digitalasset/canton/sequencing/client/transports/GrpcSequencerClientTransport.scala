@@ -16,7 +16,11 @@ import com.digitalasset.canton.lifecycle.{
   RunOnShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.GrpcError.GrpcServiceUnavailable
+import com.digitalasset.canton.networking.grpc.GrpcError.{
+  GrpcClientError,
+  GrpcRequestRefusedByServer,
+  GrpcServiceUnavailable,
+}
 import com.digitalasset.canton.networking.grpc.{
   CantonGrpcUtil,
   GrpcClient,
@@ -34,11 +38,12 @@ import com.digitalasset.canton.sequencing.client.{
   SubscriptionErrorRetryPolicy,
 }
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.sequencing.protocol.SendAsyncError.SendAsyncErrorGrpc
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil.syntax.*
+import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Context.CancellableContext
 import io.grpc.{CallOptions, ManagedChannel, Status}
@@ -110,21 +115,9 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
     )
     response.biflatMap(
       fromGrpcError(_, messageId).toEitherT,
-      fromResponse(_, SendAsyncVersionedResponse.fromProtoV30).toEitherT,
+      _ => EitherTUtil.unitUS,
     )
   }
-
-  private def fromResponse[Proto](
-      p: Proto,
-      deserializer: Proto => ParsingResult[SendAsyncVersionedResponse],
-  ): Either[SendAsyncClientResponseError, Unit] =
-    for {
-      response <- deserializer(p)
-        .leftMap[SendAsyncClientResponseError](err =>
-          SendAsyncClientError.RequestFailed(s"Failed to deserialize response: $err")
-        )
-      _ <- response.error.toLeft(()).leftMap(SendAsyncClientError.RequestRefused.apply)
-    } yield ()
 
   private def fromGrpcError(error: GrpcError, messageId: MessageId)(implicit
       traceContext: TraceContext
@@ -132,7 +125,16 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
     val result = Either.cond(
       !bubbleSendErrorPolicy(error),
       (),
-      SendAsyncClientError.RequestFailed(s"Failed to make request to the server: $error"),
+      error match {
+        case SequencerErrors.Overloaded(_) =>
+          SendAsyncClientError.RequestRefused(SendAsyncErrorGrpc(error))
+        case _: GrpcRequestRefusedByServer =>
+          SendAsyncClientError.RequestRefused(SendAsyncErrorGrpc(error))
+        case _: GrpcClientError =>
+          SendAsyncClientError.RequestFailed(s"Failed to make request to the server: $error")
+        case _ =>
+          ErrorUtil.invalidState("We should bubble only refused and client errors")
+      },
     )
 
     // log that we're swallowing the error
@@ -145,8 +147,9 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
     result
   }
 
-  /** We receive grpc errors for a variety of reasons. The send operation is at-most-once and should only be bubbled up
-    * and potentially retried if we are absolutely certain the request will never be sequenced.
+  /** We receive grpc errors for a variety of reasons. The send operation is at-most-once and should
+    * only be bubbled up and potentially retried if we are absolutely certain the request will never
+    * be sequenced.
     */
   private def bubbleSendErrorPolicy(error: GrpcError): Boolean =
     error match {
@@ -244,7 +247,9 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
 trait GrpcClientTransportHelpers {
   this: FlagCloseable & NamedLogging =>
 
-  /** Retry policy to retry once for authentication failures to allow re-authentication and optionally retry when unavailable. */
+  /** Retry policy to retry once for authentication failures to allow re-authentication and
+    * optionally retry when unavailable.
+    */
   protected def retryPolicy(
       retryOnUnavailable: Boolean
   )(implicit traceContext: TraceContext): GrpcError => Boolean = {

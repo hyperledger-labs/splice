@@ -5,10 +5,14 @@ package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.syntax.option.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.config.{
+  CantonConfigValidator,
+  CommunityOnlyCantonConfigValidation,
   NonNegativeFiniteDuration,
   PositiveDurationSeconds,
   StorageConfig,
+  UniformCantonConfigValidation,
 }
 import com.digitalasset.canton.synchronizer.sequencer.DatabaseSequencerConfig.{
   SequencerPruningConfig,
@@ -28,7 +32,8 @@ trait SequencerConfig {
   def supportsReplicas: Boolean
 }
 
-/** Unsealed trait so the database sequencer config can be reused between community and enterprise */
+/** Unsealed trait so the database sequencer config can be reused between community and enterprise
+  */
 trait DatabaseSequencerConfig {
   this: SequencerConfig =>
 
@@ -43,19 +48,25 @@ trait DatabaseSequencerConfig {
 
 object DatabaseSequencerConfig {
 
-  /** The Postgres sequencer supports adding a interceptor within the sequencer itself for manipulating sequence behavior during tests.
-    * This is used for delaying and/or dropping messages to verify the behavior of transaction processing in abnormal scenarios in a deterministic way.
-    * It is not expected to be used at runtime in any capacity and is not possible to set through pureconfig.
+  /** The Postgres sequencer supports adding a interceptor within the sequencer itself for
+    * manipulating sequence behavior during tests. This is used for delaying and/or dropping
+    * messages to verify the behavior of transaction processing in abnormal scenarios in a
+    * deterministic way. It is not expected to be used at runtime in any capacity and is not
+    * possible to set through pureconfig.
     */
   type TestingInterceptor =
     Clock => Sequencer => ExecutionContext => Sequencer
 
   /** Configuration for database sequencer pruning
     *
-    * @param maxPruningBatchSize            Maximum number of events to prune from a sequencer at a time, used to break up batches internally
-    * @param pruningMetricUpdateInterval    How frequently to update the `max-event-age` pruning progress metric in the background.
-    *                                       A setting of None disables background metric updating.
-    * @param trafficPurchasedRetention      Retention duration on how long to retain traffic purchased entry updates for each member
+    * @param maxPruningBatchSize
+    *   Maximum number of events to prune from a sequencer at a time, used to break up batches
+    *   internally
+    * @param pruningMetricUpdateInterval
+    *   How frequently to update the `max-event-age` pruning progress metric in the background. A
+    *   setting of None disables background metric updating.
+    * @param trafficPurchasedRetention
+    *   Retention duration on how long to retain traffic purchased entry updates for each member
     */
   final case class SequencerPruningConfig(
       maxPruningBatchSize: PositiveInt =
@@ -63,7 +74,15 @@ object DatabaseSequencerConfig {
       pruningMetricUpdateInterval: Option[PositiveDurationSeconds] =
         PositiveDurationSeconds.ofHours(1L).some,
       trafficPurchasedRetention: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
-  )
+  ) extends UniformCantonConfigValidation
+
+  object SequencerPruningConfig {
+    implicit val sequencerPruningConfigCantonConfigValidator
+        : CantonConfigValidator[SequencerPruningConfig] = {
+      import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+      CantonConfigValidatorDerivation[SequencerPruningConfig]
+    }
+  }
 
 }
 
@@ -71,7 +90,7 @@ final case class BlockSequencerConfig(
     writer: SequencerWriterConfig = SequencerWriterConfig.HighThroughput(),
     reader: CommunitySequencerReaderConfig = CommunitySequencerReaderConfig(),
     testingInterceptor: Option[DatabaseSequencerConfig.TestingInterceptor] = None,
-) { self =>
+) extends UniformCantonConfigValidation { self =>
   def toDatabaseSequencerConfig: DatabaseSequencerConfig = new DatabaseSequencerConfig
     with SequencerConfig {
     override val writer: SequencerWriterConfig = self.writer
@@ -84,7 +103,19 @@ final case class BlockSequencerConfig(
   }
 }
 
-sealed trait CommunitySequencerConfig extends SequencerConfig
+object BlockSequencerConfig {
+  implicit val blockSequencerConfigCantonConfigValidator
+      : CantonConfigValidator[BlockSequencerConfig] = {
+    implicit val testingInterceptorCantonConfigValidator
+        : CantonConfigValidator[TestingInterceptor] =
+      CantonConfigValidator.validateAll
+    CantonConfigValidatorDerivation[BlockSequencerConfig]
+  }
+}
+
+sealed trait CommunitySequencerConfig
+    extends SequencerConfig
+    with CommunityOnlyCantonConfigValidation
 
 final case class CommunitySequencerReaderConfig(
     override val readBatchSize: Int = SequencerReaderConfig.defaultReadBatchSize,
@@ -98,8 +129,23 @@ final case class CommunitySequencerReaderConfig(
     override val eventGenerationParallelism: Int =
       SequencerReaderConfig.defaultEventGenerationParallelism,
 ) extends SequencerReaderConfig
+    with UniformCantonConfigValidation
+
+object CommunitySequencerReaderConfig {
+  implicit val communitySequencerReaderConfigCantonConfigValidator
+      : CantonConfigValidator[CommunitySequencerReaderConfig] =
+    CantonConfigValidatorDerivation[CommunitySequencerReaderConfig]
+}
 
 object CommunitySequencerConfig {
+
+  implicit val communitySequencerConfigCantonConfigValidator
+      : CantonConfigValidator[CommunitySequencerConfig] = {
+    implicit val testingInterceptorCantonConfigValidator
+        : CantonConfigValidator[TestingInterceptor] =
+      CantonConfigValidator.validateAll
+    CantonConfigValidatorDerivation[CommunitySequencerConfig]
+  }
 
   final case class Database(
       writer: SequencerWriterConfig = SequencerWriterConfig.LowLatency(),
@@ -117,6 +163,13 @@ object CommunitySequencerConfig {
       config: ConfigCursor,
   ) extends CommunitySequencerConfig {
     override def supportsReplicas: Boolean = false
+  }
+  object External {
+    implicit val externalCantonConfigValidator: CantonConfigValidator[External] = {
+      implicit val configCursorCantonConfigValidator: CantonConfigValidator[ConfigCursor] =
+        CantonConfigValidator.validateAll // do not look into external configurations
+      CantonConfigValidatorDerivation[External]
+    }
   }
 
   final case class BftSequencer(
@@ -143,8 +196,15 @@ object CommunitySequencerConfig {
 }
 
 /** Health check related sequencer config
-  * @param backendCheckPeriod interval with which the sequencer will poll the health of its backend connection or state.
+  * @param backendCheckPeriod
+  *   interval with which the sequencer will poll the health of its backend connection or state.
   */
 final case class SequencerHealthConfig(
     backendCheckPeriod: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5)
-)
+) extends UniformCantonConfigValidation
+
+object SequencerHealthConfig {
+  implicit val sequencerHealthConfigCantonConfigValidator
+      : CantonConfigValidator[SequencerHealthConfig] =
+    CantonConfigValidatorDerivation[SequencerHealthConfig]
+}

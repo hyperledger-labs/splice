@@ -99,14 +99,16 @@ spec:
             - name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT
               value: |
                 canton.sequencers.sequencer.sequencer {
-                  config = ""
                   config {
-                    initial-bft-network {
-                      self-endpoint {
-                        host="0.0.0.0"
+                    storage.config.properties {
+                      currentSchema = "sequencer_bft"
+                    }
+                    initial-network {
+                      server-endpoint {
+                        address="0.0.0.0"
                         port=5010
                       }
-                      other-endpoints = []
+                      peer-endpoints = []
                     }
                   }
                   type = "BFT"

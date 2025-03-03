@@ -205,6 +205,7 @@ class ValidatingTopologyMappingChecks(
       effectiveTime: EffectiveTime,
       code: Code,
       pendingChangesLookup: PendingChangesLookup,
+      maxSerialExclusive: PositiveInt,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Seq[
@@ -229,7 +230,11 @@ class ValidatingTopologyMappingChecks(
             .filter(pendingTx =>
               !pendingTx.isProposal && pendingTx.transaction.mapping.code == code
             )
-          (storedTxs.result.map(_.transaction) ++ pending)
+          val allTransactions = (storedTxs.result.map(_.transaction) ++ pending)
+          // only look at the >history< of the mapping (up to exclusive the max serial), because
+          // otherwise it would be looking also at the future, which could lead to the wrong conclusion
+          // (eg detecting a member as "rejoining".
+          allTransactions.filter(_.serial < maxSerialExclusive)
         }
     )
 
@@ -477,9 +482,9 @@ class ValidatingTopologyMappingChecks(
   private val requiredKeyPurposes = Set(KeyPurpose.Encryption, KeyPurpose.Signing)
 
   /** Checks the following:
-    * - threshold is less than or equal to the number of confirming participants
-    * - new participants have a valid DTC
-    * - new participants have an OTK with at least 1 signing key and 1 encryption key
+    *   - threshold is less than or equal to the number of confirming participants
+    *   - new participants have a valid DTC
+    *   - new participants have an OTK with at least 1 signing key and 1 encryption key
     */
   private def checkPartyToParticipant(
       effective: EffectiveTime,
@@ -620,6 +625,9 @@ class ValidatingTopologyMappingChecks(
         )
         mediatorsAlreadyAssignedToGroups = result
           .flatMap(_.selectMapping[MediatorSynchronizerState])
+          // only look at other groups to avoid a race between validating this proposal and
+          // having persisted the same transaction as fully authorized from other synchronizer owners.
+          .filter(_.mapping.group != toValidate.mapping.group)
           .flatMap(tx =>
             tx.mapping.allMediatorsInGroup.collect {
               case med if newMediators.contains(med) => med -> tx.mapping.group
@@ -641,8 +649,10 @@ class ValidatingTopologyMappingChecks(
         effectiveTime,
         code = Code.MediatorSynchronizerState,
         pendingChangesLookup,
+        toValidate.serial,
       )
         .flatMap { mdsHistory =>
+          logger.debug(s"gerolf: $mdsHistory")
           val allMediatorsPreviouslyOnSynchronizer = mdsHistory.view
             .flatMap(_.selectMapping[MediatorSynchronizerState])
             .flatMap(_.mapping.allMediatorsInGroup)
@@ -680,6 +690,7 @@ class ValidatingTopologyMappingChecks(
         effectiveTime,
         code = Code.SequencerSynchronizerState,
         pendingChangesLookup,
+        toValidate.serial,
       )
         .flatMap { sdsHistory =>
           val allSequencersPreviouslyOnSynchronizer = sdsHistory.view
@@ -804,16 +815,12 @@ class ValidatingTopologyMappingChecks(
     checkNoClashWithDecentralizedNamespaces()
   }
 
-  /** Checks whether the given PTP is considered an explicit admin party allocation. This is true if all following conditions are met:
-    * <ul>
-    *   <li>threshold == 1</li>
-    *   <li>there is only a single hosting participant<li>
-    *     <ul>
-    *       <li>with Submission permission</li>
-    *       <li>participantId.adminParty == partyId</li>
-    *     </ul>
-    *   </li>
-    * </ul
+  /** Checks whether the given PTP is considered an explicit admin party allocation. This is true if
+    * all following conditions are met:
+    *   - threshold == 1
+    *   - there is only a single hosting participant
+    *     - with Submission permission
+    *     - participantId.adminParty == partyId
     */
   private def isExplicitAdminPartyAllocation(
       ptp: PartyToParticipant,

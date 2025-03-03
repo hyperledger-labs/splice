@@ -8,8 +8,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  updateAutomationConfig,
   ConfigurableApp,
+  updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import org.scalatest.time.{Minute, Span}
 
@@ -165,7 +166,7 @@ class SvOffboardingIntegrationTest
               val decentralizedNamespaces =
                 sv1Backend.participantClient.topology.decentralized_namespaces
                   .list(
-                    filterStore = decentralizedSynchronizerId.filterString,
+                    store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
                     filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
                   )
               inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>

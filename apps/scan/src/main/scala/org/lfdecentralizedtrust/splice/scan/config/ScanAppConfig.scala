@@ -17,8 +17,8 @@ import org.lfdecentralizedtrust.splice.config.{
 trait BaseScanAppConfig {}
 
 final case class ScanSynchronizerConfig(
-    sequencer: ClientConfig,
-    mediator: ClientConfig,
+    sequencer: FullClientConfig,
+    mediator: FullClientConfig,
 )
 
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
@@ -29,7 +29,7 @@ case class ScanAppBackendConfig(
     override val storage: DbConfig,
     svUser: String,
     override val participantClient: ParticipantClientConfig,
-    sequencerAdminClient: ClientConfig,
+    sequencerAdminClient: FullClientConfig,
     // Map from domain id prefix to sequencer/mediator config
     // This is for the Poc from #13301
     synchronizers: Map[String, ScanSynchronizerConfig] = Map.empty,

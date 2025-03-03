@@ -17,11 +17,11 @@ import scala.annotation.tailrec
   */
 trait AdminCommandRunner {
 
-  /** Run a GRPC admin command and return its result.
-    * Most of the commands are only defined for the GRPC interface, so we default to showing an error message
-    * if the command is called for a node configured with an HTTP interface.
+  /** Run a GRPC admin command and return its result. Most of the commands are only defined for the
+    * GRPC interface, so we default to showing an error message if the command is called for a node
+    * configured with an HTTP interface.
     */
-  def adminCommand[Result](
+  protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result]
   ): ConsoleCommandResult[Result]
 
@@ -111,7 +111,7 @@ trait FeatureFlagFilter extends NamedLogging {
       noTracingLogger.error(
         s"The command is currently disabled. You need to enable it explicitly by setting `canton.features.$config = yes` in your Canton configuration file (`.conf`)"
       )
-      throw new InteractiveCommandFailure()
+      throw new CommandFailure()
     }
 
   protected def check[T](flag: FeatureFlag)(command: => T): T =

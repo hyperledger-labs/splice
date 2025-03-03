@@ -10,6 +10,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Block
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.leaders.LeaderSelectionPolicy
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.retransmissions.EpochStatusBuilder
@@ -52,7 +53,7 @@ class EpochState[E <: Env[E]](
     completedBlocks: Seq[Block] = Seq.empty,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
-)(implicit mc: MetricsContext)
+)(implicit mc: MetricsContext, config: BftBlockOrderer.Config)
     extends NamedLogging
     with FlagCloseable {
 
@@ -283,6 +284,10 @@ object EpochState {
   ) {
     def relativeBlockIndex(blockNumber: BlockNumber): Int = slotNumbers.indexOf(blockNumber)
     def firstBlockNumber: BlockNumber = slotNumbers.head1
+    def isFirstInSegment(blockNumber: BlockNumber): Boolean = relativeBlockIndex(blockNumber) == 0
+    def previousBlockNumberInSegment(currentBlockNumber: BlockNumber): Option[BlockNumber] =
+      // `lift` is just like `get`
+      slotNumbers.lift(slotNumbers.indexOf(currentBlockNumber) - 1)
   }
 
   sealed trait EpochCompletionStatus {

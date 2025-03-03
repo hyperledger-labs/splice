@@ -46,7 +46,7 @@ object GeneratorsCrypto {
     Generators.nonEmptySet[CryptoKeyFormat]
 
   implicit val fingerprintArb: Arbitrary[Fingerprint] = Arbitrary(
-    Generators.lengthLimitedStringGen(String68).map(s => Fingerprint.tryCreate(s.str))
+    Generators.lengthLimitedStringGen(String68).map(s => Fingerprint.tryFromString(s.str))
   )
 
   val validUsageGen: Gen[Set[SigningKeyUsage]] = for {
@@ -77,9 +77,10 @@ object GeneratorsCrypto {
       signingKeySpec <- Arbitrary
         .arbitrary[SigningKeySpec]
 
-      /** The session signing keys inside the signature delegation are a special type of signing key where
-        * the format is fixed (i.e. DerX509Spki) and their scheme is identified by the 'sessionKeySpec' protobuf field.
-        * Therefore, we cannot use the usual Arbitrary.arbitrary[SigningKey] because it produces keys in a Symbolic format.
+      /** The session signing keys inside the signature delegation are a special type of signing key
+        * where the format is fixed (i.e. DerX509Spki) and their scheme is identified by the
+        * 'sessionKeySpec' protobuf field. Therefore, we cannot use the usual
+        * Arbitrary.arbitrary[SigningKey] because it produces keys in a Symbolic format.
         */
       sessionKey = JcePrivateCrypto
         .generateSigningKeypair(
@@ -145,8 +146,6 @@ object GeneratorsCrypto {
     loggerFactoryNotUsed,
   )
 
-  private lazy val sequencerKey = crypto.generateSymbolicSigningKey()
-
   // TODO(#15813): Change arbitrary encryption keys to match real keys
   implicit val encryptionPublicKeyArb: Arbitrary[EncryptionPublicKey] = Arbitrary(for {
     key <- Arbitrary.arbitrary[ByteString]
@@ -159,9 +158,18 @@ object GeneratorsCrypto {
     Gen.oneOf(Arbitrary.arbitrary[SigningPublicKey], Arbitrary.arbitrary[EncryptionPublicKey])
   )
 
-  def sign(str: String, purpose: HashPurpose, usage: NonEmpty[Set[SigningKeyUsage]]): Signature = {
-    val hash = crypto.pureCrypto.build(purpose).addWithoutLengthPrefix(str).finish()
-    crypto.sign(hash, sequencerKey.id, usage)
+  // Test key intended for signing an unassignment result message.
+  lazy val testSigningKey: SigningPublicKey =
+    crypto.generateSymbolicSigningKey(usage = SigningKeyUsage.ProtocolOnly)
+
+  def sign(
+      signingKeyId: Fingerprint,
+      strToSign: String,
+      purpose: HashPurpose,
+      usage: NonEmpty[Set[SigningKeyUsage]],
+  ): Signature = {
+    val hash = crypto.pureCrypto.build(purpose).addWithoutLengthPrefix(strToSign).finish()
+    crypto.sign(hash, signingKeyId, usage)
   }
 
   implicit val symmetricKeyArb: Arbitrary[SymmetricKey] =
@@ -180,7 +188,7 @@ object GeneratorsCrypto {
         encryptionAlgorithmSpec <- Arbitrary.arbitrary[EncryptionAlgorithmSpec]
         fingerprint <- Gen
           .stringOfN(68, Gen.alphaChar)
-          .map(str => Fingerprint.tryCreate(String68.tryCreate(str)))
+          .map(str => Fingerprint.tryFromString(String68.tryCreate(str)))
       } yield AsymmetricEncrypted.apply(ciphertext, encryptionAlgorithmSpec, fingerprint)
     )
 }

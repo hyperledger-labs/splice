@@ -4,8 +4,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.PositiveDurationSeconds
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{FullClientConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -91,7 +90,7 @@ class ManualStartIntegrationTest
       def sequencerAdminConnection(name: String, config: SvAppBackendConfig) = {
         val loggerFactoryWithKey = loggerFactory.append("sequencer", name)
         new SequencerAdminConnection(
-          ClientConfig(port = config.localSynchronizerNode.value.sequencer.adminApi.port),
+          FullClientConfig(port = config.localSynchronizerNode.value.sequencer.adminApi.port),
           env.environment.config.monitoring.logging.api,
           loggerFactoryWithKey,
           grpcClientMetrics,
@@ -101,7 +100,7 @@ class ManualStartIntegrationTest
       def mediatorAdminConnection(name: String, config: SvAppBackendConfig) = {
         val loggerFactoryWithKey = loggerFactory.append("mediator", name)
         new MediatorAdminConnection(
-          ClientConfig(port = config.localSynchronizerNode.value.mediator.adminApi.port),
+          FullClientConfig(port = config.localSynchronizerNode.value.mediator.adminApi.port),
           env.environment.config.monitoring.logging.api,
           loggerFactoryWithKey,
           grpcClientMetrics,
@@ -376,7 +375,7 @@ class ManualStartIntegrationTest
     import env.executionContext
     val loggerFactoryWithKey = loggerFactory.append("participant", name)
     new ParticipantAdminConnection(
-      ClientConfig(port = config.participantClient.adminApi.port),
+      FullClientConfig(port = config.participantClient.adminApi.port),
       env.environment.config.monitoring.logging.api,
       loggerFactoryWithKey,
       grpcClientMetrics,

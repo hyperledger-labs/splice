@@ -34,7 +34,7 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -73,14 +73,14 @@ class PartiesAdministrationGroup(
   def list(
       filterParty: String = "",
       filterParticipant: String = "",
-      filterSynchronizerId: String = "",
+      synchronizerIds: Set[SynchronizerId] = Set.empty,
       asOf: Option[Instant] = None,
       limit: PositiveInt = defaultLimit,
   ): Seq[ListPartiesResult] =
     consoleEnvironment.run {
       adminCommand(
         TopologyAdminCommands.Aggregation.ListParties(
-          filterSynchronizerId = filterSynchronizerId,
+          synchronizerIds = synchronizerIds,
           filterParty = filterParty,
           filterParticipant = filterParticipant,
           asOf = asOf,
@@ -112,14 +112,14 @@ class ParticipantPartiesAdministrationGroup(
       Example: participant1.parties.hosted(filterParty="alice")""")
   def hosted(
       filterParty: String = "",
-      filterSynchronizerId: String = "",
+      synchronizerIds: Set[SynchronizerId] = Set.empty,
       asOf: Option[Instant] = None,
       limit: PositiveInt = defaultLimit,
   ): Seq[ListPartiesResult] =
     list(
       filterParty,
       filterParticipant = participantId.filterString,
-      filterSynchronizerId = filterSynchronizerId,
+      synchronizerIds = synchronizerIds,
       asOf = asOf,
       limit = limit,
     )
@@ -306,7 +306,7 @@ class ParticipantPartiesAdministrationGroup(
           ),
           signedBy = Seq(this.participantId.fingerprint),
           serial = nextSerial,
-          store = AuthorizedStore.filterName,
+          store = TopologyStoreId.Authorized,
           mustFullyAuthorize = mustFullyAuthorize,
           change = TopologyChangeOp.Replace,
           forceChanges = ForceFlags.none,
@@ -341,25 +341,25 @@ class ParticipantPartiesAdministrationGroup(
       modifier = modifier,
     )
 
-  @Help.Summary("Start party replication from a source participant", FeatureFlag.Preview)
+  @Help.Summary("Add a previously existing party to the local participant", FeatureFlag.Preview)
   @Help.Description(
-    """Initiate replicating a party from the specified source participant to this participant on the specified synchronizer.
-      |Performs some checks synchronously and then initiates the replication asynchronously. The optional `id`
+    """Initiate adding a previously existing party to this participant on the specified synchronizer.
+      |Performs some checks synchronously and then initiates party replication asynchronously. The returned `id`
       |parameter allows identifying asynchronous progress and errors."""
   )
-  def start_party_replication(
+  def add_party_async(
       party: PartyId,
-      sourceParticipant: ParticipantId,
       synchronizerId: SynchronizerId,
-      id: Option[String] = None,
-  ): Unit = check(FeatureFlag.Preview) {
+      sourceParticipant: Option[ParticipantId],
+      serial: Option[PositiveInt],
+  ): String = check(FeatureFlag.Preview) {
     consoleEnvironment.run {
       reference.adminCommand(
-        ParticipantAdminCommands.PartyManagement.StartPartyReplication(
-          id,
+        ParticipantAdminCommands.PartyManagement.AddPartyAsync(
           party,
-          sourceParticipant,
           synchronizerId,
+          sourceParticipant,
+          serial,
         )
       )
     }

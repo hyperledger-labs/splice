@@ -74,7 +74,7 @@ class SequencerAdminConnection(
       TopologyAdminCommands.Read
         .GenesisState(
           timestamp = Some(timestamp),
-          filterSynchronizerStore = None,
+          synchronizerStore = None,
           observer = responseObserver,
         )
     ).flatMap(_ => responseObserver.resultBytes)

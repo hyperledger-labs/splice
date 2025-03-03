@@ -10,6 +10,7 @@ import cats.syntax.functor.*
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{CantonConfigValidator, KmsConfig}
 import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.health.CloseableAtomicHealthComponent
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.TracedLogger
@@ -55,16 +56,21 @@ final case class KmsKeyId(str: String300) extends PrettyPrinting {
   )
 }
 
-/** Represents a KMS interface and allows symmetric encryption/decryption with keys stored in the KMS. */
-trait Kms extends FlagCloseable {
+/** Represents a KMS interface and allows symmetric encryption/decryption with keys stored in the
+  * KMS.
+  */
+trait Kms extends FlagCloseable with CloseableAtomicHealthComponent {
   type Config <: KmsConfig
 
   def config: Config
 
   /** Creates a new signing key pair in the KMS and returns its key identifier.
-    * @param signingKeySpec defines the signing key specification to which the key is going to be used for.
-    * @param name an optional name to identify the key.
-    * @return a key id or an error if it fails to create a key
+    * @param signingKeySpec
+    *   defines the signing key specification to which the key is going to be used for.
+    * @param name
+    *   an optional name to identify the key.
+    * @return
+    *   a key id or an error if it fails to create a key
     */
   def generateSigningKeyPair(
       signingKeySpec: SigningKeySpec,
@@ -85,12 +91,14 @@ trait Kms extends FlagCloseable {
       tc: TraceContext,
   ): EitherT[FutureUnlessShutdown, KmsError, KmsKeyId]
 
-  /** Creates a new symmetric encryption key in the KMS and returns its key identifier.
-    * The specific encryption scheme is not necessary (default is taken)
-    * because this is intended to be used to generate a KMS wrapper key.
+  /** Creates a new symmetric encryption key in the KMS and returns its key identifier. The specific
+    * encryption scheme is not necessary (default is taken) because this is intended to be used to
+    * generate a KMS wrapper key.
     *
-    * @param name an optional name to identify the key.
-    * @return a key id or an error if it fails to create a key
+    * @param name
+    *   an optional name to identify the key.
+    * @return
+    *   a key id or an error if it fails to create a key
     */
   def generateSymmetricEncryptionKey(
       name: Option[KeyName] = None
@@ -111,9 +119,12 @@ trait Kms extends FlagCloseable {
 
   /** Creates a new (asymmetric) encryption key pair in the KMS and returns a key identifier.
     *
-    * @param encryptionKeySpec defines the encryption key specification to which the key is going to be used for.
-    * @param name an optional name to identify the key.
-    * @return a key id or an error if it fails to create a key
+    * @param encryptionKeySpec
+    *   defines the encryption key specification to which the key is going to be used for.
+    * @param name
+    *   an optional name to identify the key.
+    * @return
+    *   a key id or an error if it fails to create a key
     */
   def generateAsymmetricEncryptionKeyPair(
       encryptionKeySpec: EncryptionKeySpec,
@@ -146,10 +157,14 @@ trait Kms extends FlagCloseable {
 
   /** Get public key for signing from KMS given a KMS key identifier.
     *
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @return the public signing key for that keyId
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @return
+    *   the public signing key for that keyId
     */
-  def getPublicSigningKey(keyId: KmsKeyId)(implicit
+  def getPublicSigningKey(
+      keyId: KmsKeyId
+  )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): EitherT[FutureUnlessShutdown, KmsError, SigningPublicKey] =
@@ -157,15 +172,19 @@ trait Kms extends FlagCloseable {
       getPublicSigningKeyInternal(keyId)
     )
 
-  protected def getPublicSigningKeyInternal(keyId: KmsKeyId)(implicit
+  protected def getPublicSigningKeyInternal(
+      keyId: KmsKeyId
+  )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): EitherT[FutureUnlessShutdown, KmsError, SigningPublicKey]
 
   /** Get public key for encryption from KMS given a KMS key identifier.
     *
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @return the public encryption key for that keyId
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @return
+    *   the public encryption key for that keyId
     */
   def getPublicEncryptionKey(
       keyId: KmsKeyId
@@ -184,10 +203,12 @@ trait Kms extends FlagCloseable {
       tc: TraceContext,
   ): EitherT[FutureUnlessShutdown, KmsError, EncryptionPublicKey]
 
-  /** Checks that a key identified by keyId exists in the KMS and is not deleted or disabled,
-    * and therefore can be used.
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @return error if it fails to find key
+  /** Checks that a key identified by keyId exists in the KMS and is not deleted or disabled, and
+    * therefore can be used.
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @return
+    *   error if it fails to find key
     */
   def keyExistsAndIsActive(keyId: KmsKeyId)(implicit
       ec: ExecutionContext,
@@ -204,10 +225,13 @@ trait Kms extends FlagCloseable {
 
   /** Symmetrically encrypt the data passed as a byte string using a KMS symmetric key.
     *
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @param data byte string to encrypt. The higher bound on the data size we can encrypt is 4kb
-    *             (i.e. maximum accepted input size for the external KMSs that we support).
-    * @return an encrypted byte string or an error if it fails to encrypt
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @param data
+    *   byte string to encrypt. The higher bound on the data size we can encrypt is 4kb (i.e.
+    *   maximum accepted input size for the external KMSs that we support).
+    * @return
+    *   an encrypted byte string or an error if it fails to encrypt
     */
   def encryptSymmetric(
       keyId: KmsKeyId,
@@ -230,10 +254,13 @@ trait Kms extends FlagCloseable {
 
   /** Symmetrically decrypt the data passed as a byte array using a KMS symmetric key.
     *
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @param data byte string to decrypt. The higher bound on the data size we can decrypt is 6144 bytes
-    *             (i.e. maximum accepted input size for the external KMSs that we support).
-    * @return a decrypted byte string or an error if it fails to decrypt
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @param data
+    *   byte string to decrypt. The higher bound on the data size we can decrypt is 6144 bytes (i.e.
+    *   maximum accepted input size for the external KMSs that we support).
+    * @return
+    *   a decrypted byte string or an error if it fails to decrypt
     */
   def decryptSymmetric(
       keyId: KmsKeyId,
@@ -256,13 +283,17 @@ trait Kms extends FlagCloseable {
 
   /** Asymmetrically decrypt the data passed as a byte array using a KMS private key.
     *
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @param data byte string to decrypt. The higher bound on the data size we can decrypt is 256bytes
-    *             (i.e. the ciphertext length for RSA2048-OAEP-SHA256 encryption; when using
-    *             RSAES-OAEP the ciphertext size is always equal to the size of the Modulus).
-    * @param encryptionAlgorithmSpec the encryption algorithm that was used to encrypt the plaintext message.
-    *                                The algorithm must be compatible with the KMS key that you specify.
-    * @return a decrypted byte string or an error if it fails to decrypt
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @param data
+    *   byte string to decrypt. The higher bound on the data size we can decrypt is 256bytes (i.e.
+    *   the ciphertext length for RSA2048-OAEP-SHA256 encryption; when using RSAES-OAEP the
+    *   ciphertext size is always equal to the size of the Modulus).
+    * @param encryptionAlgorithmSpec
+    *   the encryption algorithm that was used to encrypt the plaintext message. The algorithm must
+    *   be compatible with the KMS key that you specify.
+    * @return
+    *   a decrypted byte string or an error if it fails to decrypt
     */
   def decryptAsymmetric(
       keyId: KmsKeyId,
@@ -287,12 +318,17 @@ trait Kms extends FlagCloseable {
 
   /** Sign the data passed as a byte string using a KMS key.
     *
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @param data byte string to sign. The higher bound on the data size we can sign is 4kb
-    *             (i.e. maximum accepted input size for the external KMSs that we support).
-    * @param signingAlgorithmSpec the signing algorithm to use to generate the signature
-    * @param signingKeySpec the key spec of the signing key, not strictly necessary but some KMS need it.
-    * @return a byte string corresponding to the signature of the data
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @param data
+    *   byte string to sign. The higher bound on the data size we can sign is 4kb (i.e. maximum
+    *   accepted input size for the external KMSs that we support).
+    * @param signingAlgorithmSpec
+    *   the signing algorithm to use to generate the signature
+    * @param signingKeySpec
+    *   the key spec of the signing key, not strictly necessary but some KMS need it.
+    * @return
+    *   a byte string corresponding to the signature of the data
     */
   def sign(
       keyId: KmsKeyId,
@@ -319,8 +355,10 @@ trait Kms extends FlagCloseable {
 
   /** Schedule a deletion of a KMS key (takes between 7-30 days)
     *
-    * @param keyId key identifier (e.g. AWS key ARN)
-    * @return an error if it fails to schedule a deletion of a key
+    * @param keyId
+    *   key identifier (e.g. AWS key ARN)
+    * @return
+    *   an error if it fails to schedule a deletion of a key
     */
   def deleteKey(
       keyId: KmsKeyId
@@ -403,11 +441,6 @@ object KmsError {
   // todo i10029: create error codes for these exceptions
   final case class KmsCreateClientError(reason: String) extends KmsError {
     override protected def pretty: Pretty[KmsCreateClientError] =
-      prettyOfClass(param("reason", _.reason.unquoted))
-  }
-
-  final case class KmsNoConfigError(reason: String) extends KmsError {
-    override protected def pretty: Pretty[KmsNoConfigError] =
       prettyOfClass(param("reason", _.reason.unquoted))
   }
 

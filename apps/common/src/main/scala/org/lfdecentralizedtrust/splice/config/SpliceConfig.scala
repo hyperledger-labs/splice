@@ -14,8 +14,10 @@ import com.digitalasset.canton.tracing.TracingConfig
   */
 abstract class SpliceBackendConfig extends LocalNodeConfig {
   override val init: InitConfig = InitConfig()
-  override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
+
+  override def crypto: CryptoConfig = CryptoConfig()
+
   override val topology: TopologyConfig = TopologyConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()

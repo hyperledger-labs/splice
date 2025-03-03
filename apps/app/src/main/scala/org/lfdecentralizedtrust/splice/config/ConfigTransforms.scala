@@ -611,7 +611,7 @@ object ConfigTransforms {
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
 
-  private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
+  private def portTransform(bump: Int, c: FullClientConfig): FullClientConfig =
     c.copy(port = c.port + bump)
 
   private def portTransform(bump: Int, c: LedgerApiClientConfig): LedgerApiClientConfig =

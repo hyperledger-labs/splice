@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import cats.data.OptionT
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
@@ -12,9 +13,9 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TimeQuery
+import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{PartyToParticipant, TopologyChangeOp}
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -53,7 +54,7 @@ class DsoPartyHosting(
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] =
     participantAdminConnection
       .listPartyToParticipant(
-        filterStore = domain.toProtoPrimitive,
+        store = TopologyStoreId.SynchronizerStore(domain).some,
         operation = Some(TopologyChangeOp.Replace),
         filterParticipant = participantId.fold("")(_.toProtoPrimitive),
         filterParty = party.toProtoPrimitive,

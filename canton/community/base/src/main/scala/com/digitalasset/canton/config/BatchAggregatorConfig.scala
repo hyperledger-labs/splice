@@ -4,12 +4,22 @@
 package com.digitalasset.canton.config
 
 import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 
 /** Parameters for that batcher that batches queries (e.g., to a DB).
   */
-sealed trait BatchAggregatorConfig extends Product with Serializable
+sealed trait BatchAggregatorConfig
+    extends Product
+    with Serializable
+    with UniformCantonConfigValidation
 
 object BatchAggregatorConfig {
+  implicit val batchAggregatorConfigCantonConfigValidator
+      : CantonConfigValidator[BatchAggregatorConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[BatchAggregatorConfig]
+  }
+
   val defaultMaximumInFlight: PositiveNumeric[Int] = PositiveNumeric.tryCreate(2)
   val defaultMaximumBatchSize: PositiveNumeric[Int] = PositiveNumeric.tryCreate(500)
 
@@ -28,8 +38,10 @@ object BatchAggregatorConfig {
       maximumBatchSize = maximumBatchSize,
     )
 
-  /** @param maximumInFlight Maximum number of in-flight get queries.
-    * @param maximumBatchSize Maximum number of queries in a batch.
+  /** @param maximumInFlight
+    *   Maximum number of in-flight get queries.
+    * @param maximumBatchSize
+    *   Maximum number of queries in a batch.
     */
   final case class Batching(
       maximumInFlight: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumInFlight,

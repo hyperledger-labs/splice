@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxParallelTraverse_
+import cats.implicits.{catsSyntaxOptionId, catsSyntaxParallelTraverse_}
 import cats.syntax.either.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -592,7 +592,7 @@ class ParticipantAdminConnection(
         "initial_party_to_participant",
         show"Party $partyId is allocated on $participantId",
         listPartyToParticipant(
-          store.filterName,
+          store.some,
           filterParty = partyId.filterString,
         ).map(_.nonEmpty),
         proposeInitialPartyToParticipant(
@@ -740,7 +740,7 @@ class ParticipantAdminConnection(
         case transactionType @ (TopologyTransactionType.ProposalSignedByOwnKey |
             TopologyTransactionType.AllProposals) =>
           listPartyToParticipant(
-            filterStore = synchronizerId.filterString,
+            store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
             filterParty = party.filterString,
             proposals = transactionType,
           ).flatMap { proposals =>

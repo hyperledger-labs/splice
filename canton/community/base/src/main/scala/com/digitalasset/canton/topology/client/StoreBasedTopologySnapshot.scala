@@ -4,7 +4,7 @@
 package com.digitalasset.canton.topology.client
 
 import cats.syntax.functorFilter.*
-import com.digitalasset.canton.crypto.KeyPurpose
+import com.digitalasset.canton.crypto.{KeyPurpose, SigningKeyUsage}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -30,9 +30,12 @@ import scala.reflect.ClassTag
 
 /** Topology snapshot loader
   *
-  * @param timestamp the asOf timestamp to use
-  * @param store the db store to use
-  * @param packageDependencyResolver provides a way determine the direct and indirect package dependencies
+  * @param timestamp
+  *   the asOf timestamp to use
+  * @param store
+  *   the db store to use
+  * @param packageDependencyResolver
+  *   provides a way determine the direct and indirect package dependencies
   */
 class StoreBasedTopologySnapshot(
     val timestamp: CantonTimestamp,
@@ -315,7 +318,9 @@ class StoreBasedTopologySnapshot(
   private def findMembersWithoutSigningKeys[T <: Member](members: Seq[T])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[T]] =
-    signingKeys(members).map(keys => members.filter(keys.get(_).forall(_.isEmpty)).toSet)
+    signingKeys(members, SigningKeyUsage.All).map(keys =>
+      members.filter(keys.get(_).forall(_.isEmpty)).toSet
+    )
 
   /** returns the list of currently known mediator groups */
   override def mediatorGroups()(implicit

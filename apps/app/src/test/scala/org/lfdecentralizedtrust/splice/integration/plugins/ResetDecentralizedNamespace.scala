@@ -8,6 +8,7 @@ import com.digitalasset.canton.console.ConsoleMacros
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.DecentralizedNamespaceDefinition
 import io.grpc
 import org.slf4j.event.Level
@@ -28,7 +29,7 @@ final class ResetDecentralizedNamespace extends ResetTopologyStatePlugin {
     val sv1ParticipantNamespace = sv1.participantClientWithAdminToken.id.uid.namespace
     val decentralizedNamespace =
       DecentralizedNamespaceDefinition.computeNamespace(Set(sv1ParticipantNamespace))
-    val store = synchronizerId.filterString
+    val store = TopologyStoreId.Synchronizer(synchronizerId)
 
     sv1.participantClientWithAdminToken.topology.decentralized_namespaces
       .list(

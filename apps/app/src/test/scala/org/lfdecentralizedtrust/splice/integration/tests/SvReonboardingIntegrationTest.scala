@@ -29,7 +29,7 @@ import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, 
 import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, DbConfig}
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 
@@ -130,7 +130,7 @@ class SvReonboardingIntegrationTest
                     adminApi = referenceValidatorConfig.adminApi
                       .copy(internalPort = Some(Port.tryCreate(27503))),
                     participantClient = ParticipantClientConfig(
-                      ClientConfig(port = Port.tryCreate(27502)),
+                      FullClientConfig(port = Port.tryCreate(27502)),
                       referenceValidatorConfig.participantClient.ledgerApi.copy(
                         clientConfig =
                           referenceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
