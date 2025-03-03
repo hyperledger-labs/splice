@@ -103,8 +103,13 @@ POST /v1/updates
 ^^^^^^^^^^^^^^^^
 
 Post a paged `UpdateHistoryRequestV1 <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L1672>`_
-request to get all updates up to ``page_size``, optionally specifying an ``after`` object with ``after_migration_id`` and ``after_record_time`` fields.
-(for the beginning of the network you can omit the ``after`` field).
+request to get all updates up to ``page_size``.
+
+Requesting all updates
+""""""""""""""""""""""
+
+To get the first page of updates from the beginning of the network, omit the ``after`` field in the request body.
+
 An example of a ``UpdateHistoryRequestV1`` request body is shown below, getting a page of max 10 updates from the beginning of the network:
 
 .. code-block:: json
@@ -113,7 +118,11 @@ An example of a ``UpdateHistoryRequestV1`` request body is shown below, getting 
       "page_size": 10
     }
 
-Another example of a ``UpdateHistoryRequestV1`` request body is shown below, getting a page of max 10 updates after the specified record time:
+To get the next page of updates, take the ``migration_id`` and the ``record_time`` from the last update in the response of the previous successful request and use this
+in a subsequent request in the ``after`` object, to read the next page.
+Once you receive less updates than the requested ``page_size``, you have reached the end of the stream.
+
+An example of a ``UpdateHistoryRequestV1`` request body is shown below, getting a page of max 10 updates after the specified record time:
 
 .. code-block:: json
 
@@ -125,8 +134,26 @@ Another example of a ``UpdateHistoryRequestV1`` request body is shown below, get
       }
     }
 
-Take the ``migration_id`` and the ``record_time`` from the last update in the response of the previous successful request and use this
-in a subsequent request in the ``after`` object, to read the next page. Once you receive less updates than the requested ``page_size``, you have reached the end of the stream.
+Requesting updates from an arbitrary record time
+""""""""""""""""""""""""""""""""""""""""""""""""
+
+To get updates starting from an arbitrary record time, specify the ``after`` field in the request body,
+where ``after_record_time`` is the time at which you want to start fetching updates (exclusive),
+and ``after_migration_id`` is the migration ID that was active at that time.
+
+Note that the record time ranges of different migrations may overlap,
+i.e., the record time can go back after a hard domain migration.
+Read the `OpenAPI documentation <https://github.com/hyperledger-labs/splice/blob/893346e70b1220be999d89853a0f9ecae5083b08/apps/scan/src/main/openapi/scan-internal.yaml#L1737>`_
+to understand how the ``after_migration_id`` field affects the response.
+
+If you don't know what migration ID was active at the chose time,
+start with migration ID 0 and keep incrementing it by one
+until you find the lowest migration id that includes a higher record time than the one you specified in `after_record_time`.
+
+After getting the first page of updates, use the ``after`` field as described in the above section to fetch subsequent pages.
+
+Reading the response
+""""""""""""""""""""
 
 The response returns a list of transactions. Every transaction contains the following fields:
 

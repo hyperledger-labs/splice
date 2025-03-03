@@ -520,6 +520,12 @@ paths:
         Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
         Unlike /v0/updates, this endpoint returns responses that are consistent across different
         scan instances. Event ids returned by this endpoint are not comparable to event ids returned by /v0/updates.
+
+        Updates are ordered lexicographically by `(migration id, record time)`.
+        For a given migration id, each update has a unique record time.
+        The record time ranges of different migrations may overlap, i.e.,
+        it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
+        and there may be two updates with the same record time but different migration ids.
       requestBody:
         required: true
         content:
