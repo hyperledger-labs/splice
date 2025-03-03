@@ -259,7 +259,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "docs-docs",
     "provider": "",
@@ -651,7 +651,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -708,7 +708,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -790,7 +790,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -997,7 +997,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1115,7 +1115,7 @@
           }
         }
       },
-      "version": "0.3.11"
+      "version": "0.3.12"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
