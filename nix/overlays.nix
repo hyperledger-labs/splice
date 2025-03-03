@@ -61,20 +61,7 @@
   pre-commit = super.pre-commit.overrideAttrs (old: {
     doCheck = false;
   });
-  geckodriver = super.geckodriver.overrideAttrs (old: rec {
-    version = "0.35.0";
-    src = super.fetchFromGitHub {
-      owner = "mozilla";
-      repo = "geckodriver";
-      rev = "refs/tags/v${version}";
-      sha256 = "sha256-3EJP+y+Egz0kj5e+1FRHPGWfneB/tCCVggmgmylMyDE=";
-    };
-    cargoDeps = old.cargoDeps.overrideAttrs {
-      inherit version;
-      inherit src;
-      outputHash = "sha256-gopI5iOCSzD23mvOues76WIiBtpNf9A6X9NoOULm6Qo=";
-    };
-  });
+  geckodriver = super.callPackage ./geckodriver.nix { inherit (super.darwin.apple_sdk.frameworks) Security; };
   git-search-replace = super.callPackage ./git-search-replace.nix {};
   sphinx-lint = super.callPackage ./sphinx-lint.nix {};
   jsonnet = super.callPackage ./jsonnet.nix {};

@@ -215,7 +215,21 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       val browserLogFile = Paths.get("log", s"$logFileName.$attempt.log").toFile
       val driver =
         Try {
-          val builder = new GeckoDriverService.Builder().withLogFile(browserLogFile)
+          val builder = new GeckoDriverService.Builder()
+            .withLogFile(browserLogFile)
+            // Specify the driver executable explicitly, this is important to avoid it checking for new versions which can result in log warnings like this:
+            // The geckodriver version (0.35.0) detected in PATH at /nix/store/… might not be compatible with the detected firefox version
+            .usingDriverExecutable(
+              new java.io.File(
+                sys.env
+                  .get("GECKODRIVER")
+                  .getOrElse(
+                    sys.error(
+                      "GECKODRIVER environment variable was not set, this should be set through nix/direnv so check your setup"
+                    )
+                  )
+              )
+            );
           new FirefoxDriver(builder.build(), options)
         }.toEither.valueOr { e =>
           logger.info(s"FirefoxDriver failed to start ($name); retrying. The error was: $e")
