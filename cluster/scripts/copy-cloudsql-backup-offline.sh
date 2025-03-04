@@ -19,6 +19,23 @@ target_dir=$3
 bucket_name=$4
 TEMP_DB_PROJECT="da-cn-shared"
 
+function delete_instance() {
+  local instance=$1
+  if [ -z "$(gcloud sql instances list --filter "name = $instance" --no-user-output-enabled)" ]; then
+    _info "Instance $instance does not exist, nothing to delete"
+  fi
+  # Despite the restore operations having completed, the delete sometimes still fails with
+  # "Operation failed because another operation was already in progress", so we retry a few times
+  for i in {1..5}; do
+    _info "Deleting instance $instance (attempt $i)"
+    if gcloud sql instances delete "$instance" --quiet --async; then
+      break
+    fi
+    _warning "Failed to delete instance $instance. Retrying..."
+    sleep 10
+  done
+}
+
 function cleanup() {
 
   if [ -n "${sa:-}" ]; then
@@ -29,8 +46,7 @@ function cleanup() {
   fi
 
   if [ -n "${restore_instance:-}" ]; then
-    _info "Deleting instance $restore_instance"
-    gcloud sql instances delete "$restore_instance" --quiet --async || true
+    delete_instance "$restore_instance"
   fi
 }
 trap cleanup EXIT
