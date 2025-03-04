@@ -123,7 +123,7 @@ const SetDsoRulesConfig: React.FC<{
               data-testid="enable-next-scheduled-domain-upgrade"
             />
           }
-          label="Set next scheduled domain upgrade"
+          label="Set next scheduled synchronizer upgrade"
         />
       </FormControl>
     </Stack>

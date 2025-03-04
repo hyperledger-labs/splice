@@ -117,6 +117,6 @@ How to run through a HDM
    you can schedule a HDM for like 5 minutes in the future
 
    -  New vote &gt; Set DSO Rules Configuration &gt; check “Set next scheduled
-      domain upgrade”
+      synchronizer upgrade”
 
 -  then you should be able to just run through the process as normal
