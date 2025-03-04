@@ -86,7 +86,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       updateHistoryFromParticipant(ledgerBegin, updateHistory.updateStreamParty, participant)
 
     val recordedUpdates = updateHistory
-      .getUpdates(
+      .getAllUpdates(
         Some(
           (
             0L,
@@ -95,7 +95,6 @@ trait UpdateHistoryTestUtil extends TestCommon {
             actualUpdates.head.update.recordTime.addMicros(-1L),
           )
         ),
-        includeImportUpdates = true,
         PageLimit.tryCreate(actualUpdates.size),
       )
       .futureValue
@@ -128,9 +127,8 @@ trait UpdateHistoryTestUtil extends TestCommon {
       scanClient: ScanAppClientReference,
   ): Assertion = {
     val historyFromStore = scanBackend.appState.store.updateHistory
-      .getUpdates(
+      .getAllUpdates(
         None,
-        includeImportUpdates = true,
         PageLimit.tryCreate(1000),
       )
       .futureValue

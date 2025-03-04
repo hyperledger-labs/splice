@@ -1024,7 +1024,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
               val backfilledUpdates =
                 sv1ScanLocalBackend.appState.store.updateHistory
-                  .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
+                  .getAllUpdates(None, PageLimit.tryCreate(1000))
                   .futureValue
               backfilledUpdates.collect {
                 case TreeUpdateWithMigrationId(tree, migrationId)

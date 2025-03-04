@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.store
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 
@@ -55,14 +56,12 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           backfiller = mkBackfilling(source = storeA2, destination = storeB2, 2)
           _ <- backfillAll(backfiller)
           // Check that the updates are the same
-          updatesA <- storeA2.getUpdates(
+          updatesA <- storeA2.getAllUpdates(
             None,
-            includeImportUpdates = true,
             PageLimit.tryCreate(1000),
           )
-          updatesB <- storeB2.getUpdates(
+          updatesB <- storeB2.getAllUpdates(
             None,
-            includeImportUpdates = true,
             PageLimit.tryCreate(1000),
           )
           infoB2 <- storeB2.sourceHistory.migrationInfo(0)
@@ -148,20 +147,158 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           backfiller = mkBackfilling(source = storeA5, destination = storeB5, 5)
           _ <- backfillAll(backfiller)
           // Check that the updates are the same
-          updatesA <- storeA5.getUpdates(
+          updatesA <- storeA5.getAllUpdates(
             None,
-            includeImportUpdates = true,
             PageLimit.tryCreate(1000),
           )
-          updatesB <- storeB5.getUpdates(
+          updatesB <- storeB5.getAllUpdates(
             None,
-            includeImportUpdates = true,
             PageLimit.tryCreate(1000),
           )
         } yield {
           updatesA.map(_.update.update.updateId) should contain theSameElementsAs updatesB.map(
             _.update.update.updateId
           )
+        }
+      }
+    }
+
+    "importUpdatesBackfillingInfo" should {
+      "return None if backfilling is not initialized" in {
+        val storeA0 = mkStore(domainMigrationId = 0, participantId = participant1)
+        for {
+          _ <- initStore(storeA0)
+
+          info <- storeA0.destinationHistory.importUpdatesBackfillingInfo
+        } yield {
+          info shouldBe None
+        }
+      }
+
+      "return correct value for (backfilling fully complete, now in first migration)" in {
+        val storeA0 = mkStore(domainMigrationId = 0, participantId = participant1)
+        for {
+          _ <- initStore(storeA0)
+          tx1 <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
+          _ <- storeA0.initializeBackfilling(0, domain1, tx1.getUpdateId, complete = true)
+
+          info <- storeA0.destinationHistory.importUpdatesBackfillingInfo
+        } yield {
+          info.value.migrationId shouldBe 0
+          info.value.lastUpdateId shouldBe None
+        }
+      }
+
+      "return correct value for (backfilling fully complete, now in second migration)" in {
+        val storeA0 = mkStore(domainMigrationId = 0, participantId = participant1)
+        val storeA1 = mkStore(domainMigrationId = 1, participantId = participant1)
+        for {
+          _ <- initStore(storeA0)
+          _ <- initStore(storeA1)
+
+          tx1 <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
+          _ <- importUpdate(tx1, validOffset(2), storeA1)
+          _ <- create(domain1, validContractId(3), validOffset(3), party1, storeA1, time(3))
+
+          _ <- storeA1.initializeBackfilling(0, domain1, tx1.getUpdateId, complete = true)
+
+          info <- storeA0.destinationHistory.importUpdatesBackfillingInfo
+        } yield {
+          info.value.migrationId shouldBe 0
+          info.value.lastUpdateId shouldBe None
+        }
+      }
+
+      "return correct value for (update backfilling complete, now in first migration)" in {
+        val storeA0 = mkStore(domainMigrationId = 0, participantId = participant1)
+        for {
+          _ <- initStore(storeA0)
+
+          _ <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
+          tx2 <- create(domain1, validContractId(2), validOffset(2), party1, storeA0, time(2))
+
+          _ <- storeA0.initializeBackfilling(0, domain1, tx2.getUpdateId, complete = false)
+          _ <- storeA0.destinationHistory.markBackfillingComplete()
+
+          info <- storeA0.destinationHistory.importUpdatesBackfillingInfo
+        } yield {
+          info.value.migrationId shouldBe 0
+          info.value.lastUpdateId shouldBe None
+        }
+      }
+
+      "return correct value for (update backfilling complete, now in second migration)" in {
+        val storeA0 = mkStore(domainMigrationId = 0, participantId = participant1)
+        val storeA1 = mkStore(domainMigrationId = 1, participantId = participant1)
+        for {
+          _ <- initStore(storeA0)
+          _ <- initStore(storeA1)
+
+          // One update in each migration, but the import update is missing
+          tx1 <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
+          _ <- create(domain1, validContractId(3), validOffset(3), party1, storeA1, time(3))
+
+          _ <- storeA1.initializeBackfilling(0, domain1, tx1.getUpdateId, complete = false)
+          _ <- storeA1.destinationHistory.markBackfillingComplete()
+
+          info <- storeA1.destinationHistory.importUpdatesBackfillingInfo
+        } yield {
+          info.value.migrationId shouldBe 1
+          info.value.lastUpdateId shouldBe None
+        }
+      }
+
+      "return correct value for (import backfilling in progress, now in second migration)" in {
+        val storeA0 = mkStore(domainMigrationId = 0, participantId = participant1)
+        val storeA1 = mkStore(domainMigrationId = 1, participantId = participant1)
+        for {
+          _ <- initStore(storeA0)
+          _ <- initStore(storeA1)
+
+          // One update in each migration, with the corresponding import update,
+          // but the import backfilling is not marked complete, so we don't know if there are more import updates.
+          tx1 <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
+          itx <- importUpdate(tx1, validOffset(2), storeA1)
+          _ <- create(domain1, validContractId(3), validOffset(3), party1, storeA1, time(3))
+
+          _ <- storeA1.initializeBackfilling(0, domain1, tx1.getUpdateId, complete = false)
+          _ <- storeA1.destinationHistory.markBackfillingComplete()
+
+          info <- storeA1.destinationHistory.importUpdatesBackfillingInfo
+        } yield {
+          info.value.migrationId shouldBe 1
+          info.value.lastUpdateId shouldBe Some(itx.getUpdateId)
+        }
+      }
+
+      "return correct last update id" in {
+        val storeA0 = mkStore(domainMigrationId = 0, participantId = participant1)
+        val storeA1 = mkStore(domainMigrationId = 1, participantId = participant1)
+        for {
+          _ <- initStore(storeA0)
+          _ <- initStore(storeA1)
+
+          // 10 updates in migration 0, with corresponding import updates in migration 1
+          txs <- MonadUtil.sequentialTraverse((1 to 10).toList) { i =>
+            create(domain1, validContractId(i), validOffset(i), party1, storeA0, time(i))
+          }
+          itxs <- MonadUtil.sequentialTraverse(txs.zipWithIndex) { case (tx, i) =>
+            importUpdate(tx, validOffset(10 + i), storeA1)
+          }
+          _ <- create(domain1, validContractId(30), validOffset(30), party1, storeA1, time(30))
+
+          _ <- storeA1.initializeBackfilling(
+            0,
+            domain1,
+            txs.headOption.value.getUpdateId,
+            complete = false,
+          )
+          _ <- storeA1.destinationHistory.markBackfillingComplete()
+
+          info <- storeA1.destinationHistory.importUpdatesBackfillingInfo
+        } yield {
+          info.value.migrationId shouldBe 1
+          info.value.lastUpdateId shouldBe Some(itxs.map(_.getUpdateId).max)
         }
       }
     }
