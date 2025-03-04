@@ -569,7 +569,7 @@ on a pay-as-you-go basis with rate limiting.
 This is currently enabled by default!
 To disable or tune to your needs, edit the following section in the validator-values.yaml file:
 
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
     :start-after: CONFIGURING_TOPUP_START
     :end-before: CONFIGURING_TOPUP_END

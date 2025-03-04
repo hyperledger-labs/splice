@@ -19,6 +19,10 @@ Upcoming
 
     The compose deployments contain an updated nginx.conf that now uses the new 8080 ports.
 
+  * Move ``topup`` section from the ``validator-values.yaml`` example file to the ``standalone-validator.yaml`` example file
+    to make it more clear that configuring topups is a reasonable option only for non-SV validators.
+    See `hyperledger-labs/splice#255 <https://github.com/hyperledger-labs/splice/pull/255>`_
+
 0.3.13
 ------
 
