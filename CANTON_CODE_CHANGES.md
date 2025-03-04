@@ -25,6 +25,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `CantonConfig.sequencerNodeParametersByStringX` made public
 * `ActiveContract.loadFromByteString` made public
 * ``PositiveFiniteDuration` config reader and writer made public
+* `ProofOfOwnership` made public
 ## Misc
 * Added support for interface filters in ledger api ACS commands. TODO (#17403): This should be upstreamed.
 * Generalization of `Environment`

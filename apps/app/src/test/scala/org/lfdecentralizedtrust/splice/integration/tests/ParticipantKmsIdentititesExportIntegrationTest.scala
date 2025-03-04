@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, UniqueIdentifier}
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllValidatorConfigs
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
@@ -9,16 +9,15 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
-import org.scalatest.Ignore
 
 import java.nio.file.{Path, Paths}
 
-// TODO(#17677) Reenable once Canton fixes their compatibility issues
-@Ignore
 class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with StandaloneCanton {
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
   val aliceParticipantDumpFile = testDumpDir.resolve("alice-kms-id-identity-dump.json")
+
+  val participantIdPrefix = "aliceValidatorNew"
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
@@ -36,7 +35,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
                   ParticipantBootstrapDumpConfig
                     .File(
                       aliceParticipantDumpFile,
-                      Some(s"aliceValidator"),
+                      Some(participantIdPrefix),
                     )
                 ),
               )
@@ -117,7 +116,9 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
         }
 
         clue("Participant ID is the same") {
-          aliceValidatorBackend.participantClientWithAdminToken.id shouldBe predefinedDump.id
+          aliceValidatorBackend.participantClientWithAdminToken.id.toProtoPrimitive shouldBe ParticipantId(
+            UniqueIdentifier.tryCreate(participantIdPrefix, predefinedDump.id.member.uid.namespace)
+          ).toProtoPrimitive
         }
 
         val dumpFromValidator = aliceValidatorBackend.dumpParticipantIdentities()
