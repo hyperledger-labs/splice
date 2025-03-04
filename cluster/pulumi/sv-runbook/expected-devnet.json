@@ -819,6 +819,7 @@
         ],
         "failOnAppVersionMismatch": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialAmuletPrice": "0.0517",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.dev.global.canton.network.digitalasset.com"
         },

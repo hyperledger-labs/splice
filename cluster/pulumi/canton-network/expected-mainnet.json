@@ -1156,6 +1156,7 @@
           "prefix": "mainzrh/sv-1"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialAmuletPrice": "0.0517",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,
           "baseRateBurstWindowMins": 20,

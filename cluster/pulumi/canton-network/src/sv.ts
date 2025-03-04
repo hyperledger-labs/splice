@@ -47,6 +47,7 @@ import {
   installValidatorApp,
   installValidatorSecrets,
 } from 'splice-pulumi-common-validator/src/validator';
+import { initialAmuletPrice } from 'splice-pulumi-common/src/initialAmuletPrice';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -382,6 +383,7 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
+    initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     cometBFT: {
       enabled: true,

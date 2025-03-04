@@ -23,6 +23,10 @@ Upcoming
     to make it more clear that configuring topups is a reasonable option only for non-SV validators.
     See `hyperledger-labs/splice#255 <https://github.com/hyperledger-labs/splice/pull/255>`_
 
+  * Added the ``initialAmuletPrice`` helm option to set the initial amulet price vote (i.e., the price for which your SV node will vote when onboarded).
+    See the :ref:`configuration instructions <helm-configure-global-domain>`.
+    Note that this only takes effect for new nodes. For already existing nodes, change the price vote through the SV UI.
+
 0.3.13
 ------
 

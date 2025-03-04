@@ -947,6 +947,7 @@
           "prefix": "testzrh/sv-1"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialAmuletPrice": "0.0517",
         "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,

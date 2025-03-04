@@ -542,19 +542,22 @@ For configuring your sv app, please modify the file ``splice-node/examples/sv-he
 
 - Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
-- If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
+- If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the ``auth.audience`` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
-- Please set `domain.sequencerPublicUrl` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
-- Please set `scan.publicUrl` to the URL to your Scan app in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
+- Please set ``domain.sequencerPublicUrl`` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
+- Please set ``scan.publicUrl`` to the URL to your Scan app in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 - It is recommended to :ref:`configure pruning <sv-pruning>` .
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. If you do not want to share
   this, set it to an empty string.
-- If you would like to redistribute all or part of the SV rewards with other parties, you can fill up the `extraBeneficiaries` section with the desired parties and the percentage of the reward that corresponds to them.
+- If you would like to redistribute all or part of the SV rewards with other parties, you can fill up the ``extraBeneficiaries`` section with the desired parties and the percentage of the reward that corresponds to them.
   Note that the party you register must be known on the network for the reward coupon issuance to succeed.
   Furthermore, that party must be hosted on a validator node for its wallet to collect the SV reward coupons. That collection will happen automatically if the wallet is running.
   If it is not running during the time that the reward coupon can be collected, the corresponding reward is marked as unclaimed, and stored in an DSO-wide unclaimed reward pool.
-  The `extraBeneficiaries` can be changed with just a restart of the SV app.
+  The ``extraBeneficiaries`` can be changed with just a restart of the SV app.
+- Optionally, uncomment the line for ``initialAmuletPrice`` and set it to your desired amulet price.
+  This will create an amulet price vote from your SV with the configured price when onboarded.
+  If not set, no vote will be cast. This can always be done later manually from the SV app UI.
 
 If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, in your ``sv-values.yaml``:
 
