@@ -80,7 +80,7 @@ cat <<EOF | gcloud storage cp - "${TARGET_DIR}/backup-${run_id}.json"
   "notes": "This clone of DA-2 MainNet backups was created for archiving purposes, \
 by running the copy-node-backups-offline.sh script from the <git_repo> repo, \
 at the <copy_script_commit> commit, with the <before_date> argument. \
-It copied the backups with <run_id> (which is a UNIX timestamp of the time in which the
+It copied the backups with <run_id> (which is a UNIX timestamp of the time in which the \
 backups were originally taken)."
 }
 EOF
