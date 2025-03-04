@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppCli
 import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.duration.*
 
-trait SvUiIntegrationTestUtil extends TestCommon {
+trait SvUiPreflightIntegrationTestUtil extends TestCommon {
 
   this: FrontendTestCommon =>
 
@@ -102,7 +102,7 @@ trait SvUiIntegrationTestUtil extends TestCommon {
               if (secretsItr.hasNext) Some(secretsItr.next().text) else None
             },
           )
-          actAndCheck(timeUntilSuccess = 40.seconds)(
+          actAndCheck(timeUntilSuccess = 2.minutes)(
             "click",
             click on "create-validator-onboarding-secret",
           )(

@@ -369,7 +369,7 @@ class ScanHistoryBackfillingIntegrationTest
   private def allUpdatesFromScanBackend(scanBackend: ScanAppBackendReference) = {
     // Need to use the store directly, as the HTTP endpoint refuses to return data unless it's completely backfilled
     scanBackend.appState.store.updateHistory
-      .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
+      .getAllUpdates(None, PageLimit.tryCreate(1000))
       .futureValue
   }
 

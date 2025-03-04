@@ -32,7 +32,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
       migrationId: Long = migration1,
   ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
     store
-      .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
+      .getAllUpdates(None, PageLimit.tryCreate(1000))
       .map(_.filter(_.migrationId == migrationId).map(_.update))
   }
 
@@ -410,11 +410,10 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         ): Seq[TransactionTreeUpdate] = {
           val result =
             store
-              .getUpdates(
+              .getAllUpdates(
                 after.map { case (migrationId, recordTime) =>
                   (migrationId, CantonTimestamp.assertFromInstant(recordTime))
                 },
-                includeImportUpdates = true,
                 PageLimit.tryCreate(1),
               )
               .futureValue
@@ -462,14 +461,12 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             },
             maxCount = updates.size,
           )
-          all <- storeMigrationId1.getUpdates(
+          all <- storeMigrationId1.getAllUpdates(
             None,
-            includeImportUpdates = true,
             PageLimit.tryCreate(1000),
           )
-          all2 <- storeMigrationId2.getUpdates(
+          all2 <- storeMigrationId2.getAllUpdates(
             None,
-            includeImportUpdates = true,
             PageLimit.tryCreate(1000),
           )
         } yield {

@@ -62,7 +62,7 @@ spec:
         - name: SPLICE_APP_UI_POLL_INTERVAL
           value: {{ .Values.uiPollInterval | quote }}
         ports:
-        - containerPort: 80
+        - containerPort: 8080
           name: http
           protocol: TCP
         resources:
@@ -97,5 +97,6 @@ spec:
     app: {{ $ansWebUiLabel }}
   ports:
   - name: http
-    port: 80
+    targetPort: http
+    port: {{ .Values.service.ans.port }}
     protocol: TCP

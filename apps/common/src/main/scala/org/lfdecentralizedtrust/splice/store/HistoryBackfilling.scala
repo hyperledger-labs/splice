@@ -304,15 +304,20 @@ object HistoryBackfilling {
     *                            None if the given migration id is the beginning of known history.
     * @param recordTimeRange     All domains that produced history items in the given migration id,
     *                            along with the record time of the newest and oldest history item associated with each domain.
+    * @param lastImportUpdateId  The id of the last import update (where import updates are sorted by update id)
+    *                            for the given migration id, if any.
     * @param complete            True if the backfilling for the given migration id is complete,
     *                            i.e., the history knows the first item for each domain in the given migration id.
     *                            We need this to decide when the backfilling is complete, because it might be difficult to
     *                            identify the first item of a migration otherwise.
+    * @param importUpdatesComplete True if the import updates for the given migration id are complete.
     */
   final case class SourceMigrationInfo(
       previousMigrationId: Option[Long],
       recordTimeRange: Map[DomainId, DomainRecordTimeRange],
+      lastImportUpdateId: Option[String],
       complete: Boolean,
+      importUpdatesComplete: Boolean,
   )
 
   /** Information about the point at which backfilling is currently inserting data.
