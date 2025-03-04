@@ -16,7 +16,7 @@ import DA.Time
 import Splice.Scripts.Util
 import Splice.Scripts.TokenTestUtils
 import Splice.Amulet
-import Splice.Amulet.TokenApiUtils (amuletInstrumentId)
+import Splice.Amulet.TokenApiUtils (amuletInstrumentId, createdInRoundMetaKey, ratePerRoundMetaKey)
 import Splice.AmuletRules
 
 import Util.Disclosure
@@ -42,7 +42,15 @@ setupTest = do
   featureApp app aliceValidator
 
   -- Bob taps coin to send to Alice.
-  tap app bob 50.0
+  holdingCid <- tap app bob 50.0
+
+  holding <- queryInterfaceContractId @Holding bob.primaryParty (toInterfaceContractId holdingCid)
+  holding === Some HoldingView with
+    owner = bob.primaryParty
+    instrumentId = InstrumentId with id = "Amulet", admin = app.dso
+    amount = 50.0
+    lock = None
+    meta = Metadata with values = Map.fromList [(createdInRoundMetaKey, "1"), (ratePerRoundMetaKey, "0.00002")]
 
   -- Check initial balance setup
   checkBalance app alice 1.0
