@@ -94,7 +94,7 @@ spec:
           - mountPath: "/work"
             name: work
         command: ["/bin/sh"]
-        args: ["-c", "gcloud auth activate-service-account --key-file /root/gcloud/gcp-credentials.json && tar -C /data -czvf /work/backup.tar.gz . && gsutil cp /work/backup.tar.gz ${target_dir}/cometbft/cometbft.tar.gz"]
+        args: ["-c", "gcloud auth activate-service-account --key-file /root/gcloud/gcp-credentials.json 2>&1 && tar -C /data -czvf /work/backup.tar.gz . 2>&1 && gsutil cp /work/backup.tar.gz ${target_dir}/cometbft/cometbft.tar.gz 2>&1"]
         env:
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: "/root/gcloud/gcp-credentials.json"

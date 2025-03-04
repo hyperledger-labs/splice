@@ -207,8 +207,7 @@ jobs:
           no_output_timeout: "20m"
           cmd: |
             cncluster activate
-            # Several gcloud commands print stuff to stderr, so we redirect it to stdout to avoid noise on the logs
-            cluster/scripts/copy-node-backups-offline.sh << parameters.before-date >> 2>&1
+            cluster/scripts/copy-node-backups-offline.sh << parameters.before-date >>
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
