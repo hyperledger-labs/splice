@@ -1,218 +1,52 @@
 [
   {
-    "user_id": "google-oauth2|110899582324745131610",
-    "email": "itai.segall@digitalasset.com",
-    "name": "Itai Segall",
-    "given_name": "Itai",
-    "family_name": "Segall",
-    "nickname": "itai.segall",
-    "created_at": "2022-09-23T16:26:22.307Z",
-    "updated_at": "2025-02-27T18:35:25.494Z",
-    "last_login": "2025-02-27T18:35:25.494Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AeXRPp7E4AT_43hP_ls9quHT0qafFSoDkKy4OzQ6U7nzbVT6tPVaU5yu6TF57oHtxK11d3KN_J23YTMM0HU-Rk_8DlY-DIMSVJ2NlvtHLhEGPSB__KfYy87uA8DSswKISem-dC2EZVo6tgHwWFYTEs3Yj5W746bROcx-m_FE-csaCgYKAVESARASFQHGX2MijB60PLlM1HvPXcoQuGYjhg0178",
-        "user_id": "110899582324745131610"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/ACg8ocIH5nrO82TqJGtAs4v9VruHAS8SX1UF45w5iP6UGjAJwgkmMGpH=s96-c",
-    "last_ip": "2600:4041:41f0:4800:183b:b14e:69dd:358d",
-    "logins_count": 245,
-    "email_verified": true
+    "user_id": "google-oauth2|102407267956826102715",
+    "email": "martin.florian@digitalasset.com",
+    "created_at": "2022-12-13T13:47:51.341Z"
   },
   {
     "user_id": "google-oauth2|110432686293453333498",
     "email": "robert.autenrieth@digitalasset.com",
-    "name": "Robert Autenrieth",
-    "given_name": "Robert",
-    "family_name": "Autenrieth",
-    "nickname": "robert.autenrieth",
-    "created_at": "2022-09-23T14:32:54.487Z",
-    "updated_at": "2025-02-26T12:41:33.825Z",
-    "last_login": "2025-02-26T12:41:33.825Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AeXRPp6H6Y7LvZqN_k-ZpJtroel8wuz375B2nU-yqyGVGrmxekexWICg-YjmVv-i8x9SDnvFamLtscF-LO7DkzpOjMJk562K_tf4Wq5mX_aLt86iuUpWOejMrXYJDZFMdMA5CHA01xgT7-Ywkb2e-XeVcO3y9rlyTq3FJ18EaCgYKAfESARMSFQHGX2MiiAGQ5FsHMPNAioqDR_7JmQ0175",
-        "user_id": "110432686293453333498"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/ACg8ocJmwBhEOd15pBLxGqZmOAPPfZtviOYbsoEZDXpRycqO4r1_th8=s96-c",
-    "last_ip": "146.4.45.122",
-    "logins_count": 32,
-    "email_verified": true
-  },
-  {
-    "user_id": "google-oauth2|102407267956826102715",
-    "email": "martin.florian@digitalasset.com",
-    "name": "Martin Florian",
-    "given_name": "Martin",
-    "family_name": "Florian",
-    "nickname": "martin.florian",
-    "created_at": "2022-12-13T13:47:51.341Z",
-    "updated_at": "2025-02-24T14:57:19.315Z",
-    "last_login": "2025-02-24T14:57:19.315Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AXeO80RPM4i-9DG6czJYDyGdl5V--qIzCPrC3vhPA9P1eW1l1DlE2TsQg2eHw49daMWtdtD8ImmlERUFwg8gf7LTrzP2gtLYUdE7f4iCqfRBPpdjQoHlpctNq5RMcOKJwNfjE4gDBwnEA8k2TzHyOa_ETlOgOWfYQHvBU7AD1T4aCgYKAdkSARISFQHGX2Mi_3qLNPIenEJLd_ohtSn-oA0178",
-        "user_id": "102407267956826102715"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/ACg8ocJ6JtHfEDP1C_8_PmQhMQYLJrt-AgcfcboQH4i4tPt457hYrkc=s96-c",
-    "last_ip": "2a02:2455:800f:fffe:551e:1f87:121e:6235",
-    "logins_count": 56,
-    "email_verified": true
+    "created_at": "2022-09-23T14:32:54.487Z"
   },
   {
     "user_id": "google-oauth2|103930368588823687273",
     "email": "moritz.kiefer@digitalasset.com",
-    "name": "Moritz Kiefer",
-    "given_name": "Moritz",
-    "family_name": "Kiefer",
-    "nickname": "moritz.kiefer",
-    "created_at": "2022-12-14T11:50:51.326Z",
-    "updated_at": "2025-02-20T12:18:15.438Z",
-    "last_login": "2025-02-20T12:18:15.437Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AXeO80SMS8vEwkTtYO44LVJaMGBSniz3vLGj0o_XvGhCb0sv9_gDJ6uQjv5KJniX15PPjC_VDFTRFe-Mo8_89JK-aUDfkvXzRAqDz6Ko3cJfprVmf3OI4UIgtJQYuXP4w4wH2i72L3lSsNaflS5pU0SMTOnTL0J8-8MXbU8pnwaCgYKAWoSARASFQHGX2MiT4nzmWvgFR906XTqjypCKA0177",
-        "user_id": "103930368588823687273"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/ACg8ocL10QLTa3bNmwR3fuo09-HY3NuQT5GY0USWcun0x_lMF6_0hIk=s96-c",
-    "last_ip": "35.198.147.95",
-    "logins_count": 146,
-    "email_verified": true
+    "created_at": "2022-12-14T11:50:51.326Z"
+  },
+  {
+    "user_id": "google-oauth2|110899582324745131610",
+    "email": "itai.segall@digitalasset.com",
+    "created_at": "2022-09-23T16:26:22.307Z"
   },
   {
     "user_id": "google-oauth2|108162427964339419065",
     "email": "simon@digitalasset.com",
-    "name": "Simon Meier",
-    "given_name": "Simon",
-    "family_name": "Meier",
-    "nickname": "simon",
-    "created_at": "2023-02-02T09:13:37.873Z",
-    "updated_at": "2025-01-16T06:20:49.174Z",
-    "last_login": "2025-01-16T06:20:49.173Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0ARW5m77jazKJjB1PvdQ2Q6q5Sn1yYaaS6JxY7PobZtbxPbmApXaQYihbq2vnVkGVRxjtoY9pD8z8u0W2ti6brYF5IkoEgxXNf4gEEna0pOlH08ocAee-8d_bQZrbNj2fBFV0095gw7v_ZC4YkDWnuDD2YOSvkkiuvlcwaCgYKAU4SARMSFQHGX2MiarAErrYGBBA_YmItx_JViQ0171",
-        "user_id": "108162427964339419065"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/ACg8ocKkJ9Pos11Zg48E2A7jmDr3bOgk7tMLzb0e03NuYZsuVk8NaeY=s96-c",
-    "last_ip": "35.198.147.95",
-    "logins_count": 23,
-    "email_verified": true
+    "created_at": "2023-02-02T09:13:37.873Z"
+  },
+  {
+    "user_id": "google-oauth2|100515055195029920502",
+    "email": "oriol.munoz@digitalasset.com",
+    "created_at": "2023-02-15T09:31:56.96Z"
   },
   {
     "user_id": "google-oauth2|118161925457207857623",
     "email": "julien.tinguely@digitalasset.com",
-    "name": "Julien Tinguely",
-    "given_name": "Julien",
-    "family_name": "Tinguely",
-    "nickname": "julien.tinguely",
-    "created_at": "2023-03-21T14:52:14.371Z",
-    "updated_at": "2023-12-20T13:04:45.411Z",
-    "last_login": "2023-12-20T13:04:45.411Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AfB_byAsQNQr4SLkZNV7HFMyi2sPC-_g9yLxnbX68s-YgsY4AjF9qCun9-AjbY6-O0NHFOXlPEh1cPNfa-OPcvTiqs2qJz-wyRWKldb57glQrWpVo8NwnaFUPzHzNXjzrp07cGDSsDK8f9wMLDGd-Wn--U2-9c-qCGodaCgYKAZwSARMSFQHGX2Mia3naxUMZzkrsOR7iMJl9zQ0171",
-        "user_id": "118161925457207857623"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a-/ALV-UjXuLJPDKo53iWt8NIhYr37-wTOzoSfB5fGgnP_pX1x0X5e91Y8OaCgt8FR8A_K0mKjPWvHEsB6dEH7s-eXMQoopKWUugUMKYuARtAq7j_uz9QDwaij7UDoaPEJWywbKkS8vYwTFhgBRF4Sf0DKjDdGmUHnt0zmQQr1fPnBS1ENGYn8WjURGg3JpKQJBnWmgtHS1FzkDxJmHADI6NkAqolIX9NbqwxYhz8Q8IPdpZMyrJaewka3yhkOdj32cxtuvFkUsHEqfL7TmC7LIUUTbQaPpQ8tsN9xUZm_JCN1-wq8hGt1O54cB6vqHa44s64OMdipY7a4h79d4vjIpU_QVlpGpcqyaJWrwuzoI5W8Q7dDDxMqatf2iWzgDN4mcYtA6ks7-ydAv-fZVIuE88BRsDx5Di-sD8WMmA_aDKp6b6eQOWpoO_9wucrwt79GEuVGX6pNINaXdllWmvgLpiGVhWcQmzbhWNNHPJcgICw631jVQuyVHALvcuE5NvHRfZmRAD0ZtEN-BN-pqoJ-njnEq1Mjl0v19EMjhRu10WDfFPJhWlYJKUd5I6KoSjj3c3JJxbOMYut10UjK01KU46I4HU-vhsYoLEKO1AYjpSRNSc1-8NmKuZLR67pB0Jie1Qh75upuNAnxlITkMOqLM20DLFYTuYrVPer_6oQeRPuQD3SnCJ1FsPD0JyqDTaMBWdJ7yMEck73l8FM-U2-v8zj5k9OETuEQJE_-1czWEJ818mb3bKqDsr9-gMI_P7N5nOem1uPrJxyrf47p-3_-ArQrAwt1FAJumhbSehaF4B0EoTSI9LaFQV8wtTp0MVIkDQuEeiT1HQiAEyHl_ZgtqMSdSWBDPSuJFHYztFVP10ijO4ooUB7RXXBKNOxvKGGWXvIxGjIXeV114I-28wwdw6OK7ukCzq68ODzd9PW0eaFIE3d8OGw=s96-c",
-    "last_ip": "35.198.147.95",
-    "logins_count": 30,
-    "email_verified": true
+    "created_at": "2023-03-21T14:52:14.371Z"
   },
   {
     "user_id": "google-oauth2|106265882859845879513",
     "email": "raymond.roestenburg@digitalasset.com",
-    "name": "Raymond Roestenburg",
-    "given_name": "Raymond",
-    "family_name": "Roestenburg",
-    "nickname": "raymond.roestenburg",
-    "created_at": "2023-01-19T17:16:49.255Z",
-    "updated_at": "2023-12-07T12:06:12.369Z",
-    "last_login": "2023-12-07T12:06:12.369Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AfB_byDjvQc4gV_gFb7b6qCg3i1btrLa4gq23G-vVZeJoY1QlVj85iyicZseEQ-FqUJy7xwkhNiR0Nvn3f7FR2PpVnxSBFS0_gDWWDpRVyyq8zAxTMqnZg1barFPoyuemPBcSZUlhh5P25bdOhpMjbO6YVnvg7NbpjAaCgYKAcQSARESFQHGX2MiWlUlby3F8qu2c-mmBYeDfA0170",
-        "user_id": "106265882859845879513"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/ACg8ocLWxvPdHnimm7os75oBpG_fpGfM8sQgVVrWcZnzHLsihg=s96-c",
-    "last_ip": "35.198.147.95",
-    "logins_count": 53,
-    "email_verified": true
+    "created_at": "2023-01-19T17:16:49.255Z"
   },
   {
     "user_id": "google-oauth2|101034414073429253538",
     "email": "wayne.collier@digitalasset.com",
-    "name": "Wayne Collier",
-    "given_name": "Wayne",
-    "family_name": "Collier",
-    "nickname": "wayne.collier",
-    "created_at": "2023-03-02T14:47:12.201Z",
-    "updated_at": "2023-08-07T21:44:51.618Z",
-    "last_login": "2023-08-07T21:44:51.618Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AfB_byAuNiQiKJdymkpt21wfjK7-Qeibu4BxWsXXzMyJoQ7EjYiBXL7nMA35l_70aE5Bhlq2tNGsyHLEMooMq5ShODNtNGRuHXG3_R_GpeBABV8Of2O5FiCZ5D7ssFVcKJyobkp9PIAU1X9g7qd9eDP0tnR-R3MaCgYKAegSARISFQHsvYlsXfnhPsv9-zbrpLguHZvdPQ0166",
-        "user_id": "101034414073429253538"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/AAcHTtcePGAQzV1cS9HKl0JHhP8CiRJVsChrgf653C1aKEyi5Q=s96-c",
-    "last_ip": "34.132.91.75",
-    "logins_count": 26,
-    "email_verified": true
+    "created_at": "2023-03-02T14:47:12.201Z"
   },
   {
     "user_id": "google-oauth2|107135255038634034067",
     "email": "nicu.reut@digitalasset.com",
-    "name": "Nicu Reut",
-    "given_name": "Nicu",
-    "family_name": "Reut",
-    "nickname": "nicu.reut",
-    "created_at": "2023-06-19T11:01:08.171Z",
-    "updated_at": "2023-06-19T11:01:08.171Z",
-    "last_login": "2023-06-19T11:01:08.17Z",
-    "identities": [
-      {
-        "connection": "google-oauth2",
-        "provider": "google-oauth2",
-        "isSocial": true,
-        "access_token": "ya29.a0AWY7Cknj0cWnGiz-Qmv4xK4fB5rg3cF39qaTh5GyC9ClXoXadRqbxio5UvdL0WI43ynp8yP_mgH5ZM5qwu2k_Z8H1Eo_u9qRD58kFnUh_ddbKD0yI490SlSq2K__J_SPmngMAC6NRFgnIpi8LePuJJByeQGuaCgYKAdESARESFQG1tDrpuUzKPVPfFn4cIx_yHQuy-Q0163",
-        "user_id": "107135255038634034067"
-      }
-    ],
-    "picture": "https://lh3.googleusercontent.com/a/AAcHTtfGqzxnqQ98xCtrMXBWyKrGteHdbjROexqyshDA=s96-c",
-    "last_ip": "35.198.147.95",
-    "logins_count": 1,
-    "email_verified": true
+    "created_at": "2023-06-19T11:01:08.171Z"
   }
 ]

@@ -15,7 +15,7 @@ tenants=(canton-network-dev.us.auth0.com canton-network-sv-test.us.auth0.com can
 users="$(yq < cluster/user-configs/sv-users.yaml .user_emails -o json)"
 for tenant in "${tenants[@]}"
 do
-  all_auth0_users="$(auth0 users search -n 1000 --query digitalasset.com --tenant "$tenant" --json)"
+  all_auth0_users="$(auth0 users search -n 1000 --query digitalasset.com --tenant "$tenant" --json | jq 'map({user_id,email,created_at})')"
   jq -n --argjson auth0_users "$all_auth0_users" --argjson approved_users "$users" \
      '$auth0_users | map(select(. as $user | $approved_users | index($user.email)))' > \
     "$REPO_ROOT/cluster/user-configs/$tenant.json"
