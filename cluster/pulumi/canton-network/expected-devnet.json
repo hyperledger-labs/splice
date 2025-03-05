@@ -2594,7 +2594,9 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7",
+        "validatorWalletUsers": [
+          "auth0|64afbc0956a97fe9577249d7"
+        ],
         "walletSweep": {
           "Digital-Asset-2::1220dcf294bffd10439167f7460b1b6926b7a87d3237b748c7de6d7367fad3e33b20": {
             "maxBalanceUSD": 3000,
@@ -3456,7 +3458,9 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
+        "validatorWalletUsers": [
+          "auth0|64afbc353bbc7ca776e27bf4"
+        ]
       },
       "version": "0.3.13"
     },
@@ -4311,7 +4315,9 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
+        "validatorWalletUsers": [
+          "auth0|64afbc4431b562edb8995da6"
+        ]
       },
       "version": "0.3.13"
     },
@@ -5166,7 +5172,9 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
+        "validatorWalletUsers": [
+          "auth0|64afbc720e20777e46fff490"
+        ]
       },
       "version": "0.3.13"
     },

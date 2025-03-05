@@ -16,7 +16,9 @@ scanAddress: "TRUSTED_SCAN_URL"
 # Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
 # not only the suffix ``43b68e1e4978b000cefba352``:
-validatorWalletUser: "OPERATOR_WALLET_USER_ID"
+# You can specify multiple user ids if you want multiple users to be able to log into your wallet.
+validatorWalletUsers:
+  - "OPERATOR_WALLET_USER_ID"
 auth:
   # replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
   audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"

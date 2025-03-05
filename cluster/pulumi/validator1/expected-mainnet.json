@@ -791,7 +791,9 @@
         },
         "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "digitalasset-validator1-1",
-        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
+        "validatorWalletUsers": [
+          "auth0|63e3d75ff4114d87a2c1e4f5"
+        ]
       },
       "version": "0.3.11"
     },

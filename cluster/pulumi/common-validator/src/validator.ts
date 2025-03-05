@@ -184,7 +184,7 @@ export async function installValidatorApp(
         : undefined,
       scanAddress: config.scanAddress,
       extraDomains: config.extraDomains,
-      validatorWalletUser: config.validatorWalletUser,
+      validatorWalletUsers: [config.validatorWalletUser],
       svSponsorAddress: !config.svValidator ? config.svSponsorAddress : undefined,
       onboardingSecretFrom:
         !config.svValidator && config.onboardingSecret

@@ -1315,7 +1315,9 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|663d6fd6902e3665a5dc1ad1",
+        "validatorWalletUsers": [
+          "auth0|663d6fd6902e3665a5dc1ad1"
+        ],
         "walletSweep": {
           "Digital-Asset-2::12209b21d512c6a7e2f5d215266fe6568cb732caaef7ff04e308f990a652340d3529": {
             "maxBalanceUSD": 3000,

@@ -27,6 +27,11 @@ Upcoming
     See the :ref:`configuration instructions <helm-configure-global-domain>`.
     Note that this only takes effect for new nodes. For already existing nodes, change the price vote through the SV UI.
 
+* Validator
+
+  Adde the option to specify multiple ``validatorWalletUsers`` in the validator helm charts. The existing ``validatorWalletUser`` option is
+  still supported.
+
 0.3.13
 ------
 

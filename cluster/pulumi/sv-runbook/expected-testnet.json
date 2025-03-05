@@ -963,7 +963,9 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
+        "validatorWalletUsers": [
+          "auth0|64553aa683015a9687d9cc2e"
+        ]
       },
       "version": "0.3.12"
     },
