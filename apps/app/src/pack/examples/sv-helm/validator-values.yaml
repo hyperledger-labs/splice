@@ -24,18 +24,6 @@ auth:
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
 
-# CONFIGURING_TOPUP_START
-# Configuring a validator's traffic top-up loop;
-# see documentation for more detailed information.
-topup:
-  # set to false in order to disable automatic traffic top-ups
-  enabled: true
-  # target throughput in bytes / second of sequenced traffic; targetThroughput=0 <=> enabled=false
-  targetThroughput: 20000
-  # minTopupInterval - minimum time interval that must elapse before the next top-up
-  minTopupInterval: "1m"
-# CONFIGURING_TOPUP_END
-
 # This will disable the wallet HTTP server and wallet automations when set to false
 enableWallet: true
 

@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
+  SRARC_OffboardSv,
+  SRARC_CreateTransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
@@ -22,12 +25,15 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
 }
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import org.scalatest.time.{Minute, Span}
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
@@ -92,6 +98,50 @@ class SvOffboardingIntegrationTest
           sv4ValidatorBackend,
         )
       }
+
+      sv1Backend.dsoDelegateBasedAutomation
+        .trigger[ExecuteConfirmedActionTrigger]
+        .pause()
+        .futureValue
+      val externalPartyAmuletRules = sv1ScanBackend.getExternalPartyAmuletRules()
+      // Create TransferCommand to trigger creation of confirmations for creating the transfer command counter.
+      // We don't want to test external parties in this test so we just create it directly from SV1.
+      actAndCheck(
+        "Create TransferCommand",
+        sv1Backend.participantClient.ledger_api_extensions.commands.submitJava(
+          actAs = Seq(sv1Backend.getDsoInfo().svParty),
+          readAs = Seq(sv1Backend.getDsoInfo().dsoParty),
+          optTimeout = None,
+          commands = externalPartyAmuletRules.contractId
+            .exerciseExternalPartyAmuletRules_CreateTransferCommand(
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+              BigDecimal(0.0).bigDecimal,
+              Instant.now().plus(5, ChronoUnit.MINUTES),
+              0L,
+            )
+            .commands
+            .asScala
+            .toSeq,
+          applicationId = sv1Backend.config.ledgerApiUser,
+        ),
+      )(
+        "Wait for 4 confirmations to be created for creating transfer command counter",
+        _ => {
+          val confirmations = sv1Backend.participantClient.ledger_api_extensions.acs
+            .filterJava(Confirmation.COMPANION)(
+              sv1Backend.getDsoInfo().dsoParty,
+              c =>
+                inside(c.data.action) { case arcDsoRules: ARC_DsoRules =>
+                  inside(arcDsoRules.dsoAction) { case _: SRARC_CreateTransferCommandCounter =>
+                    true
+                  }
+                },
+            )
+          confirmations should have size (4)
+        },
+      )
 
       val (_, voteRequestCid4) = actAndCheck(
         "SV1 create a vote request to remove sv4", {
@@ -244,6 +294,20 @@ class SvOffboardingIntegrationTest
             }
           }
         },
+      )
+      // Check that the ExecuteConfirmedActionTrigger ignores the confirmation from SV4 now that it is no longer a member.
+      sv1ScanBackend.lookupTransferCommandCounterByParty(
+        sv1Backend.getDsoInfo().svParty
+      ) shouldBe None
+      actAndCheck(
+        "Resume ExecuteConfirmedActionTrigger",
+        sv1Backend.dsoDelegateBasedAutomation.trigger[ExecuteConfirmedActionTrigger].resume(),
+      )(
+        "TransferCommandCounter gets created",
+        (_: Unit) =>
+          sv1ScanBackend.lookupTransferCommandCounterByParty(
+            sv1Backend.getDsoInfo().svParty
+          ) shouldBe a[Some[_]],
       )
     }
   }
