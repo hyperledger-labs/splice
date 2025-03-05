@@ -35,6 +35,7 @@ import {
   sanitizedForPostgres,
   spliceInstanceNames,
   SvIdKey,
+  svUserIds,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
@@ -325,7 +326,9 @@ async function installValidator(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
-    validatorWalletUser: svConfig.validatorWalletUser,
+    validatorWalletUsers: [svConfig.validatorWalletUser].concat(
+      svUserIds(validatorSecrets.auth0Client.getCfg())
+    ),
     dependencies: sv.participant.asDependencies,
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,

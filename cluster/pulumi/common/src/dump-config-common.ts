@@ -3,6 +3,7 @@ import * as sinon from 'sinon';
 import { setMocks } from '@pulumi/pulumi/runtime/mocks';
 
 import { Auth0ClientSecret, Auth0ClusterConfig } from './auth0types';
+import { isMainNet } from './config';
 
 export enum PulumiFunction {
   // tokens for functions being called during the test run,
@@ -69,7 +70,9 @@ export const cantonNetworkAuth0Config = {
   },
   appToApiAudience: {},
   appToClientAudience: {},
-  auth0Domain: 'auth0Domain',
+  auth0Domain: isMainNet
+    ? 'canton-network-mainnet.us.auth0.com'
+    : 'canton-network-dev.us.auth0.com',
   auth0MgtClientId: 'auth0MgtClientId',
   auth0MgtClientSecret: 'auth0MgtClientSecret',
   fixedTokenCacheName: 'fixedTokenCacheName',
@@ -96,7 +99,7 @@ export const svRunbookAuth0Config = {
     sv: 'https://ledger_api.example.com',
     validator: 'https://ledger_api.example.com',
   },
-  auth0Domain: 'auth0Domain',
+  auth0Domain: 'canton-network-sv-test.us.auth0.com',
   auth0MgtClientId: 'auth0MgtClientId',
   auth0MgtClientSecret: 'auth0MgtClientSecret',
   fixedTokenCacheName: 'fixedTokenCacheName',

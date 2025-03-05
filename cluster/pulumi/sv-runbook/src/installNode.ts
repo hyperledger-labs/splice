@@ -40,6 +40,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   InstalledHelmChart,
   ansDomainPrefix,
+  svUserIds,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -386,6 +387,7 @@ async function installSvAndValidator(
       enable: true,
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
+    validatorWalletUsers: [validatorWalletUserName].concat(svUserIds(auth0Config)),
     ...spliceInstanceNames,
   };
 

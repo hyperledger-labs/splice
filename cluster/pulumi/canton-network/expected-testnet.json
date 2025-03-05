@@ -16,7 +16,7 @@
           "client-id": "sv-1-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-1-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -41,7 +41,7 @@
           "client-id": "sv1-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv1-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -63,7 +63,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -85,7 +85,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -107,7 +107,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -379,7 +379,7 @@
           "client-id": "sv-1-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-1-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -404,7 +404,7 @@
           "client-id": "sv1-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv1-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -426,7 +426,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -448,7 +448,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -470,7 +470,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -888,7 +888,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
@@ -1041,7 +1041,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "test.global.canton.network.digitalasset.com",
@@ -1108,7 +1108,16 @@
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
-          "auth0|64529b128448ded6aa68048f"
+          "auth0|64529b128448ded6aa68048f",
+          "google-oauth2|110899582324745131610",
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|118161925457207857623",
+          "google-oauth2|106265882859845879513",
+          "google-oauth2|101034414073429253538",
+          "google-oauth2|107135255038634034067"
         ],
         "walletSweep": {
           "Digital-Asset-2::1220d8749a807f84ffd21562284604a94e450762046c2f70d7a2edb240d98df68524": {

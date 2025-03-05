@@ -16,7 +16,7 @@
           "client-id": "sv-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-mainnet.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -41,7 +41,7 @@
           "client-id": "sv-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-mainnet.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -63,7 +63,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-mainnet.us.auth0.com"
         }
       }
     },
@@ -85,7 +85,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-mainnet.us.auth0.com"
         }
       }
     },
@@ -107,7 +107,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-mainnet.us.auth0.com"
         }
       }
     },
@@ -401,7 +401,7 @@
           "client-id": "sv-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-mainnet.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -426,7 +426,7 @@
           "client-id": "sv-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-mainnet.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -448,7 +448,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-mainnet.us.auth0.com"
         }
       }
     },
@@ -470,7 +470,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-mainnet.us.auth0.com"
         }
       }
     },
@@ -492,7 +492,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-mainnet.us.auth0.com"
         }
       }
     },
@@ -1118,7 +1118,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-mainnet.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "global.canton.network.digitalasset.com",
@@ -1249,7 +1249,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-mainnet.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "global.canton.network.digitalasset.com",
@@ -1316,7 +1316,10 @@
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
-          "auth0|663d6fd6902e3665a5dc1ad1"
+          "auth0|663d6fd6902e3665a5dc1ad1",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|110899582324745131610"
         ],
         "walletSweep": {
           "Digital-Asset-2::12209b21d512c6a7e2f5d215266fe6568cb732caaef7ff04e308f990a652340d3529": {

@@ -54,7 +54,7 @@ export type ValidatorSecrets = {
 type BasicValidatorConfig = {
   xns: ExactNamespace;
   topupConfig?: ValidatorTopupConfig;
-  validatorWalletUser?: string;
+  validatorWalletUsers: string[];
   disableAllocateLedgerApiUserParty?: boolean;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: CnInput<pulumi.Resource>[];
@@ -184,7 +184,7 @@ export async function installValidatorApp(
         : undefined,
       scanAddress: config.scanAddress,
       extraDomains: config.extraDomains,
-      validatorWalletUsers: [config.validatorWalletUser],
+      validatorWalletUsers: config.validatorWalletUsers,
       svSponsorAddress: !config.svValidator ? config.svSponsorAddress : undefined,
       onboardingSecretFrom:
         !config.svValidator && config.onboardingSecret
