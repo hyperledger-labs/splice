@@ -29,8 +29,12 @@ Upcoming
 
 * Validator
 
-  Adde the option to specify multiple ``validatorWalletUsers`` in the validator helm charts. The existing ``validatorWalletUser`` option is
-  still supported.
+  * Added the option to specify multiple ``validatorWalletUsers`` in the validator helm charts. The existing ``validatorWalletUser`` option is
+    still supported.
+
+* Docs
+
+  * Added documentation for managing network resets for validators and super validators.
 
 0.3.13
 ------

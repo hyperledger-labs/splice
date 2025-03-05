@@ -14,6 +14,7 @@ Supervalidators
 
    sv_helm.rst
    sv_upgrades.rst
+   sv_network_resets.rst
    sv_backup.rst
    sv_pruning.rst
    sv_restore.rst
