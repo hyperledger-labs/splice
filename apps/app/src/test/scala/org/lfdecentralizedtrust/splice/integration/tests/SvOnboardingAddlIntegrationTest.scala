@@ -24,7 +24,8 @@ class SvOnboardingAddlIntegrationTest
     with WalletTestUtil
     with SvTestUtil {
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     super.environmentDefinition
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateAllSvAppConfigs { (name, config) =>

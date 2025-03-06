@@ -3,15 +3,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.SynchronizerAlias
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.splitwell.automation.AcceptedAppPaymentRequestsTrigger
 import org.lfdecentralizedtrust.splice.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -24,8 +19,7 @@ class SplitwellIntegrationTest
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {

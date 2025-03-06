@@ -12,14 +12,7 @@ import com.daml.error.ErrorResource
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v2.admin.ObjectMetaOuterClass
-import com.daml.ledger.javaapi.data.{
-  Command,
-  CreatedEvent,
-  ExercisedEvent,
-  Transaction,
-  TransactionTree,
-  User,
-}
+import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -856,13 +849,6 @@ class SpliceLedgerConnection(
         commandOut: SubmitCommands[C],
     ): Future[Unit] = go()
 
-    def yieldTransaction()(implicit
-        tc: TraceContext,
-        dom: SynchronizerIdRequired,
-        dedup: SubmitDedup[CmdId],
-        commandOut: SubmitCommands[C],
-    ): Future[Transaction] = go()
-
     @annotation.nowarn("cat=unused&msg=pickT")
     def yieldResult[Z]()(implicit
         tc: TraceContext,
@@ -919,8 +905,6 @@ class SpliceLedgerConnection(
             result match {
               case _: Ignored =>
                 clientSubmit(WF.CompletionOffset)(offset => (offset, (): Z0))
-              case _: JustTransaction =>
-                clientSubmit(WF.Transaction)(tx => (tx.getOffset, tx))
               case k: ResultAndOffset[t, Z0] =>
                 for {
                   tree <- clientSubmit(WF.TransactionTree)(tx => (tx.getOffset, tx))
@@ -1343,9 +1327,6 @@ object SpliceLedgerConnection {
   object SubmitResult {
     private[SpliceLedgerConnection] final class Ignored extends SubmitResult[Any, Unit]
     implicit val Ignored: SubmitResult[Any, Unit] = new Ignored
-    private[SpliceLedgerConnection] final class JustTransaction
-        extends SubmitResult[Any, Transaction]
-    implicit val JustTransaction: SubmitResult[Any, Transaction] = new JustTransaction
     implicit def resultAndOffset[T]: SubmitResult[Update[T], (Long, T)] = new ResultAndOffset()
     implicit def onlyResult[T]: SubmitResult[Update[T], T] = new ResultAndOffset((_, t) => t)
     implicit def exercising[T, Z](implicit

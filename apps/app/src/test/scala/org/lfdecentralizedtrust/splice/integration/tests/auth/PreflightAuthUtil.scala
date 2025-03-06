@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests.auth
 
+import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.SvAppClientReference
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -12,6 +13,7 @@ import com.digitalasset.canton.integration.BaseIntegrationTest
 
 trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
   this: BaseIntegrationTest[
+    SpliceConfig,
     EnvironmentImpl,
     SpliceTestConsoleEnvironment,
   ] & TestCommon =>

@@ -5,17 +5,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.bumpUrl
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.JoinWithKey
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, SvTestUtil}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.scalatest.time.{Minute, Span}
 
@@ -31,8 +26,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>

@@ -4,16 +4,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.
   Subscription,
   SubscriptionRequest,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
@@ -22,8 +17,7 @@ class WalletSubscriptionsIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.

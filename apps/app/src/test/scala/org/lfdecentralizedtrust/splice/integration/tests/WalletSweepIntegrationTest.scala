@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
@@ -17,7 +16,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, EnvironmentImpl}
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithSharedEnvironment,
@@ -322,8 +321,7 @@ class WalletSweepToValidatorOperatorIntegrationTest extends WalletSweepIntegrati
     onboardWalletUser(walletClient, validatorBackend)
   }
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) => {
@@ -438,8 +436,7 @@ class WalletSweepToEndUserIntegrationTest extends WalletSweepIntegrationTest {
     newPartyId
   }
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) => {

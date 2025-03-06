@@ -330,6 +330,7 @@ sealed trait ScanHttpEncodings {
         nodesWithChildren,
       ),
       decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
+      /*implementedInterfaces = */ java.util.Collections.emptyList(),
     )
   }
 
@@ -557,6 +558,7 @@ object ScanHttpEncodings {
             nodesWithChildren.toMap,
           ),
           exercised.getExerciseResult,
+          exercised.getImplementedInterfaces,
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }

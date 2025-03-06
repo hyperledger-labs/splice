@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.config.{
   ParticipantBootstrapDumpConfig,
   ParticipantClientConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -23,7 +22,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -67,8 +65,7 @@ class ValidatorReonboardingIntegrationTest
   private def charlieLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("charlieWalletLocal")
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withPreSetup(_ => ())

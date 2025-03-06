@@ -1,9 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.reonboard
 
 import cats.syntax.parallel.*
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.{
   SvUiIntegrationTestUtil,
@@ -14,7 +12,6 @@ import org.lfdecentralizedtrust.splice.util.{
   SvFrontendTestUtil,
   WalletFrontendTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.util.FutureInstances.*
 import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
@@ -36,8 +33,7 @@ class SvOffboardPreflightIntegrationTest
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
     )

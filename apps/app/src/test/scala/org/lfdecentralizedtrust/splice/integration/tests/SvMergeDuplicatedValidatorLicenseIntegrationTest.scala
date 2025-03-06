@@ -14,7 +14,8 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
     extends SvIntegrationTestBase
     with TriggerTestUtil {
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
 

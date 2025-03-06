@@ -1,12 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.parallel.*
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
@@ -14,7 +10,6 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -25,8 +20,7 @@ import scala.jdk.OptionConverters.*
 
 class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))

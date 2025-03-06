@@ -2,9 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient.GroupKey
 import SpliceTests.BracketSynchronous.*
 import org.lfdecentralizedtrust.splice.util.{
@@ -14,7 +12,6 @@ import org.lfdecentralizedtrust.splice.util.{
   SplitwellFrontendTestUtil,
   WalletTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import SplitwellUpgradeFrontendIntegrationTest.*
 
 class SplitwellUpgradeFrontendIntegrationTest
@@ -27,8 +24,7 @@ class SplitwellUpgradeFrontendIntegrationTest
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => ConfigTransforms.useSplitwellUpgradeDomain()(config))

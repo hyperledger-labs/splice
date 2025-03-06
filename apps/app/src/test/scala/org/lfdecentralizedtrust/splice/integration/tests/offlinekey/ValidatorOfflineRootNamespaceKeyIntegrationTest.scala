@@ -1,14 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{PostgresAroundEach, ProcessTestUtil, WalletTestUtil}
 
 class ValidatorOfflineRootNamespaceKeyIntegrationTest
@@ -27,8 +22,7 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
   // Runs against a temporary Canton instance.
   override lazy val resetRequiredTopologyState = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // we start the participants during the test so we cannot pre-allocate

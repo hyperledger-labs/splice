@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration
 
 import com.daml.metrics.Timed
+import com.digitalasset.canton.config.SharedCantonConfig
 import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
@@ -54,14 +55,16 @@ import scala.jdk.CollectionConverters.*
   * All integration tests must be located in package [[com.digitalasset.canton.integration.tests]]
   * or a subpackage thereof. This is required to correctly compute unit test coverage.
   */
-trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
+trait BaseIntegrationTest[C <: SharedCantonConfig[
+  C
+], E <: Environment, TCE <: TestConsoleEnvironment[C, E]]
     extends FixtureAnyWordSpec
     with BaseTest
     with RepeatableTestSuiteTest
-    with HasEnvironmentDefinition[E, TCE]
+    with HasEnvironmentDefinition[C, E, TCE]
     with ProtocolVersionChecksFixtureAnyWordSpec
     with IntegrationTestMetrics {
-  this: EnvironmentSetup[E, TCE] =>
+  this: EnvironmentSetup[C, E, TCE] =>
 
   type FixtureParam = TCE
 

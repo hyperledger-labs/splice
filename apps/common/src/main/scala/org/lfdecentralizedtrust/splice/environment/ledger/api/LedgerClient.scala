@@ -685,17 +685,6 @@ object LedgerClient {
         }
       )
 
-    val Transaction: SubmitAndWaitFor[jdata.Transaction] =
-      impl((response: CSOC.SubmitAndWaitForTransactionResponse) =>
-        jdata.Transaction.fromProto(response.getTransaction)
-      ) {
-        { case (stub, r, ec) =>
-          stub
-            .submitAndWaitForTransaction(command_service.SubmitAndWaitRequest.fromJavaProto(r))
-            .map(r => command_service.SubmitAndWaitForTransactionResponse.toJavaProto(r))(ec)
-        }
-      }
-
     val TransactionTree: SubmitAndWaitFor[jdata.TransactionTree] =
       impl((response: CSOC.SubmitAndWaitForTransactionTreeResponse) =>
         jdata.TransactionTree.fromProto(response.getTransaction)

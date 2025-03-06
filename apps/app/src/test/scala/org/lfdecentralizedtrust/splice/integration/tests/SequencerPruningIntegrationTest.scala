@@ -20,7 +20,8 @@ class SequencerPruningIntegrationTest
     with WalletTestUtil
     with ProcessTestUtil {
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     super.environmentDefinition
       .addConfigTransforms(
         (_, config) =>

@@ -18,22 +18,17 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
-  EnvironmentImpl,
   PackageResource,
   ParticipantAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{DarUtil, ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.admin.api.client.data.DarDescription
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.google.protobuf.ByteString
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -65,8 +60,7 @@ class BootstrapPackageConfigIntegrationTest
     walletPaymentsVersion = "0.1.4",
   )
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
@@ -272,7 +266,7 @@ class BootstrapPackageConfigIntegrationTest
         uploadedDarDescriptions.map { darDesc =>
           val darBytes: ByteString =
             participantAdminConnection
-              .lookupDar(darDesc.darId)
+              .lookupDar(darDesc.mainPackageId)
               .futureValue
               .value
           val darMetadata = DarUtil.readDarMetadata(darDesc.name, darBytes.newInput())

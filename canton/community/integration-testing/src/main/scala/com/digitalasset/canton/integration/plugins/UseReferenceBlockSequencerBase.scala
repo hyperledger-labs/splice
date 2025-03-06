@@ -25,15 +25,16 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig
   *   different synchronizer).
   */
 abstract class UseReferenceBlockSequencerBase[
+    Config <: SharedCantonConfig[Config],
     StorageConfigT <: StorageConfig,
     SequencerConfigT <: SequencerConfig,
     EnvT <: Environment,
-    TestConsoleEnvT <: TestConsoleEnvironment[EnvT],
+    TestConsoleEnvT <: TestConsoleEnvironment[Config, EnvT],
 ](
     override protected val loggerFactory: NamedLoggerFactory,
     driverSingleWordName: String,
     sequencerGroups: SequencerSynchronizerGroups = SingleSynchronizer,
-) extends EnvironmentSetupPlugin[EnvT, TestConsoleEnvT] {
+) extends EnvironmentSetupPlugin[Config, EnvT, TestConsoleEnvT] {
 
   protected final def dbNameForGroup(group: Int): String = s"${driverSingleWordName}_db_$group"
 
@@ -48,7 +49,7 @@ abstract class UseReferenceBlockSequencerBase[
   }
 
   protected def driverConfigs(
-      config: EnvT#Config,
+      config: CantonConfig,
       storageConfigs: Map[InstanceName, StorageConfigT],
   ): Map[InstanceName, SequencerConfigT]
 }

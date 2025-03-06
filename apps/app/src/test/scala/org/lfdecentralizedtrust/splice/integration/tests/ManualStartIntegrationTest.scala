@@ -7,7 +7,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{FullClientConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{
   MediatorId,
   Member,
@@ -43,8 +42,7 @@ class ManualStartIntegrationTest
 
   override lazy val dbsSuffix = "manual_start_2_" + UUID.randomUUID.toString.substring(0, 4)
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] = {
+  override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       // Do not use `simpleTopology4Svs`, because that one waits for shared canton nodes to be initialized
       // and then attempts to allocate users on the sv1 participant. This test doesn't care about the shared

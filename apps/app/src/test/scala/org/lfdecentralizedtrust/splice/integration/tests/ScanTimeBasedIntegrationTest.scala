@@ -6,19 +6,14 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
@@ -29,8 +24,7 @@ class ScanTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.

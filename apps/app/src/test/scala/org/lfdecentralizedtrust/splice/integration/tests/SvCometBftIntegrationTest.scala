@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   CometBftJsonRpcRequest,
   CometBftJsonRpcRequestId,
@@ -23,7 +22,6 @@ import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftConnectionConfig, Co
 import org.lfdecentralizedtrust.splice.sv.config.CometBftConfig
 import org.lfdecentralizedtrust.splice.util.SvTestUtil
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import io.circe.Json
@@ -36,8 +34,7 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
 
   import ExecutionContext.Implicits.global
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms(

@@ -562,7 +562,7 @@ lazy val `apps-common` =
       `canton-bindings-java` % "test->test",
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
-      `canton-community-testing` % "test",
+      `canton-community-testing` % "test->test",
       `splice-wartremover-extension` % "compile->compile;test->test",
       // We include all DARs here to make sure they are available as resources.
       `splice-amulet-daml`,

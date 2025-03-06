@@ -10,7 +10,6 @@ import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDurati
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
@@ -48,11 +47,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  EnvironmentImpl,
-  ParticipantAdminConnection,
-  RetryFor,
-}
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
@@ -121,8 +116,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))

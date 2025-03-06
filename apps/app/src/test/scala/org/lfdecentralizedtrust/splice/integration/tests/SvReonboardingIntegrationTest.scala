@@ -14,7 +14,6 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   bumpUrl,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
@@ -35,7 +34,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -83,8 +81,7 @@ class SvReonboardingIntegrationTest
   private def validatorLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("validatorWalletLocal")
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation

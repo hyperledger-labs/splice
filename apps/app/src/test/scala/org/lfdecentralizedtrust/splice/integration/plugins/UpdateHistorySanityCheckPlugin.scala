@@ -39,7 +39,7 @@ class UpdateHistorySanityCheckPlugin(
     ignoredRootCreates: Seq[Identifier],
     ignoredRootExercises: Seq[(Identifier, String)],
     protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment]
+) extends EnvironmentSetupPlugin[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
     with Matchers
     with Eventually
     with Inspectors

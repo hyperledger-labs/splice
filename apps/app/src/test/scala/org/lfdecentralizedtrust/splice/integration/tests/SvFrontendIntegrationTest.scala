@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
@@ -10,7 +9,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.support.ui.Select
@@ -33,8 +31,7 @@ class SvFrontendIntegrationTest
     with VotesFrontendTestUtil
     with ValidatorLicensesFrontendTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
 

@@ -410,6 +410,7 @@ object UpdateHistoryTestBase {
         nodesWithChildren,
       ),
       /*exerciseResult = */ exercised.getExerciseResult,
+      /*implementedInterfaces = */ exercised.getImplementedInterfaces,
     )
   }
 

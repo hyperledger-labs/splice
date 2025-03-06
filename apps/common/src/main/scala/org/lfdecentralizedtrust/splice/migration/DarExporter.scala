@@ -14,7 +14,7 @@ class DarExporter(participantAdminConnection: ParticipantAdminConnection) {
   def exportAllDars()(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[Dar]] = for {
     darDescriptions <- participantAdminConnection.listDars()
     dars <- darDescriptions.traverse { dar =>
-      participantAdminConnection.lookupDar(dar.darId).map(_.map(Dar(dar.darId, _)))
+      participantAdminConnection.lookupDar(dar.mainPackageId).map(_.map(Dar(dar.mainPackageId, _)))
     }
   } yield dars.flatten
 

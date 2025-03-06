@@ -12,7 +12,8 @@ import scala.jdk.CollectionConverters.*
 
 class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart

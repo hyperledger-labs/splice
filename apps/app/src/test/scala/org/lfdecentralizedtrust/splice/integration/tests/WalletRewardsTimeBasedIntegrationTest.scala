@@ -1,22 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletRewardsTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // TODO (#10859) remove and fix test failures

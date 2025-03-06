@@ -6,7 +6,6 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import io.circe.syntax.EncoderOps
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -23,7 +22,6 @@ import org.lfdecentralizedtrust.splice.console.{
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -87,8 +85,7 @@ class DisasterRecoveryIntegrationTest
   override lazy val resetRequiredTopologyState = false
 
   // Any app with port starting with 28 or with name suffixed by 'Local' is an app started after the disaster
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation

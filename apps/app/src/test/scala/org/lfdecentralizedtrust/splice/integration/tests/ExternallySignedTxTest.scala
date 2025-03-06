@@ -1,13 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -21,8 +19,7 @@ trait ExternallySignedTxTest
     with ExternallySignedPartyTestUtil
     with HasTempDirectory {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] = {
+  override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
   }
 

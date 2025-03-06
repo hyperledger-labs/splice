@@ -221,7 +221,7 @@ class ParticipantPartyMigrator(
         "dars_uploaded",
         "Required dars are uploaded",
         participantAdminConnection.listDars().map { dars =>
-          val availablePackageIds = dars.map(_.darId)
+          val availablePackageIds = dars.map(_.mainPackageId)
           if (!requiredDars.forall(dar => availablePackageIds.contains(dar.packageId)))
             throw Status.FAILED_PRECONDITION
               .withDescription(

@@ -1420,6 +1420,7 @@ object BuildCommon {
           pekko_http_core,
           daml_pekko_http_metrics,
           daml_lf_api_type_signature,
+          protostuff_parser,
           tapir_json_circe,
           tapir_pekko_http_server,
           tapir_openapi_docs,

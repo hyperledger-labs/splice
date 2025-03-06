@@ -7,13 +7,10 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import io.circe.JsonObject
 import org.openqa.selenium.By
 import spray.json.DefaultJsonProtocol.StringJsonFormat
@@ -36,8 +33,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
   val amuletPrice = 2
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)

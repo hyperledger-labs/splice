@@ -13,7 +13,11 @@ import io.grpc.StatusRuntimeException
 import scala.util.control.NonFatal
 
 abstract class ResetTopologyStatePlugin
-    extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTests.SpliceTestConsoleEnvironment]
+    extends EnvironmentSetupPlugin[
+      SpliceConfig,
+      EnvironmentImpl,
+      SpliceTests.SpliceTestConsoleEnvironment,
+    ]
     with BaseTest {
 
   private val MAX_RETRIES = 15
