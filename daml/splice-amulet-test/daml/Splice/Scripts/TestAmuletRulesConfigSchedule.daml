@@ -11,7 +11,7 @@ import Splice.AmuletRules
 import Splice.AmuletConfig
 import Splice.Fees
 import Splice.Schedule
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Scripts.Util
 
 

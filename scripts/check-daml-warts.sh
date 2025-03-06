@@ -14,7 +14,7 @@ set -euo pipefail
 
 ignored_files=(
   'daml/splice-util/daml/Splice/Util.daml'
-  'token-standard/examples/splice-token-trading-test/daml/TradingApp.daml'
+  'token-standard/splice-token-standard-test/daml/Splice/Testing/Apps/TradingApp.daml'
   'canton/')
 
 # TODO(#9466): also check for naked `Xyz_Fetch` choices

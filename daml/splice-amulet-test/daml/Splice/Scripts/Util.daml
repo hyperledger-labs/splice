@@ -29,7 +29,7 @@ import Splice.RelRound
 import Splice.Schedule
 import Splice.ValidatorLicense
 
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Util
 
 -- Bootstrapping Amulet

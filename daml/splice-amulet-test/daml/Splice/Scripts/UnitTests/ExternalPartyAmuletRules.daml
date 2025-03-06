@@ -15,7 +15,7 @@ import Splice.ExternalPartyAmuletRules
 import Splice.Types
 import Splice.Round
 
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 
 
 

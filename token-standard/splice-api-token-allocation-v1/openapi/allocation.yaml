@@ -15,6 +15,7 @@ paths:
       operationId: "getAllocationTransferContext"
       description: |
         Get the choice context to execute a transfer on an allocation.
+      # TODO(#18152): consider whether the OpenAPI endpoint should accept the metadata that would be passed to the choice; or even just take the full choice argument
       parameters:
         - name: allocation_id
           description: "The contract ID of the allocation whose transfer the caller wants to execute."

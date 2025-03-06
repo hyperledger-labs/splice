@@ -1,8 +1,10 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- | OTC Trading venue example templates.
-module TradingApp where
+-- | An example of how to build an OTC trading app for multi-leg standard token trades.
+--
+-- Used as part of the testing infrastructure to test the DvP workflows based on the token standard.
+module Splice.Testing.Apps.TradingApp where
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
@@ -135,7 +137,7 @@ template OTCTrade
       allocationRequest_RejectImpl _self AllocationRequest_Reject{..} = do
         -- Note: this corresponds to signalling early that one is going to fail to deliver one's assets.
         -- A real trading app will likely demand punitive charges for this.
-        require "Actor is a sender" (any (actor ==) (map (.sender) transferLegs))
+        require "Actor is a sender" (any (\leg -> actor == leg.sender) transferLegs)
         pure ChoiceExecutionMetadata with meta = emptyMetadata
 
       allocationRequest_WithdrawImpl _self _extraArgs =

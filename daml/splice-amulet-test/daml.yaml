@@ -14,13 +14,9 @@ dependencies:
 data-dependencies:
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
+  - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
   - -Wno-template-interface-depends-on-daml-script
   - --target=2.1
-codegen:
-  java:
-    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceAmuletTest
-    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java

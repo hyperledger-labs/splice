@@ -21,6 +21,7 @@ API docs for daml packages
    ../api/splice-validator-lifecycle/index
    ../api/splice-wallet/index
    ../api/splice-wallet-payments/index
+   ../api/splice-token-standard-test/index
    ../api/splice-api-token-metadata-v1/index
    ../api/splice-api-token-holding-v1/index
    ../api/splice-api-token-transfer-instruction-v1/index

@@ -35,7 +35,13 @@ ensure_damlc_exists() {
 
 ensure_damlc_exists
 
-DAML_PROJECT_FILES="$(find "$REPO_ROOT/daml" "$REPO_ROOT/token-standard" -maxdepth 2 \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml -not -ipath '*-test*' -not -ipath '*splitwell*' -not -ipath '*app-manager*' -print)"
+DAML_PROJECT_FILES="\
+  $(find "$REPO_ROOT/daml" "$REPO_ROOT/token-standard" -maxdepth 2 \
+    \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
+    -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test*' \)  \
+    -not -ipath '*splitwell*' \
+    -not -ipath '*app-manager*' \
+    -print)"
 for project_file in $DAML_PROJECT_FILES
 do
     project_dir="$(dirname "${project_file#"$REPO_ROOT"/}")"

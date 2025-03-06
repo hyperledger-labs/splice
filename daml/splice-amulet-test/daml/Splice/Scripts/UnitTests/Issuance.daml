@@ -10,7 +10,7 @@ import Daml.Script
 
 import Splice.Issuance
 import Splice.Schedule
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 
 -- Shared parameters
 --------------------
