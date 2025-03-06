@@ -110,7 +110,7 @@ canton.validator-apps.validator_backend_$index = {
     }
 
     ledger-api-user = $user
-    validator-wallet-user = $user
+    validator-wallet-users = [$user]
     validator-party-hint = $partyHint
 
     auth {

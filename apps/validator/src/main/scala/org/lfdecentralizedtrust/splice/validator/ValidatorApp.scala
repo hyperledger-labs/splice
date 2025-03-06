@@ -833,21 +833,28 @@ class ValidatorApp(
           )
         }
       })
-      _ <- appInitStep(s"Onboard validator") {
-        ValidatorUtil.onboard(
+      _ <- appInitStep(s"Onboard validator wallet users") {
+        val users = if (config.validatorWalletUsers.isEmpty) {
           // TODO(#12764) also onboard ledgerApiUser if both users are set
-          endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
-          knownParty = Some(validatorParty),
-          automation,
-          validatorUserName = config.ledgerApiUser,
-          // we're initializing so AmuletRules is guaranteed to be on domainId
-          getAmuletRulesDomain = () => _ => Future successful domainId,
-          participantAdminConnection,
-          retryProvider,
-          logger,
-          CommandPriority.High,
-          RetryFor.WaitingOnInitDependency,
-        )
+          Seq(config.ledgerApiUser)
+        } else {
+          config.validatorWalletUsers
+        }
+        users.traverse_ { user =>
+          ValidatorUtil.onboard(
+            endUserName = user,
+            knownParty = Some(validatorParty),
+            automation,
+            validatorUserName = config.ledgerApiUser,
+            // we're initializing so AmuletRules is guaranteed to be on domainId
+            getAmuletRulesDomain = () => _ => Future successful domainId,
+            participantAdminConnection,
+            retryProvider,
+            logger,
+            CommandPriority.High,
+            RetryFor.WaitingOnInitDependency,
+          )
+        }
       }
       _ <- appInitStep(s"Ensure validator is onboarded") {
         ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
@@ -873,7 +880,7 @@ class ValidatorApp(
           automation,
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
-          validatorWalletUserName = config.validatorWalletUser,
+          validatorWalletUserNames = config.validatorWalletUsers,
           walletManagerOpt,
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           scanConnection = scanConnection,
