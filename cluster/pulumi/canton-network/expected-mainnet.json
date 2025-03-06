@@ -1173,7 +1173,7 @@
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "onboardingFoundingSvRewardWeightBps": 140000,
+        "onboardingFoundingSvRewardWeightBps": 150000,
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "27 h",
         "onboardingType": "found-dso",
