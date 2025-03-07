@@ -67,7 +67,9 @@ class SvOffboardPreflightIntegrationTest
         },
       )
 
-      // 10020 is for the
+      // In SvReOnboardPreflightIntegrationTest, we are transferring 100000 USD
+      // from a temporary validator that is configured to use the offboarded SV party
+      // to the reonboarded SV.
       tapAmulets(100020)
     }
   }
