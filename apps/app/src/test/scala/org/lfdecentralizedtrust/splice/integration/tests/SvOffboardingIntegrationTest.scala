@@ -154,7 +154,7 @@ class SvOffboardingIntegrationTest
           sv1Backend.createVoteRequest(
             sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
             action,
-            "url",
+            "https://vote-request-url.com",
             "description",
             sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           )
@@ -172,7 +172,7 @@ class SvOffboardingIntegrationTest
 
       actAndCheck(
         "SV2 votes on removing sv4", {
-          sv2Backend.castVote(voteRequestCid4, true, "url", "description")
+          sv2Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")
         },
       )(
         "The majority has voted but without an acceptance majority, the trigger should not remove sv4",
@@ -184,8 +184,8 @@ class SvOffboardingIntegrationTest
       actAndCheck(
         // We need SV4's vote here for immediate offboarding
         "SV3 and SV4 vote on removing sv4", {
-          sv3Backend.castVote(voteRequestCid4, true, "url", "description")
-          sv4Backend.castVote(voteRequestCid4, true, "url", "description")
+          sv3Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")
+          sv4Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")
         },
       )(
         "Everyone voted, thus the trigger should remove the dso party hosting for sv4",
