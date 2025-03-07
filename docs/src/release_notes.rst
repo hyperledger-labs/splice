@@ -8,8 +8,12 @@
 Release Notes
 =============
 
-0.3.14
+0.3.15
 ------
+
+.. important::
+
+    * This release fixes a Scan backfilling regression introduced in 0.3.14. Please skip 0.3.14 and upgrade directly to 0.3.15.
 
 * Deployment
 
