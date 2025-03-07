@@ -113,8 +113,9 @@ class SvReOnboardPreflightIntegrationTest
         val usdText = find(id("wallet-balance-usd")).value.text.trim
         val amuletText = find(id("wallet-balance-amulet")).value.text.trim
 
-        val amulet = BigDecimal(amuletText.split(" ").head)
-        val usd = BigDecimal(usdText.split(" ").head)
+        val amuletAcronym = sv1ScanClient.getSpliceInstanceNames().amuletNameAcronym
+        val amulet = parseAmountText(amuletText, amuletAcronym)
+        val usd = parseAmountText(usdText, "USD")
 
         val amuletPrice = (usd / amulet).setScale(10, BigDecimal.RoundingMode.HALF_UP)
         logger.info(s"Amulet price: $amuletPrice")
