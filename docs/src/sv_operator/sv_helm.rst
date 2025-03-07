@@ -37,6 +37,8 @@ Requirements
 
    export MIGRATION_ID=0
 
+.. include:: ../common/backup_suggestion.rst
+
 .. _sv-identity:
 
 Generating an SV identity

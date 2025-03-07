@@ -30,6 +30,8 @@ Requirements
 
   tar xzvf |version|\_splice-node.tar.gz
 
+.. include:: ../common/backup_suggestion.rst
+
 .. include:: required_network_parameters.rst
 
 TRUSTED_SCAN_URL
