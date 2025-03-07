@@ -82,14 +82,10 @@ class ScanHistoryBackfillingTrigger(
       Future.successful(Seq.empty)
     } else {
       store.updateHistory.getBackfillingState().map {
-        case Some(state) =>
-          if (state.updatesComplete && state.importUpdatesComplete) {
-            Seq.empty
-          } else if (!state.updatesComplete) {
-            Seq(ScanHistoryBackfillingTrigger.BackfillTask())
-          } else {
-            Seq(ScanHistoryBackfillingTrigger.ImportUpdatesBackfillTask())
-          }
+        case Some(state) if state.complete =>
+          Seq.empty
+        case Some(_) =>
+          Seq(ScanHistoryBackfillingTrigger.BackfillTask())
         case None =>
           Seq(ScanHistoryBackfillingTrigger.InitializeBackfillingTask(findHistoryStartAfter))
       }
@@ -105,8 +101,6 @@ class ScanHistoryBackfillingTrigger(
   ): Future[TaskOutcome] = task match {
     case ScanHistoryBackfillingTrigger.InitializeBackfillingTask(_) =>
       initializeBackfilling()
-    case ScanHistoryBackfillingTrigger.ImportUpdatesBackfillTask() =>
-      performImportUpdatesBackfilling()
     case ScanHistoryBackfillingTrigger.BackfillTask() =>
       performBackfilling()
   }
@@ -178,8 +172,9 @@ class ScanHistoryBackfillingTrigger(
     synchronized {
       val batchSize = 100
       for {
-        updates <- store.updateHistory.getUpdatesWithoutImportUpdates(
+        updates <- store.updateHistory.getUpdates(
           findHistoryStartAfter,
+          includeImportUpdates = false,
           PageLimit.tryCreate(batchSize),
         )
         _ = updates.lastOption.foreach(u =>
@@ -256,24 +251,10 @@ class ScanHistoryBackfillingTrigger(
       case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>
         TaskNoop
       case HistoryBackfilling.Outcome.BackfillingIsComplete =>
-        logger.info("UpdateHistory backfilling is complete")
+        logger.info(
+          "UpdateHistory backfilling is complete, this trigger should not do any work ever again"
+        )
         TaskSuccess("Backfilling completed")
-    }
-  } yield outcome
-
-  private def performImportUpdatesBackfilling()(implicit
-      traceContext: TraceContext
-  ): Future[TaskOutcome] = for {
-    connection <- getOrCreateScanConnection()
-    backfilling = getOrCreateBackfilling(connection)
-    outcome <- backfilling.backfillImportUpdates().map {
-      case HistoryBackfilling.Outcome.MoreWorkAvailableNow =>
-        TaskSuccess("Backfilling import updates step completed")
-      case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>
-        TaskNoop
-      case HistoryBackfilling.Outcome.BackfillingIsComplete =>
-        logger.info("UpdateHistory backfilling import updates is complete")
-        TaskSuccess("Backfilling import updates completed")
     }
   } yield outcome
 
@@ -298,10 +279,6 @@ object ScanHistoryBackfillingTrigger {
       prettyOfClass(param("after", _.after))
   }
   final case class BackfillTask() extends Task {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass()
-  }
-  final case class ImportUpdatesBackfillTask() extends Task {
     override def pretty: Pretty[this.type] =
       prettyOfClass()
   }
