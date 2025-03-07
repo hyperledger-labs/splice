@@ -10,11 +10,14 @@ import { ContractId } from '@daml/types';
 import { useSvConfig } from '../../utils';
 import VoteForm from './VoteForm';
 
-const SvListVoteRequests: React.FC = () => {
+const SvListVoteRequests: React.FC<{ supportsVoteEffectivityAndSetConfig: boolean }> = ({
+  supportsVoteEffectivityAndSetConfig,
+}) => {
   const config = useSvConfig();
   return (
     <SvClientProvider url={config.services.sv.url}>
       <ListVoteRequests
+        supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
         showActionNeeded
         voteForm={(requestContractId: ContractId<VoteRequest>, currentSvVote?: SvVote) => (
           <VoteForm voteRequestCid={requestContractId} vote={currentSvVote} />

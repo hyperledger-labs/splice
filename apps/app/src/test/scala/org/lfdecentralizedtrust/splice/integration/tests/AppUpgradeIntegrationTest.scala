@@ -240,6 +240,7 @@ class AppUpgradeIntegrationTest
             ),
             java.util.Optional.empty(),
           )
+          // TODO(#16139): adaptation to this test required
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_AddFutureAmuletConfigSchedule(
               new AmuletRules_AddFutureAmuletConfigSchedule(

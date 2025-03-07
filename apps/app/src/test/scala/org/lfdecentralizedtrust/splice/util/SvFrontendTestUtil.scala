@@ -9,6 +9,18 @@ import scala.concurrent.duration.DurationInt
 trait SvFrontendTestUtil extends TestCommon {
   this: CommonAppInstanceReferences & FrontendTestCommon =>
 
+  def setExpirationDate(party: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    setDateTime(party, "datetime-picker-vote-request-expiration", dateTime)
+  }
+
+  def setAmuletConfigDate(party: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    setDateTime(party, "datetime-picker-amulet-configuration", dateTime)
+  }
+
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ): Assertion = {

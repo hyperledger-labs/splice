@@ -73,7 +73,7 @@ describe('SV user can', () => {
   });
 });
 
-describe('An AddFutureAmuletConfigSchedule request', () => {
+describe('An SetConfig request', () => {
   test('defaults to the current amulet configuration', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
@@ -86,12 +86,19 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
 
     const dropdown = screen.getByTestId('display-actions');
     expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: 'CRARC_AddFutureAmuletConfigSchedule' } });
+    fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
 
     expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
-    expect(await screen.findByDisplayValue('4815162342')).toBeDefined();
-  });
+    expect(await screen.findByDisplayValue('0.03')).toBeDefined();
 
+    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+
+    expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
+    expect(await screen.findByDisplayValue('10')).toBeDefined();
+  });
+});
+
+describe('An AddFutureAmuletConfigSchedule request', () => {
   test('is displayed in executed section when its effective date is in the past', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);

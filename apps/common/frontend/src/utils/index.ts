@@ -3,3 +3,4 @@
 export * from './auth';
 export * from './amuletRules';
 export * from './helpers';
+export * from './versions';

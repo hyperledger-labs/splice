@@ -13,7 +13,7 @@ export interface VoteRequestValidity {
   isValid: boolean;
   alertMessage: object;
 }
-
+// TODO(#16139): retire deprecated code
 function validateScheduleDateTime(
   data: Contract<VoteRequest>[],
   formattedUTCtime: string

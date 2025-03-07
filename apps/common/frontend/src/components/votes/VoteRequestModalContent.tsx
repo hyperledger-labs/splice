@@ -17,7 +17,7 @@ interface VoteRequestModalProps {
     voteRequestContractId: ContractId<VoteRequest>,
     currentSvVote: SvVote | undefined
   ) => React.ReactNode;
-  effectiveAt?: string;
+  effectiveAt?: Date;
 }
 
 const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({

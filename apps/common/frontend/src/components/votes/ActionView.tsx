@@ -27,6 +27,7 @@ import {
   AmuletRules_AddFutureAmuletConfigSchedule,
   AmuletRules_UpdateFutureAmuletConfigSchedule,
   AmuletRules_RemoveFutureAmuletConfigSchedule,
+  AmuletRules_SetConfig,
 } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { Schedule } from '@daml.js/splice-amulet/lib/Splice/Schedule';
 import {
@@ -56,7 +57,7 @@ function findLatestVoteResult(
   time: string,
   actionName: string,
   votesHooks: VotesHooks,
-  tableType?: VoteRequestResultTableType
+  voteRequestResultTableType?: VoteRequestResultTableType
 ): DsoRules_CloseVoteRequestResult | undefined {
   const voteResultsQuery = votesHooks.useListVoteRequestResult(
     1,
@@ -64,7 +65,7 @@ function findLatestVoteResult(
     undefined,
     undefined,
     time,
-    tableType !== 'Rejected'
+    voteRequestResultTableType !== 'Rejected'
   );
   if (!voteResultsQuery.data || !voteResultsQuery.data[0]) {
     return undefined;
@@ -104,7 +105,7 @@ function findAmuletRulesScheduleItemToCompareAgainst(
   scheduleTime: string,
   votesHooks: VotesHooks,
   defaultConfig: AmuletConfig<USD>,
-  tableType?: VoteRequestResultTableType
+  voteRequestResultTableType?: VoteRequestResultTableType
 ): [string, AmuletConfig<USD>] {
   function parseAmuletRulesAction(
     action: ActionRequiringConfirmation
@@ -127,20 +128,21 @@ function findAmuletRulesScheduleItemToCompareAgainst(
     scheduleTime,
     'CRARC_AddFutureAmuletConfigSchedule',
     votesHooks,
-    tableType
+    voteRequestResultTableType
   )?.request.action;
   const latestUpdateAction = findLatestVoteResult(
     scheduleTime,
     'CRARC_UpdateFutureAmuletConfigSchedule',
     votesHooks,
-    tableType
+    voteRequestResultTableType
   )?.request.action;
 
   const currentAmuletConfig = Schedule(Time, AmuletConfig(USD)).encode(
     getAmuletConfigurationAsOfNow(schedule)
   ) as Schedule<string, AmuletConfig<USD>>;
 
-  const isExecutedOrRejected = tableType === 'Executed' || tableType === 'Rejected';
+  const isExecutedOrRejected =
+    voteRequestResultTableType === 'Executed' || voteRequestResultTableType === 'Rejected';
 
   if (isExecutedOrRejected) {
     if (!latestAddAction) {
@@ -196,9 +198,9 @@ function findAmuletRulesScheduleItemToCompareAgainst(
 
 export const ActionView: React.FC<{
   action: ActionRequiringConfirmation;
-  tableType?: VoteRequestResultTableType;
-  effectiveAt?: string;
-}> = ({ action, tableType, effectiveAt }) => {
+  voteRequestResultTableType?: VoteRequestResultTableType;
+  effectiveAt?: Date;
+}> = ({ action, voteRequestResultTableType, effectiveAt }) => {
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
 
@@ -258,13 +260,13 @@ export const ActionView: React.FC<{
       }
       case 'SRARC_SetConfig': {
         return (
-          <SetConfigValueTable
+          <SetDsoConfigValueTable
             votesHooks={votesHooks}
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             dsoAction={dsoAction}
             effectiveAt={effectiveAt}
-            tableType={tableType}
+            voteRequestResultTableType={voteRequestResultTableType}
           />
         );
       }
@@ -298,7 +300,7 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
-            tableType={tableType}
+            voteRequestResultTableType={voteRequestResultTableType}
           />
         );
       }
@@ -309,7 +311,7 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
-            tableType={tableType}
+            voteRequestResultTableType={voteRequestResultTableType}
           />
         );
       }
@@ -320,7 +322,19 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
-            tableType={tableType}
+            voteRequestResultTableType={voteRequestResultTableType}
+          />
+        );
+      }
+      case 'CRARC_SetConfig': {
+        return (
+          <SetAmuletConfigValueTable
+            votesHooks={votesHooks}
+            dsoInfosQuery={dsoInfosQuery}
+            actionType={actionType}
+            amuletAction={amuletRulesAction}
+            effectiveAt={effectiveAt}
+            voteRequestResultTableType={voteRequestResultTableType}
           />
         );
       }
@@ -390,8 +404,8 @@ const AddFutureConfigValueTable: React.FC<{
     tag: 'CRARC_AddFutureAmuletConfigSchedule';
     value: AmuletRules_AddFutureAmuletConfigSchedule;
   };
-  tableType?: VoteRequestResultTableType;
-}> = ({ votesHooks, dsoInfosQuery, actionType, amuletRulesAction, tableType }) => {
+  voteRequestResultTableType?: VoteRequestResultTableType;
+}> = ({ votesHooks, dsoInfosQuery, actionType, amuletRulesAction, voteRequestResultTableType }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
   if (voteRequests.isLoading) {
@@ -411,10 +425,10 @@ const AddFutureConfigValueTable: React.FC<{
     amuletRulesAction.value.newScheduleItem._1,
     votesHooks,
     amuletRulesAction.value.newScheduleItem._2,
-    tableType
+    voteRequestResultTableType
   );
 
-  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !tableType
+  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? getInflightVoteRequests(
         amuletRulesAction.tag,
         voteRequests.data.map(vr => vr.payload)
@@ -448,8 +462,8 @@ const AddFutureConfigValueTable: React.FC<{
             title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
-                data={amuletRulesAction.value.newScheduleItem._2}
-                compareWithData={amuletConfigToCompareWith[1]}
+                newConfig={amuletRulesAction.value.newScheduleItem._2}
+                actualConfig={amuletConfigToCompareWith[1]}
               />
             ),
           },
@@ -458,8 +472,8 @@ const AddFutureConfigValueTable: React.FC<{
           title: <DateWithDurationDisplay datetime={vr[0]} />,
           content: (
             <PrettyJsonDiff
-              data={amuletRulesAction.value.newScheduleItem._2}
-              compareWithData={vr[1]}
+              newConfig={amuletRulesAction.value.newScheduleItem._2}
+              actualConfig={vr[1]}
             />
           ),
         })),
@@ -476,8 +490,8 @@ const RemoveFutureConfigValueTable: React.FC<{
     tag: 'CRARC_RemoveFutureAmuletConfigSchedule';
     value: AmuletRules_RemoveFutureAmuletConfigSchedule;
   };
-  tableType?: VoteRequestResultTableType;
-}> = ({ votesHooks, dsoInfosQuery, actionType, amuletRulesAction, tableType }) => {
+  voteRequestResultTableType?: VoteRequestResultTableType;
+}> = ({ votesHooks, dsoInfosQuery, actionType, amuletRulesAction, voteRequestResultTableType }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
   if (voteRequests.isLoading) {
@@ -496,7 +510,7 @@ const RemoveFutureConfigValueTable: React.FC<{
     amuletRulesAction.value.scheduleTime,
     votesHooks,
     dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
-    tableType
+    voteRequestResultTableType
   );
   // TODO(#15154): Implement config diffs of CRARC_RemoveFutureAmuletConfigSchedule action
   return (
@@ -510,8 +524,8 @@ const RemoveFutureConfigValueTable: React.FC<{
         ),
         ScheduleItem: (
           <PrettyJsonDiff
-            data={amuletConfigToCompareWith[1]}
-            compareWithData={amuletConfigToCompareWith[1]}
+            newConfig={amuletConfigToCompareWith[1]}
+            actualConfig={amuletConfigToCompareWith[1]}
           />
         ),
       }}
@@ -527,8 +541,8 @@ const UpdateFutureConfigValueTable: React.FC<{
     tag: 'CRARC_UpdateFutureAmuletConfigSchedule';
     value: AmuletRules_UpdateFutureAmuletConfigSchedule;
   };
-  tableType?: VoteRequestResultTableType;
-}> = ({ votesHooks, dsoInfosQuery, actionType, amuletRulesAction, tableType }) => {
+  voteRequestResultTableType?: VoteRequestResultTableType;
+}> = ({ votesHooks, dsoInfosQuery, actionType, amuletRulesAction, voteRequestResultTableType }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
   if (voteRequests.isLoading) {
@@ -548,10 +562,10 @@ const UpdateFutureConfigValueTable: React.FC<{
     amuletRulesAction.value.scheduleItem._1,
     votesHooks,
     amuletRulesAction.value.scheduleItem._2,
-    tableType
+    voteRequestResultTableType
   );
 
-  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !tableType
+  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? getInflightVoteRequests(
         amuletRulesAction.tag,
         voteRequests.data.map(vr => vr.payload)
@@ -585,8 +599,8 @@ const UpdateFutureConfigValueTable: React.FC<{
             title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
-                data={amuletRulesAction.value.scheduleItem._2}
-                compareWithData={amuletConfigToCompareWith[1]}
+                newConfig={amuletRulesAction.value.scheduleItem._2}
+                actualConfig={amuletConfigToCompareWith[1]}
               />
             ),
           },
@@ -595,8 +609,8 @@ const UpdateFutureConfigValueTable: React.FC<{
           title: <DateWithDurationDisplay datetime={vr[0]} />,
           content: (
             <PrettyJsonDiff
-              data={amuletRulesAction.value.scheduleItem._2}
-              compareWithData={vr[1]}
+              newConfig={amuletRulesAction.value.scheduleItem._2}
+              actualConfig={vr[1]}
             />
           ),
         })),
@@ -605,44 +619,144 @@ const UpdateFutureConfigValueTable: React.FC<{
   );
 };
 
-const SetConfigValueTable: React.FC<{
+const SetAmuletConfigValueTable: React.FC<{
+  votesHooks: BaseVotesHooks;
+  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
+  actionType: string;
+  amuletAction: { tag: 'CRARC_SetConfig'; value: AmuletRules_SetConfig };
+  effectiveAt?: Date | string;
+  voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
+}> = ({
+  votesHooks,
+  dsoInfosQuery,
+  actionType,
+  amuletAction,
+  effectiveAt,
+  voteRequestResultTableType,
+}) => {
+  const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+  if (voteRequests.isLoading) {
+    return <Loading />;
+  }
+  if (voteRequests.isError) {
+    return <p>Error, something went wrong.</p>;
+  }
+  if (!voteRequests.data) {
+    return <p>no VoteRequest contractId is specified</p>;
+  }
+  const latestConfig =
+    effectiveAt && voteRequestResultTableType
+      ? findLatestVoteResult(
+          dayjs(effectiveAt).subtract(1, 'seconds').toISOString(),
+          'CRARC_SetConfig',
+          votesHooks,
+          voteRequestResultTableType
+        )
+      : undefined;
+
+  const amuletConfigToCompareWith: [string, AmuletConfig<USD>] = !latestConfig
+    ? [
+        'initial',
+        voteRequestResultTableType
+          ? amuletAction.value.newConfig
+          : (AmuletConfig(USD).encode(
+              dsoInfosQuery.data.amuletRules.payload.configSchedule.initialValue
+            ) as AmuletConfig<USD>),
+      ]
+    : [
+        latestConfig.request.voteBefore,
+        (
+          (latestConfig.request.action.value as ARC_AmuletRules).amuletRulesAction
+            .value as AmuletRules_SetConfig
+        ).newConfig,
+      ];
+
+  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
+    ? getInflightVoteRequests(
+        amuletAction.tag,
+        voteRequests.data.map(vr => vr.payload)
+      )
+        .map(vr => {
+          const newConfig = (vr.action.value as ARC_AmuletRules).amuletRulesAction
+            ?.value as AmuletRules_SetConfig;
+          return [vr.voteBefore, AmuletConfig(USD).encode(newConfig.newConfig)] as [
+            string,
+            AmuletConfig<USD>
+          ];
+        })
+        .filter(v => !dayjs(v[0]).isSame(dayjs(effectiveAt)))
+    : [];
+
+  return (
+    <ActionValueTable
+      actionType={actionType}
+      actionName={amuletAction.tag}
+      accordionList={{
+        unfoldedAccordions: [
+          {
+            title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
+            content: (
+              <PrettyJsonDiff
+                newConfig={amuletAction.value.newConfig}
+                baseConfig={amuletAction.value.baseConfig}
+                actualConfig={
+                  AmuletConfig(USD).encode(
+                    dsoInfosQuery.data.amuletRules.payload.configSchedule.initialValue
+                  ) as AmuletConfig<USD>
+                }
+              />
+            ),
+          },
+        ],
+        foldedAccordions: inflightVoteRequests.map(vr => ({
+          title: <DateWithDurationDisplay datetime={vr[0]} />,
+          content: <PrettyJsonDiff newConfig={amuletAction.value.newConfig} actualConfig={vr[1]} />,
+        })),
+      }}
+    />
+  );
+};
+
+const SetDsoConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
   dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
   actionType: string;
   dsoAction: { tag: 'SRARC_SetConfig'; value: DsoRules_SetConfig };
-  effectiveAt?: string;
-  tableType?: VoteRequestResultTableType; // tableType is only defined for the Planned, Executed and Rejected tabs
-}> = ({ votesHooks, dsoInfosQuery, actionType, dsoAction, effectiveAt, tableType }) => {
+  effectiveAt?: Date;
+  voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
+}> = ({
+  votesHooks,
+  dsoInfosQuery,
+  actionType,
+  dsoAction,
+  effectiveAt,
+  voteRequestResultTableType,
+}) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
-
   if (voteRequests.isLoading) {
     return <Loading />;
   }
-
   if (voteRequests.isError) {
     return <p>Error, something went wrong.</p>;
   }
-
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  // TODO(#15180): Implement effectivity on all actions
   // we need to subtract 1 second because the effectiveAt differs slightly from the completedAt in DsoRules-based actions
   const latestConfig =
-    effectiveAt && tableType
+    effectiveAt && voteRequestResultTableType
       ? findLatestVoteResult(
           dayjs(effectiveAt).subtract(1, 'seconds').toISOString(),
           'SRARC_SetConfig',
           votesHooks,
-          tableType
+          voteRequestResultTableType
         )
       : undefined;
 
   const dsoConfigToCompareWith: [string, DsoRulesConfig] = !latestConfig
     ? [
         'initial',
-        tableType
+        voteRequestResultTableType
           ? dsoAction.value.newConfig
           : (DsoRulesConfig.encode(dsoInfosQuery.data.dsoRules.payload.config) as DsoRulesConfig),
       ]
@@ -652,7 +766,7 @@ const SetConfigValueTable: React.FC<{
           .newConfig,
       ];
 
-  const inflightVoteRequests: [string, DsoRulesConfig][] = !tableType
+  const inflightVoteRequests: [string, DsoRulesConfig][] = !voteRequestResultTableType
     ? getInflightVoteRequests(
         dsoAction.tag,
         voteRequests.data.map(vr => vr.payload)
@@ -678,15 +792,20 @@ const SetConfigValueTable: React.FC<{
             title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
-                data={dsoAction.value.newConfig}
-                compareWithData={dsoConfigToCompareWith[1]}
+                newConfig={dsoAction.value.newConfig}
+                baseConfig={dsoConfigToCompareWith[1]}
+                actualConfig={
+                  DsoRulesConfig.encode(
+                    dsoInfosQuery.data.dsoRules.payload.config
+                  ) as DsoRulesConfig
+                }
               />
             ),
           },
         ],
         foldedAccordions: inflightVoteRequests.map(vr => ({
           title: <DateWithDurationDisplay datetime={vr[0]} />,
-          content: <PrettyJsonDiff data={dsoAction.value.newConfig} compareWithData={vr[1]} />,
+          content: <PrettyJsonDiff newConfig={dsoAction.value.newConfig} actualConfig={vr[1]} />,
         })),
       }}
     />

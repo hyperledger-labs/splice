@@ -44,7 +44,7 @@ interface VoteModalProps {
   ) => React.ReactNode;
   curSvVote?: SvVote;
   tableType?: VoteRequestResultTableType;
-  effectiveAt?: string;
+  effectiveAt?: Date;
 }
 
 const VoteModalContent: React.FC<VoteModalProps> = ({
@@ -77,7 +77,11 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
       <CardContent sx={{ paddingX: '64px' }}>
         <Stack direction="column" mb={4} spacing={1}>
           <Typography variant="h5">Requested Action</Typography>
-          <ActionView action={actionReq} tableType={tableType} effectiveAt={effectiveAt} />
+          <ActionView
+            action={actionReq}
+            voteRequestResultTableType={tableType}
+            effectiveAt={effectiveAt}
+          />
         </Stack>
         <Stack direction="column" mb={4} spacing={1}>
           <Typography variant="h5">Request Information</Typography>
@@ -122,6 +126,18 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
                     <Link href={reason.url} id="vote-request-modal-reason-url">
                       {reason.url}
                     </Link>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6">Effective At</Typography>
+                  </TableCell>
+                  <TableCell>
+                    {effectiveAt ? (
+                      <DateWithDurationDisplay datetime={effectiveAt} enableDuration />
+                    ) : (
+                      <Typography>threshold</Typography>
+                    )}
                   </TableCell>
                 </TableRow>
                 <TableRow>

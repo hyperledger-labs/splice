@@ -61,8 +61,11 @@ trait AmuletConfigUtil extends TestCommon {
     )
   }
 
-  def setAmuletConfig(configs: Seq[(Option[Duration], AmuletConfig[USD], AmuletConfig[USD])])(
-      implicit env: SpliceTestConsoleEnvironment
+  def setAmuletConfig(
+      configs: Seq[(Option[Duration], AmuletConfig[USD], AmuletConfig[USD])],
+      expiration: Duration = Duration.ofSeconds(60),
+  )(implicit
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     // add new configs
     configs.foreach { case (duration, newConfig, baseConfig) =>
@@ -76,13 +79,19 @@ trait AmuletConfigUtil extends TestCommon {
           )
         ),
         duration,
-        true,
+        accept = true,
+        expiration,
       )
     }
   }
 
-  def votingFlow(action: ActionRequiringConfirmation, duration: Option[Duration], accept: Boolean)(
-      implicit env: SpliceTestConsoleEnvironment
+  def votingFlow(
+      action: ActionRequiringConfirmation,
+      effectivity: Option[Duration],
+      accept: Boolean,
+      expiration: Duration,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val dsoRules = sv1Backend.getDsoInfo().dsoRules
     val sv1Party = sv1Backend.getDsoInfo().svParty
@@ -97,16 +106,10 @@ trait AmuletConfigUtil extends TestCommon {
             action,
             "url",
             description,
-            duration match {
-              case None =>
-                new RelTime(
-                  sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout.microseconds
-                )
-              case Some(duration) => new RelTime(duration.toMillis - 1000L)
-            },
-            duration match {
+            new RelTime(expiration.toMillis),
+            effectivity match {
               case None => None
-              case Some(duration) => Some(env.environment.clock.now.add(duration).toInstant)
+              case Some(effectivity) => Some(env.environment.clock.now.add(effectivity).toInstant)
             },
           )
         },

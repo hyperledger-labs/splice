@@ -32,7 +32,11 @@ import { ContractId } from '@daml/types';
 import { VoteRequestsFilterTable } from './VoteRequestFilterTable';
 import VoteRequestModalContent from './VoteRequestModalContent';
 import { VoteResultModalContent } from './VoteResultModalContent';
-import { VoteRequestResultTableType, VoteResultsFilterTable } from './VoteResultsFilterTable';
+import {
+  VoteRequestResultTableType,
+  VoteRequestResultTableType2,
+  VoteResultsFilterTable,
+} from './VoteResultsFilterTable';
 
 dayjs.extend(utc);
 
@@ -77,6 +81,7 @@ const TabPanel = (props: TabPanelProps) => {
 };
 
 interface ListVoteRequestsProps {
+  supportsVoteEffectivityAndSetConfig: boolean;
   showActionNeeded: boolean;
   voteForm?: (
     voteRequestContractId: ContractId<VoteRequest>,
@@ -88,16 +93,17 @@ export type VoteResultModalState =
   | { open: false }
   | {
       open: true;
-      tableType: VoteRequestResultTableType;
+      tableType: VoteRequestResultTableType | VoteRequestResultTableType2;
       voteResult: DsoRules_CloseVoteRequestResult;
-      effectiveAt: string;
+      effectiveAt: Date;
     };
 
 export type VoteRequestModalState =
   | { open: false }
-  | { open: true; voteRequestContractId: ContractId<VoteRequest>; effectiveAt: string };
+  | { open: true; voteRequestContractId: ContractId<VoteRequest>; effectiveAt: Date };
 
 export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
+  supportsVoteEffectivityAndSetConfig,
   showActionNeeded,
   voteForm,
 }) => {
@@ -205,6 +211,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
             ),
             () => (
               <VoteRequestsFilterTable
+                supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
                 voteRequests={voteRequestsNotVoted}
                 getAction={getAction}
                 openModalWithVoteRequest={openModalWithVoteRequest}
@@ -214,81 +221,99 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
           ],
         ]
       : []
-  ).concat([
-    [
-      () => (
-        <Tab
-          key={'in-progress'}
-          label="In Progress"
-          {...tabProps('in-progress')}
-          id={'tab-panel-in-progress'}
-        />
-      ),
-      () => (
-        <VoteRequestsFilterTable
-          voteRequests={voteRequestsVoted}
-          getAction={getAction}
-          openModalWithVoteRequest={openModalWithVoteRequest}
-          tableBodyId={'sv-voting-in-progress-table-body'}
-        />
-      ),
-    ],
-    [
-      () => (
-        <Tab key={'planned'} label="Planned" {...tabProps('planned')} id={'tab-panel-planned'} />
-      ),
-      () => (
-        <VoteResultsFilterTable
-          getAction={getAction}
-          tableBodyId={'sv-vote-results-planned-table-body'}
-          tableType={'Planned'}
-          openModalWithVoteResult={openModalWithVoteResult}
-          validityColumnName={'Effective At'}
-          accepted
-          effectiveFrom={now}
-        />
-      ),
-    ],
-    [
-      () => (
-        <Tab
-          key={'executed'}
-          label="Executed"
-          {...tabProps('executed')}
-          id={'tab-panel-executed'}
-        />
-      ),
-      () => (
-        <VoteResultsFilterTable
-          getAction={getAction}
-          tableBodyId={'sv-vote-results-executed-table-body'}
-          tableType={'Executed'}
-          openModalWithVoteResult={openModalWithVoteResult}
-          accepted
-        />
-      ),
-    ],
-    [
-      () => (
-        <Tab
-          key={'rejected'}
-          label="Rejected"
-          {...tabProps('rejected')}
-          id={'tab-panel-rejected'}
-        />
-      ),
-      () => (
-        <VoteResultsFilterTable
-          getAction={getAction}
-          tableBodyId={'sv-vote-results-rejected-table-body'}
-          tableType={'Rejected'}
-          openModalWithVoteResult={openModalWithVoteResult}
-          validityColumnName={'Rejected At'}
-          accepted={false}
-        />
-      ),
-    ],
-  ]);
+  )
+    .concat([
+      [
+        () => (
+          <Tab
+            key={'in-progress'}
+            label="In Progress"
+            {...tabProps('in-progress')}
+            id={'tab-panel-in-progress'}
+          />
+        ),
+        () => (
+          <VoteRequestsFilterTable
+            supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
+            voteRequests={voteRequestsVoted}
+            getAction={getAction}
+            openModalWithVoteRequest={openModalWithVoteRequest}
+            tableBodyId={'sv-voting-in-progress-table-body'}
+          />
+        ),
+      ],
+    ])
+    .concat(
+      !supportsVoteEffectivityAndSetConfig
+        ? [
+            [
+              () => (
+                <Tab
+                  key={'planned'}
+                  label="Planned"
+                  {...tabProps('planned')}
+                  id={'tab-panel-planned'}
+                />
+              ),
+              () => (
+                <VoteResultsFilterTable
+                  supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
+                  getAction={getAction}
+                  tableBodyId={'sv-vote-results-planned-table-body'}
+                  tableType={'Planned'}
+                  openModalWithVoteResult={openModalWithVoteResult}
+                  validityColumnName={'Effective At'}
+                  accepted
+                  effectiveFrom={now}
+                />
+              ),
+            ],
+          ]
+        : []
+    )
+    .concat([
+      [
+        () => (
+          <Tab
+            key={'executed'}
+            label="Executed"
+            {...tabProps('executed')}
+            id={'tab-panel-executed'}
+          />
+        ),
+        () => (
+          <VoteResultsFilterTable
+            supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
+            getAction={getAction}
+            tableBodyId={'sv-vote-results-executed-table-body'}
+            tableType={'Executed'}
+            openModalWithVoteResult={openModalWithVoteResult}
+            accepted
+          />
+        ),
+      ],
+      [
+        () => (
+          <Tab
+            key={'rejected'}
+            label="Rejected"
+            {...tabProps('rejected')}
+            id={'tab-panel-rejected'}
+          />
+        ),
+        () => (
+          <VoteResultsFilterTable
+            supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
+            getAction={getAction}
+            tableBodyId={'sv-vote-results-rejected-table-body'}
+            tableType={'Rejected'}
+            openModalWithVoteResult={openModalWithVoteResult}
+            validityColumnName={'Rejected At'}
+            accepted={false}
+          />
+        ),
+      ],
+    ]);
 
   return (
     <Stack>

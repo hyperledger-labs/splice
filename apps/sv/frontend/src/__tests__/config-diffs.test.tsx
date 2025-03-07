@@ -40,8 +40,11 @@ describe('SV user can', () => {
   });
 });
 
-describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () => {
-  const action = 'CRARC_AddFutureAmuletConfigSchedule';
+describe('SV can see AmuletRules config diffs', () => {
+  // Note: here we test each VoteRequest phases using both the deprecated action and the actual action
+  // the underlying components and logic are the same.
+  const deprecatedAction = 'CRARC_AddFutureAmuletConfigSchedule';
+  const action = 'CRARC_SetConfig';
 
   test('while creating a vote request.', async () => {
     const user = userEvent.setup();
@@ -57,32 +60,22 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     expect(dropdown).toBeDefined();
     fireEvent.change(dropdown!, { target: { value: action } });
 
+    const input = screen.getByTestId('transferConfig.createFee.fee-value');
+    await userEvent.type(input, '42');
+
     expect(await screen.findByText('Config diffs')).toBeDefined();
 
-    // current comparison + 1 in-flight vote request
-    checkNumberNumberOfDiffs(2);
+    // current comparison
+    checkNumberNumberOfDiffs(1);
   });
 
   test('in the action needed section.', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Action Needed', action, user);
+    await goToGovernanceTabAndClickOnAction('Action Needed', deprecatedAction, user);
 
     const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '222.2');
-    await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
-
-    // current comparison
-    checkNumberNumberOfDiffs(1);
-  });
-
-  test('in the planned section.', async () => {
-    const user = userEvent.setup();
-    render(<AppWithConfig />);
-
-    await goToGovernanceTabAndClickOnAction('Planned', action, user);
-
-    const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '1.03');
     await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
     // current comparison
@@ -93,7 +86,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Executed', action, user);
+    await goToGovernanceTabAndClickOnAction('Executed', deprecatedAction, user);
 
     //TODO(#14813): when an action is executed, the AmuletConfigSchedule is updated and actualized to now, therefore the diff is empty for the first change
     await screen.findByTestId('stringify-display');
@@ -106,7 +99,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Rejected', action, user);
+    await goToGovernanceTabAndClickOnAction('Rejected', deprecatedAction, user);
 
     await screen.findByTestId('stringify-display');
 
@@ -115,7 +108,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
   });
 });
 
-describe('SV can see config diffs of SRARC_SetConfig', () => {
+describe('SV can see DsoRules config diffs', () => {
   const action = 'SRARC_SetConfig';
 
   test('while creating a vote request.', async () => {
@@ -137,7 +130,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     expect(await screen.findByText('Config diffs')).toBeDefined();
 
-    // current comparison + 1 in-flight vote request
+    // current comparison
     checkNumberNumberOfDiffs(3);
   });
 

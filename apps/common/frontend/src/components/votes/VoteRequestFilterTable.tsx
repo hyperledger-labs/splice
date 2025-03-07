@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { CopyableTypography, DateDisplay } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
+import dayjs from 'dayjs';
 import React from 'react';
 
 import { Chip } from '@mui/material';
@@ -15,6 +16,7 @@ import {
 import { VoteRequestModalState } from './ListVoteRequests';
 
 interface ListVoteRequestsTableProps {
+  supportsVoteEffectivityAndSetConfig: boolean;
   voteRequests: Contract<VoteRequest>[];
   getAction: (action: ActionRequiringConfirmation) => string;
   openModalWithVoteRequest: (voteRequestModalState: VoteRequestModalState) => void;
@@ -22,6 +24,7 @@ interface ListVoteRequestsTableProps {
 }
 
 export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
+  supportsVoteEffectivityAndSetConfig,
   voteRequests,
   getAction,
   openModalWithVoteRequest,
@@ -77,7 +80,25 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
       type: 'date',
       width: 250,
       renderCell: (params: GridRenderCellParams) => {
-        return <DateDisplay datetime={params.value} />;
+        const now = dayjs();
+        return dayjs(params.value).isBefore(now) ? (
+          <>Expired</>
+        ) : (
+          <DateDisplay datetime={params.value} />
+        );
+      },
+    },
+    {
+      field: 'effectiveAt',
+      headerName: 'Effective At',
+      type: 'date',
+      width: 250,
+      renderCell: (params: GridRenderCellParams) => {
+        return typeof params.value === 'object' ? (
+          <DateDisplay datetime={params.value} />
+        ) : (
+          'threshold'
+        );
       },
     },
     {
@@ -97,6 +118,11 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
     action: getAction(request.payload.action),
     requester: request.payload.requester,
     expiresAt: new Date(request.payload.voteBefore),
+    // TODO(#16139): get rid of supportsVoteEffectivityAndSetConfig check
+    effectiveAt:
+      supportsVoteEffectivityAndSetConfig && request.payload?.targetEffectiveAt
+        ? new Date(request.payload.targetEffectiveAt)
+        : undefined,
     createdAt: request.createdAt,
     voteStatus: request.contractId,
     idx: index,
@@ -106,7 +132,7 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
     openModalWithVoteRequest({
       open: true,
       voteRequestContractId: params.row.trackingCid,
-      effectiveAt: params.row.expiresAt.toISOString(),
+      effectiveAt: params.row.expiresAt,
     });
   };
 

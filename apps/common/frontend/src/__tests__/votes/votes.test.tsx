@@ -1,22 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { QueryClient, UseQueryResult, useQuery, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
-import { theme } from 'common-frontend';
+import { QueryClient, QueryClientProvider, useQuery, UseQueryResult } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { DsoInfo, SvVote, theme, VotesHooks, VotesHooksContext } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
-import { dsoInfo, getExpectedAmuletRulesConfigDiffsHTML } from 'common-test-handlers';
-import { checkAmuletRulesExpectedConfigDiffsHTML } from 'common-test-utils';
+import { dsoInfo } from 'common-test-handlers';
 import React from 'react';
-import { test, expect, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { ThemeProvider } from '@mui/material';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
-  VoteRequest,
   DsoRules_CloseVoteRequestResult,
+  VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { ContractId } from '@daml/types';
 
@@ -112,7 +110,10 @@ const TestVotes: React.FC<{ showActionNeeded: boolean }> = ({ showActionNeeded }
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <VotesHooksContext.Provider value={provider}>
-          <ListVoteRequests showActionNeeded={showActionNeeded} />
+          <ListVoteRequests
+            supportsVoteEffectivityAndSetConfig
+            showActionNeeded={showActionNeeded}
+          />
         </VotesHooksContext.Provider>
       </QueryClientProvider>
     </ThemeProvider>
@@ -134,23 +135,6 @@ describe('Votes list should', () => {
   test('NOT Show votes requiring action, when that is disabled', async () => {
     render(<TestVotes showActionNeeded={false} />);
     expect(screen.queryByText('Action Needed')).toBeNull();
-  });
-
-  test('Show votes that are planned', async () => {
-    render(<TestVotes showActionNeeded />);
-
-    const planned = await screen.findByText('Planned');
-    expect(planned).toBeDefined();
-    fireEvent.click(planned);
-
-    const plannedRows = await screen.findAllByText('CRARC_AddFutureAmuletConfigSchedule');
-    expect(plannedRows).toHaveLength(1);
-
-    const action = plannedRows[0]; // Use the first element from the array
-    fireEvent.click(action);
-
-    const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '0.06');
-    await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
   });
 
   test('Show votes that are executed', async () => {

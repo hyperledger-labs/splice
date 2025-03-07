@@ -2,12 +2,12 @@
 export function getAmuletConfig(createFee: string) {
   return {
     packageConfig: {
-      amuletNameService: '0.1.5',
-      walletPayments: '0.1.5',
-      dsoGovernance: '0.1.8',
-      validatorLifecycle: '0.1.1',
-      amulet: '0.1.5',
-      wallet: '0.1.5',
+      amuletNameService: '0.1.8',
+      walletPayments: '0.1.8',
+      dsoGovernance: '0.1.11',
+      validatorLifecycle: '0.1.2',
+      amulet: '0.1.8',
+      wallet: '0.1.8',
     },
     tickDuration: {
       microseconds: '600000000',
@@ -253,12 +253,12 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
     '    }\n' +
     '  ]\n' +
     '}</pre></div></li><li data-key="packageConfig" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">packageConfig</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "amulet": "0.1.5",\n' +
-    '  "amuletNameService": "0.1.5",\n' +
-    '  "dsoGovernance": "0.1.8",\n' +
-    '  "validatorLifecycle": "0.1.1",\n' +
-    '  "wallet": "0.1.5",\n' +
-    '  "walletPayments": "0.1.5"\n' +
+    '  "amulet": "0.1.8",\n' +
+    '  "amuletNameService": "0.1.8",\n' +
+    '  "dsoGovernance": "0.1.11",\n' +
+    '  "validatorLifecycle": "0.1.2",\n' +
+    '  "wallet": "0.1.8",\n' +
+    '  "walletPayments": "0.1.8"\n' +
     '}</pre></div></li><li data-key="tickDuration" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">tickDuration</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "microseconds": "600000000"\n' +
     `}</pre></div></li><li data-key="transferConfig" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">transferConfig</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="createFee" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">createFee</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="fee" class="jsondiffpatch-modified"><div class="jsondiffpatch-property-name">fee</div><div class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalCreateFee}"</pre></div><div class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementCreateFee}"</pre></div></li></ul><li data-key="extraFeaturedAppRewardAmount" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">extraFeaturedAppRewardAmount</div><div class="jsondiffpatch-value"><pre>"1.0"</pre></div></li><li data-key="holdingFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">holdingFee</div><div class="jsondiffpatch-value"><pre>{\n` +

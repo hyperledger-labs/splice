@@ -80,7 +80,8 @@ class SplitwellApp(
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  override def packages: Seq[DarResource] = super.packages ++ DarResources.splitwell.all
+  override def packagesForJsonDecoding: Seq[DarResource] =
+    super.packagesForJsonDecoding ++ DarResources.splitwell.all
 
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
