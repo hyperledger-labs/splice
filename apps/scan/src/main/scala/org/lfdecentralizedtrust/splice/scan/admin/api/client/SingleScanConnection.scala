@@ -54,6 +54,7 @@ import org.apache.pekko.stream.Materializer
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the DSO party id.
@@ -121,6 +122,15 @@ class SingleScanConnection private[client] (
       HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
     )
   }
+
+  override def listVoteRequests()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListDsoRulesVoteRequests(),
+    )
 
   override def getExternalPartyAmuletRules()(implicit
       ec: ExecutionContext,
@@ -489,20 +499,6 @@ class SingleScanConnection private[client] (
         domainId,
         before,
         atOrAfter,
-        count,
-      ),
-    )
-
-  override def getImportUpdates(
-      migrationId: Long,
-      afterUpdateId: String,
-      count: Int,
-  )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.GetImportUpdates(
-        migrationId,
-        afterUpdateId,
         count,
       ),
     )

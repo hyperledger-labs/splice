@@ -235,7 +235,7 @@ object SpliceUtil {
   private val dummyReadVsWriteScalingFactor = 4
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
-
+  // TODO(#16139) get rid of this method
   def defaultAmuletConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,

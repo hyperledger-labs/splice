@@ -22,7 +22,11 @@ import java.time.{LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
+
+import java.nio.file.Path
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -33,10 +37,46 @@ class SvFrontendIntegrationTest
     with VotesFrontendTestUtil
     with ValidatorLicensesFrontendTestUtil {
 
+  // TODO(#16139): change tests to work with current version
+  private val initialPackageConfig = InitialPackageConfig(
+    amuletVersion = "0.1.7",
+    amuletNameServiceVersion = "0.1.7",
+    dsoGovernanceVersion = "0.1.10",
+    validatorLifecycleVersion = "0.1.1",
+    walletVersion = "0.1.7",
+    walletPaymentsVersion = "0.1.7",
+  )
+
+  private val splitwellDarPath = "daml/dars/splitwell-0.1.7.dar"
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(initialPackageConfig = initialPackageConfig)
+        )(config)
+      )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
+          if (name == "splitwellValidator")
+            validatorConfig.copy(
+              appInstances = validatorConfig.appInstances.updated(
+                "splitwell",
+                validatorConfig
+                  .appInstances("splitwell")
+                  .copy(
+                    dars = validatorConfig.appInstances("splitwell").dars ++ Seq(
+                      Path.of(splitwellDarPath)
+                    )
+                  ),
+              )
+            )
+          else
+            validatorConfig
+        )(conf)
+      )
 
   "SV UIs" should {
     "have basic login functionality" in { implicit env =>

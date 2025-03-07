@@ -654,7 +654,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 .plus(12, ChronoUnit.SECONDS)
               scheduleDomainMigration(
                 sv1Backend,
-                Seq(sv2Backend, sv3Backend, sv4Backend),
+                Seq(sv2Backend, sv3Backend),
                 Some(new SynchronizerUpgradeSchedule(scheduledTime, 1L)),
               )
             },
@@ -1000,6 +1000,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 "url",
                 "description",
                 sv1LocalBackend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                None,
               ),
             )(
               "VoteRequest and Vote should be there",
@@ -1024,7 +1025,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
               val backfilledUpdates =
                 sv1ScanLocalBackend.appState.store.updateHistory
-                  .getAllUpdates(None, PageLimit.tryCreate(1000))
+                  .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
                   .futureValue
               backfilledUpdates.collect {
                 case TreeUpdateWithMigrationId(tree, migrationId)

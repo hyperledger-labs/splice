@@ -218,7 +218,7 @@ spec:
         {{- end }}
         name: scan-web-ui
         ports:
-        - containerPort: 8080
+        - containerPort: 80
           name: scan-ui
           protocol: TCP
         resources:
@@ -253,8 +253,7 @@ spec:
     app: {{ $scanWebUiAppLabel }}
   ports:
   - name: scan-ui
-    targetPort: scan-ui
-    port: {{ .Values.service.ui.port }}
+    port: 80
     protocol: TCP
 ---
 {{- if .Values.enablePostgresMetrics }}

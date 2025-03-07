@@ -520,12 +520,6 @@ paths:
         Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
         Unlike /v0/updates, this endpoint returns responses that are consistent across different
         scan instances. Event ids returned by this endpoint are not comparable to event ids returned by /v0/updates.
-
-        Updates are ordered lexicographically by `(migration id, record time)`.
-        For a given migration id, each update has a unique record time.
-        The record time ranges of different migrations may overlap, i.e.,
-        it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
-        and there may be two updates with the same record time but different migration ids.
       requestBody:
         required: true
         content:
@@ -1216,27 +1210,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetUpdatesBeforeResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-
-  /v0/backfilling/import-updates:
-    post:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "getImportUpdates"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/GetImportUpdatesRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetImportUpdatesResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
@@ -2933,18 +2906,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RecordTimeRange"
-        last_import_update_id:
-          description: |
-            The update id of the last import update (where import updates are sorted by update id, ascending)
-            for the given migration id, if any
-          type: string
         complete:
           description: |
-            True if this scan has all non-import updates for given migration id
-          type: boolean
-        import_updates_complete:
-          description: |
-            True if this scan has all import updates for the given migration id
+            True if this scan has all updates for given migration id
           type: boolean
 
     RecordTimeRange:
@@ -2993,36 +2957,6 @@ components:
           format: int32
 
     GetUpdatesBeforeResponse:
-      type: object
-      required:
-        - transactions
-      properties:
-        transactions:
-          type: array
-          items:
-            $ref: "#/components/schemas/UpdateHistoryItem"
-
-    GetImportUpdatesRequest:
-      type: object
-      required:
-        - migration_id
-        - after_update_id
-        - limit
-      properties:
-        migration_id:
-          type: integer
-          format: int64
-        after_update_id:
-          description: |
-            Only return updates with an update id strictly greater than this.
-          type: string
-        limit:
-          description: |
-            Return at most this many updates. The actual number of updates returned may be smaller.
-          type: integer
-          format: int32
-
-    GetImportUpdatesResponse:
       type: object
       required:
         - transactions

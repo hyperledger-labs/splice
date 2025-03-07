@@ -4,6 +4,7 @@ import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder'
 import { useMutation } from '@tanstack/react-query';
 import {
   ActionView,
+  ConfirmationDialog,
   DateWithDurationDisplay,
   DisableConditionally,
   SvClientProvider,
@@ -358,15 +359,6 @@ export const CreateVoteRequest: React.FC = () => {
                   ) as ActionRequiringConfirmation
                 }
                 effectiveAt={expiresAt}
-                expirationInDays={expirationInDays}
-                confirmationDialogProps={{
-                  showDialog: confirmDialogOpen,
-                  onAccept: handleConfirmationAccept,
-                  onClose: () => setConfirmDialogOpen(false),
-                  title: 'Confirm Your Vote Request',
-                  attributePrefix: 'vote',
-                  children: null,
-                }}
               />
             </Stack>
           )}
@@ -402,6 +394,23 @@ export const CreateVoteRequest: React.FC = () => {
           </Stack>
         </CardContent>
       </Card>
+      <ConfirmationDialog
+        showDialog={confirmDialogOpen}
+        onAccept={handleConfirmationAccept}
+        onClose={() => setConfirmDialogOpen(false)}
+        title="Confirm Your Vote Request"
+        attributePrefix="vote"
+      >
+        <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
+        <br />
+        Please note:
+        <ul>
+          <li>This action cannot be undone.</li>
+          <li>You will not be able to edit this request afterwards.</li>
+          <li>You may only edit your vote after creation.</li>
+          <li>The vote request will expire in {expirationInDays} days.</li>
+        </ul>
+      </ConfirmationDialog>
     </Stack>
   );
 };

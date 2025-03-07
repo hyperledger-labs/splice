@@ -51,9 +51,6 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
                 // Wait for traffic topup trigger to do its thing
                 tap()
                 fail("Tapping again due to Traffic balance below reserved traffic amount error")
-              case Some(errDetails) if errDetails.contains("NOT_CONNECTED_TO_DOMAIN") =>
-                tap()
-                fail(s"Tapping again due to a participant not connected to domain error")
               case errDetails => errDetails
             },
           )

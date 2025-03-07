@@ -84,9 +84,6 @@ extraBeneficiaries:
 # If you do not wish to share this, set it to an empty string.
 contactPoint: "YOUR_CONTACT_POINT"
 
-# Uncomment and set your preferred amulet price
-# initialAmuletPrice: 0.005
-
 spliceInstanceNames:
   networkName: # Please provide a value as provided in the docs
   networkFaviconUrl: # Please provide a value as provided in the docs

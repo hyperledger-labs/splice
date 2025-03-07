@@ -53,7 +53,3 @@ spliceInstanceNames:
 
 # set the poll interval used by the UI in milliseconds (optional)
 # uiPollInterval:
-
-service:
-  ui:
-    port: 80

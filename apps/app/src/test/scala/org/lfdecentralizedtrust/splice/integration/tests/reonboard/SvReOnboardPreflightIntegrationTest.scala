@@ -5,8 +5,8 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.{
+  SvUiIntegrationTestUtil,
   PreflightIntegrationTestUtil,
-  SvUiPreflightIntegrationTestUtil,
 }
 import org.lfdecentralizedtrust.splice.sv.util.AnsUtil
 import org.lfdecentralizedtrust.splice.util.{
@@ -18,11 +18,9 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.time.{Minute, Span}
 
-import scala.concurrent.duration.DurationInt
-
 class SvReOnboardPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("validator", "sv")
-    with SvUiPreflightIntegrationTestUtil
+    with SvUiIntegrationTestUtil
     with SvFrontendTestUtil
     with PreflightIntegrationTestUtil
     with FrontendLoginUtil
@@ -125,7 +123,7 @@ class SvReOnboardPreflightIntegrationTest
         }
       }
 
-      actAndCheck(timeUntilSuccess = 30.seconds)(
+      actAndCheck(
         "Accept transfer offer", {
           click on acceptButton
           click on "navlink-transactions"

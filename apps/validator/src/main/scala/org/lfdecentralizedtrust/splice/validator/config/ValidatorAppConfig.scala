@@ -145,12 +145,12 @@ case class ValidatorAppBackendConfig(
     // The hint to be used for the validator operator's party ID
     // Must be None for SV validators, Some(hint) for non-SV validators
     validatorPartyHint: Option[String],
-    // Separate user names for the validator operator to be used as users in the
+    // An optional separate user name for the validator operator to be used as its user in the
     // wallet. May be useful if the IAM provider does not allow tokens that are used both by
     // machine-to-machine services and login users - in that case, set ledgerApiUser to the m2m
-    // one, and validatorWalletUsers to include the login one. If not provided, the ledgerApiUser is onboarded
+    // one, and validatorWalletUser to the login one. If not provided, the ledgerApiUser is onboarded
     // to the wallet automatically.
-    validatorWalletUsers: Seq[String],
+    validatorWalletUser: Option[String],
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],
     participantClient: ParticipantClientConfig,

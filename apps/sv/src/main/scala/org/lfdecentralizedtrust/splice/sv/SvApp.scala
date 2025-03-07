@@ -96,6 +96,8 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
+import java.time.Instant
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -990,6 +992,7 @@ object SvApp {
       reasonUrl: String,
       reasonDescription: String,
       expiration: Json,
+      effectiveTime: Optional[Instant],
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
   )(implicit
       ec: ExecutionContext,
@@ -1024,6 +1027,7 @@ object SvApp {
               decodedAction,
               reason,
               java.util.Optional.of(decodedExpiration),
+              effectiveTime,
             )
             cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
             _ <- dsoStoreWithIngestion.connection

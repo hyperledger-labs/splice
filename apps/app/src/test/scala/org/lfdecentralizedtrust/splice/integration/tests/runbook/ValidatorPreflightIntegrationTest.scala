@@ -182,8 +182,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           }
         }
 
-        // In preflights we have a higher chance of domain reconnects so we have to account for those
-        actAndCheck(2.minutes)(
+        actAndCheck(
           "Accept transfer offer", {
             click on acceptButton
             click on "navlink-transactions"

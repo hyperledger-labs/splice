@@ -96,3 +96,21 @@ instance HasCheckedFetch MemberTraffic ForDso where
 
 instance HasCheckedFetch MemberTraffic ForMemberTraffic where
     contractGroupId MemberTraffic{..} = ForMemberTraffic with ..
+
+instance Patchable BaseRateTrafficLimits where
+  patch new base current = BaseRateTrafficLimits with
+    burstAmount = patch new.burstAmount base.burstAmount current.burstAmount
+    burstWindow = patch new.burstWindow base.burstWindow current.burstWindow
+
+instance Patchable SynchronizerFeesConfig where
+  patch new base current = SynchronizerFeesConfig with
+    baseRateTrafficLimits = patch new.baseRateTrafficLimits base.baseRateTrafficLimits current.baseRateTrafficLimits
+    extraTrafficPrice = patch new.extraTrafficPrice base.extraTrafficPrice current.extraTrafficPrice
+    readVsWriteScalingFactor = patch new.readVsWriteScalingFactor base.readVsWriteScalingFactor current.readVsWriteScalingFactor
+    minTopupAmount = patch new.minTopupAmount base.minTopupAmount current.minTopupAmount
+
+instance Patchable AmuletDecentralizedSynchronizerConfig where
+  patch new base current = AmuletDecentralizedSynchronizerConfig with
+    requiredSynchronizers = patch new.requiredSynchronizers base.requiredSynchronizers current.requiredSynchronizers
+    activeSynchronizer = patch new.activeSynchronizer base.activeSynchronizer current.activeSynchronizer
+    fees = patch new.fees base.fees current.fees

@@ -15,6 +15,7 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
+import java.time.Duration
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.GrpcError
@@ -137,6 +138,11 @@ object SpliceTests extends LazyLogging {
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
     protected lazy val resetRequiredTopologyState: Boolean = true
+
+    /** Note that `durationUntilOffboardingEffectivity` is set to 20 seconds to allow quick offboarding in our tests.
+      *        The default duration that should be used in our offboarding process is 3 hours.
+      */
+    protected val durationUntilOffboardingEffectivity = Duration.ofSeconds(20)
 
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty

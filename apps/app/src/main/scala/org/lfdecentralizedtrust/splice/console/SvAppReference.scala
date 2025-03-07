@@ -171,6 +171,7 @@ abstract class SvAppReference(
       reasonUrl: String,
       reasonDescription: String,
       expiration: RelTime,
+      effectiveTime: Option[Instant],
   )(implicit tc: TraceContext): Unit = {
     consoleEnvironment.run {
       httpCommand(
@@ -180,6 +181,7 @@ abstract class SvAppReference(
           reasonUrl,
           reasonDescription,
           expiration,
+          effectiveTime,
         )
       )
     }

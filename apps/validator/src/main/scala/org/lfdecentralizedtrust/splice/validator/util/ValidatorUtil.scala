@@ -230,7 +230,7 @@ private[validator] object ValidatorUtil {
       endUserName: String,
       storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
-      validatorWalletUserNames: Seq[String],
+      validatorWalletUserName: Option[String],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
@@ -250,7 +250,7 @@ private[validator] object ValidatorUtil {
           _ <-
             if (
               endUserName == validatorUserName ||
-              validatorWalletUserNames.contains(endUserName)
+              validatorWalletUserName.contains(endUserName)
             ) {
               val msg = s"Tried to offboard the validator's user: $endUserName"
               logger.warn(msg)

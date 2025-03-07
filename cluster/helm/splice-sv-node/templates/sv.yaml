@@ -70,10 +70,6 @@ spec:
               {{- if eq .Values.onboardingType "found-dso" }}
             - name: SPLICE_APP_SV_IS_DEV_NET
               value: {{ .Values.isDevNet | quote }}
-                {{- if .Values.initialAmuletPrice }}
-            - name: SPLICE_APP_SV_INITIAL_AMULET_PRICE
-              value: {{ .Values.initialAmuletPrice | quote }}
-                {{- end }}
               {{- end }}
               {{ if .Values.onboardingType }}
             - name: SPLICE_APP_SV_ONBOARDING_TYPE
@@ -99,10 +95,6 @@ spec:
             {{- if .Values.initialHoldingFee }}
             - name: SPLICE_APP_SV_INITIAL_HOLDING_FEE
               value: {{ .Values.initialHoldingFee | quote }}
-            {{- end }}
-            {{- if .Values.initialAmuletPrice }}
-            - name: SPLICE_APP_SV_INITIAL_AMULET_PRICE_VOTE
-              value: {{ .Values.initialAmuletPrice | quote }}
             {{- end }}
             - name: SPLICE_APP_SV_AUTH_AUDIENCE
               value: {{ .Values.auth.audience | quote }}

@@ -262,6 +262,7 @@ class AppUpgradeIntegrationTest
                     "url",
                     "description",
                     sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                    None,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -325,6 +326,7 @@ class AppUpgradeIntegrationTest
                     "url",
                     "description",
                     sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                    None,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)

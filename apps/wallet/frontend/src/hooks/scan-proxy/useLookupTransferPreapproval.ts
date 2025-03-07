@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend-utils';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { ApiException } from 'scan-proxy-openapi';
 
 import { TransferPreapproval } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/module';
@@ -14,6 +14,7 @@ const useLookupTransferPreapproval = (
   const scanClient = useValidatorScanProxyClient();
 
   return useQuery<Contract<TransferPreapproval> | null>({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['scan-api', 'lookupTransferPreapproval', party, TransferPreapproval],
     queryFn: async () => {
       try {

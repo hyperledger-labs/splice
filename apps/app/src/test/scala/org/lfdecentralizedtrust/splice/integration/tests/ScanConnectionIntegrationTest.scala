@@ -1,19 +1,21 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.util.{ConfigScheduleUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, WalletTestUtil}
 import org.slf4j.event.Level
+
+import scala.concurrent.duration.DurationInt
 
 class ScanConnectionIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil
+    with AmuletConfigUtil
     with WalletTestUtil {
 
   override def environmentDefinition
@@ -27,22 +29,26 @@ class ScanConnectionIntegrationTest
     val (_, _) = onboardAliceAndBob()
     // tap once so the AmuletRules are cached...
     aliceWalletClient.tap(5)
-    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
-    clue("schedule a config change, so the amuletrules change, invalidating the cache.") {
-      val configSchedule =
-        createConfigSchedule(
-          currentConfigSchedule,
-          (
-            defaultTickDuration.asJava,
-            mkUpdatedAmuletConfig(
-              currentConfigSchedule,
-              tickDuration = defaultTickDuration,
-              maxNumInputs = 101,
-            ),
-          ),
+    val baseConfig = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule.initialValue
+    clue("change the amulet config to invalidate the cache.") {
+      val newConfig =
+        mkUpdatedAmuletConfig(
+          sv1ScanBackend.getAmuletRules().contract,
+          tickDuration = defaultTickDuration,
+          maxNumInputs = 101,
         )
 
-      setFutureConfigSchedule(configSchedule)
+      setAmuletConfig(Seq((Some(durationUntilOffboardingEffectivity), newConfig, baseConfig)))
+    }
+    eventually(40.seconds) {
+      sv1ScanBackend
+        .getAmuletRules()
+        .contract
+        .payload
+        .configSchedule
+        .initialValue
+        .transferConfig
+        .maxNumInputs shouldBe 101
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(

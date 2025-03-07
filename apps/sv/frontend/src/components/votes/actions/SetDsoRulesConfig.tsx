@@ -89,7 +89,7 @@ const SetDsoRulesConfig: React.FC<{
           value: {
             dsoAction: {
               tag: 'SRARC_SetConfig',
-              value: { newConfig: decoded.result },
+              value: { newConfig: decoded.result, baseConfig: null },
             },
           },
         });
@@ -123,7 +123,7 @@ const SetDsoRulesConfig: React.FC<{
               data-testid="enable-next-scheduled-domain-upgrade"
             />
           }
-          label="Set next scheduled synchronizer upgrade"
+          label="Set next scheduled domain upgrade"
         />
       </FormControl>
     </Stack>

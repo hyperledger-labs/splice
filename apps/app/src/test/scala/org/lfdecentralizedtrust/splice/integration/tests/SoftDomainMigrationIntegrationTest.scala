@@ -1,8 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
@@ -11,7 +11,7 @@ import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.{BaseTest, DomainAlias, SequencerAlias}
 import org.lfdecentralizedtrust.splice.automation.{AmuletConfigReassignmentTrigger, AssignTrigger}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.AmuletConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.AmuletDecentralizedSynchronizerConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   DsoDecentralizedSynchronizerConfig,
@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRulesConfig,
@@ -51,19 +51,12 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }
-import org.lfdecentralizedtrust.splice.util.{
-  Codec,
-  ConfigScheduleUtil,
-  SplitwellTestUtil,
-  SynchronizerFeesTestUtil,
-  TriggerTestUtil,
-  UpdateHistoryTestUtil,
-  WalletTestUtil,
-}
+import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
 import org.scalatest.time.{Minute, Span}
 
 import java.time.temporal.ChronoUnit
+import java.util.Optional
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -71,7 +64,6 @@ import scala.jdk.OptionConverters.*
 
 class SoftDomainMigrationIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil
     with SplitwellTestUtil
     with TriggerTestUtil
     with WalletTestUtil
@@ -280,18 +272,17 @@ class SoftDomainMigrationIntegrationTest
         sv1Backend.createVoteRequest(
           sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
           new ARC_AmuletRules(
-            new CRARC_AddFutureAmuletConfigSchedule(
-              new AmuletRules_AddFutureAmuletConfigSchedule(
-                new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-                  scheduledTime,
-                  newAmuletConfig,
-                )
+            new CRARC_SetConfig(
+              new AmuletRules_SetConfig(
+                newAmuletConfig,
+                amuletConfig,
               )
             )
           ),
           "url",
           "description",
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+          None,
         )
       },
     )("amulet config vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -316,10 +307,6 @@ class SoftDomainMigrationIntegrationTest
     //     )
     //   }
     // }
-
-    eventually() {
-      sv1ScanBackend.getAmuletRules().payload.configSchedule.futureValues should not be empty
-    }
 
     val dsoRules = sv1Backend.getDsoInfo().dsoRules
 
@@ -370,13 +357,15 @@ class SoftDomainMigrationIntegrationTest
                         newDomainId.toProtoPrimitive,
                       ),
                       dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
-                    )
+                    ),
+                    Optional.empty(),
                   )
                 )
               ),
               "url",
               "description",
               sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
             )
           },
         )(

@@ -4,22 +4,24 @@
 package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import cats.implicits.catsSyntaxApplicativeId
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
+import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.tracing.TraceContext
+import io.circe.syntax.EncoderOps
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.{
-  MediatorAdminConnection,
-  ParticipantAdminConnection,
-  RetryProvider,
-  SequencerAdminConnection,
-  SpliceStatus,
-}
-import org.lfdecentralizedtrust.splice.http.{HttpValidatorLicensesHandler, HttpVotesHandler}
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_admin as v0}
+import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_admin as v0}
+import org.lfdecentralizedtrust.splice.http.{HttpValidatorLicensesHandler, HttpVotesHandler}
 import org.lfdecentralizedtrust.splice.store.{AppStore, AppStoreWithIngestion, VotesStore}
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.migration.{
@@ -30,19 +32,12 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, TemplateJsonDecoder}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.TraceContext
-import io.circe.syntax.EncoderOps
-import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.Path
 import java.time.Instant
+import java.util.Optional
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 
@@ -253,6 +248,10 @@ class HttpSvAdminHandler(
           body.url,
           body.description,
           body.expiration,
+          body.effectiveTime match {
+            case Some(effectiveTime) => Optional.of(effectiveTime.toInstant)
+            case None => Optional.empty()
+          },
           dsoStoreWithIngestion,
         )
         .flatMap {

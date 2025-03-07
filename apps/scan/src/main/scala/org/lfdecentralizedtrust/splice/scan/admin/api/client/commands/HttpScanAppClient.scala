@@ -52,6 +52,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
 
 import java.util.Base64
 import java.time.Instant
@@ -98,6 +99,26 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.GetDsoPartyIdResponse.OK(response) =>
       Codec.decode(Codec.Party)(response.dsoPartyId)
+    }
+  }
+
+  case class ListDsoRulesVoteRequests()
+      extends InternalBaseCommand[http.ListDsoRulesVoteRequestsResponse, Seq[
+        Contract[VoteRequest.ContractId, VoteRequest]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListDsoRulesVoteRequestsResponse] =
+      client.listDsoRulesVoteRequests(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListDsoRulesVoteRequestsResponse.OK(response) =>
+      response.dsoRulesVoteRequests
+        .traverse(c => Contract.fromHttp(VoteRequest.COMPANION)(c))
+        .leftMap(_.toString)
     }
   }
 
@@ -1265,10 +1286,7 @@ object HttpScanAppClient {
           SourceMigrationInfo(
             previousMigrationId = response.previousMigrationId,
             recordTimeRange = recordTimeRange,
-            lastImportUpdateId = response.lastImportUpdateId,
             complete = response.complete,
-            // This field was introduced in a later version of the API, consider all old remotes as not complete
-            importUpdatesComplete = response.importUpdatesComplete.getOrElse(false),
           )
         )
       case http.GetMigrationInfoResponse.NotFound(_) =>
@@ -1308,42 +1326,6 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetUpdatesBeforeResponse.OK(response) =>
-        Right(
-          response.transactions.map(http =>
-            ProtobufJsonScanHttpEncodings.httpToLapiUpdate(http).update
-          )
-        )
-    }
-  }
-
-  case class GetImportUpdates(
-      migrationId: Long,
-      afterUpdateId: String,
-      limit: Int,
-  ) extends InternalBaseCommand[
-        http.GetImportUpdatesResponse,
-        Seq[LedgerClient.GetTreeUpdatesResponse],
-      ] {
-    override def submitRequest(
-        client: http.ScanClient,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], http.GetImportUpdatesResponse] = {
-      client.getImportUpdates(
-        definitions
-          .GetImportUpdatesRequest(
-            migrationId,
-            afterUpdateId,
-            limit,
-          ),
-        headers,
-      )
-    }
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetImportUpdatesResponse.OK(response) =>
         Right(
           response.transactions.map(http =>
             ProtobufJsonScanHttpEncodings.httpToLapiUpdate(http).update

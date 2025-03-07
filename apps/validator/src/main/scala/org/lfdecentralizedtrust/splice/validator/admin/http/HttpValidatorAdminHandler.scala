@@ -66,7 +66,7 @@ class HttpValidatorAdminHandler(
     storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
     identitiesStore: NodeIdentitiesStore,
     validatorUserName: String,
-    validatorWalletUserNames: Seq[String],
+    validatorWalletUserName: Option[String],
     walletManagerOpt: Option[UserWalletManager],
     getAmuletRulesDomain: GetAmuletRulesDomain,
     scanConnection: ScanConnection,
@@ -245,7 +245,7 @@ class HttpValidatorAdminHandler(
       user,
       storeWithIngestion,
       validatorUserName,
-      validatorWalletUserNames,
+      validatorWalletUserName,
       retryProvider,
       logger,
     )

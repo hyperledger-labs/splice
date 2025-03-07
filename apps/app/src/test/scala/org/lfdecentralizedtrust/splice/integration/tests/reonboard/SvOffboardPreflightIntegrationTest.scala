@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.{
-  SvUiPreflightIntegrationTestUtil,
+  SvUiIntegrationTestUtil,
   PreflightIntegrationTestUtil,
 }
 import org.lfdecentralizedtrust.splice.util.{
@@ -28,7 +28,7 @@ import scala.jdk.CollectionConverters.*
 
 class SvOffboardPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2", "sv3", "sv4", "sv")
-    with SvUiPreflightIntegrationTestUtil
+    with SvUiIntegrationTestUtil
     with SvFrontendTestUtil
     with PreflightIntegrationTestUtil
     with FrontendLoginUtil

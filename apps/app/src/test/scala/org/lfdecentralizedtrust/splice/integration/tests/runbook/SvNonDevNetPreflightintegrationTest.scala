@@ -12,7 +12,7 @@ import scala.util.Try
 
 abstract class SvNonDevNetPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
-    with SvUiPreflightIntegrationTestUtil
+    with SvUiIntegrationTestUtil
     with DataExportTestUtil
     with FrontendLoginUtil {
 
