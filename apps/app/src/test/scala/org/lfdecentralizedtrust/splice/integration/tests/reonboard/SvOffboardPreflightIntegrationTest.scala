@@ -77,7 +77,7 @@ class SvOffboardPreflightIntegrationTest
   "SV runbook is offboarded" in { implicit env =>
     import env.executionContext
 
-    val requestReasonUrl = "This is a request reason url."
+    val requestReasonUrl = "https://vote-request-url.com"
     val requestReasonBody = "This is a request reason."
 
     val sv1 = env.svs.remote.find(sv => sv.name == s"sv1").value
