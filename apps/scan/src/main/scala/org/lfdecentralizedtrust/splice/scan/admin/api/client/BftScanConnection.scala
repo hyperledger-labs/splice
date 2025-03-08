@@ -250,10 +250,6 @@ class BftScanConnection(
           val completeResponses = responses.withData.filter { case (_, migrationInfo) =>
             migrationInfo.complete
           }
-          val importUpdatesCompleteResponses = responses.withData.filter {
-            case (_, migrationInfo) =>
-              migrationInfo.importUpdatesComplete
-          }
           for {
             // We already have the responses, use bftCall() to avoid re-implementing the consensus logic.
             // All non-malicious scans that have backfilled the input migrationId should return
@@ -261,15 +257,6 @@ class BftScanConnection(
             previousMigrationId <- bftCall(
               connection => Future.successful(completeResponses(connection).previousMigrationId),
               BftCallConfig.forAvailableData(connections, completeResponses.contains),
-              // This method is very sensitive to unavailable SVs.
-              // Do not log warnings for failures to reach consensus, as this would be too noisy,
-              // and instead rely on metrics to situations when backfilling is not progressing.
-              Level.INFO,
-            )
-            lastImportUpdateId <- bftCall(
-              connection =>
-                Future.successful(importUpdatesCompleteResponses(connection).lastImportUpdateId),
-              BftCallConfig.forAvailableData(connections, importUpdatesCompleteResponses.contains),
               // This method is very sensitive to unavailable SVs.
               // Do not log warnings for failures to reach consensus, as this would be too noisy,
               // and instead rely on metrics to situations when backfilling is not progressing.
@@ -283,9 +270,7 @@ class BftScanConnection(
               SourceMigrationInfo(
                 previousMigrationId = previousMigrationId,
                 recordTimeRange = unionOfRecordTimeRanges,
-                lastImportUpdateId = lastImportUpdateId,
                 complete = completeResponses.nonEmpty,
-                importUpdatesComplete = importUpdatesCompleteResponses.nonEmpty,
               )
             )
           }
@@ -324,40 +309,6 @@ class BftScanConnection(
       tc: TraceContext,
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
     bftCall(_.lookupTransferPreapprovalByParty(receiver))
-
-  override def getImportUpdates(
-      migrationId: Long,
-      afterUpdateId: String,
-      count: Int,
-  )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
-    val connections = scanList.scanConnections
-    for {
-      // Ask ALL scans for the migration info so that we can figure out who has the data
-      responses <- getMigrationInfoResponses(connections, migrationId)
-      // Filter out connections that don't have any data
-      withData = responses.withData.toList.filter { case (_, info) =>
-        info.importUpdatesComplete
-      }
-      connectionsWithData = withData.map(_._1)
-      // Make a BFT call to connections that have the data
-      result <- bftCall(
-        connection => connection.getImportUpdates(migrationId, afterUpdateId, count),
-        BftCallConfig.forAvailableData(connections, connectionsWithData.contains),
-        // This method is very sensitive to unavailable SVs.
-        // Do not log warnings for failures to reach consensus, as this would be too noisy,
-        // and instead rely on metrics to situations when backfilling is not progressing.
-        Level.INFO,
-        // This call returns up to 100 full daml transaction trees. It's not feasible to log them all,
-        // so we only print their update ids. This is enough to investigate consensus failures if different
-        // scans return different updates. In the more unlikely case where scans disagree on the payload of
-        // a given update, we would need to fetch the update payload from the update history database.
-        shortenResponsesForLog =
-          (responses: Seq[LedgerClient.GetTreeUpdatesResponse]) => responses.map(_.update.updateId),
-      )
-    } yield {
-      result
-    }
-  }
 
   override def getUpdatesBefore(
       migrationId: Long,

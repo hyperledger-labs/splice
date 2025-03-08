@@ -89,3 +89,17 @@ export function isExpirationBeforeEffectiveDate(
     };
   }
 }
+
+export function isValidUrl(url: string): boolean {
+  let validUrl: URL;
+  try {
+    validUrl = new URL(url);
+  } catch (error) {
+    return false;
+  }
+  return ['http:', 'https:'].some(protocol => validUrl.protocol === protocol);
+}
+
+export function isValidVoteRequestUrl(url: string): boolean {
+  return url === '' || isValidUrl(url);
+}
