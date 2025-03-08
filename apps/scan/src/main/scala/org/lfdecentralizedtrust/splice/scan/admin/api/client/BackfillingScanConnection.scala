@@ -25,10 +25,4 @@ trait BackfillingScanConnection extends FlagCloseableAsync {
       atOrAfter: Option[CantonTimestamp],
       count: Int,
   )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]]
-
-  def getImportUpdates(
-      migrationId: Long,
-      afterUpdateId: String,
-      count: Int,
-  )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]]
 }

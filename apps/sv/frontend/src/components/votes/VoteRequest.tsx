@@ -38,6 +38,7 @@ import { Alerting, AlertState } from '../../utils/Alerting';
 import {
   isExpirationBeforeEffectiveDate,
   isScheduleDateTimeValid,
+  isValidUrl,
   VoteRequestValidity,
 } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
@@ -338,6 +339,7 @@ export const CreateVoteRequest: React.FC = () => {
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <TextField
+                  error={!isValidUrl(url)}
                   id="create-reason-url"
                   onChange={e => setUrl(e.target.value)}
                   value={url}
@@ -385,6 +387,7 @@ export const CreateVoteRequest: React.FC = () => {
                       }`,
                 },
                 { disabled: summary === '', reason: 'No summary' },
+                { disabled: !isValidUrl(url), reason: 'Invalid URL' },
               ]}
             >
               <Button

@@ -49,6 +49,8 @@ class SvReOnboardPreflightIntegrationTest
 
   private val password = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
 
+  private val usdTappedInOffboardTest = BigDecimal("100000")
+
   "Validator create a transfer offer to the reonboarded SV" in { implicit env =>
     val (_, offboardedSvParty) = withFrontEnd("validator") { implicit webDriver =>
       actAndCheck(
@@ -67,7 +69,8 @@ class SvReOnboardPreflightIntegrationTest
           val usdText = find(id("wallet-balance-usd")).value.text.trim
           usdText should not be "..."
           val usd = parseAmountText(usdText, "USD")
-          usd should be >= BigDecimal("100000")
+
+          usd should be >= usdTappedInOffboardTest
 
           val loggedInUser = seleniumText(find(id("logged-in-user")))
           val ansUtil = new AnsUtil(ansAcronym)
@@ -105,15 +108,29 @@ class SvReOnboardPreflightIntegrationTest
 
     reonbardedSvParty should not be offboardedSvParty
 
-    withFrontEnd("validator") { implicit webDriver =>
+    val amuletPrice = withFrontEnd("validator") { implicit webDriver =>
+      val amuletPrice = clue("Getting the amulet price") {
+        val usdText = find(id("wallet-balance-usd")).value.text.trim
+        val amuletText = find(id("wallet-balance-amulet")).value.text.trim
+
+        val amuletAcronym = sv1ScanClient.getSpliceInstanceNames().amuletNameAcronym
+        val amulet = parseAmountText(amuletText, amuletAcronym)
+        val usd = parseAmountText(usdText, "USD")
+
+        val amuletPrice = (usd / amulet).setScale(10, BigDecimal.RoundingMode.HALF_UP)
+        logger.info(s"Amulet price: $amuletPrice")
+
+        amuletPrice
+      }
       clue(s"Creating transfer offer for: $reonbardedSvParty") {
         createTransferOffer(
           reonbardedSvParty,
-          BigDecimal("100000") / 0.005,
+          usdTappedInOffboardTest / amuletPrice,
           90,
           "p2ptransfer",
         )
       }
+      amuletPrice
     }
 
     withFrontEnd("sv") { implicit webDriver =>
@@ -142,12 +159,12 @@ class SvReOnboardPreflightIntegrationTest
             val transaction = readTransactionFromRow(tx)
             transaction.action should matchText("Received")
             transaction.ccAmount should beWithin(
-              BigDecimal(20000000) - smallAmount,
-              BigDecimal(20000000),
+              usdTappedInOffboardTest / amuletPrice - smallAmount,
+              usdTappedInOffboardTest / amuletPrice,
             )
             transaction.usdAmount should beWithin(
-              BigDecimal(100000) - smallAmount,
-              BigDecimal(100000),
+              usdTappedInOffboardTest - smallAmount,
+              usdTappedInOffboardTest,
             )
           }
         },

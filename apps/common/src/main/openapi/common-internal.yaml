@@ -118,14 +118,90 @@ components:
         name:
           type: string
 
+    ParticipantUsersData:
+      type: object
+      required:
+        - identityProviders
+        - users
+      properties:
+        identityProviders:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantIdentityProvider"
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantUser"
+
+    # Modeled after Canton's `IdentityProviderConfig`
+    ParticipantIdentityProvider:
+      type: object
+      required:
+        - id
+        - isDeactivated
+        - jwksUrl
+        - issuer
+        - audience
+      properties:
+        id:
+          type: string
+        isDeactivated:
+          type: boolean
+          default: false
+        jwksUrl:
+          type: string
+        issuer:
+          type: string
+        audience:
+          type: string
+
     ParticipantUser:
       type: object
       required:
         - id
+        - rights
+        - isDeactivated
+        - annotations
       properties:
         id:
           type: string
         primaryParty:
+          type: string
+        rights:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantUserRight"
+        isDeactivated:
+          type: boolean
+          default: false
+        annotations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantUserAnnotation"
+        identityProviderId:
+          type: string
+          default: ""
+
+    ParticipantUserRight:
+      type: object
+      required:
+        - kind
+      properties:
+        kind:
+          type: string
+          enum: [ "participantAdmin", "canActAs", "canReadAs", "identityProviderAdmin", "canReadAsAnyParty" ]
+        party:
+          type: string
+
+    ParticipantUserAnnotation:
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+        value:
           type: string
 
     GetDsoInfoResponse:

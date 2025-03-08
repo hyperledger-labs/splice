@@ -240,6 +240,7 @@ class ValidatorAutomationService(
         new DecentralizedSynchronizerMigrationTrigger(
           domainMigrationId,
           triggerContext,
+          connection,
           participantAdminConnection,
           path,
           scanConnection,

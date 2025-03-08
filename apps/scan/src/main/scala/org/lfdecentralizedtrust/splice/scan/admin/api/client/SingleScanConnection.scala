@@ -492,20 +492,6 @@ class SingleScanConnection private[client] (
         count,
       ),
     )
-
-  override def getImportUpdates(
-      migrationId: Long,
-      afterUpdateId: String,
-      count: Int,
-  )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.GetImportUpdates(
-        migrationId,
-        afterUpdateId,
-        count,
-      ),
-    )
 }
 
 object SingleScanConnection {

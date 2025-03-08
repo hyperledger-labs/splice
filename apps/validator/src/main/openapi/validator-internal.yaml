@@ -745,6 +745,7 @@ components:
       type: object
       required:
         - participant
+        # TODO(tech-debt) make `participant_users` required once HDM base version is at 0.3.15 or higher
         - acs_snapshot
         - acs_timestamp
         - dars
@@ -754,6 +755,8 @@ components:
       properties:
         participant:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        participant_users:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"
         acs_snapshot:
           description: |
             base64 encoded string of acs snapshot for the requested party id

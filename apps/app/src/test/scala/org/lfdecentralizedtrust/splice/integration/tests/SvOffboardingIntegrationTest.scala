@@ -31,6 +31,9 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import org.scalatest.time.{Minute, Span}
+import cats.syntax.foldable.*
+import cats.instances.future.*
+import cats.instances.seq.*
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -75,6 +78,7 @@ class SvOffboardingIntegrationTest
     // Mediator offboarding leaves the offboarded mediator in a permanently broken state.
     // To make sure this doesn't keep a Canton instance that spams us with logs for that mediator,
     // we use a dedicated Canton instance for this test that is shut down at the end.
+    import env.executionContext
     withCantonSvNodes(
       (
         Some(sv1Backend),
@@ -154,7 +158,7 @@ class SvOffboardingIntegrationTest
           sv1Backend.createVoteRequest(
             sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
             action,
-            "url",
+            "https://vote-request-url.com",
             "description",
             sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           )
@@ -170,9 +174,24 @@ class SvOffboardingIntegrationTest
         },
       )
 
+      // offboarding the sequencer/mediator here can cause very long timeouts in
+      // ExecuteConfirmedActionTrigger as transactions from other arbitrary
+      // triggers can hold up the sequencing of TransferCommandCounter creation.
+      // We're really interested in Splice governance offboarding in this test
+      // so focus on robustness to that here.
+      def cantonMediatorSequencerTriggers = Seq(sv1Backend, sv2Backend, sv3Backend).flatMap { svb =>
+        Seq(
+          svb.dsoAutomation.trigger[SvOffboardingMediatorTrigger],
+          svb.dsoAutomation.trigger[SvOffboardingSequencerTrigger],
+        )
+      }
+      withClue("pause offboarding triggers") {
+        cantonMediatorSequencerTriggers.traverse_(_.pause()).futureValue
+      }
+
       actAndCheck(
         "SV2 votes on removing sv4", {
-          sv2Backend.castVote(voteRequestCid4, true, "url", "description")
+          sv2Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")
         },
       )(
         "The majority has voted but without an acceptance majority, the trigger should not remove sv4",
@@ -184,8 +203,8 @@ class SvOffboardingIntegrationTest
       actAndCheck(
         // We need SV4's vote here for immediate offboarding
         "SV3 and SV4 vote on removing sv4", {
-          sv3Backend.castVote(voteRequestCid4, true, "url", "description")
-          sv4Backend.castVote(voteRequestCid4, true, "url", "description")
+          sv3Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")
+          sv4Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")
         },
       )(
         "Everyone voted, thus the trigger should remove the dso party hosting for sv4",
@@ -206,11 +225,37 @@ class SvOffboardingIntegrationTest
                 .svParty
                 .uid
                 .namespace
+              // wait for SV to be removed from Daml code
               sv3Backend.getDsoInfo().dsoRules.payload.offboardedSvs.keySet() should contain(
                 sv4Backend.getDsoInfo().svParty.toProtoPrimitive
               )
             }
+          }
+        },
+      )
 
+      // Check that the ExecuteConfirmedActionTrigger ignores the confirmation from SV4 now that it is no longer a member.
+      sv1ScanBackend.lookupTransferCommandCounterByParty(
+        sv1Backend.getDsoInfo().svParty
+      ) shouldBe None
+      actAndCheck(
+        "Resume ExecuteConfirmedActionTrigger",
+        sv1Backend.dsoDelegateBasedAutomation.trigger[ExecuteConfirmedActionTrigger].resume(),
+      )(
+        "TransferCommandCounter gets created",
+        (_: Unit) =>
+          sv1ScanBackend.lookupTransferCommandCounterByParty(
+            sv1Backend.getDsoInfo().svParty
+          ) shouldBe a[Some[_]],
+      )
+
+      actAndCheck(
+        "resume offboarding triggers",
+        cantonMediatorSequencerTriggers.foreach(_.resume()),
+      )(
+        "mediator and sequencer offboard",
+        _ =>
+          suppressFailedClues(loggerFactory) {
             clue("Check decentralized namespace offboarding") {
               val decentralizedNamespaces =
                 sv1Backend.participantClient.topology.decentralized_namespaces
@@ -292,22 +337,7 @@ class SvOffboardingIntegrationTest
                 )
                 .toSet
             }
-          }
-        },
-      )
-      // Check that the ExecuteConfirmedActionTrigger ignores the confirmation from SV4 now that it is no longer a member.
-      sv1ScanBackend.lookupTransferCommandCounterByParty(
-        sv1Backend.getDsoInfo().svParty
-      ) shouldBe None
-      actAndCheck(
-        "Resume ExecuteConfirmedActionTrigger",
-        sv1Backend.dsoDelegateBasedAutomation.trigger[ExecuteConfirmedActionTrigger].resume(),
-      )(
-        "TransferCommandCounter gets created",
-        (_: Unit) =>
-          sv1ScanBackend.lookupTransferCommandCounterByParty(
-            sv1Backend.getDsoInfo().svParty
-          ) shouldBe a[Some[_]],
+          },
       )
     }
   }

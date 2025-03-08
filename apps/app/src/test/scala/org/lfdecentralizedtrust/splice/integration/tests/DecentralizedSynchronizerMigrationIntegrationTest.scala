@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
@@ -11,6 +12,7 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.ledger.api.domain.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
@@ -565,6 +567,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
         createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
       }
+      createSomeParticipantUsersState(aliceValidatorBackend.participantClient)
+      val (idpcsBeforeMigration, usersBeforeMigration, rightsBeforeMigration) =
+        getParticipantUsersState(aliceValidatorBackend.participantClient)
 
       val sequencerUrlSetBeforeUpgrade =
         clue("validator should connect to all sequencer urls on the old network") {
@@ -946,6 +951,22 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               }
             }
 
+            clue("Participant users state was preserved") {
+              val (idpcsAfterMigration, usersAfterMigration, rightsAfterMigration) =
+                getParticipantUsersState(
+                  aliceValidatorLocal.participantClient
+                )
+              val usersAfterMigrationExImportAnnotations =
+                usersAfterMigration.map(user =>
+                  user.copy(annotations = user.annotations.filter { case (key, _) =>
+                    !key.contains("acs_import")
+                  })
+                )
+              idpcsAfterMigration should contain theSameElementsAs idpcsBeforeMigration
+              usersAfterMigrationExImportAnnotations should contain theSameElementsAs usersBeforeMigration
+              rightsAfterMigration should contain theSameElementsAs rightsBeforeMigration
+            }
+
             startValidatorAndTapAmulet(
               v("splitwellValidatorLocal"),
               uwc("splitwellProviderWalletLocal"),
@@ -1024,7 +1045,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
               val backfilledUpdates =
                 sv1ScanLocalBackend.appState.store.updateHistory
-                  .getAllUpdates(None, PageLimit.tryCreate(1000))
+                  .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
                   .futureValue
               backfilledUpdates.collect {
                 case TreeUpdateWithMigrationId(tree, migrationId)
@@ -1328,6 +1349,106 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String =
     sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+
+  private def createSomeParticipantUsersState(participant: ParticipantClientReference) = {
+    // for test isolation
+    val suffix = (new scala.util.Random).nextInt().toHexString.toLowerCase
+
+    val idpcsOriginally = participant.ledger_api.identity_provider_config.list()
+    val usersOriginally = participant.ledger_api.users.list().users
+
+    val someParties = clue("Create fresh parties for fresh users") {
+      // more than just users state, but allocating fresh parties reduces chance of conflicts
+      for (i <- 0 to 2)
+        yield participant.ledger_api.parties.allocate(s"fake-party-${i}-${suffix}", "").party
+    }
+    actAndCheck(
+      "Create some participant users state", {
+        participant.ledger_api.identity_provider_config.create(
+          s"fake-idp-enabled-${suffix}",
+          false,
+          "https://jwks.fake.com",
+          s"https://issuer-${suffix}.fake.com",
+          None,
+        )
+        participant.ledger_api.identity_provider_config.create(
+          s"fake-idp-disabled-${suffix}",
+          true,
+          "https://jwks2.fake.com",
+          s"https://issuer-2-${suffix}.fake.com",
+          Some(s"https://${suffix}.fake.com"),
+        )
+        participant.ledger_api.users.create(
+          s"fake-user-0-${suffix}",
+          Set(someParties(0)),
+          Option(someParties(0)),
+          Set(someParties(2)),
+          true,
+          true,
+          true,
+          Map("fake-key" -> "fake-value"),
+          s"fake-idp-enabled-${suffix}",
+          true,
+        )
+        participant.ledger_api.users.create(
+          s"fake-user-1-${suffix}",
+          Set(someParties(1)),
+          None,
+          Set(),
+          false,
+          false,
+          false,
+          Map.empty,
+          s"fake-idp-disabled-${suffix}",
+          false,
+        )
+        participant.ledger_api.users.create(
+          s"fake-user-2-${suffix}",
+          Set(),
+          None,
+          Set(someParties(2)),
+          false,
+          false,
+          true,
+          Map("fake-key-2" -> "fake-value-2"),
+          "",
+          false,
+        )
+      },
+    )(
+      "Participant users state created",
+      _ => {
+
+        val (
+          idpcs,
+          users,
+          _,
+        ) = getParticipantUsersState(participant)
+        idpcs.length shouldBe idpcsOriginally.length + 2
+        users.length should be >= usersOriginally.length + 3
+      },
+    )
+  }
+
+  private def getParticipantUsersState(
+      participant: ParticipantClientReference
+  ): (Seq[IdentityProviderConfig], Seq[User], Map[String, UserRights]) = {
+    val idpcs = participant.ledger_api.identity_provider_config.list()
+    val users = (Seq("") ++ idpcs.map(_.identityProviderId.value)).map { idp =>
+      participant.ledger_api.users.list(identityProviderId = idp).users
+    }.flatten
+    val rights =
+      users
+        .map(user =>
+          (user.id, participant.ledger_api.users.rights.list(user.id, user.identityProviderId))
+        )
+        .toMap
+    (
+      idpcs,
+      users,
+      rights,
+    )
+  }
 }
 
 object DecentralizedSynchronizerMigrationIntegrationTest extends OptionValues {
