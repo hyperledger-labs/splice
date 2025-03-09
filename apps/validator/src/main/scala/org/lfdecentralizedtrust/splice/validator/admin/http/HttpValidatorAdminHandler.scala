@@ -86,6 +86,7 @@ class HttpValidatorAdminHandler(
   private val workflowId = this.getClass.getSimpleName
   private val store = storeWithIngestion.store
   private val dumpGenerator = new DomainMigrationDumpGenerator(
+    storeWithIngestion.connection,
     participantAdminConnection,
     retryProvider,
     loggerFactory,
