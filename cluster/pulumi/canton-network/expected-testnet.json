@@ -1109,17 +1109,18 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "auth0|64529b128448ded6aa68048f",
-          "google-oauth2|102407267956826102715",
-          "google-oauth2|110432686293453333498",
-          "google-oauth2|100985872861279769661",
-          "google-oauth2|103930368588823687273",
+          "google-oauth2|115021477892550483906",
           "google-oauth2|110899582324745131610",
-          "google-oauth2|108162427964339419065",
-          "google-oauth2|100515055195029920502",
           "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
           "google-oauth2|106265882859845879513",
-          "google-oauth2|101034414073429253538",
-          "google-oauth2|107135255038634034067"
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
         ],
         "walletSweep": {
           "Digital-Asset-2::1220d8749a807f84ffd21562284604a94e450762046c2f70d7a2edb240d98df68524": {

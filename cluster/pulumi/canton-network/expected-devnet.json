@@ -2596,17 +2596,18 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "auth0|64afbc0956a97fe9577249d7",
-          "google-oauth2|102407267956826102715",
-          "google-oauth2|110432686293453333498",
-          "google-oauth2|100985872861279769661",
-          "google-oauth2|103930368588823687273",
+          "google-oauth2|115021477892550483906",
           "google-oauth2|110899582324745131610",
-          "google-oauth2|108162427964339419065",
-          "google-oauth2|100515055195029920502",
           "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
           "google-oauth2|106265882859845879513",
-          "google-oauth2|101034414073429253538",
-          "google-oauth2|107135255038634034067"
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
         ],
         "walletSweep": {
           "Digital-Asset-2::1220dcf294bffd10439167f7460b1b6926b7a87d3237b748c7de6d7367fad3e33b20": {
@@ -3471,17 +3472,18 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "auth0|64afbc353bbc7ca776e27bf4",
-          "google-oauth2|102407267956826102715",
-          "google-oauth2|110432686293453333498",
-          "google-oauth2|100985872861279769661",
-          "google-oauth2|103930368588823687273",
+          "google-oauth2|115021477892550483906",
           "google-oauth2|110899582324745131610",
-          "google-oauth2|108162427964339419065",
-          "google-oauth2|100515055195029920502",
           "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
           "google-oauth2|106265882859845879513",
-          "google-oauth2|101034414073429253538",
-          "google-oauth2|107135255038634034067"
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
         ]
       },
       "version": "0.3.15"
@@ -4339,17 +4341,18 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "auth0|64afbc4431b562edb8995da6",
-          "google-oauth2|102407267956826102715",
-          "google-oauth2|110432686293453333498",
-          "google-oauth2|100985872861279769661",
-          "google-oauth2|103930368588823687273",
+          "google-oauth2|115021477892550483906",
           "google-oauth2|110899582324745131610",
-          "google-oauth2|108162427964339419065",
-          "google-oauth2|100515055195029920502",
           "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
           "google-oauth2|106265882859845879513",
-          "google-oauth2|101034414073429253538",
-          "google-oauth2|107135255038634034067"
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
         ]
       },
       "version": "0.3.15"
@@ -5207,17 +5210,18 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "auth0|64afbc720e20777e46fff490",
-          "google-oauth2|102407267956826102715",
-          "google-oauth2|110432686293453333498",
-          "google-oauth2|100985872861279769661",
-          "google-oauth2|103930368588823687273",
+          "google-oauth2|115021477892550483906",
           "google-oauth2|110899582324745131610",
-          "google-oauth2|108162427964339419065",
-          "google-oauth2|100515055195029920502",
           "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
           "google-oauth2|106265882859845879513",
-          "google-oauth2|101034414073429253538",
-          "google-oauth2|107135255038634034067"
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
         ]
       },
       "version": "0.3.15"
