@@ -11,10 +11,10 @@ Release Notes
 Upcoming
 --------
 
-* Validator app
+* SV and validator apps
 
-  * The validator app now preserves participant-local user state across synchronizer upgrades with downtime.
-    More specifically, it preserves identity provider configs and users with all state attached to them (including, for example, rights and metadata annotations).
+  * The SV and validator apps now preserve participant-local user state across synchronizer upgrades with downtime.
+    More specifically, SVs and validators now preserve identity provider configs and users with all state attached to them (including, for example, rights and metadata annotations).
 
 0.3.15
 ------

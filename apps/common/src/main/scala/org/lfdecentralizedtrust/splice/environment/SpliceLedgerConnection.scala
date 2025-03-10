@@ -552,6 +552,7 @@ class BaseLedgerConnection(
   ): Future[Seq[(UserManagementServiceOuterClass.User, Seq[User.Right])]] =
     for {
       identityProviderConfigs <- listIdentityProviderConfigs()
+      // the `Seq(None)` is so we also get the users that have no explicit idp set
       identityProviderIds: Seq[Option[String]] = Seq(None) ++ identityProviderConfigs.map(
         (c: IdentityProviderConfig) => Some(c.identityProviderId)
       )
