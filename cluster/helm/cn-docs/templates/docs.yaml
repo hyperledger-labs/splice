@@ -65,7 +65,7 @@ spec:
     app: docs
   ports:
     - name: http
-      port: 80
+      port: {{ .Values.service.http.port }}
       targetPort: http
       protocol: TCP
     - name: https
