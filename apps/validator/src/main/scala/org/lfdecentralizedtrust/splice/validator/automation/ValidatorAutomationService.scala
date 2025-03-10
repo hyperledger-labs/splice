@@ -47,7 +47,6 @@ class ValidatorAutomationService(
     grpcDeadline: Option[NonNegativeFiniteDuration],
     transferPreapprovalConfig: TransferPreapprovalConfig,
     sequencerConnectionFromScan: Boolean,
-    prevetDuration: NonNegativeFiniteDuration,
     isSvValidator: Boolean,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
@@ -206,7 +205,6 @@ class ValidatorAutomationService(
     new ValidatorPackageVettingTrigger(
       participantAdminConnection,
       scanConnection,
-      prevetDuration,
       triggerContext,
     )
   )

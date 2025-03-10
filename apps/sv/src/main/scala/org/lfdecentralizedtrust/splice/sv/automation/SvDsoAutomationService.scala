@@ -344,7 +344,6 @@ class SvDsoAutomationService(
       new SvPackageVettingTrigger(
         participantAdminConnection,
         dsoStore,
-        config.prevetDuration,
         triggerContext,
       )
     )
