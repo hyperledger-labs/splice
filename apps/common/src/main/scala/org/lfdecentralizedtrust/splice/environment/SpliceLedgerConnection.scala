@@ -11,7 +11,8 @@ import cats.syntax.traverse.*
 import com.daml.error.ErrorResource
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
-import com.daml.ledger.api.v2.admin.ObjectMetaOuterClass
+import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
+import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
@@ -60,7 +61,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
-import scala.annotation.implicitNotFound
+import scala.annotation.{implicitNotFound}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -316,6 +317,8 @@ class BaseLedgerConnection(
         .getOrCreateUser(
           userLf,
           new User.Right.CanActAs(party.toLf) +: userRights,
+          false,
+          Map.empty,
           identityProviderId,
         )
       partyId =
@@ -324,6 +327,29 @@ class BaseLedgerConnection(
             .getOrElse(sys.error(s"user $user was allocated without primary party"))
         )
     } yield partyId
+  }
+
+  // Doesn't update an existing user; only creates a new one if a config with that ID doesn't exist.
+  def ensureUserCreated(
+      user: String,
+      primaryParty: Option[PartyId],
+      rights: Seq[User.Right],
+      isDeactivated: Boolean = false,
+      annotations: Map[String, String] = Map.empty,
+      identityProviderId: Option[String] = None,
+  )(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    val userId = Ref.UserId.assertFromString(user)
+    val userLf = primaryParty match {
+      case None =>
+        new User(userId)
+      case Some(party) =>
+        new User(userId, party.toLf)
+    }
+    client
+      .getOrCreateUser(userLf, rights, isDeactivated, annotations, identityProviderId)
+      .map(_ => ())
   }
 
   def setUserPrimaryParty(
@@ -521,20 +547,64 @@ class BaseLedgerConnection(
   ): Future[String] =
     waitForUserMetadata(userId, SV_NAME_USER_METADATA_KEY)
 
-  def ensureIdentityProviderConfig(id: String, issuer: String, jwksUrl: String, audience: String)(
-      implicit tc: TraceContext
+  def listAllUserData()(implicit
+      tc: TraceContext
+  ): Future[Seq[(UserManagementServiceOuterClass.User, Seq[User.Right])]] =
+    for {
+      identityProviderConfigs <- listIdentityProviderConfigs()
+      identityProviderIds: Seq[Option[String]] = Seq(None) ++ identityProviderConfigs.map(
+        (c: IdentityProviderConfig) => Some(c.identityProviderId)
+      )
+      allUsers <- identityProviderIds.traverse(listAllUsersProto(None, 1000, _)).map(_.flatten)
+      allUserData <- allUsers.traverse { user =>
+        for {
+          rights <- client.listUserRights(
+            user.getId,
+            Option(user.getIdentityProviderId).filter(_.nonEmpty),
+          )
+        } yield (user, rights)
+      }
+    } yield allUserData
+
+  private def listAllUsersProto(
+      pageToken: Option[String],
+      pageSize: Int,
+      identityProviderId: Option[String],
+  )(implicit tc: TraceContext): Future[Seq[UserManagementServiceOuterClass.User]] =
+    client.listUsersProto(pageToken, pageSize, identityProviderId).flatMap {
+      case (users, nextToken) =>
+        if (nextToken.isEmpty) {
+          Future.successful(users)
+        } else {
+          listAllUsersProto(nextToken, pageSize, identityProviderId).map(users ++ _)
+        }
+    }
+
+  def listIdentityProviderConfigs()(implicit
+      tc: TraceContext
+  ): Future[Seq[IdentityProviderConfig]] =
+    client.listIdentityProviderConfigs()
+
+  // Doesn't update an existing config; only creates a new one if a config with that ID doesn't exist.
+  def ensureIdentityProviderConfigCreated(
+      id: String,
+      isDeactivated: Boolean,
+      jwksUrl: String,
+      issuer: String,
+      audience: String,
+  )(implicit
+      tc: TraceContext
   ): Future[Unit] =
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
-      "ensure_identity_provider_config",
+      "ensure_identity_provider_config_created",
       show"Create identity provider $id",
-      client.createIdentityProviderConfig(id, issuer, jwksUrl, audience).recover {
+      client.createIdentityProviderConfig(id, isDeactivated, jwksUrl, issuer, audience).recover {
         case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
           logger.info(show"Identity provider $id already exists")
       },
       logger,
     )
-
 }
 
 /** Subscription for reading the ledger */
