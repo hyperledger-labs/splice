@@ -527,21 +527,29 @@ function subcmd_test_after_migration {
     _error "Onboarding failed"
   fi
 
+  amulet_price=$(curl --location "https://scan.sv-2.${GCP_CLUSTER_HOSTNAME}/api/scan/v0/open-and-issuing-mining-rounds" \
+    --header 'Content-Type: application/json' \
+    --data '{"cached_open_mining_round_contract_ids" : [], "cached_issuing_round_contract_ids" : []}' \
+    | jq -r '.open_mining_rounds  | to_entries | .[0] | .value.contract.payload.amuletPrice')
+  # we tapped $100, so we expect the balance to be at least 99
+  min_expected_balance=$(echo "99 / $amulet_price" | bc)
+
   _info "Check the balance"
   for i in {1..30}; do
     balance=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/balance' \
       -H "Authorization: Bearer $TOKEN" \
       -H 'Content-Type: application/json' | jq -r '.effective_unlocked_qty')
 
-    if [ -z "$balance" ] || (( $(echo "$balance < 5000" | bc -l) )); then
-      _info "Balance is $balance, expected at least 5000. Retrying."
+    if [ -z "$balance" ] || (( $(echo "$balance < $min_expected_balance" | bc -l) )); then
+      _info "Balance is $balance, expected at least $min_expected_balance (\$99 at amulet price of $amulet_price). Retrying."
     else
       _info "Balance is $balance"
       break
     fi
   done
-  if [ -z "$balance" ] || (( $(echo "$balance < 5000" | bc -l) )); then
-    _error "Balance is $balance, expected at least 5000. Out of retries."
+
+  if [ -z "$balance" ] || (( $(echo "$balance < $min_expected_balance" | bc -l) )); then
+    _error "Balance is $balance, expected at least $min_expected_balance (\$99 at amulet price of $amulet_price). Out of retries."
   fi
 }
 

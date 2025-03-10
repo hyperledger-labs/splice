@@ -168,6 +168,7 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:
           cmd_name: Run post-migration steps
+          cluster: << parameters.cluster >>
           cmd: build-tools/splice-compose.sh test_after_migration
       - when:
           condition: << parameters.send_notifications >>
