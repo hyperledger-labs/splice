@@ -8,8 +8,8 @@ synchronizerMigration:
   active:
     id: 1
     provider: external
-    version: 0.3.12
-    releaseReference: "refs/heads/release-line-0.3.12"
+    version: 0.3.13
+    releaseReference: "refs/heads/release-line-0.3.13"
 pulumiProjectConfig:
   default:
     isExternalCluster: true
