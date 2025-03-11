@@ -56,3 +56,6 @@ jobs:
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "deployment"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "operator"

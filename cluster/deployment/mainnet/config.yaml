@@ -14,3 +14,5 @@ pulumiProjectConfig:
 monitoring:
   alerting:
     enableNoDataAlerts: true
+operatorDeployment:
+  reference: refs/heads/main

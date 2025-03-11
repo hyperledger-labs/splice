@@ -62,8 +62,8 @@ A _release line branch_ is branched from the _ancestor branch_.
   - [ ] Before merging, open the `preview_pulumi_changes` CircleCi workflow and approve the jobs to generate `deployment` and `devnet` previews.
     Review the changes together with someone else, paying particular attention to deleted or newly created resources.
 - [ ] Warn our partners on [#supervalidator-operations](https://daholdings.slack.com/archives/C085C3ESYCT): "We'll be upgrading the DA-2 and DA-Eng nodes on DevNet to test a new version. Some turbulence might be expected."
-- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: update-deployment` and `cluster: devnet`.
-    - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
+- [ ] Forward-port the changes to `config.yaml` and `cluster/deployment/devnet/.envrc.vars` to `main`. The `deployment` stack, which watches `main`, should pick that up
+and upgrade the other pulumi stacks.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
     - A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful and on the right commit.
       Remember to check that the `lastSuccessfulCommit` field points to the release line that you expect.

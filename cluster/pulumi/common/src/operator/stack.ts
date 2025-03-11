@@ -2,61 +2,61 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { CLUSTER_BASENAME, config, isMainNet } from 'splice-pulumi-common';
 
-import { namespace } from '../namespace';
-import { operator } from '../operator';
+export type EnvRefs = { [key: string]: unknown };
 
-const requiredEnvs = Array.from([
-  'AUTH0_CN_MANAGEMENT_API_CLIENT_ID',
-  'AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET',
-  'AUTH0_SV_MANAGEMENT_API_CLIENT_ID',
-  'AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET',
-  'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID',
-  'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET',
-]);
+export function createEnvRefs(envSecretName: string, namespaceName: string = 'operator'): EnvRefs {
+  const requiredEnvs = Array.from([
+    'AUTH0_CN_MANAGEMENT_API_CLIENT_ID',
+    'AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET',
+    'AUTH0_SV_MANAGEMENT_API_CLIENT_ID',
+    'AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET',
+    'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID',
+    'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET',
+  ]);
 
-const optionalEnvs = Array.from([
-  'K6_USERS_PASSWORD',
-  'K6_VALIDATOR_ADMIN_PASSWORD',
-  'SLACK_ACCESS_TOKEN',
-]).concat(
-  isMainNet
-    ? ['AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET', 'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID']
-    : []
-);
+  const optionalEnvs = Array.from([
+    'K6_USERS_PASSWORD',
+    'K6_VALIDATOR_ADMIN_PASSWORD',
+    'SLACK_ACCESS_TOKEN',
+  ]).concat(
+    isMainNet
+      ? ['AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET', 'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID']
+      : []
+  );
 
-const env: {
-  [key: string]: string;
-} = {};
+  const env: {
+    [key: string]: string;
+  } = {};
 
-requiredEnvs.forEach(key => (env[key] = config.requireEnv(key)));
-optionalEnvs.forEach(key => {
-  const optionalEnv = config.optionalEnv(key);
-  if (optionalEnv) {
-    env[key] = optionalEnv;
-  }
-});
+  requiredEnvs.forEach(key => (env[key] = config.requireEnv(key)));
+  optionalEnvs.forEach(key => {
+    const optionalEnv = config.optionalEnv(key);
+    if (optionalEnv) {
+      env[key] = optionalEnv;
+    }
+  });
 
-const envSecret = new k8s.core.v1.Secret('env', {
-  metadata: {
-    name: 'env',
-    namespace: namespace.ns.metadata.name,
-  },
-  type: 'Opaque',
-  stringData: env,
-});
-
-const envRefs: {
-  [key: string]: unknown;
-} = {};
-Object.keys(env).forEach(key => {
-  envRefs[key] = {
-    type: 'Secret',
-    secret: {
-      name: envSecret.metadata.name,
-      key: key,
+  const envSecret = new k8s.core.v1.Secret(envSecretName, {
+    metadata: {
+      name: envSecretName,
+      namespace: namespaceName,
     },
-  };
-});
+    type: 'Opaque',
+    stringData: env,
+  });
+
+  const envRefs: EnvRefs = {};
+  Object.keys(env).forEach(key => {
+    envRefs[key] = {
+      type: 'Secret',
+      secret: {
+        name: envSecret.metadata.name,
+        key: key,
+      },
+    };
+  });
+  return envRefs;
+}
 
 /*https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/docs/stacks.md*/
 export function createStackCR(
@@ -64,14 +64,17 @@ export function createStackCR(
   projectName: string,
   supportsResetOnSameCommit: boolean,
   ref: k8s.apiextensions.CustomResource,
-  extraEnvs: { [key: string]: string } = {}
+  envRefs: EnvRefs,
+  extraEnvs: { [key: string]: string } = {},
+  namespaceName: string = 'operator',
+  dependsOn: pulumi.Resource[] = []
 ): pulumi.CustomResource {
   return new k8s.apiextensions.CustomResource(
     name,
     {
       apiVersion: 'pulumi.com/v1',
       kind: 'Stack',
-      metadata: { name: name, namespace: namespace.logicalName },
+      metadata: { name: name, namespace: namespaceName },
       spec: {
         ...{
           stack: `organization/${projectName}/${name}.${CLUSTER_BASENAME}`,
@@ -130,7 +133,7 @@ export function createStackCR(
       },
     },
     {
-      dependsOn: [operator],
+      dependsOn: dependsOn,
     }
   );
 }

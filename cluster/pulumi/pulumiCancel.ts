@@ -30,6 +30,8 @@ export async function runStacksCancel(): Promise<void> {
   operations.push(cancelOperation(validatorRunbookStack));
   const deploymentStack = await stack('deployment', 'deployment', true, {});
   operations.push(cancelOperation(deploymentStack));
+  const operatorStack = await stack('operator', 'operator', true, {});
+  operations.push(cancelOperation(operatorStack));
   const infraStack = await stack('infra', 'infra', true, {});
   operations.push(cancelOperation(infraStack));
   await awaitAllOrThrowAllExceptions(operations);

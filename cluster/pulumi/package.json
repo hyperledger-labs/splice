@@ -37,6 +37,7 @@
         "observability",
         "validator-runbook",
         "deployment",
+        "operator",
         "multi-validator",
         "sv-canton",
         "validator1",

@@ -1,9 +1,8 @@
 {
-  "name": "cn-deployment-operator",
+  "name": "cn-pulumi-operator",
   "main": "src/index.ts",
   "dependencies": {
-    "splice-pulumi-common": "1.0.0",
-    "splice-pulumi-common-sv": "1.0.0"
+    "splice-pulumi-common": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

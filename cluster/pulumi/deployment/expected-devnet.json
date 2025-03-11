@@ -17,42 +17,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -71,7 +71,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           }
@@ -105,41 +105,10 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
-      "kind": "Alert",
-      "metadata": {
-        "name": "flux-deployment-alert",
-        "namespace": "operator"
-      },
-      "spec": {
-        "eventMetadata": {
-          "cluster": "dev"
-        },
-        "eventSeverity": "info",
-        "eventSources": [
-          {
-            "kind": "GitRepository",
-            "name": "*"
-          }
-        ],
-        "providerRef": {
-          "name": "flux-slack-provider"
-        },
-        "summary": "Deployment for stack"
-      }
-    },
-    "name": "deployment-alerts",
-    "provider": "",
-    "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Alert"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "env",
+        "name": "deployment-env",
         "namespace": "operator"
       },
       "stringData": {
@@ -156,164 +125,7 @@
       },
       "type": "Opaque"
     },
-    "name": "env",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "flux2",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "flux",
-      "namespace": "operator",
-      "repositoryOpts": {
-        "repo": "https://fluxcd-community.github.io/helm-charts"
-      },
-      "values": {
-        "cli": {
-          "affinity": {
-            "nodeAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                  {
-                    "matchExpressions": [
-                      {
-                        "key": "cn_infra",
-                        "operator": "Exists"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "tolerations": [
-            {
-              "effect": "NoSchedule",
-              "key": "cn_infra",
-              "operator": "Exists"
-            }
-          ]
-        },
-        "helmController": {
-          "create": false
-        },
-        "imageAutomationController": {
-          "create": false
-        },
-        "imageReflectionController": {
-          "create": false
-        },
-        "kustomizeController": {
-          "create": false
-        },
-        "notificationController": {
-          "affinity": {
-            "nodeAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                  {
-                    "matchExpressions": [
-                      {
-                        "key": "cn_infra",
-                        "operator": "Exists"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "tolerations": [
-            {
-              "effect": "NoSchedule",
-              "key": "cn_infra",
-              "operator": "Exists"
-            }
-          ]
-        },
-        "prometheus": {
-          "podMonitor": {
-            "create": true
-          }
-        },
-        "sourceController": {
-          "affinity": {
-            "nodeAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                  {
-                    "matchExpressions": [
-                      {
-                        "key": "cn_infra",
-                        "operator": "Exists"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "tolerations": [
-            {
-              "effect": "NoSchedule",
-              "key": "cn_infra",
-              "operator": "Exists"
-            }
-          ]
-        }
-      },
-      "version": "2.12.4"
-    },
-    "name": "flux",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "github",
-        "namespace": "operator"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "password": "s3cr3t",
-          "username": "canton-network-da"
-        }
-      },
-      "type": "Opaque"
-    },
-    "name": "github",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "gke-credentials",
-        "namespace": "operator"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "googleCredentials": "s3cr3t"
-        }
-      },
-      "type": "Opaque"
-    },
-    "name": "gke-credentials",
+    "name": "deployment-env",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -335,42 +147,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -389,7 +201,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           }
@@ -415,16 +227,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s-imgpull-operator-default",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "apiVersion": "pulumi.com/v1",
       "kind": "Stack",
       "metadata": {
@@ -439,42 +241,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -493,7 +295,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           }
@@ -517,63 +319,6 @@
   },
   {
     "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "default",
-        "namespace": "operator"
-      }
-    },
-    "name": "operator-default",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-operator-default::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "docker-reg-cred",
-        "namespace": "operator"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "operator-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Namespace",
-      "metadata": {
-        "labels": {},
-        "name": "operator"
-      }
-    },
-    "name": "operator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
     "id": "organization/infra/infra.dev",
     "inputs": {
       "name": "organization/infra/infra.dev"
@@ -581,176 +326,6 @@
     "name": "organization/infra/infra.dev",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator",
-      "compat": "true",
-      "name": "pulumi-kubernetes-operator",
-      "namespace": "operator",
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_infra",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "controller": {
-          "args": [
-            "--zap-level=debug",
-            "--zap-time-encoding=iso8601",
-            "--zap-encoder=json"
-          ],
-          "gracefulShutdownTimeoutDuration": "30m"
-        },
-        "createClusterRole": true,
-        "extraEnv": [
-          {
-            "name": "CLOUDSDK_CORE_PROJECT",
-            "value": "da-cn-devnet"
-          },
-          {
-            "name": "CLOUDSDK_COMPUTE_REGION",
-            "value": "us-central1"
-          },
-          {
-            "name": "GOOGLE_APPLICATION_CREDENTIALS",
-            "value": "/app/gcp-credentials.json"
-          },
-          {
-            "name": "GOOGLE_CREDENTIALS",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "googleCredentials",
-                "name": "gke-credentials"
-              }
-            }
-          },
-          {
-            "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
-            "value": "true"
-          },
-          {
-            "name": "SPLICE_OPERATOR_DEPLOYMENT",
-            "value": "true"
-          }
-        ],
-        "extraVolumeMounts": [
-          {
-            "mountPath": "/app/gcp-credentials.json",
-            "name": "gcp-credentials",
-            "subPath": "googleCredentials"
-          }
-        ],
-        "extraVolumes": [
-          {
-            "name": "gcp-credentials",
-            "secret": {
-              "secretName": "gke-credentials"
-            }
-          }
-        ],
-        "image": {
-          "pullPolicy": "Always",
-          "registry": "digitalasset-canton-network-docker.jfrog.io",
-          "repository": "digitalasset/pulumi-kubernetes-operator",
-          "tag": "0.0.1-deadbeef"
-        },
-        "imagePullSecrets": [
-          {
-            "name": "docker-reg-cred"
-          }
-        ],
-        "maxHistory": 10,
-        "resources": {
-          "limits": {
-            "cpu": 5,
-            "memory": "20G"
-          },
-          "requests": {
-            "cpu": 1,
-            "memory": "2G"
-          }
-        },
-        "serviceMonitor": {
-          "enabled": true,
-          "namespace": "operator",
-          "service": {
-            "annotations": {},
-            "type": "ClusterIP"
-          }
-        },
-        "terminationGracePeriodSeconds": 1800,
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_infra",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.7.3"
-    },
-    "name": "pulumi-kubernetes-operator",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
-      "kind": "Provider",
-      "metadata": {
-        "name": "flux-slack-provider",
-        "namespace": "operator"
-      },
-      "spec": {
-        "address": "https://slack.com/api/chat.postMessage",
-        "channel": "team-canton-network-dev-testnet-deployment",
-        "secretRef": {
-          "name": "slack"
-        },
-        "type": "slack"
-      }
-    },
-    "name": "slack-notification-provider",
-    "provider": "",
-    "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Provider"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "slack",
-        "namespace": "operator"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "token": "s3cr3t"
-        }
-      },
-      "type": "Opaque"
-    },
-    "name": "slack",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,
@@ -848,42 +423,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -902,7 +477,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           }
@@ -942,42 +517,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -996,7 +571,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1048,42 +623,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1102,7 +677,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1154,42 +729,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1208,7 +783,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1260,42 +835,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1314,7 +889,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1366,42 +941,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1420,7 +995,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1472,42 +1047,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1526,7 +1101,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1578,42 +1153,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1632,7 +1207,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1684,42 +1259,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1738,7 +1313,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1790,42 +1365,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1844,7 +1419,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1898,42 +1473,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -1952,7 +1527,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -2006,42 +1581,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -2060,7 +1635,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           }
@@ -2102,42 +1677,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -2156,7 +1731,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           }
@@ -2198,42 +1773,42 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           },
@@ -2252,7 +1827,7 @@
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
-              "name": "env"
+              "name": "deployment-env"
             },
             "type": "Secret"
           }

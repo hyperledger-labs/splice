@@ -4,6 +4,6 @@
     "src/**/*.ts",
     "*.ts"
 ,
-"../common/src/operator/flux-source.ts"
+"../common/src/operator/stack.ts"
 ]
 }
