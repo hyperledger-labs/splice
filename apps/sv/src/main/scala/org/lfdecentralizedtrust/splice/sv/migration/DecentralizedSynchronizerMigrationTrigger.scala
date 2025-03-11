@@ -7,6 +7,7 @@ import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
+  SpliceLedgerConnection,
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
@@ -32,6 +33,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     domainAlias: DomainAlias,
     localSynchronizerNode: LocalSynchronizerNode,
     dsoStore: SvDsoStore,
+    ledgerConnection: SpliceLedgerConnection,
     protected val participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection0: SequencerAdminConnection,
     protected val dumpPath: Path,
@@ -104,6 +106,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     DomainMigrationDump
       .getDomainMigrationDump(
         domainAlias,
+        ledgerConnection,
         participantAdminConnection,
         localSynchronizerNode,
         loggerFactory,

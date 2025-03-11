@@ -11,7 +11,7 @@ import scala.concurrent.duration.DurationInt
 /** Preflight test that makes sure that *our* SVs (1-4) have initialized fine.
   */
 class DsoPreflightIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("sv")
+    extends FrontendIntegrationTestWithSharedEnvironment("sv", "docs")
     with PreflightIntegrationTestUtil
     with SvUiPreflightIntegrationTestUtil {
 
@@ -57,6 +57,21 @@ class DsoPreflightIntegrationTest
           votedSvParties,
         )
       }
+    }
+  }
+
+  "The docs are reachable and working" in { _ =>
+    val docsUrl = s"https://${sys.env("NETWORK_APPS_ADDRESS")}/";
+    withFrontEnd("docs") { implicit webDriver =>
+      silentActAndCheck(
+        "load docs",
+        go to docsUrl,
+      )(
+        "The docs are live",
+        { _ =>
+          find(id("global-synchronizer-for-the-canton-network")) should not be empty
+        },
+      )
     }
   }
 }

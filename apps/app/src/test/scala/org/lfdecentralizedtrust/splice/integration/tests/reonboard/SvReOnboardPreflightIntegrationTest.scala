@@ -125,7 +125,7 @@ class SvReOnboardPreflightIntegrationTest
       clue(s"Creating transfer offer for: $reonbardedSvParty") {
         createTransferOffer(
           reonbardedSvParty,
-          usdTappedInOffboardTest / amuletPrice,
+          walletUsdToAmulet(usdTappedInOffboardTest, amuletPrice),
           90,
           "p2ptransfer",
         )
@@ -159,8 +159,8 @@ class SvReOnboardPreflightIntegrationTest
             val transaction = readTransactionFromRow(tx)
             transaction.action should matchText("Received")
             transaction.ccAmount should beWithin(
-              usdTappedInOffboardTest / amuletPrice - smallAmount,
-              usdTappedInOffboardTest / amuletPrice,
+              walletUsdToAmulet(usdTappedInOffboardTest, amuletPrice) - smallAmount,
+              walletUsdToAmulet(usdTappedInOffboardTest, amuletPrice),
             )
             transaction.usdAmount should beWithin(
               usdTappedInOffboardTest - smallAmount,

@@ -37,6 +37,7 @@ import java.util.UUID
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import scala.math.BigDecimal.RoundingMode
 import scala.util.control.NonFatal
 
 trait WalletTestUtil extends TestCommon with AnsTestUtil {
@@ -48,9 +49,9 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   def walletAmuletPrice = defaultWalletAmuletPrice
 
   def walletUsdToAmulet(usd: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice) =
-    usd / amuletPrice
+    (usd / amuletPrice).setScale(10, RoundingMode.HALF_UP)
   def walletAmuletToUsd(cc: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice) =
-    cc * amuletPrice
+    (cc * amuletPrice).setScale(10, RoundingMode.HALF_UP)
 
   lazy val defaultHoldingFeeAmulet = walletUsdToAmulet(SpliceUtil.defaultHoldingFee.rate)
 

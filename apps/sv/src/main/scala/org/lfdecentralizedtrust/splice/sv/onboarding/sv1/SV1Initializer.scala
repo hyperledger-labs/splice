@@ -194,11 +194,15 @@ class SV1Initializer(
               BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
             )
             .map(_.nonEmpty),
-          participantAdminConnection
-            .uploadDarFiles(
-              requiredDars(sv1Config.initialPackageConfig),
-              RetryFor.WaitingOnInitDependency,
-            )
+          requiredDars(sv1Config.initialPackageConfig)
+            .traverse { packageToVet =>
+              participantAdminConnection
+                .vetDar(
+                  domainId,
+                  DarResource(packageToVet.resourcePath),
+                  None,
+                )
+            }
             .flatMap { _ =>
               initConnection.ensureUserMetadataAnnotation(
                 config.ledgerApiUser,

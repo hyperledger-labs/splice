@@ -3,11 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.codegen.java.splice
 
 import java.time.Instant
-
 import scala.jdk.CollectionConverters.*
 
 /** Scala representation of amulet configuration schedule. */

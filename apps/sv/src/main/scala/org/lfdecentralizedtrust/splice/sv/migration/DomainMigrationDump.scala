@@ -4,8 +4,15 @@
 package org.lfdecentralizedtrust.splice.sv.migration
 
 import cats.implicits.toBifunctorOps
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
+import org.lfdecentralizedtrust.splice.migration.{
+  ParticipantUsersData,
+  ParticipantUsersDataExporter,
+}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.migration.SynchronizerNodeIdentities.getSynchronizerNodeIdentities
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
@@ -23,12 +30,14 @@ case class DomainMigrationDump(
     migrationId: Long,
     nodeIdentities: SynchronizerNodeIdentities,
     domainDataSnapshot: DomainDataSnapshot,
+    participantUsers: Option[ParticipantUsersData],
     createdAt: Instant,
 ) {
   def toHttp: http.GetDomainMigrationDumpResponse = http.GetDomainMigrationDumpResponse(
     migrationId,
     nodeIdentities.toHttp(),
     domainDataSnapshot.toHttp,
+    participantUsers.map(_.toHttp),
     createdAt.toString,
   )
 }
@@ -50,16 +59,19 @@ object DomainMigrationDump {
   ): Either[String, DomainMigrationDump] = for {
     identities <- SynchronizerNodeIdentities.fromHttp(response.identities)
     snapshot <- DomainDataSnapshot.fromHttp(response.dataSnapshot)
+    participantUsers = response.participantUsers.map(ParticipantUsersData.fromHttp)
     timestamp <- Try(Instant.parse(response.createdAt)).toEither.leftMap(_.getMessage)
   } yield DomainMigrationDump(
     response.migrationId,
     nodeIdentities = identities,
     domainDataSnapshot = snapshot,
+    participantUsers = participantUsers,
     createdAt = timestamp,
   )
 
   def getDomainMigrationDump(
       domainAlias: DomainAlias,
+      ledgerConnection: SpliceLedgerConnection,
       participantAdminConnection: ParticipantAdminConnection,
       synchronizerNode: LocalSynchronizerNode,
       loggerFactory: NamedLoggerFactory,
@@ -78,11 +90,14 @@ object DomainMigrationDump {
         domainAlias,
         loggerFactory,
       )
+      participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
+      participantUsersData <- participantUsersDataExporter.exportParticipantUsersData()
       snapshot <- domainDataSnapshotGenerator.getDomainMigrationSnapshot
     } yield DomainMigrationDump(
       migrationId,
       identities,
       snapshot,
+      Some(participantUsersData),
       Instant.now(),
     )
   }

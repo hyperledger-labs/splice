@@ -216,6 +216,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   )(implicit
       driver: WebDriverType
   ) = {
+    assert(transferAmount.scale <= 10, "Amulet amount must have at most 10 decimal places")
     click on "navlink-transfer"
     click on "create-offer-receiver"
     setAnsField(
