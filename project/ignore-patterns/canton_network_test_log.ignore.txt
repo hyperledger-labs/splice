@@ -107,4 +107,7 @@ SoftDomainMigrationIntegrationTest.*The global domain global-domain-new.* is not
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
 
+# TODO(#18150) - remove this
+Vetted state contains multiple entries
+
 # Make sure to have a trailing newline

@@ -235,7 +235,6 @@ case class SvAppBackendConfig(
     domainMigrationDumpPath: Option[Path] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
-    prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
