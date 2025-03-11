@@ -644,6 +644,7 @@ class DisasterRecoveryIntegrationTest
       migrationId = dump.migrationId,
       ids,
       dump.dataSnapshot,
+      None,
       createdAt = dump.createdAt,
     )
     fullDumpFile.write(fullDump.asJson.spaces2)

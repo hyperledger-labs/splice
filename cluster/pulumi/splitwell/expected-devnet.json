@@ -16,7 +16,7 @@
           "client-id": "splitwell-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -41,7 +41,7 @@
           "client-id": "splitwell-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -63,7 +63,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "splitwell-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -85,7 +85,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "splitwell-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -226,7 +226,7 @@
           "client-id": "splitwell-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -251,7 +251,7 @@
           "client-id": "splitwell-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -273,7 +273,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "splitwell-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -295,7 +295,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "splitwell-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -399,7 +399,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -525,7 +525,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -538,7 +538,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-5",
       "namespace": "splitwell",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -565,7 +565,7 @@
           }
         },
         "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -582,7 +582,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 5
           }
         },
         "participantAdminUserNameFrom": {
@@ -593,7 +593,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_5",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -606,9 +606,9 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
-    "name": "splitwell-participant-4",
+    "name": "splitwell-participant-5",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -717,9 +717,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
-        "participantHost": "participant-4",
+        "participantHost": "participant-5",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -736,7 +736,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -927,7 +927,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -944,7 +944,7 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
+          "id": 5,
           "migrating": false
         },
         "nodeIdentifier": "splitwell",
@@ -955,7 +955,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "val_splitwell",
           "port": 5432,
@@ -989,9 +989,11 @@
         },
         "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "digitalasset-splitwell-1",
-        "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
+        "validatorWalletUsers": [
+          "auth0|65de04b385816c4a38cc044f"
+        ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

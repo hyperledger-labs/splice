@@ -89,7 +89,7 @@ const UpdateSvRewardWeight: React.FC<{
         <TextField
           id="reward-weight"
           type="number"
-          value={updateSvRewardWeightAction.newRewardWeight}
+          value={updateSvRewardWeightAction.newRewardWeight || '0000'}
           onChange={e => updateAction(updateSvRewardWeightAction.svParty, e.target.value)}
         />
       </FormControl>

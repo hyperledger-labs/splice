@@ -530,7 +530,7 @@
           }
         ]
       },
-      "version": "0.3.11"
+      "version": "0.3.13"
     },
     "name": "cluster-gateway",
     "provider": "",
@@ -644,7 +644,7 @@
         "notification_policies.yaml": "apiVersion: 1\npolicies:\n  - orgId: 1\n    receiver: cn-ci-channel-notification\n    routes:\n      - receiver: cn-ci-channel-high-prio-notification\n        object_matchers:\n          - - priority\n            - '='\n            - high\n        group_wait: 30s\n        group_interval: 30m\n        repeat_interval: 4h\n        continue: true\n      - receiver: cn-ci-channel-notification\n        group_wait: 30s\n        group_interval: 30m\n        repeat_interval: 4h\n",
         "sv-status-report_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: sv status reports\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: adlmhpz5iv4sgc\n        title: Report Creation Time Lag\n        condition: No recent report\n        data:\n          - refId: Report time lag\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              editorMode: code\n              expr: time() - max by (report_publisher) (splice_sv_status_report_creation_time_us{namespace=~\".*\", report_publisher=~\".*\", canton_version=~\".*\"}) / 1000000\n              instant: false\n              interval: \"\"\n              intervalMs: 30000\n              legendFormat: '{{report_publisher}}'\n              maxDataPoints: 43200\n              range: true\n              refId: Report time lag\n          - refId: Latest report time lag\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params: []\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - B\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: Report time lag\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: Latest report time lag\n              settings:\n                mode: dropNN\n              type: reduce\n          - refId: No recent report\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 300\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: Latest report time lag\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: No recent report\n              type: threshold\n        dashboardUid: cdlm6c7fn7vuod\n        panelId: 18\n        noDataState: Alerting\n        execErrState: Error\n        for: 5m\n        annotations:\n          __dashboardUid__: cdlm6c7fn7vuod\n          __panelId__: \"18\"\n          severity: critical\n          description: The SV {{ $labels.report_publisher }} has not submitted a status report recently\n          runbook_url: \"\"\n          summary: Status report creation time lag too high\n        labels:\n          \"team\": \"support\"\n        isPaused: false\n",
         "templates.yaml": "# config file version\napiVersion: 1\n\n# List of templates to import or update\n# source https://community.grafana.com/t/working-configuration-example-for-alerts-templating-telegram-and-slack/80988\ntemplates:\n  - name: slack\n    template: |\n      {{ define \"slack_title\" }}\n        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}\n        {{- range .Alerts.Firing -}}\n          {{- if eq .Annotations.severity \"critical\" -}}\n            {{- $hasCritical = true -}}\n          {{- else if eq .Annotations.severity \"warning\" -}}\n            {{- $hasWarning = true -}}\n          {{- else if eq .Annotations.severity \"info\" -}}\n            {{- $hasInfo = true -}}\n          {{- else -}}\n            {{- $hasOthers = true -}}\n          {{- end -}}\n        {{- end -}}\n\n        testzrh\n        {{ if gt (len .Alerts.Firing) 0 }}\n          {{- if $hasCritical }}\n          🔥 {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing\n          {{- else if $hasWarning }}\n          ⚠️ {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing\n          {{- else }}\n          :information_source: {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing\n          {{- end }}\n        {{ end }}\n        {{ if gt (len .Alerts.Resolved) 0 }} ✅ {{ len .Alerts.Resolved }} alert(s) resolved {{ end }}\n      {{ end }}\n\n      {{ define \"slack_message\" }}\n        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}\n        {{- range .Alerts.Firing -}}\n          {{- if eq .Annotations.severity \"critical\" -}}\n            {{- $hasCritical = true -}}\n          {{- else if eq .Annotations.severity \"warning\" -}}\n            {{- $hasWarning = true -}}\n          {{- else if eq .Annotations.severity \"info\" -}}\n            {{- $hasInfo = true -}}\n          {{- else -}}\n            {{- $hasOthers = true -}}\n          {{- end -}}\n        {{- end -}}\n        {{ if $hasCritical }} 🔥Critical alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity \"critical\" -}} {{ template \"slack_alert_firing\" .}} {{ end }} {{ end }} {{ end }}\n        {{ if $hasWarning }} ⚠️Warning alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity \"warning\" -}} {{ template \"slack_alert_firing\" .}} {{ end }} {{ end }} {{ end }}\n        {{ if $hasInfo }} :information_source:Info alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity \"info\" -}} {{ template \"slack_alert_firing\" .}} {{ end }} {{ end }} {{ end }}\n        {{ if $hasOthers }} Other alerts {{ range .Alerts.Firing }} {{- if and (and (ne .Annotations.severity \"info\")  (ne .Annotations.severity \"warning\")) (ne .Annotations.severity \"critical\") -}} {{ template \"slack_alert_firing\" . }} {{ end }} {{ end }} {{ end }}\n        {{ if gt (len .Alerts.Resolved) 0 }} ✅Resolved Alerts {{ range .Alerts.Resolved }} {{ template \"slack_alert_resolved\" .}} {{ end }} {{ end }}\n      {{ end }}\n\n      {{ define \"slack_alert_firing\" }}\n        *{{ .Labels.alertname }}*\n        {{ .Annotations.summary }}\n        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}\n        {{- if .Labels.service }}\n        Service: {{ .Labels.service }}\n        {{- end }}\n        {{ template \"slack_gcloud_log_link\" . }}\n      {{ end }}\n\n      {{ define \"slack_alert_resolved\" }}\n        *{{ .Labels.alertname }}*\n        {{ if .Annotations.severity }}{{ .Annotations.severity }}{{ end }}\n        {{ .Annotations.summary }}\n        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}\n      {{ end }}\n\n      {{ define \"slack_gcloud_log_link\" }}<https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format \"2006-01-02T15:04:05Z\"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format \"2006-01-02T15:04:05Z\"  }};query=resource.labels.cluster_name%3D%22cn-testzrhnet%22%0A{{ .Labels.gcloud_filter }}?project=da-cn-devnet|cloud logs>{{ end }}\n\n      {{ define \"slack_color\" -}}\n        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}\n        {{- range .Alerts.Firing -}}\n          {{- if eq .Annotations.severity \"critical\" -}}\n            {{- $hasCritical = true -}}\n          {{- else if eq .Annotations.severity \"warning\" -}}\n            {{- $hasWarning = true -}}\n          {{- else if eq .Annotations.severity \"info\" -}}\n            {{- $hasInfo = true -}}\n          {{- else -}}\n            {{- $hasOthers = true -}}\n          {{- end -}}\n        {{- end -}}\n        {{ if eq .Status \"firing\" -}}\n          {{ if $hasCritical -}}\n            danger\n          {{- else if $hasWarning -}}\n            warning\n          {{- else -}}\n            #439FE0\n          {{- end -}}\n        {{ else -}}\n          good\n        {{- end }}\n      {{- end }}\n\n      {{ define \"support_email_message\" }}\n      [ MAINNET-DA2-SVN-CRITICAL-ALERT 9f2b7e1a-4c3d-58b9-9f1e-df9c4a5b6e7d ]\n      {{ if gt (len .Alerts.Firing) 0 }}**Firing**\n      {{ template \"__text_alert_list\" .Alerts.Firing }}{{ if gt (len .Alerts.Resolved) 0 }}\n      {{ end }}{{ end }}{{ if gt (len .Alerts.Resolved) 0 }}**Resolved**\n      {{ template \"__text_alert_list\" .Alerts.Resolved }}{{ end }}{{ end }}\n",
-        "traffic_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: traffic\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: adw5rd048zf9ca\n        title: Wasted Traffic\n        condition: C\n        data:\n          - refId: A\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: sum by (namespace, job, member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~\"PAR::.*\"}[5m])) / 1000\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: A\n          - refId: B\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params: []\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - B\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: A\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: B\n              type: reduce\n          - refId: C\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 1\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: B\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: threshold\n        dashboardUid: fdnphvrryfq4gf\n        panelId: 6\n        noDataState: OK\n        execErrState: Error\n        for: 1m\n        annotations:\n          __dashboardUid__: fdnphvrryfq4gf\n          __panelId__: \"6\"\n          description: The rate of traffic wasted by sequencer {{ index $labels \"job\" }} in namespace {{ index $labels \"namespace\" }} for member {{ index $labels \"member\" }} exceeded 1 kB over 5 mins\n          severity: critical\n          summary: Traffic wasted by {{ index $labels \"namespace\" }} sequencer for {{ index $labels \"member\" }} exceeded threshold\n        labels: {}\n        isPaused: false\n"
+        "traffic_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: traffic\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: adw5rd048zf9ca\n        title: Wasted Traffic\n        condition: wasted_traffic_threshold\n        data:\n          - refId: wasted_traffic\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~\"PAR::.*\"}[5m]))\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: wasted_traffic\n          - refId: wasted_traffic_threshold\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 1024\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: wasted_traffic\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: wasted_traffic_threshold\n              type: threshold\n        dashboardUid: fdnphvrryfq4gf\n        panelId: 6\n        noDataState: OK\n        execErrState: Error\n        for: 1m\n        annotations:\n          __dashboardUid__: fdnphvrryfq4gf\n          __panelId__: \"6\"\n          description: The rate of traffic wasted by member {{ $labels.member }} exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last 5m\n          severity: critical\n          summary: Traffic wasted by {{ $labels.member }} exceeded threshold ({{ humanize1024 1024 }}b over 5m)\n        labels: {}\n        isPaused: false\n"
       },
       "kind": "ConfigMap",
       "metadata": {
@@ -1329,7 +1329,6 @@
             "3.132.125.148/32",
             "3.133.232.151/32",
             "3.20.42.135/32",
-            "34.41.138.150/32",
             "34.65.50.224/32",
             "34.65.71.223/32",
             "34.249.108.136/32",
@@ -1346,6 +1345,7 @@
             "23.23.157.199/32",
             "3.214.156.145/32",
             "34.251.204.203/32",
+            "157.180.17.68/32",
             "34.170.134.16/32",
             "35.241.160.235/32",
             "34.208.129.158/32",
@@ -1377,6 +1377,7 @@
             "54.254.42.103/32",
             "52.76.12.157/32",
             "54.74.139.89/32",
+            "34.73.41.68/32",
             "3.232.148.147/32",
             "35.196.137.141/32",
             "35.227.42.209/32",
@@ -1389,6 +1390,7 @@
             "54.197.110.228/32",
             "23.23.157.199/32",
             "3.214.156.145/32",
+            "54.246.2.248/32",
             "74.119.41.6/32",
             "204.75.143.6/32",
             "103.58.110.6/32",
@@ -1649,186 +1651,6 @@
               "port": 26196,
               "protocol": "TCP",
               "targetPort": 26196
-            },
-            {
-              "name": "cometbft-2-0-gw",
-              "port": 26206,
-              "protocol": "TCP",
-              "targetPort": 26206
-            },
-            {
-              "name": "cometbft-2-1-gw",
-              "port": 26216,
-              "protocol": "TCP",
-              "targetPort": 26216
-            },
-            {
-              "name": "cometbft-2-2-gw",
-              "port": 26226,
-              "protocol": "TCP",
-              "targetPort": 26226
-            },
-            {
-              "name": "cometbft-2-3-gw",
-              "port": 26236,
-              "protocol": "TCP",
-              "targetPort": 26236
-            },
-            {
-              "name": "cometbft-2-4-gw",
-              "port": 26246,
-              "protocol": "TCP",
-              "targetPort": 26246
-            },
-            {
-              "name": "cometbft-2-5-gw",
-              "port": 26256,
-              "protocol": "TCP",
-              "targetPort": 26256
-            },
-            {
-              "name": "cometbft-2-6-gw",
-              "port": 26266,
-              "protocol": "TCP",
-              "targetPort": 26266
-            },
-            {
-              "name": "cometbft-2-7-gw",
-              "port": 26276,
-              "protocol": "TCP",
-              "targetPort": 26276
-            },
-            {
-              "name": "cometbft-2-8-gw",
-              "port": 26286,
-              "protocol": "TCP",
-              "targetPort": 26286
-            },
-            {
-              "name": "cometbft-2-9-gw",
-              "port": 26296,
-              "protocol": "TCP",
-              "targetPort": 26296
-            },
-            {
-              "name": "cometbft-3-0-gw",
-              "port": 26306,
-              "protocol": "TCP",
-              "targetPort": 26306
-            },
-            {
-              "name": "cometbft-3-1-gw",
-              "port": 26316,
-              "protocol": "TCP",
-              "targetPort": 26316
-            },
-            {
-              "name": "cometbft-3-2-gw",
-              "port": 26326,
-              "protocol": "TCP",
-              "targetPort": 26326
-            },
-            {
-              "name": "cometbft-3-3-gw",
-              "port": 26336,
-              "protocol": "TCP",
-              "targetPort": 26336
-            },
-            {
-              "name": "cometbft-3-4-gw",
-              "port": 26346,
-              "protocol": "TCP",
-              "targetPort": 26346
-            },
-            {
-              "name": "cometbft-3-5-gw",
-              "port": 26356,
-              "protocol": "TCP",
-              "targetPort": 26356
-            },
-            {
-              "name": "cometbft-3-6-gw",
-              "port": 26366,
-              "protocol": "TCP",
-              "targetPort": 26366
-            },
-            {
-              "name": "cometbft-3-7-gw",
-              "port": 26376,
-              "protocol": "TCP",
-              "targetPort": 26376
-            },
-            {
-              "name": "cometbft-3-8-gw",
-              "port": 26386,
-              "protocol": "TCP",
-              "targetPort": 26386
-            },
-            {
-              "name": "cometbft-3-9-gw",
-              "port": 26396,
-              "protocol": "TCP",
-              "targetPort": 26396
-            },
-            {
-              "name": "cometbft-4-0-gw",
-              "port": 26406,
-              "protocol": "TCP",
-              "targetPort": 26406
-            },
-            {
-              "name": "cometbft-4-1-gw",
-              "port": 26416,
-              "protocol": "TCP",
-              "targetPort": 26416
-            },
-            {
-              "name": "cometbft-4-2-gw",
-              "port": 26426,
-              "protocol": "TCP",
-              "targetPort": 26426
-            },
-            {
-              "name": "cometbft-4-3-gw",
-              "port": 26436,
-              "protocol": "TCP",
-              "targetPort": 26436
-            },
-            {
-              "name": "cometbft-4-4-gw",
-              "port": 26446,
-              "protocol": "TCP",
-              "targetPort": 26446
-            },
-            {
-              "name": "cometbft-4-5-gw",
-              "port": 26456,
-              "protocol": "TCP",
-              "targetPort": 26456
-            },
-            {
-              "name": "cometbft-4-6-gw",
-              "port": 26466,
-              "protocol": "TCP",
-              "targetPort": 26466
-            },
-            {
-              "name": "cometbft-4-7-gw",
-              "port": 26476,
-              "protocol": "TCP",
-              "targetPort": 26476
-            },
-            {
-              "name": "cometbft-4-8-gw",
-              "port": 26486,
-              "protocol": "TCP",
-              "targetPort": 26486
-            },
-            {
-              "name": "cometbft-4-9-gw",
-              "port": 26496,
-              "protocol": "TCP",
-              "targetPort": 26496
             }
           ]
         },

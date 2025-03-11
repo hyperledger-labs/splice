@@ -68,7 +68,7 @@ class HttpValidatorAdminHandler(
     storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
     identitiesStore: NodeIdentitiesStore,
     validatorUserName: String,
-    validatorWalletUserName: Option[String],
+    validatorWalletUserNames: Seq[String],
     walletManagerOpt: Option[UserWalletManager],
     getAmuletRulesDomain: GetAmuletRulesDomain,
     scanConnection: ScanConnection,
@@ -88,6 +88,7 @@ class HttpValidatorAdminHandler(
   private val workflowId = this.getClass.getSimpleName
   private val store = storeWithIngestion.store
   private val dumpGenerator = new DomainMigrationDumpGenerator(
+    storeWithIngestion.connection,
     participantAdminConnection,
     retryProvider,
     loggerFactory,
@@ -247,7 +248,7 @@ class HttpValidatorAdminHandler(
       user,
       storeWithIngestion,
       validatorUserName,
-      validatorWalletUserName,
+      validatorWalletUserNames,
       retryProvider,
       logger,
     )

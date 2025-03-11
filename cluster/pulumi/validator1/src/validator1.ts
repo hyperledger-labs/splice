@@ -103,7 +103,7 @@ export async function installValidator1(
   const scanAddress = `http://scan-app.sv-1:5012`;
 
   const validator = await installValidatorApp({
-    validatorWalletUser,
+    validatorWalletUsers: [validatorWalletUser],
     xns,
     dependencies: [],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),

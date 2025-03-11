@@ -3,7 +3,7 @@
     "description": "Periodic backup of DevNet",
     "attribution-actor": "system",
     "parameters": {
-      "branch": "release-line-0.3.12",
+      "branch": "release-line-0.3.15",
       "run-job": "backup-devnet"
     },
     "timetable": {

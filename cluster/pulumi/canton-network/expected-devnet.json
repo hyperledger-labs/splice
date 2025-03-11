@@ -16,7 +16,7 @@
           "client-id": "sv-1-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-1-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -41,7 +41,7 @@
           "client-id": "sv1-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv1-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -66,7 +66,7 @@
           "client-id": "sv-2-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-2-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -91,7 +91,7 @@
           "client-id": "sv2-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv2-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -116,7 +116,7 @@
           "client-id": "sv-3-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-3-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -141,7 +141,7 @@
           "client-id": "sv3-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv3-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -166,7 +166,7 @@
           "client-id": "sv-4-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-4-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -191,7 +191,7 @@
           "client-id": "sv4-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv4-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -213,7 +213,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -235,7 +235,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -257,7 +257,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -279,7 +279,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-2-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -301,7 +301,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-2-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -323,7 +323,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-2-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -345,7 +345,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-3-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -367,7 +367,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-3-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -389,7 +389,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-3-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -411,7 +411,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-4-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -433,7 +433,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-4-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -455,7 +455,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-4-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1072,7 +1072,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1291,7 +1291,7 @@
           "client-id": "sv-1-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-1-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1316,7 +1316,7 @@
           "client-id": "sv1-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv1-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1341,7 +1341,7 @@
           "client-id": "sv-2-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-2-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1366,7 +1366,7 @@
           "client-id": "sv2-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv2-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1391,7 +1391,7 @@
           "client-id": "sv-3-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-3-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1416,7 +1416,7 @@
           "client-id": "sv3-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv3-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1441,7 +1441,7 @@
           "client-id": "sv-4-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-4-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1466,7 +1466,7 @@
           "client-id": "sv4-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv4-validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -1488,7 +1488,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1510,7 +1510,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1532,7 +1532,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1554,7 +1554,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-2-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1576,7 +1576,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-2-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1598,7 +1598,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-2-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1620,7 +1620,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-3-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1642,7 +1642,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-3-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1664,7 +1664,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-3-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1686,7 +1686,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-4-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1708,7 +1708,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-4-sv-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1730,7 +1730,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "sv-4-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -1925,7 +1925,6 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "4",
               "5"
             ]
           }
@@ -1942,7 +1941,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -1999,7 +1998,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -2175,9 +2174,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -2186,7 +2185,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-4-sequencer",
+        "sequencerAddress": "global-domain-5-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -2203,7 +2202,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -2352,17 +2351,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 385000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
@@ -2392,7 +2386,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -2402,20 +2396,20 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-5-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-4-mediator",
-          "sequencerAddress": "global-domain-4-sequencer",
+          "mediatorAddress": "global-domain-5-mediator",
+          "sequencerAddress": "global-domain-5-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-4.sv-2.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-5.sv-2.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -2451,6 +2445,7 @@
           "prefix": "dev/sv-1"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialAmuletPrice": "0.0517",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 400000,
           "baseRateBurstWindowMins": 20,
@@ -2463,15 +2458,15 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
+          "id": 5,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "onboardingFoundingSvRewardWeightBps": 140000,
+        "onboardingFoundingSvRewardWeightBps": 150000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingRoundZeroDuration": "27 h",
+        "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -2500,7 +2495,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -2543,7 +2538,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -2553,7 +2548,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-5.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -2562,10 +2557,10 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "validator_sv_1",
           "port": 5432,
@@ -2597,7 +2592,21 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7",
+        "validatorWalletUsers": [
+          "auth0|64afbc0956a97fe9577249d7",
+          "google-oauth2|115021477892550483906",
+          "google-oauth2|110899582324745131610",
+          "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
+          "google-oauth2|106265882859845879513",
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
+        ],
         "walletSweep": {
           "Digital-Asset-2::1220dcf294bffd10439167f7460b1b6926b7a87d3237b748c7de6d7367fad3e33b20": {
             "maxBalanceUSD": 3000,
@@ -2606,7 +2615,7 @@
           }
         }
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -2816,7 +2825,6 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "4",
               "5"
             ]
           }
@@ -2833,7 +2841,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -2890,7 +2898,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -3066,9 +3074,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "scan_sv_2",
           "port": 5432,
@@ -3077,7 +3085,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-4-sequencer",
+        "sequencerAddress": "global-domain-5-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -3094,7 +3102,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -3243,17 +3251,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 385000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
@@ -3283,7 +3286,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -3293,21 +3296,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-5-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-4-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-5-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-4-mediator",
-          "sequencerAddress": "global-domain-4-sequencer",
+          "mediatorAddress": "global-domain-5-mediator",
+          "sequencerAddress": "global-domain-5-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-4.sv-2-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-5.sv-2-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -3322,6 +3325,7 @@
           "prefix": "dev/sv-2"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -3330,13 +3334,13 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
+          "id": 5,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
         "onboardingName": "Digital-Asset-Eng-2",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "sv_sv_2",
           "port": 5432,
@@ -3365,7 +3369,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -3408,7 +3412,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -3418,7 +3422,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-5.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -3427,10 +3431,10 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "validator_sv_2",
           "port": 5432,
@@ -3462,9 +3466,23 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
+        "validatorWalletUsers": [
+          "auth0|64afbc353bbc7ca776e27bf4",
+          "google-oauth2|115021477892550483906",
+          "google-oauth2|110899582324745131610",
+          "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
+          "google-oauth2|106265882859845879513",
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
+        ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -3674,7 +3692,6 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "4",
               "5"
             ]
           }
@@ -3691,7 +3708,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -3748,7 +3765,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -3924,9 +3941,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "scan_sv_3",
           "port": 5432,
@@ -3935,7 +3952,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-4-sequencer",
+        "sequencerAddress": "global-domain-5-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -3952,7 +3969,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -4101,17 +4118,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 385000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
@@ -4141,7 +4153,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -4151,21 +4163,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-5-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-4-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-5-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-4-mediator",
-          "sequencerAddress": "global-domain-4-sequencer",
+          "mediatorAddress": "global-domain-5-mediator",
+          "sequencerAddress": "global-domain-5-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-4.sv-3-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-5.sv-3-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -4180,6 +4192,7 @@
           "prefix": "dev/sv-3"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -4188,13 +4201,13 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
+          "id": 5,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
         "onboardingName": "Digital-Asset-Eng-3",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "sv_sv_3",
           "port": 5432,
@@ -4223,7 +4236,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -4266,7 +4279,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -4276,7 +4289,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-5.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -4285,10 +4298,10 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "validator_sv_3",
           "port": 5432,
@@ -4320,9 +4333,23 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
+        "validatorWalletUsers": [
+          "auth0|64afbc4431b562edb8995da6",
+          "google-oauth2|115021477892550483906",
+          "google-oauth2|110899582324745131610",
+          "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
+          "google-oauth2|106265882859845879513",
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
+        ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -4532,7 +4559,6 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "4",
               "5"
             ]
           }
@@ -4549,7 +4575,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -4606,7 +4632,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -4782,9 +4808,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "scan_sv_4",
           "port": 5432,
@@ -4793,7 +4819,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-4-sequencer",
+        "sequencerAddress": "global-domain-5-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -4810,7 +4836,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -4959,17 +4985,12 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 385000
           },
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
             "rewardWeightBps": 110000
-          },
-          {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Tradeweb-Markets-1",
@@ -4999,7 +5020,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -5009,21 +5030,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-5-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-4-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-5-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-4-mediator",
-          "sequencerAddress": "global-domain-4-sequencer",
+          "mediatorAddress": "global-domain-5-mediator",
+          "sequencerAddress": "global-domain-5-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-4.sv-4-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-5.sv-4-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -5038,6 +5059,7 @@
           "prefix": "dev/sv-4"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -5046,13 +5068,13 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
+          "id": 5,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
         "onboardingName": "Digital-Asset-Eng-4",
         "onboardingType": "join-with-key",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "sv_sv_4",
           "port": 5432,
@@ -5081,7 +5103,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -5124,7 +5146,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -5134,7 +5156,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-5.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -5143,10 +5165,10 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 5
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-5",
         "persistence": {
           "databaseName": "validator_sv_4",
           "port": 5432,
@@ -5178,9 +5200,23 @@
           "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
-        "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
+        "validatorWalletUsers": [
+          "auth0|64afbc720e20777e46fff490",
+          "google-oauth2|115021477892550483906",
+          "google-oauth2|110899582324745131610",
+          "google-oauth2|118161925457207857623",
+          "google-oauth2|102407267956826102715",
+          "google-oauth2|103930368588823687273",
+          "google-oauth2|107135255038634034067",
+          "google-oauth2|100515055195029920502",
+          "google-oauth2|106265882859845879513",
+          "google-oauth2|110432686293453333498",
+          "google-oauth2|108162427964339419065",
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
+        ]
       },
-      "version": "0.3.12"
+      "version": "0.3.15"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",

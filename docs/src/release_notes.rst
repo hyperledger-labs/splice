@@ -11,9 +11,56 @@ Release Notes
 Upcoming
 --------
 
+* SV and validator apps
+
+  * The SV and validator apps now preserve participant-local user state across synchronizer upgrades with downtime.
+    More specifically, SVs and validators now preserve identity provider configs and users with all state attached to them (including, for example, rights and metadata annotations).
+
+0.3.15
+------
+
+.. important::
+
+    * This release fixes a Scan backfilling regression introduced in 0.3.14. Please skip 0.3.14 and upgrade directly to 0.3.15.
+
+* Deployment
+
+  * Change the port used by nginx in the UI docker images from 80 to 8080.
+
+    The services defined by the helm charts still expose port 80 by default, but now all of them are configurable through the helm values, eg: the validator helm chart has new values configured through `service.wallet.port` & `service.ans.port`.
+
+    The compose deployments contain an updated nginx.conf that now uses the new 8080 ports.
+
+  * Move ``topup`` section from the ``validator-values.yaml`` example file to the ``standalone-validator.yaml`` example file
+    to make it more clear that configuring topups is a reasonable option only for non-SV validators.
+    See `hyperledger-labs/splice#255 <https://github.com/hyperledger-labs/splice/pull/255>`_
+
+  * Added the ``initialAmuletPrice`` helm option to set the initial amulet price vote (i.e., the price for which your SV node will vote when onboarded).
+    See the :ref:`configuration instructions <helm-configure-global-domain>`.
+    Note that this only takes effect for new nodes. For already existing nodes, change the price vote through the SV UI.
+
+* Validator
+
+  * Added the option to specify multiple ``validatorWalletUsers`` in the validator helm charts. The existing ``validatorWalletUser`` option is
+    still supported.
+
+* Docs
+
+  * Added documentation for managing network resets for validators and super validators.
+
+0.3.13
+------
+
 * Docs
 
   * Add documentation about :ref:`traffic`.
+  * Add documentation about :ref:`computing total burnt coin <total_burn>`.
+  * Enable commenting on doc pages.
+
+* Config changes
+
+  * Increased the time before a participant retries a sequencer submission back to 10 seconds (from 5 seconds). This ensures we're not too aggressive in
+    retrying, thus leading to traffic waste.
 
 0.3.12
 ------

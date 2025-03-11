@@ -20,6 +20,15 @@ synchronizerMigration:
   active:
     id: 4
     provider: external
-    version: 0.3.13-snapshot.20250224.8390.0.v5f7d491c
+    version: 0.3.15-snapshot.20250307.8495.0.v7f69e805
     releaseReference: "refs/tags/cilr"
 persistentSequencerHeapDumps: true
+monitoring:
+  alerting:
+    enableNoDataAlerts: true
+    alerts:
+      trafficWaste:
+        kilobytes: 50
+        overMinutes: 30
+      cometbft:
+        expectedMaxBlocksPerSecond: 7

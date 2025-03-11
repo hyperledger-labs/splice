@@ -3,13 +3,13 @@
     "description": "DevNet Validator Runbook Preflight Tests run 1 Hour after every Runbook Reset",
     "attribution-actor": "system",
     "parameters" : {
-      "branch": "release-line-0.3.12",
+      "branch": "release-line-0.3.15",
       "run-job": "healthcheck-validator-runbook-devnet"
     },
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
-        1, 7, 11, 18
+        1, 7, 13, 19
       ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],

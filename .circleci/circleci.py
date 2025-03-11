@@ -157,15 +157,41 @@ def fetch_previous_pipelines(current_pipeline_number: int, branch_filter: str, b
 
   return pipelines
 
-def fetch_workflows(pipeline_id: str) -> list[Workflow]:
-  url = f"{BASE_CCI_API_URL}/pipeline/{pipeline_id}/workflow"
-  return fetch_paginated(url, WorkflowsResponse.Schema())
+def _handleHttpErrorResponse(err: requests.exceptions.HTTPError):
+  if err.response and err.response.status_code == 404:
+    print(f"Attempt {attempt}/{max_retries}: Workflow not found for pipeline {pipeline_id}.")
+  elif err.response:
+    print(f"HTTP error (status code {err.response.status_code}): {err}")
+  else:
+    print(f"Request failed with no response: {err}")
 
-def fetch_workflow(workflow_id: str) -> Workflow:
+def fetch_workflows(pipeline_id: str, max_retries=3, delay=3) -> list[Workflow]:
+  url = f"{BASE_CCI_API_URL}/pipeline/{pipeline_id}/workflow"
+  for attempt in range(1, max_retries + 1):
+    try:
+      return fetch_paginated(url, WorkflowsResponse.Schema())
+    except requests.exceptions.HTTPError as err:
+      _handleHttpErrorResponse(err)
+    if attempt < max_retries:
+      print(f"Retrying in {delay} seconds.")
+      time.sleep(delay)
+  print(f"Max retries reached. Unable to fetch workflows for pipeline {pipeline_id}.")
+  return list()
+
+def fetch_workflow(workflow_id: str, max_retries=3, delay=3) -> Workflow:
   url = f"{BASE_CCI_API_URL}/workflow/{workflow_id}"
-  raw_response = requests.get(url, headers = HEADERS)
-  raw_response.raise_for_status()
-  return Workflow.Schema().load(raw_response.json())
+  for attempt in range(1, max_retries + 1):
+    try:
+      raw_response = requests.get(url, headers = HEADERS)
+      raw_response.raise_for_status()
+      return Workflow.Schema().load(raw_response.json())
+    except requests.exceptions.HTTPError as err:
+      _handleHttpErrorResponse(err)
+    if attempt < max_retries:
+      print(f"Retrying in {delay} seconds.")
+      time.sleep(delay)
+  print(f"Max retries reached. Unable to fetch workflows for pipeline {pipeline_id}.")
+  return None
 
 def gen_recent_workflow_runs(workflow_name: str, branch: str, start_date: datetime, end_date: datetime) -> Iterator[InsightWorkflow]:
   url = f"{BASE_CCI_API_URL}/insights/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/workflows/{workflow_name}"

@@ -33,18 +33,13 @@ export function installCanton(
   svConfig: SvConfig,
   dependsOn: CnInput<Resource>[]
 ): InstalledMigrationSpecificSv {
-  const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
+  const internalMigrations = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
   const externalMigrations = decentralizedSynchronizerMigrationConfig.allExternalMigrations;
-  const upgradeMigration = decentralizedSynchronizerMigrationConfig.upgrade;
-  const externalNonUpgradeMigration = externalMigrations.filter(m =>
-    upgradeMigration ? m.id !== upgradeMigration.id : true
-  );
   const activeMigrationId =
     decentralizedSynchronizerMigrationConfig.activeDatabaseId ||
     decentralizedSynchronizerMigrationConfig.active.id;
-  // we rely on the assumption that we never completely remove a migration between the internal and the active migration
   const migrationId = externalMigrations.map(e => e.id).includes(activeMigrationId)
-    ? activeMigrationId - externalNonUpgradeMigration.length
+    ? Math.max(...internalMigrations.map(m => m.id)) // the last internal stack
     : activeMigrationId;
 
   const externalActiveMigration = {
@@ -60,7 +55,7 @@ export function installCanton(
       internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
     },
   };
-  if (migrationsContainedInStack.length > 0) {
+  if (internalMigrations.length > 0) {
     const sequencerPostgres =
       defaultPostgres ||
       postgres.installPostgres(
@@ -94,7 +89,7 @@ export function installCanton(
         decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
         migrationId
       );
-    const installedMigrations = migrationsContainedInStack.map(migration => {
+    const installedMigrations = internalMigrations.map(migration => {
       return {
         migration,
         canton: installCantonComponents(

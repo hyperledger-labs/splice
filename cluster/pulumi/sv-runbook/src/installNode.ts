@@ -40,6 +40,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   InstalledHelmChart,
   ansDomainPrefix,
+  svUserIds,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -69,6 +70,8 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
 
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
 const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerUpgradeConfig;
+
+const initialAmuletPrice = config.optionalEnv('INITIAL_AMULET_PRICE');
 
 export async function installNode(
   auth0Client: Auth0Client,
@@ -282,6 +285,7 @@ async function installSvAndValidator(
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
+    initialAmuletPrice,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -383,6 +387,7 @@ async function installSvAndValidator(
       enable: true,
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
+    validatorWalletUsers: [validatorWalletUserName].concat(svUserIds(auth0Config)),
     ...spliceInstanceNames,
   };
 

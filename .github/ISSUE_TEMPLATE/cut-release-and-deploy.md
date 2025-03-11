@@ -67,7 +67,10 @@ A _release line branch_ is branched from the _ancestor branch_.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
     - A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful and on the right commit.
       Remember to check that the `lastSuccessfulCommit` field points to the release line that you expect.
-- [ ] Confirm that we didn't break anything (e.g., via the sv status grafana dashboard)
+- [ ] Confirm that we didn't break anything; for example:
+  - [ ] The [SV Status Report Dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/caffa6f7-c421-4579-a839-b026d3b76826/sv-status-reports?orgId=1) looks green
+  - [ ] There are no (unexpected) open alerts
+  - [ ] The docs are reachable at both https://dev.network.canton.global/ and https://dev.global.canton.network.digitalasset.com/
 - [ ] Forward port the above change that bumped the devnet version to both the _ancestor branch_ and `origin/main`.
 - [ ] Merge a PR into `origin/main` with the following changes:
   - [ ] Update the branch references in `.circleci/triggers/*/devnet-*.json` only for devnet.

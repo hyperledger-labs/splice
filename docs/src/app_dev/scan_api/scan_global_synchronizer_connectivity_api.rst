@@ -17,7 +17,7 @@ Listing all SV Scans
 --------------------
 
 Every Scan can list all approved SV scans connected to the network.
-For example, query from `/v0/scans <|gsf_scan_url|/api/scan/v0/scans>`_ on |gsf_scan_url|, and the response will be something like
+For example, query from `/v0/scans <scan_openapi.html#get--v0-scans>`_ from |gsf_scan_url|, and the response will be something like
 
 .. code-block:: json
 
@@ -45,11 +45,13 @@ For example, query from `/v0/scans <|gsf_scan_url|/api/scan/v0/scans>`_ on |gsf_
 In this case, ``Global-Synchronizer-Foundation`` matches the originally-used Scan.
 Take any of these ``publicUrl``\ s and query ``/api/scan/v0/scans``, and the same set will be returned.
 
+.. _Listing_all_SV_Sequencers:
+
 Listing all SV Sequencers
 -------------------------
 
 Likewise, Canton sequencers for all approved SVs are published by every Scan.
-For example, query from `/v0/dso-sequencers <|gsf_scan_url|/api/scan/v0/dso-sequencers>`_ on |gsf_scan_url|, and the result will be something like
+For example, query from `/v0/dso-sequencers <scan_openapi.html#get--v0-dso-sequencers>`_, and the result will be something like
 
 .. code-block:: json
 
@@ -88,7 +90,7 @@ Listing all Validators
 ----------------------
 
 Every validator approved on the network has a "license" on the ledger.
-The `/v0/admin/validator/licenses <|gsf_scan_url|/api/scan/v0/admin/validator/licenses>`_ endpoint lists all of these in the form of ``Splice.ValidatorLicense:ValidatorLicense`` Daml contracts.
+The `/v0/admin/validator/licenses <scan_openapi.html#get--v0-admin-validator-licenses>`_ endpoint lists all of these in the form of ``Splice.ValidatorLicense:ValidatorLicense`` Daml contracts.
 These include:
 
 * onboarding identification, in the form of ``validator``, ``sponsor``, and ``dso``,
@@ -155,7 +157,7 @@ Parties' Hosting Participants
 In any Canton deployment, `each party is hosted on a participant <https://docs.daml.com/canton/architecture/overview.html#synchronization-domain-entities>`_.
 This can be accessed through Scan with `/v0/domains/{domain_id}/parties/{party_id}/participant-id <scan_openapi.html#get--v0-domains-domain_id-parties-party_id-participant-id>`_.
 
-For example, looking up `/v0/domains/global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17/parties/digitalasset-testValidator-1::1220e92bbc9d80cb6e283184017b307b9f44f23d32d7d195cdbcac033ae91eac2f28/participant-id <|gsf_scan_url|/api/scan/v0/domains/global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17/parties/digitalasset-testValidator-1::1220e92bbc9d80cb6e283184017b307b9f44f23d32d7d195cdbcac033ae91eac2f28/participant-id>`_ on a test network yields
+For example, looking up ``/v0/domains/global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17/parties/digitalasset-testValidator-1::1220e92bbc9d80cb6e283184017b307b9f44f23d32d7d195cdbcac033ae91eac2f28/participant-id`` on a test network yields
 
 .. code-block:: json
 

@@ -15,7 +15,7 @@ import type {
 } from './auth0types';
 import { config, isMainNet } from './config';
 import { infraStack } from './stackReferences';
-import { ExactNamespace, fixedTokens } from './utils';
+import { ExactNamespace, fixedTokens, loadJsonFromFile, REPO_ROOT } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
@@ -465,5 +465,12 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
       }
   }
 }
+
+export const svUserIds = (auth0Cfg: Auth0Config): string[] => {
+  console.error(auth0Cfg);
+  const json = loadJsonFromFile(`${REPO_ROOT}/cluster/user-configs/${auth0Cfg.auth0Domain}.json`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return json.map((user: any) => user.user_id);
+};
 
 export const ansDomainPrefix = 'cns';

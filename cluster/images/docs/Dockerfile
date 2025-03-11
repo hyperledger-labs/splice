@@ -2,15 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ARG base_version
-FROM splice-app:${base_version}
+FROM splice-app:${base_version} AS splice
 
-FROM nginx:stable
-ARG version
+ARG base_version
+FROM splice-web-ui:${base_version}
 
-LABEL org.opencontainers.image.base.name="nginx:stable"
+ARG base_version
+LABEL org.opencontainers.image.base.name="splice-web-ui:${base_version}"
 
-COPY --from=0 app/splice-node/docs/html /usr/share/nginx/html/
-COPY --from=0 app/LICENSE .
+COPY --from=splice app/splice-node/docs/html /usr/share/nginx/html/
+COPY --from=splice app/LICENSE .
 COPY script.js /tmpl/script.js.tmpl
-COPY docker-entrypoint.sh /custom-docker-entrypoint.sh
+COPY --chmod=500 docker-entrypoint.sh /custom-docker-entrypoint.sh
 ENTRYPOINT ["/custom-docker-entrypoint.sh"]
