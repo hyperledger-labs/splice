@@ -67,6 +67,7 @@ class SvReOnboardPreflightIntegrationTest
         _ => {
           userIsLoggedIn()
           val usdText = find(id("wallet-balance-usd")).value.text.trim
+          logger.info(s"Wallet balance: $usdText")
           usdText should not be "..."
           val usd = parseAmountText(usdText, "USD")
 
@@ -157,15 +158,14 @@ class SvReOnboardPreflightIntegrationTest
           }
           inside(expectedRow) { case Seq(tx) =>
             val transaction = readTransactionFromRow(tx)
+            logger.info(s"Found transaction $transaction")
             transaction.action should matchText("Received")
-            transaction.ccAmount should beWithin(
-              walletUsdToAmulet(usdTappedInOffboardTest, amuletPrice) - smallAmount,
-              walletUsdToAmulet(usdTappedInOffboardTest, amuletPrice),
+            // Lower bound because of transfer fees, upper bound because of rounding errors
+            // as we're converting from USD to amulet (when creating the offer) and back (here).
+            transaction.ccAmount should beAround(
+              walletUsdToAmulet(usdTappedInOffboardTest, amuletPrice)
             )
-            transaction.usdAmount should beWithin(
-              usdTappedInOffboardTest - smallAmount,
-              usdTappedInOffboardTest,
-            )
+            transaction.usdAmount should beAround(usdTappedInOffboardTest)
           }
         },
       )
