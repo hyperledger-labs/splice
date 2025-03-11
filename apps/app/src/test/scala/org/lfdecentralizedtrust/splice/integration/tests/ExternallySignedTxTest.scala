@@ -170,6 +170,7 @@ trait ExternallySignedTxTest
   }
 
   protected def runProcess(args: Seq[String], token: String): Unit = {
+    logger.info(s"Running process: $args with auth token $token")
     val readLines = mutable.Buffer[String]()
     val errorProcessor = ProcessLogger(line => readLines.append(line))
     val exitCode = Process(args, None, ("VALIDATOR_JWT_TOKEN", token)).!(errorProcessor)

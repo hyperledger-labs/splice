@@ -180,6 +180,10 @@ jobs:
     uses: ./.github/workflows/build.ui_tests.yml
     secrets: inherit
 
+  ts_cli_tests:
+    uses: ./.github/workflows/build.ts_cli_tests.yml
+    secrets: inherit
+
   docs:
     uses: ./.github/workflows/build.docs.yml
     secrets: inherit
@@ -216,6 +220,7 @@ jobs:
     - scala_test_app_upgrade
     - scala_test_without_canton
     - ui_tests
+    - ts_cli_tests
     - docs
     runs-on: self-hosted-docker-tiny
     container:

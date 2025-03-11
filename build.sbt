@@ -111,6 +111,7 @@ lazy val root: Project = (project in file("."))
     `splice-api-token-allocation-request-v1-daml`,
     `splice-api-token-allocation-instruction-v1-daml`,
     `splice-token-standard-test-daml`,
+    `splice-token-test-dummy-holding-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
@@ -134,6 +135,7 @@ lazy val root: Project = (project in file("."))
     tools,
     `splice-wartremover-extension`,
     docs,
+    `token-standard-cli`,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -371,6 +373,41 @@ lazy val `splice-token-standard-test-daml` =
       Compile / damlEnableJavaCodegen := false,
     )
 
+lazy val `splice-token-test-dummy-holding-daml` =
+  project
+    .in(file("token-standard/examples/splice-token-test-dummy-holding"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := true,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `token-standard-cli` =
+  project
+    .in(file("token-standard/cli"))
+    .settings(
+      Headers.TsHeaderSettings,
+      npmInstallOpenApiDeps := Seq.empty,
+      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value,
+      npmTest := {
+        val log = streams.value.log
+        (Test / compile).value
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "test:sbt"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+    )
+
 // Shared non-template/non-interface code
 // used across our DARs.
 lazy val `splice-util-daml` =
@@ -578,6 +615,7 @@ lazy val `apps-common` =
       `splice-api-token-allocation-v1-daml`,
       `splice-api-token-allocation-request-v1-daml`,
       `splice-api-token-allocation-instruction-v1-daml`,
+      `splice-token-test-dummy-holding-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
