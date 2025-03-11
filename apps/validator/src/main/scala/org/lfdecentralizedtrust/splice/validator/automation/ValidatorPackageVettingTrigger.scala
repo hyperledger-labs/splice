@@ -3,12 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{PackageVettingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -21,7 +21,7 @@ class ValidatorPackageVettingTrigger(
     override val tracer: Tracer,
 ) extends PackageVettingTrigger(ValidatorPackageVettingTrigger.packages) {
 
-  override def getDomainId()(implicit tc: TraceContext): Future[DomainId] =
+  override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =
     scanConnection.getAmuletRulesDomain()(tc)
 
   override def getAmuletRules()(implicit tc: TraceContext) =

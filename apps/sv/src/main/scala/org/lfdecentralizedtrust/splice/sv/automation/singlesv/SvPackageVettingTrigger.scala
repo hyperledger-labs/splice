@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.automation.{PackageVettingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
@@ -21,7 +21,7 @@ class SvPackageVettingTrigger(
     override val tracer: Tracer,
 ) extends PackageVettingTrigger(SvPackageVettingTrigger.packages) {
 
-  override def getDomainId()(implicit tc: TraceContext): Future[DomainId] =
+  override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =
     store.getDsoRules().map(_.domain)
 
   override def getAmuletRules()(implicit tc: TraceContext) =

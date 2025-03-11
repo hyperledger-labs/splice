@@ -11,7 +11,7 @@ import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDurati
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.ledger.api.domain.IdentityProviderConfig
+import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
@@ -1385,7 +1385,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           // more than just users state, but allocating fresh parties makes it easier to create interesting users
           Seq(someExistingParty) ++ {
             for (i <- 0 to 2)
-              yield participant.ledger_api.parties.allocate(s"fake-party-${i}-${suffix}", "").party
+              yield participant.ledger_api.parties.allocate(s"fake-party-${i}-${suffix}").party
           }
         }
       } else {

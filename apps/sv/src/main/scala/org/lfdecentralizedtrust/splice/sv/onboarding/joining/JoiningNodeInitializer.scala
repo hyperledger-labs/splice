@@ -808,7 +808,7 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
         )
-        _ <- vetting.vetCurrentPackages(domainId, amuletRules.contract)
+        _ <- vetting.vetCurrentPackages(synchronizerId, amuletRules.contract)
         _ = logger.info("Packages vetting completed")
       } yield ()
     }

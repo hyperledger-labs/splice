@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.util
 import cats.syntax.foldable.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
@@ -29,7 +29,7 @@ class PackageVetting(
     extends NamedLogging {
 
   def vetCurrentPackages(
-      domainId: DomainId,
+      domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
@@ -52,7 +52,7 @@ class PackageVetting(
   }
 
   def vetPackages(
-      domainId: DomainId,
+      domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
@@ -64,7 +64,7 @@ class PackageVetting(
   }
 
   private def vetPackage(
-      domainId: DomainId,
+      domainId: SynchronizerId,
       pkg: PackageIdResolver.Package,
       packageVersion: PackageVersion,
       validFrom: Option[Instant],

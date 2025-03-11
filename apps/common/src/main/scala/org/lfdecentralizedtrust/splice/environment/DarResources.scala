@@ -6,11 +6,8 @@ package org.lfdecentralizedtrust.splice.environment
 import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName, PackageVersion}
 import com.digitalasset.daml.lf.language.Ast.PackageMetadata
 import org.lfdecentralizedtrust.splice.util.DarUtil
-import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashOps, HashPurpose}
-import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.daml.lf.archive.Dar
 import com.digitalasset.daml.lf.language.Ast
-import com.google.protobuf.ByteString
 
 import java.nio.file.Path
 import scala.util.Using

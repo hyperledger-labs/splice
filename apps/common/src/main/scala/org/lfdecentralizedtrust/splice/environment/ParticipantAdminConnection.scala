@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.{catsSyntaxOptionId, catsSyntaxParallelTraverse_}
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -13,7 +13,6 @@ import com.digitalasset.canton.admin.api.client.commands.{
   PruningSchedulerCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{
-  DarDescription,
   ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
@@ -54,7 +53,6 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
 }
-import org.lfdecentralizedtrust.splice.util.{DarUtil, UploadablePackage}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
@@ -97,7 +95,7 @@ class ParticipantAdminConnection(
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
-  private def listConnectedDomains()(implicit
+  def listConnectedDomains()(implicit
       traceContext: TraceContext
   ): Future[Seq[ListConnectedSynchronizersResult]] = {
     runCmd(ParticipantAdminCommands.SynchronizerConnectivity.ListConnectedSynchronizers())
@@ -331,15 +329,6 @@ class ParticipantAdminConnection(
 
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId().map(ParticipantId(_))
-
-  def listConnectedDomain()(implicit
-      traceContext: TraceContext
-  ): Future[Seq[ListConnectedSynchronizersResult]] =
-    for {
-      connectedDomain <- runCmd(
-        ParticipantAdminCommands.SynchronizerConnectivity.ListConnectedSynchronizers()
-      )
-    } yield connectedDomain
 
   def lookupSynchronizerConnectionConfig(
       domain: SynchronizerAlias

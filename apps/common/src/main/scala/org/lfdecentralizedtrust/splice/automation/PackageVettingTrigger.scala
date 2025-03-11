@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.util.PackageVetting
 import com.digitalasset.canton.tracing.TraceContext
@@ -14,7 +14,7 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     extends PollingTrigger
     with PackageIdResolver.HasAmuletRules {
 
-  def getDomainId()(implicit tc: TraceContext): Future[DomainId]
+  def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId]
 
   protected def participantAdminConnection: ParticipantAdminConnection
 
@@ -27,7 +27,7 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      domainId <- getDomainId()
+      domainId <- getSynchronizerId()
       amuletRules <- getAmuletRules()
       _ <- vetting.vetPackages(domainId, amuletRules)
     } yield false

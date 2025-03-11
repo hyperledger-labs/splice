@@ -466,7 +466,7 @@ class ValidatorApp(
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar =>
-        participantAdminConnection.uploadDarFileWithVettingOnAllConnectedDomains(
+        participantAdminConnection.uploadDarFileWithVettingOnAllConnectedSynchronizers(
           dar,
           RetryFor.WaitingOnInitDependency,
         )
@@ -861,8 +861,8 @@ class ValidatorApp(
             knownParty = Some(validatorParty),
             automation,
             validatorUserName = config.ledgerApiUser,
-          // we're initializing so AmuletRules is guaranteed to be on synchronizerId
-          getAmuletRulesDomain = () => _ => Future successful synchronizerId,
+            // we're initializing so AmuletRules is guaranteed to be on synchronizerId
+            getAmuletRulesDomain = () => _ => Future successful synchronizerId,
             participantAdminConnection,
             retryProvider,
             logger,

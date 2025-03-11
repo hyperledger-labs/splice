@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
@@ -520,7 +521,7 @@ class AppUpgradeIntegrationTest
       .list(
         filterParticipant = participant.id.filterString,
         timeQuery = HeadState,
-        filterStore = "Authorized",
+        store = Some(Authorized),
       )
       .flatMap(_.item.packages)
       .filter(_.validFrom.forall(_.isBefore(CantonTimestamp.now())))

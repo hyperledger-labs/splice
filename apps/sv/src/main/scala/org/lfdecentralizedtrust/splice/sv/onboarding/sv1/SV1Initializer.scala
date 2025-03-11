@@ -198,7 +198,7 @@ class SV1Initializer(
             .traverse { packageToVet =>
               participantAdminConnection
                 .vetDar(
-                  domainId,
+                  synchronizerId,
                   DarResource(packageToVet.resourcePath),
                   None,
                 )

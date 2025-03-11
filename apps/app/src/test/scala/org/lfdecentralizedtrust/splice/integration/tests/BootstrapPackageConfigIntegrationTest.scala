@@ -5,8 +5,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
@@ -36,7 +36,6 @@ import org.scalatest.time.{Minute, Span}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
-import org.scalatest.time.{Minute, Span}
 import org.scalatest.Ignore
 
 // TODO(#17544) Reenable once the DAR issues are fixed
@@ -89,9 +88,9 @@ class BootstrapPackageConfigIntegrationTest
         conf.copy(validatorApps =
           conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
             _.map { aliceValidatorConfig =>
-              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+              val withoutExtraSynchronizers = aliceValidatorConfig.domains.copy(extra = Seq.empty)
               aliceValidatorConfig.copy(
-                domains = withoutExtraDomains
+                domains = withoutExtraSynchronizers
               )
             }
           }
@@ -220,7 +219,7 @@ class BootstrapPackageConfigIntegrationTest
                 eventuallySucceeds() {
                   sv.castVote(
                     voteRequest.contractId,
-                    true,
+                    isAccepted = true,
                     "url",
                     "description",
                   )
@@ -244,7 +243,11 @@ class BootstrapPackageConfigIntegrationTest
         clue("vetting topology is update to the new config") {
           eventuallySucceeds() {
             val vettingTopologyState = sv1Backend.participantClient.topology.vetted_packages.list(
-              decentralizedSynchronizerId.filterString,
+              store = Some(
+                TopologyStoreId.Synchronizer(
+                  decentralizedSynchronizerId
+                )
+              ),
               filterParticipant = sv1Backend.participantClient.id.filterString,
             )
             val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
@@ -276,7 +279,7 @@ class BootstrapPackageConfigIntegrationTest
   }
 
   private def checkDarVersions(
-      domainId: DomainId,
+      domainId: SynchronizerId,
       darsToCheck: Seq[(PackageResource, String)],
       participantAdminConnection: ParticipantAdminConnection,
   ): Unit = {
