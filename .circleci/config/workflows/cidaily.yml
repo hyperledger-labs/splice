@@ -91,6 +91,8 @@ workflow:
           cluster: "cidaily"
           requires:
             - deploy_validator_runbook
+            # TODO(#8300) Remove this once the preflight check doesn't wait for the sv runbook deployment
+            - deploy_sv_runbook
       - backup_cluster:
           name: backup_cidaily
           <<: *main-branch-only
