@@ -126,6 +126,41 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
+    "see recent activity in infinte scroll" in { implicit env =>
+      val (aliceUserParty, _) = onboardAliceAndBob()
+
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
+
+      clue("Tap amulets for Alice to create transactions") {
+        (1 to 5).foreach { i =>
+          aliceWalletClient.tap(i * 100)
+        }
+      }
+
+      clue("Bob transfers to alice") {
+        bobWalletClient.tap(100.0)
+        (1 to 5).foreach { i =>
+          p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, i)
+        }
+        advanceRoundsByOneTick
+      }
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to recent activity page in scan UI",
+          go to s"http://localhost:${scanUIPort}/recent-activity",
+        )(
+          "Check the recent activity has more items than a single page size",
+          _ => {
+            // frontend pagination is 10 items per page so we should see more than the first page on load
+            // 5 taps and 5 transfers plus some automation should give us more than 10 items
+            findAll(className("activity-row")).length should be > 10
+          },
+        )
+      }
+    }
+
     "see DSO and Amulet Info" in { implicit env =>
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
