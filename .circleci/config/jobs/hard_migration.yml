@@ -419,7 +419,9 @@ jobs:
 
             # if the version for the operator is a release version ensure we use the public repository.
             # we do not commit this, as this is only for deploying the operator itself which we do only here.
-            if [[ $OPERATOR_IMAGE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            # Since the operator images are taken from the branch from which we run this, CIRCLE_BRANCH should
+            # be the corresponding branch, so if that's main or a release branch, we use the public repository too.
+            if [[ $OPERATOR_IMAGE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$CIRCLE_BRANCH" == main ]] || [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
               echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             else
               echo "export SPLICE_ARTIFACTS_REPOSITORY=private" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
