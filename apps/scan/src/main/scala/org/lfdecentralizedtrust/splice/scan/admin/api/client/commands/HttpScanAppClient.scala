@@ -30,7 +30,6 @@ import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
-import org.lfdecentralizedtrust.splice.http.v0.external.scan as externalHttp
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
@@ -74,7 +73,7 @@ object HttpScanAppClient {
   }
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = externalHttp.ScanClient
+    override type Client = http.ScanClient
 
     def createClient(host: String)(implicit
         httpClient: HttpClient,
@@ -82,7 +81,7 @@ object HttpScanAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      externalHttp.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+      http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -705,41 +704,41 @@ object HttpScanAppClient {
 
   case class GetMemberTrafficStatus(domainId: DomainId, memberId: Member)
       extends ExternalBaseCommand[
-        externalHttp.GetMemberTrafficStatusResponse,
+        http.GetMemberTrafficStatusResponse,
         definitions.MemberTrafficStatus,
       ] {
 
     override def submitRequest(
-        client: externalHttp.ScanClient,
+        client: http.ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], externalHttp.GetMemberTrafficStatusResponse] =
+    ], http.GetMemberTrafficStatusResponse] =
       client.getMemberTrafficStatus(domainId.toProtoPrimitive, memberId.toProtoPrimitive, headers)
 
     override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case externalHttp.GetMemberTrafficStatusResponse.OK(response) => Right(response.trafficStatus)
+      case http.GetMemberTrafficStatusResponse.OK(response) => Right(response.trafficStatus)
     }
   }
 
   case class GetPartyToParticipant(domainId: DomainId, partyId: PartyId)
       extends ExternalBaseCommand[
-        externalHttp.GetPartyToParticipantResponse,
+        http.GetPartyToParticipantResponse,
         ParticipantId,
       ] {
 
     override def submitRequest(
-        client: externalHttp.ScanClient,
+        client: http.ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], externalHttp.GetPartyToParticipantResponse] =
+    ], http.GetPartyToParticipantResponse] =
       client.getPartyToParticipant(domainId.toProtoPrimitive, partyId.toProtoPrimitive, headers)
 
     override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case externalHttp.GetPartyToParticipantResponse.OK(response) =>
+      case http.GetPartyToParticipantResponse.OK(response) =>
         for {
           participantId <- Codec.decode(Codec.Participant)(response.participantId)
         } yield participantId

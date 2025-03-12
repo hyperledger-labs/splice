@@ -73,7 +73,7 @@ The below table provides a quick overview of the endpoints that the Scan Bulk Da
      - Returns the ACS Snapshot for a given record time
 
 If you would rather read the yaml Open API specification file directly, this can be found in the Splice repository at
-`scan-internal.yaml <https://github.com/hyperledger-labs/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan-internal.yaml>`_.
+`scan.yaml <https://github.com/hyperledger-labs/splice/blob/08fc692cf2952a52cce00473793d1dca08c0fba5/apps/scan/src/main/openapi/scan.yaml>`_.
 
 Example URLs for accessing the Scan Bulk Data API are:
 
@@ -102,7 +102,7 @@ provides a JSON encoded version of the recorded update history. Once you have an
 POST /v1/updates
 ^^^^^^^^^^^^^^^^
 
-Post a paged `UpdateHistoryRequestV1 <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan-internal.yaml#L1672>`_
+Post a paged `UpdateHistoryRequestV1 <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan.yaml#L1672>`_
 request to get all updates up to ``page_size``.
 
 Requesting all updates
@@ -143,7 +143,7 @@ and ``after_migration_id`` is the migration ID that was active at that time.
 
 Note that the record time ranges of different migrations may overlap,
 i.e., the record time can go back after a hard domain migration.
-Read the `OpenAPI documentation <https://github.com/hyperledger-labs/splice/blob/893346e70b1220be999d89853a0f9ecae5083b08/apps/scan/src/main/openapi/scan-internal.yaml#L1737>`_
+Read the `OpenAPI documentation <https://github.com/hyperledger-labs/splice/blob/893346e70b1220be999d89853a0f9ecae5083b08/apps/scan/src/main/openapi/scan.yaml#L1737>`_
 to understand how the ``after_migration_id`` field affects the response.
 
 If you don't know what migration ID was active at the chose time,
