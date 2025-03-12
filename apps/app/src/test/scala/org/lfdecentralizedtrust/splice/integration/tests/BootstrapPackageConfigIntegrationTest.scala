@@ -3,6 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
@@ -25,15 +30,12 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.{DarUtil, ProcessTestUtil, StandaloneCanton}
-import com.digitalasset.canton.admin.api.client.data.DarDescription
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.data.CantonTimestamp
-import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
+import org.scalatest.time.{Minute, Span}
+
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
-import org.scalatest.time.{Minute, Span}
 import org.scalatest.Ignore
 
 // TODO(#17544) Reenable once the DAR issues are fixed
@@ -86,9 +88,9 @@ class BootstrapPackageConfigIntegrationTest
         conf.copy(validatorApps =
           conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
             _.map { aliceValidatorConfig =>
-              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+              val withoutExtraSynchronizers = aliceValidatorConfig.domains.copy(extra = Seq.empty)
               aliceValidatorConfig.copy(
-                domains = withoutExtraDomains
+                domains = withoutExtraSynchronizers
               )
             }
           }
@@ -135,6 +137,7 @@ class BootstrapPackageConfigIntegrationTest
         sv4Backend.appState.participantAdminConnection,
       ).foreach(
         checkDarVersions(
+          decentralizedSynchronizerId,
           Seq(
             DarResources.amulet -> initialPackageConfig.amuletVersion,
             DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
@@ -148,6 +151,7 @@ class BootstrapPackageConfigIntegrationTest
       )
 
       checkDarVersions(
+        decentralizedSynchronizerId,
         Seq(
           DarResources.amulet -> initialPackageConfig.amuletVersion,
           DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
@@ -215,7 +219,7 @@ class BootstrapPackageConfigIntegrationTest
                 eventuallySucceeds() {
                   sv.castVote(
                     voteRequest.contractId,
-                    true,
+                    isAccepted = true,
                     "url",
                     "description",
                   )
@@ -235,6 +239,25 @@ class BootstrapPackageConfigIntegrationTest
             }
           },
         )
+
+        clue("vetting topology is update to the new config") {
+          eventuallySucceeds() {
+            val vettingTopologyState = sv1Backend.participantClient.topology.vetted_packages.list(
+              store = Some(
+                TopologyStoreId.Synchronizer(
+                  decentralizedSynchronizerId
+                )
+              ),
+              filterParticipant = sv1Backend.participantClient.id.filterString,
+            )
+            val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
+              .find(_.packageId == DarResources.amulet.bootstrap.packageId)
+              .value
+            newAmuletVettedPackage.validFrom.value shouldBe CantonTimestamp.assertFromInstant(
+              scheduledTime
+            )
+          }
+        }
 
         // Ensure that the code below really uses the new version. Locally things can be sufficiently
         // fast that you otherwise still end up using the old version.
@@ -256,33 +279,31 @@ class BootstrapPackageConfigIntegrationTest
   }
 
   private def checkDarVersions(
+      domainId: SynchronizerId,
       darsToCheck: Seq[(PackageResource, String)],
       participantAdminConnection: ParticipantAdminConnection,
   ): Unit = {
     eventually() {
-      val uploadedDarDescriptions: Seq[DarDescription] =
-        participantAdminConnection.listDars().futureValue
-      val uploadedDarNameAndVersions: Seq[(PackageName, PackageVersion)] =
-        uploadedDarDescriptions.map { darDesc =>
-          val darBytes: ByteString =
-            participantAdminConnection
-              .lookupDar(darDesc.mainPackageId)
-              .futureValue
-              .value
-          val darMetadata = DarUtil.readDarMetadata(darDesc.name, darBytes.newInput())
-          darMetadata.name -> darMetadata.version
-        }
+      val vettedPackages: Seq[VettedPackage] =
+        participantAdminConnection.getVettingState(domainId).futureValue.mapping.packages
+      val uploadedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
+        vettedPackages
+          .flatMap { darDesc =>
+            DarResources.lookupPackageId(darDesc.packageId)
+          }
+          .map(dar => dar.metadata.name -> dar.metadata.version)
+      }
       darsToCheck.foreach { case (packageResource, upToVersion) =>
         withClue(
           s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"
         ) {
-          checkDarVersionsUpTo(uploadedDarNameAndVersions, packageResource, upToVersion)
+          checkDarLatestVersion(uploadedDarNameAndVersions, packageResource, upToVersion)
         }
       }
     }
   }
 
-  private def checkDarVersionsUpTo(
+  private def checkDarLatestVersion(
       uploadedDars: Seq[(PackageName, PackageVersion)],
       packageResource: PackageResource,
       requiredVersion: String,
@@ -295,11 +316,7 @@ class BootstrapPackageConfigIntegrationTest
           name == packageResource.bootstrap.metadata.name
         }
       dars should not be empty
-      dars.foreach { case (_, version) =>
-        version should be <= PackageVersion.assertFromString(
-          requiredVersion
-        )
-      }
+      dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)
     }
   }
 }

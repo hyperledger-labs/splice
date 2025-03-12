@@ -76,6 +76,8 @@ the example here. As long as you have docker-compose 2.26.0 or newer you should 
 
   tar xzvf |version|\_splice-node.tar.gz
 
+.. include:: ../common/backup_suggestion.rst
+
 .. include:: required_network_parameters.rst
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.

@@ -1,4 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
+import util from 'node:util';
 import {
   approveDaSupportSvNode,
   svPrivateConfigsClusterDirectory,
@@ -19,19 +20,47 @@ export const clusterBaseDomain = clusterHostname.split('.')[0];
 
 export const gcpDnsProject = config.requireEnv('GCP_DNS_PROJECT');
 
+const MonitoringConfigSchema = z.object({
+  alerting: z.object({
+    enableNoDataAlerts: z.boolean(),
+    alerts: z.object({
+      trafficWaste: z.object({
+        kilobytes: z.number(),
+        overMinutes: z.number(),
+      }),
+      cometbft: z.object({
+        expectedMaxBlocksPerSecond: z.number(),
+      }),
+      loadTester: z.object({
+        minRate: z.number(),
+      }),
+    }),
+  }),
+});
 export const InfraConfigSchema = z.object({
   infra: z.object({
     ipWhitelisting: z.object({
       extraWhitelistedIngress: z.array(z.string()).default([]),
     }),
   }),
+  monitoring: MonitoringConfigSchema,
 });
 
 export type Config = z.infer<typeof InfraConfigSchema>;
 
 // eslint-disable-next-line
 // @ts-ignore
-export const infraConfig = InfraConfigSchema.parse(clusterYamlConfig).infra;
+const fullConfig = InfraConfigSchema.parse(clusterYamlConfig);
+
+console.error(
+  `Loaded infra config: ${util.inspect(fullConfig, {
+    depth: null,
+    maxStringLength: null,
+  })}`
+);
+
+export const infraConfig = fullConfig.infra;
+export const monitoringConfig = fullConfig.monitoring;
 
 const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
 

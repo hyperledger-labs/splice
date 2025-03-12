@@ -175,7 +175,7 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
     data.filter(res => res.status === 'rejected') as PromiseRejectedResult[]
   ).map(res => res.reason);
   if (rejectionReasons.length > 0) {
-    const message = `Ran ${operations.length} operations. ${rejectionReasons.length} failed`;
+    const message = `Ran ${operations.length} operations. ${rejectionReasons.length} failed. Reasons of rejections: ${rejectionReasons}`;
     console.error(message);
     throw new Error(message);
   }

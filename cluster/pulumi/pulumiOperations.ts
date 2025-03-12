@@ -12,7 +12,7 @@ export function refreshOperation(
   stack: automation.Stack,
   abortController: PulumiAbortController
 ): Operation {
-  return operation(`refresh-${stack.name}`, downStack(stack, abortController));
+  return operation(`refresh-${stack.name}`, refreshStack(stack, abortController));
 }
 
 export async function refreshStack(

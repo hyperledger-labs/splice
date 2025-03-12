@@ -50,7 +50,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('set next scheduled domain upgrade', async () => {
+  test('set next scheduled synchronizer upgrade', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 

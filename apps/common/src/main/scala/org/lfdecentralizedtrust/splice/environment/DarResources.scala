@@ -3,10 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName, PackageVersion}
 import com.digitalasset.daml.lf.language.Ast.PackageMetadata
 import org.lfdecentralizedtrust.splice.util.DarUtil
-import com.google.protobuf.ByteString
+import com.digitalasset.daml.lf.archive.Dar
+import com.digitalasset.daml.lf.language.Ast
+
+import java.nio.file.Path
 import scala.util.Using
 
 // TODO (#17153): all the old packages have been commented out to avoid
@@ -273,17 +276,28 @@ final case class DarResource(
 )
 
 object DarResource {
+
+  def apply(path: Path): DarResource = {
+    val dar = DarUtil.readDar(path.toFile)
+    apply(path.getFileName.toString, dar)
+  }
+
   def apply(file: String): DarResource = {
     val input = getClass.getClassLoader.getResourceAsStream(file)
     if (input == null) {
       throw new IllegalArgumentException(s"Not found: $file")
     }
-    val (darBytes, dar) =
+    val dar =
       Using.resource(input) { resourceStream =>
-        val bytes = ByteString.readFrom(resourceStream)
-        val metadata = Using.resource(bytes.newInput())(DarUtil.readDar(file, _))
-        (bytes, metadata)
+        DarUtil.readDar(file, resourceStream)
       }
+    apply(file, dar)
+  }
+
+  private def apply(
+      file: String,
+      dar: Dar[(PackageId, Ast.Package)],
+  ): DarResource = {
     DarResource(
       file,
       dar.main._1,

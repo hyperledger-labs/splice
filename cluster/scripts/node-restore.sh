@@ -292,19 +292,39 @@ function wait_cloudsql_restore() {
 
   local stack
   stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
-  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
+  instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
+  cloudsql_restore_instance_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
 
   local -i i=0
   _info "Waiting for restore of $component to finish..."
 
-  while true; do
-    num_running=$(gcloud sql operations list --instance="$cloudsql_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json | jq length)
+  # Sleeping for 30 here because it's possible we are being rate limited
+  retry_sleep_time=30
+  should_not_retry=0
+  while [[ $should_not_retry = 0 ]]; do
+
+    # Using conditional execution to prevent automatic exit
+    if ! gcloud_output=$(gcloud sql operations list --instance="$cloudsql_restore_instance_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json 2>&1); then
+      _error "Error fetching SQL operations: $gcloud_output" >&2
+      sleep "$retry_sleep_time"
+      continue 1
+    fi
+
+    if ! echo "$gcloud_output" | jq empty &>/dev/null; then
+      _error "Error: Invalid JSON output from gcloud command"
+      _error "Output was: $gcloud_output"
+      sleep "$retry_sleep_time"
+      continue 1
+    fi
+
+    num_running=$(echo "$gcloud_output" | jq length)
+
     if [ "$num_running" == 0 ]; then
       _info "Restore of instance $component done"
-      break
+      should_not_retry=1
     else
-      (( i++ ))&& (( i > 300 )) &&_error "Timed out waiting for backup restore of $component"
-      sleep 5
+      ((i++)) && ((i > 300)) && _error "Timed out waiting for backup restore of $component"
+      sleep "$retry_sleep_time"
       _info "still waiting..."
     fi
   done

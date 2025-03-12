@@ -122,3 +122,6 @@ export HELM_MAX_HISTORY_SIZE=10
 
 # default repository for cluster deployments, scratchnet deployments override this
 export SPLICE_ARTIFACTS_REPOSITORY=public
+
+export PRIVATE_CONFIGS_PATH=${REPO_ROOT}/cluster/configs-private
+export PUBLIC_CONFIGS_PATH=${REPO_ROOT}/cluster/configs

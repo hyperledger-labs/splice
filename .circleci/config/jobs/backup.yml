@@ -184,3 +184,32 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
+
+  copy_backup_to_bucket:
+    executor: self_hosted
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      before-date:
+        type: string
+      namespace_name:
+        type: string
+        default: "sv-1"
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Copy backup to bucket
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          no_output_timeout: "20m"
+          cmd: |
+            cncluster activate
+            cluster/scripts/copy-node-backups-offline.sh << parameters.before-date >>
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>

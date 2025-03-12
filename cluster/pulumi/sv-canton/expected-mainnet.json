@@ -181,7 +181,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.12"
     },
     "name": "sv-1-cometbft-global-domain-2",
     "provider": "",
@@ -305,7 +305,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.12"
     },
     "name": "sv-1-global-domain-2",
     "provider": "",
@@ -467,7 +467,7 @@
           }
         },
         "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "jwksUrl": "https://canton-network-mainnet.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -511,7 +511,7 @@
           }
         ]
       },
-      "version": "0.3.10"
+      "version": "0.3.12"
     },
     "name": "sv-1-participant-2",
     "provider": "",

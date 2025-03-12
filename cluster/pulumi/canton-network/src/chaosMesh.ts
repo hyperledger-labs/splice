@@ -104,7 +104,7 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
         },
         {
           kind: 'User',
-          name: 'oriol.munoz.princep@digitalasset.com',
+          name: 'oriol.munoz@digitalasset.com',
         },
         {
           kind: 'User',

@@ -64,6 +64,7 @@ parameters:
         backup-status-mainnet,
         purge-unused-dbs-cidaily,
         bump-configs,
+        copy-mainnet-backup-to-bucket,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -101,6 +102,10 @@ parameters:
   migration-id:
     type: integer
     default: 0
+  # used for copying old backups to a bucket
+  before-date:
+    type: string
+    default: ""
 
 notify-fail: &notify-fail
   context: slack-context
@@ -131,6 +136,7 @@ cluster-parameter: &cluster-parameter
         "ciupgrade",
         "devnet",
         "mainnet",
+        "mainnet-old",
         "testnet",
         "testnet-preview",
         "observability",
@@ -2068,6 +2074,35 @@ jobs:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
 
+  copy_backup_to_bucket:
+    executor: self_hosted
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      before-date:
+        type: string
+      namespace_name:
+        type: string
+        default: "sv-1"
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Copy backup to bucket
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          no_output_timeout: "20m"
+          cmd: |
+            cncluster activate
+            cluster/scripts/copy-node-backups-offline.sh << parameters.before-date >>
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+
   deploy_sv_runbook:
     executor: self_hosted
     environment:
@@ -2649,7 +2684,7 @@ jobs:
         default: ""
       deploy_retry_count:
         type: integer
-        default: 10
+        default: 2
       send_notifications:
         type: boolean
         default: true
@@ -2687,6 +2722,7 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:
           cmd_name: Run post-migration steps
+          cluster: << parameters.cluster >>
           cmd: build-tools/splice-compose.sh test_after_migration
       - when:
           condition: << parameters.send_notifications >>
@@ -3364,7 +3400,9 @@ jobs:
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY \
-           --keep CIRCLE_BRANCH"
+           --keep CIRCLE_BRANCH \
+           --keep CIRCLE_REPOSITORY_URL \
+           --keep CIRCLE_SHA1"
           cmd: |
             if [[ << parameters.is_public >> == true ]]; then
               echo "Publishing to public docker repo"
@@ -6376,6 +6414,17 @@ workflows:
           context:
             - slack-context
             - canton-network-vpn
+
+  copy_mainnet_backup_to_bucket:
+    when:
+      equal: [ copy-mainnet-backup-to-bucket, << pipeline.parameters.run-job >> ]
+    jobs:
+      - copy_backup_to_bucket:
+          cluster: "mainnet-old"
+          before-date: << pipeline.parameters.before-date >>
+          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
+          context:
+            - slack-context
 
   update_deployment:
     when:

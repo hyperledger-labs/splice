@@ -52,8 +52,11 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
   });
 }
 
-export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
-  return imagePullSecretByNamespaceNameForServiceAccount(ns, 'default', []);
+export function imagePullSecretByNamespaceName(
+  ns: string,
+  dependsOn: pulumi.Resource[] = []
+): pulumi.Resource[] {
+  return imagePullSecretByNamespaceNameForServiceAccount(ns, 'default', dependsOn);
 }
 
 export function imagePullSecretByNamespaceNameForServiceAccount(
@@ -143,7 +146,7 @@ function patchServiceAccountWithImagePullSecret(
 }
 
 export function imagePullSecret(ns: ExactNamespace): CnInput<pulumi.Resource>[] {
-  return imagePullSecretByNamespaceName(ns.logicalName);
+  return imagePullSecretByNamespaceName(ns.logicalName, [ns.ns]);
 }
 
 export function imagePullSecretWithNonDefaultServiceAccount(

@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.validator.migration
 
 import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationTrigger
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationTrigger.ScheduledMigration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
@@ -21,6 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 final class DecentralizedSynchronizerMigrationTrigger(
     override protected val currentMigrationId: Long,
     baseContext: TriggerContext,
+    ledgerConnection: SpliceLedgerConnection,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val dumpPath: Path,
     scanConnection: ScanConnection,
@@ -37,6 +41,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
   override protected val sequencerAdminConnection: None.type = None
 
   private val dumpGenerator = new DomainMigrationDumpGenerator(
+    ledgerConnection,
     participantAdminConnection,
     context.retryProvider,
     context.loggerFactory,

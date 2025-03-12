@@ -37,6 +37,7 @@ You can find hardware requirements for both options in a :ref:`dedicated section
    validator_compose.rst
    validator_helm.rst
    validator_upgrades.rst
+   validator_network_resets.rst
    validator_backups.rst
    validator_disaster_recovery.rst
    validator_security.rst

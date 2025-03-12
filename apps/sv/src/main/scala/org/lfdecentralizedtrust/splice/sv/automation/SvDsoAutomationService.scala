@@ -232,6 +232,7 @@ class SvDsoAutomationService(
             config.domains.global.alias,
             synchronizerNode,
             dsoStore,
+            connection,
             participantAdminConnection,
             synchronizerNode.sequencerAdminConnection,
             dumpPath: Path,
@@ -360,7 +361,6 @@ class SvDsoAutomationService(
       new SvPackageVettingTrigger(
         participantAdminConnection,
         dsoStore,
-        config.prevetDuration,
         triggerContext,
       )
     )
