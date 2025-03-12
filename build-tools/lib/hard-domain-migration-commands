@@ -52,6 +52,24 @@ EOF
   _update_cluster_config "$migration_config" "synchronizerMigration.$migration_type"
 }
 
+subcommand_whitelist[update_active_version]='Upgrade the version of the active migration id including CHARTS_VERSION'
+
+function subcmd_update_active_version() {
+    local cluster_directory
+    if [ "$#" -ne 1 ]; then
+        _error "Usage: $0 $SCRIPTNAME [version]"
+    fi
+    # yq doesn't like the version being unquoted so we quote it here
+    _update_cluster_config "\"$1\"" "synchronizerMigration.active.version"
+    if [ -z "${TARGET_CLUSTER-}" ]; then
+        cluster_directory="$(pwd)"
+    else
+        cluster_directory="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}"
+    fi
+    set -x
+    sed -i "s/^export CHARTS_VERSION=.*$/export CHARTS_VERSION=\"$1\"/" "$cluster_directory/.envrc.vars"
+}
+
 subcommand_whitelist[update_config_to_migrate]='Upgrade the cluster config.yaml to migrate cluster'
 
 function subcmd_update_config_to_migrate() {

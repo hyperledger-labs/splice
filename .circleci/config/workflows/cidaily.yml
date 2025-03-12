@@ -101,6 +101,14 @@ workflow:
             - slack-context
           requires:
             - deploy_cluster_cidaily
+      - update_cilr:
+          name: update_cilr
+          <<: *main-branch-only
+          <<: *notify-fail
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
 
   cidaily_health_check:
     when:

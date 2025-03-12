@@ -3949,6 +3949,20 @@ jobs:
               /home/circleci/project/.circleci/create-gh-release.sh ${CIRCLE_BRANCH/release-line-/}
             fi
 
+  update_cilr:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Create branch to point CILR to and update tag
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          cmd: |
+            VERSION="$(get-snapshot-version)"
+            .circleci/update-cilr.sh
+
   # TODO(#14845): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that
   #               it succeeds.
@@ -4967,6 +4981,14 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster_cidaily
+      - update_cilr:
+          name: update_cilr
+          <<: *main-branch-only
+          <<: *notify-fail
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
 
   cidaily_health_check:
     when:
