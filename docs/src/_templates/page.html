@@ -1,8 +1,8 @@
 {%- extends "layout.html" %}
 {% block body %}
 {{ body }}
-<div class="section ablog__comments">
-  <h2>Comments</h2>
+<section id="comments">
+  <h2>Comments<a class="headerlink" href="#comments"></a></h2>
   <script src="https://giscus.app/client.js"
     data-repo="global-synchronizer-foundation/docs"
     data-repo-id="R_kgDONbkPcQ"
@@ -18,5 +18,5 @@
     crossorigin="anonymous"
     async>
   </script>
-</div>
+</section>
 {% endblock %}
