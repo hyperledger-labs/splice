@@ -8,6 +8,5 @@
 
 set -euo pipefail
 
-# TODO(#18253): We temporarily hard-code this to a branch where we cherry-picked the deployment stack PR.
-# once 0.3.16 is cut, this should be LATEST_RELEASE instead.
-echo "0.3.15-deployment-stack"
+latest_release=$(cat "$REPO_ROOT/LATEST_RELEASE")
+echo "release-line-${latest_release}"
