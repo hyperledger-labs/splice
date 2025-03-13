@@ -253,7 +253,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 6
+          "domains": 1
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
@@ -398,7 +398,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-5",
+      "name": "participant-0",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -442,7 +442,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -453,7 +453,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_5",
+          "databaseName": "participant_0",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -469,7 +469,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "validator-participant-5",
+    "name": "validator-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -618,10 +618,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "5"
+          "id": "0"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-5",
+        "participantAddress": "participant-0",
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",

@@ -12,12 +12,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "mediator-4-pg-secrets",
+        "name": "mediator-0-pg-secrets",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-mediator-4-pg-secrets",
+    "name": "cn-app-sv-1-mediator-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -34,12 +34,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "mediator-5-pg-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-mediator-5-pg-secrets",
+    "name": "cn-app-sv-1-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -56,12 +56,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-4-pg-secrets",
+        "name": "sequencer-0-pg-secrets",
         "namespace": "sv-1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-1-participant-4-pg-secrets",
+    "name": "cn-app-sv-1-sequencer-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -78,78 +78,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-5-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-participant-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-4-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-sequencer-4-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-5-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-sequencer-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-4-pg-secrets",
+        "name": "mediator-0-pg-secrets",
         "namespace": "sv-2"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-2-mediator-4-pg-secrets",
+    "name": "cn-app-sv-2-mediator-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -166,12 +100,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "mediator-5-pg-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "sv-2"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-2-mediator-5-pg-secrets",
+    "name": "cn-app-sv-2-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -188,12 +122,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-4-pg-secrets",
+        "name": "sequencer-0-pg-secrets",
         "namespace": "sv-2"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-2-participant-4-pg-secrets",
+    "name": "cn-app-sv-2-sequencer-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -210,78 +144,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-5-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-2-participant-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-4-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-2-sequencer-4-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-5-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-2-sequencer-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-4-pg-secrets",
+        "name": "mediator-0-pg-secrets",
         "namespace": "sv-3"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-3-mediator-4-pg-secrets",
+    "name": "cn-app-sv-3-mediator-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -298,12 +166,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "mediator-5-pg-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "sv-3"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-3-mediator-5-pg-secrets",
+    "name": "cn-app-sv-3-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -320,12 +188,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-4-pg-secrets",
+        "name": "sequencer-0-pg-secrets",
         "namespace": "sv-3"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-3-participant-4-pg-secrets",
+    "name": "cn-app-sv-3-sequencer-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -342,78 +210,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-5-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-3-participant-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-4-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-3-sequencer-4-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-5-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-3-sequencer-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-4-pg-secrets",
+        "name": "mediator-0-pg-secrets",
         "namespace": "sv-4"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-4-mediator-4-pg-secrets",
+    "name": "cn-app-sv-4-mediator-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -430,12 +232,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "mediator-5-pg-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "sv-4"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-4-mediator-5-pg-secrets",
+    "name": "cn-app-sv-4-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -452,12 +254,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-4-pg-secrets",
+        "name": "sequencer-0-pg-secrets",
         "namespace": "sv-4"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-4-participant-4-pg-secrets",
+    "name": "cn-app-sv-4-sequencer-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -474,78 +276,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-5-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-4-participant-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-4-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-4-sequencer-4-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-5-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-4-sequencer-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-4-pg-secrets",
+        "name": "mediator-0-pg-secrets",
         "namespace": "sv"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-mediator-4-pg-secrets",
+    "name": "cn-app-sv-mediator-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -562,12 +298,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "mediator-5-pg-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "sv"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-mediator-5-pg-secrets",
+    "name": "cn-app-sv-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -584,78 +320,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-4-pg-secrets",
+        "name": "sequencer-0-pg-secrets",
         "namespace": "sv"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-participant-4-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-5-pg-secrets",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-participant-5-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-4-pg-secrets",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-sequencer-4-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-5-pg-secrets",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-sequencer-5-pg-secrets",
+    "name": "cn-app-sv-sequencer-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -665,7 +335,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-1-sv-canton-migration-4",
+    "name": "k8s-imgpull-sv-1-sv-canton-migration-0",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -675,7 +345,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-1-sv-canton-migration-5",
+    "name": "k8s-imgpull-sv-2-sv-canton-migration-0",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -685,7 +355,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-2-sv-canton-migration-4",
+    "name": "k8s-imgpull-sv-3-sv-canton-migration-0",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -695,7 +365,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-2-sv-canton-migration-5",
+    "name": "k8s-imgpull-sv-4-sv-canton-migration-0",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -705,57 +375,7 @@
     "inputs": {
       "enableServerSideApply": "true"
     },
-    "name": "k8s-imgpull-sv-3-sv-canton-migration-4",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s-imgpull-sv-3-sv-canton-migration-5",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s-imgpull-sv-4-sv-canton-migration-4",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s-imgpull-sv-4-sv-canton-migration-5",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s-imgpull-sv-sv-canton-migration-4",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s-imgpull-sv-sv-canton-migration-5",
+    "name": "k8s-imgpull-sv-sv-canton-migration-0",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
   },
@@ -766,7 +386,7 @@
       "chart": "splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
-      "name": "cometbft-global-domain-5",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -800,20 +420,20 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-5",
-          "chainIdSuffix": "4"
+          "chainId": "dev-0",
+          "chainIdSuffix": "5"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26516
+          "port": 26016
         },
         "logLevel": "debug",
         "metrics": {
@@ -826,15 +446,15 @@
           ],
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
-          "identifier": "global-domain-5-cometbft",
-          "istioPort": 26516,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26016,
           "keysSecret": "",
           "privateKey": "sv1-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
@@ -846,13 +466,13 @@
         },
         "nodeName": "Digital-Asset-2",
         "peers": [],
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -867,7 +487,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-1-cometbft-global-domain-5",
+    "name": "sv-1-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -877,7 +497,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-mediator-4-pg-cantonnet",
+    "name": "sv-1-db-mediator-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -887,7 +507,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-mediator-5-pg-cantonnet",
+    "name": "sv-1-db-participant-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -897,37 +517,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-1-db-participant-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-1-db-participant-5-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-1-db-sequencer-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-1-db-sequencer-5-pg-cantonnet",
+    "name": "sv-1-db-sequencer-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -935,7 +525,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-global-domain-5",
+    "name": "sv-1-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -946,7 +536,7 @@
       "chart": "splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
-      "name": "global-domain-5",
+      "name": "global-domain-0",
       "namespace": "sv-1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -984,33 +574,33 @@
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_5_mediator",
+            "databaseName": "global_domain_0_mediator",
             "port": 5432,
-            "postgresName": "mediator-5-pg",
-            "secretName": "mediator-5-pg-secrets"
+            "postgresName": "mediator-0-pg",
+            "secretName": "mediator-0-pg-secrets"
           }
         },
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "sequencer": {
           "driver": {
-            "host": "global-domain-5-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_5_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "port": 5432,
-            "postgresName": "sequencer-5-pg",
-            "secretName": "sequencer-5-pg-secrets"
+            "postgresName": "sequencer-0-pg",
+            "secretName": "sequencer-0-pg-secrets"
           }
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1021,7 +611,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-1-global-domain-5",
+    "name": "sv-1-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1033,7 +623,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-4-pg-passwd",
+    "name": "sv-1-mediator-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1041,7 +631,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-mediator-4-pg",
+    "name": "sv-1-mediator-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -1078,11 +668,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-1-mediator-4-pg",
+    "name": "sv-1-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -1094,7 +684,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-mediator-5-pg-passwd",
+    "name": "sv-1-participant-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1102,7 +692,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-mediator-5-pg",
+    "name": "sv-1-participant-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -1139,133 +729,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "5"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-1-mediator-5-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-participant-4-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-1-participant-4-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "4"
-        }
-      }
-    },
-    "name": "sv-1-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-participant-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-1-participant-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-1-participant-5-pg",
+    "name": "sv-1-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -1276,7 +744,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-5",
+      "name": "participant-0",
       "namespace": "sv-1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -1321,7 +789,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -1332,13 +800,13 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_5",
+          "databaseName": "participant_0",
           "port": 5432,
-          "postgresName": "participant-5-pg",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "participant-5-pg-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1349,7 +817,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-1-participant-5",
+    "name": "sv-1-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1361,7 +829,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-1-sequencer-4-pg-passwd",
+    "name": "sv-1-sequencer-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1369,7 +837,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-sequencer-4-pg",
+    "name": "sv-1-sequencer-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -1406,72 +874,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-1-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-sequencer-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-1-sequencer-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-1-sequencer-5-pg",
+    "name": "sv-1-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -1482,7 +889,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "sv-canton-migration-4-docker-reg-cred",
+        "name": "sv-canton-migration-0-docker-reg-cred",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -1493,7 +900,7 @@
       },
       "type": "kubernetes.io/dockerconfigjson"
     },
-    "name": "sv-1-sv-canton-migration-4-docker-reg-cred",
+    "name": "sv-1-sv-canton-migration-0-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1504,77 +911,18 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "sv-canton-migration-4-docker-reg-cred"
+          "name": "sv-canton-migration-0-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-1"
       }
     },
-    "name": "sv-1-sv-canton-migration-4",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-sv-canton-migration-4::undefined_id",
+    "name": "sv-1-sv-canton-migration-0",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-sv-canton-migration-0::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-canton-migration-5-docker-reg-cred",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-1-sv-canton-migration-5-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "sv-canton-migration-5-docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-1"
-      }
-    },
-    "name": "sv-1-sv-canton-migration-5",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-1-sv-canton-migration-5::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Namespace",
-      "metadata": {
-        "labels": {
-          "istio-injection": "enabled"
-        },
-        "name": "sv-1"
-      }
-    },
-    "name": "sv-1",
-    "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
   },
   {
     "custom": true,
@@ -1600,7 +948,7 @@
       "chart": "splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
-      "name": "cometbft-global-domain-5",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-2",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -1634,20 +982,20 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-5",
-          "chainIdSuffix": "4"
+          "chainId": "dev-0",
+          "chainIdSuffix": "5"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26526
+          "port": 26026
         },
         "logLevel": "info",
         "metrics": {
@@ -1660,15 +1008,15 @@
           ],
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26526",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26026",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
-          "identifier": "global-domain-5-cometbft",
-          "istioPort": 26526,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26026,
           "keysSecret": "",
           "privateKey": "sv2-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
@@ -1681,21 +1029,21 @@
         "nodeName": "Digital-Asset-Eng-2",
         "peers": [
           {
-            "externalAddress": "global-domain-5-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           },
           {
-            "externalAddress": "global-domain-5-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -1710,7 +1058,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-2-cometbft-global-domain-5",
+    "name": "sv-2-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1720,7 +1068,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-2-db-mediator-4-pg-cantonnet",
+    "name": "sv-2-db-mediator-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -1730,7 +1078,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-2-db-mediator-5-pg-cantonnet",
+    "name": "sv-2-db-participant-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -1740,37 +1088,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-2-db-participant-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-2-db-participant-5-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-2-db-sequencer-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-2-db-sequencer-5-pg-cantonnet",
+    "name": "sv-2-db-sequencer-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -1778,7 +1096,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-2-global-domain-5",
+    "name": "sv-2-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -1789,7 +1107,7 @@
       "chart": "splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
-      "name": "global-domain-5",
+      "name": "global-domain-0",
       "namespace": "sv-2",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -1827,33 +1145,33 @@
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_5_mediator",
+            "databaseName": "global_domain_0_mediator",
             "port": 5432,
-            "postgresName": "mediator-5-pg",
-            "secretName": "mediator-5-pg-secrets"
+            "postgresName": "mediator-0-pg",
+            "secretName": "mediator-0-pg-secrets"
           }
         },
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "sequencer": {
           "driver": {
-            "host": "global-domain-5-cometbft-cometbft-rpc.sv-2.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-2.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_5_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "port": 5432,
-            "postgresName": "sequencer-5-pg",
-            "secretName": "sequencer-5-pg-secrets"
+            "postgresName": "sequencer-0-pg",
+            "secretName": "sequencer-0-pg-secrets"
           }
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1864,7 +1182,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-2-global-domain-5",
+    "name": "sv-2-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1876,7 +1194,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-2-mediator-4-pg-passwd",
+    "name": "sv-2-mediator-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1884,7 +1202,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-2-mediator-4-pg",
+    "name": "sv-2-mediator-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -1921,11 +1239,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-2-mediator-4-pg",
+    "name": "sv-2-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -1937,7 +1255,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-2-mediator-5-pg-passwd",
+    "name": "sv-2-participant-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1945,7 +1263,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-2-mediator-5-pg",
+    "name": "sv-2-participant-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -1982,133 +1300,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "5"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-2-mediator-5-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-2-participant-4-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-2-participant-4-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "4"
-        }
-      }
-    },
-    "name": "sv-2-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-2-participant-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-2-participant-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-2-participant-5-pg",
+    "name": "sv-2-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -2119,7 +1315,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-5",
+      "name": "participant-0",
       "namespace": "sv-2",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -2164,7 +1360,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -2175,13 +1371,13 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_5",
+          "databaseName": "participant_0",
           "port": 5432,
-          "postgresName": "participant-5-pg",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "participant-5-pg-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2192,7 +1388,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-2-participant-5",
+    "name": "sv-2-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2204,7 +1400,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-2-sequencer-4-pg-passwd",
+    "name": "sv-2-sequencer-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2212,7 +1408,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-2-sequencer-4-pg",
+    "name": "sv-2-sequencer-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -2249,72 +1445,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-2-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-2-sequencer-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-2-sequencer-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-2-sequencer-5-pg",
+    "name": "sv-2-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -2325,7 +1460,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "sv-canton-migration-4-docker-reg-cred",
+        "name": "sv-canton-migration-0-docker-reg-cred",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -2336,7 +1471,7 @@
       },
       "type": "kubernetes.io/dockerconfigjson"
     },
-    "name": "sv-2-sv-canton-migration-4-docker-reg-cred",
+    "name": "sv-2-sv-canton-migration-0-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -2347,77 +1482,18 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "sv-canton-migration-4-docker-reg-cred"
+          "name": "sv-canton-migration-0-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-2"
       }
     },
-    "name": "sv-2-sv-canton-migration-4",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2-sv-canton-migration-4::undefined_id",
+    "name": "sv-2-sv-canton-migration-0",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2-sv-canton-migration-0::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-canton-migration-5-docker-reg-cred",
-        "namespace": "sv-2"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-2-sv-canton-migration-5-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "sv-canton-migration-5-docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-2"
-      }
-    },
-    "name": "sv-2-sv-canton-migration-5",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-2-sv-canton-migration-5::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Namespace",
-      "metadata": {
-        "labels": {
-          "istio-injection": "enabled"
-        },
-        "name": "sv-2"
-      }
-    },
-    "name": "sv-2",
-    "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
   },
   {
     "custom": true,
@@ -2443,7 +1519,7 @@
       "chart": "splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
-      "name": "cometbft-global-domain-5",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-3",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -2477,20 +1553,20 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-5",
-          "chainIdSuffix": "4"
+          "chainId": "dev-0",
+          "chainIdSuffix": "5"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26536
+          "port": 26036
         },
         "logLevel": "info",
         "metrics": {
@@ -2503,15 +1579,15 @@
           ],
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26536",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26036",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
-          "identifier": "global-domain-5-cometbft",
-          "istioPort": 26536,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26036,
           "keysSecret": "",
           "privateKey": "sv3-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
@@ -2524,21 +1600,21 @@
         "nodeName": "Digital-Asset-Eng-3",
         "peers": [
           {
-            "externalAddress": "global-domain-5-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "global-domain-5-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -2553,7 +1629,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-3-cometbft-global-domain-5",
+    "name": "sv-3-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2563,7 +1639,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-3-db-mediator-4-pg-cantonnet",
+    "name": "sv-3-db-mediator-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -2573,7 +1649,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-3-db-mediator-5-pg-cantonnet",
+    "name": "sv-3-db-participant-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -2583,37 +1659,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-3-db-participant-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-3-db-participant-5-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-3-db-sequencer-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-3-db-sequencer-5-pg-cantonnet",
+    "name": "sv-3-db-sequencer-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -2621,7 +1667,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-3-global-domain-5",
+    "name": "sv-3-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -2632,7 +1678,7 @@
       "chart": "splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
-      "name": "global-domain-5",
+      "name": "global-domain-0",
       "namespace": "sv-3",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -2670,33 +1716,33 @@
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_5_mediator",
+            "databaseName": "global_domain_0_mediator",
             "port": 5432,
-            "postgresName": "mediator-5-pg",
-            "secretName": "mediator-5-pg-secrets"
+            "postgresName": "mediator-0-pg",
+            "secretName": "mediator-0-pg-secrets"
           }
         },
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "sequencer": {
           "driver": {
-            "host": "global-domain-5-cometbft-cometbft-rpc.sv-3.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-3.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_5_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "port": 5432,
-            "postgresName": "sequencer-5-pg",
-            "secretName": "sequencer-5-pg-secrets"
+            "postgresName": "sequencer-0-pg",
+            "secretName": "sequencer-0-pg-secrets"
           }
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2707,7 +1753,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-3-global-domain-5",
+    "name": "sv-3-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2719,7 +1765,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-3-mediator-4-pg-passwd",
+    "name": "sv-3-mediator-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2727,7 +1773,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-3-mediator-4-pg",
+    "name": "sv-3-mediator-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -2764,11 +1810,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-3-mediator-4-pg",
+    "name": "sv-3-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -2780,7 +1826,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-3-mediator-5-pg-passwd",
+    "name": "sv-3-participant-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -2788,7 +1834,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-3-mediator-5-pg",
+    "name": "sv-3-participant-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -2825,133 +1871,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "5"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-3-mediator-5-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-3-participant-4-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-3-participant-4-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "4"
-        }
-      }
-    },
-    "name": "sv-3-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-3-participant-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-3-participant-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-3-participant-5-pg",
+    "name": "sv-3-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -2962,7 +1886,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-5",
+      "name": "participant-0",
       "namespace": "sv-3",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -3007,7 +1931,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -3018,13 +1942,13 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_5",
+          "databaseName": "participant_0",
           "port": 5432,
-          "postgresName": "participant-5-pg",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "participant-5-pg-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3035,7 +1959,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-3-participant-5",
+    "name": "sv-3-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3047,7 +1971,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-3-sequencer-4-pg-passwd",
+    "name": "sv-3-sequencer-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3055,7 +1979,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-3-sequencer-4-pg",
+    "name": "sv-3-sequencer-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -3092,72 +2016,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-3-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-3-sequencer-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-3-sequencer-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-3-sequencer-5-pg",
+    "name": "sv-3-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -3168,7 +2031,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "sv-canton-migration-4-docker-reg-cred",
+        "name": "sv-canton-migration-0-docker-reg-cred",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -3179,7 +2042,7 @@
       },
       "type": "kubernetes.io/dockerconfigjson"
     },
-    "name": "sv-3-sv-canton-migration-4-docker-reg-cred",
+    "name": "sv-3-sv-canton-migration-0-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -3190,77 +2053,18 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "sv-canton-migration-4-docker-reg-cred"
+          "name": "sv-canton-migration-0-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-3"
       }
     },
-    "name": "sv-3-sv-canton-migration-4",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3-sv-canton-migration-4::undefined_id",
+    "name": "sv-3-sv-canton-migration-0",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3-sv-canton-migration-0::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-canton-migration-5-docker-reg-cred",
-        "namespace": "sv-3"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-3-sv-canton-migration-5-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "sv-canton-migration-5-docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-3"
-      }
-    },
-    "name": "sv-3-sv-canton-migration-5",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-3-sv-canton-migration-5::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Namespace",
-      "metadata": {
-        "labels": {
-          "istio-injection": "enabled"
-        },
-        "name": "sv-3"
-      }
-    },
-    "name": "sv-3",
-    "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
   },
   {
     "custom": true,
@@ -3286,7 +2090,7 @@
       "chart": "splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
-      "name": "cometbft-global-domain-5",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-4",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -3320,20 +2124,20 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-5",
-          "chainIdSuffix": "4"
+          "chainId": "dev-0",
+          "chainIdSuffix": "5"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26546
+          "port": 26046
         },
         "logLevel": "info",
         "metrics": {
@@ -3346,15 +2150,15 @@
           ],
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26546",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26046",
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
-          "identifier": "global-domain-5-cometbft",
-          "istioPort": 26546,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26046,
           "keysSecret": "",
           "privateKey": "sv4-cometbft-keys-node-private-key",
           "retainBlocks": 5040000,
@@ -3367,21 +2171,21 @@
         "nodeName": "Digital-Asset-Eng-4",
         "peers": [
           {
-            "externalAddress": "global-domain-5-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "global-domain-5-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
         ],
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -3396,7 +2200,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-4-cometbft-global-domain-5",
+    "name": "sv-4-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3406,7 +2210,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-4-db-mediator-4-pg-cantonnet",
+    "name": "sv-4-db-mediator-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -3416,7 +2220,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-4-db-mediator-5-pg-cantonnet",
+    "name": "sv-4-db-participant-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -3426,37 +2230,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-4-db-participant-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-4-db-participant-5-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-4-db-sequencer-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-4-db-sequencer-5-pg-cantonnet",
+    "name": "sv-4-db-sequencer-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -3464,7 +2238,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-4-global-domain-5",
+    "name": "sv-4-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -3475,7 +2249,7 @@
       "chart": "splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
-      "name": "global-domain-5",
+      "name": "global-domain-0",
       "namespace": "sv-4",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -3513,33 +2287,33 @@
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
-            "databaseName": "global_domain_5_mediator",
+            "databaseName": "global_domain_0_mediator",
             "port": 5432,
-            "postgresName": "mediator-5-pg",
-            "secretName": "mediator-5-pg-secrets"
+            "postgresName": "mediator-0-pg",
+            "secretName": "mediator-0-pg-secrets"
           }
         },
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "sequencer": {
           "driver": {
-            "host": "global-domain-5-cometbft-cometbft-rpc.sv-4.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv-4.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "global_domain_5_sequencer",
+            "databaseName": "global_domain_0_sequencer",
             "port": 5432,
-            "postgresName": "sequencer-5-pg",
-            "secretName": "sequencer-5-pg-secrets"
+            "postgresName": "sequencer-0-pg",
+            "secretName": "sequencer-0-pg-secrets"
           }
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3550,7 +2324,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-4-global-domain-5",
+    "name": "sv-4-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3562,7 +2336,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-4-mediator-4-pg-passwd",
+    "name": "sv-4-mediator-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3570,7 +2344,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-4-mediator-4-pg",
+    "name": "sv-4-mediator-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -3607,11 +2381,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-4-mediator-4-pg",
+    "name": "sv-4-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -3623,7 +2397,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-4-mediator-5-pg-passwd",
+    "name": "sv-4-participant-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3631,7 +2405,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-4-mediator-5-pg",
+    "name": "sv-4-participant-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -3668,133 +2442,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "5"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-4-mediator-5-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-4-participant-4-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-4-participant-4-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "4"
-        }
-      }
-    },
-    "name": "sv-4-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-4-participant-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-4-participant-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-4-participant-5-pg",
+    "name": "sv-4-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -3805,7 +2457,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-5",
+      "name": "participant-0",
       "namespace": "sv-4",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -3850,7 +2502,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -3861,13 +2513,13 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_5",
+          "databaseName": "participant_0",
           "port": 5432,
-          "postgresName": "participant-5-pg",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "participant-5-pg-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3878,7 +2530,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-4-participant-5",
+    "name": "sv-4-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3890,7 +2542,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-4-sequencer-4-pg-passwd",
+    "name": "sv-4-sequencer-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -3898,7 +2550,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-4-sequencer-4-pg",
+    "name": "sv-4-sequencer-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -3935,72 +2587,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-4-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-4-sequencer-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-4-sequencer-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-4-sequencer-5-pg",
+    "name": "sv-4-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -4011,7 +2602,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "sv-canton-migration-4-docker-reg-cred",
+        "name": "sv-canton-migration-0-docker-reg-cred",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -4022,7 +2613,7 @@
       },
       "type": "kubernetes.io/dockerconfigjson"
     },
-    "name": "sv-4-sv-canton-migration-4-docker-reg-cred",
+    "name": "sv-4-sv-canton-migration-0-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -4033,59 +2624,17 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "sv-canton-migration-4-docker-reg-cred"
+          "name": "sv-canton-migration-0-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-4"
       }
     },
-    "name": "sv-4-sv-canton-migration-4",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4-sv-canton-migration-4::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-canton-migration-5-docker-reg-cred",
-        "namespace": "sv-4"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-4-sv-canton-migration-5-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "sv-canton-migration-5-docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-4"
-      }
-    },
-    "name": "sv-4-sv-canton-migration-5",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4-sv-canton-migration-5::undefined_id",
+    "name": "sv-4-sv-canton-migration-0",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-4-sv-canton-migration-0::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -4110,30 +2659,13 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
-      "kind": "Namespace",
-      "metadata": {
-        "labels": {
-          "istio-injection": "enabled"
-        },
-        "name": "sv-4"
-      }
-    },
-    "name": "sv-4",
-    "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-1"
       }
     },
-    "name": "sv-canton-migration-4",
+    "name": "sv-canton-migration-0",
     "provider": "",
     "type": "kubernetes:core/v1:ServiceAccount"
   },
@@ -4144,11 +2676,11 @@
       "apiVersion": "v1",
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-2"
       }
     },
-    "name": "sv-canton-migration-4",
+    "name": "sv-canton-migration-0",
     "provider": "",
     "type": "kubernetes:core/v1:ServiceAccount"
   },
@@ -4159,11 +2691,11 @@
       "apiVersion": "v1",
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-3"
       }
     },
-    "name": "sv-canton-migration-4",
+    "name": "sv-canton-migration-0",
     "provider": "",
     "type": "kubernetes:core/v1:ServiceAccount"
   },
@@ -4174,11 +2706,11 @@
       "apiVersion": "v1",
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv-4"
       }
     },
-    "name": "sv-canton-migration-4",
+    "name": "sv-canton-migration-0",
     "provider": "",
     "type": "kubernetes:core/v1:ServiceAccount"
   },
@@ -4189,86 +2721,11 @@
       "apiVersion": "v1",
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv"
       }
     },
-    "name": "sv-canton-migration-4",
-    "provider": "",
-    "type": "kubernetes:core/v1:ServiceAccount"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-1"
-      }
-    },
-    "name": "sv-canton-migration-5",
-    "provider": "",
-    "type": "kubernetes:core/v1:ServiceAccount"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-2"
-      }
-    },
-    "name": "sv-canton-migration-5",
-    "provider": "",
-    "type": "kubernetes:core/v1:ServiceAccount"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-3"
-      }
-    },
-    "name": "sv-canton-migration-5",
-    "provider": "",
-    "type": "kubernetes:core/v1:ServiceAccount"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv-4"
-      }
-    },
-    "name": "sv-canton-migration-5",
-    "provider": "",
-    "type": "kubernetes:core/v1:ServiceAccount"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv"
-      }
-    },
-    "name": "sv-canton-migration-5",
+    "name": "sv-canton-migration-0",
     "provider": "",
     "type": "kubernetes:core/v1:ServiceAccount"
   },
@@ -4279,7 +2736,7 @@
       "chart": "splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
-      "name": "cometbft-global-domain-5",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -4313,20 +2770,20 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "db": {},
         "founder": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "dev-5",
-          "chainIdSuffix": "4"
+          "chainId": "dev-0",
+          "chainIdSuffix": "5"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26506
+          "port": 26006
         },
         "logLevel": "info",
         "metrics": {
@@ -4339,27 +2796,27 @@
           ],
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26506",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26006",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
-          "identifier": "global-domain-5-cometbft",
-          "istioPort": 26506,
+          "identifier": "global-domain-0-cometbft",
+          "istioPort": 26006,
           "keysSecret": "cometbft-keys",
           "retainBlocks": 5040000
         },
         "nodeName": "DA-Helm-Test-Node",
         "peers": [],
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.dev.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "dev.global.canton.network.digitalasset.com:26516",
+          "externalAddress": "dev.global.canton.network.digitalasset.com:26016",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -4374,7 +2831,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-cometbft-global-domain-5",
+    "name": "sv-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4384,7 +2841,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-db-mediator-4-pg-cantonnet",
+    "name": "sv-db-mediator-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -4394,7 +2851,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-db-mediator-5-pg-cantonnet",
+    "name": "sv-db-participant-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -4404,37 +2861,7 @@
     "inputs": {
       "name": "cantonnet"
     },
-    "name": "sv-db-participant-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-db-participant-5-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-db-sequencer-4-pg-cantonnet",
-    "provider": "",
-    "type": "gcp:sql/database:Database"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cantonnet"
-    },
-    "name": "sv-db-sequencer-5-pg-cantonnet",
+    "name": "sv-db-sequencer-0-pg-cantonnet",
     "provider": "",
     "type": "gcp:sql/database:Database"
   },
@@ -4442,7 +2869,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-global-domain-5",
+    "name": "sv-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -4453,7 +2880,7 @@
       "chart": "splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
-      "name": "global-domain-5",
+      "name": "global-domain-0",
       "namespace": "sv",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -4491,33 +2918,33 @@
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
-            "databaseName": "mediator_5",
+            "databaseName": "mediator_0",
             "port": 5432,
-            "postgresName": "mediator-5-pg",
-            "secretName": "mediator-5-pg-secrets"
+            "postgresName": "mediator-0-pg",
+            "secretName": "mediator-0-pg-secrets"
           }
         },
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "sequencer": {
           "driver": {
-            "host": "global-domain-5-cometbft-cometbft-rpc.sv.svc.cluster.local",
+            "host": "global-domain-0-cometbft-cometbft-rpc.sv.svc.cluster.local",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
-            "databaseName": "sequencer_5",
+            "databaseName": "sequencer_0",
             "port": 5432,
-            "postgresName": "sequencer-5-pg",
-            "secretName": "sequencer-5-pg-secrets"
+            "postgresName": "sequencer-0-pg",
+            "secretName": "sequencer-0-pg-secrets"
           }
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -4528,7 +2955,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-global-domain-5",
+    "name": "sv-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4540,7 +2967,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-4-pg-passwd",
+    "name": "sv-mediator-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4548,7 +2975,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-mediator-4-pg",
+    "name": "sv-mediator-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -4585,11 +3012,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-mediator-4-pg",
+    "name": "sv-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -4601,7 +3028,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-5-pg-passwd",
+    "name": "sv-participant-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4609,7 +3036,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-mediator-5-pg",
+    "name": "sv-participant-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -4646,133 +3073,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "5"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-mediator-5-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-participant-4-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-participant-4-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "4"
-        }
-      }
-    },
-    "name": "sv-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-participant-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-participant-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-participant-5-pg",
+    "name": "sv-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -4783,7 +3088,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-5",
+      "name": "participant-0",
       "namespace": "sv",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -4828,7 +3133,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -4839,13 +3144,13 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_5",
+          "databaseName": "participant_0",
           "port": 5432,
-          "postgresName": "participant-5-pg",
+          "postgresName": "participant-0-pg",
           "schema": "participant",
-          "secretName": "participant-5-pg-secrets"
+          "secretName": "participant-0-pg-secrets"
         },
-        "serviceAccountName": "sv-canton-migration-5",
+        "serviceAccountName": "sv-canton-migration-0",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -4856,7 +3161,7 @@
       },
       "version": "0.3.15"
     },
-    "name": "sv-participant-5",
+    "name": "sv-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4868,7 +3173,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-4-pg-passwd",
+    "name": "sv-sequencer-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -4876,7 +3181,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-sequencer-4-pg",
+    "name": "sv-sequencer-0-pg",
     "provider": "",
     "type": "canton:cloud:postgres"
   },
@@ -4913,72 +3218,11 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "4"
+          "migration_id": "0"
         }
       }
     },
-    "name": "sv-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/databaseInstance:DatabaseInstance"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-sequencer-5-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-sequencer-5-pg",
-    "provider": "",
-    "type": "canton:cloud:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "databaseVersion": "POSTGRES_14",
-      "deletionProtection": false,
-      "region": "us-central1",
-      "settings": {
-        "activationPolicy": "ALWAYS",
-        "backupConfiguration": {
-          "enabled": true,
-          "pointInTimeRecoveryEnabled": true
-        },
-        "databaseFlags": [
-          {
-            "name": "temp_file_limit",
-            "value": "100000000"
-          }
-        ],
-        "insightsConfig": {
-          "queryInsightsEnabled": true
-        },
-        "ipConfiguration": {
-          "enablePrivatePathForGoogleCloudServices": true,
-          "ipv4Enabled": false,
-          "privateNetwork": "projects/test-project/global/networks/default"
-        },
-        "locationPreference": {
-          "zone": "us-central1-a"
-        },
-        "tier": "db-custom-2-7680",
-        "userLabels": {
-          "cluster": "dev",
-          "migration_id": "5"
-        }
-      }
-    },
-    "name": "sv-sequencer-5-pg",
+    "name": "sv-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/databaseInstance:DatabaseInstance"
   },
@@ -4989,7 +3233,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "sv-canton-migration-4-docker-reg-cred",
+        "name": "sv-canton-migration-0-docker-reg-cred",
         "namespace": "sv"
       },
       "stringData": {
@@ -5000,7 +3244,7 @@
       },
       "type": "kubernetes.io/dockerconfigjson"
     },
-    "name": "sv-sv-canton-migration-4-docker-reg-cred",
+    "name": "sv-sv-canton-migration-0-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -5011,59 +3255,17 @@
       "apiVersion": "v1",
       "imagePullSecrets": [
         {
-          "name": "sv-canton-migration-4-docker-reg-cred"
+          "name": "sv-canton-migration-0-docker-reg-cred"
         }
       ],
       "kind": "ServiceAccount",
       "metadata": {
-        "name": "sv-canton-migration-4",
+        "name": "sv-canton-migration-0",
         "namespace": "sv"
       }
     },
-    "name": "sv-sv-canton-migration-4",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-sv-canton-migration-4::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-canton-migration-5-docker-reg-cred",
-        "namespace": "sv"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
-        }
-      },
-      "type": "kubernetes.io/dockerconfigjson"
-    },
-    "name": "sv-sv-canton-migration-5-docker-reg-cred",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "sv-canton-migration-5-docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "sv-canton-migration-5",
-        "namespace": "sv"
-      }
-    },
-    "name": "sv-sv-canton-migration-5",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-sv-canton-migration-5::undefined_id",
+    "name": "sv-sv-canton-migration-0",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-sv-sv-canton-migration-0::undefined_id",
     "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
@@ -5087,30 +3289,13 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "apiVersion": "v1",
-      "kind": "Namespace",
-      "metadata": {
-        "labels": {
-          "istio-injection": "enabled"
-        },
-        "name": "sv"
-      }
-    },
-    "name": "sv",
-    "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-4-pg",
+    "name": "user-sv-1-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5124,7 +3309,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-mediator-5-pg",
+    "name": "user-sv-1-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5138,7 +3323,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-4-pg",
+    "name": "user-sv-1-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5152,7 +3337,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-participant-5-pg",
+    "name": "user-sv-2-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5166,7 +3351,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-4-pg",
+    "name": "user-sv-2-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5180,7 +3365,7 @@
         "value": null
       }
     },
-    "name": "user-sv-1-sequencer-5-pg",
+    "name": "user-sv-2-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5194,7 +3379,7 @@
         "value": null
       }
     },
-    "name": "user-sv-2-mediator-4-pg",
+    "name": "user-sv-3-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5208,7 +3393,7 @@
         "value": null
       }
     },
-    "name": "user-sv-2-mediator-5-pg",
+    "name": "user-sv-3-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5222,7 +3407,7 @@
         "value": null
       }
     },
-    "name": "user-sv-2-participant-4-pg",
+    "name": "user-sv-3-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5236,7 +3421,7 @@
         "value": null
       }
     },
-    "name": "user-sv-2-participant-5-pg",
+    "name": "user-sv-4-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5250,7 +3435,7 @@
         "value": null
       }
     },
-    "name": "user-sv-2-sequencer-4-pg",
+    "name": "user-sv-4-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5264,7 +3449,7 @@
         "value": null
       }
     },
-    "name": "user-sv-2-sequencer-5-pg",
+    "name": "user-sv-4-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5278,7 +3463,7 @@
         "value": null
       }
     },
-    "name": "user-sv-3-mediator-4-pg",
+    "name": "user-sv-mediator-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5292,7 +3477,7 @@
         "value": null
       }
     },
-    "name": "user-sv-3-mediator-5-pg",
+    "name": "user-sv-participant-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   },
@@ -5306,217 +3491,7 @@
         "value": null
       }
     },
-    "name": "user-sv-3-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-3-participant-5-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-3-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-3-sequencer-5-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-4-mediator-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-4-mediator-5-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-4-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-4-participant-5-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-4-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-4-sequencer-5-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-mediator-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-mediator-5-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-participant-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-participant-5-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-sequencer-4-pg",
-    "provider": "",
-    "type": "gcp:sql/user:User"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cnadmin",
-      "password": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": null
-      }
-    },
-    "name": "user-sv-sequencer-5-pg",
+    "name": "user-sv-sequencer-0-pg",
     "provider": "",
     "type": "gcp:sql/user:User"
   }
