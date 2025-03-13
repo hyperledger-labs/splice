@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Loading } from 'common-frontend';
 import { JSONValue, JsonEditor, JSONObject } from 'common-frontend-utils';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import React, { useState, useEffect } from 'react';
 
 import { Checkbox, FormControl, FormControlLabel, Stack, Typography } from '@mui/material';
@@ -13,8 +13,10 @@ import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
 
 const SetDsoRulesConfig: React.FC<{
+  expiration: Dayjs;
   chooseAction: (action: ActionFromForm) => void;
-}> = ({ chooseAction }) => {
+  setIsValidSynchronizerPauseTime: (isValid: boolean) => void;
+}> = ({ expiration, chooseAction, setIsValidSynchronizerPauseTime }) => {
   const dsoInfosQuery = useDsoInfos();
   // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue> | undefined>(
@@ -34,15 +36,18 @@ const SetDsoRulesConfig: React.FC<{
   const handleSynchronizerUpgradeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     if (checked) {
-      setDsoRulesConfigAction({
+      const c = {
         ...configuration,
         nextScheduledSynchronizerUpgrade,
-      });
+      };
+      setDsoRulesConfigAction(c);
     } else {
-      setDsoRulesConfigAction({
+      const c = {
         ...configuration,
         nextScheduledSynchronizerUpgrade: null,
-      });
+      };
+      setDsoRulesConfigAction(c);
+      setIsValidSynchronizerPauseTime(true);
     }
   };
 
@@ -64,7 +69,19 @@ const SetDsoRulesConfig: React.FC<{
         setNextScheduledSynchronizerUpgrade(upgradeConfig);
       }
     }
-  }, [configuration, dsoInfosQuery]);
+    if (configuration && configuration.nextScheduledSynchronizerUpgrade) {
+      const nextScheduledUpgrade = dayjs(nextScheduledSynchronizerUpgrade.time);
+      expiration.isBefore(nextScheduledUpgrade)
+        ? setIsValidSynchronizerPauseTime(true)
+        : setIsValidSynchronizerPauseTime(false);
+    }
+  }, [
+    configuration,
+    dsoInfosQuery,
+    expiration,
+    nextScheduledSynchronizerUpgrade.time,
+    setIsValidSynchronizerPauseTime,
+  ]);
 
   if (dsoInfosQuery.isError) {
     return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;

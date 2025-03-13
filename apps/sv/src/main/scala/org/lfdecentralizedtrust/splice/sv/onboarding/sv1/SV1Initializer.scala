@@ -186,31 +186,40 @@ class SV1Initializer(
         ),
         retryProvider.ensureThatB(
           RetryFor.WaitingOnInitDependency,
-          "sv1_initial_package_upload",
+          "sv1_initial_package_vetting",
           "SV1 has uploaded the initial set of packages",
           initConnection
             .lookupUserMetadata(
               config.ledgerApiUser,
               BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
             )
-            .map(_.nonEmpty),
-          requiredDars(sv1Config.initialPackageConfig)
-            .traverse { packageToVet =>
-              participantAdminConnection
-                .vetDar(
-                  domainId,
-                  DarResource(packageToVet.resourcePath),
-                  None,
+            .map(_.nonEmpty), {
+            val packages = requiredDars(sv1Config.initialPackageConfig)
+            logger.info(
+              s"Starting with initial package ${sv1Config.initialPackageConfig} and vetting ${packages
+                  .map(_.resourcePath)}"
+            )
+            packages
+              .traverse { packageToVet =>
+                logger.info(
+                  s"Vetting initial package ${packageToVet.packageId} - ${packageToVet.resourcePath} on domain $domainId"
                 )
-            }
-            .flatMap { _ =>
-              initConnection.ensureUserMetadataAnnotation(
-                config.ledgerApiUser,
-                BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
-                "true",
-                RetryFor.WaitingOnInitDependency,
-              )
-            },
+                participantAdminConnection
+                  .vetDar(
+                    domainId,
+                    DarResource(packageToVet.resourcePath),
+                    None,
+                  )
+              }
+              .flatMap { _ =>
+                initConnection.ensureUserMetadataAnnotation(
+                  config.ledgerApiUser,
+                  BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+                  "true",
+                  RetryFor.WaitingOnInitDependency,
+                )
+              }
+          },
           logger,
         ),
       ).tupled
@@ -488,7 +497,7 @@ class SV1Initializer(
 
   private def requiredDars(initialPackageConfig: InitialPackageConfig): Seq[UploadablePackage] = {
     def darsUpToInitialConfig(packageResource: PackageResource, requiredVersion: String) = {
-      packageResource.others
+      packageResource.all
         .filter { darResource =>
           val required = PackageVersion.assertFromString(requiredVersion)
           darResource.metadata.version <= required
