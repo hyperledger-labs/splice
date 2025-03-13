@@ -4,6 +4,14 @@
 
 Major changes:
 
+* Added a `BurnMintFactory` API to `Splice.Api.Token.HoldingV1` to
+  capture generic burns and mints that do not fall under the transfer
+  or allocation APIs.
+
+## 2025-02-28
+
+Major changes:
+
 * Move development https://github.com/hyperledger-labs/splice/tree/canton-3.3/token-standard.
   to reflect that the API definitions of the token standard will be developed and open sourced as part of the splice project.
 * Rename modules as follows
