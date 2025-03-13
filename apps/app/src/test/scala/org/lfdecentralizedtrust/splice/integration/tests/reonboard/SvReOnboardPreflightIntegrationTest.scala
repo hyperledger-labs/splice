@@ -47,7 +47,8 @@ class SvReOnboardPreflightIntegrationTest
     s"https://wallet.validator.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private val validatorUsername = s"admin@validator.com"
 
-  private val password = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
+  private val svPassword = sys.env("SV_DEV_NET_WEB_UI_PASSWORD");
+  private val validatorPassword = sys.env("VALIDATOR_WEB_UI_PASSWORD");
 
   private val usdTappedInOffboardTest = BigDecimal("100000")
 
@@ -58,7 +59,7 @@ class SvReOnboardPreflightIntegrationTest
           completeAuth0LoginWithAuthorization(
             validatorWalletUrl,
             validatorUsername,
-            password,
+            validatorPassword,
             () => find(id("logout-button")) should not be empty,
           )
         },
@@ -89,7 +90,7 @@ class SvReOnboardPreflightIntegrationTest
           completeAuth0LoginWithAuthorization(
             svWalletUrl,
             svUsername,
-            password,
+            svPassword,
             () => find(id("logout-button")) should not be empty,
           )
         },
