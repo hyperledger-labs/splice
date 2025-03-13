@@ -50,6 +50,7 @@ A _release line branch_ is branched from the _ancestor branch_.
       also automatically bundle the sources from the release-line branch.
 - [ ] Merge a PR into the _ancestor branch_ with the following changes:
   - Update `VERSION` and `LATEST_RELEASE`. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
+- [ ] Communicate to partners that a new version is available
 
 ## Upgrade our own nodes on DevNet
 
@@ -76,7 +77,6 @@ and upgrade the other pulumi stacks.
   - [ ] Update the branch references in `.circleci/triggers/*/devnet-*.json` only for devnet.
         This will upgrade our periodic health checks to use the new release version.
         Old health checks may not work against the upgraded cluster, so expect some failures until this PR is merged.
-- [ ] Communicate to partners that a new version is available
 
 ## Upgrade our own nodes on TestNet and MainNet
 
