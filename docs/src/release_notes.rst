@@ -8,16 +8,18 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.16
+------
 
 * SV and validator apps
 
   * The SV and validator apps now preserve participant-local user state across synchronizer upgrades with downtime.
     More specifically, SVs and validators now preserve identity provider configs and users with all state attached to them (including, for example, rights and metadata annotations).
+
 * Scan
 
-  * the Scan API in scan-internal.yaml and scan-external.yaml have been merged into one scan.yaml file. Deprecated endpoints are marked with ``deprecated: true``.
+  * The Scan API in scan-internal.yaml and scan-external.yaml have been merged into one scan.yaml file. Deprecated endpoints are marked with ``deprecated: true``.
+
 * Deployment
 
   * Make synchronizer migration PVC names configurable through ``pvc.volumeName``. Thanks to Stéphane Loeuillet for contributing this in https://github.com/digital-asset/decentralized-canton-sync/pull/338
