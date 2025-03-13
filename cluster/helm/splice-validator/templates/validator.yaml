@@ -329,7 +329,7 @@ spec:
       {{- if $requiresMigrationPvc }}
         - name: domain-upgrade-dump-volume
           persistentVolumeClaim:
-            claimName: "domain-migration-validator-pvc"
+            claimName: {{ .Values.pvc.volumeName }}
       {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
@@ -367,7 +367,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "domain-migration-validator-pvc"
+  name: {{ .Values.pvc.volumeName }}
   namespace: {{ $.Release.Namespace }}
   labels:
     app: {{ $validatorAppLabel }}

@@ -18,6 +18,9 @@ Upcoming
 * Scan
 
   * the Scan API in scan-internal.yaml and scan-external.yaml have been merged into one scan.yaml file. Deprecated endpoints are marked with ``deprecated: true``.
+* Deployment
+
+  * Make synchronizer migration PVC names configurable through ``pvc.volumeName``. Thanks to Stéphane Loeuillet for contributing this in https://github.com/digital-asset/decentralized-canton-sync/pull/338
 
 0.3.15
 ------
