@@ -86,6 +86,8 @@ export const CreateVoteRequest: React.FC = () => {
     'milliseconds'
   );
 
+  const [isValidSynchronizerPauseTime, setIsValidSynchronizerPauseTime] = useState<boolean>(true);
+
   useEffect(() => {
     setExpiration(expirationFromVoteRequestTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,6 +187,7 @@ export const CreateVoteRequest: React.FC = () => {
       listVoteRequestsQuery.data!,
       effectiveDate
     );
+
     if (!scheduleValidity.isValid) {
       setAlertMessage(scheduleValidity.alertMessage);
     }
@@ -286,6 +289,9 @@ export const CreateVoteRequest: React.FC = () => {
               slotProps={{
                 textField: {
                   id: 'datetime-picker-vote-request-expiration',
+                  inputProps: {
+                    'data-testid': 'datetime-picker-vote-request-expiration',
+                  },
                 },
               }}
               closeOnSelect
@@ -306,7 +312,13 @@ export const CreateVoteRequest: React.FC = () => {
           {actionName === 'SRARC_RevokeFeaturedAppRight' && (
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
-          {actionName === 'SRARC_SetConfig' && <SetDsoRulesConfig chooseAction={chooseAction} />}
+          {actionName === 'SRARC_SetConfig' && (
+            <SetDsoRulesConfig
+              expiration={expiration}
+              chooseAction={chooseAction}
+              setIsValidSynchronizerPauseTime={setIsValidSynchronizerPauseTime}
+            />
+          )}
           {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
             <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
           )}
@@ -388,10 +400,15 @@ export const CreateVoteRequest: React.FC = () => {
                 },
                 { disabled: summary === '', reason: 'No summary' },
                 { disabled: !isValidUrl(url), reason: 'Invalid URL' },
+                {
+                  disabled: !isValidSynchronizerPauseTime,
+                  reason: 'Synchronizer upgrade time is before the expiry/effective date',
+                },
               ]}
             >
               <Button
                 id="create-voterequest-submit-button"
+                data-testid="create-voterequest-submit-button"
                 fullWidth
                 type={'submit'}
                 size="large"
