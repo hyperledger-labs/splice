@@ -201,6 +201,9 @@
         "pvc": {
           "type": "object",
           "properties": {
+            "volumeName": {
+              "type": "string"
+            },
             "volumeStorageClass": {
               "type": "string"
             }
