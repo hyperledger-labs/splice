@@ -55,6 +55,9 @@ if (clusterProdLike) {
           {
             kind: 'GitRepository',
             name: '*',
+            matchLabels: {
+              notifications: 'true',
+            },
           },
         ],
       },

@@ -334,6 +334,9 @@
       "apiVersion": "source.toolkit.fluxcd.io/v1",
       "kind": "GitRepository",
       "metadata": {
+        "labels": {
+          "notifications": "true"
+        },
         "name": "splice-node-active",
         "namespace": "operator"
       },
@@ -360,6 +363,9 @@
       "apiVersion": "source.toolkit.fluxcd.io/v1",
       "kind": "GitRepository",
       "metadata": {
+        "labels": {
+          "notifications": "true"
+        },
         "name": "splice-node-migration-4",
         "namespace": "operator"
       },
@@ -386,6 +392,9 @@
       "apiVersion": "source.toolkit.fluxcd.io/v1",
       "kind": "GitRepository",
       "metadata": {
+        "labels": {
+          "notifications": "true"
+        },
         "name": "splice-node-migration-5",
         "namespace": "operator"
       },

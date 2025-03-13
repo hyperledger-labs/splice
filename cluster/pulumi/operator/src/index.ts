@@ -6,8 +6,11 @@ import { flux } from './flux';
 import { namespace } from './namespace';
 import { installDeploymentStack } from './stacks/deployment';
 
-const deploymentStackReference = gitRepoForRef('deployment', operatorDeploymentConfig.reference, [
-  flux,
-]);
+const deploymentStackReference = gitRepoForRef(
+  'deployment',
+  operatorDeploymentConfig.reference,
+  false, // no notifications since this typically follows `main` and is too noisy
+  [flux]
+);
 const envRefs = createEnvRefs('operator-env', namespace.logicalName);
 installDeploymentStack(deploymentStackReference, envRefs);

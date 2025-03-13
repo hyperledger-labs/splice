@@ -17,6 +17,9 @@
         "eventSources": [
           {
             "kind": "GitRepository",
+            "matchLabels": {
+              "notifications": "true"
+            },
             "name": "*"
           }
         ],
@@ -579,6 +582,9 @@
       "apiVersion": "source.toolkit.fluxcd.io/v1",
       "kind": "GitRepository",
       "metadata": {
+        "labels": {
+          "notifications": "false"
+        },
         "name": "splice-node-deployment",
         "namespace": "operator"
       },

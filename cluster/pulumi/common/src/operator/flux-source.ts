@@ -7,6 +7,7 @@ export type GitFluxRef = k8s.apiextensions.CustomResource;
 export function gitRepoForRef(
   nameSuffix: string,
   ref: string,
+  notifications: boolean = true,
   dependsOn: Resource[] = []
 ): GitFluxRef {
   return new k8s.apiextensions.CustomResource(
@@ -14,7 +15,13 @@ export function gitRepoForRef(
     {
       apiVersion: 'source.toolkit.fluxcd.io/v1',
       kind: 'GitRepository',
-      metadata: { name: `splice-node-${nameSuffix}`, namespace: 'operator' },
+      metadata: {
+        name: `splice-node-${nameSuffix}`,
+        namespace: 'operator',
+        labels: {
+          notifications: notifications ? 'true' : 'false',
+        },
+      },
       spec: {
         interval: '5m',
         url: 'https://github.com/DACH-NY/canton-network-node',
