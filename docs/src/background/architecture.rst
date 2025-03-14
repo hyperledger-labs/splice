@@ -17,12 +17,12 @@ Daml Code Architecture
 Package Structure
 ~~~~~~~~~~~~~~~~~
 
-The Daml code implementing CC, CNS, and the GS governance is implemented in seven packages:
+The Daml code implementing Canton Coin (CC), the Canton Name Service (CNS), and Global Synchronizer governance is implemented in seven packages:
 
 - ``splice-util``: implements utility functions used across the other packages
 - ``splice-amulet``: implements CC
 - ``splice-amulet-name-service``: implements CNS
-- ``splice-dso-governance``: implements GS governance, and decentralized CC and CNS automation
+- ``splice-dso-governance``: implements Global Synchronizer governance, and decentralized CC and CNS automation
 - ``splice-validator-lifecycle``: implements the workflows required for an SV node to onboard a validator
 - ``splice-wallet-payments``: implements CC specific payment workflows
 - ``splice-wallet``: implements the splice-wallet specific workflows for peer-to-peer transfers of CC and for delegating the automation for traffic-top-ups, sweeping, and batched transfer execution to a validator operator.
@@ -51,12 +51,12 @@ You can find their Daml docs in the :ref:`app_dev_daml_api` section.
 Decentralized Transaction Validation and Automation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-CC, CNS, and GS governance are implemented in a decentralized fashion to tolerate up to ``f`` faulty or dishonest SV nodes
+CC, CNS, and Global Synchronizer governance are implemented in a decentralized fashion to tolerate up to ``f`` faulty or dishonest SV nodes
 for ``f = numSvNodes - t`` and confirmation threshold ``t = ceiling (numSvNodes * 2.0 / 3.0)``.
 
 The implementation uses three key techniques to achieves this Byzantine fault tolerance:
 
-- **decentralized DSO party**: it sets up a decentralized Daml party, called the DSO party, with
+- **DSO party**: it sets up a decentralized Daml party, called the DSO party, with
   confirmation threshold ``t`` and hosted on all SV nodes.
 - **on-ledger confirmations**: it requires explicit on-ledger confirmations from ``t`` SV nodes for
   exercising choices with off-ledger input in the name of the DSO party.
