@@ -9,6 +9,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
@@ -31,12 +32,12 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
+import org.scalatest.Ignore
 import org.scalatest.time.{Minute, Span}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
-import org.scalatest.Ignore
 
 // TODO(#17544) Reenable once the DAR issues are fixed
 @Ignore
@@ -150,6 +151,19 @@ class BootstrapPackageConfigIntegrationTest
         )
       )
 
+      clue("alice taps amulet with initial package") {
+        val tapContractId = aliceValidatorWalletClient.tap(10)
+        aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+          .filterJava(
+            Amulet.COMPANION
+          )(dsoParty, _.id == tapContractId)
+          .loneElement
+          .getContractTypeId
+          .getPackageId shouldBe DarResources.amulet.getPackageIdWithVersion(
+          initialPackageConfig.amuletVersion
+        )
+      }
+
       checkDarVersions(
         decentralizedSynchronizerId,
         Seq(
@@ -240,7 +254,18 @@ class BootstrapPackageConfigIntegrationTest
           },
         )
 
-        clue("vetting topology is update to the new config") {
+        clue("alice taps amulet with new package") {
+          val tapContractId = aliceValidatorWalletClient.tap(10)
+          aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+            .filterJava(
+              Amulet.COMPANION
+            )(dsoParty, _.id == tapContractId)
+            .loneElement
+            .getContractTypeId
+            .getPackageId shouldBe DarResources.amulet.bootstrap.packageId
+        }
+
+        clue("vetting topology is updated to the new config") {
           eventuallySucceeds() {
             val vettingTopologyState = sv1Backend.participantClient.topology.vetted_packages.list(
               store = Some(

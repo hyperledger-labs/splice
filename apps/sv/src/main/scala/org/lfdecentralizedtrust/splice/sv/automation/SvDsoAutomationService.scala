@@ -92,7 +92,8 @@ class SvDsoAutomationService(
       domainUnpausedSync,
       dsoStore,
       PackageIdResolver
-        .inferFromAmuletRules(
+        .inferFromAmuletRulesIfEnabled(
+          config.parameters.enableCantonPackageSelection,
           clock,
           dsoStore,
           loggerFactory,

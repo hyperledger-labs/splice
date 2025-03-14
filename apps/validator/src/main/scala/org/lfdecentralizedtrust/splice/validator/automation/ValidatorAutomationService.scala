@@ -68,6 +68,7 @@ class ValidatorAutomationService(
     contactPoint: String,
     supportsSoftDomainMigrationPoc: Boolean,
     initialSynchronizerTime: Option[CantonTimestamp],
+    enableCantonPackageSelection: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -79,7 +80,8 @@ class ValidatorAutomationService(
       domainTimeSync,
       domainUnpausedSync,
       store,
-      PackageIdResolver.inferFromAmuletRules(
+      PackageIdResolver.inferFromAmuletRulesIfEnabled(
+        enableCantonPackageSelection,
         clock,
         scanConnection,
         loggerFactory,

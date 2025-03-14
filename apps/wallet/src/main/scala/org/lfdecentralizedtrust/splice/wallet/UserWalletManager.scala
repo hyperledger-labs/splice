@@ -62,6 +62,7 @@ class UserWalletManager(
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
     supportsSoftDomainMigrationPoc: Boolean,
     dedupDuration: DedupDuration,
+    enableCantonPackageSelection: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -236,6 +237,7 @@ class UserWalletManager(
       autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
       supportsSoftDomainMigrationPoc,
       dedupDuration,
+      enableCantonPackageSelection,
     )
     (userRetryProvider, walletService)
   }

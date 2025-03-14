@@ -238,7 +238,8 @@ class ValidatorApp(
                         val readWriteConnection = ledgerClient.connection(
                           this.getClass.getSimpleName,
                           loggerFactory,
-                          PackageIdResolver.inferFromAmuletRules(
+                          PackageIdResolver.inferFromAmuletRulesIfEnabled(
+                            config.parameters.enableCantonPackageSelection,
                             clock,
                             scanConnection,
                             loggerFactory,
@@ -768,6 +769,7 @@ class ValidatorApp(
             participantId,
             config.ingestFromParticipantBegin,
             config.ingestUpdateHistoryFromParticipantBegin,
+            config.parameters.enableCantonPackageSelection,
           )
           val walletManager = new UserWalletManager(
             ledgerClient,
@@ -792,6 +794,7 @@ class ValidatorApp(
             config.autoAcceptTransfers,
             config.supportsSoftDomainMigrationPoc,
             dedupDuration,
+            config.parameters.enableCantonPackageSelection,
           )
           Some(walletManager)
         } else {
@@ -833,6 +836,7 @@ class ValidatorApp(
         config.contactPoint,
         config.supportsSoftDomainMigrationPoc,
         initialSynchronizerTime,
+        config.parameters.enableCantonPackageSelection,
         loggerFactory,
       )
       synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)

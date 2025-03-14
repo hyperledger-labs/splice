@@ -44,6 +44,7 @@ class ExternalPartyWalletManager(
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    enableCantonPackageSelection: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -174,6 +175,7 @@ class ExternalPartyWalletManager(
       participantId,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      enableCantonPackageSelection,
     )
     (externalPartyRetryProvider, walletService)
   }
