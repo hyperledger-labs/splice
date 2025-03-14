@@ -72,7 +72,6 @@ and upgrade the other pulumi stacks.
   - [ ] The [SV Status Report Dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/caffa6f7-c421-4579-a839-b026d3b76826/sv-status-reports?orgId=1) looks green
   - [ ] There are no (unexpected) open alerts
   - [ ] The docs are reachable at both https://dev.network.canton.global/ and https://dev.global.canton.network.digitalasset.com/
-- [ ] Forward port the above change that bumped the devnet version to both the _ancestor branch_ and `origin/main`.
 - [ ] Merge a PR into `origin/main` with the following changes:
   - [ ] Update the branch references in `.circleci/triggers/*/devnet-*.json` only for devnet.
         This will upgrade our periodic health checks to use the new release version.
