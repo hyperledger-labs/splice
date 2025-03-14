@@ -38,6 +38,7 @@ migration:
   attachPvc: true
 # pvc used for migrations
 pvc:
+  volumeName: sv-app-global-domain-migration-pvc
   volumeStorageClass: standard-rwo
 
 failOnAppVersionMismatch: true
