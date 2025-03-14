@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Splice.ExternalPartyAmuletRules where
 
+import DA.Optional
 import DA.Time (RelTime, subTime)
 
 import Splice.Api.Token.MetadataV1
@@ -263,7 +264,7 @@ amulet_transferFactory_transferImpl this _self arg = do
   require "At least one holding must be provided" (not $ null transfer.holdingCids)
 
   -- execute transfer
-  _ <- exercise preapprovalCid TransferPreapproval_Send
+  result <- exercise preapprovalCid TransferPreapproval_Send
     with
       sender = transfer.sender
       context = paymentContext
@@ -272,9 +273,13 @@ amulet_transferFactory_transferImpl this _self arg = do
 
   -- return result
   pure Api.Token.TransferInstructionV1.TransferFactory_TransferResult with
-    optTransferInstructionCid = None
+    output = Api.Token.TransferInstructionV1.TransferFactory_TransferResult_Completed
+      with
+        holdings = Api.Token.TransferInstructionV1.TransferResultHoldings
+          with
+            senderHoldingCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
+            receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
     meta = emptyMetadata
-
 
 -- Token standard allocation factory
 ------------------------------------

@@ -102,8 +102,17 @@ test_happy_path = script do
   Map.size enrichedChoice.arg.extraArgs.context.values === 4
   Map.size enrichedChoice.disclosures.disclosures === 6  -- the above plus the referenced holding contract
 
+  WalletClient.checkBalanceApprox bob registry.instrumentId 50.0
+
   -- Trigger an atomic, single-transaction transfer
-  submitWithDisclosures' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  result <- submitWithDisclosures' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  TransferFactory_TransferResult_Completed holdings <- pure result.output
+  case holdings.senderHoldingCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox bob holdingCid 40.0
+    cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+  case holdings.receiverHoldingCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox alice holdingCid 10.0
+    cids -> abort ("Unexpected number of receiverHoldingCids: " <> show cids)
 
   -- check balance
   WalletClient.checkBalance alice registry.instrumentId 10.0

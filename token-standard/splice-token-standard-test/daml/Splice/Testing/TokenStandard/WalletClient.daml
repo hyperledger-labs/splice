@@ -15,6 +15,8 @@ module Splice.Testing.TokenStandard.WalletClient
     checkBalanceBounds,
     checkBalance,
     checkBalanceApprox,
+    checkHoldingBounds,
+    checkHoldingApprox,
 
     -- * Reading allocations
     listRequestedAllocations,
@@ -61,10 +63,26 @@ checkBalanceBounds p instrumentId (lb, ub) = do
     "Wallet " <> show p <> ": balance of " <> show total <> " for " <> show instrumentId <>
     " is not within the expected range [" <> show lb <> ", " <> show ub <> "]"
 
+-- | Check the bounds on an individual holding's amount.
+checkHoldingBounds : Party -> ContractId Holding -> (Decimal, Decimal) -> Script ()
+checkHoldingBounds p holdingCid (lb, ub) = do
+  holdingO <- queryInterfaceContractId p holdingCid
+  debug holdingO
+  let holding = case holdingO of
+        None -> error $ "Holding " <> show holdingCid <> " was not found"
+        Some holding -> holding
+  unless (holding.amount >= lb && holding.amount <= ub) $ fail $
+    "Holding " <> show holding <>
+    " is not within the expected range [" <> show lb <> ", " <> show ub <> "]"
+
 -- | Check the approximate value (+/- 1.0) a party's total balance of all holdings of the given instrument.
 checkBalanceApprox : Party -> InstrumentId -> Decimal -> Script ()
 checkBalanceApprox p instrumentId approximateBalance =
   checkBalanceBounds p instrumentId (approximateBalance - 1.0, approximateBalance + 1.0)
+
+-- | Check the approximate (+/- 1.0) amount of an individual holding.
+checkHoldingApprox : Party -> ContractId Holding -> Decimal -> Script ()
+checkHoldingApprox p holdingCid approximateAmount = checkHoldingBounds p holdingCid (approximateAmount - 1.0, approximateAmount + 1.0)
 
 -- | Check the exact value a party's total balance of all holdings of the given instrument.
 checkBalance : Party -> InstrumentId -> Decimal -> Script ()

@@ -137,10 +137,32 @@ interface TransferFactory where
 
 -- | Result of requesting a transfer.
 data TransferFactory_TransferResult = TransferFactory_TransferResult with
-  optTransferInstructionCid : Optional (ContractId TransferInstruction)
-    -- ^ The contract ID of the transfer instruction, in case the transfer could not be executed atomically.
+  output : TransferFactory_TransferResult_Output
+   -- ^ The output of the transfer. Can either be the updated holdings or a transfer instruction if their
+   -- transfer cannot be completed atomically.
   meta : Metadata
     -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+
+data TransferFactory_TransferResult_Output
+  = TransferFactory_TransferResult_Completed
+      with
+        holdings : TransferResultHoldings
+          -- ^ Updated sender and receiver holdings
+  | TransferFactory_TransferResult_Pending
+      with
+        transferInstructionCid : ContractId TransferInstruction
+          -- ^ Contract id of the transfer instruction that will be used to complete the transfer
+  deriving (Show, Eq)
+
+-- | The holdings that were newly created as part of completing the transfer.
+-- MAY be empty for registries that do not track the holdings on-ledger.
+data TransferResultHoldings = TransferResultHoldings
+  with
+    senderHoldingCids : [ContractId Holding]
+      -- ^ Newly created holdings owned by the sender. Often used to return "change".
+    receiverHoldingCids : [ContractId Holding]
+      -- ^ The newly created holdings owned by the receiver.
+  deriving (Show, Eq)
 
 -- | View for `TransferFactory`.
 data TransferFactoryView = TransferFactoryView
@@ -148,3 +170,11 @@ data TransferFactoryView = TransferFactoryView
     admin : Party
       -- ^ The party representing the registry app that administers the instruments for
       -- which this transfer factory can be used.
+
+data TransferInstruction_ReportSuccessResult = TransferInstruction_ReportSuccessResult
+  with
+    holdings : TransferResultHoldings
+      -- ^ Newly created sender and receiver holdings
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+  deriving (Show, Eq)

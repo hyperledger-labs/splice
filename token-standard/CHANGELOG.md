@@ -8,6 +8,10 @@ Major changes:
   capture generic burns and mints that do not fall under the transfer
   or allocation APIs.
 
+Polishing changes:
+
+* Added the new holdings to the result types of `TransferFactor_Transfer`, `TransferInstruction_ReportSuccess` and `Allocation_ExecuteTransfer`.
+
 ## 2025-02-28
 
 Major changes:

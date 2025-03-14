@@ -161,7 +161,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       ).toValue
       val originalResult: JavaApi.DamlRecord =
         new transferinstructionv1.TransferFactory_TransferResult(
-          Optional.of(
+          new transferinstructionv1.transferfactory_transferresult_output.TransferFactory_TransferResult_Pending(
             new transferinstructionv1.TransferInstruction.ContractId(validContractId(333))
           ),
           someMetadata,

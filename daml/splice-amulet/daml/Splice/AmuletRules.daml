@@ -18,7 +18,7 @@ import DA.Traversable (forA)
 import DA.Time
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
-
+import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig (AmuletConfig(..), TransferConfig(..), validAmuletConfig, defaultTransferPreapprovalFee)
@@ -1101,6 +1101,12 @@ data CreatedAmulet
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Show, Eq, Ord)
+
+createdAmuletToHolding : CreatedAmulet -> ContractId Api.Token.HoldingV1.Holding
+createdAmuletToHolding = \case
+  TransferResultAmulet cid -> toInterfaceContractId cid
+  TransferResultLockedAmulet cid -> toInterfaceContractId cid
+  ExtCreatedAmulet _ -> error "Unexpected ExtCreatedAmulet"
 
 -- | An individual input for a batch transfer.
 data TransferInput
