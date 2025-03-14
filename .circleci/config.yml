@@ -5758,7 +5758,6 @@ workflows:
       equal: [ purge-unused-dbs-cidaily, << pipeline.parameters.run-job >> ]
     jobs:
       - purge_unused_dbs:
-          <<: *main-branch-only
           <<: *notify-fail
           context:
             - slack-context
