@@ -5,7 +5,6 @@
 
 module Splice.Amulet.TokenApiUtils where
 
-import DA.Action (unless)
 import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1
@@ -34,9 +33,6 @@ ratePerRoundMetaKey = splicePrefix <> "rate-per-round"
 -- Choice contexts
 ------------------
 
-amuletChoiceContextName : Text
-amuletChoiceContextName = splicePrefix <> "amulet"
-
 amuletRulesContextKey : Text
 amuletRulesContextKey = "amulet-rules"
 
@@ -48,17 +44,6 @@ featuredAppRightContextKey = "featured-app-right"
 
 transferPreapprovalContextKey : Text
 transferPreapprovalContextKey = "transfer-preapproval"
-
-validateAmuletChoiceContext : ChoiceContext -> Update ()
-validateAmuletChoiceContext context = do
-  unless (context.name == amuletChoiceContextName) $
-    fail $ "Expected choice context for: " <> amuletChoiceContextName <> ", got: " <> context.name
-
-getAmuletContext : ExtraArgs -> Update ChoiceContext
-getAmuletContext extraArgs = do
-  let context = extraArgs.context
-  validateAmuletChoiceContext context
-  pure context
 
 lookupContextContractId : Template t => ChoiceContext -> Text -> Update (Optional (ContractId t))
 lookupContextContractId context k = do

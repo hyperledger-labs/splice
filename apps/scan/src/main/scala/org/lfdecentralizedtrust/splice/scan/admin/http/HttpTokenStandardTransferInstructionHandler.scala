@@ -90,14 +90,13 @@ class HttpTokenStandardTransferInstructionHandler(
                 io.circe.parser
                   .parse(
                     new metadatav1.ChoiceContext(
-                      "splice.lfdecentralizedtrust.org/amulet",
                       Map(
                         "amulet-rules" -> amuletRules.contractId.contractId,
                         "open-round" -> newestOpenRound.contractId.contractId,
                         "transfer-preapproval" -> transferPreapproval.contractId.contractId,
                       ).map[String, metadatav1.AnyValue] { case (k, v) =>
                         k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
-                      }.asJava,
+                      }.asJava
                     ).toJson
                   )
                   .getOrElse(

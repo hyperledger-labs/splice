@@ -240,13 +240,12 @@ amulet_transferFactory_transferImpl this _self arg = do
   let dso = this.dso
   -- validate call to factory and retrieve context
   require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show this.dso) (expectedAdmin == dso)
-  context <- getAmuletContext extraArgs
-  paymentContext <- paymentFromChoiceContext dso context
+  paymentContext <- paymentFromChoiceContext dso extraArgs.context
 
   -- == validate each field of the transfer specification ==
   -- sender: nothing to validate
   -- receiver: validate that it approves the preapproval
-  preapprovalCid <- getContextContractId @TransferPreapproval context transferPreapprovalContextKey
+  preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context transferPreapprovalContextKey
   preapproval <- fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
   require "Preapproval receiver matches transfer receiver" (preapproval.receiver == transfer.receiver)
   -- amount:
@@ -295,7 +294,6 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   let AllocationFactory_Allocate {expectedAdmin, allocation, inputHoldings, extraArgs} = arg
   -- validate call to factory and retrieve context
   require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show dso) (expectedAdmin == dso)
-  context <- getAmuletContext extraArgs
 
   -- We are using an unfeatured payment context, as the locking to self should not be featured.
   -- Ideally we could feature the 'settlement.executor', but at this point we don't have the
@@ -303,7 +301,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   --
   -- The latter transfer that happens as part of the settlement will feature the 'settlement.executor',
   -- which is what we want: incentivize successful settlements.
-  paymentContext <- unfeaturedPaymentContextFromChoiceContext dso context
+  paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
 
   -- == validate each field of the requested allocation
   let settlement = allocation.settlement

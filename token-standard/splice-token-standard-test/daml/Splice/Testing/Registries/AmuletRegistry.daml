@@ -186,7 +186,6 @@ registryApi_getAllocationTransferContext registry allocCid = do
 
 mkAmuletContext : Map.Map Text AnyValue -> ChoiceContext
 mkAmuletContext values = ChoiceContext with
-  name = amuletChoiceContextName
   values
 
 getAmuletRules : AmuletRegistry -> Script (ContractId AmuletRules, AmuletRules)

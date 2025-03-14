@@ -373,7 +373,7 @@ async def handle_transfer_preapproval_send_token_standard(args, scan_client: Sca
                                  "executeBefore": expires_at,
                                  "holdingCids": holding_cids,
                                  "meta": {"values": []}},
-                    "extraArgs": {"context": {"values": [], "name": "splice.lfdecentralizedtrust.org/amulet"}, "meta": {"values": []}}}
+                    "extraArgs": {"context": {"values": []}, "meta": {"values": []}}}
     transfer_factory = await scan_client.get_transfer_factory(choice_args)
 
     choice_args["extraArgs"]["context"] = transfer_factory["choice_context"]["choice_context_data"]

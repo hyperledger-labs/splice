@@ -30,7 +30,7 @@ import Daml.Script
 -- | Use this to construct an empty 'ExtraArgs' record.
 emptyExtraArgs : ExtraArgs
 emptyExtraArgs = ExtraArgs with
-  context = ChoiceContext with name = ""; values = Map.empty
+  context = ChoiceContext with values = Map.empty
   meta = emptyMetadata
 
 -- | A representation of a ChoiceContext and disclosed contracts as they would be returned by the
@@ -45,18 +45,11 @@ withExtraDisclosures discs ctx =
   ctx with disclosures = ctx.disclosures <> discs
 
 instance Semigroup OpenApiChoiceContext where
-  ctx1 <> ctx2
-    | name1 == name2 =
+  ctx1 <> ctx2 =
         OpenApiChoiceContext with
           choiceContext = ChoiceContext with
-            name = name1
             values = ctx1.choiceContext.values <> ctx2.choiceContext.values
           disclosures = ctx1.disclosures <> ctx2.disclosures
-    | otherwise =
-        error $ "cannot merge differently named choice contexts: " <> show [name1, name2]
-    where
-      name1 = ctx1.choiceContext.name
-      name2 = ctx2.choiceContext.name
 
 -- | A choice on a factory contract enriched with an appropriate choice-context and disclosures.
 data EnrichedFactoryChoice t ch = EnrichedFactoryChoice with
