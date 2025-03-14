@@ -399,7 +399,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -525,7 +525,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -606,7 +606,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "splitwell-participant-0",
     "provider": "",
@@ -736,7 +736,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -993,7 +993,7 @@
           "auth0|65de04b385816c4a38cc044f"
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",
