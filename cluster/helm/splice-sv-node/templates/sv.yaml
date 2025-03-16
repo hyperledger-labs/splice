@@ -366,7 +366,7 @@ spec:
       {{- if .Values.migration.attachPvc }}
         - name: domain-upgrade-dump-volume
           persistentVolumeClaim:
-            claimName: "sv-app-global-domain-migration-pvc"
+            claimName: {{ .Values.pvc.volumeName }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -404,7 +404,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "sv-app-global-domain-migration-pvc"
+  name: {{ .Values.pvc.volumeName }}
   namespace: {{ $.Release.Namespace }}
   annotations:
     helm.sh/resource-policy: keep
