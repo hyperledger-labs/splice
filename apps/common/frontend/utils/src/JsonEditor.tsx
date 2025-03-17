@@ -50,6 +50,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
               type="text"
               value={cleanedValue}
               id={nestedKey + '-value'}
+              data-testid={nestedKey + '-value'}
               style={{ textAlign: 'right' }}
               onChange={e => handleValueChange(nestedKey, e.target.value)}
             />

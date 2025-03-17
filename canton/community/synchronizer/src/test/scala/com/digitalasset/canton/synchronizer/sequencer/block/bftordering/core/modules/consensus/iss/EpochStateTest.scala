@@ -9,9 +9,9 @@ import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Epoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.leaders.SimpleLeaderSelectionPolicy
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleRef
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
@@ -46,6 +46,7 @@ class EpochStateTest extends AsyncWordSpec with BaseTest {
   import EpochStateTest.*
 
   private val clock = new SimClock(loggerFactory = loggerFactory)
+  implicit private val config: BftBlockOrderer.Config = BftBlockOrderer.Config()
 
   "EpochState" should {
 
@@ -57,13 +58,12 @@ class EpochStateTest extends AsyncWordSpec with BaseTest {
             startBlockNumber = BlockNumber.First,
             length = 7,
           )
-        val membership = Membership(myId, otherPeers)
+        val membership = Membership.forTesting(myId, otherPeers)
         val epoch =
           Epoch(
             epochInfo,
             currentMembership = membership,
             previousMembership = membership, // Not relevant for the test
-            SimpleLeaderSelectionPolicy,
           )
         val epochState =
           new EpochState[SelfEnv](
@@ -94,13 +94,12 @@ class EpochStateTest extends AsyncWordSpec with BaseTest {
           startBlockNumber = BlockNumber.First,
           length = 7,
         )
-      val membership = Membership(myId, otherPeers)
+      val membership = Membership.forTesting(myId, otherPeers)
       val epoch =
         Epoch(
           epochInfo,
           currentMembership = membership,
           previousMembership = membership, // Not relevant for the test
-          SimpleLeaderSelectionPolicy,
         )
 
       val epochState =
@@ -173,9 +172,14 @@ object EpochStateTest {
   private def segmentModuleRefFactory(
       segmentState: SegmentState,
       @unused _epochMetricsAccumulator: EpochMetricsAccumulator,
-  )(implicit traceContext: TraceContext): ModuleRef[ConsensusSegment.Message] = {
-    case pbftEvent: ConsensusSegment.ConsensusMessage.PbftEvent =>
-      segmentState.processEvent(pbftEvent)
-    case _ => ()
-  }
+  ): ModuleRef[ConsensusSegment.Message] =
+    new ModuleRef[ConsensusSegment.Message] {
+      override def asyncSendTraced(
+          msg: ConsensusSegment.Message
+      )(implicit traceContext: TraceContext): Unit = msg match {
+        case pbftEvent: ConsensusSegment.ConsensusMessage.PbftEvent =>
+          segmentState.processEvent(pbftEvent)
+        case _ => ()
+      }
+    }
 }

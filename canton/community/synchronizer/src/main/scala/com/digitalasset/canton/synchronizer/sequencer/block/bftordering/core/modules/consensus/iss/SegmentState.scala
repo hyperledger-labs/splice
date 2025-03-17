@@ -8,6 +8,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Block
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation.{
   ConsensusCertificateValidator,
@@ -43,15 +44,15 @@ class SegmentState(
     abort: String => Nothing,
     metrics: BftOrderingMetrics,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit mc: MetricsContext)
+)(implicit mc: MetricsContext, config: BftBlockOrderer.Config)
     extends NamedLogging {
 
   private val membership = epoch.currentMembership
-  private val eligibleLeaders = epoch.leaders
+  private val eligibleLeaders = membership.leaders
   private val originalLeaderIndex = eligibleLeaders.indexOf(segment.originalLeader)
   private val epochNumber = epoch.info.number
   private val viewChangeBlockMetadata = BlockMetadata(epochNumber, segment.slotNumbers.head1)
-  private val pbftMessageValidator = new PbftMessageValidatorImpl(epoch, metrics)(abort)
+  private val pbftMessageValidator = new PbftMessageValidatorImpl(segment, epoch, metrics)(abort)
   private val commitCertValidator = new ConsensusCertificateValidator(
     membership.orderingTopology.strongQuorum
   )
@@ -70,8 +71,6 @@ class SegmentState(
 
   private val segmentBlocks: NonEmpty[Seq[SegmentBlockState]] =
     segment.slotNumbers.map { blockNumber =>
-      val firstInSegment = blockNumber == segment.firstBlockNumber
-
       new SegmentBlockState(
         viewNumber =>
           new PbftBlockState(
@@ -81,7 +80,6 @@ class SegmentState(
             currentLeader,
             epochNumber,
             viewNumber,
-            firstInSegment,
             abort,
             metrics,
             loggerFactory,
@@ -294,7 +292,8 @@ class SegmentState(
   }
 
   /** process some kind of message, which will either be a network message or an internal event
-    * @param process process the message and indicate if we should attempt to advance the view change process
+    * @param process
+    *   process the message and indicate if we should attempt to advance the view change process
     */
   private def processViewChangeMessage[Message](
       message: Message,

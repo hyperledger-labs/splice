@@ -5,8 +5,7 @@ import better.files.File.apply
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import io.circe.syntax.EncoderOps
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -23,7 +22,6 @@ import org.lfdecentralizedtrust.splice.console.{
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -87,8 +85,7 @@ class DisasterRecoveryIntegrationTest
   override lazy val resetRequiredTopologyState = false
 
   // Any app with port starting with 28 or with name suffixed by 'Local' is an app started after the disaster
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation
@@ -160,7 +157,7 @@ class DisasterRecoveryIntegrationTest
                 aliceValidatorConf
                   .copy(
                     participantClient = ParticipantClientConfig(
-                      ClientConfig(port = Port.tryCreate(28502)),
+                      FullClientConfig(port = Port.tryCreate(28502)),
                       aliceValidatorConf.participantClient.ledgerApi.copy(
                         clientConfig =
                           aliceValidatorConf.participantClient.ledgerApi.clientConfig.copy(
@@ -647,6 +644,7 @@ class DisasterRecoveryIntegrationTest
       migrationId = dump.migrationId,
       ids,
       dump.dataSnapshot,
+      None,
       createdAt = dump.createdAt,
     )
     fullDumpFile.write(fullDump.asJson.spaces2)

@@ -64,7 +64,7 @@ class AdvanceOpenMiningRoundTrigger(
           amuletPriceVotes.map(_.contractId).asJava,
         )
       )
-      (_, _) <- svTaskContext.connection
+      _ <- svTaskContext.connection
         .submit(
           Seq(store.key.svParty),
           Seq(store.key.dsoParty),
@@ -74,7 +74,7 @@ class AdvanceOpenMiningRoundTrigger(
         // as the target domain here.
         .withSynchronizerId(task.work.openRounds.domain)
         .noDedup
-        .yieldResultAndOffset()
+        .yieldUnit()
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
     )

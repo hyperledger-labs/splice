@@ -60,7 +60,7 @@ Your detailed API event logging is turned on but you are doing quite a few concu
 Late processing \(or clock skew\) of batch with counter.*after sequencing
 
 # Shows up during global domain migration test, when the domain is frozen
-Failed to submit submission due to .*\(Overloaded\(Submission rate exceeds rate limit of 0/s\.\)\)
+ABORTED/SEQUENCER_OVERLOADED.*Submission rate exceeds rate limit of 0/s
 
 # This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
 .*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
@@ -100,6 +100,7 @@ Now retrying operation 'insert block'
 
 # TODO(#13874): investigate why it happens and remove if possible
 Failed to send commitment message batch for period CommitmentPeriod.*RequestRefused\(UnknownRecipients
+SEQUENCER_UNKNOWN_RECIPIENTS.*validatorLocalForValidatorReonboardingIT
 
 # TODO(#15539) Figure out where this is coming from
 Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality

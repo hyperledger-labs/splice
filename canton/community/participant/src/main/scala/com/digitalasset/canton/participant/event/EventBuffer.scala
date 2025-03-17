@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.event
 
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update
@@ -15,12 +16,12 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
 
-/** Buffer to hold Ledger API Indexer events for a particular connected synchronizer's RecordOrderPublisher
-  * for the duration of Online Party Replication (OPR) while OPR-replicated ACS contracts are published
-  * as they arrive at the target participant.
+/** Buffer to hold Ledger API Indexer events for a particular connected synchronizer's
+  * RecordOrderPublisher for the duration of Online Party Replication (OPR) while OPR-replicated ACS
+  * contracts are published as they arrive at the target participant.
   *
-  * Note: All the public methods of this class are not thread-safe and must only be called from the RecordOrderPublisher
-  * TaskScheduler such that only a single method is executed at a time.
+  * Note: All the public methods of this class are not thread-safe and must only be called from the
+  * RecordOrderPublisher TaskScheduler such that only a single method is executed at a time.
   */
 private[event] final class EventBuffer(
     recordTimeBufferBegin: CantonTimestamp,
@@ -34,8 +35,8 @@ private[event] final class EventBuffer(
   // record time order.
   private val lastBufferedRecordTime = new AtomicReference[CantonTimestamp](recordTimeBufferBegin)
 
-  /** Buffer/hold back a concurrent Ledger API indexer update/event during OPR such that OPR-replicated ACS contracts
-    * can be published "before" with respect to record time order.
+  /** Buffer/hold back a concurrent Ledger API indexer update/event during OPR such that
+    * OPR-replicated ACS contracts can be published "before" with respect to record time order.
     */
   def bufferEvent(event: Update)(implicit traceContext: TraceContext): Unit = {
     ErrorUtil.requireState(
@@ -47,14 +48,14 @@ private[event] final class EventBuffer(
 
   /** Mark the OPR ACS chunk event with the buffer begin timestamp as record time.
     */
-  def markEventWithRecordTime(eventWithRecordTime: CantonTimestamp => Update)(implicit
-      traceContext: TraceContext
-  ): Update = {
+  def markEventsWithRecordTime(buildEventsWithRecordTime: CantonTimestamp => NonEmpty[Seq[Update]])(
+      implicit traceContext: TraceContext
+  ): NonEmpty[Seq[Update]] = {
     val queueRecordTime = recordTimeBufferBegin
     logger.debug(
       s"Marking replicated contracts indexer event with record time ${queueRecordTime.toMicros}"
     )
-    eventWithRecordTime(queueRecordTime)
+    buildEventsWithRecordTime(queueRecordTime)
   }
 
   /** Extracts and clear the buffered events. This is meant to be called before closing the buffer.

@@ -31,8 +31,8 @@ import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.admin.grpc.GrpcVaultService
 import com.digitalasset.canton.crypto.admin.v30.VaultServiceGrpc
-import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CryptoPrivateStoreFactory
-import com.digitalasset.canton.crypto.store.CryptoPrivateStoreError
+import com.digitalasset.canton.crypto.kms.KmsFactory
+import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPrivateStoreFactory}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeBootstrap.HealthDumpFunction
@@ -102,10 +102,11 @@ import java.util.concurrent.{Executors, ScheduledExecutorService}
 import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 
-/** When a canton node is created it first has to obtain an identity before most of its services can be started.
-  * This process will begin when `start` is called and will try to perform as much as permitted by configuration automatically.
-  * If external action is required before this process can complete `start` will return successfully but `isInitialized` will still be false.
-  * When the node is successfully initialized the underlying node will be available through `getNode`.
+/** When a canton node is created it first has to obtain an identity before most of its services can
+  * be started. This process will begin when `start` is called and will try to perform as much as
+  * permitted by configuration automatically. If external action is required before this process can
+  * complete `start` will return successfully but `isInitialized` will still be false. When the node
+  * is successfully initialized the underlying node will be available through `getNode`.
   */
 trait CantonNodeBootstrap[+T <: CantonNode]
     extends FlagCloseable
@@ -156,8 +157,8 @@ final case class CantonNodeBootstrapCommonArguments[
     clock: Clock,
     metrics: M,
     storageFactory: StorageFactory,
-    cryptoFactory: CryptoFactory,
     cryptoPrivateStoreFactory: CryptoPrivateStoreFactory,
+    kmsFactory: KmsFactory,
     futureSupervisor: FutureSupervisor,
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
@@ -165,8 +166,8 @@ final case class CantonNodeBootstrapCommonArguments[
     tracerProvider: TracerProvider,
 )
 
-/** CantonNodeBootstrapImpl insists that nodes have their own topology manager
-  * and that they have the ability to auto-initialize their identity on their own.
+/** CantonNodeBootstrapImpl insists that nodes have their own topology manager and that they have
+  * the ability to auto-initialize their identity on their own.
   */
 abstract class CantonNodeBootstrapImpl[
     T <: CantonNode,
@@ -331,8 +332,8 @@ abstract class CantonNodeBootstrapImpl[
   /** callback for topology read service
     *
     * this callback must be implemented by all node types, providing access to the synchronizer
-    * topology stores which are only available in a later startup stage (sequencer and mediator nodes) or
-    * in the node runtime itself (participant connected synchronizer)
+    * topology stores which are only available in a later startup stage (sequencer and mediator
+    * nodes) or in the node runtime itself (participant connected synchronizer)
     */
   protected def sequencedTopologyStores: Seq[TopologyStore[SynchronizerStore]]
 
@@ -449,11 +450,12 @@ abstract class CantonNodeBootstrapImpl[
       // crypto factory doesn't write to the db during startup, hence,
       // we won't have "isPassive" issues here
       performUnlessClosingEitherUSF("create-crypto")(
-        arguments.cryptoFactory
+        Crypto
           .create(
             cryptoConfig,
             storage,
             arguments.cryptoPrivateStoreFactory,
+            arguments.kmsFactory,
             ReleaseProtocolVersion.latest,
             arguments.parameterConfig.nonStandardConfig,
             arguments.futureSupervisor,
@@ -590,7 +592,8 @@ abstract class CantonNodeBootstrapImpl[
       for {
         // create namespace key
         namespaceKey <- CantonNodeBootstrapImpl.getOrCreateSigningKey(crypto)(
-          s"$name-${SigningKeyUsage.Namespace.identifier}"
+          s"$name-${SigningKeyUsage.Namespace.identifier}",
+          SigningKeyUsage.NamespaceOnly,
         )
         // create id
         identifierName =
@@ -795,10 +798,16 @@ abstract class CantonNodeBootstrapImpl[
           nsd,
           ProtocolVersion.latest,
         )
-        // all nodes need a signing key
+        // all nodes need two signing keys: (1) for sequencer authentication and (2) for protocol signing
+        sequencerAuthKey <- CantonNodeBootstrapImpl
+          .getOrCreateSigningKey(crypto)(
+            s"$name-${SigningKeyUsage.SequencerAuthentication.identifier}",
+            SigningKeyUsage.SequencerAuthenticationOnly,
+          )
         signingKey <- CantonNodeBootstrapImpl
           .getOrCreateSigningKey(crypto)(
-            s"$name-${SigningKeyUsage.Protocol.identifier}"
+            s"$name-${SigningKeyUsage.Protocol.identifier}",
+            SigningKeyUsage.ProtocolOnly,
           )
         // key owner id depends on the type of node
         ownerId = member(nodeId)
@@ -810,16 +819,17 @@ abstract class CantonNodeBootstrapImpl[
                 .getOrCreateEncryptionKey(crypto)(
                   s"$name-encryption"
                 )
-            } yield NonEmpty.mk(Seq, signingKey, encryptionKey)
+            } yield NonEmpty.mk(Seq, sequencerAuthKey, signingKey, encryptionKey)
           } else {
             EitherT.rightT[FutureUnlessShutdown, String](
-              NonEmpty.mk(Seq, signingKey)
+              NonEmpty.mk(Seq, sequencerAuthKey, signingKey)
             )
           }
         // register the keys
         _ <- authorizeStateUpdate(
           Seq(
             namespaceKey.fingerprint,
+            sequencerAuthKey.fingerprint,
             signingKey.fingerprint,
           ),
           OwnerToKeyMapping(ownerId, keys),
@@ -862,7 +872,7 @@ object CantonNodeBootstrapImpl {
 
   def getOrCreateSigningKey(crypto: Crypto)(
       name: String,
-      usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
+      usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,

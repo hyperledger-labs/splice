@@ -5,10 +5,10 @@ package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.data.EitherT
 import cats.syntax.alternative.*
-import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyColl.*
 import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.ledger.participant.state.SynchronizerRank
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.submission.UsableSynchronizers
@@ -18,66 +18,71 @@ import com.digitalasset.canton.participant.sync.TransactionRoutingError.Topology
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ReassignmentTag.Target
 
 import scala.concurrent.ExecutionContext
 
 private[routing] class SynchronizerSelectorFactory(
-    admissibleSynchronizers: AdmissibleSynchronizers,
+    admissibleSynchronizersComputation: AdmissibleSynchronizersComputation,
     priorityOfSynchronizer: SynchronizerId => Int,
     synchronizerRankComputation: SynchronizerRankComputation,
-    synchronizerStateProvider: SynchronizerStateProvider,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext) {
+
   def create(
-      transactionData: TransactionData
+      transactionData: TransactionData,
+      synchronizerState: RoutingSynchronizerState,
+      submitters: Set[LfPartyId],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerSelector] =
     for {
-      admissibleSynchronizers <- admissibleSynchronizers.forParties(
-        submitters = transactionData.actAs -- transactionData.externallySignedSubmissionO.fold(
-          Set.empty[LfPartyId]
-        )(_.signatures.keys.map(_.toLf).toSet),
+      admissibleSynchronizers <- admissibleSynchronizersComputation.forParties(
+        submitters = submitters,
         informees = transactionData.informees,
+        synchronizerState = synchronizerState,
       )
     } yield new SynchronizerSelector(
       transactionData,
       admissibleSynchronizers,
       priorityOfSynchronizer,
       synchronizerRankComputation,
-      synchronizerStateProvider,
+      synchronizerState,
       loggerFactory,
     )
 }
 
 /** Selects the best synchronizer for routing.
   *
-  * @param admissibleSynchronizers     Synchronizers that host both submitters and informees of the transaction:
-  *                          - submitters have to be hosted on the local participant
-  *                          - informees have to be hosted on some participant
-  *                            It is assumed that the participant is connected to all synchronizers in `connectedSynchronizers`
-  * @param priorityOfSynchronizer      Priority of each synchronizer (lowest number indicates highest priority)
-  * @param synchronizerRankComputation Utility class to compute `SynchronizerRank`
-  * @param synchronizerStateProvider   Provides state information about a synchronizer.
-  *                              Note: returns an either rather than an option since failure comes from disconnected
-  *                              synchronizers and we assume the participant to be connected to all synchronizers in `connectedSynchronizers`
+  * @param admissibleSynchronizers
+  *   Synchronizers that host both submitters and informees of the transaction:
+  *   - submitters have to be hosted on the local participant
+  *   - informees have to be hosted on some participant It is assumed that the participant is
+  *     connected to all synchronizers in `connectedSynchronizers`
+  * @param priorityOfSynchronizer
+  *   Priority of each synchronizer (lowest number indicates highest priority)
+  * @param synchronizerRankComputation
+  *   Utility class to compute `SynchronizerRank`
+  * @param synchronizerState
+  *   Provides state information about a synchronizer. Note: returns an either rather than an option
+  *   since failure comes from disconnected synchronizers and we assume the participant to be
+  *   connected to all synchronizers in `connectedSynchronizers`
   */
 private[routing] class SynchronizerSelector(
     val transactionData: TransactionData,
     admissibleSynchronizers: NonEmpty[Set[SynchronizerId]],
     priorityOfSynchronizer: SynchronizerId => Int,
     synchronizerRankComputation: SynchronizerRankComputation,
-    synchronizerStateProvider: SynchronizerStateProvider,
+    val synchronizerState: RoutingSynchronizerState,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  /** Choose the appropriate synchronizer for a transaction.
-    * The synchronizer is chosen as follows:
-    * 1. synchronizer whose id equals `transactionData.prescribedSynchronizerO` (if non-empty)
-    * 2. The synchronizer with the smaller number of reassignments on which all informees have active participants
+  /** Choose the appropriate synchronizer for a transaction. The synchronizer is chosen as follows:
+    *   1. synchronizer whose id equals `transactionData.prescribedSynchronizerO` (if non-empty)
+    *
+    *   1. The synchronizer with the smaller number of reassignments on which all informees have
+    *      active participants
     */
   def forMultiSynchronizer(implicit
       traceContext: TraceContext
@@ -93,26 +98,28 @@ private[routing] class SynchronizerSelector(
               contracts,
               Target(prescribedSynchronizer),
               transactionData.readers,
+              synchronizerState,
             )
-            .mapK(FutureUnlessShutdown.outcomeK)
         } yield synchronizerRank
 
       case None =>
         for {
           admissibleSynchronizers <- filterSynchronizers(admissibleSynchronizers)
-          synchronizerRank <- pickSynchronizerIdAndComputeReassignments(
-            contracts,
-            admissibleSynchronizers,
+          synchronizerRank <- synchronizerRankComputation.computeBestSynchronizerRank(
+            synchronizerState = synchronizerState,
+            contracts = contracts,
+            readers = transactionData.readers,
+            synchronizerIds = admissibleSynchronizers,
           )
         } yield synchronizerRank
     }
   }
 
-  /** Choose the appropriate synchronizer for a transaction.
-    * The synchronizer is chosen as follows:
-    * 1. synchronizer whose alias equals the workflow id
-    * 2. synchronizer of all input contracts (fail if there is more than one)
-    * 3. An arbitrary synchronizer to which the submitter can submit and on which all informees have active participants
+  /** Choose the appropriate synchronizer for a transaction. The synchronizer is chosen as follows:
+    *   1. synchronizer whose alias equals the workflow id
+    *   1. synchronizer of all input contracts (fail if there is more than one)
+    *   1. An arbitrary synchronizer to which the submitter can submit and on which all informees
+    *      have active participants
     */
   def forSingleSynchronizer(implicit
       traceContext: TraceContext
@@ -156,14 +163,14 @@ private[routing] class SynchronizerSelector(
 
     val (unableToFetchStateSynchronizers, synchronizerStates) =
       admissibleSynchronizers.forgetNE.toList.map { synchronizerId =>
-        synchronizerStateProvider.getTopologySnapshotAndPVFor(synchronizerId).map {
+        synchronizerState.getTopologySnapshotAndPVFor(synchronizerId).map {
           case (snapshot, protocolVersion) =>
             (synchronizerId, protocolVersion, snapshot)
         }
       }.separate
 
     for {
-      synchronizers <- EitherT.right(
+      synchronizers <- EitherT.right[TransactionRoutingError](
         UsableSynchronizers.check(
           synchronizers = synchronizerStates,
           transaction = transactionData.transaction,
@@ -226,16 +233,16 @@ private[routing] class SynchronizerSelector(
 
   /** Validation that are shared between single- and multi- synchronizer submission:
     *
-    * - Participant is connected to `synchronizerId`
+    *   - Participant is connected to `synchronizerId`
     *
-    * - List `synchronizersOfSubmittersAndInformees` contains `synchronizerId`
+    *   - List `synchronizersOfSubmittersAndInformees` contains `synchronizerId`
     */
   private def validatePrescribedSynchronizer(synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionRoutingError, Unit] =
     for {
       synchronizerState <- EitherT.fromEither[FutureUnlessShutdown](
-        synchronizerStateProvider.getTopologySnapshotAndPVFor(synchronizerId)
+        synchronizerState.getTopologySnapshotAndPVFor(synchronizerId)
       )
       (snapshot, protocolVersion) = synchronizerState
 
@@ -265,38 +272,6 @@ private[routing] class SynchronizerSelector(
         }
 
     } yield ()
-
-  private def pickSynchronizerIdAndComputeReassignments(
-      contracts: Seq[ContractData],
-      synchronizers: NonEmpty[Set[SynchronizerId]],
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerRank] = {
-    val rankedSynchronizerOpt = FutureUnlessShutdown.outcomeF {
-      for {
-        rankedSynchronizers <- synchronizers.forgetNE.toList
-          .parTraverseFilter(targetSynchronizer =>
-            synchronizerRankComputation
-              .compute(
-                contracts,
-                Target(targetSynchronizer),
-                transactionData.readers,
-              )
-              .toOption
-              .value
-          )
-        // Priority of synchronizer
-        // Number of reassignments if we use this synchronizer
-        // pick according to the least amount of reassignments
-      } yield rankedSynchronizers.minOption
-        .toRight(
-          TransactionRoutingError.AutomaticReassignmentForTransactionFailure.Failed(
-            s"None of the following $synchronizers is suitable for automatic reassignment."
-          )
-        )
-    }
-    EitherT(rankedSynchronizerOpt)
-  }
 
   private def getSynchronizerOfInputContracts
       : EitherT[FutureUnlessShutdown, TransactionRoutingError, Option[SynchronizerId]] = {

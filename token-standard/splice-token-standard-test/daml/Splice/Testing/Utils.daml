@@ -1,0 +1,91 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Testing utilities to simplify testing token standard usage and implementation.
+module Splice.Testing.Utils
+  (
+    -- * Utilities for disclosures
+    Disclosures'(..),
+    queryDisclosure',
+    submitWithDisclosures',
+    submitWithDisclosuresMustFail',
+
+    -- * Working with OpenAPI requests and responses
+    emptyExtraArgs,
+    EnrichedFactoryChoice(..),
+
+    OpenApiChoiceContext(..),
+    withExtraDisclosures,
+
+    -- * Simpler party allocation
+    allocatePartyExact
+  ) where
+
+import qualified DA.Map as Map
+
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+
+import Daml.Script
+
+-- | Use this to construct an empty 'ExtraArgs' record.
+emptyExtraArgs : ExtraArgs
+emptyExtraArgs = ExtraArgs with
+  context = ChoiceContext with values = Map.empty
+  meta = emptyMetadata
+
+-- | A representation of a ChoiceContext and disclosed contracts as they would be returned by the
+-- an OpenAPI endpoint of the token standard.
+data OpenApiChoiceContext = OpenApiChoiceContext with
+  choiceContext : ChoiceContext
+  disclosures : Disclosures'
+
+-- | Add extra disclosures to an 'OpenApiChoiceContext'.
+withExtraDisclosures : Disclosures' -> OpenApiChoiceContext -> OpenApiChoiceContext
+withExtraDisclosures discs ctx =
+  ctx with disclosures = ctx.disclosures <> discs
+
+instance Semigroup OpenApiChoiceContext where
+  ctx1 <> ctx2 =
+        OpenApiChoiceContext with
+          choiceContext = ChoiceContext with
+            values = ctx1.choiceContext.values <> ctx2.choiceContext.values
+          disclosures = ctx1.disclosures <> ctx2.disclosures
+
+-- | A choice on a factory contract enriched with an appropriate choice-context and disclosures.
+data EnrichedFactoryChoice t ch = EnrichedFactoryChoice with
+  factoryCid : ContractId t
+  arg : ch
+  disclosures : Disclosures'
+
+
+-- | A set of disclosures. Used to work around the fact that duplicate disclosures for the
+-- same contract are not allowed.
+data Disclosures' = Disclosures' with
+    disclosures : Map.Map Api.Token.MetadataV1.AnyContractId Disclosure
+
+instance Monoid Disclosures' where
+  mempty = Disclosures' with disclosures = Map.empty
+
+instance Semigroup Disclosures' where
+  (Disclosures' ds1) <> (Disclosures' ds2) =
+    Disclosures' with disclosures = Map.union ds1 ds2
+
+-- | Retrieve a disclosed contract by its contract-id from a specific party's ACS.
+queryDisclosure' : forall t. Template t => Party -> ContractId t -> Script Disclosures'
+queryDisclosure' p cid = do
+  optDisc <- queryDisclosure @t p cid
+  case optDisc of
+    None -> fail $ "Disclosure not found for: " <> show cid
+    Some d -> pure Disclosures' with disclosures = Map.fromList [(coerceContractId cid, d)]
+
+-- | Version of 'submitWithDisclosures' that works with the simplified `Disclosures'` type.
+submitWithDisclosures' : Party -> Disclosures' -> Commands a -> Script a
+submitWithDisclosures' p (Disclosures' ds) cmds = submitWithDisclosures p (Map.values ds) cmds
+
+-- | Version of 'submitWithDisclosuresMustFail' that works with the simplified `Disclosures'` type.
+submitWithDisclosuresMustFail' : Party -> Disclosures' -> Commands a -> Script ()
+submitWithDisclosuresMustFail' p (Disclosures' ds) cmds = submitWithDisclosuresMustFail p (Map.values ds) cmds
+
+-- | Allocate party with a specific name.
+allocatePartyExact : Text -> Script Party
+allocatePartyExact name = allocatePartyWithHint name (PartyIdHint name)

@@ -19,7 +19,11 @@ import sys.process.*
   * that will be required by the following test, but leaves the port in a TIME_WAIT state.
   */
 case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
-    extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTests.SpliceTestConsoleEnvironment]
+    extends EnvironmentSetupPlugin[
+      SpliceConfig,
+      EnvironmentImpl,
+      SpliceTests.SpliceTestConsoleEnvironment,
+    ]
     with BaseTest {
 
   protected val timeout = 2.minutes

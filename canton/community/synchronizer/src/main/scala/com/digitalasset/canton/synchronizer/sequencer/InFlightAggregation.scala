@@ -23,18 +23,22 @@ import scala.collection.immutable.SortedMap
   *
   * Since the [[com.digitalasset.canton.sequencing.protocol.AggregationId]] computationally
   * identifies the envelope contents, their recipients, and the
-  * [[com.digitalasset.canton.sequencing.protocol.SubmissionRequest.topologyTimestamp]],
-  * we do not need to maintain these data as part of the in-flight tracking.
-  * Instead, we can derive them from the submission request that makes the aggregation reach its threshold.
+  * [[com.digitalasset.canton.sequencing.protocol.SubmissionRequest.topologyTimestamp]], we do not
+  * need to maintain these data as part of the in-flight tracking. Instead, we can derive them from
+  * the submission request that makes the aggregation reach its threshold.
   *
-  * @param aggregatedSenders The senders whose submission request have already been aggregated
-  *                          with the timestamp of their aggregated submission request and the signatures on the envelopes.
-  * @param maxSequencingTimestamp The max sequencing timestamp of the aggregatable submission requests.
-  *                               The aggregation will stop being in-flight when this timestamp has elapsed
-  * @param rule The aggregation rule describing the eligible members and the threshold to reach
+  * @param aggregatedSenders
+  *   The senders whose submission request have already been aggregated with the timestamp of their
+  *   aggregated submission request and the signatures on the envelopes.
+  * @param maxSequencingTimestamp
+  *   The max sequencing timestamp of the aggregatable submission requests. The aggregation will
+  *   stop being in-flight when this timestamp has elapsed
+  * @param rule
+  *   The aggregation rule describing the eligible members and the threshold to reach
   */
 final case class InFlightAggregation private (
     aggregatedSenders: SortedMap[Member, AggregationBySender],
+    firstSequencingTimestamp: CantonTimestamp,
     maxSequencingTimestamp: CantonTimestamp,
     rule: AggregationRule,
 ) extends PrettyPrinting
@@ -49,13 +53,13 @@ final case class InFlightAggregation private (
       )
       .flatten
 
-  /** The aggregated signatures on the closed envelopes in the aggregatable submission request,
-    * in the same order as the envelopes are in the batch.
+  /** The aggregated signatures on the closed envelopes in the aggregatable submission request, in
+    * the same order as the envelopes are in the batch.
     *
-    * The signatures for each envelope are ordered by the sender who produced them,
-    * rather than the order in which the senders' submission requests were sequenced.
-    * This avoids leaking the order of internal sequencing, as the signatures themselves anyway leak the sender
-    * through the signing key's fingerprint.
+    * The signatures for each envelope are ordered by the sender who produced them, rather than the
+    * order in which the senders' submission requests were sequenced. This avoids leaking the order
+    * of internal sequencing, as the signatures themselves anyway leak the sender through the
+    * signing key's fingerprint.
     */
   def aggregatedSignatures: Seq[Seq[Signature]] =
     aggregatedSenders.values.map(_.signatures).transpose.map(_.flatten.toSeq).toSeq
@@ -83,25 +87,27 @@ final case class InFlightAggregation private (
   }
 
   def asUpdate: InFlightAggregationUpdate = InFlightAggregationUpdate(
-    Some(FreshInFlightAggregation(maxSequencingTimestamp, rule)),
+    Some(FreshInFlightAggregation(firstSequencingTimestamp, maxSequencingTimestamp, rule)),
     Chain(
       aggregatedSenders
         .map { case (sender, aggregationBySender) =>
-          AggregatedSender(sender, aggregationBySender)
+          AggregatedSender(sender, maxSequencingTimestamp, aggregationBySender)
         }
         .to(Seq)*
     ),
   )
 
-  /** Returns whether the in-flight aggregation has expired before or at the given timestamp.
-    * An expired in-flight aggregation is no longer needed and can be removed.
+  /** Returns whether the in-flight aggregation has expired before or at the given timestamp. An
+    * expired in-flight aggregation is no longer needed and can be removed.
     */
   def expired(timestamp: CantonTimestamp): Boolean = timestamp >= maxSequencingTimestamp
 
   /** Undoes all changes to the in-flight aggregation state that happened after the given timestamp.
     *
-    * @return [[scala.None$]] if the aggregation is not in-flight at the given timestamp.
-    *         An aggregation in in-flight from the first [[aggregatedSenders]]' timestamp to the [[maxSequencingTimestamp]].
+    * @return
+    *   [[scala.None$]] if the aggregation is not in-flight at the given timestamp. An aggregation
+    *   in in-flight from the first [[aggregatedSenders]]' timestamp to the
+    *   [[maxSequencingTimestamp]].
     */
   def project(timestamp: CantonTimestamp): Option[InFlightAggregation] =
     for {
@@ -111,7 +117,12 @@ final case class InFlightAggregation private (
           sequencingTimestamp <= timestamp
       }
       _ <- Option.when(projectedSenders.nonEmpty)(())
-    } yield new InFlightAggregation(projectedSenders, maxSequencingTimestamp, rule)
+    } yield new InFlightAggregation(
+      projectedSenders,
+      firstSequencingTimestamp,
+      maxSequencingTimestamp,
+      rule,
+    )
 
   override protected def pretty: Pretty[this.type] = prettyOfClass(
     param("aggregated senders", _.aggregatedSenders),
@@ -123,10 +134,16 @@ final case class InFlightAggregation private (
   @VisibleForTesting
   def copy(
       aggregatedSenders: SortedMap[Member, AggregationBySender] = this.aggregatedSenders,
+      firstSequencingTimestamp: CantonTimestamp = this.firstSequencingTimestamp,
       maxSequencingTimestamp: CantonTimestamp = this.maxSequencingTimestamp,
       rule: AggregationRule = this.rule,
   ): InFlightAggregation =
-    InFlightAggregation.tryCreate(aggregatedSenders, maxSequencingTimestamp, rule)
+    InFlightAggregation.tryCreate(
+      aggregatedSenders,
+      firstSequencingTimestamp,
+      maxSequencingTimestamp,
+      rule,
+    )
 
   /** @throws java.lang.IllegalStateException if the class invariant does not hold */
   def checkInvariant()(implicit loggingContext: NamedLoggingContext): Unit =
@@ -138,12 +155,14 @@ final case class InFlightAggregation private (
 object InFlightAggregation {
   def create(
       aggregatedSenders: Map[Member, AggregationBySender],
+      firstSequencingTimestamp: CantonTimestamp,
       maxSequencingTimestamp: CantonTimestamp,
       rule: AggregationRule,
   ): Either[String, InFlightAggregation] =
     checkInvariant(aggregatedSenders, maxSequencingTimestamp, rule).map(_ =>
       new InFlightAggregation(
         SortedMap.from(aggregatedSenders),
+        firstSequencingTimestamp,
         maxSequencingTimestamp,
         rule,
       )
@@ -151,26 +170,31 @@ object InFlightAggregation {
 
   def tryCreate(
       aggregatedSenders: Map[Member, AggregationBySender],
+      firstSequencingTimestamp: CantonTimestamp,
       maxSequencingTimestamp: CantonTimestamp,
       rule: AggregationRule,
   ): InFlightAggregation =
-    create(aggregatedSenders, maxSequencingTimestamp, rule)
+    create(aggregatedSenders, firstSequencingTimestamp, maxSequencingTimestamp, rule)
       .valueOr(err => throw new IllegalArgumentException(err))
 
   @VisibleForTesting
   def apply(
       rule: AggregationRule,
+      firstSequencingTimestamp: CantonTimestamp,
       maxSequencingTimestamp: CantonTimestamp,
       aggregatedSenders: (Member, AggregationBySender)*
   ): InFlightAggregation =
     InFlightAggregation.tryCreate(
       aggregatedSenders = Map.from(aggregatedSenders),
+      firstSequencingTimestamp,
       maxSequencingTimestamp,
       rule,
     )
 
   def initial(fresh: FreshInFlightAggregation): InFlightAggregation =
-    checked(tryCreate(Map.empty, fresh.maxSequencingTimestamp, fresh.rule))
+    checked(
+      tryCreate(Map.empty, fresh.firstSequencingTimestamp, fresh.maxSequencingTimestamp, fresh.rule)
+    )
 
   private def checkInvariant(
       aggregatedSenders: Map[Member, AggregationBySender],
@@ -208,7 +232,9 @@ object InFlightAggregation {
   /** The aggregatable submission was already delivered at the given timestamp. */
   final case class AlreadyDelivered(deliveredAt: CantonTimestamp) extends InFlightAggregationError
 
-  /** The given sender has already contributed its aggregatable submission request, which was sequenced at the given timestamp */
+  /** The given sender has already contributed its aggregatable submission request, which was
+    * sequenced at the given timestamp
+    */
   final case class AggregationStuffing(sender: Member, sequencingTimestamp: CantonTimestamp)
       extends InFlightAggregationError
 
@@ -242,6 +268,7 @@ object InFlightAggregation {
       case Some(inFlightAggregation) =>
         freshO.foreach { fresh =>
           val existing = FreshInFlightAggregation(
+            inFlightAggregation.firstSequencingTimestamp,
             inFlightAggregation.maxSequencingTimestamp,
             inFlightAggregation.rule,
           )

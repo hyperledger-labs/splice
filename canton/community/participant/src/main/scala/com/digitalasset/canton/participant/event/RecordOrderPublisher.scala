@@ -4,13 +4,14 @@
 package com.digitalasset.canton.participant.event
 
 import cats.implicits.catsSyntaxOptionId
-import com.digitalasset.canton.SequencerCounter
+import com.daml.nameof.NameOf.functionFullName
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.{CantonTimestamp, TaskScheduler, TaskSchedulerMetrics}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update.EmptyAcsPublicationRequired
-import com.digitalasset.canton.ledger.participant.state.{SequencedUpdate, Update}
+import com.digitalasset.canton.ledger.participant.state.{FloatingUpdate, SequencedUpdate, Update}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -20,39 +21,45 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
+import com.digitalasset.canton.{RequestCounter, SequencerCounter}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-/** Helper trait for Online Party Replication event publishing.
-  * Refer to methods in the [[RecordOrderPublisher]] for documentation.
+/** Helper trait for Online Party Replication event publishing. Refer to methods in the
+  * [[RecordOrderPublisher]] for documentation.
   */
 sealed trait PublishesOnlinePartyReplicationEvents {
-  def schedulePublishAddContracts(buildEventAtRecordTime: CantonTimestamp => Update)(implicit
-      traceContext: TraceContext
-  ): Unit
+  def schedulePublishAddContracts(buildEventAtRecordTime: CantonTimestamp => NonEmpty[Seq[Update]])(
+      implicit traceContext: TraceContext
+  ): UnlessShutdown[Unit]
 
-  def publishBufferedEvents()(implicit traceContext: TraceContext): Unit
+  def publishBufferedEvents()(implicit traceContext: TraceContext): UnlessShutdown[Unit]
 }
 
 /** Publishes upstream events and active contract set changes in the order of their record time.
   *
-  * The protocol processors produce events and active contract set changes in the result message order in phase 7.
-  * The [[RecordOrderPublisher]] pushes the events to indexer and the active contract set changes in record time order
-  * (which equals sequencing time order).
-  * (including empty changes on time proofs) to the appropriate listener, which is normally [[pruning.AcsCommitmentProcessor]].
-  * The events are published only after the [[com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker]]
-  * has observed the timestamp.
+  * The protocol processors produce events and active contract set changes in the result message
+  * order in phase 7. The [[RecordOrderPublisher]] pushes the events to indexer and the active
+  * contract set changes in record time order (which equals sequencing time order). (including empty
+  * changes on time proofs) to the appropriate listener, which is normally
+  * [[pruning.AcsCommitmentProcessor]]. The events are published only after the
+  * [[com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker]] has
+  * observed the timestamp.
   *
-  * All sequencer counters above and including `initSc` must eventually be signalled to the [[RecordOrderPublisher]] using [[tick]].
-  * An event is published only when all sequencer counters between `initSc` and its associated sequencer counter
-  * have been signalled.
+  * All sequencer counters above and including `initSc` must eventually be signalled to the
+  * [[RecordOrderPublisher]] using [[tick]]. An event is published only when all sequencer counters
+  * between `initSc` and its associated sequencer counter have been signalled.
   *
-  * @param initSc The initial sequencer counter from which on events should be published
-  * @param initTimestamp The initial timestamp from which on events should be published
-  * @param metrics The task scheduler metrics
-  * @param executionContextForPublishing Execution context for publishing the events
+  * @param initSc
+  *   The initial sequencer counter from which on events should be published
+  * @param initTimestamp
+  *   The initial timestamp from which on events should be published
+  * @param metrics
+  *   The task scheduler metrics
+  * @param executionContextForPublishing
+  *   Execution context for publishing the events
   */
 class RecordOrderPublisher(
     synchronizerId: SynchronizerId,
@@ -102,22 +109,28 @@ class RecordOrderPublisher(
       )
     }
 
-  /** Schedules the given `eventO` to be published on the `eventLog`, and schedules the causal "tick" defined by `clock`.
-    * Tick must be called exactly once for all sequencer counters higher than initTimestamp.
+  /** Schedules the given `eventO` to be published on the `eventLog`, and schedules the causal
+    * "tick" defined by `clock`. Tick must be called exactly once for all sequencer counters higher
+    * than initTimestamp.
     *
-    * @param event The update event to be published.
+    * @param event
+    *   The update event to be published.
+    * @param rcO
+    *   The optional request counter for logging as RCs are more human-readable than timestamps.
     */
-  def tick(event: SequencedUpdate)(implicit traceContext: TraceContext): Future[Unit] =
-    ifNotClosedYet {
+  def tick(event: SequencedUpdate, rcO: Option[RequestCounter])(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] =
+    performUnlessClosingF(functionFullName) {
       if (event.recordTime > initTimestamp) {
-        event.requestCounterO
+        rcO
           .foreach(requestCounter =>
             logger.debug(s"Schedule publication for request counter $requestCounter")
           )
         onlyForTestingRecordAcceptedTransactions(event)
         taskScheduler.scheduleTask(EventPublicationTask(event))
         logger.debug(
-          s"Observing time ${event.recordTime} for sequencer counter ${event.sequencerCounter} for publishing (with event:$event, requestCounterO:${event.requestCounterO})"
+          s"Observing time ${event.recordTime} for sequencer counter ${event.sequencerCounter} for publishing (with event:$event, requestCounterO:$rcO)"
         )
         taskScheduler.addTick(event.sequencerCounter, event.recordTime)
         // this adds backpressure from indexer queue to protocol processing:
@@ -135,24 +148,31 @@ class RecordOrderPublisher(
     }
 
   /** Schedule a floating event, if the current synchronizer time is earlier than timestamp.
-    * @param timestamp The desired timestamp of the publication: if cannot be met, the function will return a Left.
-    * @param eventFactory A function returning an optional Update to be published.
-    *                     This function will be executed as the scheduled task is executing. (if scheduling is possible)
-    *                     This function will be called with timestamp.
-    * @param onScheduled A function creating a FutureUnlessShutdown[T].
-    *                    This function will be only executed, if the scheduling is possible.
-    *                    This function will be executed before the scheduleFloatingEventPublication returns. (if scheduling is possible)
-    *                    Execution of the floating event publication will wait for the onScheduled operation to finish.
-    * @param traceContext Should be the TraceContext of the event
-    * @return A Left with the current synchronizer time, if scheduling is not possible as the synchronizer time is bigger.
-    *         A Right with the result of the onScheduled FutureUnlessShutdown[T].
+    * @param timestamp
+    *   The desired timestamp of the publication: if cannot be met, the function will return a Left.
+    * @param eventFactory
+    *   A function returning an optional Update to be published. This function will be executed as
+    *   the scheduled task is executing. (if scheduling is possible) This function will be called
+    *   with timestamp.
+    * @param onScheduled
+    *   A function creating a FutureUnlessShutdown[T]. This function will be only executed, if the
+    *   scheduling is possible. This function will be executed before the
+    *   scheduleFloatingEventPublication returns. (if scheduling is possible) Execution of the
+    *   floating event publication will wait for the onScheduled operation to finish.
+    * @param traceContext
+    *   Should be the TraceContext of the event
+    * @return
+    *   A Left with the current synchronizer time, if scheduling is not possible as the synchronizer
+    *   time is bigger. A Right with the result of the onScheduled FutureUnlessShutdown[T].
     */
   def scheduleFloatingEventPublication[T](
       timestamp: CantonTimestamp,
-      eventFactory: CantonTimestamp => Option[Update],
+      eventFactory: CantonTimestamp => Option[FloatingUpdate],
       onScheduled: () => FutureUnlessShutdown[T], // perform will wait for this to complete
-  )(implicit traceContext: TraceContext): Either[CantonTimestamp, FutureUnlessShutdown[T]] =
-    ifNotClosedYet {
+  )(implicit
+      traceContext: TraceContext
+  ): UnlessShutdown[Either[CantonTimestamp, FutureUnlessShutdown[T]]] =
+    performUnlessClosing(functionFullName) {
       taskScheduler
         .scheduleTaskIfLater(
           desiredTimestamp = timestamp,
@@ -168,87 +188,101 @@ class RecordOrderPublisher(
     }
 
   /** Schedule a floating event, if the current synchronizer time is earlier than timestamp.
-    * @param timestamp The desired timestamp of the publication: if cannot be met, the function will return a Left.
-    * @param eventFactory A function returning an optional Update to be published.
-    *                     This function will be executed as the scheduled task is executing. (if scheduling is possible)
-    *                     This function will be called with timestamp.
-    * @param traceContext Should be the TraceContext of the event
-    * @return A Left with the current synchronizer time, if scheduling is not possible as the synchronizer time is bigger.
-    *         A Right with unit if possible.
+    * @param timestamp
+    *   The desired timestamp of the publication: if cannot be met, the function will return a Left.
+    * @param eventFactory
+    *   A function returning an optional Update to be published. This function will be executed as
+    *   the scheduled task is executing. (if scheduling is possible) This function will be called
+    *   with timestamp.
+    * @param traceContext
+    *   Should be the TraceContext of the event
+    * @return
+    *   A Left with the current synchronizer time, if scheduling is not possible as the synchronizer
+    *   time is bigger. A Right with unit if possible.
     */
   def scheduleFloatingEventPublication(
       timestamp: CantonTimestamp,
-      eventFactory: CantonTimestamp => Option[Update],
-  )(implicit traceContext: TraceContext): Either[CantonTimestamp, Unit] =
+      eventFactory: CantonTimestamp => Option[FloatingUpdate],
+  )(implicit traceContext: TraceContext): UnlessShutdown[Either[CantonTimestamp, Unit]] =
     scheduleFloatingEventPublication(
       timestamp = timestamp,
       eventFactory = eventFactory,
       onScheduled = () => FutureUnlessShutdown.unit,
-    ).map(_ => ())
+    ).map(_.map(_ => ()))
 
   /** Schedule a floating event immediately: with the synchronizer time of the last published event.
-    * @param eventFactory A function returning an optional Update to be published.
-    *                     This function will be executed as the scheduled task is executing.
-    *                     This function will be called with the realized synchronizer timestamp.
-    * @param traceContext Should be the TraceContext of the event
-    * @return The timestamp used for the publication.
+    * @param eventFactory
+    *   A function returning an optional Update to be published. This function will be executed as
+    *   the scheduled task is executing. This function will be called with the realized synchronizer
+    *   timestamp.
+    * @param traceContext
+    *   Should be the TraceContext of the event
+    * @return
+    *   The timestamp used for the publication.
     */
   def scheduleFloatingEventPublicationImmediately(
-      eventFactory: CantonTimestamp => Option[Update]
-  )(implicit traceContext: TraceContext): CantonTimestamp = ifNotClosedYet {
-    taskScheduler
-      .scheduleTaskImmediately(
-        taskFactory = immediateTimestamp =>
-          eventFactory(immediateTimestamp) match {
-            case Some(event) =>
-              publishOrBuffer(
-                event,
-                s"floating event immediately with timestamp $immediateTimestamp",
-              )
-            case None =>
-              logger.debug(
-                s"Skip publish-immediately floating event with timestamp $immediateTimestamp: nothing to publish"
-              )
-              FutureUnlessShutdown.unit
-          },
-        taskTraceContext = traceContext,
-      )
-  }
+      eventFactory: CantonTimestamp => Option[FloatingUpdate]
+  )(implicit traceContext: TraceContext): UnlessShutdown[CantonTimestamp] =
+    performUnlessClosing(functionFullName) {
+      taskScheduler
+        .scheduleTaskImmediately(
+          taskFactory = immediateTimestamp =>
+            eventFactory(immediateTimestamp) match {
+              case Some(event) =>
+                publishOrBuffer(
+                  event,
+                  s"floating event immediately with timestamp $immediateTimestamp",
+                )
+              case None =>
+                logger.debug(
+                  s"Skip publish-immediately floating event with timestamp $immediateTimestamp: nothing to publish"
+                )
+                FutureUnlessShutdown.unit
+            },
+          taskTraceContext = traceContext,
+        )
+    }
 
   /** Schedules an empty acs change publication task to be published to the `acsChangeListener`.
     */
   def scheduleEmptyAcsChangePublication(
       sequencerCounter: SequencerCounter,
       timestamp: CantonTimestamp,
-  )(implicit traceContext: TraceContext): Unit = ifNotClosedYet {
-    if (sequencerCounter >= initSc) {
-      scheduleFloatingEventPublication(
-        timestamp = timestamp,
-        eventFactory = EmptyAcsPublicationRequired(synchronizerId, _).some,
-      ).toOption.getOrElse(
-        ErrorUtil.invalidState(
-          "Trying to schedule empty ACS change publication too late: the specified timestamp is already ticked."
+  )(implicit traceContext: TraceContext): UnlessShutdown[Unit] =
+    performUnlessClosing(functionFullName) {
+      if (sequencerCounter >= initSc) {
+        scheduleFloatingEventPublication(
+          timestamp = timestamp,
+          eventFactory = EmptyAcsPublicationRequired(synchronizerId, _).some,
+        ).foreach(
+          _.toOption.getOrElse(
+            ErrorUtil.invalidState(
+              "Trying to schedule empty ACS change publication too late: the specified timestamp is already ticked."
+            )
+          )
         )
-      )
+      }
     }
-  }
 
-  /** Schedules the beginning of buffering of Ledger API Indexer event publishing for Online Party Replication.
+  /** Schedules the beginning of buffering of Ledger API Indexer event publishing for Online Party
+    * Replication.
     *
-    * Meant to be scheduled when the PartyToParticipant topology transaction adds a new participant to an existing party.
+    * Meant to be scheduled when the PartyToParticipant topology transaction adds a new participant
+    * to an existing party.
     */
   def scheduleEventBuffering(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Either[CantonTimestamp, Unit] = ifNotClosedYet {
-    taskScheduler
-      .scheduleTaskIfLater(
-        desiredTimestamp = timestamp,
-        taskFactory = _ => {
-          FloatingBufferEventsPublicationTask(timestamp = timestamp)
-        },
-      )
-      .map(_ => ())
-  }
+  )(implicit traceContext: TraceContext): UnlessShutdown[Either[CantonTimestamp, Unit]] =
+    performUnlessClosing(functionFullName) {
+      taskScheduler
+        .scheduleTaskIfLater(
+          desiredTimestamp = timestamp,
+          taskFactory = _ => {
+            FloatingBufferEventsPublicationTask(timestamp = timestamp)
+          },
+        )
+        .map(_ => ())
+    }
 
   /** Schedules publishing of an Online Party Replication ACS chunk as soon as possible.
     *
@@ -256,8 +290,8 @@ class RecordOrderPublisher(
     * [[publishBufferedEvents]] calls.
     */
   def schedulePublishAddContracts(
-      buildEventAtRecordTime: CantonTimestamp => Update
-  )(implicit traceContext: TraceContext): Unit =
+      buildEventAtRecordTime: CantonTimestamp => NonEmpty[Seq[Update]]
+  )(implicit traceContext: TraceContext): UnlessShutdown[Unit] =
     scheduleBufferingEventTaskImmediately { timestamp =>
       logger.debug(s"Publish add contracts at $timestamp")
       ledgerApiIndexerBuffer.get() match {
@@ -266,16 +300,21 @@ class RecordOrderPublisher(
             "Buffering of LedgerApiIndexer events should be started before adding contracts"
           )
         case Some(buffer) =>
-          val event = buffer.markEventWithRecordTime(buildEventAtRecordTime)
-          publishLedgerApiIndexerEvent(event)
+          val events = buffer.markEventsWithRecordTime(buildEventAtRecordTime)
+          MonadUtil
+            .sequentialTraverse_(events) { event =>
+              logger.debug(s"Publishing contract add $event")
+              publishLedgerApiIndexerEvent(event)
+            }
       }
     }
 
-  /** Schedules flushing of events that were buffered during Online Party Replication as soon as possible.
+  /** Schedules flushing of events that were buffered during Online Party Replication as soon as
+    * possible.
     *
     * Meant to be called once Online Party Replication has succeeded.
     */
-  def publishBufferedEvents()(implicit traceContext: TraceContext): Unit =
+  def publishBufferedEvents()(implicit traceContext: TraceContext): UnlessShutdown[Unit] =
     scheduleBufferingEventTaskImmediately { timestamp =>
       ledgerApiIndexerBuffer.getAndSet(None) match {
         case None => FutureUnlessShutdown.unit
@@ -294,15 +333,12 @@ class RecordOrderPublisher(
 
   private def scheduleBufferingEventTaskImmediately(
       perform: CantonTimestamp => FutureUnlessShutdown[Unit]
-  )(implicit traceContext: TraceContext): Unit = ifNotClosedYet(
-    taskScheduler
-      .scheduleTaskImmediately(taskFactory = perform, taskTraceContext = traceContext)
-      .discard
-  )
-
-  private def ifNotClosedYet[T](t: => T)(implicit traceContext: TraceContext): T =
-    if (isClosing) ErrorUtil.invalidState("RecordOrderPublisher should not be used after closed")
-    else t
+  )(implicit traceContext: TraceContext): UnlessShutdown[Unit] =
+    performUnlessClosing(functionFullName)(
+      taskScheduler
+        .scheduleTaskImmediately(taskFactory = perform, taskTraceContext = traceContext)
+        .discard
+    )
 
   private sealed trait PublicationTask extends TaskScheduler.TimedTask
 
@@ -350,7 +386,7 @@ class RecordOrderPublisher(
       waitFor: FutureUnlessShutdown[T], // ability to hold back publication execution
       override val timestamp: CantonTimestamp,
   )(
-      eventO: () => Option[Update]
+      eventO: () => Option[FloatingUpdate]
   )(implicit val traceContext: TraceContext)
       extends PublicationTask {
 

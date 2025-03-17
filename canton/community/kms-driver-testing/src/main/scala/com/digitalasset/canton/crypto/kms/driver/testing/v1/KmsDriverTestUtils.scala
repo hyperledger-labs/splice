@@ -1,5 +1,5 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms.driver.testing.v1
 
@@ -18,6 +18,7 @@ import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   HashAlgorithm,
   PbkdfScheme,
+  SigningKeyUsage,
   SigningPublicKey,
   SymmetricKeyScheme,
 }
@@ -77,13 +78,16 @@ object KmsDriverTestUtils {
     )
   }
 
-  def signingPublicKey(publicKey: PublicKey): SigningPublicKey = {
+  def signingPublicKey(
+      publicKey: PublicKey,
+      usage: NonEmpty[Set[SigningKeyUsage]],
+  ): SigningPublicKey = {
     val key = ByteString.copyFrom(publicKey.key)
     val spec = publicKey.spec match {
       case spec: SigningKeySpec => spec.transformInto[crypto.SigningKeySpec]
       case _: EncryptionKeySpec => sys.error("public key is not a signing public key")
     }
-    SigningPublicKey(CryptoKeyFormat.DerX509Spki, key, spec)()
+    SigningPublicKey(CryptoKeyFormat.DerX509Spki, key, spec, usage)()
   }
 
   def encryptionPublicKey(publicKey: PublicKey): EncryptionPublicKey = {

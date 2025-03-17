@@ -2,21 +2,15 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PEndpointConfig
 import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 
 class BFTManualStartIntegrationTest extends IntegrationTest {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] = {
+  override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology4Svs("BFT")
       .withTrafficTopupsEnabled
@@ -30,10 +24,11 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
                   _.copy(
                     isBftSequencer = true,
                     externalPeerApiUrlSuffix = Some(
-                      Endpoint(
+                      P2PEndpointConfig(
                         "localhost",
                         RequireTypes.Port
                           .tryCreate(5010 + Integer.parseInt(sv.stripPrefix("sv")) * 100),
+                        tlsConfig = None,
                       )
                     ),
                   )

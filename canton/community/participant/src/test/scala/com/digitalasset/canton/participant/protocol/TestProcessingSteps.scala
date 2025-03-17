@@ -254,7 +254,7 @@ class TestProcessingSteps(
           engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
         )
       ),
-      EitherT.pure[FutureUnlessShutdown, RequestError](Seq.empty),
+      EitherT.pure[FutureUnlessShutdown, RequestError](None),
       (),
     )
     EitherT.rightT(res)
@@ -268,11 +268,10 @@ class TestProcessingSteps(
       ],
   )(implicit
       traceContext: com.digitalasset.canton.tracing.TraceContext
-  ): Seq[com.digitalasset.canton.protocol.messages.ConfirmationResponse] = Seq.empty
+  ): Option[com.digitalasset.canton.protocol.messages.ConfirmationResponses] = None
 
   override def eventAndSubmissionIdForRejectedCommand(
       ts: CantonTimestamp,
-      rc: RequestCounter,
       sc: SequencerCounter,
       submitterMetadata: ViewSubmitterMetadata,
       rootHash: RootHash,

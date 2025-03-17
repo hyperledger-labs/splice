@@ -15,7 +15,7 @@ import Splice.Round
 import Splice.Types
 import Splice.ValidatorLicense
 import Splice.Scripts.Util
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 
 totalRewardsPerRound : Decimal
 totalRewardsPerRound = issuanceConfig_0_0p5.amuletToIssuePerYear / (365.0 * 24.0 * 6.0) -- one round every 10'

@@ -32,9 +32,8 @@ CREATE TABLE lapi_ledger_end_synchronizer_index (
   synchronizer_id INTEGER PRIMARY KEY NOT NULL,
   sequencer_counter BIGINT,
   sequencer_timestamp BIGINT,
-  request_counter BIGINT,
-  request_timestamp BIGINT,
-  request_sequencer_counter BIGINT,
+  repair_timestamp BIGINT,
+  repair_counter BIGINT,
   record_time BIGINT NOT NULL
 );
 
@@ -129,7 +128,7 @@ CREATE TABLE lapi_events_create (
     submitters INTEGER ARRAY,
 
     -- * shared event information
-    contract_id VARCHAR NOT NULL,
+    contract_id BINARY VARYING NOT NULL,
     template_id INTEGER NOT NULL,
     package_name INTEGER NOT NULL,
     package_version INTEGER, -- Can be null for LF 2.1
@@ -190,7 +189,7 @@ CREATE TABLE lapi_events_consuming_exercise (
     submitters INTEGER ARRAY,
 
     -- * shared event information
-    contract_id VARCHAR NOT NULL,
+    contract_id BINARY VARYING NOT NULL,
     template_id INTEGER NOT NULL,
     package_name INTEGER NOT NULL,
     flat_event_witnesses INTEGER ARRAY NOT NULL DEFAULT ARRAY[], -- stakeholders
@@ -247,7 +246,7 @@ CREATE TABLE lapi_events_non_consuming_exercise (
     submitters INTEGER ARRAY,
 
     -- * shared event information
-    contract_id VARCHAR NOT NULL,
+    contract_id BINARY VARYING NOT NULL,
     template_id INTEGER NOT NULL,
     package_name INTEGER NOT NULL,
     tree_event_witnesses INTEGER ARRAY NOT NULL DEFAULT ARRAY[], -- informees
@@ -303,7 +302,7 @@ CREATE TABLE lapi_events_unassign (
     submitter INTEGER NOT NULL,
 
     -- * shared event information
-    contract_id VARCHAR NOT NULL,
+    contract_id BINARY VARYING NOT NULL,
     template_id INTEGER NOT NULL,
     package_name INTEGER NOT NULL,
     flat_event_witnesses INTEGER ARRAY NOT NULL DEFAULT ARRAY[], -- stakeholders
@@ -350,7 +349,7 @@ CREATE TABLE lapi_events_assign (
     submitter INTEGER NOT NULL,
 
     -- * shared event information
-    contract_id VARCHAR NOT NULL,
+    contract_id BINARY VARYING NOT NULL,
     template_id INTEGER NOT NULL,
     package_name INTEGER NOT NULL,
     package_version INTEGER, -- Can be null for LF 2.1

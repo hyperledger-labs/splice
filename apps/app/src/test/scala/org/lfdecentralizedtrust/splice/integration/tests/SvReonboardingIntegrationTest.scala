@@ -14,7 +14,6 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   bumpUrl,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
@@ -29,13 +28,12 @@ import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, 
 import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, DbConfig}
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -83,8 +81,7 @@ class SvReonboardingIntegrationTest
   private def validatorLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("validatorWalletLocal")
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation
@@ -130,7 +127,7 @@ class SvReonboardingIntegrationTest
                     adminApi = referenceValidatorConfig.adminApi
                       .copy(internalPort = Some(Port.tryCreate(27503))),
                     participantClient = ParticipantClientConfig(
-                      ClientConfig(port = Port.tryCreate(27502)),
+                      FullClientConfig(port = Port.tryCreate(27502)),
                       referenceValidatorConfig.participantClient.ledgerApi.copy(
                         clientConfig =
                           referenceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(

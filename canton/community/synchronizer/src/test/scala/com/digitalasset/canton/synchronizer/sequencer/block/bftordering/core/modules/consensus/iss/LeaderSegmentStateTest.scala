@@ -10,13 +10,13 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.{
   Epoch,
   Segment,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Block
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.leaders.SimpleLeaderSelectionPolicy
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
   BlockNumber,
@@ -41,6 +41,7 @@ class LeaderSegmentStateTest extends AsyncWordSpec with BftSequencerBaseTest {
 
   private val metrics = SequencerMetrics.noop(getClass.getSimpleName).bftOrdering
   private implicit val mc: MetricsContext = MetricsContext.Empty
+  private implicit val config: BftBlockOrderer.Config = BftBlockOrderer.Config()
   private val clock = new SimClock(loggerFactory = loggerFactory)
 
   import LeaderSegmentStateTest.*
@@ -140,7 +141,7 @@ class LeaderSegmentStateTest extends AsyncWordSpec with BftSequencerBaseTest {
     }
 
     "tell when this node is blocking progress" in {
-      val membership = Membership(myId, otherPeers)
+      val membership = Membership.forTesting(myId, otherPeers)
       val epoch = Epoch(
         EpochInfo.mk(
           number = EpochNumber.First,
@@ -149,7 +150,6 @@ class LeaderSegmentStateTest extends AsyncWordSpec with BftSequencerBaseTest {
         ),
         currentMembership = membership,
         previousMembership = membership, // Not relevant for the test
-        SimpleLeaderSelectionPolicy,
       )
       val mySegment =
         epoch.segments.find(_.originalLeader == myId).getOrElse(fail("myId should have a segment"))
@@ -239,13 +239,12 @@ object LeaderSegmentStateTest {
   private val otherPeers: Set[SequencerId] = (1 to 3).map { index =>
     fakeSequencerId(s"peer$index")
   }.toSet
-  private val currentMembership = Membership(myId, otherPeers)
+  private val currentMembership = Membership.forTesting(myId, otherPeers)
   private val epoch =
     Epoch(
       EpochInfo.mk(EpochNumber.First, startBlockNumber = BlockNumber.First, 7),
       currentMembership,
       previousMembership = currentMembership, // not relevant
-      SimpleLeaderSelectionPolicy,
     )
 
   private val commits = (otherPeers + myId)

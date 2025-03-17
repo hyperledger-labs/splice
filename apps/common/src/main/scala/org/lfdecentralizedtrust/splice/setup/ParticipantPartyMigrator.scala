@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.setup
 
 import cats.data.EitherT
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   DarResource,
@@ -55,7 +56,7 @@ class ParticipantPartyMigrator(
       synchronizerId <- participantAdminConnection.getSynchronizerId(synchronizerAlias)
       allPartyToParticipants <- participantAdminConnection
         .listPartyToParticipant(
-          synchronizerId.filterString,
+          TopologyStoreId.SynchronizerStore(synchronizerId).some,
           filterParticipant = oldParticipantId.uid.toProtoPrimitive,
         )
       partyToParticipants =
@@ -74,7 +75,7 @@ class ParticipantPartyMigrator(
       partyIdsToMigrate = topologyTxs.map(_.mapping.partyId).toSet
       partyIdsAlreadyMigrated <- participantAdminConnection
         .listPartyToParticipant(
-          synchronizerId.filterString,
+          TopologyStoreId.SynchronizerStore(synchronizerId).some,
           filterParticipant = participantId.uid.toProtoPrimitive,
         )
         .map(_.filter(_.mapping.participants.size == 1).map(_.mapping.partyId).toSet)
@@ -220,7 +221,7 @@ class ParticipantPartyMigrator(
         "dars_uploaded",
         "Required dars are uploaded",
         participantAdminConnection.listDars().map { dars =>
-          val availablePackageIds = dars.map(_.darId)
+          val availablePackageIds = dars.map(_.mainPackageId)
           if (!requiredDars.forall(dar => availablePackageIds.contains(dar.packageId)))
             throw Status.FAILED_PRECONDITION
               .withDescription(

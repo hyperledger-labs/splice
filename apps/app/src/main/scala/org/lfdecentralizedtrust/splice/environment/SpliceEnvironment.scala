@@ -9,9 +9,11 @@ import com.digitalasset.canton.console.ConsoleOutput
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
+import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
-import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrap
+import com.digitalasset.canton.synchronizer.mediator.{MediatorNodeBootstrap, MediatorNodeConfig}
 import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.metrics.SpliceMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.ScanAppBootstrap
@@ -170,7 +172,7 @@ trait SpliceEnvironment extends Environment {
 
 }
 
-object SpliceEnvironmentFactory extends EnvironmentFactory[EnvironmentImpl] {
+object SpliceEnvironmentFactory extends EnvironmentFactory[SpliceConfig, EnvironmentImpl] {
   override def create(
       config: SpliceConfig,
       loggerFactory: NamedLoggerFactory,
@@ -197,21 +199,19 @@ class EnvironmentImpl(
     new SpliceConsoleEnvironment(this, consoleOutput)
 
   override protected def participantNodeFactory
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap] =
-    ParticipantNodeBootstrap.CommunityParticipantFactory
+      : ParticipantNodeBootstrap.Factory[LocalParticipantConfig, ParticipantNodeBootstrap] = ???
 
   override protected lazy val migrationsFactory: DbMigrationsFactory =
     new CommunityDbMigrationsFactory(loggerFactory)
 
-  // createWhateverX copied from canton's CommunityEnvironment:
   override protected def createMediator(
       name: String,
-      mediatorConfig: Config#MediatorNodeConfigType,
+      mediatorConfig: MediatorNodeConfig,
   ): MediatorNodeBootstrap = ???
 
   override protected def createSequencer(
       name: String,
-      sequencerConfig: Config#SequencerNodeConfigType,
+      sequencerConfig: SequencerNodeConfig,
   ): SequencerNodeBootstrap = ???
 
   override def isEnterprise: Boolean = false

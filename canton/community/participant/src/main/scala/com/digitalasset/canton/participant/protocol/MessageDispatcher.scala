@@ -56,8 +56,9 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
 
-/** Dispatches the incoming messages of the [[com.digitalasset.canton.sequencing.client.SequencerClient]]
-  * to the different processors. It also informs the [[conflictdetection.RequestTracker]] about the passing of time for messages
+/** Dispatches the incoming messages of the
+  * [[com.digitalasset.canton.sequencing.client.SequencerClient]] to the different processors. It
+  * also informs the [[conflictdetection.RequestTracker]] about the passing of time for messages
   * that are not processed by the [[TransactionProcessor]].
   */
 trait MessageDispatcher { this: NamedLogging =>
@@ -88,7 +89,6 @@ trait MessageDispatcher { this: NamedLogging =>
   protected def requestCounterAllocator: RequestCounterAllocator
   protected def recordOrderPublisher: RecordOrderPublisher
   protected def badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor
-  protected def repairProcessor: RepairProcessor
   protected def inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker
   protected def metrics: ConnectedSynchronizerMetrics
 
@@ -114,11 +114,16 @@ trait MessageDispatcher { this: NamedLogging =>
       // It is nevertheless OK to schedule the empty ACS change
       // because we use a different tie breaker for the empty ACS commitment.
       // This is also why we must not tick the record order publisher here.
-      recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
-      doProcess(AcsCommitment { () =>
-        logger.debug(s"Processing ACS commitments for timestamp $ts")
-        acsCommitmentProcessor(ts, Traced(acsCommitments))
-      })
+      FutureUnlessShutdown
+        .lift(
+          recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
+        )
+        .flatMap(_ =>
+          doProcess(AcsCommitment { () =>
+            logger.debug(s"Processing ACS commitments for timestamp $ts")
+            acsCommitmentProcessor(ts, Traced(acsCommitments))
+          })
+        )
     } else pureProcessingResult
   }
 
@@ -134,40 +139,34 @@ trait MessageDispatcher { this: NamedLogging =>
       )
 
   /** Rules for processing batches of envelopes:
-    * <ul>
-    *   <li>Identity transactions can be included in any batch of envelopes. They must be processed first.
-    *     <br/>
-    *     The identity processor ignores replayed or invalid transactions and merely logs an error.
-    *   </li>
-    *   <li>Acs commitments can be included in any batch of envelopes.
-    *     They must be processed before the requests and results to
-    *     meet the precondition of [[com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor]]'s `processBatch`
+    *   - Identity transactions can be included in any batch of envelopes. They must be processed
+    *     first. The identity processor ignores replayed or invalid transactions and merely logs an
+    *     error.
+    *   - Acs commitments can be included in any batch of envelopes. They must be processed before
+    *     the requests and results to meet the precondition of
+    *     [[com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor]]'s `processBatch`
     *     method.
-    *   </li>
-    *   <li>A [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] message should be sent only by the trusted mediator of the synchronizer.
-    *     The mediator should never include further messages with a [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]].
-    *     So a participant accepts a [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]]
-    *     only if there are no other messages (except topology transactions and ACS commitments) in the batch.
-    *     Otherwise, the participant ignores the [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] and raises an alarm.
-    *   </li>
-    *   <li>
-    *     Request messages originate from untrusted participants.
-    *     If the batch contains exactly one [[com.digitalasset.canton.protocol.messages.RootHashMessage]]
-    *     that is sent to the participant and the mediator only,
-    *     the participant processes only request messages with the same root hash.
-    *     If there are no such root hash message or multiple thereof,
-    *     the participant does not process the request at all
-    *     because the mediator will reject the request as a whole.
-    *   </li>
-    *   <li>
-    *     We do not know the submitting member of a particular submission because such a submission may be sequenced through
-    *     an untrusted individual sequencer node (e.g., on a BFT synchronizer). Such a sequencer node could lie about
-    *     the actual submitting member. These lies work even with signed submission requests
-    *     when an earlier submission request is replayed.
-    *     So we cannot rely on honest synchronizer nodes sending their messages only once and instead must
-    *     deduplicate replays on the recipient side.
-    *   </li>
-    * </ul>
+    *   - A [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] message should
+    *     be sent only by the trusted mediator of the synchronizer. The mediator should never
+    *     include further messages with a
+    *     [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]]. So a participant
+    *     accepts a [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] only if
+    *     there are no other messages (except topology transactions and ACS commitments) in the
+    *     batch. Otherwise, the participant ignores the
+    *     [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] and raises an
+    *     alarm.
+    *   - Request messages originate from untrusted participants. If the batch contains exactly one
+    *     [[com.digitalasset.canton.protocol.messages.RootHashMessage]] that is sent to the
+    *     participant and the mediator only, the participant processes only request messages with
+    *     the same root hash. If there are no such root hash message or multiple thereof, the
+    *     participant does not process the request at all because the mediator will reject the
+    *     request as a whole.
+    *   - We do not know the submitting member of a particular submission because such a submission
+    *     may be sequenced through an untrusted individual sequencer node (e.g., on a BFT
+    *     synchronizer). Such a sequencer node could lie about the actual submitting member. These
+    *     lies work even with signed submission requests when an earlier submission request is
+    *     replayed. So we cannot rely on honest synchronizer nodes sending their messages only once
+    *     and instead must deduplicate replays on the recipient side.
     */
   protected def processBatch(
       eventE: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]]
@@ -200,14 +199,6 @@ trait MessageDispatcher { this: NamedLogging =>
         sc,
         ts,
       )
-      // Make room for the repair requests that have been inserted before the current timestamp.
-      //
-      // Some sequenced events do not take this code path (e.g. deliver errors),
-      // but repair requests may still be tagged to their timestamp.
-      // We therefore wedge all of them in now before we possibly allocate a request counter for the current event.
-      // It is safe to not wedge repair requests with the sequenced events they're tagged to
-      // because wedging affects only request counter allocation.
-      repairProcessorResult <- repairProcessorWedging(ts)
       transactionReassignmentResult <- processTransactionAndReassignmentMessages(
         eventE,
         sc,
@@ -219,7 +210,6 @@ trait MessageDispatcher { this: NamedLogging =>
         identityResult,
         trafficResult,
         acsCommitmentResult,
-        repairProcessorResult,
         transactionReassignmentResult,
       )
     )
@@ -394,7 +384,9 @@ trait MessageDispatcher { this: NamedLogging =>
   }
 
   /** Checks the root hash messages and extracts the views with the correct view type.
-    * @return [[com.digitalasset.canton.util.Checked.Abort]] indicates a really malformed request and the appropriate reaction
+    * @return
+    *   [[com.digitalasset.canton.util.Checked.Abort]] indicates a really malformed request and the
+    *   appropriate reaction
     */
   private def checkRootHashMessageAndViews(
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
@@ -427,9 +419,11 @@ trait MessageDispatcher { this: NamedLogging =>
     )
   } yield goodRequest
 
-  /** Return only the root hash messages sent to a mediator, along with the mediator group recipient.
-    * The mediator group recipient can be `None` if there is no root hash message sent to a mediator group.
-    * @throws IllegalArgumentException if there are root hash messages that address more than one mediator group.
+  /** Return only the root hash messages sent to a mediator, along with the mediator group
+    * recipient. The mediator group recipient can be `None` if there is no root hash message sent to
+    * a mediator group.
+    * @throws IllegalArgumentException
+    *   if there are root hash messages that address more than one mediator group.
     */
   private def filterRootHashMessagesToMediator(
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
@@ -520,9 +514,9 @@ trait MessageDispatcher { this: NamedLogging =>
         )
     }
 
-  /** Check that we received encrypted views with the same view type as the root hash message.
-    * If there is no such view, return an aborting error; otherwise return those views.
-    * Also return non-aborting errors for the other received view types (if any).
+  /** Check that we received encrypted views with the same view type as the root hash message. If
+    * there is no such view, return an aborting error; otherwise return those views. Also return
+    * non-aborting errors for the other received view types (if any).
     */
   private def checkEncryptedViewsForRootHashMessage(
       encryptedViews: Seq[OpenEnvelope[EncryptedViewMessage[ViewType]]],
@@ -566,17 +560,6 @@ trait MessageDispatcher { this: NamedLogging =>
 
     badEncryptedViewsC.flatMap((_: Unit) => goodEncryptedViewsC)
   }
-
-  protected def repairProcessorWedging(
-      upToExclusive: CantonTimestamp
-  )(implicit traceContext: TraceContext): ProcessingResult =
-    doProcess(
-      UnspecifiedMessageKind(() =>
-        FutureUnlessShutdown.pure(
-          repairProcessor.wedgeRepairRequests(upToExclusive)
-        )
-      )
-    )
 
   protected def observeSequencing(
       events: Seq[RawProtocolEvent]
@@ -737,7 +720,8 @@ private[participant] object MessageDispatcher {
     }
   }
 
-  /** @tparam A The type returned by processors for the given kind
+  /** @tparam A
+    *   The type returned by processors for the given kind
     */
   sealed trait MessageKind extends Product with Serializable with PrettyPrinting {
     override protected def pretty: Pretty[MessageKind.this.type] =
@@ -786,7 +770,6 @@ private[participant] object MessageDispatcher {
         requestCounterAllocator: RequestCounterAllocator,
         recordOrderPublisher: RecordOrderPublisher,
         badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
-        repairProcessor: RepairProcessor,
         inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
         loggerFactory: NamedLoggerFactory,
         metrics: ConnectedSynchronizerMetrics,
@@ -806,7 +789,6 @@ private[participant] object MessageDispatcher {
         requestCounterAllocator: RequestCounterAllocator,
         recordOrderPublisher: RecordOrderPublisher,
         badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
-        repairProcessor: RepairProcessor,
         inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
         loggerFactory: NamedLoggerFactory,
         metrics: ConnectedSynchronizerMetrics,
@@ -833,7 +815,6 @@ private[participant] object MessageDispatcher {
         requestCounterAllocator,
         recordOrderPublisher,
         badRootHashMessagesRequestProcessor,
-        repairProcessor,
         inFlightSubmissionSynchronizerTracker,
         loggerFactory,
         metrics,

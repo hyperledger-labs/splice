@@ -92,7 +92,8 @@ class SvDsoAutomationService(
       domainUnpausedSync,
       dsoStore,
       PackageIdResolver
-        .inferFromAmuletRules(
+        .inferFromAmuletRulesIfEnabled(
+          config.parameters.enableCantonPackageSelection,
           clock,
           dsoStore,
           loggerFactory,
@@ -232,6 +233,7 @@ class SvDsoAutomationService(
             config.domains.global.alias,
             synchronizerNode,
             dsoStore,
+            connection,
             participantAdminConnection,
             synchronizerNode.sequencerAdminConnection,
             dumpPath: Path,
@@ -360,7 +362,6 @@ class SvDsoAutomationService(
       new SvPackageVettingTrigger(
         participantAdminConnection,
         dsoStore,
-        config.prevetDuration,
         triggerContext,
       )
     )

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.{EitherT, OptionT}
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
@@ -12,13 +13,14 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.{
-  RequiredProposalNotFound,
   DsoPartyMigrationFailure,
+  RequiredProposalNotFound,
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.PartyToParticipant
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -100,7 +102,7 @@ class SponsorDsoPartyHosting(
     OptionT(
       participantAdminConnection
         .listPartyToParticipant(
-          synchronizerId.filterString,
+          TopologyStoreId.SynchronizerStore(synchronizerId).some,
           filterParty = dsoParty.filterString,
           proposals = AllProposals,
         )

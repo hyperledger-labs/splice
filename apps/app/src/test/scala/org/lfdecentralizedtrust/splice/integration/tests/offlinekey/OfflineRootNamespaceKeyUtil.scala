@@ -1,11 +1,12 @@
 package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.FullClientConfig
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.transaction.{
   NamespaceDelegation,
   OwnerToKeyMapping,
@@ -36,11 +37,11 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
   private def nextAvailableDb = randomDbsIterator.next()
 
   def instanceHasNoRootNamespaceKey(participant: InstanceReference): Unit = {
-    val instanceId = participant.id
-    val participantKeys = participant.keys.secret.list()
-    participantKeys.exists(
-      _.id == instanceId.namespace.fingerprint
-    ) shouldBe false
+    checkInstanceHasRootNamespaceKey(participant) shouldBe false
+  }
+
+  def instanceHasRootNamespaceKey(participant: InstanceReference): Unit = {
+    checkInstanceHasRootNamespaceKey(participant) shouldBe true
   }
 
   def setupOfflineNodeWithKey(
@@ -63,14 +64,14 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
       "SECOND_EXTRA_PARTICIPANT_ADMIN_USER" -> "not_used",
     ) {
 
-      val adminApiConfig = ClientConfig(port = Port.tryCreate(27702))
+      val adminApiConfig = FullClientConfig(port = Port.tryCreate(27702))
       val offlineParticipantClient =
         new ParticipantClientReference(
           env,
           s"remote participant for key generation",
           RemoteParticipantConfig(
             adminApiConfig,
-            ClientConfig(port = Port.tryCreate(27701)),
+            FullClientConfig(port = Port.tryCreate(27701)),
           ),
         )
       offlineParticipantClient.health.wait_for_ready_for_id()
@@ -122,11 +123,11 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
     )
     node.topology.transactions.load(
       Seq(rootNamespaceDelegation),
-      "Authorized",
+      Authorized,
     )
     node.topology.transactions.load(
       Seq(delegationTopologyTransaction),
-      "Authorized",
+      Authorized,
     )
     val encryptionKey =
       node.keys.secret.generate_encryption_key("ecryption")
@@ -139,4 +140,13 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
       signedBy = Seq(delegatedNamespaceKey.fingerprint, signingKey.fingerprint),
     )
   }
+
+  private def checkInstanceHasRootNamespaceKey(participant: InstanceReference): Boolean = {
+    val instanceId = participant.id
+    val participantKeys = participant.keys.secret.list()
+    participantKeys.exists(
+      _.id == instanceId.namespace.fingerprint
+    )
+  }
+
 }

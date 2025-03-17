@@ -5,7 +5,12 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
 import cats.data.OptionT
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
+import cats.implicits.{
+  catsSyntaxOptionId,
+  catsSyntaxTuple2Semigroupal,
+  catsSyntaxTuple4Semigroupal,
+  toTraverseOps,
+}
 import cats.syntax.foldable.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
@@ -54,12 +59,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SvApp}
-import org.lfdecentralizedtrust.splice.util.{
-  Contract,
-  PackageVetting,
-  TemplateJsonDecoder,
-  UploadablePackage,
-}
+import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -86,7 +86,6 @@ class JoiningNodeInitializer(
     extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     participantId: ParticipantId,
-    requiredDars: Seq[UploadablePackage],
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
     override protected val cometBftNode: Option[CometBftNode],
@@ -154,24 +153,18 @@ class JoiningNodeInitializer(
       )
     )
     for {
-      (dsoPartyId, darUploads) <- (
+      (dsoPartyId, _) <- (
         // If we're not onboarded yet, this waits for the sponsoring SV
         getDsoPartyId(initConnection),
-        for {
-          // Register domain with manualConnect=true. Confusingly, this still connects the first time.
-          // However, it won't connect if we crash and get here again which is what we're really after.
-          // If the url is unset, we skip this step. This is fine if the node has already initialized its
-          // own sequencer.
-          _ <- domainConfigO.traverse_(
-            participantAdminConnection.ensureDomainRegisteredNoHandshake(
-              _,
-              RetryFor.WaitingOnInitDependency,
-            )
+        // Register domain with manualConnect=true. Confusingly, this still connects the first time.
+        // However, it won't connect if we crash and get here again which is what we're really after.
+        // If the url is unset, we skip this step. This is fine if the node has already initialized its
+        // own sequencer.
+        domainConfigO.traverse_(
+          participantAdminConnection.ensureDomainRegisteredNoHandshake(
+            _,
+            RetryFor.WaitingOnInitDependency,
           )
-          // Have the uploads run in the background while we setup the sv party to save time
-        } yield participantAdminConnection.uploadDarFiles(
-          requiredDars,
-          RetryFor.WaitingOnInitDependency,
         ),
       ).tupled
       decentralizedSynchronizerId <- connectToDomainUnlessMigratingDsoParty(dsoPartyId)
@@ -180,7 +173,6 @@ class JoiningNodeInitializer(
         config,
         participantAdminConnection,
       )
-      _ <- darUploads
       storeKey = SvStore.Key(svParty, dsoPartyId)
       migrationInfo =
         DomainMigrationInfo(
@@ -812,12 +804,11 @@ class JoiningNodeInitializer(
         amuletRules = dsoInfo.amuletRules
         vetting = new PackageVetting(
           SvPackageVettingTrigger.packages,
-          config.prevetDuration,
           clock,
           participantAdminConnection,
           loggerFactory,
         )
-        _ <- vetting.vetPackages(amuletRules.contract)
+        _ <- vetting.vetCurrentPackages(synchronizerId, amuletRules.contract)
         _ = logger.info("Packages vetting completed")
       } yield ()
     }
@@ -952,7 +943,7 @@ class JoiningNodeInitializer(
         // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
         // we are in the middle of an DSO party migration so don't reconnect to the domain.
         proposals <- participantAdminConnection.listPartyToParticipant(
-          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).filterName,
+          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
           filterParty = dsoPartyId.filterString,
           filterParticipant = participantId.filterString,
           proposals = TopologyTransactionType.ProposalSignedByOwnKey,

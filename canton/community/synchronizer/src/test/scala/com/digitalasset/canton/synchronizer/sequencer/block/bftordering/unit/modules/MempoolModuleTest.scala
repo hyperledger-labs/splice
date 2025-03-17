@@ -4,8 +4,8 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.unit.modules
 
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.mempool.{
   MempoolModule,
@@ -19,31 +19,32 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SequencerNode,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{Env, ModuleRef}
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.unit.modules.UnitTestContext.DelayCount
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.FiniteDuration
 
-import UnitTestContext.DelayCount
-
-class MempoolModuleTest extends AnyWordSpec with BaseTest {
+class MempoolModuleTest extends AnyWordSpec with BftSequencerBaseTest {
 
   private val AnOrderRequest = Mempool.OrderRequest(
     Traced(OrderingRequest("tag", ByteString.copyFromUtf8("b")))
   )
 
   private val requestRefusedHandler = Some(new ModuleRef[SequencerNode.Message] {
-    override def asyncSend(msg: SequencerNode.Message): Unit =
+    override def asyncSendTraced(msg: SequencerNode.Message)(implicit
+        traceContext: TraceContext
+    ): Unit =
       msg match {
         case SequencerNode.RequestAccepted => fail("the request should fail")
         case _ => ()
       }
   })
 
-  private implicit val unitTestContext: UnitTestContext[UnitTestEnv, Mempool.Message] =
-    UnitTestContext()
+  private implicit val unitTestContext: UnitTestEnv#ActorContextT[Mempool.Message] =
+    new UnitTestContextWithTraceContext()
 
   "the mempool module" when {
 
@@ -66,15 +67,13 @@ class MempoolModuleTest extends AnyWordSpec with BaseTest {
       "refuse the request" in {
         val mempool =
           createMempool[UnitTestEnv](fakeModuleExpectingSilence, maxRequestPayloadBytes = 0)
-        mempool.receiveInternal(
-          Mempool.CreateLocalBatches(1)
-        )
-        mempool.receiveInternal(
-          Mempool.OrderRequest(
-            Traced(
-              OrderingRequest("tag", ByteString.copyFromUtf8("c"))
-            ),
-            requestRefusedHandler,
+        mempool.receiveInternal(Mempool.CreateLocalBatches(1))
+        suppressProblemLogs(
+          mempool.receiveInternal(
+            Mempool.OrderRequest(
+              Traced(OrderingRequest("tag", ByteString.copyFromUtf8("c"))),
+              requestRefusedHandler,
+            )
           )
         )
         succeed
@@ -181,8 +180,9 @@ class MempoolModuleTest extends AnyWordSpec with BaseTest {
         val mempoolState = new MempoolState()
 
         val timerCell = new AtomicReference[Option[(DelayCount, Mempool.Message)]](None)
-        implicit val timeCellContext: FakeTimerCellUnitTestContext[Mempool.Message] =
-          FakeTimerCellUnitTestContext(timerCell)
+        implicit val timeCellContext
+            : FakeTimerCellUnitTestContextWithTraceContext[Mempool.Message] =
+          new FakeTimerCellUnitTestContextWithTraceContext(timerCell)
 
         val mempool = createMempool[FakeTimerCellUnitTestEnv](
           availability = fakeCellModule[Availability.Message[

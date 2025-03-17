@@ -27,7 +27,7 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast
 import com.digitalasset.canton.sequencing.client.SequencerClient
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
@@ -382,10 +382,9 @@ abstract class SynchronizerOutbox extends SynchronizerOutboxHandle {
   ): FutureUnlessShutdown[Unit]
 }
 
-/** Dynamic version of a TopologyManagerObserver allowing observers
-  * to be dynamically added or removed while the TopologyManager stays up.
-  * (This is helpful for mediator node failover where synchronizer-outboxes are started
-  * and closed.)
+/** Dynamic version of a TopologyManagerObserver allowing observers to be dynamically added or
+  * removed while the TopologyManager stays up. (This is helpful for mediator node failover where
+  * synchronizer-outboxes are started and closed.)
   */
 class SynchronizerOutboxDynamicObserver(val loggerFactory: NamedLoggerFactory)
     extends TopologyManagerObserver
@@ -429,6 +428,7 @@ class SynchronizerOutboxFactory(
       protocolVersion: ProtocolVersion,
       targetTopologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
+      timeTracker: SynchronizerTimeTracker,
       clock: Clock,
       synchronizerLoggerFactory: NamedLoggerFactory,
   )(implicit
@@ -439,6 +439,7 @@ class SynchronizerOutboxFactory(
       sequencerClient,
       synchronizerId,
       memberId,
+      timeTracker,
       clock,
       topologyConfig,
       protocolVersion,
@@ -557,6 +558,7 @@ class SynchronizerOutboxFactorySingleCreate(
       protocolVersion: ProtocolVersion,
       targetTopologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
+      timeTracker: SynchronizerTimeTracker,
       clock: Clock,
       synchronizerLoggerFactory: NamedLoggerFactory,
   )(implicit
@@ -576,6 +578,7 @@ class SynchronizerOutboxFactorySingleCreate(
       protocolVersion,
       targetTopologyClient,
       sequencerClient,
+      timeTracker,
       clock,
       synchronizerLoggerFactory,
     ).tap(outbox => outboxRef.putIfAbsent(outbox).discard)

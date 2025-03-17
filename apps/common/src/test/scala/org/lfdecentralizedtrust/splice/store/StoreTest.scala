@@ -625,6 +625,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       true,
       1,
       damlUnit.getInstance(),
+      Seq.empty.asJava,
     )
   }
 
@@ -662,6 +663,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       consuming,
       1,
       result,
+      Seq.empty.asJava,
     )
   }
 
@@ -701,6 +703,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exercised.isConsuming,
         nodeId,
         exercised.getExerciseResult,
+        Seq.empty.asJava,
       )
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
@@ -722,6 +725,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           exercised.isConsuming,
           lastDescendedNodeId,
           exercised.getExerciseResult,
+          Seq.empty.asJava,
         ).asInstanceOf[E]
       case e => e
     }
@@ -1216,6 +1220,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       false,
       1,
       exerciseResult,
+      Seq.empty.asJava,
     )
 
   /** Convenience wrapper that autoinfers the payloadValue assuming

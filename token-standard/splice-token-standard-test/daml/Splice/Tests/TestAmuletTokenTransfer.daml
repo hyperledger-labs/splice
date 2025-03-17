@@ -1,0 +1,182 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests showing that the token standard can be used to execute
+-- free-of-payment transfers of Amulet tokens; and how to do so.
+module Splice.Tests.TestAmuletTokenTransfer where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Daml.Script
+
+import DA.Assert ((===))
+import qualified DA.Map as Map
+import DA.Time
+
+import Splice.Amulet (AppRewardCoupon(..))
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+-- Shared test setup
+--------------------
+
+data TestSetup = TestSetup with
+  registry : AmuletRegistry.AmuletRegistry
+  alice : Party
+  aliceValidator : Party
+  bob : Party
+  bobHoldingCid : ContractId Holding
+  now : Time
+  defaultTransfer : Api.Token.TransferInstructionV1.Transfer
+
+setupTest : Script TestSetup
+setupTest = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  alice <- allocatePartyExact "alice"
+  aliceValidator <- allocatePartyExact "alice-validator"
+  bob <- allocatePartyExact "bob"
+
+  -- Alice creates a transfer pre-approval. This contract can be used to execute an instant transfer
+  -- from Bob to Alice (it needs to be disclosed as part of transfer initiation).
+  now <- getTime
+  let expiresAt = (now `addRelTime` days 30)
+  AmuletRegistry.createTransferPreapproval registry alice aliceValidator expiresAt
+
+  -- feature the alice's validator party, to check that they get featured registry rewards
+  AmuletRegistry.featureApp registry aliceValidator
+
+  -- Bob taps coin to send to Alice.
+  AmuletRegistry.tapFaucet registry bob 50.0
+
+  [(bobHoldingCid, bobHolding)] <- WalletClient.listHoldings bob registry.instrumentId
+  bobHolding === HoldingView with
+    owner = bob
+    instrumentId = InstrumentId with id = "Amulet", admin = registry.dso
+    amount = 50.0
+    lock = None
+    meta = Metadata with
+      values = Map.fromList
+        [ ("splice.lfdecentralizedtrust.org/created-in-round", "1")
+        , ("splice.lfdecentralizedtrust.org/rate-per-round", "0.00004")
+        ]
+
+  -- Check initial balance setup
+  WalletClient.checkBalance alice registry.instrumentId 0.0
+  WalletClient.checkBalance bob registry.instrumentId 50.0
+
+  -- Define default transfer from Bob to Alice
+  let
+    defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
+      sender = bob
+      receiver = alice
+      amount = 10.0
+      instrumentId = registry.instrumentId
+      executeBefore = now `addRelTime` days 1
+      holdingCids = [bobHoldingCid]
+      meta = Metadata with
+        values = Map.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
+
+  return TestSetup with ..
+
+
+-- Individual tests
+-------------------
+
+test_happy_path : Script ()
+test_happy_path = script do
+  TestSetup {..} <- setupTest
+
+  -- check that the default transfer can be executed
+  let transfer = defaultTransfer
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  Map.size enrichedChoice.arg.extraArgs.context.values === 4
+  Map.size enrichedChoice.disclosures.disclosures === 6  -- the above plus the referenced holding contract
+
+  WalletClient.checkBalanceApprox bob registry.instrumentId 50.0
+
+  -- Trigger an atomic, single-transaction transfer
+  result <- submitWithDisclosures' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  TransferFactory_TransferResult_Completed holdings <- pure result.output
+  case holdings.senderHoldingCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox bob holdingCid 40.0
+    cids -> abort ("Unexpected number of senderHoldingCids: " <> show cids)
+  case holdings.receiverHoldingCids of
+    [holdingCid] -> WalletClient.checkHoldingApprox alice holdingCid 10.0
+    cids -> abort ("Unexpected number of receiverHoldingCids: " <> show cids)
+
+  -- check balance
+  WalletClient.checkBalance alice registry.instrumentId 10.0
+  WalletClient.checkBalanceApprox bob registry.instrumentId 40.0
+
+  -- there is a featured registry reward for aliceValidator that created Alice's transfer preapproval
+  [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator
+  aliceValidatorCoupon.featured === True
+  aliceValidatorCoupon.amount === 2.16
+
+  pure ()
+
+
+test_no_holdings : Script ()
+test_no_holdings = script do
+  TestSetup {..} <- setupTest
+
+  -- check that the default transfer can be executed
+  let transfer = defaultTransfer with
+        holdingCids = []
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- Show that the actual transfer choice fails
+  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  pure ()
+
+
+test_expired : Script ()
+test_expired = script do
+  TestSetup {..} <- setupTest
+
+  let transfer = defaultTransfer
+  -- TODO(#18168): get rid of the requirement for impls. to check the time bounds, so that external parties work with long delays
+  setTime (transfer.executeBefore `addRelTime` days 1)
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- Show that the actual transfer choice fails
+  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  pure ()
+
+
+test_wrong_admin : Script ()
+test_wrong_admin = script do
+  TestSetup {..} <- setupTest
+
+  let transfer = defaultTransfer
+  setTime (transfer.executeBefore `addRelTime` days 1)
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = alice -- set the wrong admin
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- Show that the actual transfer choice fails
+  submitWithDisclosuresMustFail' bob enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  pure ()

@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.migration
 
 import cats.data.EitherT
-import cats.implicits.showInterpolator
+import cats.implicits.{catsSyntaxOptionId, showInterpolator}
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryFor,
@@ -15,7 +15,8 @@ import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -60,7 +61,7 @@ class AcsExporter(
         participantId <- participantAdminConnection.getId()
         parties <- participantAdminConnection
           .listPartyToParticipant(
-            filterStore = domain.filterString,
+            store = TopologyStoreId.SynchronizerStore(domain).some,
             filterParticipant = participantId.toProtoPrimitive,
           )
           .map(_.map(_.mapping.partyId))

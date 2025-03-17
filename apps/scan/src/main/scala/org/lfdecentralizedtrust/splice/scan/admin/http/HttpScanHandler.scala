@@ -8,19 +8,11 @@ import cats.syntax.either.*
 import cats.syntax.traverseFilter.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.google.protobuf.ByteString
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.{amulet, ans as ansCodegen}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommand,
@@ -31,12 +23,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, Thresholds}
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
-  DevnetTap,
-  Mint,
-  Transfer,
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
@@ -45,6 +37,11 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   HoldingsSummaryRequest,
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
+}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  DevnetTap,
+  Mint,
+  Transfer,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -56,7 +53,6 @@ import org.lfdecentralizedtrust.splice.http.{
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
 import org.lfdecentralizedtrust.splice.store.{AppStore, PageLimit, SortOrder, VotesStore}
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -64,6 +60,15 @@ import org.lfdecentralizedtrust.splice.util.{
   PackageQualifiedName,
   QualifiedName,
 }
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.admin.data.ActiveContract
+import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf.ByteString
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
 
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.util.Base64
@@ -78,6 +83,7 @@ class HttpScanHandler(
     svUserName: String,
     spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
+    sequencerAdminConnection: SequencerAdminConnection,
     protected val store: ScanStore,
     snapshotStore: AcsSnapshotStore,
     dsoAnsResolver: DsoAnsResolver,
@@ -1708,6 +1714,103 @@ class HttpScanHandler(
               .toVector
           )
         }
+    }
+  }
+  override def getMemberTrafficStatus(
+      respond: ScanResource.GetMemberTrafficStatusResponse.type
+  )(synchronizerId: String, memberId: String)(
+      extracted: TraceContext
+  ): Future[ScanResource.GetMemberTrafficStatusResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getMemberTrafficStatus") { _ => _ =>
+      for {
+        member <- Member.fromProtoPrimitive_(memberId) match {
+          case Right(member) => Future.successful(member)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode member ID: $error")
+            )
+        }
+        domain <- SynchronizerId.fromString(synchronizerId) match {
+          case Right(domain) => Future.successful(domain)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
+            )
+        }
+        actual <- sequencerAdminConnection.getSequencerTrafficControlState(member)
+        actualConsumed = actual.extraTrafficConsumed.value
+        actualLimit = actual.extraTrafficLimit.value
+        targetTotalPurchased <- store.getTotalPurchasedMemberTraffic(member, domain)
+      } yield {
+        definitions.GetMemberTrafficStatusResponse(
+          definitions.MemberTrafficStatus(
+            definitions.ActualMemberTrafficState(actualConsumed, actualLimit),
+            definitions.TargetMemberTrafficState(targetTotalPurchased),
+          )
+        )
+      }
+    }
+  }
+
+  override def getPartyToParticipant(respond: ScanResource.GetPartyToParticipantResponse.type)(
+      synchronizerId: String,
+      partyId: String,
+  )(extracted: TraceContext): Future[ScanResource.GetPartyToParticipantResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
+      for {
+        domain <- SynchronizerId.fromString(synchronizerId) match {
+          case Right(domain) => Future.successful(domain)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
+            )
+        }
+        party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+          case Right(party) => Future.successful(party)
+          case Left(error) =>
+            Future.failed(
+              HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
+            )
+        }
+        response <- sequencerAdminConnection.getPartyToParticipant(domain, party)
+        participantId <- response.mapping.participantIds match {
+          case Seq() =>
+            Future.failed(
+              HttpErrorHandler.notFound(
+                s"No participant id found hosting party: $party"
+              )
+            )
+          case Seq(participantId) => Future.successful(participantId)
+          case _ =>
+            Future.failed(
+              HttpErrorHandler.internalServerError(
+                s"Party ${party} is hosted on multiple participants, which is not currently supported"
+              )
+            )
+        }
+      } yield definitions.GetPartyToParticipantResponse(participantId.toProtoPrimitive)
+    }
+  }
+
+  override def getValidatorFaucetsByValidator(
+      respond: ScanResource.GetValidatorFaucetsByValidatorResponse.type
+  )(validators: Vector[String])(
+      extracted: TraceContext
+  ): Future[ScanResource.GetValidatorFaucetsByValidatorResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getValidatorFaucetsByValidator") { _ => _ =>
+      store
+        .getValidatorLicenseByValidator(validators.map(v => PartyId.tryFromProtoPrimitive(v)))
+        .map(licenses =>
+          ScanResource.GetValidatorFaucetsByValidatorResponse.OK(
+            definitions
+              .GetValidatorFaucetsByValidatorResponse(
+                FaucetProcessor.process(licenses)
+              )
+          )
+        )
     }
   }
 }

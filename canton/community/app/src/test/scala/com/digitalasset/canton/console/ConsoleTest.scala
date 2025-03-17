@@ -12,7 +12,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{CantonCommunityConfig, ClientConfig, TestingConfigInternal}
+import com.digitalasset.canton.config.{CantonConfig, ClientConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.console.HeadlessConsole.{
   CompileError,
@@ -40,7 +40,7 @@ import java.nio.file.Paths
 
 class ConsoleTest extends AnyWordSpec with BaseTest {
 
-  lazy val DefaultConfig: CantonCommunityConfig = CantonCommunityConfig(
+  lazy val DefaultConfig: CantonConfig = CantonConfig(
     sequencers = Map(
       InstanceName.tryCreate("s1") -> ConfigStubs.sequencer,
       InstanceName.tryCreate("s2") -> ConfigStubs.sequencer,
@@ -60,7 +60,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
     ),
   )
 
-  lazy val NameClashConfig: CantonCommunityConfig = CantonCommunityConfig(
+  lazy val NameClashConfig: CantonConfig = CantonConfig(
     participants = Map(
       // Reserved keyword
       InstanceName.tryCreate("participants") -> ConfigStubs.participant,
@@ -72,20 +72,12 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
     ),
   )
 
-  abstract class TestEnvironment(val config: CantonCommunityConfig = DefaultConfig) {
+  abstract class TestEnvironment(val config: CantonConfig = DefaultConfig) {
     val environment: CommunityEnvironment = mock[CommunityEnvironment]
-    val participants: ParticipantNodes[
-      ParticipantNodeBootstrap,
-      ParticipantNode,
-      config.ParticipantConfigType,
-    ] =
-      mock[
-        ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode, config.ParticipantConfigType]
-      ]
-    val sequencers: SequencerNodes[config.SequencerNodeConfigType] =
-      mock[SequencerNodes[config.SequencerNodeConfigType]]
-    val mediators: MediatorNodes[config.MediatorNodeConfigType] =
-      mock[MediatorNodes[config.MediatorNodeConfigType]]
+    val participants: ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode] =
+      mock[ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode]]
+    val sequencers: SequencerNodes = mock[SequencerNodes]
+    val mediators: MediatorNodes = mock[MediatorNodes]
     val participantBootstrap: ParticipantNodeBootstrap = mock[ParticipantNodeBootstrap]
     val participant: ParticipantNode = mock[ParticipantNode]
     val sequencer: SequencerNodeBootstrap = mock[SequencerNodeBootstrap]
@@ -282,9 +274,18 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
       setupAdminCommandResponse("new", Right(Seq()))
       setupAdminCommandResponse("p-4", Right(Seq()))
 
+      when(
+        adminCommandRunner.runCommand(
+          anyString(),
+          any[ParticipantAdminCommands.Package.UploadDar],
+          any[ClientConfig],
+          isEq(Some(adminToken)),
+        )
+      ).thenReturn(CommandSuccessful(Seq("package")))
+
       runOrFail(s"""participants.all.dars.upload("$CantonExamplesPath", vetAllPackages=false)""")
 
-      def verifyUploadDar(p: String): ConsoleCommandResult[String] =
+      def verifyUploadDar(p: String): ConsoleCommandResult[Seq[String]] =
         verify(adminCommandRunner).runCommand(
           isEq(p),
           any[ParticipantAdminCommands.Package.UploadDar],

@@ -18,7 +18,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetDsoPartyIdResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetDsoPartyIdResponse"
   /v0/scan-proxy/featured-apps/{provider_party_id}:
     get:
       tags: [ scan-proxy ]
@@ -36,7 +36,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupFeaturedAppRightResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/LookupFeaturedAppRightResponse"
   /v0/scan-proxy/open-and-issuing-mining-rounds:
     get:
       tags: [ scan-proxy ]
@@ -78,7 +78,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByPartyResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/LookupEntryByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/scan-proxy/ans-entries:
@@ -103,7 +103,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/ListEntriesResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/ListEntriesResponse"
   /v0/scan-proxy/ans-entries/by-name/{name}:
     get:
       tags: [ scan-proxy ]
@@ -121,7 +121,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByNameResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/LookupEntryByNameResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/scan-proxy/ans-rules:
@@ -134,14 +134,14 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetAnsRulesRequest"
+              "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetAnsRulesRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetAnsRulesResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetAnsRulesResponse"
   /v0/scan-proxy/transfer-preapprovals/by-party/{party}:
     get:
       tags: [scan-proxy]
@@ -159,7 +159,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupTransferPreapprovalByPartyResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/LookupTransferPreapprovalByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/scan-proxy/transfer-command-counter/{party}:
@@ -179,7 +179,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupTransferCommandCounterByPartyResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/LookupTransferCommandCounterByPartyResponse"
         "404":
           description: No TransferCommandCounter exists for this party. This means the nonce that should be used is 0.
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
@@ -207,7 +207,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupTransferCommandStatusResponse"
+                "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/LookupTransferCommandStatusResponse"
         "404":
           description: No TransferCommand exists with this contract id within the last 24h
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"

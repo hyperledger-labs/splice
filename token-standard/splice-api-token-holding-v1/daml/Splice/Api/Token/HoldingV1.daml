@@ -43,3 +43,50 @@ data HoldingView = HoldingView
     meta : Metadata
       -- ^ Metadata.
   deriving (Eq, Show)
+
+-- | A factory for generic burn/mint operations.
+interface BurnMintFactory where
+  viewtype BurnMintFactoryView
+
+  burnMintFactory_BurnMintImpl : ContractId BurnMintFactory -> BurnMintFactory_BurnMint -> Update BurnMintFactory_BurnMintResult
+
+  nonconsuming choice BurnMintFactory_BurnMint : BurnMintFactory_BurnMintResult
+    -- ^ Burn the holdings in holdingCids and create holdings with the owners and amounts specified in
+    -- outputs. Implementations SHOULD use this over creating or archiving holdings directly so wallets can provide more details on transaction history.
+    -- Implementations SHOULD use more specific choices like `TransferFactory_Transfer` where possible.
+    --
+    -- Note that this is jointly authorized by the admin, all owners of the burnt inputs and all holders of the burnt outputs so it does
+    -- not grant anyone unilateral mint or burn rights. If that is desired, implementation specific delegation contracts can be used.
+    --
+    -- Implementations are free to restrict the implementation of this choice including failing on all inputs.
+    with
+      sender : Party
+        -- ^ The sender that owns the holdings in `holdingCids`. All holdings in `inputHoldingCids` must be owned by this party.
+      instrumentId : InstrumentId
+        -- ^ The instrument id of the holdings. All holdings in `inputHoldingCids` as well as the resulting output holdings MUST have this instrument id.
+      inputHoldingCids : [ContractId Holding]
+        -- ^ The holdings that should be burnt. All holdings in `inputHoldingCids` MUST be archived by this choice.
+      outputs : [BurnMintOutput]
+        -- ^ The holdings that should be created. The choice MUST create new holdings with the given amounts.
+      extraArgs : ExtraArgs
+        -- ^ Additional context. Implementations SHOULD include a `splice.lfdecentralizedtrust.org/reason` key in the metadata
+        -- to provide a human readable description that can be used by wallets.
+    controller (view this).admin, sender, map (.owner) outputs
+    do burnMintFactory_BurnMintImpl this self arg
+
+data BurnMintOutput = BurnMintOutput
+  with
+    owner : Party
+    amount : Decimal
+  deriving (Show, Eq)
+
+data BurnMintFactory_BurnMintResult = BurnMintFactory_BurnMintResult
+  with
+    outputCids : [ContractId Holding]
+      -- ^ The holdings created by the choice. Must contain exactly the outputs specified in the choice argument in the same order.
+  deriving (Show, Eq)
+
+data BurnMintFactoryView = BurnMintFactoryView
+   with
+     admin : Party
+   deriving (Show, Eq)

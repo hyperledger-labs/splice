@@ -109,7 +109,7 @@ final case class ReassignmentDataHelpers(
       )
 
     UnassignmentData(
-      unassignmentTs = reassignmentId.unassignmentTs,
+      reassignmentId = reassignmentId,
       unassignmentRequest = fullUnassignmentViewTree,
       unassignmentDecisionTime = CantonTimestamp.ofEpochSecond(10),
       unassignmentResult = None,
@@ -215,7 +215,8 @@ object ReassignmentDataHelpers {
     )
   }
 
-  /**  From the result, constructs the DeliveredUnassignmentResult (mostly add mediator and sequencer signatures)
+  /** From the result, constructs the DeliveredUnassignmentResult (mostly add mediator and sequencer
+    * signatures)
     */
   def unassignmentResult(
       result: ConfirmationResultMessage,

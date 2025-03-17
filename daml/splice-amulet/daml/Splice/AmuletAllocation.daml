@@ -8,6 +8,8 @@ module Splice.AmuletAllocation (
 
   ) where
 
+import DA.Optional (optionalToList)
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV1
 
@@ -51,12 +53,10 @@ allocationToAmuletOutput allocation =
     lock = None
 
 
-transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update ChoiceExecutionMetadata
+transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation AmuletAllocation{..} extraArgs = do
   let dso = allocationInstrumentAdmin allocation
-  -- extract context
-  context <- getAmuletContext extraArgs
-  paymentContext <- paymentFromChoiceContext dso context
+  paymentContext <- paymentFromChoiceContext dso extraArgs.context
   let openRoundCid = paymentContext.context.openMiningRound
   -- unlock amulet
   unlockResult <- exercise lockedAmulet LockedAmulet_Unlock with openRoundCid
@@ -67,16 +67,20 @@ transferAmuletAllocation AmuletAllocation{..} extraArgs = do
         provider = allocation.settlement.executor
         inputs = [InputAmulet amuletCid]
         outputs = [ allocationToAmuletOutput allocation ]
-  _ <- exerciseCheckedPaymentTransfer dso paymentContext transfer
-  pure ChoiceExecutionMetadata with meta = emptyMetadata
+  result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
+  pure Allocation_ExecuteTransferResult
+    with
+      holdings = AllocationResultHoldings
+        with
+          senderHoldingCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
+          receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
+      meta = emptyMetadata
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update ChoiceExecutionMetadata
 unlockAmuletAllocation amuletAllocation extraArgs = do
-  context <- getAmuletContext extraArgs
-  openRoundCid <- getContextContractId @OpenMiningRound context openRoundContextKey
+  openRoundCid <- getContextContractId @OpenMiningRound extraArgs.context openRoundContextKey
   -- prudent engineering: check the DSO party
   let dso = allocationInstrumentAdmin (amuletAllocation.allocation)
   _ <- fetchChecked (ForDso with dso) openRoundCid
   exercise amuletAllocation.lockedAmulet LockedAmulet_Unlock with openRoundCid
   pure ChoiceExecutionMetadata with meta = emptyMetadata
-

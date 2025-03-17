@@ -124,6 +124,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*consuming*/ false,
                   /*lastDescendedNodeId*/ Integer.valueOf(52),
                   /*exerciseResult*/ someValue,
+                  /*implementedInterfaces*/ Seq.empty.asJava,
                 ),
               ),
               synchronizerId = domain1,

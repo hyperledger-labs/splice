@@ -68,10 +68,16 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitiali
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
-import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  BackupDump,
+  Contract,
+  HasHealth,
+  TemplateJsonDecoder,
+  UploadablePackage,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
-  CommunityCryptoConfig,
+  CryptoConfig,
   CryptoProvider,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
@@ -93,6 +99,7 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 
 import java.nio.file.Paths
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
@@ -210,7 +217,7 @@ class SvApp(
           ),
           svSynchronizerConfig.parameters
             .toStaticSynchronizerParameters(
-              CommunityCryptoConfig(provider = CryptoProvider.Jce),
+              CryptoConfig(provider = CryptoProvider.Jce),
               ProtocolVersion.v33,
             )
             .valueOr(err =>
@@ -289,6 +296,13 @@ class SvApp(
         retryProvider,
         loggerFactory,
       )
+      _ <- appInitStep("Upload dars") {
+        val darFiles = SvPackageVettingTrigger.packages
+          .flatMap(pkg => DarResources.lookupAllPackageVersions(pkg.packageName))
+          .map(dar => UploadablePackage.fromResource(dar))
+          .toSeq
+        participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
+      }
       newJoiningNodeInitializer = (
           joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
           cometBftNode: Option[CometBftNode],
@@ -298,7 +312,6 @@ class SvApp(
           extraSynchronizerNodes,
           joiningConfig,
           participantId,
-          Seq.empty, // A joining SV does not initially upload any DARs, they will be vetted by PackageVettingTrigger instead
           config,
           amuletAppParameters.upgradesConfig,
           cometBftNode,
@@ -735,42 +748,22 @@ class SvApp(
       sys.error("Expected onboarding secrets must be unique! Check your SV app config.")
     }
     Future.traverse(config.expectedValidatorOnboardings)(c =>
-      expectConfiguredValidatorOnboarding(
-        c.secret,
-        c.expiresIn,
-        svStoreWithIngestion,
-        decentralizedSynchronizer,
-        clock,
-      )
-    )
-  }
-
-  private def expectConfiguredValidatorOnboarding(
-      secret: String,
-      expiresIn: NonNegativeFiniteDuration,
-      svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: SynchronizerId,
-      clock: Clock,
-  )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.retry(
-      RetryFor.WaitingOnInitDependency,
-      "created_validator_onboarding_contract",
-      "Create ValidatorOnboarding contract for preconfigured secret",
       SvApp
         .prepareValidatorOnboarding(
-          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, secret),
-          expiresIn,
+          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, c.secret),
+          c.expiresIn,
           svStoreWithIngestion,
           decentralizedSynchronizer,
           clock,
           logger,
+          retryProvider,
         )
         .map {
           case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
           case Right(()) => ()
-        },
-      logger,
+        }
     )
+  }
 
   private def ensureAmuletPriceVoteHasAmuletPrice(
       defaultAmuletPriceVote: BigDecimal,
@@ -850,6 +843,7 @@ object SvApp {
       decentralizedSynchronizer: SynchronizerId,
       clock: Clock,
       logger: TracedLogger,
+      retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svStore = svStoreWithIngestion.store
     val svParty = svStore.key.svParty
@@ -873,19 +867,24 @@ object SvApp {
               )
             case QueryResult(_, None) =>
               for {
-                _ <- svStoreWithIngestion.connection
-                  .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
-                  .withDedup(
-                    commandId = SpliceLedgerConnection
-                      .CommandId(
-                        "org.lfdecentralizedtrust.splice.sv.expectValidatorOnboarding",
-                        Seq(svParty),
-                        secret.secret, // not a leak as this gets hashed before it's used
-                      ),
-                    deduplicationOffset = offset,
-                  )
-                  .withSynchronizerId(synchronizerId = decentralizedSynchronizer)
-                  .yieldUnit()
+                _ <- retryProvider.retryForClientCalls(
+                  "prepare_validator_onboarding",
+                  "Create a validator onboarding contract with a secret",
+                  svStoreWithIngestion.connection
+                    .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
+                    .withDedup(
+                      commandId = SpliceLedgerConnection
+                        .CommandId(
+                          "org.lfdecentralizedtrust.splice.sv.expectValidatorOnboarding",
+                          Seq(svParty),
+                          secret.secret, // not a leak as this gets hashed before it's used
+                        ),
+                      deduplicationOffset = offset,
+                    )
+                    .withSynchronizerId(synchronizerId = decentralizedSynchronizer)
+                    .yieldUnit(),
+                  logger,
+                )
               } yield {
                 logger.info("Created new ValidatorOnboarding contract.")
                 Right(())

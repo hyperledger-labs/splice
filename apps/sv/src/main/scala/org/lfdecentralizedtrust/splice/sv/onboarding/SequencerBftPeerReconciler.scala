@@ -4,9 +4,10 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import cats.implicits.*
-import com.digitalasset.canton.config.RequireTypes
+import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PEndpointConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.automation.{TaskFailed, TaskOutcome, TaskSuccess}
@@ -41,20 +42,28 @@ class SequencerBftPeerReconciler(
       dsoRulesPeers =
         sequencersWithoutSelf
           .flatMap(_.peerUrl.toScala)
-          // the sequencers only accept the basic http protocol so far
           .map(rawPeerUrl =>
             if (rawPeerUrl.startsWith("http")) rawPeerUrl else s"http://$rawPeerUrl"
           )
           .map(Uri(_))
           .map(uri =>
-            Endpoint(
-              s"$sequencerP2pHostPrefix.${uri.authority.host.address()}",
-              RequireTypes.Port(uri.effectivePort),
+            P2PEndpoint.fromEndpointConfig(
+              P2PEndpointConfig(
+                s"$sequencerP2pHostPrefix.${uri.authority.host.address()}",
+                RequireTypes.Port(uri.effectivePort),
+                Option.when(uri.scheme == "https")(
+                  TlsClientConfig(
+                    None,
+                    None,
+                  )
+                ),
+              )
             )
           )
       currentPeers <- sequencerAdminConnection.listCurrentPeerEndpoints()
-      peersToAdd = dsoRulesPeers.filterNot(currentPeers.contains)
-      peersToRemove = currentPeers.filterNot(dsoRulesPeers.contains)
+      peersToAdd = dsoRulesPeers.filterNot(peer => currentPeers.contains(peer.id))
+      dsoRulesPeersIds = dsoRulesPeers.map(_.id)
+      peersToRemove = currentPeers.filterNot(dsoRulesPeersIds.contains)
     } yield {
       if (peersToAdd.nonEmpty || peersToRemove.nonEmpty)
         Seq(BftPeerDifference(peersToAdd, peersToRemove, currentPeers))
@@ -65,7 +74,7 @@ class SequencerBftPeerReconciler(
   override def reconcileTask(
       task: BftPeerDifference
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[TaskOutcome] = {
-    if (task.toRemove.exists(!_.host.contains(sequencerP2pHostPrefix))) {
+    if (task.toRemove.map(_.address).exists(!_.contains(sequencerP2pHostPrefix))) {
       val message =
         s"Not changing sequencer BFT p2p connection as it looks like the old sequencers are not configured for the current migration id, and there's a high chance that the sequencer is for a different migration id. Task: $task"
       logger.warn(
@@ -90,8 +99,8 @@ class SequencerBftPeerReconciler(
 
 object SequencerBftPeerReconciler {
   case class BftPeerDifference(
-      toAdd: Seq[Endpoint],
-      toRemove: Seq[Endpoint],
-      currentPeers: Seq[Endpoint],
+      toAdd: Seq[P2PEndpoint],
+      toRemove: Seq[P2PEndpoint.Id],
+      currentPeers: Seq[P2PEndpoint.Id],
   )
 }

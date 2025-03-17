@@ -4,7 +4,8 @@
 package com.digitalasset.canton.participant.admin
 
 import cats.data.{EitherT, OptionT}
-import cats.implicits.toBifunctorOps
+import cats.syntax.bifunctor.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
@@ -26,6 +27,7 @@ import com.digitalasset.canton.participant.admin.CantonPackageServiceError.Packa
   PackageVetted,
 }
 import com.digitalasset.canton.participant.admin.PackageService.*
+import com.digitalasset.canton.participant.admin.data.UploadDarData
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.store.DamlPackageStore.readPackageId
 import com.digitalasset.canton.participant.store.memory.{
@@ -36,7 +38,7 @@ import com.digitalasset.canton.participant.topology.PackageOps
 import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.EitherTUtil
+import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.{LedgerSubmissionId, LfPackageId, ProtoDeserializationError}
 import com.digitalasset.daml.lf.archive
 import com.digitalasset.daml.lf.archive.{DamlLf, DarParser, Error as LfArchiveError}
@@ -53,24 +55,24 @@ import scala.concurrent.ExecutionContext
 
 trait DarService {
   def upload(
-      darBytes: ByteString,
-      fileNameO: Option[String],
+      dars: Seq[UploadDarData],
       submissionIdO: Option[LedgerSubmissionId],
       vetAllPackages: Boolean,
       synchronizeVetting: PackageVettingSynchronization,
-      expectedMainPackageId: Option[LfPackageId],
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, DamlError, DarId]
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, DamlError, Seq[DarMainPackageId]]
 
   def validateDar(
       payload: ByteString,
       filename: String,
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, DamlError, DarId]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, DamlError, DarMainPackageId]
 
-  def getDar(darId: DarId)(implicit
+  def getDar(mainPackageId: DarMainPackageId)(implicit
       traceContext: TraceContext
   ): OptionT[FutureUnlessShutdown, PackageService.Dar]
 
-  def getDarContents(darId: DarId)(implicit
+  def getDarContents(mainPackageId: DarMainPackageId)(implicit
       traceContext: TraceContext
   ): OptionT[FutureUnlessShutdown, Seq[PackageDescription]]
 
@@ -151,33 +153,35 @@ class PackageService(
       } yield ()
     }
 
-  def removeDar(darId: DarId)(implicit
+  def removeDar(mainPackageId: DarMainPackageId)(implicit
       tc: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonError, Unit] =
-    ifDarExists(darId)(removeDarLf(_, _))(ifNotExistsOperationFailed = "DAR archive removal")
+    ifDarExists(mainPackageId)(removeDarLf(_, _))(ifNotExistsOperationFailed =
+      "DAR archive removal"
+    )
 
   def vetDar(
-      darId: DarId,
+      mainPackageId: DarMainPackageId,
       synchronizeVetting: PackageVettingSynchronization,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonError, Unit] =
-    ifDarExists(darId) { (_, darLf) =>
+    ifDarExists(mainPackageId) { (_, darLf) =>
       packageOps
         .vetPackages(darLf.all.map(readPackageId), synchronizeVetting)
         .leftWiden[CantonError]
     }(ifNotExistsOperationFailed = "DAR archive vetting")
 
-  def unvetDar(darId: DarId)(implicit
+  def unvetDar(mainPackageId: DarMainPackageId)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonError, Unit] =
-    ifDarExists(darId) { (descriptor, lfArchive) =>
+    ifDarExists(mainPackageId) { (descriptor, lfArchive) =>
       val packages = lfArchive.all.map(readPackageId)
       val mainPkg = readPackageId(lfArchive.main)
       revokeVettingForDar(mainPkg, packages, descriptor)
     }(ifNotExistsOperationFailed = "DAR archive unvetting")
 
-  private def ifDarExists(darId: DarId)(
+  private def ifDarExists(mainPackageId: DarMainPackageId)(
       action: (
           DarDescription,
           archive.Dar[DamlLf.Archive],
@@ -187,12 +191,12 @@ class PackageService(
   ): EitherT[FutureUnlessShutdown, CantonError, Unit] =
     for {
       dar <- packagesDarsStore
-        .getDar(darId)
+        .getDar(mainPackageId)
         .toRight(
           CantonPackageServiceError.Fetching.DarNotFound
             .Reject(
               operation = ifNotExistsOperationFailed,
-              darId = darId.unwrap,
+              mainPackageId = mainPackageId.unwrap,
             )
         )
       darLfE <- EitherT.fromEither[FutureUnlessShutdown](
@@ -269,10 +273,10 @@ class PackageService(
         EitherT.right(packagesDarsStore.removePackage(mainPkg))
 
       _removed <- {
-        logger.info(s"Removing dar ${darDescriptor.darId}")
+        logger.info(s"Removing dar ${darDescriptor.mainPackageId}")
         EitherT
           .liftF[FutureUnlessShutdown, CantonError, Unit](
-            packagesDarsStore.removeDar(darDescriptor.darId)
+            packagesDarsStore.removeDar(darDescriptor.mainPackageId)
           )
       }
     } yield ()
@@ -303,42 +307,112 @@ class PackageService(
     *   1. Validates the resulting Daml packages
     *   1. Persists the DAR and decoded archives in the DARs and package stores
     *   1. Dispatches the package upload event for inclusion in the ledger sync event stream
-    *   1. Updates the [[com.digitalasset.canton.participant.store.memory.MutablePackageMetadataView]]
-    *      which is used for subsequent DAR upload validations and incoming Ledger API queries
-    *   1. Issues a package vetting topology transaction for all uploaded packages (if `vetAllPackages` is enabled) and waits for
-    *      for its completion (if `synchronizeVetting` is enabled).
+    *   1. Updates the
+    *      [[com.digitalasset.canton.participant.store.memory.MutablePackageMetadataView]] which is
+    *      used for subsequent DAR upload validations and incoming Ledger API queries
+    *   1. Issues a package vetting topology transaction for all uploaded packages (if
+    *      `vetAllPackages` is enabled) and waits for for its completion (if `synchronizeVetting` is
+    *      enabled).
     *
-    * @param darBytes The DAR payload to store.
-    * @param description A description of the DAR.
-    * @param submissionIdO upstream submissionId for ledger api server to recognize previous package upload requests
-    * @param vetAllPackages if true, then the packages will be vetted automatically
-    * @param synchronizeVetting a value of PackageVettingSynchronization, that checks that the packages have been vetted on all connected synchronizers.
-    *                            The Future returned by the check will complete once all synchronizers have observed the vetting for the new packages.
-    *                            The caller may also pass be a no-op implementation that immediately returns, depending no the caller's needs for synchronization.
+    * @param darBytes
+    *   The DAR payload to store.
+    * @param description
+    *   A description of the DAR.
+    * @param submissionIdO
+    *   upstream submissionId for ledger api server to recognize previous package upload requests
+    * @param vetAllPackages
+    *   if true, then the packages will be vetted automatically
+    * @param synchronizeVetting
+    *   a value of PackageVettingSynchronization, that checks that the packages have been vetted on
+    *   all connected synchronizers. The Future returned by the check will complete once all
+    *   synchronizers have observed the vetting for the new packages. The caller may also pass be a
+    *   no-op implementation that immediately returns, depending no the caller's needs for
+    *   synchronization.
     */
-  def upload(
+  final def upload(
       darBytes: ByteString,
       description: Option[String],
       submissionIdO: Option[LedgerSubmissionId],
       vetAllPackages: Boolean,
       synchronizeVetting: PackageVettingSynchronization,
       expectedMainPackageId: Option[LfPackageId],
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, DamlError, DarId] = {
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, DamlError, DarMainPackageId] =
+    upload(
+      Seq(UploadDarData(darBytes, description, expectedMainPackageId)),
+      submissionIdO,
+      vetAllPackages,
+      synchronizeVetting,
+    ).subflatMap {
+      case Seq(mainPackageId) => Right(mainPackageId)
+      case Seq() =>
+        Left(
+          PackageServiceErrors.InternalError.Generic(
+            "Uploading the DAR unexpectedly did not return a DAR package ID"
+          )
+        )
+      case many =>
+        Left(
+          PackageServiceErrors.InternalError.Generic(
+            s"Uploading the DAR unexpectedly returned multiple DAR package IDs: $many"
+          )
+        )
+    }
+
+  /** Performs the upload DAR flow:
+    *   1. Decodes the provided DAR payloads
+    *   1. Validates the resulting Daml packages
+    *   1. Persists the DARs and decoded archives in the DARs and package stores
+    *   1. Dispatches the package upload event for inclusion in the ledger sync event stream
+    *   1. Updates the
+    *      [[com.digitalasset.canton.participant.store.memory.MutablePackageMetadataView]] which is
+    *      used for subsequent DAR upload validations and incoming Ledger API queries
+    *   1. Issues a package vetting topology transaction for all uploaded packages (if
+    *      `vetAllPackages` is enabled) and waits for for its completion (if `synchronizeVetting` is
+    *      enabled).
+    *
+    * @param dars
+    *   The DARs (bytes, description, expected main package) to upload.
+    * @param submissionIdO
+    *   upstream submissionId for ledger api server to recognize previous package upload requests
+    * @param vetAllPackages
+    *   if true, then the packages will be vetted automatically
+    * @param synchronizeVetting
+    *   a value of PackageVettingSynchronization, that checks that the packages have been vetted on
+    *   all connected synchronizers. The Future returned by the check will complete once all
+    *   synchronizers have observed the vetting to be effective for the new packages. The caller may
+    *   also pass be a no-op implementation that immediately returns, depending no the caller's
+    *   needs for synchronization.
+    */
+  def upload(
+      dars: Seq[UploadDarData],
+      submissionIdO: Option[LedgerSubmissionId],
+      vetAllPackages: Boolean,
+      synchronizeVetting: PackageVettingSynchronization,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, DamlError, Seq[DarMainPackageId]] = {
     val submissionId =
       submissionIdO.getOrElse(LedgerSubmissionId.assertFromString(UUID.randomUUID().toString))
     for {
-      uploadResult <- packageUploader.upload(
-        darBytes,
-        description,
-        submissionId,
-        expectedMainPackageId,
-      )
-      (mainPkgs, dependencies) = uploadResult
+      uploadResult <- MonadUtil.sequentialTraverse(dars) {
+        case UploadDarData(darBytes, description, expectedMainPackageId) =>
+          packageUploader.upload(
+            darBytes,
+            description,
+            submissionId,
+            expectedMainPackageId,
+          )
+      }
+      (mainPkgs, allPackages) = uploadResult.foldMap { case (mainPkg, dependencies) =>
+        (List(DarMainPackageId.tryCreate(mainPkg)), mainPkg +: dependencies)
+      }
       _ <- EitherTUtil.ifThenET(vetAllPackages)(
-        vetPackages(mainPkgs +: dependencies, synchronizeVetting)
+        vetPackages(allPackages, synchronizeVetting)
       )
 
-    } yield DarId.tryCreate(mainPkgs) // try is okay as we get this package-id from the uploader
+    } yield mainPkgs // try is okay as we get this package-id from the uploader
   }
 
   /** Returns all dars that reference a certain package id */
@@ -349,23 +423,25 @@ class PackageService(
   def validateDar(
       payload: ByteString,
       darName: String,
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, DamlError, DarId] =
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, DamlError, DarMainPackageId] =
     packageUploader.validateDar(payload, darName)
 
-  override def getDar(darId: DarId)(implicit
+  override def getDar(mainPackageId: DarMainPackageId)(implicit
       traceContext: TraceContext
   ): OptionT[FutureUnlessShutdown, PackageService.Dar] =
-    packagesDarsStore.getDar(darId)
+    packagesDarsStore.getDar(mainPackageId)
 
   override def listDars(limit: Option[Int])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[PackageService.DarDescription]] = packagesDarsStore.listDars(limit)
 
-  override def getDarContents(darId: DarId)(implicit
+  override def getDarContents(mainPackageId: DarMainPackageId)(implicit
       traceContext: TraceContext
   ): OptionT[FutureUnlessShutdown, Seq[PackageDescription]] =
     packagesDarsStore
-      .getPackageDescriptionsOfDar(darId)
+      .getPackageDescriptionsOfDar(mainPackageId)
 
   def vetPackages(
       packages: Seq[PackageId],
@@ -436,32 +512,42 @@ object PackageService {
     mutablePackageMetadataView.refreshState.map(_ => packageService)
   }
 
-  final case class DarId private (mainPackageId: String255) {
-    def unwrap: String = mainPackageId.unwrap
+  // Opaque type for the main package id of a DAR
+  final case class DarMainPackageId private (value: String255) extends AnyVal {
+    def unwrap: String = value.unwrap
+    def toProtoPrimitive: String = value.toProtoPrimitive
+    def str: String = value.str
   }
-  object DarId {
-    def create(str: String): Either[String, DarId] =
+
+  object DarMainPackageId {
+    def create(str: String): Either[String, DarMainPackageId] =
       for {
-        lengthLimited <- String255.create(str)
         _ <- LfPackageId.fromString(str)
-      } yield DarId(lengthLimited)
-    def tryCreate(str: String): DarId =
-      create(str).getOrElse(throw new IllegalArgumentException(s"Cannot convert to DarId: '$str'"))
+        lengthLimited <- String255.create(str)
+      } yield DarMainPackageId(lengthLimited)
 
-    def fromProtoPrimitive(str: String): Either[ProtoDeserializationError, DarId] =
+    def tryCreate(str: String): DarMainPackageId =
+      create(str)
+        .leftMap(err =>
+          throw new IllegalArgumentException(
+            s"Cannot convert '$str' to ${classOf[DarMainPackageId].getSimpleName}: $err"
+          )
+        )
+        .merge
+
+    def fromProtoPrimitive(str: String): Either[ProtoDeserializationError, DarMainPackageId] =
       create(str).leftMap(err => ProtoDeserializationError.StringConversionError(err))
-
   }
 
   final case class DarDescription(
-      darId: DarId,
+      mainPackageId: DarMainPackageId,
       description: String255,
       name: String255,
       version: String255,
   ) extends PrettyPrinting {
 
     override protected def pretty: Pretty[DarDescription] = prettyOfClass(
-      param("dar-id", _.darId.unwrap.readableHash),
+      param("dar-id", _.mainPackageId.unwrap.readableHash),
       param("name", _.name.str.unquoted),
       param("version", _.version.str.unquoted),
       param("description", _.description.str.unquoted),
@@ -473,7 +559,7 @@ object PackageService {
     implicit val getResult: GetResult[DarDescription] =
       GetResult(r =>
         DarDescription(
-          darId = DarId.tryCreate(r.<<),
+          mainPackageId = DarMainPackageId.tryCreate(r.<<),
           description = String255.tryCreate(r.<<),
           name = String255.tryCreate(r.<<),
           version = String255.tryCreate(r.<<),

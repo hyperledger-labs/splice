@@ -41,10 +41,11 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-/** Dispatches the incoming messages of the [[com.digitalasset.canton.sequencing.client.SequencerClient]]
-  * to the different processors.
-  * It also informs the [[com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker]]
-  * about the passing of time for messages that are not processed by the
+/** Dispatches the incoming messages of the
+  * [[com.digitalasset.canton.sequencing.client.SequencerClient]] to the different processors. It
+  * also informs the
+  * [[com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker]] about the
+  * passing of time for messages that are not processed by the
   * [[com.digitalasset.canton.participant.protocol.ProtocolProcessor]].
   */
 class ParallelMessageDispatcher(
@@ -59,7 +60,6 @@ class ParallelMessageDispatcher(
     override protected val requestCounterAllocator: RequestCounterAllocator,
     override protected val recordOrderPublisher: RecordOrderPublisher,
     override protected val badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
-    override protected val repairProcessor: RepairProcessor,
     override protected val inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
     processAsyncronously: ViewType => Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -196,8 +196,11 @@ class ParallelMessageDispatcher(
     signedEventE.event.content match {
       case deliver @ Deliver(sc, ts, _, _, _, _, _) if TimeProof.isTimeProofDeliver(deliver) =>
         logTimeProof(sc, ts)
-        recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
-        pureProcessingResult
+        FutureUnlessShutdown
+          .lift(
+            recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
+          )
+          .flatMap(_ => pureProcessingResult)
 
       case Deliver(sc, ts, _, msgId, _, _, _) =>
         // TODO(#13883) Validate the topology timestamp
@@ -238,15 +241,13 @@ class ParallelMessageDispatcher(
         Monoid[HandlerResult].empty
     def recordOrderPublisherTickF(): FutureUnlessShutdown[Unit] =
       if (tickDecision.tickRecordOrderPublisher) {
-        FutureUnlessShutdown.outcomeF(
-          recordOrderPublisher.tick(
-            SequencerIndexMoved(
-              synchronizerId = synchronizerId,
-              sequencerCounter = sc,
-              recordTime = ts,
-              requestCounterO = None,
-            )
-          )
+        recordOrderPublisher.tick(
+          SequencerIndexMoved(
+            synchronizerId = synchronizerId,
+            sequencerCounter = sc,
+            recordTime = ts,
+          ),
+          rcO = None,
         )
       } else {
         FutureUnlessShutdown.unit

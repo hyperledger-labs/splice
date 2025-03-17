@@ -1,14 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.util.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
@@ -124,8 +121,7 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   protected def checkValidatorIsConnectedToSvRunbook() = {}
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.svPreflightTopology(
       this.getClass.getSimpleName()
     )
@@ -182,7 +178,8 @@ abstract class ValidatorPreflightIntegrationTestBase
           }
         }
 
-        actAndCheck(
+        // In preflights we have a higher chance of domain reconnects so we have to account for those
+        actAndCheck(2.minutes)(
           "Accept transfer offer", {
             click on acceptButton
             click on "navlink-transactions"

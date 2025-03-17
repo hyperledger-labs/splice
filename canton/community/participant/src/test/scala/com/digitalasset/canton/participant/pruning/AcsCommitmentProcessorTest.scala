@@ -15,6 +15,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveNumeric,
 }
 import com.digitalasset.canton.config.{
+  BatchingConfig,
   DefaultProcessingTimeouts,
   NonNegativeDuration,
   TestingConfigInternal,
@@ -23,7 +24,7 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.ledger.participant.state.{
-  RequestIndex,
+  RepairIndex,
   SequencerIndex,
   SynchronizerIndex,
 }
@@ -57,6 +58,7 @@ import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
   commitmentsFromStkhdCmts,
   computeCommitmentsPerParticipant,
   emptyCommitment,
+  hashedEmptyCommitment,
   initRunningCommitments,
 }
 import com.digitalasset.canton.participant.store.*
@@ -140,8 +142,8 @@ sealed trait AcsCommitmentProcessorBaseTest
   protected def ts(i: Long): CantonTimestampSecond =
     CantonTimestampSecond.ofEpochSecond(i.longValue)
 
-  protected def toc(timestamp: Long, requestCounter: Int = 0): TimeOfChange =
-    TimeOfChange(RequestCounter(requestCounter), ts(timestamp).forgetRefinement)
+  protected def toc(timestamp: Long): TimeOfChange =
+    TimeOfChange(ts(timestamp).forgetRefinement)
 
   protected def mkChangeIdHash(index: Int) = ChangeIdHash(DefaultDamlValues.lfhash(index))
 
@@ -164,14 +166,14 @@ sealed trait AcsCommitmentProcessorBaseTest
               acs
                 .markContractCreated(
                   cid -> initialReassignmentCounter,
-                  TimeOfChange(RequestCounter(0), lifespan.activatedTs),
+                  TimeOfChange(lifespan.activatedTs),
                 )
                 .value
             else
               acs
                 .assignContract(
                   cid,
-                  TimeOfChange(RequestCounter(0), lifespan.activatedTs),
+                  TimeOfChange(lifespan.activatedTs),
                   Source(synchronizerId),
                   lifespan.reassignmentCounterAtActivation,
                 )
@@ -182,7 +184,7 @@ sealed trait AcsCommitmentProcessorBaseTest
               acs
                 .archiveContract(
                   cid,
-                  TimeOfChange(RequestCounter(0), deactivatedTs),
+                  TimeOfChange(deactivatedTs),
                 )
                 .value
             case Lifespan.UnassignmentDeactivate(
@@ -194,7 +196,7 @@ sealed trait AcsCommitmentProcessorBaseTest
               acs
                 .unassignContracts(
                   cid,
-                  TimeOfChange(RequestCounter(0), lifespan.deactivatedTs),
+                  TimeOfChange(lifespan.deactivatedTs),
                   Target(synchronizerId),
                   reassignmentCounterAtUnassignment,
                 )
@@ -233,48 +235,43 @@ sealed trait AcsCommitmentProcessorBaseTest
         LfContractId,
         (Set[LfPartyId], TimeOfChange, TimeOfChange, ReassignmentCounter, ReassignmentCounter),
       ]
-  )(toc: TimeOfChange): (CantonTimestamp, RequestCounter, AcsChange) =
-    (
-      toc.timestamp,
-      toc.rc,
-      contractSetup.foldLeft(AcsChange.empty) {
-        case (
-              acsChange,
+  )(toc: TimeOfChange): AcsChange =
+    contractSetup.foldLeft(AcsChange.empty) {
+      case (
+            acsChange,
+            (
+              cid,
               (
-                cid,
-                (
-                  stkhs,
-                  creationToc,
-                  archivalToc,
-                  assignReassignmentCounter,
-                  unassignReassignmentCounter,
-                ),
+                stkhs,
+                creationToc,
+                archivalToc,
+                assignReassignmentCounter,
+                unassignReassignmentCounter,
               ),
-            ) =>
-          AcsChange(
-            deactivations =
-              acsChange.deactivations ++ (if (archivalToc == toc)
-                                            Map(
-                                              cid ->
-                                                ContractStakeholdersAndReassignmentCounter(
-                                                  stkhs,
-                                                  unassignReassignmentCounter,
-                                                )
-                                            )
-                                          else Map.empty),
-            activations =
-              acsChange.activations ++ (if (creationToc == toc)
+            ),
+          ) =>
+        AcsChange(
+          deactivations =
+            acsChange.deactivations ++ (if (archivalToc == toc)
                                           Map(
                                             cid ->
                                               ContractStakeholdersAndReassignmentCounter(
                                                 stkhs,
-                                                assignReassignmentCounter,
+                                                unassignReassignmentCounter,
                                               )
                                           )
                                         else Map.empty),
-          )
-      },
-    )
+          activations = acsChange.activations ++ (if (creationToc == toc)
+                                                    Map(
+                                                      cid ->
+                                                        ContractStakeholdersAndReassignmentCounter(
+                                                          stkhs,
+                                                          assignReassignmentCounter,
+                                                        )
+                                                    )
+                                                  else Map.empty),
+        )
+    }
 
   // Create the processor, but return the changes instead of publishing them, such that the user can decide when
   // to publish
@@ -300,7 +297,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       FutureUnlessShutdown[AcsCommitmentProcessor],
       AcsCommitmentStore,
       TestSequencerClientSend,
-      List[(CantonTimestamp, RequestCounter, AcsChange)],
+      List[(RecordTime, AcsChange)],
       AcsCounterParticipantConfigStore,
   ) = {
 
@@ -326,12 +323,12 @@ sealed trait AcsCommitmentProcessorBaseTest
 
     val changeTimes =
       (timeProofs
-        .map(time => time.plusSeconds(1))
-        .map(ts => TimeOfChange(RequestCounter(0), ts)) ++ contractSetup.values.toList
-        .flatMap { case (_, creationTs, archivalTs, _, _) =>
+        .map(ts => TimeOfChange(ts.plusSeconds(1))) ++
+        contractSetup.values.toList.flatMap { case (_, creationTs, archivalTs, _, _) =>
           List(creationTs, archivalTs)
         }).distinct.sorted
-    val changes = changeTimes.map(changesAtToc(contractSetup))
+    val changes =
+      changeTimes.map(toc => RecordTime.fromTimeOfChange(toc) -> changesAtToc(contractSetup)(toc))
 
     val acsCommitmentConfigStore = new InMemoryAcsCommitmentConfigStore()
     val store =
@@ -373,6 +370,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       TestingConfigInternal(warnOnAcsCommitmentDegradation = warnOnAcsCommitmentDegradation),
       new SimClock(loggerFactory = loggerFactory),
       exitOnFatalFailures = true,
+      BatchingConfig(),
       // do not delay sending commitments for testing, because tests often expect to see commitments after an interval
       Some(NonNegativeInt.zero),
     )
@@ -405,8 +403,8 @@ sealed trait AcsCommitmentProcessorBaseTest
 
     val proc = for {
       processor <- acsCommitmentProcessor
-      _ = changes.foreach { case (ts, rc, acsChange) =>
-        processor.publish(RecordTime(ts, rc.v), acsChange)
+      _ = changes.foreach { case (recordTime, acsChange) =>
+        processor.publish(recordTime, acsChange)
       }
     } yield processor
     (proc, store, sequencerClient)
@@ -916,7 +914,7 @@ class AcsCommitmentProcessorTest
     }
 
     for {
-      snapshot <- acs.snapshot(at.forgetRefinement)
+      snapshot <- acs.snapshot(TimeOfChange(at.forgetRefinement))
       byStkhSet = snapshot
         .map { case (cid, (_, reassignmentCounter)) =>
           cid -> (stakeholderLookup(cid), reassignmentCounter)
@@ -1438,16 +1436,15 @@ class AcsCommitmentProcessorTest
 
       for {
         _ <- requestJournalStore.insert(
-          RequestData.clean(RequestCounter(0), CantonTimestamp.Epoch, CantonTimestamp.Epoch, None)
+          RequestData.clean(RequestCounter(0), CantonTimestamp.Epoch, CantonTimestamp.Epoch)
         )
         res <- PruningProcessor
           .latestSafeToPruneTick(
             requestJournalStore,
             Some(
               SynchronizerIndex.of(
-                RequestIndex(
-                  counter = RequestCounter(0L),
-                  sequencerCounter = Some(SequencerCounter(0L)),
+                SequencerIndex(
+                  counter = SequencerCounter(0L),
                   timestamp = CantonTimestamp.Epoch,
                 )
               )
@@ -1553,20 +1550,14 @@ class AcsCommitmentProcessorTest
             requestJournalStore,
             Some(
               SynchronizerIndex(
-                Some(
-                  RequestIndex(
-                    counter = RequestCounter(2L),
-                    sequencerCounter = None,
-                    timestamp = ts2,
-                  )
-                ),
+                None,
                 Some(
                   SequencerIndex(
                     counter = SequencerCounter(3L),
-                    timestamp = ts3,
+                    timestamp = ts2,
                   )
                 ),
-                recordTime = ts3,
+                recordTime = ts2, // record time cannot include pending request at ts3
               )
             ),
             sortedReconciliationIntervalsProvider,
@@ -1589,20 +1580,14 @@ class AcsCommitmentProcessorTest
             requestJournalStore,
             Some(
               SynchronizerIndex(
-                Some(
-                  RequestIndex(
-                    counter = RequestCounter(3L),
-                    sequencerCounter = None,
-                    timestamp = ts3,
-                  )
-                ),
+                None,
                 Some(
                   SequencerIndex(
                     counter = SequencerCounter(4L),
-                    timestamp = ts4,
+                    timestamp = ts3,
                   )
                 ),
-                recordTime = ts4,
+                recordTime = ts3,
               )
             ),
             sortedReconciliationIntervalsProvider,
@@ -1661,19 +1646,18 @@ class AcsCommitmentProcessorTest
             Some(
               SynchronizerIndex(
                 Some(
-                  RequestIndex(
-                    counter = RequestCounter(2L),
-                    sequencerCounter = None,
+                  RepairIndex(
                     timestamp = tsCleanRequest,
+                    counter = RepairCounter.Genesis,
                   )
                 ),
                 Some(
                   SequencerIndex(
                     counter = SequencerCounter(4L),
-                    timestamp = ts3,
+                    timestamp = tsCleanRequest,
                   )
                 ),
-                recordTime = ts3,
+                recordTime = tsCleanRequest, // record time cannot include pending request at ts3
               )
             ),
             sortedReconciliationIntervalsProvider,
@@ -1763,10 +1747,9 @@ class AcsCommitmentProcessorTest
               Some(
                 SynchronizerIndex(
                   Some(
-                    RequestIndex(
-                      counter = RequestCounter(3L),
-                      sequencerCounter = None,
+                    RepairIndex(
                       timestamp = tsCleanRequest2,
+                      counter = RepairCounter.Genesis,
                     )
                   ),
                   Some(
@@ -2331,9 +2314,9 @@ class AcsCommitmentProcessorTest
 
               // we apply any changes (contract deployment) that happens before our windows
               _ = changes
-                .filter(a => a._1 < testSequences.head)
-                .foreach { case (ts, tb, change) =>
-                  processor.publish(RecordTime(ts, tb.v), change)
+                .filter { case (recordTime, _) => isBefore(recordTime, testSequences.head) }
+                .foreach { case (recordTime, change) =>
+                  processor.publish(recordTime, change)
                 }
               _ <- processor.flush()
               _ <- testSequence(
@@ -2416,9 +2399,9 @@ class AcsCommitmentProcessorTest
 
           // we apply any changes (contract deployment) that happens before our windows
           _ = changes
-            .filter(a => a._1 < testSequences.head)
-            .foreach { case (ts, tb, change) =>
-              processor.publish(RecordTime(ts, tb.v), change)
+            .filter { case (recordTime, _) => isBefore(recordTime, testSequences.head) }
+            .foreach { case (recordTime, change) =>
+              processor.publish(recordTime, change)
             }
           _ <- processor.flush()
 
@@ -2495,9 +2478,9 @@ class AcsCommitmentProcessorTest
 
           // we apply any changes (contract deployment) that happens before our windows
           _ = changes
-            .filter(a => a._1 < testSequences.head)
-            .foreach { case (ts, tb, change) =>
-              processor.publish(RecordTime(ts, tb.v), change)
+            .filter { case (recordTime, _) => isBefore(recordTime, testSequences.head) }
+            .foreach { case (recordTime, change) =>
+              processor.publish(recordTime, change)
             }
           _ <- processor.flush()
           _ <- testSequence(
@@ -2708,8 +2691,8 @@ class AcsCommitmentProcessorTest
           _ <- loggerFactory
             .assertLoggedWarningsAndErrorsSeq(
               {
-                changes.foreach { case (ts, tb, change) =>
-                  processor.publish(RecordTime(ts, tb.v), change)
+                changes.foreach { case (recordTime, change) =>
+                  processor.publish(recordTime, change)
                 }
                 for {
                   _ <- processor.flush()
@@ -2834,9 +2817,11 @@ class AcsCommitmentProcessorTest
 
           // we apply any changes (contract deployment) that happens before our windows
           _ = changes
-            .filter(a => a._1 <= testSequences.head.head)
-            .foreach { case (ts, tb, change) =>
-              processor.publish(RecordTime(ts, tb.v), change)
+            .filter { case (recordTime, _) =>
+              isBefore(recordTime, testSequences.head.head, inclusive = true)
+            }
+            .foreach { case (recordTime, change) =>
+              processor.publish(recordTime, change)
             }
           _ <- processor.flush()
           _ <- testSequence(
@@ -2936,9 +2921,11 @@ class AcsCommitmentProcessorTest
 
           // we apply any changes (contract deployment) that happens before our windows
           _ = changes
-            .filter(a => a._1 <= testSequences.head)
-            .foreach { case (ts, tb, change) =>
-              processor.publish(RecordTime(ts, tb.v), change)
+            .filter { case (recordTime, _) =>
+              isBefore(recordTime, testSequences.head, inclusive = true)
+            }
+            .foreach { case (recordTime, change) =>
+              processor.publish(recordTime, change)
             }
           _ <- processor.flush()
 
@@ -3027,10 +3014,9 @@ class AcsCommitmentProcessorTest
 
           // we apply any changes (contract deployment) that happens before our windows
           _ = changes
-            .filter(a => a._1 <= testSequences.head)
-            .foreach { case (ts, tb, change) =>
-              processor.publish(RecordTime(ts, tb.v), change)
-
+            .filter { case (recordTime, _) => recordTime.timestamp <= testSequences.head }
+            .foreach { case (recordTime, change) =>
+              processor.publish(recordTime, change)
             }
           _ <- processor.flush()
 
@@ -3103,9 +3089,9 @@ class AcsCommitmentProcessorTest
           _ <- FutureUnlessShutdown
             .pure(
               changes
-                .filter(a => a._1 < testSequences.head)
-                .foreach { case (ts, tb, change) =>
-                  processor.publish(RecordTime(ts, tb.v), change)
+                .filter { case (recordTime, _) => isBefore(recordTime, testSequences.head) }
+                .foreach { case (recordTime, change) =>
+                  processor.publish(recordTime, change)
 
                 }
             )
@@ -3128,7 +3114,7 @@ class AcsCommitmentProcessorTest
       def testSequence(
           sequence: List[CantonTimestamp],
           processor: AcsCommitmentProcessor,
-          changes: List[(CantonTimestamp, RequestCounter, AcsChange)],
+          changes: List[(RecordTime, AcsChange)],
           store: AcsCommitmentStore,
           reconciliationInterval: Long,
           expectDegradation: Boolean = false,
@@ -3158,7 +3144,9 @@ class AcsCommitmentProcessorTest
           )
 
           changesApplied = changes
-            .filter(a => a._1 >= sequence.head && a._1 <= endOfRemoteCommitsPeriod)
+            .filter { case (recordTime, _) =>
+              recordTime.timestamp >= sequence.head && recordTime.timestamp <= endOfRemoteCommitsPeriod
+            }
 
           // First ask for the remote commitments to be processed, and then compute locally
           // This triggers catch-up mode
@@ -3190,7 +3178,7 @@ class AcsCommitmentProcessorTest
           }
 
           if (!justProcessingNoChecks) {
-            if (changesApplied.last._1 >= sequence.last)
+            if (changesApplied.last._1.timestamp >= sequence.last)
               assert(computed.size === sequence.length)
             assert(received.size === sequence.length)
           } else ()
@@ -3286,8 +3274,8 @@ class AcsCommitmentProcessorTest
 
           _ <- loggerFactory.assertLoggedWarningsAndErrorsSeq(
             {
-              changes.foreach { case (ts, tb, change) =>
-                processor.publish(RecordTime(ts, tb.v), change)
+              changes.foreach { case (recordTime, change) =>
+                processor.publish(recordTime, change)
               }
               for {
                 _ <- processor.flush()
@@ -3452,8 +3440,8 @@ class AcsCommitmentProcessorTest
 
           _ = loggerFactory.assertLogs(
             {
-              changes.foreach { case (ts, tb, change) =>
-                processor.publish(RecordTime(ts, tb.v), change)
+              changes.foreach { case (recordTime, change) =>
+                processor.publish(recordTime, change)
               }
               processor.flush()
             },
@@ -3495,7 +3483,7 @@ class AcsCommitmentProcessorTest
           sequencerClient.requests.size shouldBe 4
           // compute commitments for interval ends (10, 20, 30 and 35) x 2, and 3 empty ones for 5,15,25 as catch-up
           assert(computed.size === 11)
-          assert(computedCatchUp.forall(_._3 == emptyCommitment) && computedCatchUp.size == 3)
+          assert(computedCatchUp.forall(_._3 == hashedEmptyCommitment) && computedCatchUp.size == 3)
           assert(received.size === 8)
           // cannot prune past the mismatch
           assert(outstanding.contains(toc(25).timestamp))
@@ -3632,8 +3620,8 @@ class AcsCommitmentProcessorTest
               processor.processBatchInternal(ts.forgetRefinement, batch)
             }
 
-            _ = changes.foreach { case (ts, tb, change) =>
-              processor.publish(RecordTime(ts, tb.v), change)
+            _ = changes.foreach { case (recordTime, change) =>
+              processor.publish(recordTime, change)
             }
             _ <- processor.flush()
 
@@ -3672,7 +3660,9 @@ class AcsCommitmentProcessorTest
             sequencerClient.requests.size shouldBe 5
             // compute commitments for interval ends (10, 15, 20, 30 and 35) x 2, and 3 empty ones for 5,15,25 as catch-up
             assert(computed.size === 13)
-            assert(computedCatchUp.forall(_._3 == emptyCommitment) && computedCatchUp.size == 3)
+            assert(
+              computedCatchUp.forall(_._3 == hashedEmptyCommitment) && computedCatchUp.size == 3
+            )
             assert(received.size === 9)
             // cannot prune past the mismatch
             assert(outstanding.contains(toc(25).timestamp))
@@ -3723,18 +3713,20 @@ class AcsCommitmentProcessorTest
     def processChanges(
         processor: AcsCommitmentProcessor,
         store: AcsCommitmentStore,
-        changes: List[(CantonTimestamp, RequestCounter, AcsChange)],
+        changes: List[(RecordTime, AcsChange)],
         noLogSuppression: Boolean = false,
     ): FutureUnlessShutdown[Unit] = {
       lazy val fut = {
-        changes.foreach { case (ts, tb, change) =>
-          processor.publish(RecordTime(ts, tb.v), change)
+        changes.foreach { case (recordTime, change) =>
+          processor.publish(recordTime, change)
         }
         processor.flush()
       }
+      val firstTimestamp = changes.head._1.timestamp
+      val lastTimestamp = changes.last._1.timestamp
       for {
-        config <- processor.catchUpConfig(changes.head._1)
-        remote <- store.searchReceivedBetween(changes.head._1, changes.last._1)
+        config <- processor.catchUpConfig(firstTimestamp)
+        remote <- store.searchReceivedBetween(firstTimestamp, lastTimestamp)
         _ <- config match {
           case _ if remote.isEmpty || noLogSuppression => fut
           case None => fut
@@ -4331,6 +4323,9 @@ class AcsCommitmentProcessorTest
       }).failOnShutdown
     }
   }
+
+  def isBefore(rt: RecordTime, ts: CantonTimestamp, inclusive: Boolean = false): Boolean =
+    if (inclusive) rt.timestamp <= ts else rt.timestamp < ts
 }
 
 sealed trait Lifespan {

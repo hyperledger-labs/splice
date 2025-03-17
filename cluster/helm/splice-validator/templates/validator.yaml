@@ -80,6 +80,11 @@ spec:
         - name: SPLICE_APP_VALIDATOR_WALLET_USER_NAME
           value: {{ .Values.validatorWalletUser }}
         {{ end }}
+        {{- range $ii, $user := .Values.validatorWalletUsers }}
+        - name: ADDITIONAL_CONFIG_VALIDATOR_WALLET_USER_{{ $ii }}
+          value: |
+            canton.validator-apps.validator_backend.validator-wallet-users.{{ $ii }} = {{ $user }}
+        {{- end }}
         {{ if .Values.validatorPartyHint }}
         - name: SPLICE_APP_VALIDATOR_PARTY_HINT
           value: {{ .Values.validatorPartyHint }}
@@ -324,7 +329,7 @@ spec:
       {{- if $requiresMigrationPvc }}
         - name: domain-upgrade-dump-volume
           persistentVolumeClaim:
-            claimName: "domain-migration-validator-pvc"
+            claimName: {{ .Values.pvc.volumeName }}
       {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
@@ -362,7 +367,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "domain-migration-validator-pvc"
+  name: {{ .Values.pvc.volumeName }}
   namespace: {{ $.Release.Namespace }}
   labels:
     app: {{ $validatorAppLabel }}

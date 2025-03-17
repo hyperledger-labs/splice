@@ -14,12 +14,12 @@ import com.daml.logging.entries.LoggingEntries
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.auth.CantonAdminTokenAuthService
+import com.digitalasset.canton.auth.{AuthServiceWildcard, CantonAdminTokenAuthService}
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{InProcessGrpcName, ProcessingTimeout}
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.data.Offset
@@ -41,11 +41,7 @@ import com.digitalasset.canton.ledger.participant.state.{InternalStateService, P
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.lifecycle.LifeCycle.FastCloseableChannel
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.{
-  ApiRequestLogger,
-  CantonGrpcUtil,
-  ClientChannelBuilder,
-}
+import com.digitalasset.canton.networking.grpc.{ApiRequestLogger, CantonGrpcUtil}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.protocol.ContractAuthenticator
 import com.digitalasset.canton.platform.ResourceOwnerOps
@@ -67,6 +63,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{FutureUtil, SimpleExecutionQueue}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.Engine
+import io.grpc.inprocess.InProcessChannelBuilder
 import io.grpc.{BindableService, ServerInterceptor, ServerServiceDefinition}
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTelemetry
@@ -77,11 +74,14 @@ import org.apache.pekko.stream.scaladsl.Source
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
-/** The StartableStoppableLedgerApi enables a canton participant node to start and stop the ledger API server
-  * depending on whether the participant node is a High Availability active or passive replica.
+/** The StartableStoppableLedgerApi enables a canton participant node to start and stop the ledger
+  * API server depending on whether the participant node is a High Availability active or passive
+  * replica.
   *
-  * @param config ledger api server configuration
-  * @param executionContext the execution context
+  * @param config
+  *   ledger api server configuration
+  * @param executionContext
+  *   the execution context
   */
 class StartableStoppableLedgerApiServer(
     config: CantonLedgerApiServerWrapper.Config,
@@ -115,10 +115,11 @@ class StartableStoppableLedgerApiServer(
 
   /** Start the ledger API server and remember the resource.
     *
-    * Assumes that ledger api is currently stopped erroring otherwise. If asked to start during shutdown ignores start.
+    * Assumes that ledger api is currently stopped erroring otherwise. If asked to start during
+    * shutdown ignores start.
     *
-    * A possible improvement to consider in the future is to abort start upon subsequent call to stop. As is the stop
-    * will wait until an inflight start completes.
+    * A possible improvement to consider in the future is to abort start upon subsequent call to
+    * stop. As is the stop will wait until an inflight start completes.
     */
   def start()(implicit
       traceContext: TraceContext
@@ -189,16 +190,18 @@ class StartableStoppableLedgerApiServer(
       LoggingContextWithTrace(loggerFactory, telemetry)
 
     val indexServiceConfig = config.serverConfig.indexService
-
-    val authService = new CantonAdminTokenAuthService(
-      Some(config.adminToken),
-      parent = config.serverConfig.authServices.map(
-        _.create(
-          config.serverConfig.jwtTimestampLeeway,
-          loggerFactory,
-        )
-      ),
-    )
+    val authServices = new CantonAdminTokenAuthService(Some(config.adminToken)) +:
+      (
+        if (config.serverConfig.authServices.isEmpty)
+          List(AuthServiceWildcard)
+        else
+          config.serverConfig.authServices.map(
+            _.create(
+              config.serverConfig.jwtTimestampLeeway,
+              loggerFactory,
+            )
+          )
+      )
 
     val jwtVerifierLoader =
       new CachedJwtVerifierLoader(metrics = config.metrics, loggerFactory = loggerFactory)
@@ -343,7 +346,7 @@ class StartableStoppableLedgerApiServer(
         checkOverloaded = config.syncService.checkOverloaded,
         ledgerFeatures = getLedgerFeatures,
         maxDeduplicationDuration = config.maxDeduplicationDuration,
-        authService = authService,
+        authServices = authServices,
         jwtVerifierLoader = jwtVerifierLoader,
         jwtTimestampLeeway = config.serverConfig.jwtTimestampLeeway,
         tokenExpiryGracePeriodForStreams =
@@ -467,7 +470,6 @@ class StartableStoppableLedgerApiServer(
         (config.serverConfig.indexService.offsetCheckpointCacheUpdateInterval + config.serverConfig.indexService.idleStreamOffsetCheckpointTimeout).toProtoPrimitive
       )
     ),
-    interactiveSubmissionService = config.serverConfig.interactiveSubmissionService.enabled,
     partyTopologyEvents = config.cantonParameterConfig.experimentalEnableTopologyEvents,
   )
 
@@ -477,8 +479,9 @@ class StartableStoppableLedgerApiServer(
         for {
           channel <- ResourceOwner
             .forReleasable(() =>
-              ClientChannelBuilder
-                .createChannelBuilderToTrustedServer(config.serverConfig.clientConfig)
+              InProcessChannelBuilder
+                .forName(InProcessGrpcName.forPort(config.serverConfig.clientConfig.port))
+                .executor(executionContext.execute(_))
                 .build()
             )(channel =>
               Future(

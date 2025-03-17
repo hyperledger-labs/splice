@@ -1,14 +1,14 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
-import com.digitalasset.canton.{BaseTest, SynchronizerAlias, SequencerAlias}
+import com.digitalasset.canton.{BaseTest, SequencerAlias, SynchronizerAlias}
 import org.lfdecentralizedtrust.splice.automation.{AmuletConfigReassignmentTrigger, AssignTrigger}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.AmuletConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
@@ -311,7 +311,7 @@ class SoftDomainMigrationIntegrationTest
           eventuallySucceeds() {
             sv.castVote(
               voteRequest.contractId,
-              true,
+              isAccepted = true,
               "url",
               "description",
             )
@@ -332,9 +332,17 @@ class SoftDomainMigrationIntegrationTest
           clue(s"${sv.name} has signed bootstrapping state") {
             eventually() {
               val proposals = sv.participantClient.topology.synchronizer_parameters
-                .list(filterSynchronizer = "global-domain-new", proposals = true)
+                .list(
+                  filterSynchronizer = "global-domain-new",
+                  proposals = true,
+                  store = Authorized,
+                )
               val nonProposals = sv.participantClient.topology.synchronizer_parameters
-                .list(filterSynchronizer = "global-domain-new", proposals = false)
+                .list(
+                  filterSynchronizer = "global-domain-new",
+                  proposals = false,
+                  store = Authorized,
+                )
               (proposals ++ nonProposals) should not be empty
             }
           }
@@ -514,7 +522,7 @@ class SoftDomainMigrationIntegrationTest
     clue("All mediators have unlimited traffic on new domain") {
       eventually() {
         val mediatorState = sv1Backend.participantClient.topology.mediators
-          .list(filterStore = TopologyStoreId.SynchronizerStore(newSynchronizerId).filterName)
+          .list(synchronizerId = Some(newSynchronizerId))
           .loneElement
         val mediators = mediatorState.item.active.forgetNE
         mediators should have size 4
@@ -615,14 +623,14 @@ class SoftDomainMigrationIntegrationTest
     import env.executionContext
     val loggerFactoryWithKey = loggerFactory.append("synchronizer", sv.name)
     val sequencerAdminConnection = new SequencerAdminConnection(
-      ClientConfig(port = sv.config.localSynchronizerNode.value.sequencer.adminApi.port),
+      FullClientConfig(port = sv.config.localSynchronizerNode.value.sequencer.adminApi.port),
       env.environment.config.monitoring.logging.api,
       loggerFactoryWithKey,
       grpcClientMetrics,
       retryProvider,
     )
     val mediatorAdminConnection = new MediatorAdminConnection(
-      ClientConfig(port = sv.config.localSynchronizerNode.value.mediator.adminApi.port),
+      FullClientConfig(port = sv.config.localSynchronizerNode.value.mediator.adminApi.port),
       env.environment.config.monitoring.logging.api,
       loggerFactoryWithKey,
       grpcClientMetrics,

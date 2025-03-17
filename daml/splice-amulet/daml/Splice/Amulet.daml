@@ -104,8 +104,8 @@ template Amulet
         meta = Api.Token.MetadataV1.Metadata
           with
             values = Map.fromList [
-              (createdInRoundMetaKey, show amount.createdAt),
-              (ratePerRoundMetaKey, show amount.ratePerRound)
+              (createdInRoundMetaKey, show amount.createdAt.number),
+              (ratePerRoundMetaKey, show amount.ratePerRound.rate)
               ]
 
 template LockedAmulet

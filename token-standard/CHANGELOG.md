@@ -4,6 +4,18 @@
 
 Major changes:
 
+* Added a `BurnMintFactory` API to `Splice.Api.Token.HoldingV1` to
+  capture generic burns and mints that do not fall under the transfer
+  or allocation APIs.
+
+Polishing changes:
+
+* Added the new holdings to the result types of `TransferFactor_Transfer`, `TransferInstruction_ReportSuccess` and `Allocation_ExecuteTransfer`.
+
+## 2025-02-28
+
+Major changes:
+
 * Move development https://github.com/hyperledger-labs/splice/tree/canton-3.3/token-standard.
   to reflect that the API definitions of the token standard will be developed and open sourced as part of the splice project.
 * Rename modules as follows
@@ -48,6 +60,7 @@ Polishing changes:
 * Add `expectedAdmin` field to `AllocationFactory_Allocate` and `TransferFactory_Transfer` to allow safely executing those choices even if
   the explicitly disclosed factory contracts were read from a not fully trusted off-ledger API.
 * Change all interface choice implementation functions to have the signature `ContractId Interface -> ChoiceArgument -> Update ChoiceResult`.
+* Report the time of computation of the `total_supply` in the `TokenMetadata` off-ledger API.
 
 ## Initial open source release of the standard proposal
 

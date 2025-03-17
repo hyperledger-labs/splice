@@ -339,7 +339,7 @@ private[environment] class LedgerClient(
     } yield res
   }
 
-  private def listUsersProto(
+  def listUsersProto(
       pageToken: Option[String],
       pageSize: Int,
       identityProviderId: Option[String] = None,
@@ -393,6 +393,8 @@ private[environment] class LedgerClient(
   def getOrCreateUser(
       user: User,
       initialRights: Seq[User.Right],
+      isDeactivated: Boolean,
+      annotations: Map[String, String],
       identityProviderId: Option[String],
   )(implicit
       ec: ExecutionContext,
@@ -400,7 +402,7 @@ private[environment] class LedgerClient(
   ): Future[User] = {
     getUser(user.getId(), identityProviderId).recoverWith {
       case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-        createUser(user, initialRights, identityProviderId)
+        createUser(user, initialRights, isDeactivated, annotations, identityProviderId)
     }
   }
 
@@ -419,6 +421,8 @@ private[environment] class LedgerClient(
   def createUser(
       user: User,
       initialRights: Seq[User.Right],
+      isDeactivated: Boolean,
+      annotations: Map[String, String],
       identityProviderId: Option[String],
   )(implicit
       ec: ExecutionContext,
@@ -431,7 +435,15 @@ private[environment] class LedgerClient(
         Some(
           v1User.User
             .fromJavaProto(user.toProto)
+            .withIsDeactivated(isDeactivated)
             .withIdentityProviderId(identityProviderId.getOrElse(""))
+            .withMetadata(
+              object_meta.ObjectMeta.fromJavaProto(
+                ObjectMetaOuterClass.ObjectMeta.newBuilder
+                  .putAllAnnotations(annotations.asJava)
+                  .build
+              )
+            )
         ),
         initialRights.map(javaRightToV1Right),
       )
@@ -455,6 +467,8 @@ private[environment] class LedgerClient(
       )
     case _: Right.ParticipantAdmin =>
       v1User.Right.defaultInstance.withParticipantAdmin(v1User.Right.ParticipantAdmin())
+    case _: Right.CanReadAsAnyParty =>
+      v1User.Right.defaultInstance.withCanReadAsAnyParty(v1User.Right.CanReadAsAnyParty())
     case unsupported => throw new IllegalArgumentException(s"unsupported right: $unsupported")
 
   }
@@ -487,11 +501,11 @@ private[environment] class LedgerClient(
     } yield res
   }.map(_ => ())
 
-  def listUserRights(userId: String)(implicit
+  def listUserRights(userId: String, identityProviderId: Option[String] = None)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[User.Right]] = {
-    val request = v1User.ListUserRightsRequest(userId)
+    val request = v1User.ListUserRightsRequest(userId, identityProviderId.getOrElse(""))
     for {
       stub <- withCredentialsAndTraceContext(userManagementServiceStub)
       res <- stub
@@ -603,10 +617,24 @@ private[environment] class LedgerClient(
     } yield res
   }
 
+  def listIdentityProviderConfigs(
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[identity_provider_config_service.IdentityProviderConfig]] = {
+    for {
+      stub <- withCredentialsAndTraceContext(identityProviderConfigServiceStub)
+      res <- stub
+        .listIdentityProviderConfigs(
+          identity_provider_config_service.ListIdentityProviderConfigsRequest()
+        )
+    } yield res.identityProviderConfigs
+  }
+
   def createIdentityProviderConfig(
       id: String,
-      issuer: String,
+      isDeactivated: Boolean,
       jwksUrl: String,
+      issuer: String,
       audience: String,
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
@@ -616,8 +644,9 @@ private[environment] class LedgerClient(
           Some(
             identity_provider_config_service.IdentityProviderConfig(
               identityProviderId = id,
-              issuer = issuer,
+              isDeactivated = isDeactivated,
               jwksUrl = jwksUrl,
+              issuer = issuer,
               audience = audience,
             )
           )
@@ -684,17 +713,6 @@ object LedgerClient {
             .map(r => command_service.SubmitAndWaitResponse.toJavaProto(r))(ec)
         }
       )
-
-    val Transaction: SubmitAndWaitFor[jdata.Transaction] =
-      impl((response: CSOC.SubmitAndWaitForTransactionResponse) =>
-        jdata.Transaction.fromProto(response.getTransaction)
-      ) {
-        { case (stub, r, ec) =>
-          stub
-            .submitAndWaitForTransaction(command_service.SubmitAndWaitRequest.fromJavaProto(r))
-            .map(r => command_service.SubmitAndWaitForTransactionResponse.toJavaProto(r))(ec)
-        }
-      }
 
     val TransactionTree: SubmitAndWaitFor[jdata.TransactionTree] =
       impl((response: CSOC.SubmitAndWaitForTransactionTreeResponse) =>

@@ -11,7 +11,7 @@ import com.digitalasset.canton.console.{
   LocalInstanceReference,
   NodeReferences,
   StandardConsoleOutput,
-  ThrowWithDetailsErrorHandler,
+  ThrowErrorHandler,
 }
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.console.*
@@ -30,8 +30,8 @@ class SpliceConsoleEnvironment(
 ) extends ConsoleEnvironment // TODO(#736): Generalize this.
     {
 
-  override val errorHandler: com.digitalasset.canton.console.ThrowWithDetailsErrorHandler.type =
-    ThrowWithDetailsErrorHandler
+  override val errorHandler: com.digitalasset.canton.console.ThrowErrorHandler.type =
+    ThrowErrorHandler
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
     DarResources.TokenStandard.allPackageResources.flatMap(_.all) ++
@@ -48,6 +48,7 @@ class SpliceConsoleEnvironment(
     environment,
     environment.config.parameters.timeouts.processing,
     environment.config.parameters.timeouts.console,
+    environment.config.parameters.timeouts.requestTimeout,
   )(this.tracer, templateDecoder)
 
   override type Env = EnvironmentImpl
@@ -338,7 +339,7 @@ class SpliceConsoleEnvironment(
 
   override protected val consoleEnvironmentBindings = new ConsoleEnvironmentBinding()
 
-  override protected def startupOrderPrecedence(instance: LocalInstanceReference): Int =
+  override def startupOrderPrecedence(instance: LocalInstanceReference): Int =
     instance match {
       case _: SvAppBackendReference => 1
       case _: ScanAppBackendReference => 2

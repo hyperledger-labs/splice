@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.daml.ledger.api.v2.interactive
@@ -67,7 +68,7 @@ class HttpValidatorAdminHandler(
     storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
     identitiesStore: NodeIdentitiesStore,
     validatorUserName: String,
-    validatorWalletUserName: Option[String],
+    validatorWalletUserNames: Seq[String],
     walletManagerOpt: Option[UserWalletManager],
     getAmuletRulesDomain: GetAmuletRulesDomain,
     scanConnection: ScanConnection,
@@ -87,6 +88,7 @@ class HttpValidatorAdminHandler(
   private val workflowId = this.getClass.getSimpleName
   private val store = storeWithIngestion.store
   private val dumpGenerator = new DomainMigrationDumpGenerator(
+    storeWithIngestion.connection,
     participantAdminConnection,
     retryProvider,
     loggerFactory,
@@ -246,7 +248,7 @@ class HttpValidatorAdminHandler(
       user,
       storeWithIngestion,
       validatorUserName,
-      validatorWalletUserName,
+      validatorWalletUserNames,
       retryProvider,
       logger,
     )
@@ -381,7 +383,7 @@ class HttpValidatorAdminHandler(
           )
           _ <- participantAdminConnection
             .listPartyToParticipant(
-              filterStore = TopologyStoreId.AuthorizedStore.filterName,
+              store = TopologyStoreId.AuthorizedStore.some,
               filterParty = partyId.filterString,
             )
             .map { txs =>

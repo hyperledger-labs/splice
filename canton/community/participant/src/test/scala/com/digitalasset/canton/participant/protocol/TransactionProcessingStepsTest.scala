@@ -33,7 +33,7 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
     synchronizerId = synchronizerId,
     participantId = participantId,
     confirmationRequestFactory = mock[TransactionConfirmationRequestFactory],
-    confirmationResponseFactory = mock[TransactionConfirmationResponseFactory],
+    confirmationResponsesFactory = mock[TransactionConfirmationResponsesFactory],
     modelConformanceChecker = mock[ModelConformanceChecker],
     staticSynchronizerParameters = defaultStaticSynchronizerParameters,
     crypto = mock[SynchronizerCryptoClient],
@@ -54,7 +54,7 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
     },
     transactionEnricher = tx => _ => EitherT.pure(tx),
     createNodeEnricher = node => _ => EitherT.pure(node),
-    new AuthorizationValidator(participantId, true),
+    new AuthorizationValidator(participantId),
     new InternalConsistencyChecker(
       loggerFactory
     ),

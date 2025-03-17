@@ -1,16 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as paymentCodegen
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
   FrontendLoginUtil,
   TimeTestUtil,
   WalletTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.{Duration, LocalDate}
 
@@ -21,8 +18,7 @@ class WalletSubscriptionsFrontendIntegrationTest
     with TimeTestUtil {
 
   override def walletAmuletPrice = SpliceUtil.damlDecimal(2.0)
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAmuletPrice(walletAmuletPrice)

@@ -37,6 +37,7 @@ migration:
   attachPvc: true
 # pvc used for migrations
 pvc:
+  volumeName: domain-migration-validator-pvc
   volumeStorageClass: standard-rwo
 
 useSequencerConnectionsFromScan: true
@@ -63,5 +64,10 @@ spliceInstanceNames:
   nameServiceName: # Please provide a value as provided in the docs
   nameServiceNameAcronym: # Please provide a value as provided in the docs
 
+service:
+  ans:
+    port: 80
+  wallet:
+    port: 80
 # set the poll interval used by the UI in milliseconds (optional)
 # uiPollInterval:

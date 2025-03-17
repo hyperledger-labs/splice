@@ -25,16 +25,16 @@ import com.digitalasset.canton.util.MonadUtil
 
 import scala.concurrent.{ExecutionContext, Future}
 
-/** Defines the default methods for protocol signing and verification that use a topology snapshot for key lookup.
-  * This approach uses the signing APIs registered in Canton's [[com.digitalasset.canton.crypto.Crypto]]
-  * object at node startup.
+/** Defines the default methods for protocol signing and verification that use a topology snapshot
+  * for key lookup. This approach uses the signing APIs registered in Canton's
+  * [[com.digitalasset.canton.crypto.Crypto]] object at node startup.
   */
 class SyncCryptoSignerDefault(
     member: Member,
     signPublicApi: SynchronizerCryptoPureApi,
     signPrivateApi: SigningPrivateOps,
     cryptoPrivateStore: CryptoPrivateStore,
-    verificationParallelismLimit: Int,
+    verificationParallelismLimit: PositiveInt,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends SyncCryptoSigner
@@ -47,8 +47,7 @@ class SyncCryptoSignerDefault(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Fingerprint] =
     for {
-      signingKeys <- EitherT
-        .right(topologySnapshot.signingKeys(member, usage))
+      signingKeys <- EitherT.right(topologySnapshot.signingKeys(member, usage))
       existingKeys <- signingKeys.toList
         .parFilterA(pk => cryptoPrivateStore.existsSigningKey(pk.fingerprint))
         .leftMap[SyncCryptoError](SyncCryptoError.StoreError.apply)
@@ -82,7 +81,7 @@ class SyncCryptoSignerDefault(
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[Member, Map[Fingerprint, SigningPublicKey]]] =
-    // we fetch ALL signing keys for all members
+    // we fetch signing keys for all members
     topologySnapshot
       .signingKeys(members, usage)
       .map(membersToKeys =>
@@ -106,7 +105,7 @@ class SyncCryptoSignerDefault(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Signature] =
     for {
-      fingerprint <- findSigningKey(topologySnapshot, SigningKeyUsage.All)
+      fingerprint <- findSigningKey(topologySnapshot, usage)
       signature <- signPrivateApi
         .sign(hash, fingerprint, usage)
         .leftMap[SyncCryptoError](SyncCryptoError.SyncCryptoSigningError.apply)

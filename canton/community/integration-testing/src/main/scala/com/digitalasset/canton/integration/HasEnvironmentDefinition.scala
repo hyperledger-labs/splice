@@ -3,9 +3,12 @@
 
 package com.digitalasset.canton.integration
 
+import com.digitalasset.canton.config.SharedCantonConfig
 import com.digitalasset.canton.environment.Environment
 
 /** Trait for exposing only an environment definition */
-trait HasEnvironmentDefinition[E <: Environment, TCE <: TestConsoleEnvironment[E]] {
-  def environmentDefinition: BaseEnvironmentDefinition[E, TCE]
+trait HasEnvironmentDefinition[C <: SharedCantonConfig[
+  C
+], E <: Environment, TCE <: TestConsoleEnvironment[C, E]] {
+  def environmentDefinition: BaseEnvironmentDefinition[C, E, TCE]
 }

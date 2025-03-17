@@ -41,7 +41,10 @@ final case class SequencerSnapshot(
     def serializeInFlightAggregation(
         args: (AggregationId, InFlightAggregation)
     ): v30.SequencerSnapshot.InFlightAggregationWithId = {
-      val (aggregationId, InFlightAggregation(aggregatedSenders, maxSequencingTime, rule)) = args
+      val (
+        aggregationId,
+        InFlightAggregation(aggregatedSenders, _firstSequencingTimestamp, maxSequencingTime, rule),
+      ) = args
       v30.SequencerSnapshot.InFlightAggregationWithId(
         aggregationId.toProtoPrimitive,
         Some(rule.toProtoV30),
@@ -77,8 +80,8 @@ final case class SequencerSnapshot(
     )
   }
 
-  /** Indicates how to pretty print this instance.
-    * See `PrettyPrintingTest` for examples on how to implement this method.
+  /** Indicates how to pretty print this instance. See `PrettyPrintingTest` for examples on how to
+    * implement this method.
     */
   override protected def pretty: Pretty[SequencerSnapshot.this.type] = prettyOfClass(
     param("lastTs", _.lastTs),
@@ -183,9 +186,19 @@ object SequencerSnapshot extends VersioningCompanion[SequencerSnapshot] {
               } yield sender -> AggregationBySender(sequencingTimestamp, signatures)
           }
           .map(_.toMap)
+        firstSequencingTimestamp <- aggregatedSenders.values
+          .minByOption(_.sequencingTimestamp)
+          .map(_.sequencingTimestamp)
+          .toRight(
+            ProtoDeserializationError.InvariantViolation(
+              field = Some("aggregatedSenders"),
+              "Aggregated senders must not be empty",
+            )
+          )
         inFlightAggregation <- InFlightAggregation
           .create(
             aggregatedSenders,
+            firstSequencingTimestamp,
             maxSequencingTime,
             aggregationRule,
           )

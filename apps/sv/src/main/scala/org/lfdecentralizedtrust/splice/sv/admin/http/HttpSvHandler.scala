@@ -4,11 +4,13 @@
 package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import cats.data.{EitherT, OptionT}
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.applicative.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.ByteString
@@ -169,7 +171,7 @@ class HttpSvHandler(
             dsoRules <- dsoStore.getDsoRules()
             isCandidatePartyHostedOnParticipant <- participantAdminConnection
               .listPartyToParticipant(
-                dsoRules.domain.filterString,
+                TopologyStoreId.SynchronizerStore(dsoRules.domain).some,
                 filterParty = token.candidateParty.filterString,
                 filterParticipant = token.candidateParticipantId.toProtoPrimitive,
               )
@@ -310,6 +312,7 @@ class HttpSvHandler(
                 dsoRules.domain,
                 clock,
                 logger,
+                retryProvider,
               )
           }
           .flatMap {

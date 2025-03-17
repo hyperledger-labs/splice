@@ -21,8 +21,11 @@ final case class CryptoProviderScheme[S](default: S, supported: NonEmpty[Set[S]]
 
 /** Configures the optional default and allowed schemes of kind S.
   *
-  * @param default The optional scheme to use. If none is specified, use the provider's default scheme of kind S.
-  * @param allowed The optional allowed schemes to use. If none is specified, all the provider's supported schemes of kind S are allowed.
+  * @param default
+  *   The optional scheme to use. If none is specified, use the provider's default scheme of kind S.
+  * @param allowed
+  *   The optional allowed schemes to use. If none is specified, all the provider's supported
+  *   schemes of kind S are allowed.
   */
 final case class CryptoSchemeConfig[S](
     default: Option[S] = None,
@@ -38,8 +41,10 @@ object CryptoSchemeConfig {
 
 /** Stores the configuration of the signing scheme.
   *
-  * @param algorithms the algorithm specifications
-  * @param keys the key specifications
+  * @param algorithms
+  *   the algorithm specifications
+  * @param keys
+  *   the key specifications
   */
 final case class SigningSchemeConfig(
     algorithms: CryptoSchemeConfig[SigningAlgorithmSpec] = CryptoSchemeConfig(),
@@ -54,8 +59,10 @@ object SigningSchemeConfig {
 
 /** Stores the configuration of the encryption scheme.
   *
-  * @param algorithms the algorithm specifications
-  * @param keys the key specifications
+  * @param algorithms
+  *   the algorithm specifications
+  * @param keys
+  *   the key specifications
   */
 final case class EncryptionSchemeConfig(
     algorithms: CryptoSchemeConfig[EncryptionAlgorithmSpec] = CryptoSchemeConfig(),
@@ -68,41 +75,36 @@ object EncryptionSchemeConfig {
     CantonConfigValidatorDerivation[EncryptionSchemeConfig]
 }
 
-/** Cryptography configuration. */
-trait CryptoConfig {
-
-  /** the crypto provider implementation to use */
-  def provider: CryptoProvider
-
-  /** the signing key scheme configuration */
-  def signing: SigningSchemeConfig
-
-  /** the encryption scheme configuration */
-  def encryption: EncryptionSchemeConfig
-
-  /** the symmetric key scheme configuration */
-  def symmetric: CryptoSchemeConfig[SymmetricKeyScheme]
-
-  /** the hash algorithm configuration */
-  def hash: CryptoSchemeConfig[HashAlgorithm]
-
-  /** the password-based key derivation function configuration */
-  def pbkdf: CryptoSchemeConfig[PbkdfScheme]
-
-  /** optional support for a KMS */
-  def kms: Option[KmsConfig]
-
-  /** private key store configuration to allow for encrypted key storage */
-  def privateKeyStore: PrivateKeyStoreConfig
-}
-
-final case class CommunityCryptoConfig(
+/** Cryptography configuration.
+  * @param provider
+  *   the crypto provider implementation to use
+  * @param signing
+  *   the signing key scheme configuration
+  * @param encryption
+  *   the encryption scheme configuration
+  * @param symmetric
+  *   the symmetric key scheme configuration
+  * @param hash
+  *   the hash algorithm configuration
+  * @param pbkdf
+  *   the password-based key derivation function configuration
+  * @param kms
+  *   optional support for a KMS
+  * @param privateKeyStore
+  *   private key store configuration to allow for encrypted key storage
+  */
+final case class CryptoConfig(
     provider: CryptoProvider = CryptoProvider.Jce,
     signing: SigningSchemeConfig = SigningSchemeConfig(),
     encryption: EncryptionSchemeConfig = EncryptionSchemeConfig(),
     symmetric: CryptoSchemeConfig[SymmetricKeyScheme] = CryptoSchemeConfig(),
     hash: CryptoSchemeConfig[HashAlgorithm] = CryptoSchemeConfig(),
     pbkdf: CryptoSchemeConfig[PbkdfScheme] = CryptoSchemeConfig(),
-    kms: Option[CommunityKmsConfig] = None,
+    kms: Option[KmsConfig] = None,
     privateKeyStore: PrivateKeyStoreConfig = PrivateKeyStoreConfig(),
-) extends CryptoConfig
+) extends UniformCantonConfigValidation
+
+object CryptoConfig {
+  implicit val cryptoConfigValidator: CantonConfigValidator[CryptoConfig] =
+    CantonConfigValidatorDerivation[CryptoConfig]
+}

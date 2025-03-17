@@ -12,13 +12,19 @@ import com.digitalasset.canton.CantonAppDriver.installGCLogging
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.cli.{Cli, Command, LogFileAppender}
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.config.{CantonConfig, ConfigErrors, GCLoggingConfig, Generate}
+import com.digitalasset.canton.config.{
+  CantonConfig,
+  ConfigErrors,
+  GCLoggingConfig,
+  Generate,
+  SharedCantonConfig,
+}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
 import com.sun.management.GarbageCollectionNotificationInfo
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 
 import java.lang.management.ManagementFactory
@@ -34,9 +40,11 @@ import scala.util.control.NonFatal
   */
 abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging with NoTracing {
 
-  protected def environmentFactory: EnvironmentFactory[E]
+  type Config <: SharedCantonConfig[Config]
 
-  protected def withManualStart(config: E#Config): E#Config
+  protected def environmentFactory: EnvironmentFactory[Config, E]
+
+  protected def withManualStart(config: Config): Config
 
   protected def additionalVersions: Map[String, String] = Map.empty
 
@@ -128,7 +136,7 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
   }))
   logger.debug("Registered shutdown-hook.")
 
-  val cantonConfig: E#Config = {
+  val cantonConfig: Config = {
     val mergedUserConfigsE = NonEmpty.from(cliOptions.configFiles) match {
       case None if cliOptions.configMap.isEmpty =>
         Left(ConfigErrors.NoConfigFiles.Error())
@@ -174,7 +182,7 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
 
   installGCLogging(loggerFactory, cantonConfig.monitoring.logging.jvmGc)
 
-  private def writeConfigToTmpFile(mergedUserConfigs: Config) = {
+  private def writeConfigToTmpFile(mergedUserConfigs: com.typesafe.config.Config) = {
     val tmp = File.newTemporaryFile("canton-config-error-", ".conf")
     logger.error(
       s"An error occurred after parsing a config file that was obtained by merging multiple config " +
@@ -224,7 +232,7 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
 
   runner.run(environment)
 
-  def loadConfig(config: Config): Either[CantonConfigError, E#Config]
+  def loadConfig(config: com.typesafe.config.Config): Either[CantonConfigError, Config]
 
 }
 

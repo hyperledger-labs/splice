@@ -111,6 +111,12 @@ interface AllocationFactory where
         --
         -- MAY be empty for registries that do not represent their holdings on-ledger; or
         -- for registries that support automatic selection of holdings for allocations.
+        --
+        -- If specified, then the successful allocation MUST archive all of these holdings, so
+        -- that the execution of the allocation conflicts with any other allocations
+        -- using these holdings. Thereby allowing that the sender can use
+        -- deliberate contention on holdings to prevent duplicate allocations.
+
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
     controller allocation.transferLeg.sender

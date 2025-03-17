@@ -8,7 +8,16 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.daml.nameof.NameOf.functionFullName
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{
+  CantonConfigValidationError,
+  CantonConfigValidator,
+  CantonEdition,
+  CustomCantonConfigValidation,
+  EnterpriseCantonEdition,
+  NonNegativeFiniteDuration,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.crypto.SyncCryptoError.KeyNotAvailable
 import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SyncCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -50,35 +59,58 @@ import org.apache.pekko.{Done, NotUsed}
 import java.sql.SQLTransientConnectionException
 import scala.concurrent.ExecutionContext
 
-/** We throw this if a [[com.digitalasset.canton.synchronizer.sequencer.store.SaveCounterCheckpointError.CounterCheckpointInconsistent]] error is returned when saving a new member
-  * counter checkpoint. This is exceptionally concerning as may suggest that we are streaming events with inconsistent counters.
-  * Should only be caused by a bug or the datastore being corrupted.
+/** We throw this if a
+  * [[com.digitalasset.canton.synchronizer.sequencer.store.SaveCounterCheckpointError.CounterCheckpointInconsistent]]
+  * error is returned when saving a new member counter checkpoint. This is exceptionally concerning
+  * as may suggest that we are streaming events with inconsistent counters. Should only be caused by
+  * a bug or the datastore being corrupted.
   */
 class CounterCheckpointInconsistentException(message: String) extends RuntimeException(message)
 
-/** Configuration for the database based sequence reader. */
-trait SequencerReaderConfig {
-
-  /** max number of events to fetch from the datastore in one page */
-  def readBatchSize: Int
-
-  /** how frequently to checkpoint state */
-  def checkpointInterval: config.NonNegativeFiniteDuration
-
-  /** max number of payloads to fetch from the datastore in one page */
-  def payloadBatchSize: Int
-
-  /** max time window to wait for more payloads before fetching the current batch from the datastore */
-  def payloadBatchWindow: config.NonNegativeFiniteDuration
-
-  /** how many batches of payloads will be fetched in parallel */
-  def payloadFetchParallelism: Int
-
-  /** how many events will be generated from the fetched payloads in parallel */
-  def eventGenerationParallelism: Int
+/** Configuration for the database based sequence reader.
+  * @param readBatchSize
+  *   max number of events to fetch from the datastore in one page
+  * @param checkpointInterval
+  *   how frequently to checkpoint state
+  * @param pollingInterval
+  *   how frequently to poll for new events from the database. only used in the enterprise edition
+  *   if high availability has been configured, otherwise will rely on local writes performed by
+  *   this sequencer to indicate that new events are available.
+  * @param payloadBatchSize
+  *   max number of payloads to fetch from the datastore in one page
+  * @param payloadBatchWindow
+  *   max time window to wait for more payloads before fetching the current batch from the datastore
+  * @param payloadFetchParallelism
+  *   how many batches of payloads will be fetched in parallel
+  * @param eventGenerationParallelism
+  *   how many events will be generated from the fetched payloads in parallel
+  */
+final case class SequencerReaderConfig(
+    readBatchSize: Int = SequencerReaderConfig.defaultReadBatchSize,
+    checkpointInterval: config.NonNegativeFiniteDuration =
+      SequencerReaderConfig.defaultCheckpointInterval,
+    pollingInterval: Option[NonNegativeFiniteDuration] = None,
+    payloadBatchSize: Int = SequencerReaderConfig.defaultPayloadBatchSize,
+    payloadBatchWindow: config.NonNegativeFiniteDuration =
+      SequencerReaderConfig.defaultPayloadBatchWindow,
+    payloadFetchParallelism: Int = SequencerReaderConfig.defaultPayloadFetchParallelism,
+    eventGenerationParallelism: Int = SequencerReaderConfig.defaultEventGenerationParallelism,
+) extends CustomCantonConfigValidation {
+  override protected def doValidate(edition: CantonEdition): Seq[CantonConfigValidationError] =
+    Option
+      .when(pollingInterval.nonEmpty && edition != EnterpriseCantonEdition)(
+        CantonConfigValidationError(
+          s"Configuration polling-interval is supported only in $EnterpriseCantonEdition"
+        )
+      )
+      .toList
 }
 
 object SequencerReaderConfig {
+  implicit val sequencerReaderConfigCantonConfigValidator
+      : CantonConfigValidator[SequencerReaderConfig] =
+    CantonConfigValidatorDerivation[SequencerReaderConfig]
+
   val defaultReadBatchSize: Int = 100
   val defaultCheckpointInterval: config.NonNegativeFiniteDuration =
     config.NonNegativeFiniteDuration.ofSeconds(5)
@@ -87,6 +119,11 @@ object SequencerReaderConfig {
     config.NonNegativeFiniteDuration.ofMillis(5)
   val defaultPayloadFetchParallelism: Int = 2
   val defaultEventGenerationParallelism: Int = 4
+
+  /** The default polling interval if [[SequencerReaderConfig.pollingInterval]] is unset despite
+    * high availability being configured.
+    */
+  val defaultPollingInterval = NonNegativeFiniteDuration.ofMillis(50)
 }
 
 class SequencerReader(
@@ -197,10 +234,9 @@ class SequencerReader(
           )
         )
 
-    /** An Pekko flow that passes the [[UnsignedEventData]] untouched from input to output,
-      * but asynchronously records every checkpoint interval.
-      * The materialized future completes when all checkpoints have been recorded
-      * after the kill switch has been pulled.
+    /** An Pekko flow that passes the [[UnsignedEventData]] untouched from input to output, but
+      * asynchronously records every checkpoint interval. The materialized future completes when all
+      * checkpoints have been recorded after the kill switch has been pulled.
       */
     private def recordCheckpointFlow(implicit
         traceContext: TraceContext
@@ -583,7 +619,9 @@ class SequencerReader(
         )
     }
 
-    /** Attempt to save the counter checkpoint and fail horribly if we find this is an inconsistent checkpoint update. */
+    /** Attempt to save the counter checkpoint and fail horribly if we find this is an inconsistent
+      * checkpoint update.
+      */
     private def saveCounterCheckpoint(
         member: Member,
         memberId: SequencerMemberId,
@@ -853,7 +891,9 @@ object SequencerReader {
         lastBatchWasFull = readEvents.events.sizeCompare(batchSize) == 0,
       )
 
-    /** Apply a previously recorded counter checkpoint so that we don't have to start from 0 on every subscription */
+    /** Apply a previously recorded counter checkpoint so that we don't have to start from 0 on
+      * every subscription
+      */
     def startFromCheckpoint(checkpoint: CounterCheckpoint): ReadState =
       // with this checkpoint we'll start reading from this timestamp and as reads are not inclusive we'll receive the next event after this checkpoint first
       copy(

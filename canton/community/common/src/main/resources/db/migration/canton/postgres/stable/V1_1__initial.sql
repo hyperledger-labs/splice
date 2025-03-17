@@ -73,7 +73,7 @@ create table common_crypto_public_keys (
 
 -- Stores the immutable contracts, however a creation of a contract can be rolled back.
 create table par_contracts (
-  contract_id varchar collate "C" not null,
+  contract_id bytea not null,
   -- The contract is serialized using the LF contract proto serializer.
   instance bytea not null,
   -- Metadata: signatories, stakeholders, keys
@@ -84,7 +84,7 @@ create table par_contracts (
   -- We store metadata of the contract instance for inspection
   package_id varchar collate "C" not null,
   template_id varchar collate "C" not null,
-  contract_salt bytea,
+  contract_salt bytea not null,
   primary key (contract_id)
 );
 
@@ -149,20 +149,19 @@ create type operation_type as enum ('create', 'add', 'assign', 'archive', 'purge
 create table par_active_contracts (
   -- As a participant can be connected to multiple synchronizers, the active contracts are stored under a synchronizer id.
   synchronizer_idx integer not null,
-  contract_id varchar collate "C" not null,
+  contract_id bytea not null,
   change change_type not null,
   operation operation_type not null,
   -- UTC timestamp of the time of change in microsecond precision relative to EPOCH
   ts bigint not null,
-  -- Request counter of the time of change
-  request_counter bigint not null,
+  -- Repair counter of the time of change lexicographically relative to ts, min-value for non-repairs
+  repair_counter bigint not null,
   -- optional remote synchronizer index in case of reassignments
   remote_synchronizer_idx integer,
   reassignment_counter bigint default null,
-  primary key (synchronizer_idx, contract_id, ts, request_counter, change)
+  primary key (synchronizer_idx, contract_id, ts, repair_counter, change)
 );
 
-create index idx_par_active_contracts_dirty_request_reset on par_active_contracts (synchronizer_idx, request_counter);
 create index idx_par_active_contracts_contract_id on par_active_contracts (contract_id);
 create index idx_par_active_contracts_ts_synchronizer_idx on par_active_contracts (ts, synchronizer_idx);
 create index idx_par_active_contracts_pruning on par_active_contracts (synchronizer_idx, ts) where change = 'deactivation';
@@ -265,7 +264,6 @@ create table par_reassignments (
 
   -- UTC timestamp in microseconds relative to EPOCH
   unassignment_timestamp bigint not null,
-  source_synchronizer_id varchar collate "C" not null,
   unassignment_request bytea,
   -- UTC timestamp in microseconds relative to EPOCH
   unassignment_decision_time bigint not null,
@@ -288,10 +286,9 @@ create table par_journal_requests (
   -- UTC timestamp in microseconds relative to EPOCH
   -- is set only if the request is clean
   commit_time bigint,
-  repair_context varchar collate "C", -- only set on manual repair requests outside of sync protocol
   primary key (synchronizer_idx, request_counter)
 );
-create index idx_journal_request_timestamp on par_journal_requests (synchronizer_idx, request_timestamp);
+create unique index idx_journal_request_timestamp on par_journal_requests (synchronizer_idx, request_timestamp);
 create index idx_journal_request_commit_time on par_journal_requests (synchronizer_idx, commit_time);
 
 -- locally computed ACS commitments to a specific period, counter-participant and synchronizer
@@ -378,9 +375,8 @@ create table par_commitment_queue (
   -- UTC timestamp in microseconds relative to EPOCH
   to_inclusive bigint not null,
   commitment bytea not null,
-  commitment_hash varchar collate "C" not null, -- A shorter hash (SHA-256) of the commitment for the primary key instead of the bytea
   constraint check_nonempty_interval_queue check(to_inclusive > from_exclusive),
-  primary key (synchronizer_idx, sender, counter_participant, from_exclusive, to_inclusive, commitment_hash)
+  primary key (synchronizer_idx, sender, counter_participant, from_exclusive, to_inclusive, commitment)
 );
 
 create index idx_par_commitment_queue_by_time on par_commitment_queue (synchronizer_idx, to_inclusive);
@@ -430,16 +426,6 @@ create table par_active_contract_pruning (
 
 -- Maintains the latest timestamp (by synchronizer) for which ACS commitment pruning has started or finished
 create table par_commitment_pruning (
-  synchronizer_idx integer not null,
-  phase pruning_phase not null,
-  -- UTC timestamp in microseconds relative to EPOCH
-  ts bigint not null,
-  succeeded bigint null,
-  primary key (synchronizer_idx)
-);
-
--- Maintains the latest timestamp (by synchronizer) for which contract key journal pruning has started or finished
-create table par_contract_key_pruning (
   synchronizer_idx integer not null,
   phase pruning_phase not null,
   -- UTC timestamp in microseconds relative to EPOCH
@@ -696,22 +682,34 @@ create table common_pruning_schedules(
 create table seq_in_flight_aggregation(
   aggregation_id varchar collate "C" not null primary key,
   -- UTC timestamp in microseconds relative to EPOCH
+  first_sequencing_timestamp bigint not null,
+  -- UTC timestamp in microseconds relative to EPOCH
   max_sequencing_time bigint not null,
   -- serialized aggregation rule,
   aggregation_rule bytea not null
 );
 
-create index idx_seq_in_flight_aggregation_max_sequencing_time on seq_in_flight_aggregation(max_sequencing_time);
+-- NB: Do not add other indexes to this table, as this will confuse the planner to ignore the BRIN index
+create index idx_seq_in_flight_aggregation_temporal_brin
+    on seq_in_flight_aggregation
+    using brin (first_sequencing_timestamp, max_sequencing_time);
 
 create table seq_in_flight_aggregated_sender(
   aggregation_id varchar collate "C" not null,
   sender varchar collate "C" not null,
   -- UTC timestamp in microseconds relative to EPOCH
   sequencing_timestamp bigint not null,
+  -- UTC timestamp in microseconds relative to EPOCH
+  max_sequencing_time bigint not null,
   signatures bytea not null,
   primary key (aggregation_id, sender),
   constraint foreign_key_seq_in_flight_aggregated_sender foreign key (aggregation_id) references seq_in_flight_aggregation(aggregation_id) on delete cascade
 );
+
+-- NB: Do not add other indexes to this table, as this will confuse the planner to ignore the BRIN index
+create index idx_seq_in_flight_aggregated_sender_temporal_brin
+    on seq_in_flight_aggregated_sender
+        using brin (sequencing_timestamp, max_sequencing_time);
 
 -- stores the topology-x state transactions
 create table common_topology_transactions (
@@ -819,6 +817,8 @@ create table ord_epochs (
   epoch_length bigint not null,
   -- Sequencing instant of the topology snapshot in force for the epoch
   topology_ts bigint not null,
+  -- the bft time of the last transaction of the last block from the previous epoch
+  previous_epoch_max_ts bigint not null,
   -- whether the epoch is in progress
   in_progress bool not null
 );
@@ -893,9 +893,13 @@ create table ord_metadata_output_epochs (
 
 -- Stores P2P endpoints from the configuration or admin command
 create table ord_p2p_endpoints (
-  host varchar collate "C" not null,
+  address varchar collate "C" not null,
   port smallint not null,
-  primary key (host, port)
+  transport_security bool not null,
+  custom_server_trust_certificates bytea null, -- PEM string
+  client_certificate_chain bytea null, -- PEM string
+  client_private_key_file varchar collate "C" null, -- path to a file containing the client private key
+  primary key (address, port, transport_security)
 );
 
 -- Auto-vacuum settings for large sequencer tables: these are defaults set based on testing of CN CILR test deployment

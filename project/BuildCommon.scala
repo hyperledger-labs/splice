@@ -323,7 +323,7 @@ object BuildCommon {
   lazy val `canton-util-external` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-util-external", file("canton/daml-common-staging/util-external"))
+      .apply("canton-util-external", file("canton/base/util-external"))
       .dependsOn(
         `canton-pekko-fork`,
         `canton-magnolify-addon`,
@@ -371,7 +371,7 @@ object BuildCommon {
   lazy val `canton-daml-tls` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-daml-tls", file("canton/daml-common-staging/daml-tls"))
+      .apply("canton-daml-tls", file("canton/base/daml-tls"))
       .dependsOn(
         `canton-util-internal`,
         `canton-wartremover-extension` % "compile->compile;test->test",
@@ -392,7 +392,7 @@ object BuildCommon {
   lazy val `canton-daml-adjustable-clock` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-daml-adjustable-clock", file("canton/daml-common-staging/adjustable-clock"))
+      .apply("canton-daml-adjustable-clock", file("canton/base/adjustable-clock"))
       .settings(
         sharedCantonSettings
       )
@@ -401,7 +401,7 @@ object BuildCommon {
   lazy val `canton-daml-grpc-utils` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-daml-grpc-utils", file("canton/daml-common-staging/grpc-utils"))
+      .apply("canton-daml-grpc-utils", file("canton/base/grpc-utils"))
       .dependsOn(
         `canton-google-common-protos-scala`
       )
@@ -418,7 +418,7 @@ object BuildCommon {
   lazy val `canton-daml-jwt` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-daml-jwt", file("canton/daml-common-staging/daml-jwt"))
+      .apply("canton-daml-jwt", file("canton/base/daml-jwt"))
       .disablePlugins(WartRemover)
       .settings(
         sharedSettings,
@@ -1103,7 +1103,7 @@ object BuildCommon {
   lazy val `canton-daml-errors` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-daml-errors", file("canton/daml-common-staging/daml-errors"))
+      .apply("canton-daml-errors", file("canton/base/daml-errors"))
       .dependsOn(
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-google-common-protos-scala`,
@@ -1420,6 +1420,7 @@ object BuildCommon {
           pekko_http_core,
           daml_pekko_http_metrics,
           daml_lf_api_type_signature,
+          protostuff_parser,
           tapir_json_circe,
           tapir_pekko_http_server,
           tapir_openapi_docs,
@@ -1554,7 +1555,8 @@ object BuildCommon {
     val pkgs = npmInstallDeps.value
     val openApiPkgs = npmInstallOpenApiDeps.value
     val log = streams.value.log
-    val npmInstallScript = npmRootDir.value / "../build-tools/npm-install.sh"
+    val buildDir = (ThisBuild / baseDirectory).value
+    val npmInstallScript = buildDir / "build-tools" / "npm-install.sh"
     val cacheDir = streams.value.cacheDirectory / "npmInstall"
     val cache =
       FileFunction.cached(cacheDir, FileInfo.hash) { _ =>

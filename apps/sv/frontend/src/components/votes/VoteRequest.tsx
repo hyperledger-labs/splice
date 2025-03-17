@@ -4,7 +4,6 @@ import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder'
 import { useMutation } from '@tanstack/react-query';
 import {
   ActionView,
-  ConfirmationDialog,
   DateWithDurationDisplay,
   DisableConditionally,
   SvClientProvider,
@@ -39,6 +38,7 @@ import { Alerting, AlertState } from '../../utils/Alerting';
 import {
   isExpirationBeforeEffectiveDate,
   isScheduleDateTimeValid,
+  isValidUrl,
   VoteRequestValidity,
 } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
@@ -85,6 +85,8 @@ export const CreateVoteRequest: React.FC = () => {
     ),
     'milliseconds'
   );
+
+  const [isValidSynchronizerPauseTime, setIsValidSynchronizerPauseTime] = useState<boolean>(true);
 
   useEffect(() => {
     setExpiration(expirationFromVoteRequestTimeout);
@@ -185,6 +187,7 @@ export const CreateVoteRequest: React.FC = () => {
       listVoteRequestsQuery.data!,
       effectiveDate
     );
+
     if (!scheduleValidity.isValid) {
       setAlertMessage(scheduleValidity.alertMessage);
     }
@@ -286,6 +289,9 @@ export const CreateVoteRequest: React.FC = () => {
               slotProps={{
                 textField: {
                   id: 'datetime-picker-vote-request-expiration',
+                  inputProps: {
+                    'data-testid': 'datetime-picker-vote-request-expiration',
+                  },
                 },
               }}
               closeOnSelect
@@ -306,7 +312,13 @@ export const CreateVoteRequest: React.FC = () => {
           {actionName === 'SRARC_RevokeFeaturedAppRight' && (
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
-          {actionName === 'SRARC_SetConfig' && <SetDsoRulesConfig chooseAction={chooseAction} />}
+          {actionName === 'SRARC_SetConfig' && (
+            <SetDsoRulesConfig
+              expiration={expiration}
+              chooseAction={chooseAction}
+              setIsValidSynchronizerPauseTime={setIsValidSynchronizerPauseTime}
+            />
+          )}
           {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
             <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
           )}
@@ -339,6 +351,7 @@ export const CreateVoteRequest: React.FC = () => {
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <TextField
+                  error={!isValidUrl(url)}
                   id="create-reason-url"
                   onChange={e => setUrl(e.target.value)}
                   value={url}
@@ -359,6 +372,15 @@ export const CreateVoteRequest: React.FC = () => {
                   ) as ActionRequiringConfirmation
                 }
                 effectiveAt={expiresAt}
+                expirationInDays={expirationInDays}
+                confirmationDialogProps={{
+                  showDialog: confirmDialogOpen,
+                  onAccept: handleConfirmationAccept,
+                  onClose: () => setConfirmDialogOpen(false),
+                  title: 'Confirm Your Vote Request',
+                  attributePrefix: 'vote',
+                  children: null,
+                }}
               />
             </Stack>
           )}
@@ -377,10 +399,16 @@ export const CreateVoteRequest: React.FC = () => {
                       }`,
                 },
                 { disabled: summary === '', reason: 'No summary' },
+                { disabled: !isValidUrl(url), reason: 'Invalid URL' },
+                {
+                  disabled: !isValidSynchronizerPauseTime,
+                  reason: 'Synchronizer upgrade time is before the expiry/effective date',
+                },
               ]}
             >
               <Button
                 id="create-voterequest-submit-button"
+                data-testid="create-voterequest-submit-button"
                 fullWidth
                 type={'submit'}
                 size="large"
@@ -394,23 +422,6 @@ export const CreateVoteRequest: React.FC = () => {
           </Stack>
         </CardContent>
       </Card>
-      <ConfirmationDialog
-        showDialog={confirmDialogOpen}
-        onAccept={handleConfirmationAccept}
-        onClose={() => setConfirmDialogOpen(false)}
-        title="Confirm Your Vote Request"
-        attributePrefix="vote"
-      >
-        <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
-        <br />
-        Please note:
-        <ul>
-          <li>This action cannot be undone.</li>
-          <li>You will not be able to edit this request afterwards.</li>
-          <li>You may only edit your vote after creation.</li>
-          <li>The vote request will expire in {expirationInDays} days.</li>
-        </ul>
-      </ConfirmationDialog>
     </Stack>
   );
 };

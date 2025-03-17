@@ -97,6 +97,11 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
       voteResultsQuery.data,
       tableType
     );
+
+    if (tableType === 'Rejected') {
+      rows.sort((a, b) => (dayjs(a.effectiveAt).isAfter(dayjs(b.effectiveAt)) ? -1 : 1));
+    }
+
     setRows(rows);
     setQueryOptions({
       accepted: accepted,

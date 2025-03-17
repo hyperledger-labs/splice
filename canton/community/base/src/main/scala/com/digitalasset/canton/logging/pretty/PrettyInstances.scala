@@ -55,7 +55,8 @@ trait PrettyInstances {
 
   implicit def prettyTree[T <: Tree]: Pretty[T] = identity
 
-  /** Makes the syntax from [[com.digitalasset.canton.util.ShowUtil]] accessible in places where a Pretty is expected.
+  /** Makes the syntax from [[com.digitalasset.canton.util.ShowUtil]] accessible in places where a
+    * Pretty is expected.
     */
   implicit def prettyShown: Pretty[Shown] = prettyOfString(_.toString)
 
@@ -189,17 +190,16 @@ trait PrettyInstances {
     prettyOfString(packageName => show"$packageName")
 
   implicit def prettyLfContractId: Pretty[LfContractId] = prettyOfString {
-    case LfContractId.V1(discriminator, suffix)
-        // Shorten only Canton contract ids
-        if suffix.startsWith(AuthenticatedContractIdVersionV10.versionPrefixBytes) =>
-      val prefixBytesSize = CantonContractIdVersion.versionPrefixBytesSize
 
+    case LfContractId.V1(discriminator, suffix)
+        if suffix.length >= CantonContractIdVersion.versionPrefixBytesSize =>
+      val prefixBytesSize = CantonContractIdVersion.versionPrefixBytesSize
       val cantonVersionPrefix = suffix.slice(0, prefixBytesSize)
       val rawSuffix = suffix.slice(prefixBytesSize, suffix.length)
-
       discriminator.toHexString.readableHash.toString +
         cantonVersionPrefix.toHexString +
         rawSuffix.toHexString.readableHash.toString
+
     case lfContractId: LfContractId =>
       // Don't abbreviate anything for unusual contract ids
       lfContractId.toString

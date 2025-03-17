@@ -10,7 +10,13 @@ import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{
+  CantonConfigValidator,
+  NonNegativeFiniteDuration,
+  ProcessingTimeout,
+  UniformCantonConfigValidation,
+}
 import com.digitalasset.canton.crypto.{Crypto, Fingerprint, Nonce}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
@@ -38,22 +44,29 @@ import scala.concurrent.ExecutionContext
 
 /** Configures authentication token fetching
   *
-  * @param refreshAuthTokenBeforeExpiry how much time before the auth token expires should we fetch a new one?
+  * @param refreshAuthTokenBeforeExpiry
+  *   how much time before the auth token expires should we fetch a new one?
   */
 final case class AuthenticationTokenManagerConfig(
     refreshAuthTokenBeforeExpiry: NonNegativeFiniteDuration =
       AuthenticationTokenManagerConfig.defaultRefreshAuthTokenBeforeExpiry,
     retries: NonNegativeInt = AuthenticationTokenManagerConfig.defaultRetries,
     pauseRetries: NonNegativeFiniteDuration = AuthenticationTokenManagerConfig.defaultPauseRetries,
-)
+) extends UniformCantonConfigValidation
 object AuthenticationTokenManagerConfig {
+  implicit val authenticationTokenManagerConfigCantonConfigValidator
+      : CantonConfigValidator[AuthenticationTokenManagerConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[AuthenticationTokenManagerConfig]
+  }
   val defaultRefreshAuthTokenBeforeExpiry: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofSeconds(20)
   val defaultRetries: NonNegativeInt = NonNegativeInt.tryCreate(20)
   val defaultPauseRetries: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(500)
 }
 
-/** Fetch an authentication token from the sequencer by using the sequencer authentication service */
+/** Fetch an authentication token from the sequencer by using the sequencer authentication service
+  */
 class AuthenticationTokenProvider(
     synchronizerId: SynchronizerId,
     member: Member,

@@ -5,10 +5,10 @@ package com.digitalasset.canton.integration
 
 import cats.syntax.option.*
 import com.digitalasset.canton.UniquePortGenerator
-import com.digitalasset.canton.config.{CantonCommunityConfig, DbConfig, StorageConfig}
-import com.digitalasset.canton.participant.config.CommunityParticipantConfig
-import com.digitalasset.canton.synchronizer.mediator.CommunityMediatorNodeConfig
-import com.digitalasset.canton.synchronizer.sequencer.config.CommunitySequencerNodeConfig
+import com.digitalasset.canton.config.{CantonConfig, DbConfig, StorageConfig}
+import com.digitalasset.canton.participant.config.LocalParticipantConfig
+import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import com.typesafe.config.{Config, ConfigValueFactory}
 import monocle.macros.syntax.lens.*
@@ -17,7 +17,7 @@ import scala.util.Random
 
 object CommunityConfigTransforms {
 
-  type CommunityConfigTransform = CantonCommunityConfig => CantonCommunityConfig
+  type CommunityConfigTransform = CantonConfig => CantonConfig
 
   /** Parameterized version to allow specifying community or enterprise versions */
   def withUniqueDbName[SC <: StorageConfig](
@@ -58,7 +58,7 @@ object CommunityConfigTransforms {
   }
 
   def updateAllParticipantConfigs(
-      update: (String, CommunityParticipantConfig) => CommunityParticipantConfig
+      update: (String, LocalParticipantConfig) => LocalParticipantConfig
   ): CommunityConfigTransform =
     cantonConfig =>
       cantonConfig
@@ -66,23 +66,23 @@ object CommunityConfigTransforms {
         .modify(_.map { case (pName, pConfig) => (pName, update(pName.unwrap, pConfig)) })
 
   def updateAllSequencerConfigs(
-      update: (String, CommunitySequencerNodeConfig) => CommunitySequencerNodeConfig
+      update: (String, SequencerNodeConfig) => SequencerNodeConfig
   ): CommunityConfigTransform =
     _.focus(_.sequencers)
       .modify(_.map { case (sName, sConfig) => (sName, update(sName.unwrap, sConfig)) })
 
   def updateAllSequencerConfigs_(
-      update: CommunitySequencerNodeConfig => CommunitySequencerNodeConfig
+      update: SequencerNodeConfig => SequencerNodeConfig
   ): CommunityConfigTransform =
     updateAllSequencerConfigs((_, config) => update(config))
 
   def updateAllMediatorConfigs_(
-      update: CommunityMediatorNodeConfig => CommunityMediatorNodeConfig
+      update: MediatorNodeConfig => MediatorNodeConfig
   ): CommunityConfigTransform =
     updateAllMediatorConfigs((_, config) => update(config))
 
   def updateAllMediatorConfigs(
-      update: (String, CommunityMediatorNodeConfig) => CommunityMediatorNodeConfig
+      update: (String, MediatorNodeConfig) => MediatorNodeConfig
   ): CommunityConfigTransform =
     cantonConfig =>
       cantonConfig
@@ -108,7 +108,7 @@ object CommunityConfigTransforms {
     _.focus(_.parameters.betaVersionSupport).replace(enable)
 
   def updateAllParticipantConfigs_(
-      update: CommunityParticipantConfig => CommunityParticipantConfig
+      update: LocalParticipantConfig => LocalParticipantConfig
   ): CommunityConfigTransform =
     updateAllParticipantConfigs((_, participantConfig) => update(participantConfig))
 

@@ -6,41 +6,36 @@ package com.digitalasset.canton.participant.protocol
 import cats.implicits.toBifunctorOps
 import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
-import com.digitalasset.canton.protocol.{
-  AuthenticatedContractIdVersionV10,
-  CantonContractIdVersion,
-  ContractMetadata,
-  DriverContractMetadata,
-  LfContractId,
-  SerializableContract,
-  SerializableRawContractInstance,
-  UnicumGenerator,
-}
 import com.digitalasset.daml.lf.transaction.{FatContractInstance, Versioned}
 import com.digitalasset.daml.lf.value.Value.{ContractId, ContractInstance}
 
 trait ContractAuthenticator {
 
-  /** Authenticates the contract payload and metadata (consisted of ledger create time, contract instance and
-    * contract salt) against the contract id, iff the contract id has a [[com.digitalasset.canton.protocol.AuthenticatedContractIdVersionV10]] format.
+  /** Authenticates the contract payload and metadata (consisted of ledger create time, contract
+    * instance and contract salt) against the contract id,.
     *
-    * @param contract the serializable contract
+    * @param contract
+    *   the serializable contract
     */
   def authenticateSerializable(contract: SerializableContract): Either[String, Unit]
 
-  /** Authenticates the contract payload and metadata (consisted of ledger create time, contract instance and
-    * contract salt) against the contract id, iff the contract id has a [[com.digitalasset.canton.protocol.AuthenticatedContractIdVersionV10]] format.
+  /** Authenticates the contract payload and metadata (consisted of ledger create time, contract
+    * instance and contract salt) against the contract id.
     *
-    * @param contract the fat contract contract
+    * @param contract
+    *   the fat contract contract
     */
   def authenticateFat(contract: FatContractInstance): Either[String, Unit]
 
-  /** This method is used in contract upgrade verification to ensure that the metadata computed by the upgraded
-    * template matches the original metadata.
+  /** This method is used in contract upgrade verification to ensure that the metadata computed by
+    * the upgraded template matches the original metadata.
     *
-    * @param contract the contract whose metadata has been re-calculated
-    * @param metadata the recalculated metadata
+    * @param contract
+    *   the contract whose metadata has been re-calculated
+    * @param metadata
+    *   the recalculated metadata
     */
   def verifyMetadata(
       contract: SerializableContract,
@@ -85,7 +80,7 @@ class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends Contra
         .leftMap(_.toString)
       _ <- authenticate(
         contract.contractId,
-        Some(driverMetadata.salt),
+        driverMetadata.salt,
         LedgerCreateTime(createTime),
         metadata,
         contractInstance,
@@ -116,7 +111,7 @@ class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends Contra
 
   def authenticate(
       contractId: LfContractId,
-      contractSalt: Option[Salt],
+      contractSalt: Salt,
       ledgerTime: LedgerCreateTime,
       metadata: ContractMetadata,
       rawContractInstance: SerializableRawContractInstance,
@@ -124,18 +119,15 @@ class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends Contra
     val ContractId.V1(_, cantonContractSuffix) = contractId
     val optContractIdVersion = CantonContractIdVersion.fromContractSuffix(cantonContractSuffix)
     optContractIdVersion match {
-      case Right(AuthenticatedContractIdVersionV10) =>
+      case Right(contractIdVersion) =>
         for {
-          contractIdVersion <- optContractIdVersion
-          salt <- contractSalt.toRight(
-            s"Contract salt missing in serializable contract with authenticating contract id ($contractId)"
-          )
           recomputedUnicum <- unicumGenerator
             .recomputeUnicum(
-              contractSalt = salt,
+              contractSalt = contractSalt,
               ledgerCreateTime = ledgerTime,
               metadata = metadata,
               suffixedContractInstance = rawContractInstance,
+              cantonContractIdVersion = contractIdVersion,
             )
           recomputedSuffix = recomputedUnicum.toContractIdSuffix(contractIdVersion)
           _ <- Either.cond(

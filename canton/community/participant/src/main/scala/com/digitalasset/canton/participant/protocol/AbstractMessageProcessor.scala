@@ -17,7 +17,7 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.Activeness
 import com.digitalasset.canton.participant.store.SyncEphemeralState
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.{
-  ConfirmationResponse,
+  ConfirmationResponses,
   ProtocolMessage,
   SignedProtocolMessage,
 }
@@ -57,23 +57,21 @@ abstract class AbstractMessageProcessor(
         requestTimestamp,
         commitTime,
       )
-      _ <- FutureUnlessShutdown.outcomeF(
-        ephemeral.recordOrderPublisher.tick(
-          // providing directly a SequencerIndexMoved with RequestCounter for the non-submitting participant rejections
-          eventO.getOrElse(
-            SequencerIndexMoved(
-              synchronizerId = synchronizerId,
-              requestCounterO = Some(requestCounter),
-              sequencerCounter = requestSequencerCounter,
-              recordTime = requestTimestamp,
-            )
+      _ <- ephemeral.recordOrderPublisher.tick(
+        // providing directly a SequencerIndexMoved with RequestCounter for the non-submitting participant rejections
+        eventO.getOrElse(
+          SequencerIndexMoved(
+            synchronizerId = synchronizerId,
+            sequencerCounter = requestSequencerCounter,
+            recordTime = requestTimestamp,
           )
-        )
+        ),
+        Some(requestCounter),
       )
     } yield ()
 
-  /** A clean replay replays a request whose request counter is below the clean head in the request journal.
-    * Since the replayed request is clean, its effects are not persisted.
+  /** A clean replay replays a request whose request counter is below the clean head in the request
+    * journal. Since the replayed request is clean, its effects are not persisted.
     */
   protected def isCleanReplay(requestCounter: RequestCounter): Boolean =
     requestCounter < ephemeral.startingPoints.processing.nextRequestCounter
@@ -83,13 +81,13 @@ abstract class AbstractMessageProcessor(
   ): FutureUnlessShutdown[Unit] =
     if (isCleanReplay(requestCounter)) FutureUnlessShutdown.unit else f.void
 
-  protected def signResponse(
+  protected def signResponses(
       ips: SynchronizerSnapshotSyncCryptoApi,
-      response: ConfirmationResponse,
+      responses: ConfirmationResponses,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[SignedProtocolMessage[ConfirmationResponse]] =
-    SignedProtocolMessage.trySignAndCreate(response, ips, protocolVersion)
+  ): FutureUnlessShutdown[SignedProtocolMessage[ConfirmationResponses]] =
+    SignedProtocolMessage.trySignAndCreate(responses, ips, protocolVersion)
 
   // Assumes that we are not closing (i.e., that this is synchronized with shutdown somewhere higher up the call stack)
   protected def sendResponses(
@@ -133,9 +131,9 @@ abstract class AbstractMessageProcessor(
     }
   }
 
-  /** Immediately moves the request to Confirmed and
-    * register a timeout handler at the decision time with the request tracker
-    * to cover the case that the mediator does not send a confirmation result.
+  /** Immediately moves the request to Confirmed and register a timeout handler at the decision time
+    * with the request tracker to cover the case that the mediator does not send a confirmation
+    * result.
     */
   protected def prepareForMediatorResultOfBadRequest(
       requestCounter: RequestCounter,

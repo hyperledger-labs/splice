@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import cats.implicits.{catsSyntaxOptionId, catsSyntaxParallelTraverse1}
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
@@ -11,9 +11,9 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.store.TimeQuery
+import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
@@ -108,7 +108,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
             maxDomainTimeLag = context.config.pollingInterval,
           )
       dsoHostingParticipants <- participantAdminConnection.listPartyToParticipant(
-        filterStore = dsoRules.domain.filterString,
+        store = TopologyStoreId.SynchronizerStore(dsoRules.domain).some,
         filterParty = dsoParty.filterString,
         proposals = AuthorizedState,
         timeQuery = TimeQuery.Range(None, None),

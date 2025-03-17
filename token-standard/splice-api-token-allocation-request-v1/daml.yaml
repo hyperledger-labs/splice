@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-sdk-version: 3.3.0-snapshot.20250214.13611.0.v8a5fd608
+sdk-version: 3.3.0-snapshot.20250227.13636.0.vdeaa9235
 name: splice-api-token-allocation-request-v1
 version: 0.0.1 # TODO (#17541): change to 1.0.0
 source: daml

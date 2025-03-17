@@ -4,46 +4,46 @@
 package com.digitalasset.canton.environment
 
 import cats.syntax.either.*
-import com.digitalasset.canton.config.{CantonCommunityConfig, TestingConfigInternal}
+import com.digitalasset.canton.config.{CantonConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   ConsoleEnvironmentBinding,
   ConsoleOutput,
   StandardConsoleOutput,
 }
-import com.digitalasset.canton.crypto.CommunityCryptoFactory
-import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
+import com.digitalasset.canton.crypto.kms.CommunityKmsFactory
+import com.digitalasset.canton.crypto.store.CommunityCryptoPrivateStoreFactory
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
+import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.resource.{
   CommunityDbMigrationsFactory,
   CommunityStorageFactory,
   DbMigrationsFactory,
 }
 import com.digitalasset.canton.synchronizer.mediator.{
-  CommunityMediatorNodeConfig,
   CommunityMediatorReplicaManager,
   MediatorNodeBootstrap,
-  MediatorNodeConfigCommon,
+  MediatorNodeConfig,
   MediatorNodeParameters,
 }
 import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
-import com.digitalasset.canton.synchronizer.sequencer.config.CommunitySequencerNodeConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.{
   CommunitySequencerFactory,
   SequencerNodeBootstrap,
 }
 
 class CommunityEnvironment(
-    override val config: CantonCommunityConfig,
+    override val config: CantonConfig,
     override val testingConfig: TestingConfigInternal,
     override val loggerFactory: NamedLoggerFactory,
 ) extends Environment {
 
-  override type Config = CantonCommunityConfig
+  override type Config = CantonConfig
 
   override protected val participantNodeFactory
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap] =
+      : ParticipantNodeBootstrap.Factory[LocalParticipantConfig, ParticipantNodeBootstrap] =
     ParticipantNodeBootstrap.CommunityParticipantFactory
 
   override type Console = CommunityConsoleEnvironment
@@ -60,7 +60,7 @@ class CommunityEnvironment(
 
   override protected def createSequencer(
       name: String,
-      sequencerConfig: CommunitySequencerNodeConfig,
+      sequencerConfig: SequencerNodeConfig,
   ): SequencerNodeBootstrap = {
     val nodeFactoryArguments = NodeFactoryArguments(
       name,
@@ -79,8 +79,18 @@ class CommunityEnvironment(
     val bootstrapCommonArguments = nodeFactoryArguments
       .toCantonNodeBootstrapCommonArguments(
         new CommunityStorageFactory(sequencerConfig.storage),
-        new CommunityCryptoFactory(),
-        new CommunityCryptoPrivateStoreFactory(),
+        new CommunityCryptoPrivateStoreFactory(
+          nodeFactoryArguments.config.crypto.provider,
+          nodeFactoryArguments.config.crypto.kms,
+          CommunityKmsFactory,
+          nodeFactoryArguments.config.parameters.caching.kmsMetadataCache,
+          nodeFactoryArguments.config.crypto.privateKeyStore,
+          nodeFactoryArguments.parameters.nonStandardConfig,
+          nodeFactoryArguments.futureSupervisor,
+          nodeFactoryArguments.clock,
+          nodeFactoryArguments.executionContext,
+        ),
+        CommunityKmsFactory,
       )
       .valueOr(err =>
         throw new RuntimeException(s"Failed to create sequencer node $name: $err")
@@ -91,20 +101,30 @@ class CommunityEnvironment(
 
   override protected def createMediator(
       name: String,
-      mediatorConfig: CommunityMediatorNodeConfig,
+      mediatorConfig: MediatorNodeConfig,
   ): MediatorNodeBootstrap = {
 
     val factoryArguments = mediatorNodeFactoryArguments(name, mediatorConfig)
     val arguments = factoryArguments
       .toCantonNodeBootstrapCommonArguments(
         new CommunityStorageFactory(mediatorConfig.storage),
-        new CommunityCryptoFactory(),
-        new CommunityCryptoPrivateStoreFactory(),
+        new CommunityCryptoPrivateStoreFactory(
+          factoryArguments.config.crypto.provider,
+          factoryArguments.config.crypto.kms,
+          CommunityKmsFactory,
+          factoryArguments.config.parameters.caching.kmsMetadataCache,
+          factoryArguments.config.crypto.privateKeyStore,
+          factoryArguments.parameters.nonStandardConfig,
+          factoryArguments.futureSupervisor,
+          factoryArguments.clock,
+          factoryArguments.executionContext,
+        ),
+        CommunityKmsFactory,
       )
       .valueOr(err =>
         throw new RuntimeException(s"Failed to create mediator bootstrap: $err")
       ): CantonNodeBootstrapCommonArguments[
-      MediatorNodeConfigCommon,
+      MediatorNodeConfig,
       MediatorNodeParameters,
       MediatorMetrics,
     ]
@@ -119,9 +139,9 @@ class CommunityEnvironment(
   }
 }
 
-object CommunityEnvironmentFactory extends EnvironmentFactory[CommunityEnvironment] {
+object CommunityEnvironmentFactory extends EnvironmentFactory[CantonConfig, CommunityEnvironment] {
   override def create(
-      config: CantonCommunityConfig,
+      config: CantonConfig,
       loggerFactory: NamedLoggerFactory,
       testingConfigInternal: TestingConfigInternal,
   ): CommunityEnvironment =

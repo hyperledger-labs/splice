@@ -18,7 +18,11 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
-import org.lfdecentralizedtrust.splice.migration.{DomainDataRestorer, DomainMigrationInfo}
+import org.lfdecentralizedtrust.splice.migration.{
+  DomainDataRestorer,
+  DomainMigrationInfo,
+  ParticipantUsersDataRestorer,
+}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -229,6 +233,16 @@ class DomainMigrationInitializer(
         None,
         skipTrafficReconciliationTriggers = true,
       )
+      _ <- migrationDump.participantUsers match {
+        case Some(participantUsersData) => {
+          logger.info("Restoring participant users data")
+          new ParticipantUsersDataRestorer(
+            svAutomation.connection,
+            loggerFactory,
+          ).restoreParticipantUsersData(participantUsersData)
+        }
+        case None => Future.unit
+      }
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,

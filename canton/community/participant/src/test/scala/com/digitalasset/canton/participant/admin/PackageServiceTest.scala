@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.admin
 import better.files.*
 import cats.data.EitherT
 import com.daml.error.DamlError
+import com.digitalasset.canton.BaseTest.getResourcePath
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String255
@@ -14,15 +15,22 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.ledger.error.PackageServiceErrors
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.participant.admin.PackageService.DarId
-import com.digitalasset.canton.participant.admin.PackageServiceTest.readCantonExamples
+import com.digitalasset.canton.participant.admin.PackageService.DarMainPackageId
+import com.digitalasset.canton.participant.admin.PackageServiceTest.{
+  AdminWorkflowsPath,
+  readAdminWorkflows,
+  readAdminWorkflowsBytes,
+  readCantonExamples,
+  readCantonExamplesBytes,
+}
+import com.digitalasset.canton.participant.admin.data.UploadDarData
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
 import com.digitalasset.canton.participant.store.DamlPackageStore
 import com.digitalasset.canton.participant.store.memory.InMemoryDamlPackageStore
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.DefaultTestIdentities
-import com.digitalasset.canton.util.BinaryFileUtil
+import com.digitalasset.canton.util.{BinaryFileUtil, MonadUtil}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext, LfPackageId}
 import com.digitalasset.daml.lf.archive
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
@@ -43,16 +51,29 @@ import scala.util.Using
 object PackageServiceTest {
 
   @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
-  def loadExampleDar(): archive.Dar[Archive] =
+  private def loadDar(path: String): archive.Dar[Archive] =
     DarParser
-      .readArchiveFromFile(new File(BaseTest.CantonExamplesPath))
+      .readArchiveFromFile(new File(path))
       .getOrElse(throw new IllegalArgumentException("Failed to read dar"))
+
+  def loadExampleDar(): archive.Dar[Archive] =
+    loadDar(BaseTest.CantonExamplesPath)
 
   def readCantonExamples(): List[DamlLf.Archive] =
     loadExampleDar().all
 
   def readCantonExamplesBytes(): Array[Byte] =
     Files.readAllBytes(Paths.get(BaseTest.CantonExamplesPath))
+
+  private val AdminWorkflowsPath = getResourcePath("AdminWorkflows.dar")
+  def loadAdminWorkflowsDar(): archive.Dar[Archive] =
+    loadDar(AdminWorkflowsPath)
+
+  def readAdminWorkflows(): List[DamlLf.Archive] =
+    loadAdminWorkflowsDar().all
+
+  def readAdminWorkflowsBytes(): Array[Byte] =
+    Files.readAllBytes(Paths.get(AdminWorkflowsPath))
 
   def badDarPath: String =
     ("community" / "participant" / "src" / "test" / "resources" / "daml" / "illformed.dar").toString
@@ -68,6 +89,7 @@ class PackageServiceTest
     with HasActorSystem
     with HasExecutionContext {
   private val examplePackages: List[Archive] = readCantonExamples()
+  private val adminWorkflowPackages: List[Archive] = readAdminWorkflows()
   private val bytes = PackageServiceTest.readCantonExamplesBytes()
   private val description = String255.tryCreate("CantonExamples")
   private val participantId = DefaultTestIdentities.participant1
@@ -136,13 +158,6 @@ class PackageServiceTest
         dar <- packageStore.getDar(hash).value
       } yield {
         packages.map(_.packageId).toSet should contain theSameElementsAs expectedPackageIds
-        dar.foreach { tmp =>
-          tmp.bytes.zip(bytes.zipWithIndex).foreach { case (a, (b, i)) =>
-            if (a != b) {
-              logger.warn(s"byte $i: ${a.toInt} != ${b.toInt}")
-            }
-          }
-        }
         val darV = dar.valueOrFail("dar should be present")
         darV.bytes shouldBe bytes
         darV.descriptor.description shouldBe description
@@ -171,8 +186,57 @@ class PackageServiceTest
         packages.map(_.packageId).toSet should contain theSameElementsAs expectedPackageIds
         val darV = dar.valueOrFail("dar should be present")
         darV.bytes shouldBe bytes
-        darV.descriptor.darId shouldBe hash
+        darV.descriptor.mainPackageId shouldBe hash
         darV.descriptor.name.str shouldBe "CantonExamples"
+      }
+    }
+
+    "upload multiple DARs" in withEnvUS { env =>
+      import env.*
+
+      val examples = UploadDarData(
+        bytes = BinaryFileUtil
+          .readByteStringFromFile(CantonExamplesPath)
+          .valueOrFail("could not load examples"),
+        description = Some("CantonExamples"),
+        expectedMainPackageId = None,
+      )
+      val test = UploadDarData(
+        bytes = BinaryFileUtil
+          .readByteStringFromFile(AdminWorkflowsPath)
+          .valueOrFail("could not load admin workflows"),
+        description = Some("AdminWorkflows"),
+        expectedMainPackageId = None,
+      )
+
+      for {
+        hashes <- sut
+          .upload(
+            Seq(examples, test),
+            submissionIdO = None,
+            vetAllPackages = false,
+            synchronizeVetting = PackageVettingSynchronization.NoSync,
+          )
+          .value
+          .map(_.valueOrFail("upload multiple dars"))
+        packages <- packageStore.listPackages()
+        dars <- MonadUtil.sequentialTraverse(hashes)(packageStore.getDar(_).value)
+      } yield {
+        val testAndExamplePackages =
+          (examplePackages ++ adminWorkflowPackages).map(DamlPackageStore.readPackageId).toSet
+        packages.map(_.packageId).toSet should contain theSameElementsAs testAndExamplePackages
+
+        forAll(
+          Seq(
+            String255.tryCreate("CantonExamples") -> readCantonExamplesBytes(),
+            String255.tryCreate("AdminWorkflows") -> readAdminWorkflowsBytes(),
+          )
+        ) { case (name, bytes) =>
+          val dar = dars.flatten.find(_.descriptor.name == name).value
+          dar.bytes shouldBe bytes
+          dar.descriptor.description shouldBe name
+          dar.descriptor.name shouldBe name
+        }
       }
     }
 
@@ -200,8 +264,8 @@ class PackageServiceTest
                 value.code shouldBe PackageServiceErrors.Reading.MainPackageInDarDoesNotMatchExpected
               case Right(value) => fail("the expected main package id check should have failed")
             }
-          darId <- attempt(None).map(_.valueOrFail("failed to upload dar"))
-          _ <- attempt(Some(darId.unwrap)).map {
+          mainPackageId <- attempt(None).map(_.valueOrFail("failed to upload dar"))
+          _ <- attempt(Some(mainPackageId.unwrap)).map {
             case Left(value) => fail(s"should succeed but found $value")
             case Right(value) => succeed
           }
@@ -311,7 +375,7 @@ class PackageServiceTest
   "The DAR referenced by the requested hash does not exist" when {
     def rejectOnMissingDar(
         req: PackageService => EitherT[FutureUnlessShutdown, CantonError, Unit],
-        darId: DarId,
+        mainPackageId: DarMainPackageId,
         op: String,
     ): Env => Future[Assertion] = { env =>
       req(env.sut).value.unwrap.map {
@@ -320,14 +384,14 @@ class PackageServiceTest
             CantonPackageServiceError.Fetching.DarNotFound
               .Reject(
                 operation = op,
-                darId = darId.unwrap,
+                mainPackageId = mainPackageId.unwrap,
               )
           )
         case UnlessShutdown.AbortedDueToShutdown => fail("Unexpected shutdown")
       }
     }
 
-    val unknownDarId = DarId.tryCreate("darid")
+    val unknownDarId = DarMainPackageId.tryCreate("darid")
 
     "requested by PackageService.unvetDar" should {
       "reject the request with an error" in withEnv(

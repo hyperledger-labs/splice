@@ -4,7 +4,7 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.v2.{reassignment, state_service, transaction_filter}
+import com.daml.ledger.api.v2.{reassignment, state_service}
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
 import com.digitalasset.canton.http.json.v2.JsContractEntry.{
@@ -15,6 +15,7 @@ import com.digitalasset.canton.http.json.v2.JsContractEntry.{
 }
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
+import com.digitalasset.canton.http.json.v2.Protocol.Protocol
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -103,7 +104,8 @@ class JsStateService(
       .resultToRight
 
   private def getActiveContractsStream(
-      caller: CallerContext
+      caller: CallerContext,
+      protocol: Protocol,
   ): TracedInput[Unit] => Flow[
     state_service.GetActiveContractsRequest,
     JsGetActiveContractsResponse,
@@ -116,6 +118,7 @@ class JsStateService(
         stateServiceClient(caller.token())(TraceContext.empty).getActiveContracts,
         (r: state_service.GetActiveContractsResponse) =>
           protocolConverters.GetActiveContractsResponse.toJson(r),
+        protocol = protocol,
         withCloseDelay = true,
       )
     }
@@ -219,25 +222,8 @@ final case class JsGetActiveContractsResponse(
 
 object JsStateServiceCodecs {
 
-  implicit val identifierFilterSchema
-      : Schema[transaction_filter.CumulativeFilter.IdentifierFilter] =
-    Schema.oneOfWrapped
+  import JsSchema.JsServicesCommonCodecs.*
 
-  implicit val filtersRW: Codec[transaction_filter.Filters] = deriveCodec
-  implicit val cumulativeFilterRW: Codec[transaction_filter.CumulativeFilter] = deriveCodec
-  implicit val identifierFilterRW: Codec[transaction_filter.CumulativeFilter.IdentifierFilter] =
-    deriveCodec
-
-  implicit val wildcardFilterRW: Codec[transaction_filter.WildcardFilter] =
-    deriveCodec
-  implicit val templateFilterRW: Codec[transaction_filter.TemplateFilter] =
-    deriveCodec
-
-  implicit val interfaceFilterRW: Codec[transaction_filter.InterfaceFilter] =
-    deriveCodec
-
-  implicit val transactionFilterRW: Codec[transaction_filter.TransactionFilter] = deriveCodec
-  implicit val eventFormatRW: Codec[transaction_filter.EventFormat] = deriveCodec
   implicit val getActiveContractsRequestRW: Codec[state_service.GetActiveContractsRequest] =
     deriveCodec
 
@@ -248,7 +234,6 @@ object JsStateServiceCodecs {
   implicit val jsContractEntrySchema: Schema[JsContractEntry] = Schema.oneOfWrapped
 
   implicit val jsIncompleteUnassignedRW: Codec[JsIncompleteUnassigned] = deriveCodec
-  implicit val unassignedEventRW: Codec[reassignment.UnassignedEvent] = deriveCodec
   implicit val jsIncompleteAssignedRW: Codec[JsIncompleteAssigned] = deriveCodec
   implicit val jsActiveContractRW: Codec[JsActiveContract] = deriveCodec
   implicit val jsUnassignedEventRW: Codec[JsUnassignedEvent] = deriveCodec

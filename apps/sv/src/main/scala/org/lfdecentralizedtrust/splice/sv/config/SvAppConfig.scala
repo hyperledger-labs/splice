@@ -23,14 +23,14 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeLong,
   NonNegativeNumeric,
-  PositiveNumeric,
   PositiveInt,
+  PositiveNumeric,
 }
-import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PEndpointConfig
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.model.Uri
 
@@ -200,7 +200,7 @@ final case class BeneficiaryConfig(
 )
 
 final case class SvParticipantClientConfig(
-    override val adminApi: ClientConfig,
+    override val adminApi: FullClientConfig,
     override val ledgerApi: LedgerApiClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
@@ -235,7 +235,6 @@ case class SvAppBackendConfig(
     domainMigrationDumpPath: Option[Path] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
-    prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
@@ -303,10 +302,10 @@ final case class SequencerPruningConfig(
 )
 
 final case class SvSequencerConfig(
-    adminApi: ClientConfig,
-    internalApi: ClientConfig,
+    adminApi: FullClientConfig,
+    internalApi: FullClientConfig,
     externalPublicApiUrl: String,
-    externalPeerApiUrlSuffix: Option[Endpoint] = None,
+    externalPeerApiUrlSuffix: Option[P2PEndpointConfig] = None,
     // This needs to be participantResponseTimeout + mediatorResponseTimeout to make sure that the sequencer
     // does not have to serve requests that have been in flight before the sequencer's signing keys became valid.
     // See also https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
@@ -318,7 +317,7 @@ final case class SvSequencerConfig(
 ) {
   def toCantonConfig: RemoteSequencerConfig = RemoteSequencerConfig(
     adminApi,
-    SequencerConnectionConfig.Grpc(
+    SequencerApiClientConfig(
       internalApi.address,
       internalApi.port,
     ),
@@ -326,7 +325,7 @@ final case class SvSequencerConfig(
 }
 
 final case class SvMediatorConfig(
-    adminApi: ClientConfig,
+    adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
 ) {
