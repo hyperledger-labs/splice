@@ -213,7 +213,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -443,7 +443,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "loopback",
     "provider": "",
@@ -513,7 +513,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "scan",
     "provider": "",
@@ -709,7 +709,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -871,7 +871,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-app",
     "provider": "",
@@ -993,7 +993,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1071,7 +1071,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1149,7 +1149,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1274,7 +1274,7 @@
           "google-oauth2|100985872861279769661"
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.13"
     },
     "name": "validator",
     "provider": "",

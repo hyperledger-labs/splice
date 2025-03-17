@@ -3,5 +3,7 @@
   "include": [
     "src/**/*.ts",
     "*.ts"
-  ]
+,
+"../common/src/operator/flux-source.ts"
+]
 }

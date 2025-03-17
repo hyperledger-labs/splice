@@ -327,7 +327,15 @@ The `pulumi/deployment` project controls the deployment of production clusters u
 #### Deployment stack configuration
 
 The pulumi operator uses a custom docker image to allow us to use a specific pulumi version and to configure the default pulumi arguments (like parallelism).
-The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
+The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). A flux source allows a pulumi deployment to follow a certain git
+reference (e.g. a branch), and automatically apply changes pushed to that reference.
+
+The `operator` Pulumi project installs the operator, and deploys a `deployment`
+stack, which will typically follow `main`, and deploy the other stacks per the
+versions specified for them in the deployment directory in `main`.
+
+
+These deployment watch the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
 to the cluster.
 Each migration can follow a different release that is upgraded independent of the other migrations. The key `synchronizerMigration.active.releaseReference` controls the release used for all our main deployments and the infra stack.
 The deployment uses `dotenv` to read the cluster specific env configuration files.
@@ -359,8 +367,6 @@ through the following steps:
 3. If the active migration configured in the `cluster.yaml` under the key `synchronizerMigration.active.releaseReference` of
    the corresponding cluster is a Git tag, e.g., `cilr` for CILR, then tag the merged commit on `main` with that tag.
 
-4. In order for the operator to start tracking the new version, and thus apply the upgrade, trigger a CircleCI pipeline on
-   the release branch with `run-job: update-deployment` and `cluster: devnet` (or whatever cluster you are upgrading).
 
 #### The operator
 
@@ -532,6 +538,7 @@ subcommands. A few highlights include the following:
           * `echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> .envrc.vars`
           * `git checkout -b <some_temp_branch>`
           * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
+          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch>`
           * push `config.yaml` and `.envrc.vars` to the temporary branch
           * `cncluster apply_operator`
 * `cncluster pdown` - Take down any installed resources populated with

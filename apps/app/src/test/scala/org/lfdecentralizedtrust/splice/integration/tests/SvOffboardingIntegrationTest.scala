@@ -33,6 +33,7 @@ import cats.instances.seq.*
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
@@ -233,7 +234,7 @@ class SvOffboardingIntegrationTest
       sv1ScanBackend.lookupTransferCommandCounterByParty(
         sv1Backend.getDsoInfo().svParty
       ) shouldBe None
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 60.seconds)(
         "Resume ExecuteConfirmedActionTrigger",
         sv1Backend.dsoDelegateBasedAutomation.trigger[ExecuteConfirmedActionTrigger].resume(),
       )(

@@ -3,7 +3,7 @@
 import { UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
 import { DateDisplay, DsoInfo, Loading, PartyId } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
 
 import {
@@ -43,13 +43,13 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
     isFetchingNextPage: isFetchingNextLicensesPage,
   } = validatorLicensesQuery;
 
-  const { ref } = useInView({
-    onChange: inView => {
-      if (inView && hasNextLicensesPage && !isFetchingNextLicensesPage) {
-        fetchNextLicensesPage();
-      }
-    },
-  });
+  const { ref, inView } = useInView();
+
+  useEffect(() => {
+    if (inView && hasNextLicensesPage && !isFetchingNextLicensesPage) {
+      fetchNextLicensesPage();
+    }
+  }, [inView, hasNextLicensesPage, isFetchingNextLicensesPage, fetchNextLicensesPage]);
 
   if (validatorLicensesQuery.isLoading || dsoInfosQuery.isLoading) {
     return <Loading />;
@@ -92,8 +92,7 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
           </TableBody>
         </Table>
       </TableContainer>
-
-      <Box ref={ref} sx={{ alignSelf: 'center' }}>
+      <Box ref={ref} data-inview={inView} sx={{ alignSelf: 'center' }}>
         {isFetchingNextLicensesPage ? (
           <CircularProgress />
         ) : hasNextLicensesPage ? (

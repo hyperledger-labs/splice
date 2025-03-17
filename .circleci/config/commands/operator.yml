@@ -5,7 +5,17 @@ commands:
       pulumi_stack_names:
         type: string
         default: "canton-network"
+      expected_branch:
+        type: string
     steps:
+      - run_bash_command_in_nix:
+          cmd_name: Install pulumi dependencies
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: wait for all pulumi stacks to be updated.
           cluster: << parameters.cluster >>
@@ -14,7 +24,8 @@ commands:
           additional_nix_args: "--keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
-            EXPECTED_GIT_COMMIT=$(echo "refs/heads/$(git rev-parse --abbrev-ref HEAD)@sha1:$(git rev-parse HEAD)")
+            sha=$(git rev-parse << parameters.expected_branch >>)
+            EXPECTED_GIT_COMMIT=$(echo "refs/heads/<< parameters.expected_branch >>@sha1:$sha")
             wait_for_stack_updated() {
               local STACK_NAME=$1
               echo "waiting for stack $STACK_NAME being updated with commit $EXPECTED_GIT_COMMIT"
