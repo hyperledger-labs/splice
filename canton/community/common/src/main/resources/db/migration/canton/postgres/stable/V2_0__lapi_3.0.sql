@@ -75,9 +75,8 @@ CREATE TABLE lapi_ledger_end_synchronizer_index (
   synchronizer_id INTEGER PRIMARY KEY not null,
   sequencer_counter BIGINT,
   sequencer_timestamp BIGINT,
-  request_counter BIGINT,
-  request_timestamp BIGINT,
-  request_sequencer_counter BIGINT,
+  repair_timestamp BIGINT,
+  repair_counter BIGINT,
   record_time BIGINT NOT NULL
 );
 
@@ -145,7 +144,7 @@ CREATE TABLE lapi_events_assign (
     submitter integer,
 
     -- * shared event information
-    contract_id varchar collate "C" not null,
+    contract_id bytea not null,
     template_id integer not null,
     package_name integer not null,
     package_version integer, -- Can be null for LF 2.1
@@ -207,7 +206,7 @@ CREATE TABLE lapi_events_consuming_exercise (
     submitters integer[],
 
     -- * shared event information
-    contract_id varchar collate "C" not null,
+    contract_id bytea not null,
     template_id integer not null,
     package_name integer not null,
     flat_event_witnesses integer[] default '{}'::integer[] not null, -- stakeholders
@@ -264,7 +263,7 @@ CREATE TABLE lapi_events_create (
     submitters integer[],
 
     -- * shared event information
-    contract_id varchar collate "C" not null,
+    contract_id bytea not null,
     template_id integer not null,
     package_name integer not null,
     package_version integer, -- Can be null for LF 2.1
@@ -322,7 +321,7 @@ CREATE TABLE lapi_events_non_consuming_exercise (
     submitters integer[],
 
     -- * shared event information
-    contract_id varchar collate "C" not null,
+    contract_id bytea not null,
     template_id integer not null,
     package_name integer not null,
     tree_event_witnesses integer[] default '{}'::integer[] not null, -- informees
@@ -373,7 +372,7 @@ CREATE TABLE lapi_events_unassign (
     submitter integer,
 
     -- * shared event information
-    contract_id varchar collate "C" not null,
+    contract_id bytea not null,
     template_id integer not null,
     package_name integer not null,
     flat_event_witnesses integer[] default '{}'::integer[] not null, -- stakeholders

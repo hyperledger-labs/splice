@@ -6,17 +6,13 @@ import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, EnvironmentImpl}
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.PartyId
@@ -36,14 +32,14 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
   private val invalidValidator = "aliceValidatorInvalid"
   private val validatorPartyHint = s"imnotvalid_${(new scala.util.Random).nextInt(10000)}"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
       .addConfigTransformToFront((_, config) => {
+        val aliceValidatorName = InstanceName.tryCreate("aliceValidator")
         val aliceValidatorConfig = config
-          .validatorApps(InstanceName.tryCreate("aliceValidator"))
+          .validatorApps(aliceValidatorName)
         config.copy(
           validatorApps = config.validatorApps + (
             InstanceName.tryCreate(invalidValidator) ->
@@ -52,7 +48,11 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
                   validatorPartyHint = Some(validatorPartyHint),
                   ledgerApiUser = s"${aliceValidatorConfig.ledgerApiUser}2",
                 )
-          )
+          ) + (aliceValidatorName -> aliceValidatorConfig.copy(
+            validatorWalletUsers =
+              // Add a second wallet user to test that both get onboarded
+              aliceValidatorConfig.validatorWalletUsers :+ s"${aliceValidatorConfig.validatorWalletUsers.loneElement}-duplicate"
+          ))
         )
       })
       .addConfigTransformToFront((_, config) => {
@@ -108,6 +108,8 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       .contract
       .payload
       .dso shouldBe dsoParty.toProtoPrimitive
+    val users = aliceValidatorBackend.listUsers()
+    users should contain theSameElementsAs (aliceWalletClient.config.ledgerApiUser +: aliceValidatorBackend.config.validatorWalletUsers)
   }
 
   "validator apps connect to all DSO sequencers" in { implicit env =>
@@ -394,9 +396,9 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       "Wait for user to be listed",
       _ => {
         val usernames = aliceValidatorBackend.listUsers()
-        usernames should contain theSameElementsAs Seq(
-          aliceWalletClient.config.ledgerApiUser,
-          aliceValidatorBackend.config.validatorWalletUser.value,
+        usernames should contain theSameElementsAs (
+          aliceWalletClient.config.ledgerApiUser +:
+            aliceValidatorBackend.config.validatorWalletUsers
         )
       },
     )
@@ -430,8 +432,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       "Wait for the validator and wallet to report the user offboarded",
       _ => {
         val usernames = aliceValidatorBackend.listUsers()
-        usernames should contain theSameElementsAs (testUsers ++
-          Seq(aliceValidatorBackend.config.validatorWalletUser.value))
+        usernames should contain theSameElementsAs (testUsers ++ aliceValidatorBackend.config.validatorWalletUsers)
         assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend)
       },
     )

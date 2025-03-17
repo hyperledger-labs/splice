@@ -24,7 +24,7 @@ import org.slf4j.event.Level
 /** A registry of synchronizers. */
 trait SynchronizerRegistry extends AutoCloseable {
 
-  /**  Returns a synchronizer handle that is used to setup a connection to a new synchronizer
+  /** Returns a synchronizer handle that is used to setup a connection to a new synchronizer
     */
   def connect(
       config: SynchronizerConnectionConfig
@@ -34,7 +34,10 @@ trait SynchronizerRegistry extends AutoCloseable {
 
 }
 
-sealed trait SynchronizerRegistryError extends Product with Serializable with CantonError
+sealed trait SynchronizerRegistryError
+    extends Product
+    with Serializable
+    with ContextualizedCantonError
 
 object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
 
@@ -365,8 +368,8 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
 
 }
 
-/** A context handle serving all necessary information / connectivity utilities for the node to setup a connection to a
-  * new synchronizer
+/** A context handle serving all necessary information / connectivity utilities for the node to
+  * setup a connection to a new synchronizer
   */
 trait SynchronizerHandle extends AutoCloseable {
 

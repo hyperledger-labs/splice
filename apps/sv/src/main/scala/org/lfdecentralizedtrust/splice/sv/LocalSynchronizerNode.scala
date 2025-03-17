@@ -476,7 +476,7 @@ object LocalSynchronizerNode {
   def toSequencerConnection(config: ClientConfig, alias: SequencerAlias = SequencerAlias.Default) =
     new GrpcSequencerConnection(
       LocalSynchronizerNode.toEndpoints(config),
-      transportSecurity = config.tls.isDefined,
+      transportSecurity = config.tlsConfig.isDefined,
       customTrustCertificates = None,
       alias,
     )

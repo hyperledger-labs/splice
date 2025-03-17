@@ -12,6 +12,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.DeclarativeApiMetrics
 import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.EitherTUtil
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.{ExecutionContext, Future}
@@ -26,11 +27,16 @@ trait DeclarativeApiManager[NodeConfig <: LocalNodeConfig] {
 
   /** Once the node is started, we turn on the node state synchronisation
     *
-    * @param name the node name
-    * @param config the config of the node
-    * @param activeAdminToken used to obtain the admin token and at the same time check if the node is active
-    * @param metrics metrics which will be used to report on errors during state sync
-    * @param closeContext the close context of the node. the update runner will terminate when the node is closed
+    * @param name
+    *   the node name
+    * @param config
+    *   the config of the node
+    * @param activeAdminToken
+    *   used to obtain the admin token and at the same time check if the node is active
+    * @param metrics
+    *   metrics which will be used to report on errors during state sync
+    * @param closeContext
+    *   the close context of the node. the update runner will terminate when the node is closed
     */
   def started(
       name: String,
@@ -83,7 +89,7 @@ object DeclarativeApiManager {
               )
             }
           }
-          .getOrElse(EitherT.rightT(()))
+          .getOrElse(EitherTUtil.unit)
       }
 
       override def verifyConfig(name: String, config: C)(implicit
@@ -92,7 +98,6 @@ object DeclarativeApiManager {
         config.init.state
           .map(c => DeclarativeParticipantApi.readConfig(c.file).map(_ => ()))
           .getOrElse(Right(()))
-
     }
 
 }

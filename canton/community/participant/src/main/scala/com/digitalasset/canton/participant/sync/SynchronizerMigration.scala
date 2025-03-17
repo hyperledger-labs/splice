@@ -13,9 +13,8 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.error.{CantonError, ParentCantonError}
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
+import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError, ParentCantonError}
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
@@ -41,9 +40,14 @@ import com.digitalasset.canton.util.{ReassignmentTag, SameReassignmentType}
 
 import scala.concurrent.ExecutionContext
 
-sealed trait SynchronizerMigrationError extends Product with Serializable with CantonError
+sealed trait SynchronizerMigrationError
+    extends Product
+    with Serializable
+    with ContextualizedCantonError
 
-/** Migration of contracts from a source synchronizer to target synchronizer by re-associating them in the participant's persistent store. */
+/** Migration of contracts from a source synchronizer to target synchronizer by re-associating them
+  * in the participant's persistent store.
+  */
 class SynchronizerMigration(
     aliasManager: SynchronizerAliasManager,
     synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
@@ -55,6 +59,7 @@ class SynchronizerMigration(
       Unit,
     ],
     sequencerInfoLoader: SequencerInfoLoader,
+    batchingConfig: BatchingConfig,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -137,9 +142,9 @@ class SynchronizerMigration(
   }
 
   /** Checks whether the migration is possible:
-    * - Participant needs to be disconnected from both synchronizers.
-    * - No in-flight submission (except if `force = true`)
-    * - No dirty request (except if `force = true`)
+    *   - Participant needs to be disconnected from both synchronizers.
+    *   - No in-flight submission (except if `force = true`)
+    *   - No dirty request (except if `force = true`)
     */
   def isSynchronizerMigrationPossible(
       source: Source[SynchronizerAlias],
@@ -213,8 +218,8 @@ class SynchronizerMigration(
             .leftWiden[SyncServiceError]
     } yield targetSynchronizerInfo
 
-  /** Performs the synchronizer migration.
-    * Assumes that [[isSynchronizerMigrationPossible]] was called before to check preconditions.
+  /** Performs the synchronizer migration. Assumes that [[isSynchronizerMigrationPossible]] was
+    * called before to check preconditions.
     */
   def migrateSynchronizer(
       source: Source[SynchronizerAlias],
@@ -313,8 +318,7 @@ class SynchronizerMigration(
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SynchronizerMigrationError, Unit] = {
-    // TODO(i9270) parameter should be configurable
-    val batchSize = PositiveInt.tryCreate(100)
+    val batchSize = batchingConfig.maxItemsInBatch
     for {
       // load all contracts on source synchronizer
       acs <- performUnlessClosingEitherUSF(functionFullName)(

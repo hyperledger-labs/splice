@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageRef, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, Qua
 import scala.concurrent.{ExecutionContext, Future}
 
 abstract class PackageIdResolver()(implicit ec: ExecutionContext) {
-  def resolvePackageId(
+  protected def resolvePackageId(
       templateId: QualifiedName
   )(implicit tc: TraceContext): Future[String]
 
@@ -84,6 +84,29 @@ abstract class PackageIdResolver()(implicit ec: ExecutionContext) {
 }
 
 object PackageIdResolver {
+
+  private class CantonTopologyAwarePackageIdResolver(
+      extraModules: Map[String, PackageName]
+  ) extends PackageIdResolver()(ExecutionContext.global) {
+
+    override protected def resolvePackageId(templateId: QualifiedName)(implicit
+        tc: TraceContext
+    ): Future[String] = Future.successful(
+      PackageRef
+        .Name(
+          modulePackages
+            .get(templateId.moduleName)
+            .map(_.packageName)
+            .getOrElse(
+              extraModules(
+                templateId.moduleName
+              )
+            )
+        )
+        .toString()
+    )
+  }
+
   trait HasAmuletRules {
     def getAmuletRules()(implicit
         tc: TraceContext
@@ -137,7 +160,8 @@ object PackageIdResolver {
     * Templates not covered by AmuletRules can be specified in `extraPackageIdResolver`
     * which takes precedence over AmuletRules.
     */
-  def inferFromAmuletRules(
+  def inferFromAmuletRulesIfEnabled(
+      enableCantonPackageSelection: Boolean,
       clock: Clock,
       amuletRulesFetcher: HasAmuletRules,
       loggerFactory0: NamedLoggerFactory,
@@ -148,46 +172,50 @@ object PackageIdResolver {
       // Resolver that is checked when none of the standard packages match.
       extraPackageIdResolver: (splice.amuletconfig.PackageConfig, QualifiedName) => Option[String] =
         (_, _) => None,
-  )(implicit ec: ExecutionContext) = new PackageIdResolver with NamedLogging {
+      extraModules: Map[String, PackageName] = Map.empty,
+  )(implicit ec: ExecutionContext): PackageIdResolver = if (enableCantonPackageSelection) {
+    new CantonTopologyAwarePackageIdResolver(extraModules)
+  } else
+    new PackageIdResolver with NamedLogging {
 
-    override val loggerFactory = loggerFactory0
+      override val loggerFactory: NamedLoggerFactory = loggerFactory0
 
-    private def fromAmuletRules(
-        packageConfig: splice.amuletconfig.PackageConfig,
-        name: QualifiedName,
-    ): Option[String] = {
-      modulePackages
-        .get(name.moduleName)
-        .map { pkg =>
-          val version = readPackageVersion(packageConfig, pkg)
-          DarResources
-            .lookupPackageMetadata(pkg.packageName, version)
-            .fold(
-              throw new IllegalArgumentException(
-                s"No package with name ${pkg.packageName} and version ${version} is known"
-              )
-            )(_.packageId)
-        }
-    }
-
-    override def resolvePackageId(
-        name: QualifiedName
-    )(implicit tc: TraceContext): Future[String] = {
-      val pkgId = bootstrapPackageIdResolver(name) match {
-        case None =>
-          amuletRulesFetcher.getAmuletRules().map { amuletRules =>
-            val schedule = AmuletConfigSchedule(amuletRules)
-            val config = schedule.getConfigAsOf(clock.now)
-            fromAmuletRules(config.packageConfig, name)
-              .orElse(extraPackageIdResolver(config.packageConfig, name))
-              .getOrElse(throw new IllegalArgumentException(s"Unknown template $name"))
+      private def fromAmuletRules(
+          packageConfig: splice.amuletconfig.PackageConfig,
+          name: QualifiedName,
+      ): Option[String] = {
+        modulePackages
+          .get(name.moduleName)
+          .map { pkg =>
+            val version = readPackageVersion(packageConfig, pkg)
+            DarResources
+              .lookupPackageMetadata(pkg.packageName, version)
+              .fold(
+                throw new IllegalArgumentException(
+                  s"No package with name ${pkg.packageName} and version $version is known"
+                )
+              )(_.packageId)
           }
-        case Some(pkgId) => Future.successful(pkgId)
       }
-      logger.trace(s"Resolving template $name to package id $pkgId")
-      pkgId
+
+      override def resolvePackageId(
+          name: QualifiedName
+      )(implicit tc: TraceContext): Future[String] = {
+        val pkgId = bootstrapPackageIdResolver(name) match {
+          case None =>
+            amuletRulesFetcher.getAmuletRules().map { amuletRules =>
+              val schedule = AmuletConfigSchedule(amuletRules)
+              val config = schedule.getConfigAsOf(clock.now)
+              fromAmuletRules(config.packageConfig, name)
+                .orElse(extraPackageIdResolver(config.packageConfig, name))
+                .getOrElse(throw new IllegalArgumentException(s"Unknown template $name"))
+            }
+          case Some(pkgId) => Future.successful(pkgId)
+        }
+        logger.trace(s"Resolving template $name to package id $pkgId")
+        pkgId
+      }
     }
-  }
 
   def readPackageVersion(
       packageConfig: splice.amuletconfig.PackageConfig,
@@ -260,6 +288,7 @@ object PackageIdResolver {
   }
 
   object Package {
+
     object TokenStandard {
       final case object TokenMetadata extends Package
       final case object TokenHolding extends Package

@@ -1,17 +1,19 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms.driver.testing.v1
 
 import com.digitalasset.canton.crypto.CryptoTestHelper.TestMessage
 import com.digitalasset.canton.crypto.kms.driver.api.v1.*
 import com.digitalasset.canton.crypto.{Signature, SignatureFormat, SigningKeyUsage}
+import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, crypto}
 import com.google.protobuf.ByteString
 import io.opentelemetry.context.Context
 import io.scalaland.chimney.dsl.*
 import org.scalatest.wordspec.AsyncWordSpec
+import org.slf4j.Logger
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -28,13 +30,21 @@ trait KmsDriverTest extends AsyncWordSpec with BaseTest with HasExecutionContext
 
   protected val predefinedSymmetricKey: Option[String] = None
 
+  protected lazy val emptyContext = Context.root()
+
   /** Create a new specific KMS Driver instance */
   protected def newKmsDriver(): KmsDriver
 
+  protected def simpleLoggerFactory(clazz: Class[_]): Logger =
+    loggerFactory.getLogger(clazz).underlying
+
   /** Test Suite for a KMS Driver.
+    *
     * A new driver is created using `newKmsDriver` if necessary.
     *
-    * @param allowKeyGeneration Allow the generation of keys during the test. If false, the predefined keys have to be configured.
+    * @param allowKeyGeneration
+    *   Allow the generation of keys during the test. If false, the predefined keys have to be
+    *   configured.
     */
   def kmsDriver(allowKeyGeneration: Boolean): Unit = {
 
@@ -53,7 +63,6 @@ trait KmsDriverTest extends AsyncWordSpec with BaseTest with HasExecutionContext
           driver.supportedEncryptionAlgoSpecs,
         )
 
-      val emptyContext = Context.root()
       val testData = "test".getBytes
 
       "report health eventually as ok" in {
@@ -130,7 +139,8 @@ trait KmsDriverTest extends AsyncWordSpec with BaseTest with HasExecutionContext
             kmsPublicKey <- driver.getPublicKey(keyId)(emptyContext)
             kmsSignature <- driver.sign(testData, keyId, signingAlgoSpec)(emptyContext)
           } yield {
-            val publicKey = KmsDriverTestUtils.signingPublicKey(kmsPublicKey)
+            val usage = SigningKeyUsage.ProtocolOnly
+            val publicKey = KmsDriverTestUtils.signingPublicKey(kmsPublicKey, usage)
             val cryptoSigningAlgoSpec = signingAlgoSpec.transformInto[crypto.SigningAlgorithmSpec]
             val signatureFormat = SignatureFormat.fromSigningAlgoSpec(cryptoSigningAlgoSpec)
             val signature = Signature.create(
@@ -143,7 +153,7 @@ trait KmsDriverTest extends AsyncWordSpec with BaseTest with HasExecutionContext
               ByteString.copyFrom(testData),
               publicKey,
               signature,
-              SigningKeyUsage.ProtocolOnly,
+              usage,
             ) shouldBe Right(())
           }
         }
@@ -152,7 +162,7 @@ trait KmsDriverTest extends AsyncWordSpec with BaseTest with HasExecutionContext
       "fail to sign with unknown key id" in {
         val keyId = "invalid"
 
-        loggerFactory.assertLogs(
+        loggerFactory.assertLogsUnorderedOptional(
           driver
             .sign(
               testData,
@@ -162,8 +172,11 @@ trait KmsDriverTest extends AsyncWordSpec with BaseTest with HasExecutionContext
             )(emptyContext)
             .failed
             .futureValue shouldBe a[KmsDriverException],
-          _.warningMessage should include(
-            "KMS operation `signing with key KmsKeyId(invalid)` failed"
+          (
+            LogEntryOptionality.Optional,
+            _.warningMessage should include(
+              "KMS operation `signing with key KmsKeyId(invalid)` failed"
+            ),
           ),
         )
       }

@@ -29,13 +29,19 @@ import scala.concurrent.ExecutionContext
 
 /** Bundle together some data needed to route the transaction.
   *
-  * @param requiredPackagesPerParty Required packages per informee of the transaction
-  * @param actAs Act as of the submitted command
-  * @param readAs Read as of the submitted command
-  * @param inputContractsSynchronizerData Information about the input contracts
-  * @param prescribedSynchronizerIdO If non-empty, thInvalidWorkflowIde prescribed synchronizer will be chosen for routing.
-  *                          In case this synchronizer is not admissible, submission will fail.
-  * @param externallySignedSubmissionO Data for externally signed transactions. Can be empty.
+  * @param requiredPackagesPerParty
+  *   Required packages per informee of the transaction
+  * @param actAs
+  *   Act as of the submitted command
+  * @param readAs
+  *   Read as of the submitted command
+  * @param inputContractsSynchronizerData
+  *   Information about the input contracts
+  * @param prescribedSynchronizerIdO
+  *   If non-empty, thInvalidWorkflowIde prescribed synchronizer will be chosen for routing. In case
+  *   this synchronizer is not admissible, submission will fail.
+  * @param externallySignedSubmissionO
+  *   Data for externally signed transactions. Can be empty.
   */
 private[routing] final case class TransactionData private (
     transaction: LfVersionedTransaction,
@@ -59,7 +65,7 @@ private[routing] object TransactionData {
       externallySignedSubmissionO: Option[ExternallySignedSubmission],
       transaction: LfVersionedTransaction,
       ledgerTime: CantonTimestamp,
-      synchronizerStateProvider: SynchronizerStateProvider,
+      synchronizerState: RoutingSynchronizerState,
       contractsStakeholders: Map[LfContractId, Stakeholders],
       disclosedContracts: Seq[LfContractId],
       prescribedSynchronizerIdO: Option[SynchronizerId],
@@ -71,7 +77,7 @@ private[routing] object TransactionData {
       contractsSynchronizerData <-
         ContractsSynchronizerData
           .create(
-            synchronizerStateProvider,
+            synchronizerState,
             contractsStakeholders,
             disclosedContracts = disclosedContracts,
           )
@@ -94,7 +100,7 @@ private[routing] object TransactionData {
       submitterInfo: SubmitterInfo,
       transaction: LfVersionedTransaction,
       ledgerTime: CantonTimestamp,
-      synchronizerStateProvider: SynchronizerStateProvider,
+      synchronizerState: RoutingSynchronizerState,
       inputContractStakeholders: Map[LfContractId, Stakeholders],
       disclosedContracts: Seq[LfContractId],
       prescribedSynchronizerO: Option[SynchronizerId],
@@ -120,7 +126,7 @@ private[routing] object TransactionData {
         externallySignedSubmissionO = submitterInfo.externallySignedSubmission,
         transaction,
         ledgerTime,
-        synchronizerStateProvider,
+        synchronizerState,
         inputContractStakeholders,
         disclosedContracts,
         prescribedSynchronizerO,

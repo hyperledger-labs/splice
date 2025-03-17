@@ -51,7 +51,7 @@ class DomainConnector(
         .flatMap {
           case Some(_) =>
             participantAdminConnection
-              .listConnectedDomain()
+              .listConnectedDomains()
               .map(
                 _.find(_.synchronizerAlias == config.domains.global.alias).fold(
                   throw Status.FAILED_PRECONDITION

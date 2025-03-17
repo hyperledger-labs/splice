@@ -7,6 +7,8 @@ import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.command_service.*
 import com.daml.ledger.api.v2.command_submission_service.{SubmitRequest, SubmitResponse}
 import com.daml.ledger.api.v2.commands.Commands
+import com.daml.ledger.api.v2.transaction_filter.Filters
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.daml.ledger.api.v2.update_service.{
   GetTransactionByIdRequest,
   GetTransactionResponse,
@@ -20,6 +22,7 @@ import com.digitalasset.canton.ledger.api.services.CommandService
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.api.validation.CommandsValidator
 import com.digitalasset.canton.ledger.error.CommonErrors
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{
   LedgerErrorLoggingContext,
@@ -35,7 +38,7 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.{
 }
 import com.digitalasset.canton.platform.apiserver.services.{ApiCommandService, logging}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import io.grpc.{Context, Deadline}
+import io.grpc.{Context, Deadline, Status}
 
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -68,7 +71,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
       request: SubmitAndWaitRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitResponse] =
     withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
-      submitAndWaitInternal(request)(errorLogger, traceContext).map { response =>
+      submitAndWaitInternal(request.commands)(errorLogger, traceContext).map { response =>
         SubmitAndWaitResponse.of(
           updateId = response.completion.updateId,
           completionOffset = response.completion.offset,
@@ -77,17 +80,47 @@ private[apiserver] final class CommandServiceImpl private[services] (
     }
 
   def submitAndWaitForTransaction(
-      request: SubmitAndWaitRequest
+      request: SubmitAndWaitForTransactionRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForTransactionResponse] =
     withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
-      submitAndWaitInternal(request)(errorLogger, traceContext).flatMap { resp =>
-        val effectiveActAs = CommandsValidator.effectiveSubmitters(request.getCommands).actAs
+      submitAndWaitInternal(request.commands)(errorLogger, traceContext).flatMap { resp =>
+        val updateId = resp.completion.updateId
         val txRequest = GetTransactionByIdRequest(
-          updateId = resp.completion.updateId,
-          requestingParties = effectiveActAs.toList,
+          updateId = updateId,
+          transactionFormat = request.transactionFormat,
         )
         transactionServices
           .getTransactionById(txRequest)
+          .recoverWith {
+            case e: io.grpc.StatusRuntimeException
+                if e.getStatus.getCode == Status.Code.NOT_FOUND
+                  && e.getStatus.getDescription.contains(
+                    RequestValidationErrors.NotFound.Transaction.id
+                  ) =>
+              logger.debug(
+                s"Transaction not found in transaction lookup for updateId $updateId, falling back to LedgerEffects lookup without events."
+              )(traceContext)
+              // When a command submission completes successfully,
+              // the submitters can end up getting a TRANSACTION_NOT_FOUND when querying its corresponding AcsDelta
+              // transaction that either:
+              // * has only non-consuming events
+              // * has only events of contracts which have stakeholders that are not amongst the requesting parties
+              // or in general when filters defined in the transactionFormat exclude all the events from the
+              // transaction.
+              // In these situations, we fallback to a LedgerEffects transaction lookup with a wildcard filter and
+              // populate the transaction response  with its details but no events.
+              transactionServices
+                .getTransactionById(
+                  txRequest
+                    .update(
+                      _.transactionFormat.transactionShape := TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                      _.transactionFormat.eventFormat.modify(_.clearFiltersForAnyParty),
+                      _.transactionFormat.eventFormat.filtersForAnyParty := Filters(),
+                    )
+                    .clearRequestingParties
+                )
+                .map(_.update(_.transaction.modify(_.clearEvents)))
+          }
           .map(transactionResponse =>
             SubmitAndWaitForTransactionResponse
               .of(
@@ -101,7 +134,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
       request: SubmitAndWaitRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForTransactionTreeResponse] =
     withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
-      submitAndWaitInternal(request)(errorLogger, traceContext).flatMap { resp =>
+      submitAndWaitInternal(request.commands)(errorLogger, traceContext).flatMap { resp =>
         val effectiveActAs = CommandsValidator.effectiveSubmitters(request.getCommands).actAs
         val txRequest = GetTransactionByIdRequest(
           updateId = resp.completion.updateId,
@@ -114,7 +147,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
     }
 
   private def submitAndWaitInternal(
-      request: SubmitAndWaitRequest
+      commands: Option[Commands]
   )(implicit
       errorLogger: ContextualizedErrorLogger,
       traceContext: TraceContext,
@@ -127,7 +160,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
       else Future.unit
 
     def ensureCommandsPopulated: Commands =
-      request.commands.getOrElse(
+      commands.getOrElse(
         throw new IllegalArgumentException("Missing commands field in request")
       )
 

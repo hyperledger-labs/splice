@@ -3,17 +3,19 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -47,11 +49,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  EnvironmentImpl,
-  ParticipantAdminConnection,
-  RetryFor,
-}
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
@@ -120,8 +118,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
@@ -182,7 +179,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               bobValidatorConfig
                 .copy(
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(5902)),
+                    FullClientConfig(port = Port.tryCreate(5902)),
                     bobValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -208,7 +205,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     )
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27502)),
+                    FullClientConfig(port = Port.tryCreate(27502)),
                     aliceValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -247,7 +244,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     )
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27702)),
+                    FullClientConfig(port = Port.tryCreate(27702)),
                     splitwellValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         splitwellValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -313,7 +310,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     Some(Port.tryCreate(27113))
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27702)),
+                    FullClientConfig(port = Port.tryCreate(27702)),
                     splitwellBackendConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         splitwellBackendConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -346,7 +343,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 adminApi =
                   aliceSplitwellAppClientConfig.adminApi.copy(url = Uri("http://127.0.0.1:27113")),
                 participantClient = ParticipantClientConfig(
-                  ClientConfig(port = Port.tryCreate(27502)),
+                  FullClientConfig(port = Port.tryCreate(27502)),
                   aliceSplitwellAppClientConfig.participantClient.ledgerApi.copy(
                     clientConfig =
                       aliceSplitwellAppClientConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -461,6 +458,18 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       }
     }
 
+    createSomeParticipantUsersState(
+      sv2Backend.participantClient,
+      sv2Backend.getDsoInfo().svParty,
+      false,
+    )
+    val (sv2IdpcsBeforeMigration, sv2UsersBeforeMigration, sv2RightsBeforeMigration) =
+      // we ignore annotations we set ourselves because some of these change during the migration (like the migration ID)
+      getParticipantUsersState(
+        sv2ValidatorBackend.participantClient,
+        discardAnnotations = Some("network.canton.global"),
+      )
+
     def startValidatorAndTapAmulet(
         validatorBackend: ValidatorAppBackendReference,
         walletClient: WalletAppClientReference,
@@ -564,6 +573,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
         createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
       }
+      createSomeParticipantUsersState(
+        aliceValidatorBackend.participantClient,
+        charlieUserParty,
+        true,
+      )
+      val (aliceIdpcsBeforeMigration, aliceUsersBeforeMigration, aliceRightsBeforeMigration) =
+        getParticipantUsersState(aliceValidatorBackend.participantClient)
 
       val sequencerUrlSetBeforeUpgrade =
         clue("validator should connect to all sequencer urls on the old network") {
@@ -626,7 +642,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           val domainDynamicParams =
             sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
               .list(
-                decentralizedSynchronizerId.filterString
+                store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId)
               )
               .headOption
               .value
@@ -945,6 +961,28 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 sequencerUrlSet should have size 4
                 sequencerUrlSet.intersect(sequencerUrlSetBeforeUpgrade) shouldBe Set.empty
               }
+            }
+
+            clue("Alice's participant users state was preserved") {
+              val (aliceIdpcsAfterMigration, aliceUsersAfterMigration, aliceRightsAfterMigration) =
+                getParticipantUsersState(
+                  aliceValidatorLocal.participantClient,
+                  discardAnnotations = Some("acs_import"),
+                )
+              aliceIdpcsAfterMigration should contain theSameElementsAs aliceIdpcsBeforeMigration
+              aliceUsersAfterMigration should contain theSameElementsAs aliceUsersBeforeMigration
+              aliceRightsAfterMigration should contain theSameElementsAs aliceRightsBeforeMigration
+            }
+
+            clue("SV2's participant users state was preserved") {
+              val (sv2IdpcsAfterMigration, sv2UsersAfterMigration, sv2RightsAfterMigration) =
+                getParticipantUsersState(
+                  sv2LocalBackend.participantClient,
+                  discardAnnotations = Some("network.canton.global"),
+                )
+              sv2IdpcsAfterMigration should contain theSameElementsAs sv2IdpcsBeforeMigration
+              sv2UsersAfterMigration should contain theSameElementsAs sv2UsersBeforeMigration
+              sv2RightsAfterMigration should contain theSameElementsAs sv2RightsBeforeMigration
             }
 
             startValidatorAndTapAmulet(
@@ -1329,6 +1367,146 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String =
     sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+
+  private def createSomeParticipantUsersState(
+      participant: ParticipantClientReference,
+      someExistingParty: PartyId,
+      createNewParties: Boolean,
+  ) = {
+    // for test isolation
+    val suffix = (new scala.util.Random).nextInt().toHexString.toLowerCase
+
+    val idpcsOriginally = participant.ledger_api.identity_provider_config.list()
+    val usersOriginally = participant.ledger_api.users.list().users
+
+    val someParties = Seq(someExistingParty) ++ {
+      if (createNewParties) {
+        clue("Create fresh parties for fresh users") {
+          // more than just users state, but allocating fresh parties makes it easier to create interesting users
+          Seq(someExistingParty) ++ {
+            for (i <- 0 to 2)
+              yield participant.ledger_api.parties.allocate(s"fake-party-${i}-${suffix}").party
+          }
+        }
+      } else {
+        Seq()
+      }
+    }
+    actAndCheck(
+      "Create some participant users state", {
+        participant.ledger_api.identity_provider_config.create(
+          s"fake-idp-enabled-${suffix}",
+          false,
+          "https://jwks.fake.com",
+          s"https://issuer-${suffix}.fake.com",
+          None,
+        )
+        participant.ledger_api.identity_provider_config.create(
+          s"fake-idp-disabled-${suffix}",
+          true,
+          "https://jwks2.fake.com",
+          s"https://issuer-2-${suffix}.fake.com",
+          Some(s"https://${suffix}.fake.com"),
+        )
+        participant.ledger_api.users.create(
+          s"fake-user-0-${suffix}",
+          Set(someParties(0)),
+          Option(someParties(0)),
+          Set(),
+          false,
+          false,
+          true,
+          Map("fake-key-1" -> "fake-value-1"),
+          s"fake-idp-enabled-${suffix}",
+          false,
+        )
+        if (createNewParties) {
+          participant.ledger_api.users.create(
+            s"fake-user-1-${suffix}",
+            Set(someParties(1)),
+            Option(someParties(1)),
+            Set(someParties(3)),
+            true,
+            true,
+            true,
+            Map("fake-key-2" -> "fake-value-2", "fake-key-3" -> "fake-value-3"),
+            s"fake-idp-enabled-${suffix}",
+            true,
+          )
+          participant.ledger_api.users.create(
+            s"fake-user-2-${suffix}",
+            Set(someParties(2)),
+            None,
+            Set(),
+            false,
+            false,
+            false,
+            Map.empty,
+            s"fake-idp-disabled-${suffix}",
+            false,
+          )
+          participant.ledger_api.users.create(
+            s"fake-user-3-${suffix}",
+            Set(),
+            None,
+            Set(someParties(3)),
+            false,
+            false,
+            true,
+            Map("fake-key-4" -> "fake-value-4"),
+            "",
+            false,
+          )
+        }
+      },
+    )(
+      "Participant users state created",
+      _ => {
+
+        val (
+          idpcs,
+          users,
+          _,
+        ) = getParticipantUsersState(participant)
+        idpcs.length shouldBe idpcsOriginally.length + 2
+        users.length should be >= usersOriginally.length + { if (createNewParties) 4 else 1 }
+      },
+    )
+  }
+
+  private def getParticipantUsersState(
+      participant: ParticipantClientReference,
+      discardAnnotations: Option[String] = None,
+  ): (Seq[IdentityProviderConfig], Seq[User], Map[String, UserRights]) = {
+    val idpcs = participant.ledger_api.identity_provider_config.list()
+    // the `Seq("")` is so we also get the users that have no explicit idp set
+    val users = (Seq("") ++ idpcs.map(_.identityProviderId.value))
+      .map { idp =>
+        participant.ledger_api.users.list(identityProviderId = idp).users
+      }
+      .flatten
+      .map((user: User) =>
+        discardAnnotations match {
+          case Some(substring) =>
+            user.copy(annotations = user.annotations.filter { case (key, _) =>
+              !key.contains(substring)
+            })
+          case None =>
+            user
+        }
+      )
+    val rights =
+      users
+        .map(user =>
+          (user.id, participant.ledger_api.users.rights.list(user.id, user.identityProviderId))
+        )
+        .toMap
+    (
+      idpcs,
+      users,
+      rights,
+    )
+  }
 }
 
 object DecentralizedSynchronizerMigrationIntegrationTest extends OptionValues {

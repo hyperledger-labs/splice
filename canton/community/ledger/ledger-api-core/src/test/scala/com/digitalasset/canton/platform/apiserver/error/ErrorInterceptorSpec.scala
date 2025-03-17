@@ -286,8 +286,10 @@ final class ErrorInterceptorSpec
     Assertions.succeed
   }
 
-  /** @param useSelfService            - whether to use self service error codes or "rogue" exceptions
-    * @param errorInsideFutureOrStream - whether to signal the exception inside a Future or a Stream, or outside to them
+  /** @param useSelfService
+    *   whether to use self service error codes or "rogue" exceptions
+    * @param errorInsideFutureOrStream
+    *   whether to signal the exception inside a Future or a Stream, or outside to them
     */
   class HelloServiceFailing(
       useSelfService: Boolean,
@@ -367,7 +369,7 @@ object ErrorInterceptorSpec {
 
     final case class Error(msg: String)(implicit
         val loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+    ) extends ContextualizedDamlError(
           cause = s"Foo is missing: $msg"
         )
 

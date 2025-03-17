@@ -110,6 +110,7 @@ abstract class BlockSequencerFactory(
       orderingTimeFixMode: OrderingTimeFixMode,
       initialBlockHeight: Option[Long],
       sequencerSnapshot: Option[SequencerSnapshot],
+      authenticationServices: Option[AuthenticationServices],
       synchronizerLoggerFactory: NamedLoggerFactory,
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
@@ -181,6 +182,7 @@ abstract class BlockSequencerFactory(
       trafficConfig: SequencerTrafficConfig,
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot] = None,
+      authenticationServices: Option[AuthenticationServices] = None,
   )(implicit
       traceContext: TraceContext,
       tracer: trace.Tracer,
@@ -260,6 +262,7 @@ abstract class BlockSequencerFactory(
         orderingTimeFixMode,
         initialBlockHeight,
         sequencerSnapshot,
+        authenticationServices,
         synchronizerLoggerFactory,
         runtimeReady,
       )
@@ -275,15 +278,15 @@ abstract class BlockSequencerFactory(
 
 object BlockSequencerFactory {
 
-  /** Whether a sequencer implementation requires `BlockUpdateGenerator` to adjust ordering timestamps
-    * to ensure they are strictly increasing or just validate that they are.
+  /** Whether a sequencer implementation requires `BlockUpdateGenerator` to adjust ordering
+    * timestamps to ensure they are strictly increasing or just validate that they are.
     */
   sealed trait OrderingTimeFixMode
 
   object OrderingTimeFixMode {
 
-    /** Ordering timestamps are not necessarily unique or increasing.
-      * Clients should adjust timestamps to enforce that.
+    /** Ordering timestamps are not necessarily unique or increasing. Clients should adjust
+      * timestamps to enforce that.
       */
     final case object MakeStrictlyIncreasing extends OrderingTimeFixMode
 

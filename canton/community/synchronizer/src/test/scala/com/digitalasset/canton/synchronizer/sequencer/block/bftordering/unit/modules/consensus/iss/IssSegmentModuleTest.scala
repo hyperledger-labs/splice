@@ -8,6 +8,7 @@ import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose, Signatu
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Epoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModule.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.EpochInProgress
@@ -16,7 +17,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   EpochStore,
   Genesis,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.leaders.SimpleLeaderSelectionPolicy
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.{
   EpochMetricsAccumulator,
   IssSegmentModule,
@@ -106,6 +106,7 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
     BlockNumber(10L),
     DefaultEpochLength,
     Genesis.GenesisTopologyActivationTime,
+    Genesis.GenesisPreviousEpochMaxBftTime,
   )
   private val block9Commits1Node = Seq(
     Commit
@@ -521,6 +522,10 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
                 ) =>
           }
         }
+        val blockMetadata = blockMetadata4Nodes(blockOrder4Nodes.indexOf(selfId))
+        consensus.receive(
+          ConsensusSegment.ConsensusMessage.PrePrepareStored(blockMetadata, ViewNumber.First)
+        )
         context.runPipedMessagesThenVerifyAndReceiveOnModule(consensus) { x =>
           x should matchPattern {
             case MessageFromPipeToSelf(
@@ -529,7 +534,6 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
                 ) =>
           }
         }
-        val blockMetadata = blockMetadata4Nodes(blockOrder4Nodes.indexOf(selfId))
         val expectedPrePrepare = PrePrepare.create(
           blockMetadata,
           ViewNumber.First,
@@ -555,9 +559,6 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
         p2pBuffer.clear()
 
         // Prepares from follower peers should trigger sending Commit for the first block
-        consensus.receive(
-          ConsensusSegment.ConsensusMessage.PrePrepareStored(blockMetadata, ViewNumber.First)
-        )
         consensus.receive(PbftSignedNetworkMessage(basePrepare(from = otherPeers(0))))
         consensus.receive(PbftSignedNetworkMessage(basePrepare(from = otherPeers(1))))
         context.runPipedMessagesThenVerifyAndReceiveOnModule(consensus) { x =>
@@ -776,6 +777,9 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
                 ) =>
           }
         }
+        consensus.receive(
+          ConsensusSegment.ConsensusMessage.PrePrepareStored(block10Metadata1Node, ViewNumber.First)
+        )
         context.runPipedMessagesThenVerifyAndReceiveOnModule(consensus) { x =>
           x should matchPattern {
             case MessageFromPipeToSelf(
@@ -784,9 +788,6 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
                 ) =>
           }
         }
-        consensus.receive(
-          ConsensusSegment.ConsensusMessage.PrePrepareStored(block10Metadata1Node, ViewNumber.First)
-        )
         context.runPipedMessagesThenVerifyAndReceiveOnModule(consensus) { x =>
           x should matchPattern {
             case MessageFromPipeToSelf(
@@ -872,6 +873,14 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
             P2PNetworkOut.BftOrderingNetworkMessage.ConsensusMessage(expectedNewView),
             Set.empty,
           ),
+        )
+        p2pBuffer.clear()
+
+        consensus.receive(
+          ConsensusSegment.ConsensusMessage
+            .NewViewStored(BlockMetadata.mk(EpochNumber.First, BlockNumber.First), nextView)
+        )
+        p2pBuffer shouldBe ArrayBuffer(
           P2PNetworkOut.Multicast(
             P2PNetworkOut.BftOrderingNetworkMessage.ConsensusMessage(
               prepareFromPrePrepare(bottomBlock1.message)(from = selfId)
@@ -890,11 +899,6 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
         //   - delayCount=3 for nested view change timer
         //   - delayCount=4 when view change completed; expecting consensus to resume on incomplete blocks
         context.delayedMessages.size shouldBe 4
-
-        consensus.receive(
-          ConsensusSegment.ConsensusMessage
-            .NewViewStored(BlockMetadata.mk(EpochNumber.First, BlockNumber.First), nextView)
-        )
 
         context.runPipedMessagesThenVerifyAndReceiveOnModule(consensus) { x =>
           x should matchPattern {
@@ -1110,10 +1114,6 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
             ),
             Set.empty,
           ),
-          P2PNetworkOut.Multicast(
-            P2PNetworkOut.BftOrderingNetworkMessage.ConsensusMessage(prepareBottomBlock0),
-            Set.empty,
-          ),
         )
         p2pBuffer.clear()
 
@@ -1121,8 +1121,15 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
           ConsensusSegment.ConsensusMessage
             .NewViewStored(BlockMetadata.mk(EpochNumber.First, BlockNumber.First), SecondViewNumber)
         )
-        context.runPipedMessagesAndReceiveOnModule(consensus)
+        p2pBuffer should contain theSameElementsInOrderAs Seq[P2PNetworkOut.Message](
+          P2PNetworkOut.Multicast(
+            P2PNetworkOut.BftOrderingNetworkMessage.ConsensusMessage(prepareBottomBlock0),
+            Set.empty,
+          )
+        )
+        p2pBuffer.clear()
 
+        context.runPipedMessagesAndReceiveOnModule(consensus)
         p2pBuffer should contain only P2PNetworkOut.Multicast(
           P2PNetworkOut.BftOrderingNetworkMessage.ConsensusMessage(commitBottomBlock0),
           Set.empty,
@@ -1719,16 +1726,21 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
       epochStore: EpochStore[E] = new InMemoryUnitTestEpochStore[E](),
       epochInProgress: EpochStore.EpochInProgress = EpochStore.EpochInProgress(),
   )(
-      epochInfo: EpochInfo =
-        GenesisEpoch.info.next(epochLength, Genesis.GenesisTopologyActivationTime)
+      epochInfo: EpochInfo = GenesisEpoch.info.next(
+        epochLength,
+        Genesis.GenesisTopologyActivationTime,
+        Genesis.GenesisPreviousEpochMaxBftTime,
+      )
   ): IssSegmentModule[E] = {
+    implicit val metricsContext: MetricsContext = MetricsContext.Empty
+    implicit val config: BftBlockOrderer.Config = BftBlockOrderer.Config()
+
     val epoch = {
-      val membership = Membership(selfId, otherPeers = otherPeers)
+      val membership = Membership.forTesting(selfId, otherPeers = otherPeers)
       Epoch(
         epochInfo,
         currentMembership = membership,
         previousMembership = membership,
-        SimpleLeaderSelectionPolicy,
       )
     }
     val segmentState = {
@@ -1741,7 +1753,7 @@ class IssSegmentModuleTest extends AsyncWordSpec with BaseTest with HasExecution
         fail(_),
         SequencerMetrics.noop(getClass.getSimpleName).bftOrdering,
         loggerFactory,
-      )(MetricsContext.Empty)
+      )
     }
     new IssSegmentModule[E](
       epoch,
@@ -1779,10 +1791,22 @@ private object IssSegmentModuleTest {
   private val fullTopology = OrderingTopology(allPeers.toSet)
   private val aBatchId = BatchId.createForTesting("A batch id")
   private val oneRequestOrderingBlock1Ack = OrderingBlock(
-    Seq(ProofOfAvailability(aBatchId, Seq(AvailabilityAck(selfId, Signature.noSignature))))
+    Seq(
+      ProofOfAvailability(
+        aBatchId,
+        Seq(AvailabilityAck(selfId, Signature.noSignature)),
+        CantonTimestamp.MaxValue,
+      )
+    )
   )
   private val oneRequestOrderingBlock3Ack = OrderingBlock(
-    Seq(ProofOfAvailability(aBatchId, otherPeers.map(AvailabilityAck(_, Signature.noSignature))))
+    Seq(
+      ProofOfAvailability(
+        aBatchId,
+        otherPeers.map(AvailabilityAck(_, Signature.noSignature)),
+        CantonTimestamp.MaxValue,
+      )
+    )
   )
 
   def prepareFromPrePrepare(prePrepare: PrePrepare)(

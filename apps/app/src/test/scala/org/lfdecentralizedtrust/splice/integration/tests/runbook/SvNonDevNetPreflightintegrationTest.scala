@@ -1,27 +1,22 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.DataExportTestUtil
-import com.digitalasset.canton.data.CantonTimestamp
 
-import java.time.Duration
 import org.lfdecentralizedtrust.splice.util.FrontendLoginUtil
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.util.Try
 
 abstract class SvNonDevNetPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
-    with SvUiIntegrationTestUtil
+    with SvUiPreflightIntegrationTestUtil
     with DataExportTestUtil
     with FrontendLoginUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName()
     )
@@ -109,25 +104,6 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
           svScanClient,
         )
       )(_.httpReady shouldBe true)
-    }
-  }
-
-  "Check that open mining round 0 is open for 26h" in { implicit env =>
-    val (openRounds, _) = svScanClient.getOpenAndIssuingMiningRounds()
-    inside(openRounds.find(_.contract.payload.round.number == 0)) {
-      case None =>
-        val openRoundNumbers = openRounds.map(_.contract.payload.round.number)
-        logger.info(
-          s"OpenMiningRound 0 is no longer open, currently open rounds: $openRoundNumbers"
-        )
-      case Some(round) =>
-        val diff = CantonTimestamp.assertFromInstant(
-          round.contract.payload.targetClosesAt
-        ) - CantonTimestamp.assertFromInstant(round.contract.payload.opensAt)
-        // In theory this should be exact but I don't entirely trust that leap seconds or whatever don't break this
-        // and we don't actually care about it being exact.
-        diff should be < Duration.ofHours(26).plus(Duration.ofSeconds(1))
-        diff should be > Duration.ofHours(26).minus(Duration.ofSeconds(1))
     }
   }
 

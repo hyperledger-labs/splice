@@ -10,7 +10,7 @@ independently.
 
 We recommend to review this code as follows:
 
-1. Watch this [presentation](https://docs.google.com/presentation/d/1ffBf2uv3jfeupvrvLUwIFt2bjcIPzmpVNvt8eibPlSE/edit#slide=id.g2722663396b_0_1589) to get an overview
+1. Watch this [presentation](https://docs.google.com/presentation/d/1PNyGMfILA-AKaTRsBP82kavFWG2W_8JNVgOaIKVsgq4) to get an overview
 of the why and what.
 2. Review the code and its tests in the directories of the form `splice-api-token-*`
 jointly with the examples in `examples/`. Examples of particular interest are:
@@ -31,7 +31,8 @@ weekly and you can see the latest snapshot version at the top.
 Amulet implements the token standard so can be used for testing token
 standard APIs if you do not have access to another token.
 
-You can use the [localnet instructions](https://docs.token-std-dev.global.canton.network.digitalasset.com/app_dev/testing/localnet.html)
+You can use the [localnet
+instructions](https://docs.token-std-dev.global.canton.network.digitalasset.com/app_dev/testing/localnet.html)
 to spin up a local network to test your application against.
 
 ### token-std-devnet

@@ -76,7 +76,10 @@ import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
 import com.digitalasset.canton.store.SequencedEventStore
 import com.digitalasset.canton.store.SequencedEventStore.PossiblyIgnoredSequencedEvent
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
+import com.digitalasset.canton.topology.client.{
+  SynchronizerTopologyClientWithInit,
+  TopologySnapshot,
+}
 import com.digitalasset.canton.topology.processing.{
   ApproximateTime,
   EffectiveTime,
@@ -86,7 +89,6 @@ import com.digitalasset.canton.topology.processing.{
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.engine.Engine
@@ -98,13 +100,20 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /** A connected synchronizer from the synchronization service.
   *
-  * @param synchronizerId          The identifier of the connected synchronizer.
-  * @param synchronizerHandle      A synchronizer handle providing sequencer clients.
-  * @param participantId     The participant node id hosting this sync service.
-  * @param persistent        The persistent state of the connected synchronizer.
-  * @param ephemeral         The ephemeral state of the connected synchronizer.
-  * @param packageService    Underlying package management service.
-  * @param synchronizerCrypto      Synchronisation crypto utility combining IPS and Crypto operations for a single synchronizer.
+  * @param synchronizerId
+  *   The identifier of the connected synchronizer.
+  * @param synchronizerHandle
+  *   A synchronizer handle providing sequencer clients.
+  * @param participantId
+  *   The participant node id hosting this sync service.
+  * @param persistent
+  *   The persistent state of the connected synchronizer.
+  * @param ephemeral
+  *   The ephemeral state of the connected synchronizer.
+  * @param packageService
+  *   Underlying package management service.
+  * @param synchronizerCrypto
+  *   Synchronisation crypto utility combining IPS and Crypto operations for a single synchronizer.
   */
 class ConnectedSynchronizer(
     val synchronizerId: SynchronizerId,
@@ -186,7 +195,6 @@ class ConnectedSynchronizer(
     synchronizerId,
     damle,
     staticSynchronizerParameters,
-    parameters,
     synchronizerCrypto,
     sequencerClient,
     ephemeral.inFlightSubmissionSynchronizerTracker,
@@ -269,21 +277,15 @@ class ConnectedSynchronizer(
       loggerFactory,
     )
 
-  private val repairProcessor: RepairProcessor =
-    new RepairProcessor(
-      ephemeral.requestCounterAllocator,
-      loggerFactory,
-    )
-
   private val registerIdentityTransactionHandle = identityPusher.createHandler(
     synchronizerHandle.synchronizerAlias,
     synchronizerId,
     staticSynchronizerParameters.protocolVersion,
     synchronizerHandle.topologyClient,
     sequencerClient,
+    ephemeral.timeTracker,
   )
 
-  // MARK
   private val messageDispatcher: MessageDispatcher =
     messageDispatcherFactory.create(
       staticSynchronizerParameters.protocolVersion,
@@ -299,7 +301,6 @@ class ConnectedSynchronizer(
       ephemeral.requestCounterAllocator,
       ephemeral.recordOrderPublisher,
       badRootHashMessagesRequestProcessor,
-      repairProcessor,
       ephemeral.inFlightSubmissionSynchronizerTracker,
       loggerFactory,
       metrics,
@@ -344,10 +345,9 @@ class ConnectedSynchronizer(
 
     def lookupChangeMetadata(change: ActiveContractIdsChange): FutureUnlessShutdown[AcsChange] =
       for {
-        // TODO(i9270) extract magic numbers
         storedActivatedContracts <- MonadUtil.batchedSequentialTraverse(
-          parallelism = PositiveInt.tryCreate(20),
-          chunkSize = PositiveInt.tryCreate(500),
+          parallelism = parameters.batchingConfig.parallelism,
+          chunkSize = parameters.batchingConfig.maxItemsInBatch,
         )(change.activations.keySet.toSeq)(withMetadataSeq)
         storedDeactivatedContracts <- MonadUtil
           .batchedSequentialTraverse(
@@ -477,8 +477,9 @@ class ConnectedSynchronizer(
     }
 
     val startingPoints = ephemeral.startingPoints
-    val cleanHeadRc = startingPoints.processing.nextRequestCounter
-    val cleanHeadPrets = startingPoints.processing.lastSequencerTimestamp
+    val nextRequestCounter = startingPoints.processing.nextRequestCounter
+    val nextRepairCounter = startingPoints.processing.nextRepairCounter
+    val lastSequencerTimestamp = startingPoints.processing.lastSequencerTimestamp
 
     for {
       // Prepare missing key alerter
@@ -487,17 +488,8 @@ class ConnectedSynchronizer(
       // Phase 0: Initialise topology client at current clean head
       _ <- EitherT.right(initializeClientAtCleanHead())
 
-      // Phase 2: Initialize the repair processor
-      repairs <- EitherT
-        .right[ConnectedSynchronizerInitializationError](
-          persistent.requestJournalStore.repairRequests(
-            ephemeral.startingPoints.cleanReplay.nextRequestCounter
-          )
-        )
-      _ = logger.info(
-        show"Found ${repairs.size} repair requests at request counters ${repairs.map(_.rc)}"
-      )
-      _ = repairProcessor.setRemainingRepairRequests(repairs)
+      // Phase 2: Log so we know if any repairs have been applied.
+      _ = logger.info(s"The next repair counter would be $nextRepairCounter")
 
       // Phase 3: publish ACS changes from some suitable point up to clean head timestamp to the commitment processor.
       // The "suitable point" must ensure that the [[com.digitalasset.canton.participant.store.AcsSnapshotStore]]
@@ -510,14 +502,14 @@ class ConnectedSynchronizer(
       _ <- loadPendingEffectiveTimesFromTopologyStore(acsChangesReplayStartRt.timestamp)
       acsChangesToReplay <-
         if (
-          cleanHeadPrets >= acsChangesReplayStartRt.timestamp && cleanHeadRc > RequestCounter.Genesis
+          lastSequencerTimestamp >= acsChangesReplayStartRt.timestamp && (nextRequestCounter > RequestCounter.Genesis || nextRepairCounter > RepairCounter.Genesis)
         ) {
           logger.info(
-            s"Looking for ACS changes to replay between ${acsChangesReplayStartRt.timestamp} and $cleanHeadPrets"
+            s"Looking for ACS changes to replay between ${acsChangesReplayStartRt.timestamp} and $lastSequencerTimestamp"
           )
           replayAcsChanges(
             acsChangesReplayStartRt.toTimeOfChange,
-            TimeOfChange(cleanHeadRc, cleanHeadPrets),
+            TimeOfChange(lastSequencerTimestamp, Some(nextRepairCounter)),
           )
         } else
           EitherT.pure[FutureUnlessShutdown, ConnectedSynchronizerInitializationError](Seq.empty)
@@ -527,7 +519,9 @@ class ConnectedSynchronizer(
     } yield ()
   }
 
-  /** Starts the connected synchronizer. NOTE: Must only be called at most once on a synchronizer instance. */
+  /** Starts the connected synchronizer. NOTE: Must only be called at most once on a synchronizer
+    * instance.
+    */
   private[sync] def start()(implicit
       initializationTraceContext: TraceContext
   ): FutureUnlessShutdown[Either[ConnectedSynchronizerInitializationError, Unit]] =
@@ -759,8 +753,9 @@ class ConnectedSynchronizer(
   def readyForSubmission: SubmissionReady =
     SubmissionReady(ready && !isFailed && !sequencerClient.healthComponent.isFailed)
 
-  /** Helper method to perform the submission (unless shutting down), but track the inner FUS completion as well:
-    * on shutdown wait for the inner FUS to complete before closing the child-services.
+  /** Helper method to perform the submission (unless shutting down), but track the inner FUS
+    * completion as well: on shutdown wait for the inner FUS to complete before closing the
+    * child-services.
     */
   private def performSubmissionUnlessClosing[ERROR, RESULT](
       name: String,
@@ -787,8 +782,9 @@ class ConnectedSynchronizer(
     EitherT(resultPromise.future)
   }
 
-  /** @return The outer future completes after the submission has been registered as in-flight.
-    *          The inner future completes after the submission has been sequenced or if it will never be sequenced.
+  /** @return
+    *   The outer future completes after the submission has been registered as in-flight. The inner
+    *   future completes after the submission has been sequenced or if it will never be sequenced.
     */
   def submitTransaction(
       submitterInfo: SubmitterInfo,
@@ -796,6 +792,7 @@ class ConnectedSynchronizer(
       keyResolver: LfKeyResolver,
       transaction: WellFormedTransaction[WithoutSuffixes],
       disclosedContracts: Map[LfContractId, SerializableContract],
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransactionSubmissionError, FutureUnlessShutdown[
@@ -807,7 +804,14 @@ class ConnectedSynchronizer(
     ](functionFullName, SubmissionDuringShutdown.Rejection()) {
       ErrorUtil.requireState(ready, "Cannot submit transaction before recovery")
       transactionProcessor
-        .submit(submitterInfo, transactionMeta, keyResolver, transaction, disclosedContracts)
+        .submit(
+          submitterInfo,
+          transactionMeta,
+          keyResolver,
+          transaction,
+          disclosedContracts,
+          topologySnapshot,
+        )
         .onShutdown(Left(SubmissionDuringShutdown.Rejection()))
     }
 
@@ -842,7 +846,8 @@ class ConnectedSynchronizer(
               contractId,
               targetSynchronizer,
               targetProtocolVersion,
-            )
+            ),
+          synchronizerCrypto.currentSnapshotApproximation.ipsSnapshot,
         )
         .onShutdown(Left(SynchronizerNotReady(synchronizerId, "The synchronizer is shutting down")))
     }
@@ -870,7 +875,8 @@ class ConnectedSynchronizer(
       assignmentProcessor
         .submit(
           AssignmentProcessingSteps
-            .SubmissionParam(submitterMetadata, reassignmentId)
+            .SubmissionParam(submitterMetadata, reassignmentId),
+          synchronizerCrypto.currentSnapshotApproximation.ipsSnapshot,
         )
         .onShutdown(Left(SynchronizerNotReady(synchronizerId, "The synchronizer is shutting down")))
     }
@@ -1063,6 +1069,7 @@ object ConnectedSynchronizer {
           testingConfig,
           clock,
           exitOnFatalFailures = parameters.exitOnFatalFailures,
+          parameters.batchingConfig,
         )
         topologyProcessor <- topologyProcessorFactory.create(
           acsCommitmentProcessor.scheduleTopologyTick

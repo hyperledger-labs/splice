@@ -11,7 +11,7 @@
 module Splice.Api.Token.AllocationV1 where
 
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.HoldingV1 (InstrumentId)
+import Splice.Api.Token.HoldingV1 (Holding, InstrumentId)
 
 -- | A generic type to refer to data defined within an app.
 
@@ -84,11 +84,11 @@ allocationControllers AllocationView{..} =
 interface Allocation where
   viewtype AllocationView
 
-  allocation_executeTransferImpl : ContractId Allocation -> Allocation_ExecuteTransfer -> Update ChoiceExecutionMetadata
+  allocation_executeTransferImpl : ContractId Allocation -> Allocation_ExecuteTransfer -> Update Allocation_ExecuteTransferResult
   allocation_cancelImpl : ContractId Allocation -> Allocation_Cancel -> Update ChoiceExecutionMetadata
   allocation_withdrawImpl : ContractId Allocation -> Allocation_Withdraw -> Update ChoiceExecutionMetadata
 
-  choice Allocation_ExecuteTransfer : ChoiceExecutionMetadata
+  choice Allocation_ExecuteTransfer : Allocation_ExecuteTransferResult
     -- ^ Execute the transfer of the allocated assets. Intended to be used to execute the settlement.
     -- This choice SHOULD succeed provided the `settleBefore` deadline has not passed.
     with
@@ -115,3 +115,19 @@ interface Allocation where
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).transferLeg.sender
     do allocation_withdrawImpl this self arg
+
+data Allocation_ExecuteTransferResult = Allocation_ExecuteTransferResult
+  with
+    holdings : AllocationResultHoldings
+      -- ^ Updated sender and receiver holdings
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+  deriving (Show, Eq)
+
+-- | The holdings that were newly created as part of completing the allocation.
+-- MAY be empty for registries that do not track the holdings on-ledger.
+data AllocationResultHoldings = AllocationResultHoldings
+  with
+    senderHoldingCids : [ContractId Holding]
+    receiverHoldingCids : [ContractId Holding]
+  deriving (Show, Eq)

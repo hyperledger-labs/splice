@@ -48,8 +48,9 @@ import java.util.concurrent.atomic.AtomicLong
 import scala.collection.View
 import scala.concurrent.{ExecutionContext, Future}
 
-/** @param ec [[scala.concurrent.ExecutionContext]] that will be used for scheduling CPU-intensive computations
-  *           performed by an [[com.digitalasset.daml.lf.engine.Engine]].
+/** @param ec
+  *   [[scala.concurrent.ExecutionContext]] that will be used for scheduling CPU-intensive
+  *   computations performed by an [[com.digitalasset.daml.lf.engine.Engine]].
   */
 private[apiserver] final class StoreBackedCommandExecutor(
     engine: Engine,
@@ -511,7 +512,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
           contractInstance = contractInstance,
           metadata = recomputedMetadata,
           ledgerTime = ledgerTime,
-          contractSalt = Some(salt),
+          contractSalt = salt,
         ).left.map(e => s"Failed to construct SerializableContract($e)")
       } yield contract
 

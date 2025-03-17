@@ -6,12 +6,14 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 
 import scala.jdk.CollectionConverters.*
 
 class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
@@ -61,7 +63,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
           val decentralizedNamespaces =
             sv1Backend.participantClient.topology.decentralized_namespaces
               .list(
-                filterStore = decentralizedSynchronizerId.filterString,
+                store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
                 filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
               )
           inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>

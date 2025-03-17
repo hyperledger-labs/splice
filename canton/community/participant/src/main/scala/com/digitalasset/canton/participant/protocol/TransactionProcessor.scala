@@ -21,7 +21,6 @@ import com.digitalasset.canton.ledger.participant.state.{ChangeId, SubmitterInfo
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.metrics.TransactionProcessingMetrics
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.WrapsProcessorError
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.ProcessorError
@@ -36,7 +35,7 @@ import com.digitalasset.canton.participant.protocol.validation.{
   AuthorizationValidator,
   InternalConsistencyChecker,
   ModelConformanceChecker,
-  TransactionConfirmationResponseFactory,
+  TransactionConfirmationResponsesFactory,
 }
 import com.digitalasset.canton.participant.store.SyncEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
@@ -47,6 +46,7 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.hash.HashTracer.NoOp
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
+import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -62,7 +62,6 @@ class TransactionProcessor(
     synchronizerId: SynchronizerId,
     damle: DAMLe,
     staticSynchronizerParameters: StaticSynchronizerParameters,
-    parameters: ParticipantNodeParameters,
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClient,
     inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
@@ -86,7 +85,7 @@ class TransactionProcessor(
         synchronizerId,
         participantId,
         confirmationRequestFactory,
-        new TransactionConfirmationResponseFactory(
+        new TransactionConfirmationResponsesFactory(
           participantId,
           synchronizerId,
           staticSynchronizerParameters.protocolVersion,
@@ -106,7 +105,7 @@ class TransactionProcessor(
         ContractAuthenticator(crypto.pureCrypto),
         damle.enrichTransaction,
         damle.enrichCreateNode,
-        new AuthorizationValidator(participantId, parameters.enableExternalAuthorization),
+        new AuthorizationValidator(participantId),
         new InternalConsistencyChecker(
           loggerFactory
         ),
@@ -215,6 +214,7 @@ class TransactionProcessor(
       keyResolver: LfKeyResolver,
       transaction: WellFormedTransaction[WithoutSuffixes],
       disclosedContracts: Map[LfContractId, SerializableContract],
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -229,7 +229,8 @@ class TransactionProcessor(
         keyResolver,
         transaction,
         disclosedContracts,
-      )
+      ),
+      topologySnapshot,
     )
 }
 

@@ -4,10 +4,11 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.topology
 
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.{
   CryptoProvider,
   TopologyActivationTime,
@@ -42,13 +43,13 @@ object SimulationTopologyHelpers {
     onboardingTime.value.plus(simSettings.becomingOnlineAfterOnboardingDelay.toJava)
 
   def generateSimulationTopologyData(
-      peerEndpointsToOnboardingTimes: Map[Endpoint, TopologyActivationTime],
+      peerEndpointsToOnboardingTimes: Map[P2PEndpoint, TopologyActivationTime],
       loggerFactory: NamedLoggerFactory,
-  ): Map[Endpoint, SimulationTopologyData] = {
+  ): Map[P2PEndpoint, SimulationTopologyData] = {
     val crypto =
       SymbolicCrypto.create(ReleaseProtocolVersion.latest, ProcessingTimeout(), loggerFactory)
     peerEndpointsToOnboardingTimes.view.mapValues { timestamp =>
-      val keys = crypto.newSymbolicSigningKeyPair()
+      val keys = crypto.newSymbolicSigningKeyPair(SigningKeyUsage.ProtocolOnly)
       SimulationTopologyData(timestamp, keys.publicKey, keys.privateKey)
     }.toMap
   }

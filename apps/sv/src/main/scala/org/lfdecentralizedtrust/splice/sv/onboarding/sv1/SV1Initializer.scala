@@ -160,7 +160,7 @@ class SV1Initializer(
             Seq(
               new GrpcSequencerConnection(
                 NonEmpty.mk(Seq, LocalSynchronizerNode.toEndpoint(internalSequencerApi)),
-                transportSecurity = internalSequencerApi.tls.isDefined,
+                transportSecurity = internalSequencerApi.tlsConfig.isDefined,
                 customTrustCertificates = None,
                 SequencerAlias.Default,
               )
@@ -186,27 +186,40 @@ class SV1Initializer(
         ),
         retryProvider.ensureThatB(
           RetryFor.WaitingOnInitDependency,
-          "sv1_initial_package_upload",
+          "sv1_initial_package_vetting",
           "SV1 has uploaded the initial set of packages",
           initConnection
             .lookupUserMetadata(
               config.ledgerApiUser,
               BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
             )
-            .map(_.nonEmpty),
-          participantAdminConnection
-            .uploadDarFiles(
-              requiredDars(sv1Config.initialPackageConfig),
-              RetryFor.WaitingOnInitDependency,
+            .map(_.nonEmpty), {
+            val packages = requiredDars(sv1Config.initialPackageConfig)
+            logger.info(
+              s"Starting with initial package ${sv1Config.initialPackageConfig} and vetting ${packages
+                  .map(_.resourcePath)}"
             )
-            .flatMap { _ =>
-              initConnection.ensureUserMetadataAnnotation(
-                config.ledgerApiUser,
-                BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
-                "true",
-                RetryFor.WaitingOnInitDependency,
-              )
-            },
+            packages
+              .traverse { packageToVet =>
+                logger.info(
+                  s"Vetting initial package ${packageToVet.packageId} - ${packageToVet.resourcePath} on synchronizer $synchronizerId"
+                )
+                participantAdminConnection
+                  .vetDar(
+                    synchronizerId,
+                    DarResource(packageToVet.resourcePath),
+                    None,
+                  )
+              }
+              .flatMap { _ =>
+                initConnection.ensureUserMetadataAnnotation(
+                  config.ledgerApiUser,
+                  BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+                  "true",
+                  RetryFor.WaitingOnInitDependency,
+                )
+              }
+          },
           logger,
         ),
       ).tupled
@@ -489,7 +502,7 @@ class SV1Initializer(
 
   private def requiredDars(initialPackageConfig: InitialPackageConfig): Seq[UploadablePackage] = {
     def darsUpToInitialConfig(packageResource: PackageResource, requiredVersion: String) = {
-      packageResource.others
+      packageResource.all
         .filter { darResource =>
           val required = PackageVersion.assertFromString(requiredVersion)
           darResource.metadata.version <= required

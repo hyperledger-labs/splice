@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import dayjs from 'dayjs';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
 import { test, expect, describe } from 'vitest';
 
@@ -50,7 +51,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
 
-  test('set next scheduled domain upgrade', async () => {
+  test('set next scheduled synchronizer upgrade', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
@@ -70,6 +71,58 @@ describe('SV user can', () => {
     await user.click(checkBox);
 
     expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
+  });
+
+  test('scheduled synchronizer upgrade time must be before effective date', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Log In')).toBeDefined();
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
+
+    await user.click(screen.getByText('Governance'));
+
+    const dropdown = screen.getByTestId('display-actions');
+    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+
+    expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
+    expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
+
+    const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    await user.click(checkBox);
+
+    const format = 'YYYY-MM-DD HH:mm';
+    const expirationDate = screen
+      .getByTestId('datetime-picker-vote-request-expiration')
+      .getAttribute('value');
+    expect(expirationDate).toBeDefined();
+    console.log('expirationDate', expirationDate);
+
+    const expirationDateDayjs = dayjs(expirationDate);
+    const expirationDateMinus1Minute = expirationDateDayjs.subtract(1, 'minute').format(format);
+    const expirationDatePlus1Minute = expirationDateDayjs.add(1, 'minute').format(format);
+
+    const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
+      'nextScheduledSynchronizerUpgrade.time-value'
+    );
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: expirationDateMinus1Minute },
+    });
+
+    expect(
+      screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
+    ).toBeDefined();
+
+    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
+      target: { value: expirationDatePlus1Minute },
+    });
+
+    expect(screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')).toBe(
+      ''
+    );
   });
 });
 

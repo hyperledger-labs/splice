@@ -23,11 +23,12 @@ import scala.jdk.CollectionConverters.*
 
 package object commands {
 
-  /** Runs every body, even if some of them fail with a `CommandExecutionFailedException`.
-    * Succeeds, if all bodies succeed.
-    * If some body throws a `Throwable` other than `CommandExecutionFailedException`, the execution terminates immediately with that exception.
-    * If some body throws a `CommandExecutionFailedException`, subsequent bodies are still executed and afterwards the
-    * methods throws a `CommandExecutionFailedException`, preferring `CantonInternalErrors` over `CommandFailure`.
+  /** Runs every body, even if some of them fail with a `CommandExecutionFailedException`. Succeeds,
+    * if all bodies succeed. If some body throws a `Throwable` other than
+    * `CommandExecutionFailedException`, the execution terminates immediately with that exception.
+    * If some body throws a `CommandExecutionFailedException`, subsequent bodies are still executed
+    * and afterwards the methods throws a `CommandExecutionFailedException`, preferring
+    * `CantonInternalErrors` over `CommandFailure`.
     */
   private[commands] def runEvery[A](bodies: Seq[() => Unit]): Unit = {
     val exceptions = bodies.mapFilter(body =>
@@ -51,7 +52,7 @@ package object commands {
   )(implicit loggingContext: ErrorLoggingContext): CantonTimestamp =
     CantonTimestamp.fromInstant(instant).valueOr { err =>
       loggingContext.logger.error(err)(loggingContext.traceContext)
-      throw new InteractiveCommandFailure()
+      throw new CommandFailure()
     }
 
   private[commands] def writeToFile(outputFile: String, bytes: ByteString): Unit = {

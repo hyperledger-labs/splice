@@ -146,7 +146,9 @@ object LedgerApiTypeWrappers {
     field.value.map(_.sum).toList.flatMap(extract)
   }
 
-  /** Holder of "core" contract defining fields (particularly those relevant for importing contracts) */
+  /** Holder of "core" contract defining fields (particularly those relevant for importing
+    * contracts)
+    */
   final case class ContractData(
       templateId: TemplateId,
       packageName: LfPackageName,
@@ -156,7 +158,7 @@ object LedgerApiTypeWrappers {
       signatories: Set[String],
       observers: Set[String],
       inheritedContractId: LfContractId,
-      contractSalt: Option[Salt],
+      contractSalt: Salt,
       ledgerCreateTime: Option[Time.Timestamp],
   )
 

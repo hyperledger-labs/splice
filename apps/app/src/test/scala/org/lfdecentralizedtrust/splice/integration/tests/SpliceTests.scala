@@ -11,6 +11,8 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.{
+  CantonEdition,
+  CommunityCantonEdition,
   NonNegativeDuration,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
@@ -32,7 +34,7 @@ import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
 import org.apache.pekko.http.scaladsl.Http
 import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
-import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
+import org.lfdecentralizedtrust.splice.config.{AuthTokenSourceConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{EnvironmentImpl, RetryProvider}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -113,17 +115,22 @@ object SpliceTests extends LazyLogging {
         .openTelemetry
     } else OpenTelemetry.noop()
 
-  type SpliceTestConsoleEnvironment = TestConsoleEnvironment[EnvironmentImpl]
+  type SpliceTestConsoleEnvironment = TestConsoleEnvironment[SpliceConfig, EnvironmentImpl]
   type SharedSpliceEnvironment =
-    SharedEnvironment[EnvironmentImpl, SpliceTestConsoleEnvironment]
+    SharedEnvironment[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
   type IsolatedSpliceEnvironments =
-    IsolatedEnvironments[EnvironmentImpl, SpliceTestConsoleEnvironment]
+    IsolatedEnvironments[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
 
   trait IntegrationTest
-      extends BaseIntegrationTest[EnvironmentImpl, SpliceTestConsoleEnvironment]
+      extends BaseIntegrationTest[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
       with IsolatedSpliceEnvironments
       with TestCommon
       with LedgerApiExtensions {
+
+    override val edition: CantonEdition = CommunityCantonEdition
+
+    type SpliceEnvironmentDefinition =
+      BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
 
     override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
       new OpenTelemetryMetricsFactory(
@@ -161,17 +168,22 @@ object SpliceTests extends LazyLogging {
     }
 
     override def environmentDefinition
-        : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+        : BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment] =
       EnvironmentDefinition
         .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 
   trait IntegrationTestWithSharedEnvironment
-      extends BaseIntegrationTest[EnvironmentImpl, SpliceTestConsoleEnvironment]
+      extends BaseIntegrationTest[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
       with SharedSpliceEnvironment
       with BeforeAndAfterEach
       with TestCommon
       with LedgerApiExtensions {
+
+    override val edition: CantonEdition = CommunityCantonEdition
+
+    type SpliceEnvironmentDefinition =
+      BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
 
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
@@ -211,7 +223,7 @@ object SpliceTests extends LazyLogging {
     }
 
     override def environmentDefinition
-        : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+        : BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment] =
       EnvironmentDefinition
         .simpleTopology1Sv(this.getClass.getSimpleName)
 
@@ -507,7 +519,7 @@ object SpliceTests extends LazyLogging {
     }
 
     def registerHttpConnectionPoolsCleanup(implicit
-        env: TestEnvironment[EnvironmentImpl]
+        env: TestEnvironment[SpliceConfig, EnvironmentImpl]
     ): Unit = {
       implicit val sys = env.actorSystem
       implicit val ec = env.executionContext

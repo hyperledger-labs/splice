@@ -146,8 +146,8 @@ class SequencerReaderTest
     val instanceIndex: Int = 0
     // create a spy so we can add verifications on how many times methods were called
     val storeSpy: InMemorySequencerStore = spy[InMemorySequencerStore](store)
-    val testConfig: CommunitySequencerReaderConfig =
-      CommunitySequencerReaderConfig(
+    val testConfig: SequencerReaderConfig =
+      SequencerReaderConfig(
         readBatchSize = 10,
         checkpointInterval = config.NonNegativeFiniteDuration.ofMillis(800),
       )
@@ -169,8 +169,9 @@ class SequencerReaderTest
 
     def ts(epochSeconds: Int): CantonTimestamp = CantonTimestamp.ofEpochSecond(epochSeconds.toLong)
 
-    /** Can be used at most once per environment because [[org.apache.pekko.stream.scaladsl.FlowOps.take]]
-      * cancels the pre-materialized [[ManualEventSignaller.source]].
+    /** Can be used at most once per environment because
+      * [[org.apache.pekko.stream.scaladsl.FlowOps.take]] cancels the pre-materialized
+      * [[ManualEventSignaller.source]].
       */
     def readAsSeq(
         member: Member,

@@ -16,22 +16,25 @@ import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleE
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig
 
-/** @param sequencerGroups If sequencerGroups is defined, all the sequencers of the same set will share the same storage
-  *                        (which means they are part of the same synchronizer).
-  *                        All sequencers in the config that are not in a defined group will be placed in the same default group.
-  *                        If it is not defined, all sequencers will share the same storage by default and one synchronizer only is assumed.
-  *                        If in-memory storage is defined, sequencers sharing storage is not supported (each one is a different synchronizer).
+/** @param sequencerGroups
+  *   If sequencerGroups is defined, all the sequencers of the same set will share the same storage
+  *   (which means they are part of the same synchronizer). All sequencers in the config that are
+  *   not in a defined group will be placed in the same default group. If it is not defined, all
+  *   sequencers will share the same storage by default and one synchronizer only is assumed. If
+  *   in-memory storage is defined, sequencers sharing storage is not supported (each one is a
+  *   different synchronizer).
   */
 abstract class UseReferenceBlockSequencerBase[
+    Config <: SharedCantonConfig[Config],
     StorageConfigT <: StorageConfig,
     SequencerConfigT <: SequencerConfig,
     EnvT <: Environment,
-    TestConsoleEnvT <: TestConsoleEnvironment[EnvT],
+    TestConsoleEnvT <: TestConsoleEnvironment[Config, EnvT],
 ](
     override protected val loggerFactory: NamedLoggerFactory,
     driverSingleWordName: String,
     sequencerGroups: SequencerSynchronizerGroups = SingleSynchronizer,
-) extends EnvironmentSetupPlugin[EnvT, TestConsoleEnvT] {
+) extends EnvironmentSetupPlugin[Config, EnvT, TestConsoleEnvT] {
 
   protected final def dbNameForGroup(group: Int): String = s"${driverSingleWordName}_db_$group"
 
@@ -46,7 +49,7 @@ abstract class UseReferenceBlockSequencerBase[
   }
 
   protected def driverConfigs(
-      config: EnvT#Config,
+      config: CantonConfig,
       storageConfigs: Map[InstanceName, StorageConfigT],
   ): Map[InstanceName, SequencerConfigT]
 }

@@ -6,7 +6,7 @@ package com.digitalasset.canton.integration
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedCreatedEvent
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.ConsoleCommandTimeout
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, SharedCantonConfig}
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.examples.java.cycle as M
@@ -14,13 +14,18 @@ import com.digitalasset.canton.topology.PartyId
 
 /** Adds the ability to run cycles to integration tests
   *
-  * Please note that you need to upload CantonExamples.dar to the ledger before you can use this test
+  * Please note that you need to upload CantonExamples.dar to the ledger before you can use this
+  * test
   */
-trait HasCycleUtils[E <: Environment, TCE <: TestConsoleEnvironment[E]] {
-  this: BaseIntegrationTest[E, TCE] =>
+trait HasCycleUtils[C <: SharedCantonConfig[C], E <: Environment, TCE <: TestConsoleEnvironment[
+  C,
+  E,
+]] {
+  this: BaseIntegrationTest[C, E, TCE] =>
 
-  /** @param partyId assumes that the party is hosted on participant1 AND participant2 (in the simplest case
-    * this could simply mean that participant1 == participant2)
+  /** @param partyId
+    *   assumes that the party is hosted on participant1 AND participant2 (in the simplest case this
+    *   could simply mean that participant1 == participant2)
     */
   def runCycle(
       partyId: PartyId,

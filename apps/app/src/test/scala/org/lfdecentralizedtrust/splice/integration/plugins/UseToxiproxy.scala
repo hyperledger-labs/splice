@@ -21,7 +21,7 @@ case class UseToxiproxy(
     createSvLedgerApiProxies: Boolean = false,
     createScanAppProxies: Boolean = false,
     createScanLedgerApiProxy: Boolean = false,
-) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment]
+) extends EnvironmentSetupPlugin[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
     with BaseTest {
 
   val client = new ToxiproxyClient()

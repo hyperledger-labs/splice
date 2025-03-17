@@ -1,9 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -28,8 +26,7 @@ class SvOfflineRootNamespaceKeyIntegrationTest
 
   private val cantonNameSuffix: String = getClass.getSimpleName
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(cantonNameSuffix)
       // we start the participants during the test so we cannot pre-allocate

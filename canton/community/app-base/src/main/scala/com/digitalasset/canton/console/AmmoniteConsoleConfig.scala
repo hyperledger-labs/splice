@@ -7,6 +7,8 @@ import ammonite.Main
 import ammonite.main.Defaults
 import ammonite.util.Colors
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.logging.TracedLogger
 import com.typesafe.scalalogging.LazyLogging
 
@@ -14,14 +16,19 @@ import java.io.{File, IOException}
 
 /** Configure behaviour of ammonite
   *
-  * @param cacheDir cache dir, defaults to ~/.ammonite. If none is given, in-memory is used.
-  *                 If you specify a cache dir, the Canton repl will startup faster.
-  *                 In our tests, we have very rarely observed unexpected compile errors when the cache was enabled;
-  *                 if you want to avoid that, set the cache dir to None (i.e. `cache-dir = null` in the config file).
-  * @param workingDir working directory. if none is given, we'll use the working directory of the Canton process
-  * @param colors if true (default), we'll use color output
-  * @param verbose if true (not default), we'll emit verbose ammonite output
-  * @param defaultLimit default limit parameter for commands that can potentially return many results
+  * @param cacheDir
+  *   cache dir, defaults to ~/.ammonite. If none is given, in-memory is used. If you specify a
+  *   cache dir, the Canton repl will startup faster. In our tests, we have very rarely observed
+  *   unexpected compile errors when the cache was enabled; if you want to avoid that, set the cache
+  *   dir to None (i.e. `cache-dir = null` in the config file).
+  * @param workingDir
+  *   working directory. if none is given, we'll use the working directory of the Canton process
+  * @param colors
+  *   if true (default), we'll use color output
+  * @param verbose
+  *   if true (not default), we'll emit verbose ammonite output
+  * @param defaultLimit
+  *   default limit parameter for commands that can potentially return many results
   */
 final case class AmmoniteConsoleConfig(
     cacheDir: Option[java.io.File] = AmmoniteConsoleConfig.defaultCacheDir,
@@ -29,9 +36,15 @@ final case class AmmoniteConsoleConfig(
     colors: Boolean = true,
     verbose: Boolean = false,
     defaultLimit: PositiveInt = PositiveInt.tryCreate(1000),
-)
+) extends UniformCantonConfigValidation
 
 object AmmoniteConsoleConfig extends LazyLogging {
+
+  implicit val ammoniteConsoleConfigCantonConfigValidator
+      : CantonConfigValidator[AmmoniteConsoleConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[AmmoniteConsoleConfig]
+  }
 
   private def defaultCacheDir: Option[java.io.File] = {
     val f = new File(System.getProperty("user.home"))

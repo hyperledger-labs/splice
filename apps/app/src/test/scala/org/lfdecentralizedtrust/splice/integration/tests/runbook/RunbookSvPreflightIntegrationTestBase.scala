@@ -1,8 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{
   AnsFrontendTestUtil,
@@ -11,7 +9,6 @@ import org.lfdecentralizedtrust.splice.util.{
   SvTestUtil,
   WalletFrontendTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.duration.*
@@ -21,7 +18,7 @@ import scala.util.{Random, Try}
 abstract class RunbookSvPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with PreflightIntegrationTestUtil
-    with SvUiIntegrationTestUtil
+    with SvUiPreflightIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with AnsFrontendTestUtil
@@ -29,8 +26,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.svPreflightTopology(
       this.getClass.getSimpleName()
     )

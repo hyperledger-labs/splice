@@ -1,12 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests.reonboard
 
 import cats.syntax.parallel.*
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.{
-  SvUiIntegrationTestUtil,
+  SvUiPreflightIntegrationTestUtil,
   PreflightIntegrationTestUtil,
 }
 import org.lfdecentralizedtrust.splice.util.{
@@ -14,7 +12,6 @@ import org.lfdecentralizedtrust.splice.util.{
   SvFrontendTestUtil,
   WalletFrontendTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.util.FutureInstances.*
 import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
@@ -28,7 +25,7 @@ import scala.jdk.CollectionConverters.*
 
 class SvOffboardPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2", "sv3", "sv4", "sv")
-    with SvUiIntegrationTestUtil
+    with SvUiPreflightIntegrationTestUtil
     with SvFrontendTestUtil
     with PreflightIntegrationTestUtil
     with FrontendLoginUtil
@@ -36,8 +33,7 @@ class SvOffboardPreflightIntegrationTest
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
     )
@@ -67,7 +63,9 @@ class SvOffboardPreflightIntegrationTest
         },
       )
 
-      // 10020 is for the
+      // In SvReOnboardPreflightIntegrationTest, we are transferring 100000 USD
+      // from a temporary validator that is configured to use the offboarded SV party
+      // to the reonboarded SV.
       tapAmulets(100020)
     }
   }
@@ -75,7 +73,7 @@ class SvOffboardPreflightIntegrationTest
   "SV runbook is offboarded" in { implicit env =>
     import env.executionContext
 
-    val requestReasonUrl = "This is a request reason url."
+    val requestReasonUrl = "https://vote-request-url.com"
     val requestReasonBody = "This is a request reason."
 
     val sv1 = env.svs.remote.find(sv => sv.name == s"sv1").value

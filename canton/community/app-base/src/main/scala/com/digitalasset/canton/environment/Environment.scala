@@ -28,10 +28,16 @@ import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
 import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, MetricsRegistry}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
+import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.resource.DbMigrationsFactory
-import com.digitalasset.canton.synchronizer.mediator.{MediatorNodeBootstrap, MediatorNodeParameters}
+import com.digitalasset.canton.synchronizer.mediator.{
+  MediatorNodeBootstrap,
+  MediatorNodeConfig,
+  MediatorNodeParameters,
+}
 import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
 import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.telemetry.{ConfiguredOpenTelemetry, OpenTelemetryFactory}
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
@@ -53,7 +59,8 @@ import scala.util.control.NonFatal
   */
 trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
-  type Config <: CantonConfig & ConfigDefaults[DefaultPorts, Config]
+  type Config <: SharedCantonConfig[Config]
+
   type Console <: ConsoleEnvironment
 
   val config: Config
@@ -93,23 +100,20 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   lazy val tracerProvider: TracerProvider =
     TracerProvider.Factory(configuredOpenTelemetry, "console")
 
-  lazy val metricsRegistry: MetricsRegistry = {
-    config.monitoring.metrics.jvmMetrics
-      .foreach(JvmMetrics.setup(_, configuredOpenTelemetry.openTelemetry))
+  config.monitoring.metrics.jvmMetrics
+    .foreach(JvmMetrics.setup(_, configuredOpenTelemetry.openTelemetry))
 
-    new MetricsRegistry(
-      configuredOpenTelemetry.openTelemetry.meterBuilder("canton").build(),
-      testingConfig.metricsFactoryType,
-      // TODO(#13956) - remove this once we have support in canton to not fail if histograms are not registered
-      testingSupportAdhocMetrics = true,
-      histograms,
-      baseFilter,
-      loggerFactory,
-    )
-  }
+  lazy val metricsRegistry: MetricsRegistry = new MetricsRegistry(
+    configuredOpenTelemetry.openTelemetry.meterBuilder("canton").build(),
+    testingConfig.metricsFactoryType,
+    testingConfig.supportAdhocMetrics,
+    histograms,
+    baseFilter,
+    loggerFactory,
+  )
 
   protected def participantNodeFactory
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap]
+      : ParticipantNodeBootstrap.Factory[LocalParticipantConfig, ParticipantNodeBootstrap]
   protected def migrationsFactory: DbMigrationsFactory
 
   def isEnterprise: Boolean
@@ -273,7 +277,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   private val testingTimeService = new TestingTimeService(clock, () => simClocks)
 
   lazy val participants =
-    new ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode, Config#ParticipantConfigType](
+    new ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode](
       createParticipant,
       migrationsFactory,
       timeouts,
@@ -308,9 +312,9 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     List(sequencers, mediators, participants)
   private def runningNodes: Seq[CantonNodeBootstrap[CantonNode]] = allNodes.flatMap(_.running)
 
-  /** Try to startup all nodes in the configured environment and reconnect them to one another.
-    * The first error will prevent further nodes from being started.
-    * If an error is returned previously started nodes will not be stopped.
+  /** Try to startup all nodes in the configured environment and reconnect them to one another. The
+    * first error will prevent further nodes from being started. If an error is returned previously
+    * started nodes will not be stopped.
     */
   def startAndReconnect(): Either[StartupError, Unit] =
     withNewTraceContext { implicit traceContext =>
@@ -431,7 +435,8 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
   /** run some task on nodes ordered by their startup group
     *
-    * @param reverse if true, then the order will be reverted (e.g. for stop)
+    * @param reverse
+    *   if true, then the order will be reverted (e.g. for stop)
     */
   private def runOnNodesOrderedByStartupGroup[T, I](
       name: String,
@@ -461,17 +466,17 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
   protected def createSequencer(
       name: String,
-      sequencerConfig: Config#SequencerNodeConfigType,
+      sequencerConfig: SequencerNodeConfig,
   ): SequencerNodeBootstrap
 
   protected def createMediator(
       name: String,
-      mediatorConfig: Config#MediatorNodeConfigType,
+      mediatorConfig: MediatorNodeConfig,
   ): MediatorNodeBootstrap
 
   protected def createParticipant(
       name: String,
-      participantConfig: Config#ParticipantConfigType,
+      participantConfig: LocalParticipantConfig,
   ): ParticipantNodeBootstrap =
     participantNodeFactory
       .create(
@@ -495,24 +500,21 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
   protected def mediatorNodeFactoryArguments(
       name: String,
-      mediatorConfig: Config#MediatorNodeConfigType,
-  ): NodeFactoryArguments[
-    Config#MediatorNodeConfigType,
-    MediatorNodeParameters,
-    MediatorMetrics,
-  ] = NodeFactoryArguments(
-    name,
-    mediatorConfig,
-    config.mediatorNodeParametersByString(name),
-    createClock(Some(MediatorNodeBootstrap.LoggerFactoryKeyName -> name)),
-    metricsRegistry.forMediator(name),
-    testingConfig,
-    futureSupervisor,
-    loggerFactory.append(MediatorNodeBootstrap.LoggerFactoryKeyName, name),
-    writeHealthDumpToFile,
-    configuredOpenTelemetry,
-    executionContext,
-  )
+      mediatorConfig: MediatorNodeConfig,
+  ): NodeFactoryArguments[MediatorNodeConfig, MediatorNodeParameters, MediatorMetrics] =
+    NodeFactoryArguments(
+      name,
+      mediatorConfig,
+      config.mediatorNodeParametersByString(name),
+      createClock(Some(MediatorNodeBootstrap.LoggerFactoryKeyName -> name)),
+      metricsRegistry.forMediator(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory.append(MediatorNodeBootstrap.LoggerFactoryKeyName, name),
+      writeHealthDumpToFile,
+      configuredOpenTelemetry,
+      executionContext,
+    )
 
   private def simClocks: Seq[SimClock] = {
     val clocks = clock +: (participants.running.map(_.clock) ++ sequencers.running.map(
@@ -549,10 +551,11 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
 object Environment {
 
-  /** Ensure all java.util.logging statements are routed to slf4j instead and can be configured with logback.
-    * This should be paired with adding a LevelChangePropagator to the logback configuration to avoid the performance impact
-    * of translating all JUL log statements (regardless of whether they are being used).
-    * See for more details: https://logback.qos.ch/manual/configuration.html#LevelChangePropagator
+  /** Ensure all java.util.logging statements are routed to slf4j instead and can be configured with
+    * logback. This should be paired with adding a LevelChangePropagator to the logback
+    * configuration to avoid the performance impact of translating all JUL log statements
+    * (regardless of whether they are being used). See for more details:
+    * https://logback.qos.ch/manual/configuration.html#LevelChangePropagator
     */
   def installJavaUtilLoggingBridge(): Unit =
     if (!SLF4JBridgeHandler.isInstalled) {
@@ -563,9 +566,9 @@ object Environment {
 
 }
 
-trait EnvironmentFactory[E <: Environment] {
+trait EnvironmentFactory[C <: SharedCantonConfig[C], E <: Environment] {
   def create(
-      config: E#Config,
+      config: C,
       loggerFactory: NamedLoggerFactory,
       testingConfigInternal: TestingConfigInternal = TestingConfigInternal(),
   ): E

@@ -242,9 +242,22 @@ class NodeInitializer(
         if (expectedId != dump.id) {
           connection.listOwnerToKeyMapping(dump.id.member).flatMap {
             case Seq(mapping) =>
+              val (validOtkKeys, invalidOtkKeys) = mapping.mapping.keys.partition(p =>
+                p.asSigningKey.fold(true)(_.usage.contains(SigningKeyUsage.ProofOfOwnership))
+              )
+              logger.info(
+                s"Removing keys from OwnerToKeyMapping as they are not flagged for proof-of-ownership usage. This can happen for old splice versions that incorrectly specified namespace only keys in the OwnerToKeyMapping in some cases: $invalidOtkKeys"
+              )
+              val validOtkKeysNE = NonEmpty
+                .from(validOtkKeys)
+                .getOrElse(
+                  throw Status.INTERNAL
+                    .withDescription("No valid key to use in OwnerToKeyMapping")
+                    .asRuntimeException
+                )
               connection.ensureInitialOwnerToKeyMapping(
                 expectedId.member,
-                mapping.mapping.keys,
+                validOtkKeysNE,
                 RetryFor.Automation,
               )
             case mappings =>

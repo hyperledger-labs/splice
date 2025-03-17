@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250210.13596.0.v9b6d5061"
+  val version: String = "3.3.0-snapshot.20250227.13636.0.vdeaa9235"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -262,6 +262,8 @@ object CantonDependencies {
   // We have to exclude conflicting parser version
   lazy val ujson_circe =
     "com.lihaoyi" %% "ujson-circe" % upickle_version exclude ("io.circe", "circe-parser_2.13")
+
+  lazy val protostuff_parser = "io.protostuff" % "protostuff-parser" % "3.1.40"
 
   lazy val toxiproxy_java = "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4"
 

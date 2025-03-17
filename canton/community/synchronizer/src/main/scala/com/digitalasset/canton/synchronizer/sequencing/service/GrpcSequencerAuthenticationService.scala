@@ -8,7 +8,7 @@ import cats.syntax.either.*
 import com.daml.error.{ErrorCategory, ErrorCode, Explanation}
 import com.digitalasset.canton.crypto.{Nonce, Signature}
 import com.digitalasset.canton.discard.Implicits.*
-import com.digitalasset.canton.error.{Alarm, AlarmErrorCode, CantonError}
+import com.digitalasset.canton.error.{Alarm, AlarmErrorCode, CantonError, ContextualizedCantonError}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcFUSExtended
@@ -50,8 +50,8 @@ class GrpcSequencerAuthenticationService(
     extends SequencerAuthenticationService
     with NamedLogging {
 
-  /** This will complete the participant authentication process using the challenge information and returning a token
-    * to be used for further authentication.
+  /** This will complete the participant authentication process using the challenge information and
+    * returning a token to be used for further authentication.
     */
   override def authenticate(request: AuthenticateRequest): Future[AuthenticateResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
@@ -93,11 +93,11 @@ class GrpcSequencerAuthenticationService(
     }.asGrpcResponse
   }
 
-  /** This will return a random number (nonce) plus the fingerprint of the key the participant needs to use to complete
-    * the authentication process with this synchronizer.
-    * A handshake check is also done here to make sure that no participant can start authenticating without doing this check.
-    * While the pure handshake can be called without any prior setup, this endpoint will only work after topology state
-    * for the participant has been pushed to this synchronizer.
+  /** This will return a random number (nonce) plus the fingerprint of the key the participant needs
+    * to use to complete the authentication process with this synchronizer. A handshake check is
+    * also done here to make sure that no participant can start authenticating without doing this
+    * check. While the pure handshake can be called without any prior setup, this endpoint will only
+    * work after topology state for the participant has been pushed to this synchronizer.
     */
   override def challenge(request: ChallengeRequest): Future[ChallengeResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
@@ -230,7 +230,7 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
           cause =
             s"Challenge for $member rejected with ${response.getCode}/${response.getDescription}"
         )
-        with CantonError
+        with ContextualizedCantonError
 
     final case class AuthenticationFailure(member: String, response: Status)(implicit
         val loggingContext: ErrorLoggingContext
@@ -238,7 +238,7 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
           cause =
             s"Authentication for $member rejected with ${response.getCode}/${response.getDescription}"
         )
-        with CantonError
+        with ContextualizedCantonError
   }
 
   @Explanation(
@@ -260,7 +260,7 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
           cause =
             s"Faulty or malicious challenge for $member rejected with ${response.getCode}/${response.getDescription}"
         )
-        with CantonError
+        with ContextualizedCantonError
 
     final case class AuthenticationFailure(member: String, response: Status)(implicit
         override val loggingContext: ErrorLoggingContext
@@ -268,6 +268,6 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
           cause =
             s"Faulty or malicious authentication for $member rejected with ${response.getCode}/${response.getDescription}"
         )
-        with CantonError
+        with ContextualizedCantonError
   }
 }

@@ -60,6 +60,7 @@ import com.daml.ledger.api.v2.command_completion_service.{
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc.CommandServiceStub
 import com.daml.ledger.api.v2.command_service.{
   CommandServiceGrpc,
+  SubmitAndWaitForTransactionRequest,
   SubmitAndWaitForTransactionResponse,
   SubmitAndWaitForTransactionTreeResponse,
   SubmitAndWaitRequest,
@@ -120,12 +121,16 @@ import com.daml.ledger.api.v2.testing.time_service.{
 import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction
 import com.daml.ledger.api.v2.transaction.{Transaction, TransactionTree}
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_ACS_DELTA
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
+  EventFormat,
   Filters,
   InterfaceFilter,
   TemplateFilter,
   TransactionFilter,
+  TransactionFormat,
+  UpdateFormat,
 }
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.UpdateServiceStub
 import com.daml.ledger.api.v2.update_service.{
@@ -154,9 +159,9 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.{
-  IdentityProviderConfig as ApiIdentityProviderConfig,
   IdentityProviderId,
   JwksUrl,
+  IdentityProviderConfig as ApiIdentityProviderConfig,
 }
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -1165,6 +1170,37 @@ object LedgerApiCommands {
           .orElse(response.update.topologyTransaction.map(TopologyTransactionWrapper(_)))
     }
 
+    final case class SubscribeUpdates(
+        override val observer: StreamObserver[UpdateWrapper],
+        beginExclusive: Long,
+        endInclusive: Option[Long],
+        updateFormat: UpdateFormat,
+    )(override implicit val loggingContext: ErrorLoggingContext)
+        extends BaseCommand[GetUpdatesRequest, AutoCloseable, AutoCloseable]
+        with SubscribeBase[GetUpdatesRequest, GetUpdatesResponse, UpdateWrapper] {
+      override def doRequest(
+          service: UpdateServiceStub,
+          request: GetUpdatesRequest,
+          rawObserver: StreamObserver[GetUpdatesResponse],
+      ): Unit =
+        service.getUpdates(request, rawObserver)
+
+      override def extractResults(response: GetUpdatesResponse): IterableOnce[UpdateWrapper] =
+        response.update.transaction
+          .map[UpdateWrapper](TransactionWrapper.apply)
+          .orElse(response.update.reassignment.map(ReassignmentWrapper(_)))
+          .orElse(response.update.topologyTransaction.map(TopologyTransactionWrapper(_)))
+
+      override def createRequest(): Either[String, GetUpdatesRequest] = Right {
+        GetUpdatesRequest(
+          beginExclusive = beginExclusive,
+          endInclusive = endInclusive,
+          updateFormat = Some(updateFormat),
+        )
+      }
+
+    }
+
     final case class GetTransactionById(parties: Set[LfPartyId], id: String)(implicit
         ec: ExecutionContext
     ) extends BaseCommand[GetTransactionByIdRequest, GetTransactionTreeResponse, Option[
@@ -1616,11 +1652,31 @@ object LedgerApiCommands {
         override val applicationId: String,
         override val packageIdSelectionPreference: Seq[LfPackageId],
     ) extends SubmitCommand
-        with BaseCommand[SubmitAndWaitRequest, SubmitAndWaitForTransactionResponse, Transaction] {
+        with BaseCommand[
+          SubmitAndWaitForTransactionRequest,
+          SubmitAndWaitForTransactionResponse,
+          Transaction,
+        ] {
 
-      override protected def createRequest(): Either[String, SubmitAndWaitRequest] =
+      override protected def createRequest(): Either[String, SubmitAndWaitForTransactionRequest] =
         try {
-          Right(SubmitAndWaitRequest(commands = Some(mkCommand)))
+          Right(
+            SubmitAndWaitForTransactionRequest(
+              commands = Some(mkCommand),
+              // TODO(#23504) add transactionFormat argument for the console command
+              transactionFormat = Some(
+                TransactionFormat(
+                  eventFormat = Some(
+                    EventFormat(
+                      filtersByParty = actAs.map(_ -> Filters()).toMap,
+                      verbose = true,
+                    )
+                  ),
+                  transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+                )
+              ),
+            )
+          )
         } catch {
           case t: Throwable =>
             Left(t.getMessage)
@@ -1628,7 +1684,7 @@ object LedgerApiCommands {
 
       override protected def submitRequest(
           service: CommandServiceStub,
-          request: SubmitAndWaitRequest,
+          request: SubmitAndWaitForTransactionRequest,
       ): Future[SubmitAndWaitForTransactionResponse] =
         service.submitAndWaitForTransaction(request)
 

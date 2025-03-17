@@ -14,6 +14,7 @@ import com.digitalasset.canton.config.{
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
+    enableCantonPackageSelection: Boolean = true,
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 

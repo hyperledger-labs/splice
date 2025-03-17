@@ -9,19 +9,16 @@ import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.{HistogramInventory, MetricName}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{CantonCommunityConfig, TestingConfigInternal}
+import com.digitalasset.canton.config.{CantonConfig, TestingConfigInternal}
 import com.digitalasset.canton.integration.CommunityConfigTransforms
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.metrics.{ParticipantHistograms, ParticipantMetrics}
 import com.digitalasset.canton.participant.sync.SyncServiceError
 import com.digitalasset.canton.participant.{ParticipantNode, ParticipantNodeBootstrap}
-import com.digitalasset.canton.synchronizer.mediator.{
-  CommunityMediatorNodeConfig,
-  MediatorNodeBootstrap,
-}
+import com.digitalasset.canton.synchronizer.mediator.{MediatorNodeBootstrap, MediatorNodeConfig}
 import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
-import com.digitalasset.canton.synchronizer.sequencer.config.CommunitySequencerNodeConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, ConfigStubs, HasExecutionContext}
 import monocle.macros.syntax.lens.*
@@ -33,10 +30,10 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecutionContext {
   // we don't care about any values of this config, so just mock
-  lazy val participant1Config: CommunityParticipantConfig = ConfigStubs.participant
-  lazy val participant2Config: CommunityParticipantConfig = ConfigStubs.participant
+  lazy val participant1Config: LocalParticipantConfig = ConfigStubs.participant
+  lazy val participant2Config: LocalParticipantConfig = ConfigStubs.participant
 
-  lazy val sampleConfig: CantonCommunityConfig = CantonCommunityConfig(
+  lazy val sampleConfig: CantonConfig = CantonConfig(
     sequencers = Map(
       InstanceName.tryCreate("s1") -> ConfigStubs.sequencer,
       InstanceName.tryCreate("s2") -> ConfigStubs.sequencer,
@@ -56,14 +53,14 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
   }
 
   trait TestEnvironment {
-    def config: CantonCommunityConfig = sampleConfig
+    def config: CantonConfig = sampleConfig
 
     private val createParticipantMock =
       mock[(String, LocalParticipantConfig) => ParticipantNodeBootstrap]
     private val createSequencerMock =
-      mock[(String, CommunitySequencerNodeConfig) => SequencerNodeBootstrap]
+      mock[(String, SequencerNodeConfig) => SequencerNodeBootstrap]
     private val createMediatorMock =
-      mock[(String, CommunityMediatorNodeConfig) => MediatorNodeBootstrap]
+      mock[(String, MediatorNodeConfig) => MediatorNodeBootstrap]
 
     def mockSequencer: SequencerNodeBootstrap = {
       val sequencer = mock[SequencerNodeBootstrap]
@@ -110,19 +107,19 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
     ) {
       override def createParticipant(
           name: String,
-          participantConfig: CommunityParticipantConfig,
+          participantConfig: LocalParticipantConfig,
       ): ParticipantNodeBootstrap =
         createParticipantMock(name, participantConfig)
 
       override def createSequencer(
           name: String,
-          sequencerConfig: CommunitySequencerNodeConfig,
+          sequencerConfig: SequencerNodeConfig,
       ): SequencerNodeBootstrap =
         createSequencerMock(name, sequencerConfig)
 
       override def createMediator(
           name: String,
-          mediatorConfig: CommunityMediatorNodeConfig,
+          mediatorConfig: MediatorNodeConfig,
       ): MediatorNodeBootstrap =
         createMediatorMock(name, mediatorConfig)
     }
@@ -140,10 +137,10 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
       when(createParticipantMock(idMatcher, any[LocalParticipantConfig])).thenAnswer(create)
 
     protected def setupSequencerFactory(id: String, create: => SequencerNodeBootstrap): Unit =
-      when(createSequencerMock(eqTo(id), any[CommunitySequencerNodeConfig])).thenAnswer(create)
+      when(createSequencerMock(eqTo(id), any[SequencerNodeConfig])).thenAnswer(create)
 
     protected def setupMediatorFactory(id: String, create: => MediatorNodeBootstrap): Unit =
-      when(createMediatorMock(eqTo(id), any[CommunityMediatorNodeConfig])).thenAnswer(create)
+      when(createMediatorMock(eqTo(id), any[MediatorNodeConfig])).thenAnswer(create)
   }
 
   "Environment" when {
@@ -166,7 +163,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
 
       "write ports file if desired" in new TestEnvironment {
 
-        override def config: CantonCommunityConfig = {
+        override def config: CantonConfig = {
           val tmp = sampleConfig.focus(_.parameters.portsFile).replace(Some("my-ports.txt"))
           (CommunityConfigTransforms.updateAllParticipantConfigs { case (_, config) =>
             config
@@ -194,7 +191,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
       }
 
       "not start if manual start is desired" in new TestEnvironment {
-        override def config: CantonCommunityConfig =
+        override def config: CantonConfig =
           sampleConfig.focus(_.parameters.manualStart).replace(true)
 
         // These would throw on start, as all methods return null.

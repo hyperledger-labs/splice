@@ -3,6 +3,29 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+## Until 2025-03-05 (Exclusive)
+- Fixed slow sequencer shapshot query on the aggregate submission tables in the case when sequencer onboarding state
+  is requested much later and there's more data accumulated in the table:
+ - DB schema change: added fields and indexes to the aggregate submission tables to speed up the snapshot query.
+- A new storage parameter is introduced: `storage.parameters.failed-to-fatal-delay`. This parameter, which defaults to 5 minutes, defines the delay after which a database storage that is continously in a Failed state escalates to Fatal.
+  The sequencer liveness health is now changed to use its storage as a fatal dependency, which means that if the storage transitions to Fatal, the sequencer liveness health transitions irrevocably to NOT_SERVING. This allows a monitoring system to detect the situation and restart the node.
+  **NOTE** Currently, this parameter is only used by the `DbStorageSingle` component, which is only used by the sequencer.
+- Addressing a DAR on the admin api is simplified: Instead of the DAR ID concept, we directly use the main package-id, which is synonymous.
+  - Renamed all `darId` arguments to `mainPackageId`
+
+## Until 2025-02-26 (Exclusive)
+- The interactive submission service and external signing authorization logic are now always enabled. The following configuration fields must be removed from the participant's configuration:
+    - `ledger-api.interactive-submission-service.enabled`
+    - `parameters.enable-external-authorization`
+
+## Until 2025-02-19 (Exclusive)
+- Added `SequencerConnectionAdministration` to remote mediator instances, accessible e.g. via `mymediator.sequencer_connection.get`
+
+- **BREAKING CHANGE** Remote console sequencer connection config `canton.remote-sequencers.<sequencer>.public-api`
+now uses the same TLS option for custom trust store as `admin-api` and `ledger-api` sections:
+  - new: `tls.trust-collection-file = <existing-file>` instead of undocumented old: `custom-trust-certificates.pem-file`
+  - new: `tls.enabled = true` to use system's default trust store (old: impossible to configure) for all APIs
+- The sequencer's `SendAsyncVersioned` RPC returns errors as gRPC status codes instead of a dedicated error message with status OK.
 - DarService and Package service on the admin-api have been cleaned up:
   - Before, a DAR was referred through a hash over the zip file. Now, the DAR ID is the main package ID.
   - Renamed all `hash` arguments to `darId`.
@@ -12,8 +35,21 @@ Please also consult the [full documentation of this release](https://docs.daml.c
   - Added a new command `packages.list_references` to support listing which DARs are referencing a particular
     package.
 
+- New sequencer connection validation mode `SEQUENCER_CONNECTION_VALIDATON_THRESHOLD_ACTIVE` behaves like `SEQUENCER_CONNECTION_VALIDATON_ACTIVE` except that it fails when the threshold of sequencers is not reached. In Canton 3.2, `SEQUENCER_CONNECTION_VALIDATON_THRESHOLD_ACTIVE` was called `STRICT_ACTIVE`.
+
+- **BREAKING CHANGE** Renamed the `filter_store` parameter in `TopologyManagerReadService` to `store` because it doesn't act anymore as a string filter like `filter_party`.
+- **BREAKING CHANGE** Console commands changed the parameter `filterStore: String` to `store: TopologyStoreId`. Additionally, there
+  are implicit conversions in `ConsoleEnvironment` to convert `SynchronizerId` to `TopologyStoreId` and variants thereof (`Option`, `Set`, ...).
+  With these implicit conversions, whenever a `TopologyStoreId` is expected, users can pass just the synchronizer id and it will be automatically converted
+  into the correct `TopologyStoreId.Synchronizer`.
+
+- Reduced the payload size of an ACS commitment from 2kB to 34 bytes.
+
+- **BREAKING CHANGE** Changed the endpoint `PackageService.UploadDar` to accept a list of dars that can be uploaded and vetted together.
+  The same change is also represented in the `ParticipantAdminCommands.Package.UploadDar`.
+
 ## Until 2025-02-12 (Exclusive)
-- Added the concept of temporary topology stores. A temporary topology store is not connected to any synchronizer store 
+- Added the concept of temporary topology stores. A temporary topology store is not connected to any synchronizer store
   and therefore does not automatically submit transactions to synchronizers. Temporary topology stores can be used
   for the synchronizer bootstrapping ceremony to not "pollute" the synchronizer owners' authorized stores. Another use
   case is to upload a topology snapshot and inspect the snapshot via the usual topology read service endpoints.

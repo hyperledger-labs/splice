@@ -838,7 +838,7 @@ abstract class ScanStoreTest
     "getTotalPurchasedMemberTraffic" should {
 
       "return the sum over all traffic contracts for the member" in {
-        val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
+        val namespace = Namespace(Fingerprint.tryFromString(s"dummy"))
         val goodMember = ParticipantId(UniqueIdentifier.tryCreate("good", namespace))
         val badMember = MediatorId(UniqueIdentifier.tryCreate("bad", namespace))
         val goodContracts =

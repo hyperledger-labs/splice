@@ -40,11 +40,6 @@ type AnyContractId = ContractId AnyContract
 -- | A type for passing extra data from an app's backends to the choices of that app
 -- exercised in commands submitted by app users.
 data ChoiceContext = ChoiceContext with
-    name : Text
-      -- ^ -- | Name distinguishing between different kinds of choice contexts for debugging purposes.
-      --
-      -- SHOULD be of the form `<dns-name-of-app-publisher>/<app-level-name>` to make it easy to distinguish
-      -- choice contexts of different apps.
     values : Map Text AnyValue
   deriving (Show, Eq)
 

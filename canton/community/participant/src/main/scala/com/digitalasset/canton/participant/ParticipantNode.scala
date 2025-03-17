@@ -16,13 +16,9 @@ import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorServic
 import com.digitalasset.canton.config.SessionSigningKeysConfig
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
-import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
-import com.digitalasset.canton.crypto.{
-  CommunityCryptoFactory,
-  Crypto,
-  CryptoPureApi,
-  SyncCryptoApiParticipantProvider,
-}
+import com.digitalasset.canton.crypto.kms.CommunityKmsFactory
+import com.digitalasset.canton.crypto.store.CommunityCryptoPrivateStoreFactory
+import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi, SyncCryptoApiParticipantProvider}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.*
@@ -147,7 +143,7 @@ class ParticipantNodeBootstrap(
       storeId: TopologyStoreId
   ): Option[SynchronizerTopologyClient] =
     storeId match {
-      case SynchronizerStore(synchronizerId, _) =>
+      case SynchronizerStore(synchronizerId) =>
         cantonSyncService.get.flatMap(_.lookupTopologyClient(synchronizerId))
       case _ => None
     }
@@ -345,7 +341,7 @@ class ParticipantNodeBootstrap(
           // TODO(#22362): Enable correct config
           // parameters.sessionSigningKeys
           SessionSigningKeysConfig.disabled,
-          parameters.batchingConfig.parallelism.unwrap,
+          parameters.batchingConfig.parallelism,
           timeouts,
           futureSupervisor,
           loggerFactory,
@@ -882,7 +878,8 @@ class ParticipantNodeBootstrap(
 
   override def config: LocalParticipantConfig = arguments.config
 
-  /** If set to `Some(path)`, every sequencer client will record all received events to the directory `path`.
+  /** If set to `Some(path)`, every sequencer client will record all received events to the
+    * directory `path`.
     */
   protected val recordSequencerInteractions: AtomicReference[Option[RecordingConfig]] =
     new AtomicReference(None)
@@ -924,7 +921,14 @@ object ParticipantNodeBootstrap {
     type Arguments =
       CantonNodeBootstrapCommonArguments[PC, ParticipantNodeParameters, ParticipantMetrics]
 
-    protected def createEngine(arguments: Arguments): Engine
+    protected def createEngine(arguments: Arguments): Engine = DAMLe.newEngine(
+      enableLfDev = arguments.parameterConfig.alphaVersionSupport,
+      enableLfBeta = arguments.parameterConfig.betaVersionSupport,
+      enableStackTraces = arguments.parameterConfig.engine.enableEngineStackTraces,
+      profileDir = arguments.config.features.profileDir,
+      iterationsBetweenInterruptions =
+        arguments.parameterConfig.engine.iterationsBetweenInterruptions,
+    )
 
     protected def createResourceService(
         arguments: Arguments
@@ -962,16 +966,7 @@ object ParticipantNodeBootstrap {
   )
 
   object CommunityParticipantFactory
-      extends Factory[CommunityParticipantConfig, ParticipantNodeBootstrap] {
-
-    override protected def createEngine(arguments: Arguments): Engine =
-      DAMLe.newEngine(
-        enableLfDev = arguments.parameterConfig.alphaVersionSupport,
-        enableLfBeta = arguments.parameterConfig.betaVersionSupport,
-        enableStackTraces = arguments.parameterConfig.engine.enableEngineStackTraces,
-        iterationsBetweenInterruptions =
-          arguments.parameterConfig.engine.iterationsBetweenInterruptions,
-      )
+      extends Factory[LocalParticipantConfig, ParticipantNodeBootstrap] {
 
     override protected def createResourceService(
         arguments: Arguments
@@ -1011,7 +1006,7 @@ object ParticipantNodeBootstrap {
 
     override def create(
         arguments: NodeFactoryArguments[
-          CommunityParticipantConfig,
+          LocalParticipantConfig,
           ParticipantNodeParameters,
           ParticipantMetrics,
         ],
@@ -1025,8 +1020,18 @@ object ParticipantNodeBootstrap {
       arguments
         .toCantonNodeBootstrapCommonArguments(
           new CommunityStorageFactory(arguments.config.storage),
-          new CommunityCryptoFactory,
-          new CommunityCryptoPrivateStoreFactory,
+          new CommunityCryptoPrivateStoreFactory(
+            arguments.config.crypto.provider,
+            arguments.config.crypto.kms,
+            CommunityKmsFactory,
+            arguments.config.parameters.caching.kmsMetadataCache,
+            arguments.config.crypto.privateKeyStore,
+            arguments.parameters.nonStandardConfig,
+            arguments.futureSupervisor,
+            arguments.clock,
+            arguments.executionContext,
+          ),
+          CommunityKmsFactory,
         )
         .map { arguments =>
           val engine = createEngine(arguments)
@@ -1116,8 +1121,10 @@ class ParticipantNode(
 
   override def isActive: Boolean = storage.isActive
 
-  /** @param isTriggeredManually True if the call of this method is triggered by an explicit call to the connectivity service,
-    *                            false if the call of this method is triggered by a node restart or transition to active
+  /** @param isTriggeredManually
+    *   True if the call of this method is triggered by an explicit call to the connectivity
+    *   service, false if the call of this method is triggered by a node restart or transition to
+    *   active
     */
   def reconnectSynchronizersIgnoreFailures(isTriggeredManually: Boolean)(implicit
       traceContext: TraceContext,

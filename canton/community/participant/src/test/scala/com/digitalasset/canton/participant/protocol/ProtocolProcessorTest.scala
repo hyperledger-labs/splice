@@ -83,6 +83,7 @@ import com.digitalasset.canton.{
   BaseTest,
   DefaultDamlValues,
   HasExecutionContext,
+  RepairCounter,
   RequestCounter,
   SequencerCounter,
 }
@@ -217,7 +218,7 @@ class ProtocolProcessorTest
       ByteString.EMPTY,
       // this is only a placeholder, the data is not encrypted
       crypto.pureCrypto.defaultEncryptionAlgorithmSpec,
-      Fingerprint.tryCreate("dummy"),
+      Fingerprint.tryFromString("dummy"),
     ),
   )
 
@@ -433,6 +434,8 @@ class ProtocolProcessorTest
     isReceipt = false,
   )
 
+  private lazy val topologySnapshot = topology.build().topologySnapshot()
+
   private lazy val subId = DefaultDamlValues.submissionId()
   private lazy val changeId = DefaultParticipantStateValues.changeId(Set.empty)
   private lazy val changeIdHash = ChangeIdHash(changeId)
@@ -468,7 +471,7 @@ class ProtocolProcessorTest
       val (sut, _persistent, _ephemeral, _) =
         testProcessingSteps(pendingSubmissionMap = submissionMap)
       sut
-        .submit(0)
+        .submit(0, topologySnapshot)
         .valueOrFailShutdown("submission")
         .futureValue
         .failOnShutdown("shutting down while test is running")
@@ -499,7 +502,7 @@ class ProtocolProcessorTest
         )
 
       val submissionResult = loggerFactory.assertLogs(
-        sut.submit(0).futureValueUS,
+        sut.submit(0, topologySnapshot).futureValueUS,
         _.warningMessage should include(s"Failed to submit submission due to"),
       )
 
@@ -513,7 +516,7 @@ class ProtocolProcessorTest
         testProcessingSteps(pendingSubmissionMap = submissionMap)
 
       sut
-        .submit(1)
+        .submit(1, topologySnapshot)
         .valueOrFailShutdown("submission")
         .futureValue
         .failOnShutdown("shutting down while test is running")
@@ -537,7 +540,8 @@ class ProtocolProcessorTest
         parameters.parameters,
       ).forOwnerAndSynchronizer(participant, synchronizer)
       val (sut, persistent, ephemeral, _) = testProcessingSteps(crypto = crypto2)
-      val res = sut.submit(1).onShutdown(fail("submission shutdown")).value.futureValue
+      val topo2 = crypto2.currentSnapshotApproximation.ipsSnapshot
+      val res = sut.submit(1, topo2).onShutdown(fail("submission shutdown")).value.futureValue
       res shouldBe Left(TestProcessorError(NoMediatorError(CantonTimestamp.Epoch)))
     }
   }
@@ -605,6 +609,7 @@ class ProtocolProcessorTest
               requestSc + 1,
               CantonTimestamp.Epoch.minusSeconds(10),
               CantonTimestamp.Epoch.minusSeconds(10),
+              RepairCounter.Genesis,
             ),
           ),
         )
@@ -1095,6 +1100,7 @@ class ProtocolProcessorTest
             requestSc + 10,
             CantonTimestamp.Epoch.plusSeconds(30),
             CantonTimestamp.Epoch.plusSeconds(30),
+            RepairCounter.Genesis,
           ),
         )
       )

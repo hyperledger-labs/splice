@@ -185,7 +185,7 @@ export class LedgerApiClient {
     const rootEventId = Math.min(...eventIds);
     const rootEvent = tree.eventsById[rootEventId];
     const exerciseResult = choice.resultDecoder.runWithException(
-      rootEvent.ExercisedTreeEvent.exerciseResult
+      rootEvent.ExercisedTreeEvent.value.exerciseResult
     );
     return exerciseResult;
   }

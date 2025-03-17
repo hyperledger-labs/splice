@@ -5,11 +5,12 @@ package com.digitalasset.canton.participant.protocol
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.Update
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization
+import com.digitalasset.canton.ledger.participant.state.{FloatingUpdate, Update}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.topology.*
@@ -61,12 +62,12 @@ class ParticipantTopologyTerminateProcessingTest
   ): (
       ParticipantTopologyTerminateProcessing,
       TopologyStore[TopologyStoreId.SynchronizerStore],
-      ArgumentCaptor[CantonTimestamp => Option[Update]],
+      ArgumentCaptor[CantonTimestamp => Option[FloatingUpdate]],
       RecordOrderPublisher,
   ) = {
 
-    val eventCaptor: ArgumentCaptor[CantonTimestamp => Option[Update]] =
-      ArgumentCaptor.forClass(classOf[CantonTimestamp => Option[Update]])
+    val eventCaptor: ArgumentCaptor[CantonTimestamp => Option[FloatingUpdate]] =
+      ArgumentCaptor.forClass(classOf[CantonTimestamp => Option[FloatingUpdate]])
 
     val recordOrderPublisher = mock[RecordOrderPublisher]
     when(
@@ -75,7 +76,7 @@ class ParticipantTopologyTerminateProcessingTest
         eventCaptor.capture(),
       )(any[TraceContext])
     )
-      .thenReturn(Right(()))
+      .thenReturn(Outcome(Right(())))
 
     val proc = new ParticipantTopologyTerminateProcessing(
       DefaultTestIdentities.synchronizerId,
@@ -136,6 +137,13 @@ class ParticipantTopologyTerminateProcessingTest
     )
   )
 
+  val trustCertificate: SignedTopologyTransaction[Replace, SynchronizerTrustCertificate] = mkAdd(
+    SynchronizerTrustCertificate(
+      DefaultTestIdentities.participant1,
+      DefaultTestIdentities.synchronizerId,
+    )
+  )
+
   def add(
       store: TopologyStore[TopologyStoreId.SynchronizerStore],
       timestamp: CantonTimestamp,
@@ -182,7 +190,7 @@ class ParticipantTopologyTerminateProcessingTest
         } yield {
           verify(rop, times(1)).scheduleFloatingEventPublication(
             any[CantonTimestamp],
-            any[CantonTimestamp => Option[Update]],
+            any[CantonTimestamp => Option[FloatingUpdate]],
           )(any[TraceContext])
           val events = eventCaptor.getAllValues.asScala.flatMap(_(CantonTimestamp.MinValue))
           events.size shouldBe 1
@@ -222,7 +230,7 @@ class ParticipantTopologyTerminateProcessingTest
         } yield {
           verify(rop, times(1)).scheduleFloatingEventPublication(
             any[CantonTimestamp],
-            any[CantonTimestamp => Option[Update]],
+            any[CantonTimestamp => Option[FloatingUpdate]],
           )(any[TraceContext])
           val events = eventCaptor.getAllValues.asScala.flatMap(_(CantonTimestamp.MinValue))
           events.size shouldBe 1
@@ -262,7 +270,7 @@ class ParticipantTopologyTerminateProcessingTest
         } yield {
           verify(rop, times(1)).scheduleFloatingEventPublication(
             any[CantonTimestamp],
-            any[CantonTimestamp => Option[Update]],
+            any[CantonTimestamp => Option[FloatingUpdate]],
           )(any[TraceContext])
           val events = eventCaptor.getAllValues.asScala.flatMap(_(CantonTimestamp.MinValue))
           events.size shouldBe 1
@@ -340,14 +348,14 @@ class ParticipantTopologyTerminateProcessingTest
           _ = {
             verify(rop, times(0)).scheduleFloatingEventPublication(
               any[CantonTimestamp],
-              any[CantonTimestamp => Option[Update]],
+              any[CantonTimestamp => Option[FloatingUpdate]],
             )(any[TraceContext])
           }
           _ <- proc.terminate(sc2, SequencedTime(cts2), EffectiveTime(cts2))
         } yield {
           verify(rop, times(0)).scheduleFloatingEventPublication(
             any[CantonTimestamp],
-            any[CantonTimestamp => Option[Update]],
+            any[CantonTimestamp => Option[FloatingUpdate]],
           )(any[TraceContext])
           succeed
         }
@@ -364,10 +372,10 @@ class ParticipantTopologyTerminateProcessingTest
         when(
           rop.scheduleFloatingEventPublication(
             any[CantonTimestamp],
-            any[CantonTimestamp => Option[Update]],
+            any[CantonTimestamp => Option[FloatingUpdate]],
           )(any[TraceContext])
         )
-          .thenReturn(Left(CantonTimestamp.ofEpochSecond(15)))
+          .thenReturn(Outcome(Left(CantonTimestamp.ofEpochSecond(15))))
 
         for {
           _ <- add(store, cts, txs)
@@ -375,7 +383,7 @@ class ParticipantTopologyTerminateProcessingTest
         } yield {
           verify(rop, times(1)).scheduleFloatingEventPublication(
             any[CantonTimestamp],
-            any[CantonTimestamp => Option[Update]],
+            any[CantonTimestamp => Option[FloatingUpdate]],
           )(any[TraceContext])
           err.getMessage should include(
             "Cannot schedule topology event as record time is already at"
@@ -430,21 +438,24 @@ class ParticipantTopologyTerminateProcessingTest
             eventCaptor.capture(),
           )(any[TraceContext])
         ).thenAnswer { (timestamp: CantonTimestamp, _: CantonTimestamp => Option[Update]) =>
-          if (timestamp == CantonTimestamp.ofEpochSecond(20))
-            Left(CantonTimestamp.ofEpochSecond(20))
-          else
-            Right(())
+          Outcome(
+            if (timestamp == CantonTimestamp.ofEpochSecond(20))
+              Left(CantonTimestamp.ofEpochSecond(20))
+            else
+              Right(())
+          )
         }
 
-        val immediateEventCaptor: ArgumentCaptor[CantonTimestamp => Option[Update]] =
-          ArgumentCaptor.forClass(classOf[CantonTimestamp => Option[Update]])
+        val immediateEventCaptor: ArgumentCaptor[CantonTimestamp => Option[FloatingUpdate]] =
+          ArgumentCaptor.forClass(classOf[CantonTimestamp => Option[FloatingUpdate]])
         when(
           rop.scheduleFloatingEventPublicationImmediately(
             immediateEventCaptor.capture()
           )(any[TraceContext])
         )
-          .thenReturn(CantonTimestamp.ofEpochSecond(20))
+          .thenReturn(Outcome(CantonTimestamp.ofEpochSecond(20)))
         for {
+          _ <- add(store, cts.minusSeconds(2), cts.minusSeconds(1), List(trustCertificate))
           _ <- add(store, cts, cts2, List(partyParticipant1(parties.head))) // before
           _ <- add(store, cts2, cts4, List(partyParticipant1(parties(1)))) // before
           _ <- add(
@@ -478,15 +489,15 @@ class ParticipantTopologyTerminateProcessingTest
           _ <- proc.scheduleMissingTopologyEventsAtInitialization(
             topologyEventPublishedOnInitialRecordTime = true,
             traceContextLookup,
-            2,
+            PositiveInt.two,
           )
           _ = {
             verify(rop, times(3)).scheduleFloatingEventPublication(
               any[CantonTimestamp],
-              any[CantonTimestamp => Option[Update]],
+              any[CantonTimestamp => Option[FloatingUpdate]],
             )(any[TraceContext])
             verify(rop, times(0)).scheduleFloatingEventPublicationImmediately(
-              any[CantonTimestamp => Option[Update]]
+              any[CantonTimestamp => Option[FloatingUpdate]]
             )(any[TraceContext])
             extractFromUpdates(
               eventCaptor.getAllValues.asScala.toList
@@ -501,15 +512,15 @@ class ParticipantTopologyTerminateProcessingTest
           _ <- proc.scheduleMissingTopologyEventsAtInitialization(
             topologyEventPublishedOnInitialRecordTime = false,
             traceContextLookup,
-            2,
+            PositiveInt.two,
           )
         } yield {
           verify(rop, times(6)).scheduleFloatingEventPublication(
             any[CantonTimestamp],
-            any[CantonTimestamp => Option[Update]],
+            any[CantonTimestamp => Option[FloatingUpdate]],
           )(any[TraceContext])
           verify(rop, times(1)).scheduleFloatingEventPublicationImmediately(
-            any[CantonTimestamp => Option[Update]]
+            any[CantonTimestamp => Option[FloatingUpdate]]
           )(any[TraceContext])
           extractFromUpdates(
             immediateEventCaptor.getAllValues.asScala.toList

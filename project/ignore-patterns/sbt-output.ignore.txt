@@ -116,8 +116,6 @@ WARNING: Failed to fetch secret, retrying in 10 seconds
 # This is actually not a warning
 .*No want/action statements, nothing to do
 
-.*The geckodriver version cannot be discovered.*
-
 # Produced by TS codegen
 Generating daml-prim-DA-Exception-AssertionFailed
 Generating daml-prim-DA-Exception-PreconditionFailed

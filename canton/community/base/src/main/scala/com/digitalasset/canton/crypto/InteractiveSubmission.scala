@@ -103,12 +103,7 @@ object InteractiveSubmission {
     )
 
     def saltFromSerializedContract(serializedNode: SerializableContract): Bytes =
-      // Salt is not hashed in V1, so it's not relevant for now, but the hashing function takes a FatContractInstance
-      // so we extract it and pass it in still
-      serializedNode.contractSalt
-        .map(_.toProtoV30.salt)
-        .map(Bytes.fromByteString)
-        .getOrElse(Bytes.Empty)
+      Bytes.fromByteString(serializedNode.contractSalt.toProtoV30.salt)
 
     def apply(
         actAs: Set[Ref.Party],
@@ -218,10 +213,14 @@ object InteractiveSubmission {
   }
 
   /** Verify that the signatures provided cover the actAs parties, and are valid.
-    * @param hash hash of the transaction
-    * @param signatures signatures provided in the request
-    * @param cryptoSnapshot topology snapshot to use to validate signatures
-    * @param actAs actAs parties that should be covered by the signatures
+    * @param hash
+    *   hash of the transaction
+    * @param signatures
+    *   signatures provided in the request
+    * @param cryptoSnapshot
+    *   topology snapshot to use to validate signatures
+    * @param actAs
+    *   actAs parties that should be covered by the signatures
     */
   def verifySignatures(
       hash: Hash,
@@ -268,7 +267,8 @@ object InteractiveSubmission {
     }
   }
 
-  /** Verifies that there are enough _valid_ signatures for each party to reach the threshold configured for that party.
+  /** Verifies that there are enough _valid_ signatures for each party to reach the threshold
+    * configured for that party.
     */
   private def verifySignatures(
       hash: Hash,

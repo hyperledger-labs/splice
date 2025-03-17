@@ -101,7 +101,7 @@ object ConfigTransforms {
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
           validatorPartyHint =
             c.validatorPartyHint.map(h => h.replaceAll("-(.*)-", s"-$$1$suffix-")),
-          validatorWalletUser = c.validatorWalletUser.map(u => s"$u-$suffix"),
+          validatorWalletUsers = c.validatorWalletUsers.map(u => s"$u-$suffix"),
           appInstances = c.appInstances.view
             .mapValues(i =>
               i.copy(
@@ -611,7 +611,7 @@ object ConfigTransforms {
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
 
-  private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
+  private def portTransform(bump: Int, c: FullClientConfig): FullClientConfig =
     c.copy(port = c.port + bump)
 
   private def portTransform(bump: Int, c: LedgerApiClientConfig): LedgerApiClientConfig =

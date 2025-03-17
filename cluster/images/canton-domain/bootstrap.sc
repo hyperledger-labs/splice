@@ -26,7 +26,7 @@ def main() {
           false
         case NodeStatus.NotInitialized(_, _) =>
           logger.info("Initializing synchronizer")
-          com.digitalasset.canton.console.EnterpriseConsoleMacros.bootstrap.synchronizer(
+          com.digitalasset.canton.console.ConsoleMacros.bootstrap.synchronizer(
             "synchronizer",
             synchronizerOwners = Seq(sequencer),
             sequencers = Seq(sequencer),

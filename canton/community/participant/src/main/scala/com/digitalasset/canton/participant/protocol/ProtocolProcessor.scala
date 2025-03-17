@@ -6,7 +6,7 @@ package com.digitalasset.canton.participant.protocol
 import cats.data.{EitherT, NonEmptyChain}
 import cats.syntax.either.*
 import cats.syntax.functorFilter.*
-import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
@@ -71,15 +71,20 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, blocking}
 import scala.util.{Failure, Success}
 
-/** The [[ProtocolProcessor]] orchestrates Phase 3, 4, and 7 of the synchronization protocol.
-  * For this, it combines [[ProcessingSteps]] specific to a particular kind of request (transaction / reassignment)
-  * with the common processing steps.
+/** The [[ProtocolProcessor]] orchestrates Phase 3, 4, and 7 of the synchronization protocol. For
+  * this, it combines [[ProcessingSteps]] specific to a particular kind of request (transaction /
+  * reassignment) with the common processing steps.
   *
-  * @param steps The specific processing steps
-  * @tparam SubmissionParam  The bundled submission parameters
-  * @tparam SubmissionResult The bundled submission results
-  * @tparam RequestViewType     The type of view trees used by the request
-  * @tparam SubmissionError  The type of errors that occur during submission processing
+  * @param steps
+  *   The specific processing steps
+  * @tparam SubmissionParam
+  *   The bundled submission parameters
+  * @tparam SubmissionResult
+  *   The bundled submission results
+  * @tparam RequestViewType
+  *   The type of view trees used by the request
+  * @tparam SubmissionError
+  *   The type of errors that occur during submission processing
   */
 abstract class ProtocolProcessor[
     SubmissionParam,
@@ -126,13 +131,11 @@ abstract class ProtocolProcessor[
 
   private[this] def withKind(message: String): String = s"${steps.requestKind}: $message"
 
-  /** Stores a counter for the submissions.
-    * Incremented whenever we pick a mediator for a submission
+  /** Stores a counter for the submissions. Incremented whenever we pick a mediator for a submission
     * so that we use mediators round-robin.
     *
-    * Every processor picks the mediators independently,
-    * so it may be that the participant picks the same mediator several times in a row,
-    * but for different kinds of requests.
+    * Every processor picks the mediators independently, so it may be that the participant picks the
+    * same mediator several times in a row, but for different kinds of requests.
     */
   private val submissionCounter: AtomicInteger = new AtomicInteger(0)
 
@@ -147,22 +150,26 @@ abstract class ProtocolProcessor[
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SubmissionError, Unit]
 
-  /** Submits the request to the sequencer, using a recent topology snapshot and the current persisted state
-    * as an approximation to the future state at the assigned request timestamp.
+  /** Submits the request to the sequencer, using a recent topology snapshot and the current
+    * persisted state as an approximation to the future state at the assigned request timestamp.
     *
-    * @param submissionParam The bundled submission parameters
-    * @return The submission error or a future with the submission result.
-    *         With submission tracking, the outer future completes after the submission is registered as in-flight,
-    *         and the inner future after the submission has been sequenced or if it will never be sequenced.
-    *         Without submission tracking, both futures complete after the submission has been sequenced
-    *         or if it will not be sequenced.
+    * @param submissionParam
+    *   The bundled submission parameters
+    * @param topologySnapshot
+    *   A recent topology snapshot
+    * @return
+    *   The submission error or a future with the submission result. With submission tracking, the
+    *   outer future completes after the submission is registered as in-flight, and the inner future
+    *   after the submission has been sequenced or if it will never be sequenced. Without submission
+    *   tracking, both futures complete after the submission has been sequenced or if it will not be
+    *   sequenced.
     */
-  def submit(submissionParam: SubmissionParam)(implicit
+  def submit(submissionParam: SubmissionParam, topologySnapshot: TopologySnapshot)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SubmissionError, FutureUnlessShutdown[SubmissionResult]] = {
     logger.debug(withKind(s"Preparing request ${steps.submissionDescription(submissionParam)}"))
 
-    val recentSnapshot = crypto.currentSnapshotApproximation
+    val recentSnapshot = crypto.create(topologySnapshot)
     val explicitMediatorGroupIndex = steps.explicitMediatorGroup(submissionParam)
     for {
       _ <- preSubmissionValidations(submissionParam, recentSnapshot, protocolVersion)
@@ -231,7 +238,8 @@ abstract class ProtocolProcessor[
     EitherT(fut)
   }
 
-  /** Submits the batch without registering as in-flight and reports send errors as [[scala.Left$]] */
+  /** Submits the batch without registering as in-flight and reports send errors as [[scala.Left$]]
+    */
   private def submitWithoutTracking(
       submissionParam: SubmissionParam,
       untracked: steps.UntrackedSubmission,
@@ -266,11 +274,12 @@ abstract class ProtocolProcessor[
     result.bimap(untracked.toSubmissionError, FutureUnlessShutdown.pure)
   }
 
-  /** Register the submission at the [[submission.InFlightSubmissionTracker]] as in-flight, deduplicate it, and submit it.
-    * Errors after the registration are reported asynchronously only and return a [[scala.Right$]].
-    * This ensures that every submission generates at most one rejection reason, namely through the
-    * timely rejection mechanism. In-flight tracking may concurrently remove the submission at any time
-    * and publish the timely rejection event instead of the actual error.
+  /** Register the submission at the [[submission.InFlightSubmissionTracker]] as in-flight,
+    * deduplicate it, and submit it. Errors after the registration are reported asynchronously only
+    * and return a [[scala.Right$]]. This ensures that every submission generates at most one
+    * rejection reason, namely through the timely rejection mechanism. In-flight tracking may
+    * concurrently remove the submission at any time and publish the timely rejection event instead
+    * of the actual error.
     */
   private def submitWithTracking(
       submissionParam: SubmissionParam,
@@ -424,8 +433,7 @@ abstract class ProtocolProcessor[
 
   protected def metricsContextForSubmissionParam(submissionParam: SubmissionParam): MetricsContext
 
-  /** Submit the batch to the sequencer.
-    * Also registers `submissionParam` as pending submission.
+  /** Submit the batch to the sequencer. Also registers `submissionParam` as pending submission.
     */
   private def submitInternal(
       submissionParam: SubmissionParam,
@@ -513,8 +521,9 @@ abstract class ProtocolProcessor[
     }
   }
 
-  /** Schedules removal of the pending submission once the request tracker has advanced to the decision time.
-    * This happens if the request times out (w.r.t. the submission timestamp) or the sequencer never delivers a request.
+  /** Schedules removal of the pending submission once the request tracker has advanced to the
+    * decision time. This happens if the request times out (w.r.t. the submission timestamp) or the
+    * sequencer never delivers a request.
     */
   private def schedulePendingSubmissionRemoval(
       submissionTimestamp: CantonTimestamp,
@@ -930,7 +939,6 @@ abstract class ProtocolProcessor[
         .map { submitterMetadata =>
           steps.eventAndSubmissionIdForRejectedCommand(
             ts,
-            rc,
             sc,
             submitterMetadata,
             rootHash,
@@ -1017,7 +1025,9 @@ abstract class ProtocolProcessor[
     } yield ()
   }
 
-  /** Updates trackers and sends confirmation responses in the case that at least one view is wellformed. */
+  /** Updates trackers and sends confirmation responses in the case that at least one view is
+    * wellformed.
+    */
   private def trackAndSendResponsesWellformed(
       parsedRequest: steps.ParsedRequestType,
       activenessSet: ActivenessSet,
@@ -1065,7 +1075,7 @@ abstract class ProtocolProcessor[
               engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
             )
           val responses = EitherT.pure[FutureUnlessShutdown, steps.RequestError](
-            Seq.empty[(ConfirmationResponse, Recipients)]
+            Option.empty[(ConfirmationResponses, Recipients)]
           )
           val timeoutEvent = Either.right(Option.empty[SequencedUpdate])
           EitherT.pure[FutureUnlessShutdown, steps.RequestError](
@@ -1132,9 +1142,13 @@ abstract class ProtocolProcessor[
       _ = EitherTUtil.doNotAwaitUS(timeoutET, "Handling timeout failed")
 
       responsesTo <- responsesToET
-      signedResponsesTo <- EitherT.right(responsesTo.parTraverse { case (response, recipients) =>
-        signResponse(parsedRequest.snapshot, response).map(_ -> recipients)
-      })
+
+      signedResponsesTo <- EitherT.right[steps.RequestError](
+        responsesTo.traverse { case (responses, recipients) =>
+          signResponses(parsedRequest.snapshot, responses).map(_ -> recipients)
+        }
+      )
+
       engineAbortStatus <- EitherT.right(pendingData.engineAbortStatusF)
       _ <-
         if (engineAbortStatus.isAborted) {
@@ -1143,29 +1157,30 @@ abstract class ProtocolProcessor[
             s"Phase 4: Finished validation for request=${requestId.unwrap} with abort."
           )
           EitherTUtil.unitUS[steps.RequestError]
-        } else if (signedResponsesTo.nonEmpty) {
-          val messageId = sequencerClient.generateMessageId
-          logger.info(
-            s"Phase 4: Sending for request=${requestId.unwrap} with msgId=$messageId ${val (approved, rejected) =
-                signedResponsesTo
-                  .foldLeft((0, 0)) { case ((app, rej), (response, _)) =>
-                    response.message.localVerdict match {
-                      case LocalApprove() => (app + 1, rej)
-                      case _: LocalReject => (app, rej + 1)
-                    }
-                  }
-              s"approved=$approved, rejected=$rejected" }"
-          )
-          EitherT.right[steps.RequestError](
-            sendResponses(requestId, signedResponsesTo, Some(messageId))
-          )
         } else {
-          logger.info(
-            s"Phase 4: Finished validation for request=${requestId.unwrap} with nothing to approve."
-          )
-          EitherTUtil.unitUS[steps.RequestError]
+          signedResponsesTo match {
+            case Some((spm, recipients)) =>
+              val messageId = sequencerClient.generateMessageId
+              logger.info(
+                s"Phase 4: Sending for request=${requestId.unwrap} with msgId=$messageId ${val (approved, rejected) =
+                    spm.message.responses.foldLeft((0, 0)) { case ((app, rej), response) =>
+                      response.localVerdict match {
+                        case LocalApprove() => (app + 1, rej)
+                        case _: LocalReject => (app, rej + 1)
+                      }
+                    }
+                  s"approved=$approved, rejected=$rejected" }"
+              )
+              EitherT.right[steps.RequestError](
+                sendResponses(requestId, Seq(spm -> recipients), Some(messageId))
+              )
+            case _ =>
+              logger.info(
+                s"Phase 4: Finished validation for request=${requestId.unwrap} with nothing to approve."
+              )
+              EitherTUtil.unitUS[steps.RequestError]
+          }
         }
-
     } yield ()
 
   }
@@ -1198,19 +1213,20 @@ abstract class ProtocolProcessor[
 
         _ = ephemeral.requestTracker.tick(sc, ts)
 
-        responses = steps.constructResponsesForMalformedPayloads(
+        confirmationResponsesO = steps.constructResponsesForMalformedPayloads(
           requestId,
           rootHash,
           malformedPayloads,
         )
-        recipients = Recipients.cc(mediatorGroup)
-        messages <- EitherT
-          .right(responses.parTraverse { response =>
-            signResponse(snapshot, response).map(_ -> recipients)
-          })
-
-        _ <- EitherT.right(sendResponses(requestId, messages))
-
+        _ <- confirmationResponsesO match {
+          case Some(responses) =>
+            val recipients = Recipients.cc(mediatorGroup)
+            EitherT.right(
+              signResponses(snapshot, responses)
+                .map(message => sendResponses(requestId, Seq(message -> recipients)))
+            )
+          case None => EitherTUtil.unitUS
+        }
         _ = requestDataHandle.complete(None)
 
         _ <- EitherT.right[steps.RequestError](terminateRequest(rc, sc, ts, ts, None))
@@ -1352,9 +1368,8 @@ abstract class ProtocolProcessor[
     } yield asyncResult
   }
 
-  /** This processing step corresponds to the end of the synchronous part of the processing
-    * of confirmation result.
-    * The inner `EitherT` corresponds to the subsequent async stage.
+  /** This processing step corresponds to the end of the synchronous part of the processing of
+    * confirmation result. The inner `EitherT` corresponds to the subsequent async stage.
     */
   private[this] def processResultInternal2(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
@@ -1868,7 +1883,8 @@ object ProtocolProcessor {
   }
 
   /** The sequencer did not sequence our event within the allotted time
-    * @param timestamp sequencer time when the timeout occurred
+    * @param timestamp
+    *   sequencer time when the timeout occurred
     */
   final case class SequencerTimeoutError(timestamp: CantonTimestamp)
       extends SubmissionProcessingError

@@ -4,8 +4,8 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.canton.admin.api.client.commands.SequencerBftAdminCommands
-import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -14,15 +14,15 @@ trait SequencerBftAdminConnection {
   this: AppConnection =>
   implicit val ec: ExecutionContextExecutor
 
-  def addPeerEndpoint(peer: Endpoint)(implicit tc: TraceContext): Future[Unit] = {
+  def addPeerEndpoint(peer: P2PEndpoint)(implicit tc: TraceContext): Future[Unit] = {
     runCmd(
       SequencerBftAdminCommands.AddPeerEndpoint(endpoint = peer)
     )
   }
 
-  def removePeerEndpoint(peer: Endpoint)(implicit tc: TraceContext): Future[Unit] = {
+  def removePeerEndpoint(peer: P2PEndpoint.Id)(implicit tc: TraceContext): Future[Unit] = {
     runCmd(
-      SequencerBftAdminCommands.RemovePeerEndpoint(endpoint = peer)
+      SequencerBftAdminCommands.RemovePeerEndpoint(endpointId = peer)
     )
   }
 
@@ -36,10 +36,10 @@ trait SequencerBftAdminConnection {
 
   def listCurrentPeerEndpoints()(implicit
       tc: TraceContext
-  ): Future[Seq[Endpoint]] = {
+  ): Future[Seq[P2PEndpoint.Id]] = {
     runCmd(
       SequencerBftAdminCommands.GetPeerNetworkStatus(None)
-    ).map(_.endpointStatuses.map(_.endpoint))
+    ).map(_.endpointStatuses.map(_.endpointId))
   }
 
 }

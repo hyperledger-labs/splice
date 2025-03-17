@@ -25,7 +25,7 @@ import Splice.Wallet.TransferPreapproval
 import Splice.Scripts.Wallet.TestSubscriptions
 import Splice.Fees
 import Splice.Scripts.Util
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 
 createPaymentRequest : AmuletApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do

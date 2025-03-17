@@ -10,6 +10,7 @@ import com.daml.ledger.api.v2.command_service.{
   SubmitAndWaitResponse,
 }
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
+import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
 import com.daml.ledger.api.v2.{
   command_completion_service,
   command_submission_service,
@@ -25,6 +26,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsTransaction,
   JsTransactionTree,
 }
+import com.digitalasset.canton.http.json.v2.Protocol.Protocol
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.*
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -103,7 +105,8 @@ class JsCommandService(
   )
 
   private def commandCompletionStream(
-      caller: CallerContext
+      caller: CallerContext,
+      protocol: Protocol,
   ): TracedInput[Unit] => Flow[
     command_completion_service.CompletionStreamRequest,
     command_completion_service.CompletionStreamResponse,
@@ -113,6 +116,8 @@ class JsCommandService(
     prepareSingleWsStream(
       commandCompletionServiceClient(caller.token()).completionStream,
       Future.successful[command_completion_service.CompletionStreamResponse],
+      protocol = protocol,
+      withCloseDelay = false,
     )
   }
 
@@ -150,15 +155,15 @@ class JsCommandService(
     } yield result
   }
 
-  def submitAndWaitForTransaction(callerContext: CallerContext): TracedInput[JsCommands] => Future[
+  def submitAndWaitForTransaction(
+      callerContext: CallerContext
+  ): TracedInput[JsSubmitAndWaitForTransactionRequest] => Future[
     Either[JsCantonError, JsSubmitAndWaitForTransactionResponse]
   ] = req => {
     implicit val token: Option[String] = callerContext.token()
     implicit val tc: TraceContext = req.traceContext
     for {
-      commands <- protocolConverters.Commands.fromJson(req.in)
-      submitAndWaitRequest =
-        SubmitAndWaitRequest(commands = Some(commands))
+      submitAndWaitRequest <- protocolConverters.SubmitAndWaitForTransactionRequest.fromJson(req.in)
       result <- commandServiceClient(callerContext.token())
         .submitAndWaitForTransaction(submitAndWaitRequest)
         .flatMap(r => protocolConverters.SubmitAndWaitTransactionResponse.toJson(r))
@@ -191,6 +196,11 @@ class JsCommandService(
       .resultToRight
   }
 }
+
+final case class JsSubmitAndWaitForTransactionRequest(
+    commands: JsCommands,
+    transactionFormat: TransactionFormat,
+)
 
 final case class JsSubmitAndWaitForTransactionTreeResponse(
     transactionTree: JsTransactionTree
@@ -251,7 +261,7 @@ object JsCommandService extends DocumentationEndpoints {
 
   val submitAndWaitForTransactionEndpoint = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction"))
-    .in(jsonBody[JsCommands])
+    .in(jsonBody[JsSubmitAndWaitForTransactionRequest])
     .out(jsonBody[JsSubmitAndWaitForTransactionResponse])
     .description("Submit a batch of commands and wait for the flat transactions response")
 
@@ -316,6 +326,7 @@ object JsCommandService extends DocumentationEndpoints {
 
 object JsCommandServiceCodecs {
   import JsSchema.config
+  import JsSchema.JsServicesCommonCodecs.*
 
   implicit val deduplicationPeriodRW: Codec[DeduplicationPeriod] = deriveCodec
 
@@ -326,12 +337,11 @@ object JsCommandServiceCodecs {
 
   implicit val durationRW: Codec[protobuf.duration.Duration] = deriveCodec
 
-  implicit val jsTransactionRW: Codec[JsTransaction] =
+  implicit val jsSubmitAndWaitRequestRW: Codec[JsSubmitAndWaitForTransactionRequest] =
     deriveCodec
 
   implicit val jsSubmitAndWaitForTransactionResponseRW
-      : Codec[JsSubmitAndWaitForTransactionResponse] =
-    deriveCodec
+      : Codec[JsSubmitAndWaitForTransactionResponse] = deriveCodec
 
   implicit val submitResponseRW: Codec[command_submission_service.SubmitResponse] =
     deriveCodec

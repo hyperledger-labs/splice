@@ -22,7 +22,7 @@ import Splice.Types
 import Splice.ValidatorLicense
 
 import Splice.Scripts.Util
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 
 import Splice.CometBft
 import Splice.DsoRules

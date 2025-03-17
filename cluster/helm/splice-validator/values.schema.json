@@ -201,6 +201,9 @@
         "pvc": {
           "type": "object",
           "properties": {
+            "volumeName": {
+              "type": "string"
+            },
             "volumeStorageClass": {
               "type": "string"
             }
@@ -311,9 +314,6 @@
             "type": "string"
           }
         },
-        "validatorWalletUser": {
-          "type": "string"
-        },
         "additionalUsers": {
           "type": "array",
           "items": {
@@ -414,6 +414,24 @@
           }
         }
       }
+    },
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "validatorWalletUser": { "type": "string" }
+          },
+          "required": ["validatorWalletUser"],
+          "not": { "required": ["validatorWalletUsers"] }
+        },
+        {
+          "properties": {
+            "validatorWalletUsers": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["validatorWalletUsers"],
+          "not": { "required": ["validatorWalletUser"] }
+        }
+      ]
     }
   ]
 }

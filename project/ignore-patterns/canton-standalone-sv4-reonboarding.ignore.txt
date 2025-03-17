@@ -6,7 +6,7 @@ ACS_COMMITMENT_MISMATCH
 # TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
 
-RequestRefused\(SenderUnknown\(.*MED::sv4SvReonboarding
+SEQUENCER_SENDER_UNKNOWN.*MED::sv4SvReonboarding
 
 # Caused by svs being off-boarded
 TOPOLOGY_UNAUTHORIZED_TRANSACTION

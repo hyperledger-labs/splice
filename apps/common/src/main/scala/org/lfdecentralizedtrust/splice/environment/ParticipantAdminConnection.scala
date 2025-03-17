@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxParallelTraverse_
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -13,7 +13,6 @@ import com.digitalasset.canton.admin.api.client.commands.{
   PruningSchedulerCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{
-  DarDescription,
   ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
@@ -39,7 +38,6 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
@@ -55,9 +53,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
 }
-import org.lfdecentralizedtrust.splice.util.{DarUtil, UploadablePackage}
 
-import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.reflect.ClassTag
@@ -80,6 +76,7 @@ class ParticipantAdminConnection(
       retryProvider,
     )
     with HasParticipantId
+    with ParticipantAdminDarsConnection
     with StatusAdminConnection {
   override val serviceName = "Canton Participant Admin API"
 
@@ -98,7 +95,7 @@ class ParticipantAdminConnection(
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
-  private def listConnectedDomains()(implicit
+  def listConnectedDomains()(implicit
       traceContext: TraceContext
   ): Future[Seq[ListConnectedSynchronizersResult]] = {
     runCmd(ParticipantAdminCommands.SynchronizerConnectivity.ListConnectedSynchronizers())
@@ -333,15 +330,6 @@ class ParticipantAdminConnection(
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId().map(ParticipantId(_))
 
-  def listConnectedDomain()(implicit
-      traceContext: TraceContext
-  ): Future[Seq[ListConnectedSynchronizersResult]] =
-    for {
-      connectedDomain <- runCmd(
-        ParticipantAdminCommands.SynchronizerConnectivity.ListConnectedSynchronizers()
-      )
-    } yield connectedDomain
-
   def lookupSynchronizerConnectionConfig(
       domain: SynchronizerAlias
   )(implicit traceContext: TraceContext): Future[Option[SynchronizerConnectionConfig]] =
@@ -456,131 +444,6 @@ class ParticipantAdminConnection(
         } else Future.unit
     } yield ()
 
-  def uploadDarFiles(
-      pkgs: Seq[UploadablePackage],
-      retryFor: RetryFor,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] =
-    pkgs.parTraverse_(
-      uploadDarFile(_, retryFor)
-    )
-
-  def uploadDarFileLocally(
-      pkg: UploadablePackage,
-      retryFor: RetryFor,
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    uploadDarLocally(
-      pkg.resourcePath,
-      ByteString.readFrom(pkg.inputStream()),
-      pkg.packageId,
-      retryFor,
-    )
-  def uploadDarFile(
-      pkg: UploadablePackage,
-      retryFor: RetryFor,
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    uploadDarFileInternal(
-      pkg.resourcePath,
-      ByteString.readFrom(pkg.inputStream()),
-      pkg.packageId,
-      retryFor,
-    )
-
-  def uploadDarFile(
-      path: Path,
-      retryFor: RetryFor,
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    for {
-      darFile <- Future {
-        ByteString.readFrom(Files.newInputStream(path))
-      }
-      pkgId <- Future {
-        DarUtil.readPackageId(path.toString, Files.newInputStream(path))
-      }
-      _ <- uploadDarFileInternal(path.toString, darFile, pkgId, retryFor)
-    } yield ()
-
-  def lookupDar(mainPackageId: String)(implicit
-      traceContext: TraceContext
-  ): Future[Option[ByteString]] =
-    runCmd(
-      ParticipantAdminConnection.LookupDarByteString(mainPackageId)
-    )
-
-  def listDars(limit: PositiveInt = PositiveInt.MaxValue)(implicit
-      traceContext: TraceContext
-  ): Future[Seq[DarDescription]] =
-    runCmd(
-      ParticipantAdminCommands.Package.ListDars(filterName = "", limit)
-    )
-  private def uploadDarLocally(
-      path: String,
-      darFile: => ByteString,
-      mainPackageId: String,
-      retryFor: RetryFor,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    for {
-      _ <- retryProvider
-        .ensureThatO(
-          retryFor,
-          "upload_dar_locally",
-          s"DAR file $path with packageId $mainPackageId has been uploaded.",
-          lookupDar(mainPackageId).map(_.map(_ => ())),
-          runCmd(
-            ParticipantAdminCommands.Package
-              .UploadDar(
-                path,
-                vetAllPackages = true,
-                synchronizeVetting = false,
-                description = "",
-                expectedMainPackageId = mainPackageId,
-                requestHeaders = Map.empty,
-                logger,
-                Some(darFile),
-              )
-          ).map(_ => ()),
-          logger,
-        )
-    } yield ()
-  }
-
-  private def uploadDarFileInternal(
-      path: String,
-      darFile: => ByteString,
-      mainPackageId: String,
-      retryFor: RetryFor,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    for {
-      _ <- retryProvider
-        .ensureThatO(
-          retryFor,
-          "upload_dar",
-          s"DAR file $path with package id $mainPackageId has been uploaded.",
-          // TODO(#5141) and TODO(#5755): consider if we still need a check here
-          lookupDar(mainPackageId).map(_.map(_ => ())),
-          runCmd(
-            ParticipantAdminCommands.Package
-              .UploadDar(
-                path,
-                vetAllPackages = true,
-                synchronizeVetting = true,
-                description = "",
-                expectedMainPackageId = mainPackageId,
-                requestHeaders = Map.empty,
-                logger,
-                Some(darFile),
-              )
-          ).map(_ => ()),
-          logger,
-        )
-    } yield ()
-  }
-
   def ensureInitialPartyToParticipant(
       store: TopologyStoreId,
       partyId: PartyId,
@@ -592,7 +455,7 @@ class ParticipantAdminConnection(
         "initial_party_to_participant",
         show"Party $partyId is allocated on $participantId",
         listPartyToParticipant(
-          store.filterName,
+          store.some,
           filterParty = partyId.filterString,
         ).map(_.nonEmpty),
         proposeInitialPartyToParticipant(
@@ -740,7 +603,7 @@ class ParticipantAdminConnection(
         case transactionType @ (TopologyTransactionType.ProposalSignedByOwnKey |
             TopologyTransactionType.AllProposals) =>
           listPartyToParticipant(
-            filterStore = synchronizerId.filterString,
+            store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
             filterParty = party.filterString,
             proposals = transactionType,
           ).flatMap { proposals =>

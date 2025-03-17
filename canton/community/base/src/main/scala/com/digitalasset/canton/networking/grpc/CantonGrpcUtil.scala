@@ -10,8 +10,8 @@ import com.daml.error.{ErrorCategory, ErrorCategoryRetry, ErrorCode, Explanation
 import com.daml.grpc.AuthCallCredentials
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.connection.v30.{ApiInfoServiceGrpc, GetApiInfoRequest}
+import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.GrpcErrorGroup
-import com.digitalasset.canton.error.{BaseCantonError, CantonError}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, OnShutdownRunner, UnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
@@ -30,11 +30,13 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 object CantonGrpcUtil {
+
   def wrapErrUS[T](value: ParsingResult[T])(implicit
       loggingContext: ErrorLoggingContext,
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, CantonError, T] =
     wrapErrUS(EitherT.fromEither[FutureUnlessShutdown](value))
+
   def wrapErrUS[T](value: EitherT[FutureUnlessShutdown, ProtoDeserializationError, T])(implicit
       loggingContext: ErrorLoggingContext,
       ec: ExecutionContext,
@@ -46,7 +48,7 @@ object CantonGrpcUtil {
   ): EitherT[Future, StatusRuntimeException, C] =
     EitherT.fromEither[Future](value).leftMap(_.asGrpcError)
 
-  def mapErrNewETUS[T <: BaseCantonError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
+  def mapErrNewETUS[T <: CantonError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
       ec: ExecutionContext,
       errorLoggingContext: ErrorLoggingContext,
   ): EitherT[Future, StatusRuntimeException, C] =
@@ -63,39 +65,38 @@ object CantonGrpcUtil {
   ): EitherT[Future, A, B] =
     value.onShutdown(throw AbortedDueToShutdown.Error().asGrpcError)
 
-  def mapErrNew[T <: BaseCantonError, C](value: EitherT[Future, T, C])(implicit
-      executionContext: ExecutionContext,
-      errorLoggingContext: ErrorLoggingContext,
-  ): Future[C] =
-    EitherTUtil.toFuture(value.leftMap(_.asGrpcError))
-
   def mapErrNew[T <: CantonError, C](value: EitherT[Future, T, C])(implicit
       ec: ExecutionContext
   ): Future[C] =
     EitherTUtil.toFuture(value.leftMap(_.asGrpcError))
 
-  def mapErrNewEUS[T <: BaseCantonError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
+  def mapErrNewEUS[T <: CantonError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
       ec: ExecutionContext,
       errorLoggingContext: ErrorLoggingContext,
   ): Future[C] =
     EitherTUtil.toFuture(mapErrNewETUS(value))
 
-  /** Wrapper method for sending a Grpc request.
-    * Takes care of appropriate logging and retrying.
+  /** Wrapper method for sending a Grpc request. Takes care of appropriate logging and retrying.
     *
-    * NOTE that this will NOT WORK for requests with streamed responses, as such requests will report errors to the
-    * corresponding [[io.grpc.stub.StreamObserver]]. You need to do error handling within the corresponding
-    * [[io.grpc.stub.StreamObserver]].
+    * NOTE that this will NOT WORK for requests with streamed responses, as such requests will
+    * report errors to the corresponding [[io.grpc.stub.StreamObserver]]. You need to do error
+    * handling within the corresponding [[io.grpc.stub.StreamObserver]].
     *
-    * @param client             the Grpc client used to send the request
-    * @param serverName         used for logging
-    * @param send               the client method for sending the request
-    * @param requestDescription used for logging
-    * @param timeout            determines how long to retry or wait for a response.
-    *                           Will retry until 70% of this timeout has elapsed.
-    *                           Will wait for a response until this timeout has elapsed.
-    * @param logPolicy          use this to configure log levels for errors
-    * @param retryPolicy        invoked after an error to determine whether to retry
+    * @param client
+    *   the Grpc client used to send the request
+    * @param serverName
+    *   used for logging
+    * @param send
+    *   the client method for sending the request
+    * @param requestDescription
+    *   used for logging
+    * @param timeout
+    *   determines how long to retry or wait for a response. Will retry until 70% of this timeout
+    *   has elapsed. Will wait for a response until this timeout has elapsed.
+    * @param logPolicy
+    *   use this to configure log levels for errors
+    * @param retryPolicy
+    *   invoked after an error to determine whether to retry
     */
   @GrpcServiceInvocationMethod
   def sendGrpcRequest[Svc <: AbstractStub[Svc], Res](client: GrpcClient[Svc], serverName: String)(
@@ -260,8 +261,8 @@ object CantonGrpcUtil {
     }
   }
 
-  /** Performs `send` once on `service` after having set the trace context in gRPC context.
-    * Does not perform any error handling.
+  /** Performs `send` once on `service` after having set the trace context in gRPC context. Does not
+    * perform any error handling.
     *
     * Prefer [[sendGrpcRequest]] whenever possible
     */
@@ -271,11 +272,13 @@ object CantonGrpcUtil {
   )(implicit traceContext: TraceContext): Future[Resp] =
     TraceContextGrpc.withGrpcContext(traceContext)(send(service))
 
-  /** Makes the server-streaming call via `send` on the `client` in a fresh cancellable gRPC [[io.grpc.Context]]
-    * that is used to construct the stream observer via the `observerFactory`.
+  /** Makes the server-streaming call via `send` on the `client` in a fresh cancellable gRPC
+    * [[io.grpc.Context]] that is used to construct the stream observer via the `observerFactory`.
     *
-    * @param observerFactory Factory to create the stream observer for handling the message stream from the server.
-    * @param getObserver Extracts the actual stream observer from the `HasObserver` instance.
+    * @param observerFactory
+    *   Factory to create the stream observer for handling the message stream from the server.
+    * @param getObserver
+    *   Extracts the actual stream observer from the `HasObserver` instance.
     */
   def serverStreamingRequest[Svc <: AbstractStub[Svc], HasObserver, Resp](
       client: GrpcClient[Svc],
@@ -301,12 +304,15 @@ object CantonGrpcUtil {
     result
   }
 
-  /** Makes the bidirectional-streaming call via `send` on the `client` in a fresh cancellable gRPC [[io.grpc.Context]]
-    * that is used to construct the stream observer via the `observerFactory`.
+  /** Makes the bidirectional-streaming call via `send` on the `client` in a fresh cancellable gRPC
+    * [[io.grpc.Context]] that is used to construct the stream observer via the `observerFactory`.
     *
-    * @param observerFactory Factory to create the stream observer for handling the message stream from the server.
-    * @param getObserver Extracts the actual stream observer from the `HasObserver` instance.
-    * @tparam F The effect type of the observer factory.
+    * @param observerFactory
+    *   Factory to create the stream observer for handling the message stream from the server.
+    * @param getObserver
+    *   Extracts the actual stream observer from the `HasObserver` instance.
+    * @tparam F
+    *   The effect type of the observer factory.
     */
   @GrpcServiceInvocationMethod
   def bidirectionalStreamingRequest[Svc <: AbstractStub[Svc], F[_], HasObserver, Req, Resp](
@@ -358,16 +364,16 @@ object CantonGrpcUtil {
     lazy val noRetry: GrpcError => Boolean = _ => false
   }
 
-  /** The name of the service that is associated with the sequencer servers' health status.
-    * This name can have no relation with the gRPC services that the server is running with, and can be anything
-    * as long as the client and servers use the same value.
+  /** The name of the service that is associated with the sequencer servers' health status. This
+    * name can have no relation with the gRPC services that the server is running with, and can be
+    * anything as long as the client and servers use the same value.
     */
   val sequencerHealthCheckServiceName = "sequencer-health-check-service"
 
   object GrpcErrors extends GrpcErrorGroup {
 
-    /** Canton Error that can be used in Grpc Services to signal that a request could not be processed
-      * successfully due to the node shutting down
+    /** Canton Error that can be used in Grpc Services to signal that a request could not be
+      * processed successfully due to the node shutting down
       */
     @Explanation(
       "This error is returned when processing of the request was aborted due to the node shutting down."

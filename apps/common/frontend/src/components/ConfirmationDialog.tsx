@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 
-interface ConfirmationDialogProps {
+export interface ConfirmationDialogProps {
   showDialog: boolean;
   onAccept: () => void;
   onClose: () => void;

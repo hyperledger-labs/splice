@@ -101,8 +101,7 @@ object DatabaseSequencer {
         loggerFactory,
       ),
       None,
-      // Dummy config which will be ignored anyway as `config.highAvailabilityEnabled` is false
-      OnlineSequencerCheckConfig(),
+      None,
       timeouts,
       storage,
       None,
@@ -127,7 +126,7 @@ class DatabaseSequencer(
     totalNodeCount: PositiveInt,
     eventSignaller: EventSignaller,
     keepAliveInterval: Option[NonNegativeFiniteDuration],
-    onlineSequencerCheckConfig: OnlineSequencerCheckConfig,
+    onlineSequencerCheckConfig: Option[OnlineSequencerCheckConfig],
     override protected val timeouts: ProcessingTimeout,
     storage: Storage,
     exclusiveStorage: Option[Storage],
@@ -274,11 +273,12 @@ class DatabaseSequencer(
     schedule()
   }
 
-  if (config.highAvailabilityEnabled)
+  onlineSequencerCheckConfig.foreach { config =>
     periodicallyMarkLaggingSequencersOffline(
-      onlineSequencerCheckConfig.onlineCheckInterval.toInternal,
-      onlineSequencerCheckConfig.offlineDuration.toInternal,
+      config.onlineCheckInterval.toInternal,
+      config.offlineDuration.toInternal,
     )
+  }
 
   private val reader =
     new SequencerReader(
@@ -323,13 +323,13 @@ class DatabaseSequencer(
 
   override protected def sendAsyncInternal(submission: SubmissionRequest)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SendAsyncError, Unit] =
+  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
     for {
       // TODO(#12405) Support aggregatable submissions in the DB sequencer
       _ <- EitherT.cond[FutureUnlessShutdown](
         submission.aggregationRule.isEmpty,
         (),
-        SendAsyncError.RequestRefused(
+        SequencerErrors.UnsupportedFeature(
           "Aggregatable submissions are not yet supported by this database sequencer"
         ),
       )
@@ -340,7 +340,7 @@ class DatabaseSequencer(
           case _ => true
         },
         (),
-        SendAsyncError.RequestRefused(
+        SequencerErrors.UnsupportedFeature(
           "Group addresses are not yet supported by this database sequencer"
         ),
       )
@@ -351,12 +351,14 @@ class DatabaseSequencer(
       outcome: DeliverableSubmissionOutcome
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SendAsyncError, Unit] =
+  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
     writer.blockSequencerWrite(outcome)
 
   override protected def sendAsyncSignedInternal(
       signedSubmission: SignedContent[SubmissionRequest]
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SendAsyncError, Unit] =
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
     sendAsyncInternal(signedSubmission.content)
 
   override def readInternal(member: Member, offset: SequencerCounter)(implicit
@@ -395,8 +397,8 @@ class DatabaseSequencer(
   // until the database and block sequencers are unified.
   override protected def localSequencerMember: Member = SequencerId(synchronizerId.uid)
 
-  /** helper for performing operations that are expected to be called with a registered member so will just throw if we
-    * find the member is unregistered.
+  /** helper for performing operations that are expected to be called with a registered member so
+    * will just throw if we find the member is unregistered.
     */
   final protected def withExpectedRegisteredMember[A](member: Member, operationName: String)(
       fn: SequencerMemberId => FutureUnlessShutdown[A]

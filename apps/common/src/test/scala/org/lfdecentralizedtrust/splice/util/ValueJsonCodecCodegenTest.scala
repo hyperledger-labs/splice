@@ -161,7 +161,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       ).toValue
       val originalResult: JavaApi.DamlRecord =
         new transferinstructionv1.TransferFactory_TransferResult(
-          Optional.of(
+          new transferinstructionv1.transferfactory_transferresult_output.TransferFactory_TransferResult_Pending(
             new transferinstructionv1.TransferInstruction.ContractId(validContractId(333))
           ),
           someMetadata,
@@ -226,7 +226,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
     "av_map" -> new anyvalue.AV_Map(allSimpleValuesMap.asJava),
   )
   private lazy val someChoiceContext =
-    new metadatav1.ChoiceContext("splice.lfdecentralizedtrust.org/amulet", allAnyValuesMap.asJava)
+    new metadatav1.ChoiceContext(allAnyValuesMap.asJava)
   private lazy val someMetadata =
     new metadatav1.Metadata(Map("any" -> "thing", "goes" -> "here").asJava)
 

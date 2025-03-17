@@ -18,7 +18,6 @@ import com.digitalasset.canton.participant.admin.repair.ChangeAssignation.Change
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentData
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.ActiveContractStore.ContractState
-import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
@@ -47,8 +46,8 @@ private final class ChangeAssignation(
   private val targetSynchronizerId = repairTarget.map(_.synchronizer.id)
   private val targetPersistentState = repairTarget.map(_.synchronizer.persistentState)
 
-  /** Completes the processing of unassigned contract. Insert the contract in the target synchronizer
-    * and publish the assignment event.
+  /** Completes the processing of unassigned contract. Insert the contract in the target
+    * synchronizer and publish the assignment event.
     */
   def completeUnassigned(
       unassignmentData: ChangeAssignation.Data[UnassignmentData]
@@ -72,14 +71,14 @@ private final class ChangeAssignation(
       _ <- targetPersistentState.unwrap.reassignmentStore
         .completeReassignment(
           unassignmentData.payload.reassignmentId,
-          unassignmentData.targetTimeOfChange.unwrap.timestamp,
+          unassignmentData.targetTimeOfRepair.unwrap.timestamp,
         )
         .toEitherT
       _ <- persistAssignments(
         List(
           (
             contractId,
-            unassignmentData.targetTimeOfChange,
+            unassignmentData.targetTimeOfRepair,
             unassignmentData.payload.reassignmentCounter,
           )
         )
@@ -140,9 +139,10 @@ private final class ChangeAssignation(
     } yield ()
   }
 
-  /** Filter out contracts whose assignation should not be changed.
-    * Checks status on source and target synchronizer.
-    * @return Data is enriched with reassignment counter.
+  /** Filter out contracts whose assignation should not be changed. Checks status on source and
+    * target synchronizer.
+    * @return
+    *   Data is enriched with reassignment counter.
     */
   private def filterContracts(
       contracts: Iterable[ChangeAssignation.Data[LfContractId]],
@@ -173,8 +173,8 @@ private final class ChangeAssignation(
     filteredContractsIds <- filterContractsAtTarget(contractsAtSource, contractStatusAtTarget)
   } yield filteredContractsIds
 
-  /** Keep only contracts which have proper state in the source ActiveContractStore.
-    * Enrich the data with reassignment counter.
+  /** Keep only contracts which have proper state in the source ActiveContractStore. Enrich the data
+    * with reassignment counter.
     */
   private def filterContractsAtSource(
       contractIds: Iterable[ChangeAssignation.Data[LfContractId]],
@@ -215,8 +215,8 @@ private final class ChangeAssignation(
 
   /** Keep only contracts which satisfy:
     *
-    * - At least one stakeholder is hosted on the target synchronizer
-    * - State of the contract on the target synchronizer is not active or archived
+    *   - At least one stakeholder is hosted on the target synchronizer
+    *   - State of the contract on the target synchronizer is not active or archived
     */
   private def filterContractsAtTarget(
       sourceContracts: List[ChangeAssignation.Data[(LfContractId, ReassignmentCounter)]],
@@ -347,18 +347,18 @@ private final class ChangeAssignation(
     }
 
   private def persistAssignments(
-      contracts: List[(LfContractId, Target[TimeOfChange], ReassignmentCounter)]
+      contracts: List[(LfContractId, Target[TimeOfRepair], ReassignmentCounter)]
   )(implicit
       traceContext: TraceContext
   ): CheckedT[FutureUnlessShutdown, String, ActiveContractStore.AcsWarning, Unit] =
     targetPersistentState.unwrap.activeContractStore
       .assignContracts(
-        contracts.map { case (cid, toc, reassignmentCounter) =>
+        contracts.map { case (cid, tor, reassignmentCounter) =>
           (
             cid,
             sourceSynchronizerId,
             reassignmentCounter,
-            toc.unwrap,
+            tor.unwrap.toToc,
           )
         }
       )
@@ -377,7 +377,7 @@ private final class ChangeAssignation(
             contract.payload.contract.contractId,
             targetSynchronizerId,
             reassignmentCounter,
-            contract.sourceTimeOfChange.unwrap,
+            contract.sourceTimeOfRepair.unwrap.toToc,
           )
         }
       )
@@ -386,7 +386,7 @@ private final class ChangeAssignation(
     unassignF
       .flatMap(_ =>
         persistAssignments(contracts.map { case (data, reassignmentCounter) =>
-          (data.payload.contract.contractId, data.targetTimeOfChange, reassignmentCounter)
+          (data.payload.contract.contractId, data.targetTimeOfRepair, reassignmentCounter)
         })
       )
   }
@@ -449,8 +449,8 @@ private final class ChangeAssignation(
           stakeholders = contract.payload.contract.metadata.stakeholders.toList,
           assignmentExclusivity = None,
         ),
-        requestCounter = contract.sourceTimeOfChange.unwrap.rc,
-        recordTime = contract.sourceTimeOfChange.unwrap.timestamp,
+        repairCounter = contract.sourceTimeOfRepair.unwrap.repairCounter,
+        recordTime = contract.sourceTimeOfRepair.unwrap.timestamp,
       )
 
   private def assignment(reassignmentId: ReassignmentId)(implicit
@@ -476,8 +476,8 @@ private final class ChangeAssignation(
               .toByteString(repairTarget.unwrap.synchronizer.parameters.protocolVersion)
           ),
         ),
-        requestCounter = contract.targetTimeOfChange.unwrap.rc,
-        recordTime = contract.targetTimeOfChange.unwrap.timestamp,
+        repairCounter = contract.targetTimeOfRepair.unwrap.repairCounter,
+        recordTime = contract.targetTimeOfRepair.unwrap.timestamp,
       )
 }
 
@@ -486,16 +486,16 @@ private[repair] object ChangeAssignation {
 
   final case class Data[Payload](
       payload: Payload,
-      sourceTimeOfChange: Source[TimeOfChange],
-      targetTimeOfChange: Target[TimeOfChange],
+      sourceTimeOfRepair: Source[TimeOfRepair],
+      targetTimeOfRepair: Target[TimeOfRepair],
   ) {
-    def incrementRequestCounter: Either[String, Data[Payload]] =
+    def incrementRepairCounter: Either[String, Data[Payload]] =
       for {
-        incrementedSourceRc <- sourceTimeOfChange.unwrap.rc.increment
-        incrementedTargetRc <- targetTimeOfChange.unwrap.rc.increment
+        incrementedSourceToc <- sourceTimeOfRepair.unwrap.incrementRepairCounter
+        incrementedTargetToc <- targetTimeOfRepair.unwrap.incrementRepairCounter
       } yield copy(
-        sourceTimeOfChange = sourceTimeOfChange.map(_.copy(rc = incrementedSourceRc)),
-        targetTimeOfChange = targetTimeOfChange.map(_.copy(rc = incrementedTargetRc)),
+        sourceTimeOfRepair = Source(incrementedSourceToc),
+        targetTimeOfRepair = Target(incrementedTargetToc),
       )
 
     def map[T](f: Payload => T): Data[T] = this.copy(payload = f(payload))
@@ -506,7 +506,7 @@ private[repair] object ChangeAssignation {
     implicit val dataFunctorInstance: Functor[Data] = new Functor[Data] {
       // Define the map function for Data
       override def map[A, B](fa: Data[A])(f: A => B): Data[B] =
-        Data(f(fa.payload), fa.sourceTimeOfChange, fa.targetTimeOfChange)
+        Data(f(fa.payload), fa.sourceTimeOfRepair, fa.targetTimeOfRepair)
     }
 
     def from[Payload](
@@ -514,33 +514,35 @@ private[repair] object ChangeAssignation {
         changeAssignation: ChangeAssignation,
     ): Either[String, Seq[Data[Payload]]] =
       if (
-        payloads.sizeCompare(changeAssignation.repairSource.unwrap.timesOfChange) == 0 &&
-        payloads.sizeCompare(changeAssignation.repairTarget.unwrap.timesOfChange) == 0
+        payloads.sizeCompare(changeAssignation.repairSource.unwrap.timesOfRepair) == 0 &&
+        payloads.sizeCompare(changeAssignation.repairTarget.unwrap.timesOfRepair) == 0
       ) {
         Right(
           payloads
-            .zip(changeAssignation.repairSource.traverse(_.timesOfChange))
-            .zip(changeAssignation.repairTarget.traverse(_.timesOfChange))
+            .zip(changeAssignation.repairSource.traverse(_.timesOfRepair))
+            .zip(changeAssignation.repairTarget.traverse(_.timesOfRepair))
             .map { case ((data, sourceToc), targetToc) =>
               ChangeAssignation.Data(data, sourceToc, targetToc)
             }
         )
       } else
         Left(
-          s"Payloads size ${payloads.size} does not match timesOfChange size ${changeAssignation.repairSource.unwrap.timesOfChange.size} or ${changeAssignation.repairTarget.unwrap.timesOfChange.size}"
+          s"Payloads size ${payloads.size} does not match timesOfRepair size ${changeAssignation.repairSource.unwrap.timesOfRepair.size} or ${changeAssignation.repairTarget.unwrap.timesOfRepair.size}"
         )
 
     def from[Payload](payload: Payload, changeAssignation: ChangeAssignation): Data[Payload] =
       ChangeAssignation
         .Data(
           payload,
-          changeAssignation.repairSource.map(_.firstTimeOfChange),
-          changeAssignation.repairTarget.map(_.firstTimeOfChange),
+          changeAssignation.repairSource.map(_.firstTimeOfRepair),
+          changeAssignation.repairTarget.map(_.firstTimeOfRepair),
         )
   }
 
-  /** @param contract Contract that is reassigned
-    * @param isNew true if the contract was not seen before, false if already in the store
+  /** @param contract
+    *   Contract that is reassigned
+    * @param isNew
+    *   true if the contract was not seen before, false if already in the store
     */
   final case class Changed(
       contract: SerializableContract,

@@ -18,7 +18,8 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration, RequireTypes}
-import com.digitalasset.canton.console.CommandErrors.GenericCommandError
+import com.digitalasset.canton.console.CommandErrors.{GenericCommandError}
+import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CommandErrors,
@@ -30,7 +31,6 @@ import com.digitalasset.canton.console.{
   Help,
   Helpful,
   InstanceReference,
-  ParticipantReference,
 }
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -45,7 +45,6 @@ import com.digitalasset.canton.topology.admin.v30.{
   ExportTopologySnapshotResponse,
   GenesisStateResponse,
 }
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
@@ -57,8 +56,8 @@ import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
 import com.digitalasset.canton.topology.transaction.TopologyMapping.MappingHash
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{BinaryFileUtil, OptionUtil}
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
@@ -85,6 +84,10 @@ class TopologyAdministrationGroup(
   private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
   implicit protected[canton] lazy val executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
+
+  /** run a topology change command */
+  private[console] def runAdminCommand[T](grpcCommand: => GrpcAdminCommand[_, _, T]): T =
+    consoleEnvironment.run(adminCommand(grpcCommand))
 
   @Help.Summary("Initialize the node with a unique identifier")
   @Help.Description("""Every node in Canton is identified using a unique identifier, which is composed
@@ -165,78 +168,7 @@ class TopologyAdministrationGroup(
         is_idle(),
         s"topology queue status never became idle $topologyQueueStatus after $timeout",
       )
-
-    /** run a topology change command synchronized and wait until the node becomes idle again */
-    private[console] def run[T](timeout: Option[NonNegativeDuration])(func: => T): T = {
-      val ret = func
-      ConsoleMacros.utils.synchronize_topology(timeout)(consoleEnvironment)
-      ret
-    }
-
-    /** run a topology change command synchronized and wait until the node becomes idle again */
-    private[console] def runAdminCommand[T](
-        timeout: Option[NonNegativeDuration]
-    )(grpcCommand: => GrpcAdminCommand[_, _, T]): T = {
-      val ret = consoleEnvironment.run(adminCommand(grpcCommand))
-      // Only wait for topology synchronization if a timeout is specified.
-      if (timeout.nonEmpty) {
-        ConsoleMacros.utils.synchronize_topology(timeout)(consoleEnvironment)
-      }
-      ret
-    }
   }
-
-  /** If `filterStore` is not `Authorized` and if `filterSynchronizer` is non-empty, they should correspond to the same synchronizer.
-    */
-  private def areFilterStoreFilterSynchronizerCompatible(
-      filterStore: String,
-      filterSynchronizerId: String,
-  ): Either[String, Unit] = {
-    val storeO: Option[TopologyStoreId] =
-      OptionUtil.emptyStringAsNone(filterStore).map(TopologyStoreId.tryFromString)
-    val synchronizerO: Option[SynchronizerId] =
-      OptionUtil.emptyStringAsNone(filterSynchronizerId).map(SynchronizerId.tryFromString)
-
-    (storeO, synchronizerO) match {
-      case (Some(TopologyStoreId.Synchronizer(synchronizerStore)), Some(synchronizer)) =>
-        Either.cond(
-          synchronizerStore == synchronizer,
-          (),
-          s"Expecting filterSynchronizer and filterStore to relate to the same synchronizer but found `$synchronizer` and `$synchronizerStore`",
-        )
-
-      case _ => Either.unit
-    }
-  }
-
-  @Help.Summary("Creates a temporary topology store.")
-  @Help.Description(
-    """A temporary topology store is useful for orchestrating the synchronizer founding ceremony or importing a topology snapshot for later inspection.
-      |Temporary topology stores are not persisted and all transactions are kept in memory only, which means restarting the node causes the loss of all
-      |transactions in that store.
-      |Additionally, temporary topology stores are not connected to any synchronizer, so there is no automatic propagation of topology transactions
-      |from the temporary store to connected synchronizers."""
-  )
-  def create_temporary_topology_store(
-      name: String,
-      protocolVersion: ProtocolVersion,
-  ): TopologyStoreId.Temporary =
-    consoleEnvironment.run {
-      adminCommand(TopologyAdminCommands.Write.CreateTemporaryStore(name, protocolVersion))
-    }
-
-  @Help.Summary(
-    "This command drops a temporary topology store and all transactions contained in it."
-  )
-  @Help.Description(
-    """Dropping a temporary topology store is not reversible and all topology transactions in the store will
-      |be permanently dropped.
-      |It's not possible to delete the authorized store or any synchronizer store with this command."""
-  )
-  def drop_temporary_topology_store(temporaryStoreId: TopologyStoreId.Temporary): Unit =
-    consoleEnvironment.run {
-      adminCommand(TopologyAdminCommands.Write.DropTemporaryStore(temporaryStoreId))
-    }
 
   @Help.Summary("Inspect all topology transactions at once")
   @Help.Group("All Transactions")
@@ -270,14 +202,14 @@ class TopologyAdministrationGroup(
 
     @Help.Summary("Loads topology transactions from a file into the specified topology store")
     @Help.Description("The file must contain data serialized by TopologyTransactions.")
-    def import_topology_snapshot_from(file: String, store: String): Unit =
+    def import_topology_snapshot_from(file: String, store: TopologyStoreId): Unit =
       BinaryFileUtil.readByteStringFromFile(file).map(import_topology_snapshot(_, store)).valueOr {
         err =>
           throw new IllegalArgumentException(s"import_topology_snapshot failed: $err")
       }
     def import_topology_snapshot(
         topologyTransactions: ByteString,
-        store: String,
+        store: TopologyStoreId,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.unbounded
         ),
@@ -295,7 +227,7 @@ class TopologyAdministrationGroup(
 
     def load(
         transactions: Seq[GenericSignedTopologyTransaction],
-        store: String,
+        store: TopologyStoreId,
         forceFlags: ForceFlags = ForceFlags.none,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.unbounded
@@ -312,7 +244,7 @@ class TopologyAdministrationGroup(
     @Help.Description("The file must contain data serialized by SignedTopologyTransaction.")
     def load_single_from_file(
         file: String,
-        store: String,
+        store: TopologyStoreId,
         forceFlags: ForceFlags = ForceFlags.none,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.unbounded
@@ -340,7 +272,7 @@ class TopologyAdministrationGroup(
     @Help.Description("The files must contain data serialized by SignedTopologyTransaction.")
     def load_single_from_files(
         files: Seq[String],
-        store: String,
+        store: TopologyStoreId,
         forceFlags: ForceFlags = ForceFlags.none,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.unbounded
@@ -368,7 +300,7 @@ class TopologyAdministrationGroup(
     @Help.Description("The file must contain data serialized by SignedTopologyTransactions.")
     def load_multiple_from_file(
         file: String,
-        store: String,
+        store: TopologyStoreId,
         forceFlags: ForceFlags = ForceFlags.none,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.unbounded
@@ -402,7 +334,7 @@ class TopologyAdministrationGroup(
 
     def sign(
         transactions: Seq[GenericSignedTopologyTransaction],
-        store: String,
+        store: TopologyStoreId,
         signedBy: Seq[Fingerprint] = Seq.empty,
         forceFlags: ForceFlags = ForceFlags.none,
     ): Seq[GenericSignedTopologyTransaction] =
@@ -415,7 +347,7 @@ class TopologyAdministrationGroup(
     def authorize[M <: TopologyMapping: ClassTag](
         txHash: TxHash,
         mustBeFullyAuthorized: Boolean,
-        store: String,
+        store: TopologyStoreId,
         signedBy: Seq[Fingerprint] = Seq.empty,
     ): SignedTopologyTransaction[TopologyChangeOp, M] =
       consoleEnvironment.run {
@@ -431,7 +363,7 @@ class TopologyAdministrationGroup(
 
     @Help.Summary("List all transaction")
     def list(
-        filterStore: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -456,7 +388,7 @@ class TopologyAdministrationGroup(
           adminCommand(
             TopologyAdminCommands.Read.ListAll(
               BaseQuery(
-                filterStore,
+                store,
                 proposals,
                 timeQuery,
                 operation,
@@ -481,7 +413,7 @@ class TopologyAdministrationGroup(
         """
     )
     def export_topology_snapshot(
-        filterStore: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = None,
@@ -512,7 +444,7 @@ class TopologyAdministrationGroup(
               TopologyAdminCommands.Read.ExportTopologySnapshot(
                 responseObserver,
                 BaseQuery(
-                  filterStore,
+                  store,
                   proposals,
                   timeQuery,
                   operation,
@@ -527,7 +459,7 @@ class TopologyAdministrationGroup(
             call,
             responseObserver.resultBytes,
             timeout,
-            s"Exporting the topology state from store $filterStore",
+            s"Exporting the topology state from store $store",
           )
         }
     }
@@ -542,7 +474,7 @@ class TopologyAdministrationGroup(
         """
     )
     def genesis_state(
-        filterSynchronizerStore: String = "",
+        filterSynchronizerStore: Option[TopologyStoreId.Synchronizer] = None,
         timestamp: Option[CantonTimestamp] = None,
         timeout: NonNegativeDuration = timeouts.unbounded,
     ): ByteString =
@@ -553,8 +485,7 @@ class TopologyAdministrationGroup(
           adminCommand(
             TopologyAdminCommands.Read.GenesisState(
               responseObserver,
-              filterSynchronizerStore = OptionUtil
-                .emptyStringAsNone(filterSynchronizerStore),
+              synchronizerStore = filterSynchronizerStore,
               timestamp = timestamp,
             )
           )
@@ -572,16 +503,16 @@ class TopologyAdministrationGroup(
     )
     def find_latest_by_mapping_hash[M <: TopologyMapping: ClassTag](
         mappingHash: MappingHash,
-        filterStore: String,
+        store: TopologyStoreId,
         includeProposals: Boolean = false,
     ): Option[StoredTopologyTransaction[TopologyChangeOp, M]] = {
-      val latestAuthorized = list(filterStore = filterStore)
+      val latestAuthorized = list(store = store)
         .collectOfMapping[M]
         .filter(_.mapping.uniqueKey == mappingHash)
         .result
       val latestProposal =
         if (includeProposals)
-          list(filterStore = filterStore, proposals = true)
+          list(store = store, proposals = true)
             .collectOfMapping[M]
             .filter(_.mapping.uniqueKey == mappingHash)
             .result
@@ -597,15 +528,15 @@ class TopologyAdministrationGroup(
         includeProposals: when true, the result could be the latest proposal, otherwise will only return the latest fully authorized transaction"""
     )
     def find_latest_by_mapping[M <: TopologyMapping: ClassTag](
-        filterStore: String,
+        store: TopologyStoreId,
         includeProposals: Boolean = false,
     ): Option[StoredTopologyTransaction[TopologyChangeOp, M]] = {
-      val latestAuthorized = list(filterStore = filterStore)
+      val latestAuthorized = list(store = store)
         .collectOfMapping[M]
         .result
       val latestProposal =
         if (includeProposals)
-          list(filterStore = filterStore, proposals = true)
+          list(store = store, proposals = true)
             .collectOfMapping[M]
             .result
         else Seq.empty
@@ -616,7 +547,7 @@ class TopologyAdministrationGroup(
     @Help.Group("Purge Topology Transactions")
     object purge extends Helpful {
       def list(
-          filterStore: String = "",
+          store: TopologyStoreId,
           proposals: Boolean = false,
           timeQuery: TimeQuery = TimeQuery.HeadState,
           operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -627,7 +558,7 @@ class TopologyAdministrationGroup(
         adminCommand(
           TopologyAdminCommands.Read.PurgeTopologyTransaction(
             BaseQuery(
-              filterStore,
+              store,
               proposals,
               timeQuery,
               operation,
@@ -654,7 +585,7 @@ class TopologyAdministrationGroup(
         synchronizerOwners: Seq[Member],
         sequencers: Seq[SequencerId],
         mediators: Seq[MediatorId],
-        store: String,
+        store: TopologyStoreId,
     ): Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] = {
       val isSynchronizerOwner = synchronizerOwners.contains(instance.id)
       require(isSynchronizerOwner, s"Only synchronizer owners should call $functionFullName.")
@@ -663,7 +594,7 @@ class TopologyAdministrationGroup(
         instance.topology.transactions
           .find_latest_by_mapping_hash[M](
             hash,
-            filterStore = store,
+            store = store,
             includeProposals = true,
           )
           .map(_.transaction)
@@ -726,7 +657,7 @@ class TopologyAdministrationGroup(
         sequencers: Seq[SequencerId],
         mediators: Seq[MediatorId],
         outputFile: String,
-        store: String,
+        store: TopologyStoreId,
     ): Unit = {
 
       val transactions =
@@ -746,7 +677,7 @@ class TopologyAdministrationGroup(
   @Help.Group("Decentralized namespaces")
   object decentralized_namespaces extends Helpful {
     def list(
-        filterStore: String = "",
+        store: TopologyStoreId,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -757,7 +688,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListDecentralizedNamespaceDefinition(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -792,7 +723,7 @@ class TopologyAdministrationGroup(
     def propose_new(
         owners: Set[Namespace],
         threshold: PositiveInt,
-        store: String,
+        store: TopologyStoreId,
         mustFullyAuthorize: Boolean = false,
         signedBy: Option[Fingerprint] = None,
         serial: Option[PositiveInt] = None,
@@ -845,7 +776,7 @@ class TopologyAdministrationGroup(
                 If None, the serial will be automatically selected by the node.""")
     def propose(
         decentralizedNamespace: DecentralizedNamespaceDefinition,
-        store: String,
+        store: TopologyStoreId,
         mustFullyAuthorize: Boolean = false,
         signedBy: Seq[Fingerprint] = Seq.empty,
         serial: Option[PositiveInt] = None,
@@ -865,7 +796,7 @@ class TopologyAdministrationGroup(
         waitToBecomeEffective = synchronize,
       )
 
-      synchronisation.runAdminCommand(synchronize)(command)
+      runAdminCommand(command)
     }
   }
 
@@ -902,7 +833,7 @@ class TopologyAdministrationGroup(
         namespace: Namespace,
         targetKey: SigningPublicKey,
         isRootDelegation: Boolean,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         mustFullyAuthorize: Boolean = true,
         serial: Option[PositiveInt] = None,
         signedBy: Seq[Fingerprint] = Seq.empty,
@@ -911,7 +842,7 @@ class TopologyAdministrationGroup(
         ),
         forceFlags: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, NamespaceDelegation] =
-      synchronisation.runAdminCommand(synchronize)(
+      runAdminCommand(
         TopologyAdminCommands.Write.Propose(
           NamespaceDelegation.create(namespace, targetKey, isRootDelegation),
           signedBy = signedBy,
@@ -951,7 +882,7 @@ class TopologyAdministrationGroup(
     def propose_revocation(
         namespace: Namespace,
         targetKey: SigningPublicKey,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         mustFullyAuthorize: Boolean = true,
         serial: Option[PositiveInt] = None,
         signedBy: Seq[Fingerprint] = Seq.empty,
@@ -966,7 +897,7 @@ class TopologyAdministrationGroup(
         filterTargetKey = Some(targetKey.id),
       ) match {
         case Seq(nsd) =>
-          synchronisation.runAdminCommand(synchronize)(
+          runAdminCommand(
             TopologyAdminCommands.Write.Propose(
               nsd.item,
               signedBy = signedBy,
@@ -991,7 +922,7 @@ class TopologyAdministrationGroup(
       }
 
     def list(
-        filterStore: String = "",
+        store: TopologyStoreId,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -1003,7 +934,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListNamespaceDelegation(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -1052,7 +983,7 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.bounded
         ),
         // Using the authorized store by default
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         mustFullyAuthorize: Boolean = true,
         serial: Option[PositiveInt] = None,
         signedBy: Seq[Fingerprint] = Seq.empty,
@@ -1070,11 +1001,11 @@ class TopologyAdministrationGroup(
         store = store,
         waitToBecomeEffective = synchronize,
       )
-      synchronisation.runAdminCommand(synchronize)(command)
+      runAdminCommand(command)
     }
 
     def list(
-        filterStore: String = "",
+        store: TopologyStoreId,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -1086,7 +1017,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListIdentifierDelegation(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -1107,7 +1038,7 @@ class TopologyAdministrationGroup(
 
     @Help.Summary("List owner to key mapping transactions")
     def list(
-        filterStore: String = "",
+        store: Option[TopologyStoreId] = None,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -1120,7 +1051,7 @@ class TopologyAdministrationGroup(
         adminCommand(
           TopologyAdminCommands.Read.ListOwnerToKeyMapping(
             BaseQuery(
-              filterStore,
+              store,
               proposals,
               timeQuery,
               operation,
@@ -1159,16 +1090,50 @@ class TopologyAdministrationGroup(
         // configurable in case of a key under a decentralized namespace
         mustFullyAuthorize: Boolean = true,
     ): Unit = update(
-      key,
-      purpose,
+      NonEmpty.mk(Seq, (key, purpose)),
       keyOwner,
       signedBy,
       synchronize,
       add = true,
-      mustFullyAuthorize,
+      mustFullyAuthorize = mustFullyAuthorize,
       force = ForceFlags.none,
-      instance,
     )
+
+    @Help.Summary("Add a set of keys to an owner to key mapping")
+    @Help.Description(
+      """Add a set of keys to an owner to key mapping. A key owner is anyone in the system that needs a key-pair known
+        |to all members (participants, mediators, sequencers) of a synchronizer. If no owner to key mapping exists for the
+        |specified key owner, create a new mapping with the specified keys. The specified keys needs to have
+        |been created previously via the `keys.secret` api.
+
+        keys: Fingerprint and key purpose of the keys
+        keyOwner: The member that owns the key
+        signedBy: Optional fingerprint of the authorizing key which in turn refers to a specific, locally existing certificate.
+        synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
+        mustFullyAuthorize: Whether to only add the key if the member is in the position to authorize the change.
+      """
+    )
+    def add_keys(
+        keys: Seq[(Fingerprint, KeyPurpose)],
+        keyOwner: Member = instance.id.member,
+        signedBy: Seq[Fingerprint] = Seq.empty,
+        synchronize: Option[config.NonNegativeDuration] = Some(
+          consoleEnvironment.commandTimeouts.bounded
+        ),
+        // configurable in case of a key under a decentralized namespace
+        mustFullyAuthorize: Boolean = true,
+    ): Unit =
+      update(
+        NonEmpty
+          .from(keys)
+          .getOrElse(throw new IllegalArgumentException("At least one key is required")),
+        keyOwner,
+        signedBy,
+        synchronize,
+        add = true,
+        mustFullyAuthorize = mustFullyAuthorize,
+        force = ForceFlags.none,
+      )
 
     @Help.Summary("Remove a key from an owner to key mapping")
     @Help.Description(
@@ -1198,15 +1163,13 @@ class TopologyAdministrationGroup(
         mustFullyAuthorize: Boolean = true,
         force: ForceFlags = ForceFlags.none,
     ): Unit = update(
-      key,
-      purpose,
+      NonEmpty.mk(Seq, (key, purpose)),
       keyOwner,
       signedBy,
       synchronize,
       add = false,
-      mustFullyAuthorize,
+      mustFullyAuthorize = mustFullyAuthorize,
       force = force,
-      instance,
     )
 
     @Help.Summary("Rotate the key for an owner to key mapping")
@@ -1222,7 +1185,6 @@ class TopologyAdministrationGroup(
       """
     )
     def rotate_key(
-        nodeInstance: InstanceReference,
         member: Member,
         currentKey: PublicKey,
         newKey: PublicKey,
@@ -1230,7 +1192,7 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): Unit = {
-      val keysInStore = nodeInstance.keys.secret.list().map(_.publicKey)
+      val keysInStore = instance.keys.secret.list().map(_.publicKey)
       require(
         keysInStore.contains(currentKey),
         "The current key must exist and pertain to this node",
@@ -1238,55 +1200,47 @@ class TopologyAdministrationGroup(
       require(keysInStore.contains(newKey), "The new key must exist and pertain to this node")
       require(currentKey.purpose == newKey.purpose, "The rotated keys must have the same purpose")
 
+      def verifyKeyPresence(key: PublicKey, contains: Boolean): Unit =
+        // retry until we observe the change in the respective store
+        ConsoleMacros.utils.retry_until_true(
+          instance.topology.owner_to_key_mappings
+            .list(
+              filterKeyOwnerUid = instance.uid.toProtoPrimitive
+            )
+            .filter(_.context.storeId != Authorized)
+            .forall(_.item.keys.contains(key) == contains)
+        )(consoleEnvironment)
+
       // Authorize the new key
       // The owner will now have two keys, but by convention the first one added is always
       // used by everybody.
       update(
-        newKey.fingerprint,
-        newKey.purpose,
+        NonEmpty.mk(Seq, (newKey.fingerprint, newKey.purpose)),
         member,
         signedBy = Seq.empty,
         add = true,
-        nodeInstance = nodeInstance,
         synchronize = synchronize,
       )
 
-      // retry until we observe the change in the respective store
-      ConsoleMacros.utils.retry_until_true(
-        nodeInstance.topology.owner_to_key_mappings
-          .list(
-            filterKeyOwnerUid = nodeInstance.uid.toProtoPrimitive
-          )
-          .filter(_.context.storeId != Authorized)
-          .forall(_.item.keys.contains(newKey))
-      )(consoleEnvironment)
+      verifyKeyPresence(newKey, contains = true)
 
       // Remove the old key by sending the matching `Remove` transaction
       update(
-        currentKey.fingerprint,
-        currentKey.purpose,
+        NonEmpty.mk(Seq, (currentKey.fingerprint, currentKey.purpose)),
         member,
         signedBy = Seq.empty,
         add = false,
-        nodeInstance = nodeInstance,
         synchronize = synchronize,
       )
+
+      verifyKeyPresence(currentKey, contains = false)
+
+      // TODO(#24218): reduce the risk of using a new key that is not yet recognized by another node.
     }
 
-    private def update(
-        key: Fingerprint,
-        purpose: KeyPurpose,
-        keyOwner: Member,
-        signedBy: Seq[Fingerprint],
-        synchronize: Option[config.NonNegativeDuration],
-        add: Boolean,
-        mustFullyAuthorize: Boolean = true,
-        force: ForceFlags = ForceFlags.none,
-        nodeInstance: InstanceReference,
-    ): Unit = {
-      // Ensure the specified key has a private key in the vault.
-      val publicKey = nodeInstance.keys.secret.list(
-        filterFingerprint = key.toProtoPrimitive,
+    private def ensurePrivateKeyExists(fingerprint: Fingerprint, purpose: KeyPurpose): PublicKey =
+      instance.keys.secret.list(
+        filterFingerprint = fingerprint.toProtoPrimitive,
         filterPurpose = Set(purpose),
       ) match {
         case privateKeyMetadata +: Nil => privateKeyMetadata.publicKey
@@ -1298,10 +1252,25 @@ class TopologyAdministrationGroup(
           )
       }
 
+    private def update(
+        keys: NonEmpty[Seq[(Fingerprint, KeyPurpose)]],
+        keyOwner: Member,
+        signedBy: Seq[Fingerprint],
+        synchronize: Option[config.NonNegativeDuration],
+        add: Boolean,
+        mustFullyAuthorize: Boolean = true,
+        force: ForceFlags = ForceFlags.none,
+    ): Unit = {
+
+      val publicKeys = keys.map { case (fingerprint, purpose) =>
+        // Ensure the specified key has a private key in the vault and get the public key
+        ensurePrivateKeyExists(fingerprint, purpose)
+      }
+
       // Look for an existing authorized OKM mapping.
       val maybePreviousState = expectAtMostOneResult(
         list(
-          filterStore = AuthorizedStore.filterName,
+          store = Some(TopologyStoreId.Authorized),
           filterKeyOwnerUid = keyOwner.filterString,
           filterKeyOwnerType = Some(keyOwner.code),
         )
@@ -1312,23 +1281,23 @@ class TopologyAdministrationGroup(
         maybePreviousState match {
           case None =>
             (
-              OwnerToKeyMapping(keyOwner, NonEmpty(Seq, publicKey)),
+              OwnerToKeyMapping(keyOwner, publicKeys),
               PositiveInt.one,
               TopologyChangeOp.Replace,
             )
           case Some((_, TopologyChangeOp.Remove, previousSerial)) =>
             (
-              OwnerToKeyMapping(keyOwner, NonEmpty(Seq, publicKey)),
+              OwnerToKeyMapping(keyOwner, publicKeys),
               previousSerial.increment,
               TopologyChangeOp.Replace,
             )
           case Some((okm, TopologyChangeOp.Replace, previousSerial)) =>
             require(
-              !okm.keys.contains(publicKey),
-              "The owner-to-key mapping already contains the specified key to add",
+              okm.keys.intersect(publicKeys).isEmpty,
+              "The owner-to-key mapping already contains the specified keys to add",
             )
             (
-              okm.copy(keys = okm.keys :+ publicKey),
+              okm.copy(keys = okm.keys ++ publicKeys),
               previousSerial.increment,
               TopologyChangeOp.Replace,
             )
@@ -1342,10 +1311,12 @@ class TopologyAdministrationGroup(
             )
           case Some((okm, TopologyChangeOp.Replace, previousSerial)) =>
             require(
-              okm.keys.contains(publicKey),
-              "The owner-to-key mapping does not contain the specified key to remove",
+              // All publicKeys to be removed must be in okm.keys
+              publicKeys.forall(okm.keys.contains),
+              "The owner-to-key mapping does not contain the specified keys to remove",
             )
-            NonEmpty.from(okm.keys.filterNot(_ == publicKey)) match {
+            // Remove publicKeys from okm.keys
+            NonEmpty.from(okm.keys.filterNot(publicKeys.contains)) match {
               case Some(fewerKeys) =>
                 (okm.copy(keys = fewerKeys), previousSerial.increment, TopologyChangeOp.Replace)
               case None =>
@@ -1359,7 +1330,7 @@ class TopologyAdministrationGroup(
         serial,
         ops,
         signedBy,
-        AuthorizedStore.filterName,
+        TopologyStoreId.Authorized,
         synchronize,
         mustFullyAuthorize,
         force,
@@ -1371,7 +1342,7 @@ class TopologyAdministrationGroup(
         serial: RequireTypes.PositiveNumeric[Int],
         ops: TopologyChangeOp = TopologyChangeOp.Replace,
         signedBy: Seq[Fingerprint] = Seq.empty,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
@@ -1379,7 +1350,7 @@ class TopologyAdministrationGroup(
         mustFullyAuthorize: Boolean = true,
         force: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping] =
-      synchronisation.runAdminCommand(synchronize)(
+      runAdminCommand(
         TopologyAdminCommands.Write.Propose(
           mapping = proposedMapping,
           signedBy = signedBy,
@@ -1399,7 +1370,7 @@ class TopologyAdministrationGroup(
 
     @Help.Summary("List party to key mapping transactions")
     def list(
-        filterStore: String = "",
+        store: TopologyStoreId,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -1411,7 +1382,7 @@ class TopologyAdministrationGroup(
         adminCommand(
           TopologyAdminCommands.Read.ListPartyToKeyMapping(
             BaseQuery(
-              filterStore,
+              store,
               proposals,
               timeQuery,
               operation,
@@ -1429,7 +1400,7 @@ class TopologyAdministrationGroup(
         serial: RequireTypes.PositiveNumeric[Int],
         ops: TopologyChangeOp = TopologyChangeOp.Replace,
         signedBy: Option[Fingerprint] = None,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
@@ -1437,7 +1408,7 @@ class TopologyAdministrationGroup(
         mustFullyAuthorize: Boolean = true,
         force: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToKeyMapping] =
-      synchronisation.runAdminCommand(synchronize)(
+      runAdminCommand(
         TopologyAdminCommands.Write.Propose(
           mapping = proposedMapping,
           signedBy = signedBy.toList,
@@ -1455,8 +1426,8 @@ class TopologyAdministrationGroup(
   @Help.Group("Party to participant mappings")
   object party_to_participant_mappings extends Helpful {
 
-    private def findCurrent(party: PartyId, store: String) =
-      TopologyStoreId.tryFromString(store) match {
+    private def findCurrent(party: PartyId, store: TopologyStoreId) =
+      store match {
         case TopologyStoreId.Synchronizer(synchronizerId) =>
           expectAtMostOneResult(
             list(
@@ -1509,7 +1480,7 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.bounded
         ),
         mustFullyAuthorize: Boolean = false,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         force: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant] = {
 
@@ -1615,7 +1586,7 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.bounded
         ),
         mustFullyAuthorize: Boolean = false,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         forceFlags: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant] = {
       val command = TopologyAdminCommands.Write.Propose(
@@ -1633,7 +1604,7 @@ class TopologyAdministrationGroup(
         waitToBecomeEffective = synchronize,
       )
 
-      synchronisation.runAdminCommand(synchronize)(command)
+      runAdminCommand(command)
     }
 
     @Help.Summary("List party to participant mapping transactions from synchronizer store")
@@ -1668,7 +1639,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListPartyToParticipant(
           BaseQuery(
-            filterStore = synchronizerId.filterString,
+            store = TopologyStoreId.Synchronizer(synchronizerId),
             proposals,
             timeQuery,
             operation,
@@ -1681,13 +1652,18 @@ class TopologyAdministrationGroup(
       )
     }
 
-    /** Check whether the node knows about `party` being hosted on `hostingParticipants` and synchronizer `synchronizerId`,
-      * optionally the specified expected permission and threshold.
-      * @param synchronizerId       Synchronizer on which the party should be hosted
-      * @param party                The party which needs to be hosted
-      * @param hostingParticipants  Expected hosting participants
-      * @param permission           If specified, the expected permission
-      * @param threshold            If specified, the expected threshold
+    /** Check whether the node knows about `party` being hosted on `hostingParticipants` and
+      * synchronizer `synchronizerId`, optionally the specified expected permission and threshold.
+      * @param synchronizerId
+      *   Synchronizer on which the party should be hosted
+      * @param party
+      *   The party which needs to be hosted
+      * @param hostingParticipants
+      *   Expected hosting participants
+      * @param permission
+      *   If specified, the expected permission
+      * @param threshold
+      *   If specified, the expected threshold
       */
     def is_known(
         synchronizerId: SynchronizerId,
@@ -1731,10 +1707,14 @@ class TopologyAdministrationGroup(
       participantsError.isEmpty
     }
 
-    /** Check whether the node knows about `parties` being hosted on `hostingParticipants` and synchronizer `synchronizerId`.
-      * @param synchronizerId             Synchronizer on which the party should be hosted
-      * @param parties              The parties which needs to be hosted
-      * @param hostingParticipants  Expected hosting participants
+    /** Check whether the node knows about `parties` being hosted on `hostingParticipants` and
+      * synchronizer `synchronizerId`.
+      * @param synchronizerId
+      *   Synchronizer on which the party should be hosted
+      * @param parties
+      *   The parties which needs to be hosted
+      * @param hostingParticipants
+      *   Expected hosting participants
       */
     def are_known(
         synchronizerId: SynchronizerId,
@@ -1793,7 +1773,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListPartyToParticipant(
           BaseQuery(
-            filterStore = AuthorizedStore.filterName,
+            store = TopologyStoreId.Authorized,
             proposals,
             timeQuery,
             operation,
@@ -1836,7 +1816,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListPartyToParticipant(
           BaseQuery(
-            filterStore = "",
+            store = None,
             proposals,
             timeQuery,
             operation,
@@ -1854,7 +1834,7 @@ class TopologyAdministrationGroup(
   @Help.Group("Synchronizer trust certificates")
   object synchronizer_trust_certificates extends Helpful {
     def list(
-        filterStore: String = "",
+        store: Option[TopologyStoreId] = None,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -1865,7 +1845,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListSynchronizerTrustCertificate(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -1880,7 +1860,7 @@ class TopologyAdministrationGroup(
     // TODO(#14057) document console command
     def active(synchronizerId: SynchronizerId, participantId: ParticipantId): Boolean =
       list(
-        filterStore = synchronizerId.filterString,
+        store = Some(TopologyStoreId.Synchronizer(synchronizerId)),
         filterUid = participantId.filterString,
         operation = Some(TopologyChangeOp.Replace),
       ).exists { x =>
@@ -1917,7 +1897,7 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.bounded
         ),
         // Using the authorized store by default, because the trust cert upon connecting to a synchronizer is also stored in the authorized store
-        store: Option[String] = Some(AuthorizedStore.filterName),
+        store: Option[TopologyStoreId] = Some(TopologyStoreId.Authorized),
         mustFullyAuthorize: Boolean = true,
         serial: Option[PositiveInt] = None,
         change: TopologyChangeOp = TopologyChangeOp.Replace,
@@ -1928,13 +1908,13 @@ class TopologyAdministrationGroup(
           synchronizerId,
         ),
         signedBy = Seq.empty,
-        store = store.getOrElse(synchronizerId.filterString),
+        store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
         serial = serial,
         mustFullyAuthorize = mustFullyAuthorize,
         change = change,
         waitToBecomeEffective = synchronize,
       )
-      synchronisation.runAdminCommand(synchronize)(cmd)
+      runAdminCommand(cmd)
     }
 
   }
@@ -1975,7 +1955,7 @@ class TopologyAdministrationGroup(
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
-        store: Option[String] = None,
+        store: Option[TopologyStoreId] = None,
         mustFullyAuthorize: Boolean = false,
         serial: Option[PositiveInt] = None,
         change: TopologyChangeOp = TopologyChangeOp.Replace,
@@ -1990,13 +1970,13 @@ class TopologyAdministrationGroup(
         ),
         signedBy = Seq.empty,
         serial = serial,
-        store = store.getOrElse(synchronizerId.filterString),
+        store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
         mustFullyAuthorize = mustFullyAuthorize,
         change = change,
         waitToBecomeEffective = synchronize,
       )
 
-      synchronisation.runAdminCommand(synchronize)(cmd)
+      runAdminCommand(cmd)
     }
 
     @Help.Summary("Revokes the synchronizer permissions of a participant.")
@@ -2023,10 +2003,10 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.bounded
         ),
         mustFullyAuthorize: Boolean = false,
-        store: Option[String] = None,
+        store: Option[TopologyStoreId] = None,
     ): SignedTopologyTransaction[TopologyChangeOp, ParticipantSynchronizerPermission] =
       list(
-        filterStore = store.getOrElse(synchronizerId.filterString),
+        store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
         filterUid = participantId.filterString,
       ) match {
         case Seq() =>
@@ -2054,7 +2034,7 @@ class TopologyAdministrationGroup(
       }
 
     def list(
-        filterStore: String = "",
+        store: TopologyStoreId,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -2065,7 +2045,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListParticipantSynchronizerPermission(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -2084,7 +2064,10 @@ class TopologyAdministrationGroup(
         participantId: ParticipantId,
     ): Option[ListParticipantSynchronizerPermissionResult] =
       expectAtMostOneResult(
-        list(filterStore = synchronizerId.filterString, filterUid = participantId.filterString)
+        list(
+          store = TopologyStoreId.Synchronizer(synchronizerId),
+          filterUid = participantId.filterString,
+        )
       ).filter(p =>
         p.item.participantId == participantId && p.item.synchronizerId == synchronizerId
       )
@@ -2116,7 +2099,7 @@ class TopologyAdministrationGroup(
   @Help.Group("Party hosting limits")
   object party_hosting_limits extends Helpful {
     def list(
-        filterStore: String = "",
+        store: Option[TopologyStoreId] = None,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -2127,7 +2110,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListPartyHostingLimits(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -2145,7 +2128,7 @@ class TopologyAdministrationGroup(
     def propose(
         synchronizerId: SynchronizerId,
         partyId: PartyId,
-        store: Option[String] = None,
+        store: Option[TopologyStoreId] = None,
         mustFullyAuthorize: Boolean = false,
         signedBy: Seq[Fingerprint] = Seq.empty,
         serial: Option[PositiveInt] = None,
@@ -2153,11 +2136,11 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): SignedTopologyTransaction[TopologyChangeOp, PartyHostingLimits] =
-      synchronisation.runAdminCommand(synchronize)(
+      runAdminCommand(
         TopologyAdminCommands.Write.Propose(
           PartyHostingLimits(synchronizerId, partyId),
           signedBy = signedBy,
-          store = store.getOrElse(synchronizerId.toProtoPrimitive),
+          store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
           serial = serial,
           change = TopologyChangeOp.Replace,
           mustFullyAuthorize = mustFullyAuthorize,
@@ -2199,7 +2182,7 @@ class TopologyAdministrationGroup(
         participant: ParticipantId,
         adds: Seq[VettedPackage] = Nil,
         removes: Seq[PackageId] = Nil,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         mustFullyAuthorize: Boolean = false,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
@@ -2216,7 +2199,11 @@ class TopologyAdministrationGroup(
       }
       // compute the diff and then call the propose method
       val current0 = expectAtMostOneResult(
-        list(filterStore = store, filterParticipant = participant.filterString, operation = None)
+        list(
+          store = Some(store),
+          filterParticipant = participant.filterString,
+          operation = None,
+        )
       )
 
       (adds, removes) match {
@@ -2293,7 +2280,7 @@ class TopologyAdministrationGroup(
     def propose(
         participant: ParticipantId,
         packages: Seq[VettedPackage],
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
         mustFullyAuthorize: Boolean = false,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
@@ -2320,11 +2307,11 @@ class TopologyAdministrationGroup(
         waitToBecomeEffective = synchronize,
       )
 
-      synchronisation.runAdminCommand(synchronize)(command).discard
+      runAdminCommand(command).discard
     }
 
     def list(
-        filterStore: String = "",
+        store: Option[TopologyStoreId] = None,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -2335,7 +2322,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.ListVettedPackages(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -2352,7 +2339,7 @@ class TopologyAdministrationGroup(
   @Help.Group("Mediator Synchronizer State")
   object mediators extends Helpful {
     def list(
-        filterStore: String = "",
+        synchronizerId: Option[SynchronizerId] = None,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -2364,16 +2351,12 @@ class TopologyAdministrationGroup(
       def predicate(res: ListMediatorSynchronizerStateResult): Boolean =
         group.forall(_ == res.item.group)
 
-      areFilterStoreFilterSynchronizerCompatible(filterStore, filterSynchronizer).valueOr(err =>
-        throw new IllegalArgumentException(err)
-      )
-
       consoleEnvironment
         .run {
           adminCommand(
             TopologyAdminCommands.Read.MediatorSynchronizerState(
               BaseQuery(
-                filterStore,
+                synchronizerId,
                 proposals,
                 timeQuery,
                 operation,
@@ -2412,7 +2395,7 @@ class TopologyAdministrationGroup(
         observerAdds: List[MediatorId] = Nil,
         observerRemoves: List[MediatorId] = Nil,
         updateThreshold: Option[PositiveInt] = None,
-        await: Option[config.NonNegativeDuration] = Some(
+        synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         mustFullyAuthorize: Boolean = false,
@@ -2426,7 +2409,7 @@ class TopologyAdministrationGroup(
       def queryStore(proposals: Boolean): Option[(PositiveInt, MediatorSynchronizerState)] =
         expectAtMostOneResult(
           list(
-            synchronizerId.filterString,
+            Some(synchronizerId),
             group = Some(group),
             operation = Some(TopologyChangeOp.Replace),
             proposals = proposals,
@@ -2464,34 +2447,12 @@ class TopologyAdministrationGroup(
         active,
         observers,
         group,
-        store = Some(synchronizerId.filterString),
-        synchronize = None, // no synchronize - instead rely on await below
+        store = None,
+        synchronize = synchronize,
         mustFullyAuthorize = mustFullyAuthorize,
         signedBy = signedBy,
         serial = Some(serial),
       ).discard
-
-      await.foreach { timeout =>
-        ConsoleMacros.utils.retry_until_true(timeout) {
-          def areAllChangesPersisted: ((PositiveInt, MediatorSynchronizerState)) => Boolean = {
-            case (serialFound, mds) =>
-              serialFound == serial &&
-              adds.forall(mds.active.contains) && removes.forall(!mds.active.contains(_)) &&
-              observerAdds.forall(mds.observers.contains) && observerRemoves.forall(
-                !mds.observers.contains(_)
-              ) && updateThreshold.forall(_ == mds.threshold)
-          }
-
-          if (mustFullyAuthorize) {
-            queryStore(proposals = false).exists(areAllChangesPersisted)
-          } else {
-            // If the proposal does not need to be authorized, first check for proposals then for an authorized transaction
-            queryStore(proposals = true).exists(areAllChangesPersisted) || queryStore(proposals =
-              false
-            ).exists(areAllChangesPersisted)
-          }
-        }
-      }
     }
 
     @Help.Summary("Replace the mediator topology")
@@ -2521,7 +2482,7 @@ class TopologyAdministrationGroup(
         active: Seq[MediatorId],
         observers: Seq[MediatorId] = Seq.empty,
         group: NonNegativeInt,
-        store: Option[String] = None,
+        store: Option[TopologyStoreId] = None,
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
@@ -2537,11 +2498,11 @@ class TopologyAdministrationGroup(
         change = TopologyChangeOp.Replace,
         mustFullyAuthorize = mustFullyAuthorize,
         forceChanges = ForceFlags.none,
-        store = store.getOrElse(synchronizerId.filterString),
+        store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
         waitToBecomeEffective = synchronize,
       )
 
-      synchronisation.runAdminCommand(synchronize)(command)
+      runAdminCommand(command)
     }
 
     @Help.Summary("Propose to remove a mediator group")
@@ -2561,14 +2522,14 @@ class TopologyAdministrationGroup(
     def remove_group(
         synchronizerId: SynchronizerId,
         group: NonNegativeInt,
-        store: Option[String] = None,
+        store: Option[TopologyStoreId] = None,
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         mustFullyAuthorize: Boolean = false,
     ): SignedTopologyTransaction[TopologyChangeOp, MediatorSynchronizerState] = {
 
-      val mediatorStateResult = list(filterStore = synchronizerId.filterString, group = Some(group))
+      val mediatorStateResult = list(synchronizerId = synchronizerId, group = Some(group))
         .maxByOption(_.context.serial)
         .getOrElse(throw new IllegalArgumentException(s"Unknown mediator group $group"))
 
@@ -2579,11 +2540,11 @@ class TopologyAdministrationGroup(
         change = TopologyChangeOp.Remove,
         mustFullyAuthorize = mustFullyAuthorize,
         forceChanges = ForceFlags.none,
-        store = store.getOrElse(synchronizerId.filterString),
+        store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
         waitToBecomeEffective = synchronize,
       )
 
-      synchronisation.runAdminCommand(synchronize)(command)
+      runAdminCommand(command)
     }
   }
 
@@ -2591,7 +2552,7 @@ class TopologyAdministrationGroup(
   @Help.Group("Sequencer Synchronizer State")
   object sequencers extends Helpful {
     def list(
-        filterStore: String = "",
+        store: Option[TopologyStoreId] = None,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -2602,7 +2563,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.SequencerSynchronizerState(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -2642,7 +2603,7 @@ class TopologyAdministrationGroup(
         threshold: PositiveInt,
         active: Seq[SequencerId],
         passive: Seq[SequencerId] = Seq.empty,
-        store: Option[String] = None,
+        store: Option[TopologyStoreId] = None,
         mustFullyAuthorize: Boolean = false,
         signedBy: Option[Fingerprint] = None,
         serial: Option[PositiveInt] = None,
@@ -2659,7 +2620,7 @@ class TopologyAdministrationGroup(
             change = TopologyChangeOp.Replace,
             mustFullyAuthorize = mustFullyAuthorize,
             forceChanges = ForceFlags.none,
-            store = store.getOrElse(synchronizerId.filterString),
+            store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
             waitToBecomeEffective = synchronize,
           )
         )
@@ -2671,7 +2632,7 @@ class TopologyAdministrationGroup(
   object synchronizer_parameters extends Helpful {
     @Help.Summary("List dynamic synchronizer parameters")
     def list(
-        filterStore: String = "",
+        store: TopologyStoreId,
         proposals: Boolean = false,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
@@ -2682,7 +2643,7 @@ class TopologyAdministrationGroup(
       adminCommand(
         TopologyAdminCommands.Read.SynchronizerParametersState(
           BaseQuery(
-            filterStore,
+            store,
             proposals,
             timeQuery,
             operation,
@@ -2701,7 +2662,7 @@ class TopologyAdministrationGroup(
       ConsoleDynamicSynchronizerParameters(
         expectExactlyOneResult(
           list(
-            filterStore = synchronizerId.filterString,
+            store = TopologyStoreId.Synchronizer(synchronizerId),
             proposals = false,
             timeQuery = TimeQuery.HeadState,
             operation = Some(TopologyChangeOp.Replace),
@@ -2738,21 +2699,20 @@ class TopologyAdministrationGroup(
     def propose(
         synchronizerId: SynchronizerId,
         parameters: ConsoleDynamicSynchronizerParameters,
-        store: Option[String] = None,
+        store: Option[TopologyStoreId] = None,
         mustFullyAuthorize: Boolean = false,
         signedBy: Option[Fingerprint] = None,
         serial: Option[PositiveInt] = None,
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
-        waitForParticipants: Seq[ParticipantReference] = consoleEnvironment.participants.all,
         force: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, SynchronizerParametersState] = { // TODO(#15815): Don't expose internal TopologyMapping and TopologyChangeOp classes
 
       val parametersInternal =
         parameters.toInternal.valueOr(err => throw new IllegalArgumentException(err))
 
-      val res = synchronisation.runAdminCommand(synchronize)(
+      runAdminCommand(
         TopologyAdminCommands.Write.Propose(
           SynchronizerParametersState(
             synchronizerId,
@@ -2761,44 +2721,11 @@ class TopologyAdministrationGroup(
           signedBy.toList,
           serial = serial,
           mustFullyAuthorize = mustFullyAuthorize,
-          store = store.getOrElse(synchronizerId.filterString),
+          store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId)),
           forceChanges = force,
           waitToBecomeEffective = synchronize,
         )
       )
-
-      def waitForParameters(ref: TopologyAdministrationGroup): Unit =
-        synchronize
-          .foreach(timeout =>
-            ConsoleMacros.utils.retry_until_true(timeout)(
-              {
-                // cannot use get_dynamic_synchronizer_parameters, as this will throw if there are no prior parameters
-                val headState = ref.synchronizer_parameters
-                  .list(
-                    filterStore = synchronizerId.filterString,
-                    timeQuery = TimeQuery.HeadState,
-                    operation = Some(TopologyChangeOp.Replace),
-                    filterSynchronizer = synchronizerId.filterString,
-                  )
-                  .map(r => ConsoleDynamicSynchronizerParameters(r.item))
-
-                headState == Seq(parameters)
-              },
-              s"The dynamic synchronizer parameters never became effective within $timeout",
-            )
-          )
-
-      waitForParameters(TopologyAdministrationGroup.this)
-      waitForParticipants
-        .filter(p =>
-          p.health.is_running() && p.health.initialized() && p.synchronizers.is_connected(
-            synchronizerId
-          )
-        )
-        .map(_.topology)
-        .foreach(waitForParameters)
-
-      res
     }
 
     @Help.Summary("Propose an update to dynamic synchronizer parameters")
@@ -2824,15 +2751,13 @@ class TopologyAdministrationGroup(
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
-        waitForParticipants: Seq[ParticipantReference] = consoleEnvironment.participants.all,
         force: ForceFlags = ForceFlags.none,
     ): Unit = {
-      val synchronizerStore = synchronizerId.filterString
-
+      val synchronizerStore = TopologyStoreId.Synchronizer(synchronizerId)
       val previousParameters = expectExactlyOneResult(
         list(
           filterSynchronizer = synchronizerId.filterString,
-          filterStore = synchronizerStore,
+          store = synchronizerStore,
           operation = Some(TopologyChangeOp.Replace),
         )
       )
@@ -2848,34 +2773,10 @@ class TopologyAdministrationGroup(
           signedBy,
           Some(previousParameters.context.serial.increment),
           synchronize,
-          waitForParticipants,
           force,
         ).discard
       }
     }
-
-    @Help.Summary(
-      "Update the ledger time record time tolerance in the dynamic synchronizer parameters"
-    )
-    @Help.Description(
-      """
-        synchronizerId: the target synchronizer
-        newLedgerTimeRecordTimeTolerance: the new ledgerTimeRecordTimeTolerance value to apply to the synchronizer
-
-        Note: The force parameter has no effect anymore since Canton 3.2.
-              Updating ledger time record time tolerance is no longer unsafe.
-        """
-    )
-    @deprecated(
-      message =
-        "Use set_ledger_time_record_time_tolerance without the force flag parameter instead",
-      since = "3.2",
-    )
-    def set_ledger_time_record_time_tolerance(
-        synchronizerId: SynchronizerId,
-        newLedgerTimeRecordTimeTolerance: config.NonNegativeFiniteDuration,
-        force: Boolean = false,
-    ): Unit = setLedgerTimeRecordTimeTolerance(synchronizerId, newLedgerTimeRecordTimeTolerance)
 
     @Help.Summary(
       "Update the ledger time record time tolerance in the dynamic synchronizer parameters"
@@ -2964,7 +2865,7 @@ class TopologyAdministrationGroup(
       if (
         oldSynchronizerParameters.mediatorDeduplicationTimeout < minMediatorDeduplicationTimeout
       ) {
-        val err = TopologyManagerError.IncreaseOfSubmissionTimeRecordTimeTolerance
+        val err: CantonError = TopologyManagerError.IncreaseOfSubmissionTimeRecordTimeTolerance
           .PermanentlyInsecure(
             newSubmissionTimeRecordTimeTolerance.toInternal,
             oldSynchronizerParameters.mediatorDeduplicationTimeout.toInternal,
@@ -2993,7 +2894,7 @@ class TopologyAdministrationGroup(
         logger.debug("Check for incompatible past synchronizer parameters...")
 
         val allTransactions = list(
-          synchronizerId.filterString,
+          TopologyStoreId.Synchronizer(synchronizerId),
           // We can't specify a lower bound in range because that would be compared against validFrom.
           // (But we need to compare to validUntil).
           timeQuery = TimeQuery.Range(None, None),
@@ -3073,12 +2974,42 @@ class TopologyAdministrationGroup(
   @Help.Group("Topology stores")
   object stores extends Helpful {
     @Help.Summary("List available topology stores")
-    def list(): Seq[String] =
+    def list(): Seq[TopologyStoreId] =
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListStores()
         )
       }
+
+    @Help.Summary("Creates a temporary topology store.")
+    @Help.Description(
+      """A temporary topology store is useful for orchestrating the synchronizer founding ceremony or importing a topology snapshot for later inspection.
+        |Temporary topology stores are not persisted and all transactions are kept in memory only, which means restarting the node causes the loss of all
+        |transactions in that store.
+        |Additionally, temporary topology stores are not connected to any synchronizer, so there is no automatic propagation of topology transactions
+        |from the temporary store to connected synchronizers."""
+    )
+    def create_temporary_topology_store(
+        name: String,
+        protocolVersion: ProtocolVersion,
+    ): TopologyStoreId.Temporary =
+      consoleEnvironment.run {
+        adminCommand(TopologyAdminCommands.Write.CreateTemporaryStore(name, protocolVersion))
+      }
+
+    @Help.Summary(
+      "This command drops a temporary topology store and all transactions contained in it."
+    )
+    @Help.Description(
+      """Dropping a temporary topology store is not reversible and all topology transactions in the store will
+        |be permanently dropped.
+        |It's not possible to delete the authorized store or any synchronizer store with this command."""
+    )
+    def drop_temporary_topology_store(temporaryStoreId: TopologyStoreId.Temporary): Unit =
+      consoleEnvironment.run {
+        adminCommand(TopologyAdminCommands.Write.DropTemporaryStore(temporaryStoreId))
+      }
+
   }
 
   private def expectAtMostOneResult[R](seq: Seq[R]): Option[R] = seq match {

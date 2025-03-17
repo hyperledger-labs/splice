@@ -1,16 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery
+
 import java.time.Duration
 
 class RecordTimeToleranceTimeBasedIntegrationTest
@@ -18,8 +15,7 @@ class RecordTimeToleranceTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) => {
@@ -78,7 +74,10 @@ class RecordTimeToleranceTimeBasedIntegrationTest
           .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofHours(48)
       }
       val txs = sv1Backend.participantClient.topology.synchronizer_parameters
-        .list(filterStore = synchronizerId.filterString, timeQuery = TimeQuery.Range(None, None))
+        .list(
+          store = TopologyStoreId.Synchronizer(synchronizerId),
+          timeQuery = TimeQuery.Range(None, None),
+        )
       txs should have length (3)
       sv1LocalBackend.stop()
   }

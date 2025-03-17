@@ -50,8 +50,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PekkoEnv,
   PekkoFutureUnlessShutdown,
 }
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v1
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v1.ConsensusMessage as ProtoConsensusMessage
+import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
+import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.ConsensusMessage as ProtoConsensusMessage
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{ProtoDeserializationError, RichGeneratedMessage}
@@ -83,6 +83,7 @@ class DbEpochStore(
       BlockNumber(r.nextLong()),
       EpochLength(r.nextLong()),
       TopologyActivationTime(CantonTimestamp.assertFromLong(r.nextLong())),
+      CantonTimestamp.assertFromLong(r.nextLong()),
     )
   }
 
@@ -114,9 +115,9 @@ class DbEpochStore(
     val messageBytes = r.nextBytes()
 
     val messageOrError = for {
-      signedMessageProto <- Try(v1.SignedMessage.parseFrom(messageBytes)).toEither
+      signedMessageProto <- Try(v30.SignedMessage.parseFrom(messageBytes)).toEither
         .leftMap(x => ProtoDeserializationError.OtherError(x.toString))
-      message <- SignedMessage.fromProtoWithSequencerId(v1.ConsensusMessage)(parse)(
+      message <- SignedMessage.fromProtoWithSequencerId(v30.ConsensusMessage)(parse)(
         signedMessageProto
       )
     } yield message
@@ -137,8 +138,8 @@ class DbEpochStore(
       storage.update_(
         profile match {
           case _: Postgres =>
-            sqlu"""insert into ord_epochs(epoch_number, start_block_number, epoch_length, topology_ts, in_progress)
-                   values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value}, true)
+            sqlu"""insert into ord_epochs(epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts, in_progress)
+                   values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value}, ${epoch.previousEpochMaxBftTime}, true)
                    on conflict (epoch_number) do nothing
                 """
           case _: H2 =>
@@ -147,8 +148,8 @@ class DbEpochStore(
                      ord_epochs.epoch_number = ${epoch.number}
                    )
                    when not matched then
-                     insert (epoch_number, start_block_number, epoch_length, topology_ts, in_progress)
-                     values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value}, true)
+                     insert (epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts, in_progress)
+                     values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value}, ${epoch.previousEpochMaxBftTime}, true)
                 """
         },
         functionFullName,
@@ -179,14 +180,14 @@ class DbEpochStore(
         for {
           epochInfo <-
             if (!includeInProgress)
-              sql"""select epoch_number, start_block_number, epoch_length, topology_ts
+              sql"""select epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts
                     from ord_epochs
                     where in_progress = false
                     order by epoch_number desc
                     limit 1
                  """.as[EpochInfo]
             else
-              sql"""select epoch_number, start_block_number, epoch_length, topology_ts
+              sql"""select epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts
                     from ord_epochs
                     order by epoch_number desc
                     limit 1
@@ -420,7 +421,7 @@ class DbEpochStore(
     createFuture(loadEpochInfoActionName(epochNumber)) {
       storage
         .query(
-          sql"""select epoch_number, start_block_number, epoch_length, topology_ts
+          sql"""select epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts
                 from ord_epochs
                 where epoch_number = $epochNumber
                 limit 1
@@ -437,7 +438,7 @@ class DbEpochStore(
         .query(
           sql"""select
                   completed_message.message,
-                  epoch.epoch_number, epoch.start_block_number, epoch.epoch_length, epoch.topology_ts
+                  epoch.epoch_number, epoch.start_block_number, epoch.epoch_length, epoch.topology_ts, epoch.previous_epoch_max_ts
                 from
                   ord_pbft_messages_completed completed_message
                   inner join ord_epochs epoch
@@ -464,6 +465,49 @@ class DbEpochStore(
             )
           }
         }
+    }
+
+  override def loadNumberOfRecords(implicit
+      traceContext: TraceContext
+  ): PekkoFutureUnlessShutdown[EpochStore.NumberOfRecords] =
+    createFuture(loadNumberOfRecordsName) {
+      storage.query(
+        (for {
+          numberOfEpochs <- sql"""select count(*) from ord_epochs""".as[Long].head
+          numberOfMsgsCompleted <- sql"""select count(*) from ord_pbft_messages_completed"""
+            .as[Long]
+            .head
+          numberOfMsgsInProgress <- sql"""select count(*) from ord_pbft_messages_in_progress"""
+            .as[Int]
+            .head
+        } yield EpochStore
+          .NumberOfRecords(numberOfEpochs, numberOfMsgsCompleted, numberOfMsgsInProgress)),
+        functionFullName,
+      )
+    }
+
+  override def prune(epochNumberInclusive: EpochNumber)(implicit
+      traceContext: TraceContext
+  ): PekkoFutureUnlessShutdown[EpochStore.NumberOfRecords] =
+    createFuture(pruneName(epochNumberInclusive)) {
+      for {
+        epochsDeleted <- storage.update(
+          sqlu""" delete from ord_epochs where epoch_number <= $epochNumberInclusive """,
+          functionFullName,
+        )
+        pbftMessagesCompletedDeleted <- storage.update(
+          sqlu""" delete from ord_pbft_messages_completed where epoch_number <= $epochNumberInclusive """,
+          functionFullName,
+        )
+        pbftMessagesInProgressDeleted <- storage.update(
+          sqlu""" delete from ord_pbft_messages_in_progress where epoch_number <= $epochNumberInclusive """,
+          functionFullName,
+        )
+      } yield EpochStore.NumberOfRecords(
+        epochsDeleted.toLong,
+        pbftMessagesCompletedDeleted.toLong,
+        pbftMessagesInProgressDeleted,
+      )
     }
 }
 

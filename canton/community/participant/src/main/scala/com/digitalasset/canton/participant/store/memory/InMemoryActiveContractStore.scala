@@ -11,6 +11,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.ReassignmentCounter
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -35,7 +36,6 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.{ReassignmentCounter, RequestCounter}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import java.util.ConcurrentModificationException
@@ -145,28 +145,15 @@ class InMemoryActiveContractStore(
       statusF.map(ContractState(_, change.toc))
     }
 
-  override def snapshot(timestamp: CantonTimestamp)(implicit
+  override def snapshot(timeOfChange: TimeOfChange)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[SortedMap[LfContractId, (CantonTimestamp, ReassignmentCounter)]] =
+  ): FutureUnlessShutdown[SortedMap[LfContractId, (TimeOfChange, ReassignmentCounter)]] =
     FutureUnlessShutdown.pure {
-      val snapshot = SortedMap.newBuilder[LfContractId, (CantonTimestamp, ReassignmentCounter)]
+      val snapshot = SortedMap.newBuilder[LfContractId, (TimeOfChange, ReassignmentCounter)]
       table.foreach { case (contractId, contractStatus) =>
-        contractStatus.activeBy(timestamp).foreach {
+        contractStatus.activeBy(timeOfChange).foreach {
           case (activationTimestamp, reassignmentCounter) =>
             snapshot += (contractId -> (activationTimestamp, reassignmentCounter))
-        }
-      }
-      snapshot.result()
-    }
-
-  override def snapshot(rc: RequestCounter)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[SortedMap[LfContractId, (RequestCounter, ReassignmentCounter)]] =
-    FutureUnlessShutdown.pure {
-      val snapshot = SortedMap.newBuilder[LfContractId, (RequestCounter, ReassignmentCounter)]
-      table.foreach { case (contractId, contractStatus) =>
-        contractStatus.activeBy(rc).foreach { case (activationRc, reassignmentCounter) =>
-          snapshot += (contractId -> (activationRc, reassignmentCounter))
         }
       }
       snapshot.result()
@@ -188,42 +175,36 @@ class InMemoryActiveContractStore(
       snapshot.result()
     }
 
-  override def contractSnapshot(contractIds: Set[LfContractId], timestamp: CantonTimestamp)(implicit
+  override def contractSnapshot(contractIds: Set[LfContractId], timeOfChange: TimeOfChange)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[LfContractId, CantonTimestamp]] =
+  ): FutureUnlessShutdown[Map[LfContractId, TimeOfChange]] =
     FutureUnlessShutdown.pure {
       contractIds
         .to(LazyList)
         .mapFilter(contractId =>
-          table.get(contractId).flatMap(_.activeBy(timestamp)).map { case (ts, _) =>
-            contractId -> ts
+          table.get(contractId).flatMap(_.activeBy(timeOfChange)).map { case (toc, _) =>
+            contractId -> toc
           }
         )
         .toMap
     }
 
-  override def bulkContractsReassignmentCounterSnapshot(
+  override def contractsReassignmentCounterSnapshotBefore(
       contractIds: Set[LfContractId],
-      requestCounter: RequestCounter,
+      timestampExclusive: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[LfContractId, ReassignmentCounter]] = {
     logger.debug(
-      s"Looking up reassignment counters for contracts $contractIds up to but not including $requestCounter"
+      s"Looking up reassignment counters for contracts $contractIds up to but not including $timestampExclusive"
     )
-    if (requestCounter == RequestCounter.MinValue)
-      ErrorUtil.internalError(
-        new IllegalArgumentException(
-          s"The request counter $requestCounter should not be equal to ${RequestCounter.MinValue}"
-        )
-      )
     FutureUnlessShutdown.pure {
       contractIds
         .to(LazyList)
         .map(contractId =>
           table
             .get(contractId)
-            .flatMap(_.activeBy(requestCounter - 1))
+            .flatMap(_.activeBy(TimeOfChange.immediatePredecessor(timestampExclusive)))
             .fold(
               ErrorUtil.internalError(
                 new IllegalStateException(
@@ -339,7 +320,7 @@ class InMemoryActiveContractStore(
   }
 
   override def deleteSince(
-      criterion: RequestCounter
+      criterion: TimeOfChange
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     FutureUnlessShutdown.pure {
       table.foreach { case (coid, status) =>
@@ -380,7 +361,7 @@ class InMemoryActiveContractStore(
 
       // obtain the maximum reassignment counter per contract up to a certain rc
       val latestActivationReassignmentCounterPerCid
-          : Map[(LfContractId, RequestCounter), ReassignmentCounter] =
+          : Map[(LfContractId, TimeOfChange), ReassignmentCounter] =
         table.toList.flatMap { case (cid, status) =>
           // we only constrain here the upper bound timestamp, because we want to find the
           // reassignment counter of archivals, which might have been activated earlier
@@ -393,10 +374,10 @@ class InMemoryActiveContractStore(
           filterToc
             .map { case (change, _) =>
               (
-                (cid, change.toc.rc),
+                (cid, change.toc),
                 filterToc
                   .collect {
-                    case (ch, detail) if ch.isActivation && ch.toc.rc <= change.toc.rc =>
+                    case (ch, detail) if ch.isActivation && ch.toc <= change.toc =>
                       detail.reassignmentCounterO
                   }
                   .maxOption
@@ -428,7 +409,7 @@ class InMemoryActiveContractStore(
 
               case ActivenessChangeDetail.Archive | ActivenessChangeDetail.Purge =>
                 val reassignmentCounter = latestActivationReassignmentCounterPerCid.getOrElse(
-                  (coid, activenessChange.toc.rc),
+                  (coid, activenessChange.toc),
                   throw new IllegalStateException(
                     s"Unable to find reassignment counter for $coid at ${activenessChange.toc}"
                   ),
@@ -461,7 +442,7 @@ class InMemoryActiveContractStore(
   ): FutureUnlessShutdown[Option[(LfContractId)]] =
     for {
       contracts <- contractStore.find(
-        filterId = None,
+        exactId = None,
         filterPackage = Some(pkg),
         filterTemplate = None,
         limit = Int.MaxValue,
@@ -478,12 +459,13 @@ class InMemoryActiveContractStore(
 object InMemoryActiveContractStore {
   import ActiveContractStore.*
 
-  /** A contract status change consists of the actual [[ActivenessChange]] (timestamp, request counter, and kind)
-    * and the details. The [[com.digitalasset.canton.participant.store.ActiveContractStore.ActivenessChangeDetail]]
-    * determines whether the actual [[ActivenessChange]]
-    * is a creation/archival or a assignment/unassignment. In the store, at most one
+  /** A contract status change consists of the actual [[ActivenessChange]] (timestamp, request
+    * counter, and kind) and the details. The
     * [[com.digitalasset.canton.participant.store.ActiveContractStore.ActivenessChangeDetail]]
-    * may be associated with the same [[ActivenessChange]].
+    * determines whether the actual [[ActivenessChange]] is a creation/archival or a
+    * assignment/unassignment. In the store, at most one
+    * [[com.digitalasset.canton.participant.store.ActiveContractStore.ActivenessChangeDetail]] may
+    * be associated with the same [[ActivenessChange]].
     */
   type IndividualChange = (ActivenessChange, ActivenessChangeDetail)
   object IndividualChange {
@@ -540,9 +522,9 @@ object InMemoryActiveContractStore {
 
   object ActivenessChange {
 
-    /** Intended order is by [[com.digitalasset.canton.participant.util.TimeOfChange]]
-      * and then activations (creates/assignments) before deactivation,
-      * but this is the reversed order because we want to iterate over the earlier events in the [[ChangeJournal]]
+    /** Intended order is by [[com.digitalasset.canton.participant.util.TimeOfChange]] and then
+      * activations (creates/assignments) before deactivation, but this is the reversed order
+      * because we want to iterate over the earlier events in the [[ChangeJournal]]
       */
     implicit val reverseOrderingForActivenessChange: Ordering[ActivenessChange] =
       Ordering
@@ -556,8 +538,9 @@ object InMemoryActiveContractStore {
 
   /** Journal of the changes to contract.
     *
-    * @param changes The journal of changes that have been recorded for the contract.
-    *                Must be ordered by [[ActivenessChange.reverseOrderingForActivenessChange]].
+    * @param changes
+    *   The journal of changes that have been recorded for the contract. Must be ordered by
+    *   [[ActivenessChange.reverseOrderingForActivenessChange]].
     */
   final case class ContractStatus private (changes: ChangeJournal) {
     import IndividualChange.{add, archive, create, purge}
@@ -737,17 +720,18 @@ object InMemoryActiveContractStore {
       laterChanges.result().toList
     }
 
-    /** If the contract is active right after the given `timestamp`,
-      * returns the [[com.digitalasset.canton.data.CantonTimestamp]] of the latest creation or latest assignment.
+    /** If the contract is active right after the given `timestamp`, returns the
+      * [[com.digitalasset.canton.data.CantonTimestamp]] of the latest creation or latest
+      * assignment.
       */
-    def activeBy(timestamp: CantonTimestamp): Option[(CantonTimestamp, ReassignmentCounter)] = {
-      val iter = changes.iteratorFrom(ContractStatus.searchByTimestamp(timestamp))
+    def activeBy(toc: TimeOfChange): Option[(TimeOfChange, ReassignmentCounter)] = {
+      val iter = changes.iteratorFrom(ContractStatus.searchByTimestamp(toc))
       if (!iter.hasNext) { None }
       else {
         val (change, detail) = iter.next()
 
         def changeFor(reassignmentCounter: ReassignmentCounter) = Some(
-          (change.toc.timestamp, reassignmentCounter)
+          (change.toc, reassignmentCounter)
         )
 
         detail match {
@@ -758,31 +742,6 @@ object InMemoryActiveContractStore {
         }
       }
     }
-
-    /** If the contract is active right after the given `rc`,
-      * returns the [[com.digitalasset.canton.RequestCounter]] of the latest creation or latest assignment.
-      */
-    def activeBy(rc: RequestCounter): Option[(RequestCounter, ReassignmentCounter)] =
-      changes
-        .filter { case (activenessChange, _) =>
-          activenessChange.toc.rc <= rc
-        }
-        .toSeq
-        .maxByOption { case (activenessChange, _) =>
-          (activenessChange.toc, !activenessChange.isActivation)
-        }
-        .flatMap { case (change, detail) =>
-          Option.when(change.isActivation)(
-            (
-              change.toc.rc,
-              detail.reassignmentCounterO.getOrElse(
-                throw new IllegalStateException(
-                  s"Active contract should have the reassignment counter defined"
-                )
-              ),
-            )
-          )
-        }
 
     def prune(beforeAndIncluding: CantonTimestamp): Option[ContractStatus] =
       changes.keys
@@ -800,14 +759,16 @@ object InMemoryActiveContractStore {
           Some(this)
       }
 
-    /** Returns a contract status that has all changes removed whose request counter is at least `criterion`. */
-    def deleteSince(criterion: RequestCounter): ContractStatus = {
+    /** Returns a contract status that has all changes removed whose time of change is at least
+      * `criterion`.
+      */
+    def deleteSince(criterion: TimeOfChange): ContractStatus = {
       val affected = changes.headOption.exists { case (change, _detail) =>
-        change.toc.rc >= criterion
+        change.toc >= criterion
       }
       if (!affected) this
       else {
-        val retainedChanges = changes.filter { case (change, _detail) => change.toc.rc < criterion }
+        val retainedChanges = changes.filter { case (change, _detail) => change.toc < criterion }
         contractStatusFromChangeJournal(retainedChanges).getOrElse(ContractStatus.Nonexistent)
       }
     }
@@ -821,7 +782,7 @@ object InMemoryActiveContractStore {
 
     val Nonexistent = new ContractStatus(SortedMap.empty)
 
-    private def searchByTimestamp(timestamp: CantonTimestamp): ActivenessChange =
-      Deactivation(TimeOfChange(RequestCounter.MaxValue, timestamp))
+    private def searchByTimestamp(toc: TimeOfChange): ActivenessChange =
+      Deactivation(toc)
   }
 }

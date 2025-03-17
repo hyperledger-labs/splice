@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.util
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.{ApiLoggingConfig, FullClientConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.store.TopologyStoreId
@@ -127,7 +127,7 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
     def newParticipantAdminConnection(range: Int) = {
       val port = Port.tryCreate(range * 1000 + sv * 100 + 2)
       new ParticipantAdminConnection(
-        ClientConfig(port = port),
+        FullClientConfig(port = port),
         apiLoggingConfig,
         loggerFactoryWithKey,
         grpcClientMetrics,

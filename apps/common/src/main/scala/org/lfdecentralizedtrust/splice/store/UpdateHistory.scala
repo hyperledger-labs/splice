@@ -1189,6 +1189,7 @@ class UpdateHistory(
           EventId.lastDescendedNodeFromChildNodeIds(nodeId, nodesWithChildren)
         ),
         /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
+        /*implementedInterfaces = */ java.util.Collections.emptyList(),
       )
     }.toMap
     val eventsById = createEventsById ++ exerciseEventsById

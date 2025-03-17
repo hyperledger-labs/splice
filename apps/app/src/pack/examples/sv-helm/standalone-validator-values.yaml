@@ -36,3 +36,15 @@ persistence:
 # Replace YOUR_VALIDATOR_NODE_NAME with the name you provided for your validator identity.
 # This value will be used for the node identifier of your participant.
 nodeIdentifier: "YOUR_VALIDATOR_NODE_NAME"
+
+# CONFIGURING_TOPUP_START
+# Configuring a validator's traffic top-up loop;
+# see documentation for more detailed information.
+topup:
+  # set to false in order to disable automatic traffic top-ups
+  enabled: true
+  # target throughput in bytes / second of sequenced traffic; targetThroughput=0 <=> enabled=false
+  targetThroughput: 20000
+  # minTopupInterval - minimum time interval that must elapse before the next top-up
+  minTopupInterval: "1m"
+# CONFIGURING_TOPUP_END

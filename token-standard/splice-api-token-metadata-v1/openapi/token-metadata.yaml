@@ -167,6 +167,10 @@ components:
         total_supply:
           description: "Decimal encoded current total supply of the instrument."
           type: string
+        total_supply_as_of:
+          description: "The timestamp when the total supply was last computed."
+          type: string
+          format: date-time
       required:
         [
           "provider_id",

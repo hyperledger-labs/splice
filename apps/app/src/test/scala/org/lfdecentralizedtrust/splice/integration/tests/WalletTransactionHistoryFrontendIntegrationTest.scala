@@ -1,9 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as paymentCodegen
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
   FrontendLoginUtil,
   SpliceUtil,
@@ -12,7 +10,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.lfdecentralizedtrust.splice.wallet.store.{
   NotificationTxLogEntry,
   TxLogEntry as walletLogEntry,
@@ -39,8 +36,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
   override def walletAmuletPrice: java.math.BigDecimal =
     SpliceUtil.damlDecimal(amuletPrice.toDouble)
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging
@@ -188,7 +184,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
     "show extra traffic purchases" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
-        val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
+        val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUsers.loneElement
         val sv1Party = sv1ValidatorBackend.getValidatorPartyId()
         browseToSv1Wallet(sv1WalletUser)
         val trafficAmount = 10_000_000L
@@ -374,7 +370,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
           .get(sv1Party.toProtoPrimitive)
           .value
           .name
-        val sv1ValidatorWalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
+        val sv1ValidatorWalletUser = sv1ValidatorBackend.config.validatorWalletUsers.loneElement
         val amuletConfig = sv1ScanBackend.getAmuletConfigAsOf(env.environment.clock.now)
         val preapprovalFeeRate = amuletConfig.transferPreapprovalFee.toScala.map(BigDecimal(_))
         val (_, preapprovalFee) = SpliceUtil.transferPreapprovalFees(

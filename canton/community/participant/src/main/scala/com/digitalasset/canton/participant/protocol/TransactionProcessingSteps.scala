@@ -113,14 +113,15 @@ import scala.util.{Failure, Success}
 
 /** The transaction processor that coordinates the Canton transaction protocol.
   *
-  * @param participantId    The participant id hosting the transaction processor.
+  * @param participantId
+  *   The participant id hosting the transaction processor.
   */
 @nowarn("msg=dead code following this construct")
 class TransactionProcessingSteps(
     synchronizerId: SynchronizerId,
     participantId: ParticipantId,
     confirmationRequestFactory: TransactionConfirmationRequestFactory,
-    confirmationResponseFactory: TransactionConfirmationResponseFactory,
+    confirmationResponsesFactory: TransactionConfirmationResponsesFactory,
     modelConformanceChecker: ModelConformanceChecker,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     crypto: SynchronizerCryptoClient,
@@ -496,7 +497,7 @@ class TransactionProcessingSteps(
         error: SubmissionSendError
     )(implicit traceContext: TraceContext): TransactionSubmissionTrackingData = {
       val errorCode: TransactionError = error.sendError match {
-        case SendAsyncClientError.RequestRefused(SendAsyncError.Overloaded(_)) =>
+        case SendAsyncClientError.RequestRefused(error) if error.isOverload =>
           TransactionProcessor.SubmissionErrors.SequencerBackpressure.Rejection(error.toString)
         case otherSendError =>
           TransactionProcessor.SubmissionErrors.SequencerRequest.Error(otherSendError)
@@ -1014,7 +1015,7 @@ class TransactionProcessingSteps(
         )
         // The responses depend on the result of the model conformance check, and are therefore also delayed.
         val responsesF =
-          confirmationResponseFactory.createConfirmationResponses(
+          confirmationResponsesFactory.createConfirmationResponses(
             requestId,
             malformedPayloads,
             transactionValidationResult,
@@ -1050,18 +1051,15 @@ class TransactionProcessingSteps(
       malformedPayloads: Seq[MalformedPayload],
   )(implicit
       traceContext: TraceContext
-  ): Seq[ConfirmationResponse] =
-    Seq(
-      confirmationResponseFactory.createConfirmationResponsesForMalformedPayloads(
-        requestId,
-        rootHash,
-        malformedPayloads,
-      )
+  ): Option[ConfirmationResponses] =
+    confirmationResponsesFactory.createConfirmationResponsesForMalformedPayloads(
+      requestId,
+      rootHash,
+      malformedPayloads,
     )
 
   override def eventAndSubmissionIdForRejectedCommand(
       ts: CantonTimestamp,
-      rc: RequestCounter,
       sc: SequencerCounter,
       submitterMetadata: ViewSubmitterMetadata,
       _rootHash: RootHash,
@@ -1077,7 +1075,6 @@ class TransactionProcessingSteps(
           completionInfo,
           rejection,
           synchronizerId,
-          rc,
           sc,
           ts,
         )
@@ -1120,7 +1117,6 @@ class TransactionProcessingSteps(
         info,
         rejection,
         synchronizerId,
-        requestCounter,
         requestSequencerCounter,
         requestTime,
       )
@@ -1160,7 +1156,7 @@ class TransactionProcessingSteps(
 
   private[this] def createPendingTransaction(
       id: RequestId,
-      responsesF: FutureUnlessShutdown[Seq[ConfirmationResponse]],
+      responsesF: FutureUnlessShutdown[Option[ConfirmationResponses]],
       transactionValidationResult: TransactionValidationResult,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1170,8 +1166,9 @@ class TransactionProcessingSteps(
   )(implicit
       traceContext: TraceContext
   ): PendingTransaction = {
-    // We consider that we rejected if at least one of the responses is not "approve'
-    val locallyRejectedF = responsesF.map(_.exists(response => !response.localVerdict.isApprove))
+    // We consider that we rejected if at least one of the responses is not "approve"
+    val locallyRejectedF =
+      responsesF.map(_.exists(_.responses.exists(response => !response.localVerdict.isApprove)))
 
     // The request was aborted if the model conformance check ended with an abort error, due to either a timeout
     // or a negative mediator verdict concurrently received in Phase 7
@@ -1209,7 +1206,6 @@ class TransactionProcessingSteps(
 
     computeCommitAndContractsAndEvent(
       requestTime = pendingRequestData.requestTime,
-      requestCounter = pendingRequestData.requestCounter,
       txId = txValidationResult.transactionId,
       workflowIdO = txValidationResult.workflowIdO,
       requestSequencerCounter = pendingRequestData.requestSequencerCounter,
@@ -1223,7 +1219,6 @@ class TransactionProcessingSteps(
 
   private def computeCommitAndContractsAndEvent(
       requestTime: CantonTimestamp,
-      requestCounter: RequestCounter,
       txId: TransactionId,
       workflowIdO: Option[WorkflowId],
       requestSequencerCounter: SequencerCounter,
@@ -1250,8 +1245,8 @@ class TransactionProcessingSteps(
       contractMetadata =
         // We deliberately do not forward the driver metadata
         // for divulged contracts since they are not visible on the Ledger API
-        (createdContracts ++ witnessed).view.collect {
-          case (contractId, SerializableContract(_, _, _, _, Some(salt))) =>
+        (createdContracts ++ witnessed).view.map {
+          case (contractId, SerializableContract(_, _, _, _, salt)) =>
             contractId -> DriverContractMetadata(salt).toLfBytes(protocolVersion)
         }.toMap
 
@@ -1273,7 +1268,6 @@ class TransactionProcessingSteps(
           updateId = lfTxId,
           contractMetadata = contractMetadata,
           synchronizerId = synchronizerId,
-          requestCounter = requestCounter,
           sequencerCounter = requestSequencerCounter,
           recordTime = requestTime,
         )
@@ -1320,7 +1314,6 @@ class TransactionProcessingSteps(
 
       commitAndContractsAndEvent <- computeCommitAndContractsAndEvent(
         requestTime = pendingRequestData.requestTime,
-        requestCounter = pendingRequestData.requestCounter,
         txId = pendingRequestData.transactionValidationResult.transactionId,
         workflowIdO = pendingRequestData.transactionValidationResult.workflowIdO,
         requestSequencerCounter = pendingRequestData.requestSequencerCounter,
@@ -1584,7 +1577,8 @@ object TransactionProcessingSteps {
   )(implicit loggingContext: NamedLoggingContext): LfKeyResolver =
     rootView.globalKeyInputs.fmap(_.unversioned.resolution)
 
-  /** @throws java.lang.IllegalArgumentException if `receivedViewTrees` contains views with different transaction root hashes
+  /** @throws java.lang.IllegalArgumentException
+    *   if `receivedViewTrees` contains views with different transaction root hashes
     */
   def tryCommonData(receivedViewTrees: NonEmpty[Seq[FullTransactionViewTree]]): CommonData = {
     val distinctCommonData = receivedViewTrees

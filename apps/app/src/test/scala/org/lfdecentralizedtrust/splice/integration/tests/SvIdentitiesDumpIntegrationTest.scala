@@ -2,15 +2,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllSvAppConfigs
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SvIdentitiesDumpIntegrationTest.testDumpOutputDir
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 import better.files.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
@@ -22,8 +17,7 @@ import java.nio.file.{Path, Paths}
 
 class SvIdentitiesDumpIntegrationTest extends IntegrationTestWithSharedEnvironment {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms((_, conf) =>

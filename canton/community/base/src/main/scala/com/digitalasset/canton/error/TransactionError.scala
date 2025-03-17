@@ -5,13 +5,13 @@ package com.digitalasset.canton.error
 
 import com.daml.error.ErrorCode
 
-trait TransactionError extends BaseCantonError {
+trait TransactionError extends CantonBaseError {
 
   // Determines the value of the `definite_answer` key in the error details
   def definiteAnswer: Boolean = false
 
-  /** Parameter has no effect at the moment, as submission ranks are not supported.
-    * Setting to false for the time being.
+  /** Parameter has no effect at the moment, as submission ranks are not supported. Setting to false
+    * for the time being.
     */
   final override def definiteAnswerO: Option[Boolean] = Some(definiteAnswer)
 }

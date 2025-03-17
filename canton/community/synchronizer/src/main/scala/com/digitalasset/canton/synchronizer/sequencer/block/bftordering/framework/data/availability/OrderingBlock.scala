@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability
 
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v1.{
+import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.{
   AvailabilityAck as ProtoAvailabilityAck,
   OrderingBlock as ProtoOrderingBlock,
   ProofOfAvailability as ProtoProofOfAvailability,
@@ -20,6 +20,7 @@ final case class OrderingBlock(proofs: Seq[ProofOfAvailability]) {
             Some(ack.signature.toProtoV30),
           )
         },
+        proof.expirationTime.toMicros,
       )
     })
 }

@@ -49,8 +49,8 @@ import com.digitalasset.canton.sequencing.{
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
@@ -354,9 +354,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             )
 
         val LfContractId.V1(discriminator, _) = contract.contractId
-        val contractSalt = contract.contractSalt.getOrElse(
-          throw new IllegalArgumentException("Missing contract salt")
-        )
         val pureCrypto = participant.underlying
           .map(_.cryptoPureApi)
           .getOrElse(sys.error("where is my crypto?"))
@@ -368,7 +365,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             rawContract = contractInstanceWithUpdatedContractIdReferences,
             createdAt = contract.ledgerCreateTime.ts,
             discriminator = discriminator,
-            contractSalt = contractSalt,
+            contractSalt = contract.contractSalt,
             metadata = contract.metadata,
           )
 
@@ -403,13 +400,14 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         metadata: ContractMetadata,
     ): ContractId.V1 = {
       val unicumGenerator = new UnicumGenerator(cryptoPureApi)
-      val cantonContractIdVersion = AuthenticatedContractIdVersionV10
+      val cantonContractIdVersion = AuthenticatedContractIdVersionV11
       val unicum = unicumGenerator
         .recomputeUnicum(
           contractSalt,
           LedgerCreateTime(createdAt),
           metadata,
           rawContract,
+          cantonContractIdVersion,
         )
         .valueOr(err => throw new RuntimeException(err))
       cantonContractIdVersion.fromDiscriminator(discriminator, unicum)
@@ -596,14 +594,14 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def last_errors(): Map[String, String] =
       NodeLoggingUtil.lastErrors().getOrElse {
         logger.error(s"Log appender for last errors not found/configured")
-        throw new InteractiveCommandFailure()
+        throw new CommandFailure()
       }
 
     @Help.Summary("Returns log events for an error with the same trace-id")
     def last_error_trace(traceId: String): Seq[String] =
       NodeLoggingUtil.lastErrorTrace(traceId).getOrElse {
         logger.error(s"No events found for last error trace-id $traceId")
-        throw new InteractiveCommandFailure()
+        throw new CommandFailure()
       }
   }
 
@@ -656,7 +654,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def decentralized_namespace(
         owners: Seq[InstanceReference],
         threshold: PositiveInt,
-        store: String = AuthorizedStore.filterName,
+        store: TopologyStoreId = TopologyStoreId.Authorized,
     ): (Namespace, Seq[GenericSignedTopologyTransaction]) = {
       val ownersNE = NonEmpty
         .from(owners)
@@ -674,7 +672,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             owner.topology.transactions
               .find_latest_by_mapping_hash[DecentralizedNamespaceDefinition](
                 DecentralizedNamespaceDefinition.uniqueKey(expectedDNS),
-                filterStore = store,
+                store = store,
                 includeProposals = true,
               )
               .map(_.transaction)
@@ -715,10 +713,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       (decentralizedNamespaceDefinition.mapping.namespace, foundingTransactions)
     }
 
-    /** Checks that either all given sequencers and mediators already have been initialized for
-      * the expected synchronizer (returns Right(Some(_)), or none have been initialized at all (returns Right(None)).
-      * In any other case (nodes have already been initialized for another synchronizer or some nodes
-      * have been initialized but others not), this method returns a Left(error).
+    /** Checks that either all given sequencers and mediators already have been initialized for the
+      * expected synchronizer (returns Right(Some(_)), or none have been initialized at all (returns
+      * Right(None)). In any other case (nodes have already been initialized for another
+      * synchronizer or some nodes have been initialized but others not), this method returns a
+      * Left(error).
       */
     private def in_synchronizer(
         sequencers: NonEmpty[Seq[SequencerReference]],
@@ -795,7 +794,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         synchronizerOwners: Seq[InstanceReference],
         synchronizerThreshold: PositiveInt,
         sequencers: Seq[SequencerReference],
-        mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
+        mediatorsToSequencers: Map[MediatorReference, (Seq[SequencerReference], PositiveInt)],
         mediatorRequestAmplification: SubmissionRequestAmplification,
     )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {
       val synchronizerNamespace =
@@ -806,7 +805,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
       val tempStoreForBootstrap = synchronizerOwners
         .map(
-          _.topology.create_temporary_topology_store(
+          _.topology.stores.create_temporary_topology_store(
             s"$synchronizerName-setup",
             staticSynchronizerParameters.protocolVersion,
           )
@@ -822,7 +821,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       synchronizerOwners.foreach(
         _.topology.transactions.load(
           identityTransactions,
-          store = tempStoreForBootstrap.filterString,
+          store = tempStoreForBootstrap,
           ForceFlag.AlienMember,
         )
       )
@@ -831,7 +830,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         bootstrap.decentralized_namespace(
           synchronizerOwners,
           synchronizerThreshold,
-          store = tempStoreForBootstrap.filterString,
+          store = tempStoreForBootstrap,
         )
 
       val synchronizerGenesisTxs = synchronizerOwners.flatMap(
@@ -840,7 +839,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           synchronizerOwners.map(_.id.member),
           sequencers.map(_.id),
           mediators.map(_.id),
-          store = tempStoreForBootstrap.filterString,
+          store = tempStoreForBootstrap,
         )
       )
 
@@ -890,13 +889,13 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
       mediatorsToSequencers
         .filter(!_._1.health.initialized())
-        .foreach { case (mediator, mediatorSequencers) =>
+        .foreach { case (mediator, (mediatorSequencers, threshold)) =>
           mediator.setup.assign(
             synchronizerId,
             SequencerConnections.tryMany(
               mediatorSequencers
                 .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
-              PositiveInt.one,
+              threshold,
               mediatorRequestAmplification,
             ),
             // if we run bootstrap ourselves, we should have been able to reach the nodes
@@ -907,7 +906,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         }
 
       synchronizerOwners.foreach(
-        _.topology.drop_temporary_topology_store(tempStoreForBootstrap)
+        _.topology.stores.drop_temporary_topology_store(tempStoreForBootstrap)
       )
 
       synchronizerId
@@ -934,7 +933,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       synchronizer(
         synchronizerName,
         sequencers,
-        mediators.map(_ -> sequencers).toMap,
+        mediators.map(_ -> (sequencers, PositiveInt.one)).toMap,
         synchronizerOwners,
         synchronizerThreshold,
         staticSynchronizerParameters,
@@ -952,7 +951,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def synchronizer(
         synchronizerName: String,
         sequencers: Seq[SequencerReference],
-        mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
+        mediatorsToSequencers: Map[MediatorReference, (Seq[SequencerReference], PositiveInt)],
         synchronizerOwners: Seq[InstanceReference],
         synchronizerThreshold: PositiveInt,
         staticSynchronizerParameters: data.StaticSynchronizerParameters,

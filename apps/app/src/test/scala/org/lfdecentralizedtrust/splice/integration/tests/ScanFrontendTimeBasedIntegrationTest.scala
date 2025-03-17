@@ -7,13 +7,10 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import io.circe.JsonObject
 import org.openqa.selenium.By
 import spray.json.DefaultJsonProtocol.StringJsonFormat
@@ -36,8 +33,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
   val amuletPrice = 2
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
@@ -123,6 +119,41 @@ class ScanFrontendTimeBasedIntegrationTest
             Seq(s"${aliceValidatorWalletParty} 0.083 $amuletNameAcronym"),
           )
         }
+      }
+    }
+
+    "see recent activity in infinte scroll" in { implicit env =>
+      val (aliceUserParty, _) = onboardAliceAndBob()
+
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
+
+      clue("Tap amulets for Alice to create transactions") {
+        (1 to 5).foreach { i =>
+          aliceWalletClient.tap(i * 100)
+        }
+      }
+
+      clue("Bob transfers to alice") {
+        bobWalletClient.tap(100.0)
+        (1 to 5).foreach { i =>
+          p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, i)
+        }
+        advanceRoundsByOneTick
+      }
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to recent activity page in scan UI",
+          go to s"http://localhost:${scanUIPort}/recent-activity",
+        )(
+          "Check the recent activity has more items than a single page size",
+          _ => {
+            // frontend pagination is 10 items per page so we should see more than the first page on load
+            // 5 taps and 5 transfers plus some automation should give us more than 10 items
+            findAll(className("activity-row")).length should be > 10
+          },
+        )
       }
     }
 

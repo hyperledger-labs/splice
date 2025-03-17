@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.{EitherT, OptionT}
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
@@ -16,7 +17,6 @@ import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
   ListNamespaceDelegationResult,
   ListOwnerToKeyMappingResult,
-  ListVettedPackagesResult,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
@@ -44,7 +44,6 @@ import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQuery
 import com.digitalasset.canton.topology.admin.v30.ExportTopologySnapshotResponse
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   TimeQuery,
@@ -66,9 +65,12 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
   TopologyTransactionType,
 }
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId as ProtoTopologyStoreId
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
 /** Connection to nodes that expose topology information (sequencer, mediator, participant)
@@ -93,6 +95,9 @@ abstract class TopologyAdminConnection(
   override val serviceName = "Canton Participant Admin API"
 
   private val memberIdO: AtomicReference[Option[GetIdResult]] = new AtomicReference(None)
+
+  private implicit def internalStoreIdToProto(internal: TopologyStoreId): ProtoTopologyStoreId =
+    ProtoTopologyStoreId.fromInternal(internal)
 
   def getId(
   )(implicit traceContext: TraceContext): Future[UniqueIdentifier] =
@@ -147,7 +152,7 @@ abstract class TopologyAdminConnection(
     )
 
   def listPartyToParticipant(
-      filterStore: String = "",
+      store: Option[TopologyStoreId] = None,
       operation: Option[TopologyChangeOp] = None,
       filterParty: String = "",
       filterParticipant: String = "",
@@ -157,7 +162,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ListPartyToParticipant(
         BaseQuery(
-          filterStore,
+          store.map(internalStoreIdToProto),
           proposals = proposals.proposals,
           timeQuery,
           operation,
@@ -180,7 +185,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ListPartyToKeyMapping(
         BaseQuery(
-          filterStore = filterStore.filterName,
+          store = filterStore,
           proposals = proposals.proposals,
           timeQuery,
           operation,
@@ -198,7 +203,7 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(
       listPartyToParticipant(
-        filterStore = TopologyStoreId.SynchronizerStore(synchronizerId).filterName,
+        store = Some(TopologyStoreId.SynchronizerStore(synchronizerId)),
         filterParty = partyId.filterString,
       ).map { txs =>
         txs.headOption
@@ -240,7 +245,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.SequencerSynchronizerState(
         BaseQuery(
-          filterStore = store.filterName,
+          store = store,
           proposals = proposals,
           timeQuery = timeQuery,
           ops = None,
@@ -292,7 +297,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.MediatorSynchronizerState(
         BaseQuery(
-          filterStore = store.filterName,
+          store = store,
           proposals = proposals,
           timeQuery = TimeQuery.HeadState,
           ops = None,
@@ -332,7 +337,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ListDecentralizedNamespaceDefinition(
         BaseQuery(
-          filterStore = TopologyStoreId.SynchronizerStore(synchronizerId).filterName,
+          store = TopologyStoreId.SynchronizerStore(synchronizerId),
           proposals = proposals.proposals,
           timeQuery = timeQuery,
           ops = None,
@@ -372,7 +377,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ListAll(
         query = BaseQuery(
-          filterStore = store.filterName,
+          store = store,
           proposals = proposals,
           timeQuery = timeQuery,
           ops = None,
@@ -489,7 +494,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ListOwnerToKeyMapping(
         BaseQuery(
-          filterStore = AuthorizedStore.filterName,
+          store = AuthorizedStore,
           proposals = false,
           timeQuery = TimeQuery.HeadState,
           ops = None,
@@ -516,7 +521,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ExportTopologySnapshot(
         query = BaseQuery(
-          filterStore = store.filterName,
+          store = store,
           proposals = proposals,
           timeQuery = TimeQuery.Range(from = None, until = None),
           ops = None,
@@ -540,7 +545,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Write.ImportTopologySnapshot(
         topologyTransactions,
-        store.filterName,
+        store,
         waitToBecomeEffective = None,
       )
     )
@@ -566,25 +571,6 @@ abstract class TopologyAdminConnection(
       filterNamespace = participantId.namespace.filterString,
     )
 
-  def listVettedPackages(
-      participantId: ParticipantId,
-      synchronizerId: SynchronizerId,
-  )(implicit tc: TraceContext): Future[Seq[ListVettedPackagesResult]] = {
-    runCmd(
-      TopologyAdminCommands.Read.ListVettedPackages(
-        BaseQuery(
-          filterStore = TopologyStoreId.SynchronizerStore(synchronizerId).filterName,
-          proposals = false,
-          timeQuery = TimeQuery.HeadState,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
-        filterParticipant = participantId.filterString,
-      )
-    )
-  }
-
   def proposeMapping[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       mapping: M,
@@ -598,7 +584,7 @@ abstract class TopologyAdminConnection(
         mapping = mapping,
         // let canton figure out the signatures
         signedBy = Seq(),
-        store = store.filterName,
+        store = store,
         serial = Some(serial),
         mustFullyAuthorize = !isProposal,
         change = change,
@@ -758,7 +744,7 @@ abstract class TopologyAdminConnection(
       TopologyAdminCommands.Write
         .AddTransactions(
           txs,
-          store.filterName,
+          store,
           ForceFlags(
             flags*
           ),
@@ -1144,7 +1130,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.SynchronizerParametersState(
         BaseQuery(
-          storeId.filterName,
+          storeId,
           proposals = proposals.proposals,
           timeQuery,
           None,
@@ -1164,7 +1150,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ListNamespaceDelegation(
         BaseQuery(
-          filterStore = AuthorizedStore.filterName,
+          store = AuthorizedStore,
           proposals = false,
           timeQuery = TimeQuery.HeadState,
           ops = None,
@@ -1272,7 +1258,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       TopologyAdminCommands.Read.ListSynchronizerTrustCertificate(
         BaseQuery(
-          TopologyStoreId.SynchronizerStore(synchronizerId).filterName,
+          TopologyStoreId.SynchronizerStore(synchronizerId),
           proposals = false,
           timeQuery = TimeQuery.HeadState,
           ops = Some(TopologyChangeOp.Replace),
@@ -1333,7 +1319,7 @@ abstract class TopologyAdminConnection(
       "ensure_party_to_participant_removed",
       s"Remove party to participant for $partyId on $synchronizerId",
       listPartyToParticipant(
-        TopologyStoreId.SynchronizerStore(synchronizerId).filterName,
+        TopologyStoreId.SynchronizerStore(synchronizerId).some,
         Some(TopologyChangeOp.Replace),
         filterParty = partyId.filterString,
       ).map {
