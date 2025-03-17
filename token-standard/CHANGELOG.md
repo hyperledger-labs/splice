@@ -60,6 +60,7 @@ Polishing changes:
 * Add `expectedAdmin` field to `AllocationFactory_Allocate` and `TransferFactory_Transfer` to allow safely executing those choices even if
   the explicitly disclosed factory contracts were read from a not fully trusted off-ledger API.
 * Change all interface choice implementation functions to have the signature `ContractId Interface -> ChoiceArgument -> Update ChoiceResult`.
+* Report the time of computation of the `total_supply` in the `TokenMetadata` off-ledger API.
 
 ## Initial open source release of the standard proposal
 
