@@ -11,7 +11,7 @@ import {
   MigrationInfo,
 } from 'splice-pulumi-common/src/domainMigration';
 
-import { Operation, pulumiOptsWithPrefix, stack } from '../pulumi';
+import { pulumiOptsWithPrefix, stack } from '../pulumi';
 
 export function pulumiOptsForMigration(
   migration: DomainMigrationIndex,
@@ -45,18 +45,16 @@ const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
 const coreSvs = Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
-type RunForAllMigrationsResult = Operation[];
-
-export function runSvCantonForAllMigrations(
+export function runSvCantonForAllMigrations<T>(
   operation: string,
-  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<void>,
+  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<T>,
   requiresExistingStack: boolean,
   // allow the ability to force run for the runbook in certain cases
   // this also requires that the cluster is a dev cluster
   // used to ensure down/refresh always takes care of the runbook as well
   forceSvRunbook: boolean = false,
   forceMigrations: DomainMigrationIndex[] = []
-): RunForAllMigrationsResult {
+): { name: string; promise: Promise<T> }[] {
   const svsToRunFor = svsToDeploy.concat(
     !DeploySvRunbook && forceSvRunbook && isDevNet ? ['sv'] : []
   );
@@ -69,13 +67,13 @@ export function runSvCantonForAllMigrations(
   );
 }
 
-export function runSvCantonForSvs(
+export function runSvCantonForSvs<T>(
   svsToRunFor: string[],
   operation: string,
-  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<void>,
+  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<T>,
   requiresExistingStack: boolean,
   forceMigrations: DomainMigrationIndex[] = []
-): Operation[] {
+): { name: string; promise: Promise<T> }[] {
   const migrationIds = migrations.map(migration => migration.id);
   console.log(
     `Running for migration ${JSON.stringify(migrationIds)} and svs ${JSON.stringify(svsToRunFor)}`
