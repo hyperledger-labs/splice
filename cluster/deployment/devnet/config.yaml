@@ -14,6 +14,11 @@ synchronizerMigration:
     provider: external
     version: 0.3.16
     releaseReference: "refs/heads/release-line-0.3.16"
+  upgrade:
+    id: 1
+    provider: external
+    version: 0.3.16
+    releaseReference: "refs/heads/release-line-0.3.16"
 pulumiProjectConfig:
   default:
     isExternalCluster: true
