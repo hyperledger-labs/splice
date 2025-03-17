@@ -142,7 +142,7 @@ cluster-parameter: &cluster-parameter
         "scratchnetc",
         "scratchnetd",
         "scratchnete",
-        "token-standard-devnet",
+        "token-std-dev",
         "none",
       ]
     default: "none"
