@@ -1,0 +1,4 @@
+name: operator
+runtime:
+  name: nodejs
+description: Pulumi k8s operator

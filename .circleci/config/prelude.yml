@@ -52,7 +52,7 @@ parameters:
         auth0-user-cleanup,
         cluster-lock-reaper,
         apply-infra,
-        update-deployment,
+        deploy-operator,
         preview-operator,
         backup-status-devnet,
         backup-status-testnet,

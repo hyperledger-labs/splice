@@ -414,7 +414,7 @@
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "5"
+            "activeMigrationId": "0"
           },
           "splitwell": true
         },
@@ -430,7 +430,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -538,7 +538,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 6
+          "domains": 1
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
@@ -549,7 +549,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -562,7 +562,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-5",
+      "name": "participant-0",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -633,7 +633,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 5
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -644,7 +644,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_5",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -657,9 +657,9 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
-    "name": "validator1-participant-5",
+    "name": "validator1-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -782,7 +782,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -916,7 +916,7 @@
           "enable": true
         },
         "migration": {
-          "id": 5,
+          "id": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -927,7 +927,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-5",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,
@@ -965,7 +965,7 @@
           "auth0|63e3d75ff4114d87a2c1e4f5"
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.16"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

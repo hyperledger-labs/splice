@@ -50,6 +50,7 @@ A _release line branch_ is branched from the _ancestor branch_.
       also automatically bundle the sources from the release-line branch.
 - [ ] Merge a PR into the _ancestor branch_ with the following changes:
   - Update `VERSION` and `LATEST_RELEASE`. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
+- [ ] Communicate to partners that a new version is available
 
 ## Upgrade our own nodes on DevNet
 
@@ -62,8 +63,8 @@ A _release line branch_ is branched from the _ancestor branch_.
   - [ ] Before merging, open the `preview_pulumi_changes` CircleCi workflow and approve the jobs to generate `deployment` and `devnet` previews.
     Review the changes together with someone else, paying particular attention to deleted or newly created resources.
 - [ ] Warn our partners on [#supervalidator-operations](https://daholdings.slack.com/archives/C085C3ESYCT): "We'll be upgrading the DA-2 and DA-Eng nodes on DevNet to test a new version. Some turbulence might be expected."
-- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: update-deployment` and `cluster: devnet`.
-    - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
+- [ ] Forward-port the changes to `config.yaml` and `cluster/deployment/devnet/.envrc.vars` to `main`. The `deployment` stack, which watches `main`, should pick that up
+and upgrade the other pulumi stacks.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
     - A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful and on the right commit.
       Remember to check that the `lastSuccessfulCommit` field points to the release line that you expect.
@@ -71,12 +72,10 @@ A _release line branch_ is branched from the _ancestor branch_.
   - [ ] The [SV Status Report Dashboard](https://grafana.dev.global.canton.network.digitalasset.com/d/caffa6f7-c421-4579-a839-b026d3b76826/sv-status-reports?orgId=1) looks green
   - [ ] There are no (unexpected) open alerts
   - [ ] The docs are reachable at both https://dev.network.canton.global/ and https://dev.global.canton.network.digitalasset.com/
-- [ ] Forward port the above change that bumped the devnet version to both the _ancestor branch_ and `origin/main`.
 - [ ] Merge a PR into `origin/main` with the following changes:
   - [ ] Update the branch references in `.circleci/triggers/*/devnet-*.json` only for devnet.
         This will upgrade our periodic health checks to use the new release version.
         Old health checks may not work against the upgraded cluster, so expect some failures until this PR is merged.
-- [ ] Communicate to partners that a new version is available
 
 ## Upgrade our own nodes on TestNet and MainNet
 

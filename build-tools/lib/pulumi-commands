@@ -237,9 +237,9 @@ function subcmd_apply_operator(){
     _prompt_to_confirm
     _cluster_must_exist
 
-    _uses_pulumi_stack deployment
+    _uses_pulumi_stack operator
 
-    subcmd_pulumi deployment up --yes --skip-preview --show-sames "${args[@]}"
+    subcmd_pulumi operator up --yes --skip-preview --show-sames "${args[@]}"
 }
 
 ###

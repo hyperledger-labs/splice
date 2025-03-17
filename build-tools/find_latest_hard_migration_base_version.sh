@@ -8,4 +8,5 @@
 
 set -euo pipefail
 
-yq '.synchronizerMigration.active.releaseReference' < cluster/deployment/mainnet/config.yaml | sed "s/.*\///"
+latest_release=$(cat "$REPO_ROOT/LATEST_RELEASE")
+echo "release-line-${latest_release}"

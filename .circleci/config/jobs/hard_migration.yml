@@ -68,7 +68,15 @@ jobs:
             --keep VPN_USER
             --keep VPN_PASSWORD
           cmd: |
-            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1"
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+              BASE_VERSION=$(build-tools/get-charts-version "$base_version")
+            else
+              base_version=$(build-tools/get-snapshot-version)
+              BASE_VERSION=$base_version
+            fi
+
+            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1" -t "$BASE_VERSION"
           # retry on vpn disconnects.
           # Note that this might break the assumption that the validator spinup is fast enough for the
           # migration not to have to wait for it, but for now we don't want to add more complexity to the workflow.
@@ -323,25 +331,28 @@ jobs:
         default: true
     steps:
       - checkout_with_retry
-      - when:
-          condition: << parameters.base_version >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.base_version >>
-                command: |
-                  echo "Checking out commit << parameters.base_version >>"
-                  git checkout << parameters.base_version >>
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Push new branch for base version with migration config changes
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+
+            # The operator itself should use images from the branch on which this job is running.
+            OPERATOR_IMAGE_VERSION=$(build-tools/get-snapshot-version)
+
+            if [ -n "<< parameters.base_version >>" ]; then
+              echo "Checking out commit << parameters.base_version >>"
+              git checkout << parameters.base_version >>
+            fi
+
+            # Create a base version branch, with an active migration ID 0 on the base version
+            # (this represents the release-line branch corresponding to the current migration ID in a prod cluster)
 
             BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
             git branch -f $BASE_VERSION_BRANCH HEAD
@@ -349,15 +360,23 @@ jobs:
             git push -f origin $BASE_VERSION_BRANCH
             if [ -n "<< parameters.base_version >>" ]; then
               base_version="<< parameters.base_version >>"
+              BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             else
               base_version=$(build-tools/get-snapshot-version)
+              BASE_VERSION=$base_version
             fi
-            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
+
+            echo "Using BASE_VERSION: $BASE_VERSION"
+
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             #TODO(#15759) - remove the internal param after HDM base version is >= 0.3.12
             cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
-            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            # We write the changes to envrc.vars into a separate file first, so we can easily apply
+            # the same changes to the update branch later. We do not rely on e.g. `git cherry-pick`
+            # to avoid conflicts that cannot be resolved automatically.
+            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars.base"
+            rm -f "$file"
 
             echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
@@ -365,21 +384,56 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
             # requires sv1 sv-app to be up so we disable it for faster deployments
             echo "export DISABLE_COMETBFT_STATE_SYNC=true" >> "$file"
+            echo "export CHARTS_VERSION=$BASE_VERSION" >> "$file"
+            echo "export OVERRIDE_VERSION=$BASE_VERSION" >> "$file"
+
+            cat "$file" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+
             # if the base version is a release version ensure we use the public repository
+            # we write this to the .envrc.vars file directly and not to the patch that we also
+            # apply later to the upgrade version, because the upgrade version typiclaly is not public
+            # in these tests
             if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             fi
 
+            git add "$file"
             git add **/.envrc.vars
             git add **/config.yaml
             git commit -m "Add migration config to deploy version $BASE_VERSION to << parameters.cluster >>"
             git push origin $BASE_VERSION_BRANCH
+
+            # Create a deployment branch and configure the deployment stack to follow it
+            # (for prod clusters, this will typically be `main`)
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git branch -f  $DEPLOYMENT_BRANCH HEAD
+            git checkout $DEPLOYMENT_BRANCH
+            git push -f origin $DEPLOYMENT_BRANCH
+            cncluster set_operator_deployment_reference refs/heads/$DEPLOYMENT_BRANCH
+            echo "export OPERATOR_IMAGE_VERSION=$OPERATOR_IMAGE_VERSION" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            git add **/config.yaml
+            git add **/.envrc.vars
+            git commit -m "Set the operator deployment reference to $DEPLOYMENT_BRANCH on << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
+            # if the version for the operator is a release version ensure we use the public repository.
+            # we do not commit this, as this is only for deploying the operator itself which we do only here.
+            # Since the operator images are taken from the branch from which we run this, CIRCLE_BRANCH should
+            # be the corresponding branch, so if that's main or a release branch, we use the public repository too.
+            if [[ $OPERATOR_IMAGE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$CIRCLE_BRANCH" == main ]] || [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            else
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=private" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            fi
+
       - deploy_operator:
           cluster: << parameters.cluster >>
           deploy_retry_count: << parameters.deploy_retry_count >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,sv-runbook,validator-runbook"
+          expected_branch: << parameters.cluster >>-migration-base
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -431,6 +485,11 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+
+            # Create a branch for the upgrade version, with a "upgrade" migration ID 1, on the upgrade version
+            # This represents the release-line branch corresponding to the next migration ID in a prod cluster
+
             BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
@@ -438,43 +497,51 @@ jobs:
             git push -f origin $UPGRADE_VERSION_BRANCH
             if [ -n "<< parameters.base_version >>" ]; then
               base_version="<< parameters.base_version >>"
+              BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             else
               base_version=$(build-tools/get-snapshot-version)
+              BASE_VERSION=$base_version
             fi
-            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
-            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+
+            # Apply the same config changes that we applied in the base branch also to the upgrade branch
+            # (we do not cherry-pick the commit, to avoid conflicts that cannot be resolved automatically)
+
+            basefile="cluster/deployment/${TARGET_CLUSTER}/.envrc.vars.base"
+            rm -f "$basefile"
+            git checkout origin/$BASE_VERSION_BRANCH -- "$basefile"
 
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
-            echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
-            # We always include the runbook
-            echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
-            echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
-            echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
-            echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            cat "$basefile" >> "$file"
+            rm "$basefile"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
+            # (same as above, we do not cherry-pick the commit, to avoid conflicts that cannot be resolved automatically)
             cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
             cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
-            git add **/config.yaml || true
-            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git add **/config.yaml
+            git commit -m "Add config to deploy upgrade version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
-            # if the base version is a release version ensure we use the public repository
-            # we add this as a workaround for deploying the operator from the upgrade branch
-            # we don't commit it as when we deploy with the upgrade version we actually want to use the  dev repository
-            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
-            fi
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
+            # Add the new entry for the staging nodes also in the deployment branch.
+            # This will trigger the deployment stack to spin up the components for migration ID 1.
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+
+            git add **/.envrc.vars
+            git add **/config.yaml
+            git commit -m "Add config to deploy upgrade version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -511,22 +578,44 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
-            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            # Update the upgrade branch to a "migrating" state
+
+            file=$(mktemp)
+            envfile="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            echo "export CHARTS_VERSION=$UPGRADE_VERSION" >> "$file"
+            echo "export OVERRIDE_VERSION=$UPGRADE_VERSION" >> "$file"
+            cat $file >> "$envfile"
             cncluster update_config_to_migrate
 
-            git add **/config.yaml || true
-            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git add **/.envrc.vars
+            git add **/config.yaml
+            git commit -m "Update config to migrate to version $UPGRADE_VERSION on << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
+            # Update also the deployment branch to a "migrating" state (we would typically do this
+            # by back/fwd-porting the commit between the two branches, here we just apply the same
+            # changes to both, to avoid conflicts that cannot be resolved automatically)
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cat $file >> "$envfile"
+            cncluster update_config_to_migrate
+
+            git add **/.envrc.vars
+            git add **/config.yaml || true
+            git commit -m "Update config to migrate to version $UPGRADE_VERSION on << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -563,23 +652,30 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
+            # Update the upgrade branch to archive the base version
+
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
-
-            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-
             cncluster update_config_to_archive_legacy_migration
 
             git add **/config.yaml || true
-            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git commit -m "Update config to archive legacy version on << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
+            # Forward-port the same change to the deployment branch
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cncluster update_config_to_archive_legacy_migration
+
+            git add **/config.yaml || true
+            git commit -m "Update config to archive legacy version on << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -640,19 +736,28 @@ jobs:
 
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-
             cncluster update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
             git commit -m "Add migration config to remove migratingFrom" || true
             git push origin $UPGRADE_VERSION_BRANCH
+
+            # Forward-port the same change to the deployment branch
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cncluster update_config_to_remove_migrating_from
+
+            git add **/.envrc.vars
+            git add **/config.yaml || true
+            git commit -m "Add migration config to remove migratingFrom" || true
+            git push origin $DEPLOYMENT_BRANCH
           cmd_retry_count: 3
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:

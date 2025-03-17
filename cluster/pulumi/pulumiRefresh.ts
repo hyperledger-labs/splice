@@ -23,6 +23,8 @@ export async function runStacksRefresh(): Promise<void> {
   operations.push(refreshOperation(validatorRunbookStack, abortController));
   const deploymentStack = await stack('deployment', 'deployment', true, {});
   operations.push(refreshOperation(deploymentStack, abortController));
+  const operatorStack = await stack('operator', 'operator', true, {});
+  operations.push(refreshOperation(operatorStack, abortController));
   operations = operations.concat(
     runSvCantonForAllMigrations(
       'refresh',

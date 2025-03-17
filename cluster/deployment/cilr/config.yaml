@@ -32,3 +32,5 @@ monitoring:
         overMinutes: 30
       cometbft:
         expectedMaxBlocksPerSecond: 7
+operatorDeployment:
+  reference: refs/heads/main

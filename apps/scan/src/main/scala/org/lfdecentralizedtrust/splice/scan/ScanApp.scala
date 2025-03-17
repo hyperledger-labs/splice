@@ -19,13 +19,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
   SpliceLedgerClient,
 }
-import org.lfdecentralizedtrust.splice.http.v0.external.scan.ScanResource as ExternalScanResource
-import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource as InternalScanResource
+import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.splice.http.v0.scan_soft_domain_migration_poc.ScanSoftDomainMigrationPocResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
-  HttpExternalScanHandler,
   HttpScanHandler,
   HttpScanSoftDomainMigrationPocHandler,
   HttpTokenStandardTransferInstructionHandler,
@@ -209,23 +207,18 @@ class ScanApp(
         dsoParty,
         config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase(),
       )
-      internalHandler = new HttpScanHandler(
+      scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
         config.svUser,
         config.spliceInstanceNames,
         participantAdminConnection,
+        sequencerAdminConnection,
         store,
         acsSnapshotStore,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
         clock,
-        loggerFactory,
-      )
-
-      externalHandler = new HttpExternalScanHandler(
-        store,
-        sequencerAdminConnection,
         loggerFactory,
       )
 
@@ -259,8 +252,7 @@ class ScanApp(
             requestLogger(traceContext) {
               HttpErrorHandler(loggerFactory)(traceContext) {
                 concat(
-                  (InternalScanResource.routes(internalHandler, _ => provide(traceContext)) +:
-                    ExternalScanResource.routes(externalHandler, _ => provide(traceContext)) +:
+                  (ScanResource.routes(scanHandler, _ => provide(traceContext)) +:
                     TokenStandardTransferInstructionResource.routes(
                       tokenStandardTransferInstructionHandler,
                       _ => provide(traceContext),

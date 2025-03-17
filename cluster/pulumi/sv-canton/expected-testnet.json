@@ -181,7 +181,7 @@
           }
         ]
       },
-      "version": "0.3.13"
+      "version": "0.3.15"
     },
     "name": "sv-1-cometbft-global-domain-1",
     "provider": "",
@@ -305,7 +305,7 @@
           }
         ]
       },
-      "version": "0.3.13"
+      "version": "0.3.15"
     },
     "name": "sv-1-global-domain-1",
     "provider": "",
@@ -511,7 +511,7 @@
           }
         ]
       },
-      "version": "0.3.13"
+      "version": "0.3.15"
     },
     "name": "sv-1-participant-1",
     "provider": "",

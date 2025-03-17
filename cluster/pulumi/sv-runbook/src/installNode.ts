@@ -226,7 +226,7 @@ async function installSvAndValidator(
     auth0Client,
     onboardingName,
     decentralizedSynchronizerMigrationConfig,
-    imagePullDeps.concat(svKeySecret_).concat(loopback ? [loopback] : [])
+    imagePullDeps.concat([svKeySecret_, svAppSecret]).concat(loopback ? [loopback] : [])
   );
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');

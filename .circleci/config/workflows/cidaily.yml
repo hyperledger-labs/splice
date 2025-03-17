@@ -91,6 +91,8 @@ workflow:
           cluster: "cidaily"
           requires:
             - deploy_validator_runbook
+            # TODO(#8300) Remove this once the preflight check doesn't wait for the sv runbook deployment
+            - deploy_sv_runbook
       - backup_cluster:
           name: backup_cidaily
           <<: *main-branch-only
@@ -101,6 +103,14 @@ workflow:
             - slack-context
           requires:
             - deploy_cluster_cidaily
+      - update_cilr:
+          name: update_cilr
+          <<: *main-branch-only
+          <<: *notify-fail
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
 
   cidaily_health_check:
     when:
