@@ -65,6 +65,7 @@ parameters:
         purge-unused-dbs-cidaily,
         bump-configs,
         copy-mainnet-backup-to-bucket,
+        update-serverless-workflows,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -4039,6 +4040,19 @@ jobs:
           path: log
           destination: log
 
+  deploy_serverless:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Deploy serverless workglows
+          gce_authenticate: true
+          cmd: |
+            ./cluster/serverless/deploy.sh
+
   deploy_operator:
     executor: self_hosted
     environment:
@@ -6694,6 +6708,12 @@ workflows:
           deployment_only: true
           requires:
             - set_previews_deployment
+
+  update_serverless_workflows:
+    when:
+      equal: [ update-serverless-workflows, << pipeline.parameters.run-job >> ]
+    jobs:
+      - deploy_serverless
 
   backup_testnet:
     when:

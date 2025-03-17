@@ -703,3 +703,16 @@ jobs:
           name: Store logs
           path: log
           destination: log
+
+  deploy_serverless:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Deploy serverless workglows
+          gce_authenticate: true
+          cmd: |
+            ./cluster/serverless/deploy.sh
