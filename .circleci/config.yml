@@ -57,7 +57,7 @@ parameters:
         auth0-user-cleanup,
         cluster-lock-reaper,
         apply-infra,
-        update-deployment,
+        deploy-operator,
         preview-operator,
         backup-status-devnet,
         backup-status-testnet,
@@ -6557,9 +6557,9 @@ workflows:
           context:
             - slack-context
 
-  update_deployment:
+  redeploy_operator:
     when:
-      equal: [ update-deployment, << pipeline.parameters.run-job >> ]
+      equal: [ deploy-operator, << pipeline.parameters.run-job >> ]
     jobs:
       - deploy_operator:
           context:

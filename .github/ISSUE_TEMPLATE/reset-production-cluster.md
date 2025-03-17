@@ -16,9 +16,13 @@ Scheduled for: *date + time*
   - [ ] Remove any `legacy` or `archive` migrations that might still be around.
   - [ ] Make sure that the current config of the running cluster matches what you will bootstrap (see `INITIAL_PACKAGE_CONFIG_JSON`)
 - [ ] (before starting the actual reset) Send another update to SVs and validators as well as internal channels that could be relevant.
+- [ ] (while pairing with someone) Uninstall the pulumi operator with `cncluster pulumi operator down`. Note that this does not take down the actual components, only the operator stack resources, so that the operator does not
+      accidentally kick in at wrong times.
 - [ ] (while pairing with someone) Reset all the sv-canton stacks for **archived** migrations one day before the actual reset. You can also delete PVC snapshots and CloudSQL backups for the active migration. Expect this to be slow, which is why it's done one day in advance.
 - [ ] (while pairing with someone) Reset all stacks **except** the `infra` stack manually. `cncluster reset` could work, `CI=1 cncluster pulumi XYZ down --yes --skip-preview` will certainly work (check `kubectl get stacks -A` for stacks you should down and don't forget to also down the `deployment` stack). Expect some slowness/timeouts/rate-limiting from GCP.
-- [ ] Merge the PR you prepared above and re-deploy the operator (`run-job: update-deployment`, `cluster: ...`)
+- [ ] Merge the PR you prepared above
+- [ ] Forward-port the PR you prepared above to `main`.
+- [ ] Once merged to main, redeploy the operator through CircleCI: on `main`, trigger `run-jon: deploy-operator`, `cluster: ...`.
 - [ ] Wait for the network to deploy and confirm that the `AmuletRules` `packageConfig` contains the expected DAR versions.
 - [ ] Prepare and merge a second PR to the release branch that configures wallet sweeps to the DA-Wallet party (`SV1_SWEEP`, you need their wallet to be onboarded, you can ask in [#da-wallet](https://daholdings.slack.com/archives/C073K97TL3U)) and (unless you already did this earlier) sets `DISABLE_CLOUD_SQL_PROTECT` back to `false` (example PR: https://github.com/DACH-NY/canton-network-node/pull/16329).
 - [ ] Tell SVs: "You are welcome to join now with migration ID 0 and chain ID X. Please reset your existing nodes completely, clearing out all databases and PVCs, and then onboard afresh." (example text, tweak as needed)
