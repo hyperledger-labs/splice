@@ -790,6 +790,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
                   'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
                 }
               : {}),
+            'acknowledgement_alerts.yaml': readGrafanaAlertingFile('acknowledgement_alerts.yaml'),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
