@@ -37,6 +37,7 @@ migration:
   attachPvc: true
 # pvc used for migrations
 pvc:
+  volumeName: domain-migration-validator-pvc
   volumeStorageClass: standard-rwo
 
 useSequencerConnectionsFromScan: true
