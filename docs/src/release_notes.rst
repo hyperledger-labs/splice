@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Docs
+
+  * Add note about ``.localhost`` addresses used by Docker Compose-based validator deployments.
+
 0.3.16
 ------
 
