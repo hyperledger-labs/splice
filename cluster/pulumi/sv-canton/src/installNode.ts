@@ -41,6 +41,7 @@ export function installNode(
     migrationId,
     auth0Client,
     {
+      ingressName: nodeConfig.ingressName,
       onboardingName: nodeConfig.onboardingName,
       isFirstSv: isFirstSv,
       isCoreSv: isCoreSv,

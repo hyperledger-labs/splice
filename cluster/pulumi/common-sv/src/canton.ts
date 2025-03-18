@@ -29,6 +29,7 @@ export function installCantonComponents(
   auth0Client: Auth0Client,
   svConfig: {
     onboardingName: string;
+    ingressName: string;
     isFirstSv: boolean;
     isCoreSv: boolean;
   },
@@ -121,6 +122,7 @@ export function installCantonComponents(
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
       ? new InStackCantonBftDecentralizedSynchronizerNode(
           migrationId,
+          svConfig.ingressName,
           xns,
           {
             sequencerPostgres: sequencerPostgres,

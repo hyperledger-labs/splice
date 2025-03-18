@@ -39,6 +39,7 @@ import {
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
+  CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
@@ -416,8 +417,9 @@ function installSvApp(
         ...(useCantonBft
           ? {
               enableBftSequencer: true,
-              // TODO(#15343) - add back the public url when the p2p supports tls https://github.com/DACH-NY/canton/issues/23835
-              sequencerBftPublicUrlSuffix: `${xns.logicalName}.svc.cluster.local`,
+              sequencerBftPublicUrlSuffix: (
+                decentralizedSynchronizer as unknown as CantonBftSynchronizerNode
+              ).externalSequencerAddress,
             }
           : {}),
       },

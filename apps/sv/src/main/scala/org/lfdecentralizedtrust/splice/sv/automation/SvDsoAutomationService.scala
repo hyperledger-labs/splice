@@ -300,7 +300,6 @@ class SvDsoAutomationService(
               triggerContext,
               dsoStore,
               synchronizerNode.sequencerAdminConnection,
-              config.domainMigrationId,
             )
           )
         case _ =>

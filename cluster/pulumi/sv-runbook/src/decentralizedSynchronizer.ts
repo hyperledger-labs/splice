@@ -42,10 +42,11 @@ export function installCanton(
   const externalActiveMigration = {
     decentralizedSynchronizer: decentralizedSynchronizerMigrationConfig.active.sequencer
       .enableBftSequencer
-      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId)
+      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId, svRunbookConfig.ingressName)
       : new CrossStackCometBftDecentralizedSynchronizerNode(
           activeMigrationId,
-          new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier
+          new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier,
+          svRunbookConfig.ingressName
         ),
     participant: {
       asDependencies: [],
@@ -85,6 +86,7 @@ export function installCanton(
           auth0Client,
           {
             onboardingName,
+            ingressName: svRunbookConfig.ingressName,
             isFirstSv: false,
             isCoreSv: false,
           },

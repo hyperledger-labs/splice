@@ -3,6 +3,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 import {
   ChartValues,
+  CLUSTER_HOSTNAME,
   domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
   ExactNamespace,
@@ -24,6 +25,10 @@ import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { installCometBftNode } from './cometbft';
 import { StaticCometBftConfigWithNodeName } from './cometbftConfig';
 
+export interface CantonBftSynchronizerNode {
+  externalSequencerAddress: string;
+}
+
 export interface CometbftSynchronizerNode {
   cometbftRpcServiceName: string;
 }
@@ -36,13 +41,21 @@ export interface DecentralizedSynchronizerNode {
   readonly dependencies: pulumi.Resource[];
 }
 
-export class CrossStackDecentralizedSynchronizerNode implements DecentralizedSynchronizerNode {
+export class CrossStackDecentralizedSynchronizerNode
+  implements DecentralizedSynchronizerNode, CantonBftSynchronizerNode
+{
   name: string;
   migrationId: number;
+  ingressName: string;
 
-  constructor(migrationId: DomainMigrationIndex) {
+  get externalSequencerAddress(): string {
+    return `sequencer-p2p-${this.migrationId}.${this.ingressName}.${CLUSTER_HOSTNAME}`;
+  }
+
+  constructor(migrationId: DomainMigrationIndex, ingressName: string) {
     this.migrationId = migrationId;
     this.name = 'global-domain-' + migrationId.toString();
+    this.ingressName = ingressName;
   }
 
   get namespaceInternalSequencerAddress(): string {
@@ -66,8 +79,12 @@ export class CrossStackCometBftDecentralizedSynchronizerNode
 {
   cometbftRpcServiceName: string;
 
-  constructor(migrationId: DomainMigrationIndex, cometbftNodeIdentifier: string) {
-    super(migrationId);
+  constructor(
+    migrationId: DomainMigrationIndex,
+    cometbftNodeIdentifier: string,
+    ingressName: string
+  ) {
+    super(migrationId, ingressName);
     this.cometbftRpcServiceName = `${cometbftNodeIdentifier}-cometbft-rpc`;
   }
 }
@@ -83,7 +100,11 @@ abstract class InStackDecentralizedSynchronizerNode
 
   readonly dependencies: Resource[] = [this];
 
-  constructor(migrationId: DomainMigrationIndex, xns: ExactNamespace, version: CnChartVersion) {
+  protected constructor(
+    migrationId: DomainMigrationIndex,
+    xns: ExactNamespace,
+    version: CnChartVersion
+  ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${migrationId}`);
     this.xns = xns;
     this.migrationId = migrationId;
@@ -99,7 +120,13 @@ abstract class InStackDecentralizedSynchronizerNode
     },
     active: boolean,
     logLevel: LogLevel,
-    driver: { type: 'cometbft'; host: Output<string>; port: number } | { type: 'cantonbft' },
+    driver:
+      | { type: 'cometbft'; host: Output<string>; port: number }
+      | {
+          type: 'cantonbft';
+          externalAddress: string;
+          externalPort: number;
+        },
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
@@ -270,6 +297,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
 export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecentralizedSynchronizerNode {
   constructor(
     migrationId: DomainMigrationIndex,
+    ingressName: string,
     xns: ExactNamespace,
     dbs: {
       setCoreDbNames: boolean;
@@ -289,6 +317,8 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       logLevel,
       {
         type: 'cantonbft',
+        externalAddress: `sequencer-p2p-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,
+        externalPort: 443,
       },
       version,
       imagePullServiceAccountName,
