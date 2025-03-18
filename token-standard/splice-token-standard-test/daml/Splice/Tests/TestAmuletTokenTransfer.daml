@@ -99,6 +99,12 @@ test_happy_path = script do
     transfer
     extraArgs = emptyExtraArgs
 
+  view <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid TransferFactory_PublicFetch
+    with
+      expectedAdmin = registry.dso
+      actor = alice
+  view === Api.Token.TransferInstructionV1.TransferFactoryView registry.dso
+
   Map.size enrichedChoice.arg.extraArgs.context.values === 4
   Map.size enrichedChoice.disclosures.disclosures === 6  -- the above plus the referenced holding contract
 
@@ -122,7 +128,6 @@ test_happy_path = script do
   [(_, aliceValidatorCoupon)] <- query @AppRewardCoupon aliceValidator
   aliceValidatorCoupon.featured === True
   aliceValidatorCoupon.amount === 2.16
-
   pure ()
 
 
