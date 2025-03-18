@@ -2057,6 +2057,7 @@ function subcmd_purge_unused_dbs() {
         args=("--yes")
     fi
 
+    local -x PULUMI_CONFIG_PASSPHRASE=''
     npx --prefix "${REPO_ROOT}/cluster/pulumi" ts-node "${REPO_ROOT}/cluster/pulumi/purge_unused_dbs.ts" "${args[@]}"
 }
 
