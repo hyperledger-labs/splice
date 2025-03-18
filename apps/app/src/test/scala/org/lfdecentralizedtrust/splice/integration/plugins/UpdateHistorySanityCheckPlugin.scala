@@ -23,6 +23,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Span}
 
+import java.io.File
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -146,6 +147,9 @@ class UpdateHistorySanityCheckPlugin(
 
     val readLines = mutable.Buffer[String]()
     val errorProcessor = ProcessLogger(line => readLines.append(line))
+    val csvTempFile = File.createTempFile("scan_txlog", ".csv")
+    // The script fails if the file already exists so delete it here.
+    csvTempFile.delete()
     try {
       scala.sys.process
         .Process(
@@ -155,6 +159,8 @@ class UpdateHistorySanityCheckPlugin(
             scan.httpClientConfig.url.toString(),
             "--loglevel",
             "DEBUG",
+            "--report-output",
+            csvTempFile.toString,
             "--scan-balance-assertions",
             "--stop-at-record-time",
             snapshotRecordTime.toInstant.toString,
