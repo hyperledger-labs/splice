@@ -26,9 +26,10 @@ def main(request: flask.Request) -> flask.typing.ResponseReturnValue:
     else:
       bindings = policy["bindings"]
     bindings.append({"role": "roles/storage.objectAdmin", "members": [f"serviceAccount:{serviceAccount}"]})
+    print(f"Setting policy after adding {serviceAccount} to: {json.dumps(policy)}")
     storage.buckets().setIamPolicy(bucket=bucket, body={"bindings": bindings}).execute()
     policy["bindings"] = bindings
-    print(f"Policy after adding: {json.dumps(policy)}")
+    print(f"Actual policy after adding {serviceAccount}: {json.dumps(storage.buckets().getIamPolicy(bucket=bucket).execute())}")
   else:
     if not request.args or "bucket" not in request.args:
       return "Query parameter 'bucket' is required", 400
@@ -46,12 +47,14 @@ def main(request: flask.Request) -> flask.typing.ResponseReturnValue:
     objectAdminMembers = [m for b in policy["bindings"] if b["role"] == "roles/storage.objectAdmin" for m in b["members"]]
     print(f"Members of objectAdmin role: {objectAdminMembers}")
     if not f"serviceAccount:{serviceAccount}" in objectAdminMembers:
-      return "Service account not found in objectAdmin role", 404
+      print(f"Warning: service account {serviceAccount} not found in policy")
+      return "Service account not found in objectAdmin role"
     newObjectAdminMembers = [m for m in objectAdminMembers if not m == f"serviceAccount:{serviceAccount}"]
     if len(newObjectAdminMembers) > 0:
       newBindings.append({"role": "roles/storage.objectAdmin", "members": newObjectAdminMembers})
     print(f"New members of objectAdmin role: {newObjectAdminMembers}")
+    print(f"Setting policy after removing {serviceAccount} to: {json.dumps(policy)}")
     storage.buckets().setIamPolicy(bucket=bucket, body={"bindings": newBindings}).execute()
     policy["bindings"] = newBindings
-    print(f"Full policy after removing {serviceAccount}: {json.dumps(policy)}")
+    print(f"Actual policy after removing {serviceAccount}: {json.dumps(storage.buckets().getIamPolicy(bucket=bucket).execute())}")
   return "done"

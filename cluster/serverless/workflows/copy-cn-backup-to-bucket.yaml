@@ -252,7 +252,7 @@ tryCopyCometBFTBackup:
           location: ${clusterLocation}
           project: ${clusterProject}
           namespace: ${namespace}
-          timeout: 360  # 1 hour
+          timeout: 3600  # 1 hour
         result: completedJob
     - cleanup:
         call: cleanCometBFTBackup
@@ -459,11 +459,6 @@ cleanCloudSqlBackup:
                   project: ${restoreInstanceProject}
                   instance: ${restoreInstanceName}
               result: restoreInstance
-          - deleteInstance:
-              call: googleapis.sqladmin.v1.instances.delete
-              args:
-                  project: ${restoreInstanceProject}
-                  instance: ${restoreInstanceName}
           - revokeStoragePermissions:
               try:
                 call: http.get
@@ -484,6 +479,11 @@ cleanCloudSqlBackup:
                   initial_delay: 1
                   max_delay: 10
                   multiplier: 1.25
+          - deleteInstance:
+              call: googleapis.sqladmin.v1.instances.delete
+              args:
+                  project: ${restoreInstanceProject}
+                  instance: ${restoreInstanceName}
         except:
           as: e
           call: sys.log
