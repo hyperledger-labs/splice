@@ -82,6 +82,8 @@ data AllocationFactoryView = AllocationFactoryView with
     admin : Party
       -- ^ The party representing the registry app that administers the instruments
       -- for which this allocation factory can be used.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation factory, used for extensibility.
   deriving (Show, Eq)
 
 -- | Contracts implementing `AllocationFactory` are retrieved from the registry app and are

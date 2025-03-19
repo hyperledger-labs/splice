@@ -112,4 +112,8 @@ data BurnMintFactory_BurnMintResult = BurnMintFactory_BurnMintResult
 data BurnMintFactoryView = BurnMintFactoryView
    with
      admin : Party
+       -- ^ The party representing the registry app that administers the instruments
+       -- for which this burnt mint factory can be used.
+     meta : Metadata
+       -- ^ Additional metadata specific to the burn mint factory, used for extensibility.
    deriving (Show, Eq)

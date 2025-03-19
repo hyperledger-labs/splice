@@ -186,6 +186,8 @@ data TransferFactoryView = TransferFactoryView
     admin : Party
       -- ^ The party representing the registry app that administers the instruments for
       -- which this transfer factory can be used.
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer factory, used for extensibility.
   deriving (Show, Eq)
 
 data TransferInstruction_ReportSuccessResult = TransferInstruction_ReportSuccessResult

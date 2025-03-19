@@ -57,6 +57,7 @@ template ExternalPartyAmuletRules
     interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
       view = Api.Token.TransferInstructionV1.TransferFactoryView with
         admin = dso
+        meta = emptyMetadata
 
       transferFactory_transferImpl self arg = amulet_transferFactory_transferImpl this self arg
       transferFactory_publicFetchImpl _self arg = do
@@ -66,6 +67,7 @@ template ExternalPartyAmuletRules
     interface instance AllocationFactory for ExternalPartyAmuletRules where
       view = AllocationFactoryView with
         admin = dso
+        meta = emptyMetadata
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactory_allocateImpl this self arg
       allocationFactory_publicFetchImpl _self arg = do

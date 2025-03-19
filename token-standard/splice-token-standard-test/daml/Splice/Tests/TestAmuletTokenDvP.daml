@@ -130,7 +130,7 @@ testDvP = script do
     with
       expectedAdmin = registry.dso
       actor = alice
-  factoryView === Splice.Api.Token.AllocationInstructionV1.AllocationFactoryView registry.dso
+  factoryView === Splice.Api.Token.AllocationInstructionV1.AllocationFactoryView registry.dso emptyMetadata
 
   -- assume the time given to prepare has passed
   passTime (hours 1)

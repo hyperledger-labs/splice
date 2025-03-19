@@ -84,6 +84,7 @@ tradeAllocations settlementInfo transferLegs = do
     settlement = settlementInfo
     transferLegId = i
     transferLeg
+    meta = emptyMetadata
 
 template OTCTrade
   with

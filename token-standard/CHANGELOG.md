@@ -7,6 +7,7 @@ Major changes:
 Polishing changes:
 
 * Add `TransferFactory_PublicFetch`, `AllocationFactory_PublicFetch` and `BurnMintFactory_PublicFetch` choices.
+* Added `meta` field to all interface view types.
 
 ## 2025-03-17
 
