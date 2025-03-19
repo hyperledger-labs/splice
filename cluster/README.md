@@ -1633,10 +1633,7 @@ However, the following steps don't require an action from us:
 1. **Post-migration:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that makes the following changes:
    * in `config.yaml` remove `synchronizerMigration.active.migratingFrom`
    * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_COMETBFT_STATE_SYNC` to "false".
-   * [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
-     so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
-     is set to reflect the expected migration ID after completing the migration.
-   * Check that the patches worked by triggering the jobs manually once.
+   * Check that the triggers work by triggering the jobs manually once.
 1. Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
