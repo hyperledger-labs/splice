@@ -30,7 +30,7 @@ import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0 as tokenStandardHttp
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1 as tokenStandardHttp
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
@@ -59,7 +59,7 @@ import com.digitalasset.canton.topology.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0.definitions.GetFactoryRequest
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.GetFactoryRequest
 
 import java.util.Base64
 import java.time.Instant

@@ -39,7 +39,8 @@ paths:
           required: false
           schema:
             type: integer
-            default: 10
+            format: int32
+            default: 25
           description: "Number of instruments per page."
         - name: page_token
           in: query
