@@ -559,6 +559,29 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "private": "c3YyLWlkLXByaXZhdGUta2V5",
+          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -603,6 +626,29 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "private": "c3YzLWlkLXByaXZhdGUta2V5",
+          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -636,6 +682,29 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-4-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
+          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -869,6 +938,75 @@
       "type": "Opaque"
     },
     "name": "splice-app-sv-1-validator-onboarding-validator12",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YyLWlkLXByaXZhdGUta2V5",
+          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-2-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YzLWlkLXByaXZhdGUta2V5",
+          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-3-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
+          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-4-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1786,7 +1924,6 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-1-mediator",
@@ -1833,6 +1970,14 @@
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "initialAmuletPrice": "0.0517",
+        "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.6\",\"amuletNameServiceVersion\": \"0.1.6\",\"dsoGovernanceVersion\": \"0.1.9\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.6\",\"walletPaymentsVersion\": \"0.1.6\"}",
+        "initialSynchronizerFeesConfig": {
+          "baseRateBurstAmount": 400000,
+          "baseRateBurstWindowMins": 20,
+          "extraTrafficPrice": 16.67,
+          "minTopupAmount": 200000,
+          "readVsWriteScalingFactor": 4
+        },
         "isDevNet": true,
         "metrics": {
           "enable": true
@@ -1840,11 +1985,13 @@
         "migration": {
           "id": 1,
           "legacyId": 0,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
+        "onboardingFoundingSvRewardWeightBps": 150000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingType": "domain-migration",
+        "onboardingRoundZeroDuration": "2 h",
+        "onboardingType": "found-dso",
         "participantAddress": "participant-1",
         "persistence": {
           "databaseName": "sv_sv_1",
@@ -2494,17 +2641,20 @@
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
+        "joinWithKeyOnboarding": {
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+        },
         "metrics": {
           "enable": true
         },
         "migration": {
           "id": 1,
           "legacyId": 0,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
         "onboardingName": "Digital-Asset-Eng-2",
-        "onboardingType": "domain-migration",
+        "onboardingType": "join-with-key",
         "participantAddress": "participant-1",
         "persistence": {
           "databaseName": "sv_sv_2",
@@ -3147,17 +3297,20 @@
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
+        "joinWithKeyOnboarding": {
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+        },
         "metrics": {
           "enable": true
         },
         "migration": {
           "id": 1,
           "legacyId": 0,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
         "onboardingName": "Digital-Asset-Eng-3",
-        "onboardingType": "domain-migration",
+        "onboardingType": "join-with-key",
         "participantAddress": "participant-1",
         "persistence": {
           "databaseName": "sv_sv_3",
@@ -3800,17 +3953,20 @@
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
+        "joinWithKeyOnboarding": {
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+        },
         "metrics": {
           "enable": true
         },
         "migration": {
           "id": 1,
           "legacyId": 0,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
         "onboardingName": "Digital-Asset-Eng-4",
-        "onboardingType": "domain-migration",
+        "onboardingType": "join-with-key",
         "participantAddress": "participant-1",
         "persistence": {
           "databaseName": "sv_sv_4",

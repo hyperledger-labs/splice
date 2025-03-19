@@ -618,8 +618,7 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "1",
-          "migrating": true
+          "id": "1"
         },
         "nodeIdentifier": "validator-runbook",
         "participantAddress": "participant-1",
