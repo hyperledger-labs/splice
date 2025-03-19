@@ -9,6 +9,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
@@ -302,7 +303,7 @@ class SvReonboardingIntegrationTest
                 action,
                 "url",
                 "description",
-                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                new RelTime(durationUntilExpiration.toMillis * 1000),
                 Some(env.environment.clock.now.add(durationUntilOffboardingEffectivity).toInstant),
               )
             },

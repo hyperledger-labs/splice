@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
@@ -107,7 +108,7 @@ class SvOffboardingIntegrationTest
             action,
             "url",
             "description",
-            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+            new RelTime(durationUntilExpiration.toMillis * 1000),
             Some(env.environment.clock.now.add(durationUntilOffboardingEffectivity).toInstant),
           )
         },

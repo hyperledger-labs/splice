@@ -142,7 +142,9 @@ object SpliceTests extends LazyLogging {
     /** Note that `durationUntilOffboardingEffectivity` is set to 20 seconds to allow quick offboarding in our tests.
       *        The default duration that should be used in our offboarding process is 3 hours.
       */
-    protected val durationUntilOffboardingEffectivity = Duration.ofSeconds(20)
+    protected val durationUntilOffboardingEffectivity: Duration = Duration.ofSeconds(20)
+    protected val durationUntilExpiration: Duration =
+      durationUntilOffboardingEffectivity.minusSeconds(1)
 
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty

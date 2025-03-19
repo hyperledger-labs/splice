@@ -285,6 +285,16 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
   provider <- allocateParty "provider"
   [] <- query @FeaturedAppRight provider
 
+  -- voteRequests with an effective time set before the expiration date must fail
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+    requester = sv1
+    action = ARC_DsoRules with
+      dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
+        provider
+    reason = Reason with url = ""; body = "they are great!"
+    targetEffectiveAt = Some (addRelTime now (days 1))
+    voteRequestTimeout = Some (days 2)
+
   -- sv1 initiates the granting of the featured app right for the provider
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
@@ -544,7 +554,7 @@ testDsoRulesConfigChange = do
         dsoDelegateInactiveTimeout = seconds (70 + 1)
         maxTextLength = 1024 + 1
         nextScheduledSynchronizerUpgrade = Some (SynchronizerUpgradeSchedule with
-                                                    time = now
+                                                    time = addRelTime now (days 4)
                                                     migrationId = 1)
 
 

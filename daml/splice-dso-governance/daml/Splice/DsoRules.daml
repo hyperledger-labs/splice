@@ -3,11 +3,12 @@
 
 module Splice.DsoRules where
 
+import Prelude hiding (all)
 import DA.Action (void, unless)
 import DA.Either (partitionEithers)
 import DA.Exception
-import DA.Foldable (forA_)
-import DA.List as List
+import DA.Foldable (forA_, all)
+import DA.List as List hiding (all)
 import DA.Optional (isNone, fromSome, fromOptional, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
@@ -350,6 +351,7 @@ template VoteRequest
     targetEffectiveAt : Optional Time
       -- ^ The time when the action is targeted to be made effective. If None, the action is immediately effective upon 2/3 votes in favor.
   where
+    ensure all (voteBefore <=) targetEffectiveAt
     signatory dso
 
 data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with

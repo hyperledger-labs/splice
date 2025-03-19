@@ -38,7 +38,10 @@ class ScanConnectionIntegrationTest
           maxNumInputs = 101,
         )
 
-      setAmuletConfig(Seq((Some(durationUntilOffboardingEffectivity), newConfig, baseConfig)))
+      setAmuletConfig(
+        Seq((Some(durationUntilOffboardingEffectivity), newConfig, baseConfig)),
+        durationUntilExpiration,
+      )
     }
     eventually(40.seconds) {
       sv1ScanBackend
