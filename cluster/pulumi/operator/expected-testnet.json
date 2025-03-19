@@ -96,18 +96,18 @@
             },
             "type": "Literal"
           },
-          "REPO_ROOT": {
-            "literal": {
-              "value": "/tmp/pulumi-working/operator/deployment/workspace"
-            },
-            "type": "Literal"
-          },
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
               "name": "operator-env"
             },
             "type": "Secret"
+          },
+          "SPLICE_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/deployment/workspace"
+            },
+            "type": "Literal"
           }
         },
         "fluxSource": {

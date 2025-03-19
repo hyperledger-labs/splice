@@ -163,7 +163,7 @@ jobs:
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "10 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
             cncluster restore_node --force << parameters.namespace_name >> ${ACTIVE_MIGRATION_ID} << parameters.internal_stack >>

@@ -228,7 +228,7 @@ commands:
           gce_authenticate: true
           cmd_retry_count: 5 # we have seen this fail several times, see #13863
           cmd: |
-            $REPO_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
+            $SPLICE_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:

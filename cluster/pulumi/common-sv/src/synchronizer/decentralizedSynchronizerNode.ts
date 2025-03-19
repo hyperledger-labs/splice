@@ -10,7 +10,7 @@ import {
   jmxOptions,
   loadYamlFromFile,
   LogLevel,
-  REPO_ROOT,
+  SPLICE_ROOT,
   sanitizedForPostgres,
   sequencerResources,
   sequencerTokenExpirationTime,
@@ -128,7 +128,7 @@ export class InStackDecentralizedSynchronizerNode
     this.cometbftRpcServiceName = cometbftRelease.rpcServiceName;
 
     const decentralizedSynchronizerValues: ChartValues = loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
       {
         MIGRATION_ID: migrationId.toString(),
       }

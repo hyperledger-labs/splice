@@ -11,7 +11,7 @@ if [ -z "$file_path" ]; then
   exit 1
 fi
 
-latest_base_version=$("$REPO_ROOT"/build-tools/find_latest_base_version.sh)
+latest_base_version=$("$SPLICE_ROOT"/build-tools/find_latest_base_version.sh)
 
 # 'git diff --quiet' exits with 1 if there were differences and 0 means no differences.
 if git diff --quiet "$latest_base_version" HEAD "$file_path"; then

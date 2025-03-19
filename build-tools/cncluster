@@ -246,7 +246,7 @@ function _current_lock_age_formatted() {
 }
 
 function _get_holder_names() {
-    jq -r --arg login "$1" '.[$login][]?' "$REPO_ROOT/.circleci/cluster-lock-users.json"
+    jq -r --arg login "$1" '.[$login][]?' "$SPLICE_ROOT/.circleci/cluster-lock-users.json"
 }
 
 function _assert_lock() {
@@ -264,7 +264,7 @@ function _assert_lock() {
         fi
 
         # Check lock for CI...
-        if ! approver=$( "$REPO_ROOT/.circleci/approved-by.sh" ); then
+        if ! approver=$( "$SPLICE_ROOT/.circleci/approved-by.sh" ); then
             _error "Could not determine approver for CI workflow"
         fi
 
@@ -870,7 +870,7 @@ subcommand_whitelist[load_test]='Run the k6 load test against the cluster'
 function subcmd_load_test() {
     _log "Starting k6 load test"
 
-    cd "$REPO_ROOT" && sbt load-tester/npmBuild
+    cd "$SPLICE_ROOT" && sbt load-tester/npmBuild
 
     hostname="$GCP_CLUSTER_HOSTNAME"
 
@@ -880,8 +880,8 @@ function subcmd_load_test() {
     K6_PROMETHEUS_RW_SERVER_URL="$prometheus_rw" k6 \
         --verbose \
         --out experimental-prometheus-rw \
-        --env EXTERNAL_CONFIG="$(envsubst < "$REPO_ROOT/load-tester/config.sample.json")" \
-        run "$REPO_ROOT/load-tester/dist/generate-load.js"
+        --env EXTERNAL_CONFIG="$(envsubst < "$SPLICE_ROOT/load-tester/config.sample.json")" \
+        run "$SPLICE_ROOT/load-tester/dist/generate-load.js"
 }
 
 ###
@@ -904,7 +904,7 @@ subcommand_whitelist[sbt_for_preflight]='Runs Sbt, as if for the runbook preflig
 function subcmd_sbt_for_preflight() {
     _needs_auth0_management_api_creds
 
-    (cd "${REPO_ROOT}" && \
+    (cd "${SPLICE_ROOT}" && \
          MIGRATION_ID=0 \
          NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} \
          NETWORK_APPS_ADDRESS_PROTOCOL=https \
@@ -921,7 +921,7 @@ function subcmd_preflight_global_domain_upgrade() {
 
     preflight_tests=$(_get_preflight_test_names "global-domain-upgrade")
     _log "Starting global domain upgrade preflight tests: $preflight_tests"
-    cd "${REPO_ROOT}" && \
+    cd "${SPLICE_ROOT}" && \
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
@@ -947,7 +947,7 @@ subcommand_whitelist[preflight_sv]='Run the SV runbook preflight tests against t
 function subcmd_preflight_sv() {
     preflight_tests=$(_get_preflight_test_names "sv")
     _log "Starting runbook SV preflight tests: $preflight_tests"
-    cd "${REPO_ROOT}" && \
+    cd "${SPLICE_ROOT}" && \
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
@@ -959,7 +959,7 @@ subcommand_whitelist[preflight_validator]='Run the validator runbook preflight t
 function subcmd_preflight_validator() {
     preflight_tests=$(_get_preflight_test_names "validator")
     _log "Starting runbook validator preflight tests: $preflight_tests"
-    cd "${REPO_ROOT}" && \
+    cd "${SPLICE_ROOT}" && \
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
@@ -1105,7 +1105,7 @@ subcmd_export_to() {
   local exportTo="$1"
   _info "Exporting to $exportTo"
   # remove first "Running Pulumi Command" line
-  subcmd_pulumi canton-network stack export | tail -n +2 | "$REPO_ROOT"/cluster/scripts/versions-from-dump.py > "$exportTo"
+  subcmd_pulumi canton-network stack export | tail -n +2 | "$SPLICE_ROOT"/cluster/scripts/versions-from-dump.py > "$exportTo"
 }
 
 ###
@@ -1175,10 +1175,10 @@ function subcmd_lock() {
         lockholder=$(whoami)
         kubectl create secret generic cluster-lock --from-literal=lockholder="$lockholder" > /dev/null
         _info "Cluster lock claimed successfully."
-        if ! jq --arg login "$lockholder" -e 'to_entries | map(.value) | flatten | any(. == $login)' "$REPO_ROOT/.circleci/cluster-lock-users.json" >/dev/null; then
+        if ! jq --arg login "$lockholder" -e 'to_entries | map(.value) | flatten | any(. == $login)' "$SPLICE_ROOT/.circleci/cluster-lock-users.json" >/dev/null; then
             echo
             _warning \
-                "There is no corresponding entry for $lockholder in '$REPO_ROOT/.circleci/cluster-lock-users.json'.\n" \
+                "There is no corresponding entry for $lockholder in '$SPLICE_ROOT/.circleci/cluster-lock-users.json'.\n" \
                 "You will not be able to run preflight checks on CI, until you add an entry with your CI username to that file."
         fi
     fi
@@ -1451,7 +1451,7 @@ function subcmd_participant_console() {
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."
-    canton -v -c "$REPO_ROOT/build-tools/local-participant.conf"
+    canton -v -c "$SPLICE_ROOT/build-tools/local-participant.conf"
 
     _info "Stopping port forwarding."
     kill $port_forwarding_pid
@@ -1486,7 +1486,7 @@ function subcmd_sequencer_console() {
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."
-    canton -v -c "$REPO_ROOT/build-tools/local-sequencer.conf"
+    canton -v -c "$SPLICE_ROOT/build-tools/local-sequencer.conf"
 
     _info "Stopping port forwarding."
     kill $port_forwarding_pid
@@ -1521,7 +1521,7 @@ function subcmd_mediator_console() {
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."
-    canton -v -c "$REPO_ROOT/build-tools/local-mediator.conf"
+    canton -v -c "$SPLICE_ROOT/build-tools/local-mediator.conf"
 
     _info "Stopping port forwarding."
     kill $port_forwarding_pid
@@ -1579,7 +1579,7 @@ function _get_preflight_test_names() {
     tests_filename="test-full-class-names-$hint-preflight-non-devnet.log"
   fi
 
-  awk '{print $1}' "$REPO_ROOT"/"$tests_filename" | paste -s -d' ' -
+  awk '{print $1}' "$SPLICE_ROOT"/"$tests_filename" | paste -s -d' ' -
 }
 
 ###
@@ -1618,11 +1618,11 @@ function subcmd_backup_nodes() {
         case "$node" in
             sv-1|sv-2|sv-3|sv-4)
                 _info "Backing up sv node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
                 ;;
             validator1|splitwell)
                 _info "Backing up validator node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id" "$internal_stack"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id" "$internal_stack"
                 ;;
             *)
                 _error "Unknown node $node"
@@ -1668,7 +1668,7 @@ function subcmd_restore_node() {
 
     if [ -z "$backup_run_id" ]; then
         _info "No backup run_id given, looking for the latest full backup"
-        backup_run_id=$(SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id" "$internal_stack")
+        backup_run_id=$(SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id" "$internal_stack")
         if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
             _error "No recent backup found for $node"
         fi
@@ -1685,11 +1685,11 @@ function subcmd_restore_node() {
             _info "Silencing SV report creation alerts for $sv_name for 1 hour"
             subcmd_silence_grafana_alerts "1 hour" "alertname=Report Creation Time Lag" "report_publisher=$sv_name"
             _info "Restoring sv node $node"
-            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" cometbft sequencer participant mediator cn-apps
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" cometbft sequencer participant mediator cn-apps
             ;;
         validator1|splitwell)
             _info "Restoring validator node $node"
-            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" participant validator
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" participant validator
             ;;
         *)
             _error "Unknown node $node"
@@ -1705,7 +1705,7 @@ function subcmd_offboard_sv_runbook() {
 
     preflight_tests=$(_get_preflight_test_names "offboard-sv-runbook")
     _log "Starting sv offboard preparation preflight tests: $preflight_tests"
-    cd "${REPO_ROOT}" && \
+    cd "${SPLICE_ROOT}" && \
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
@@ -1719,7 +1719,7 @@ function subcmd_preflight_sv_reonboard() {
 
     preflight_tests=$(_get_preflight_test_names "re-onboard-sv-runbook")
     _log "Starting sv re onboard preparation preflight tests: $preflight_tests"
-    cd "${REPO_ROOT}" && \
+    cd "${SPLICE_ROOT}" && \
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
             sbt "apps-app/testOnly $preflight_tests"
 }
@@ -1962,7 +1962,7 @@ subcommand_whitelist[cci_upgrade_test]='Launches a CircleCI upgrade test on the 
 
 function subcmd_cci_upgrade_test() {
   cci_cluster_name=$(basename "$PWD")
-  "$REPO_ROOT/.circleci/launch-upgrade.sh" --cluster "$cci_cluster_name" "$@"
+  "$SPLICE_ROOT/.circleci/launch-upgrade.sh" --cluster "$cci_cluster_name" "$@"
 }
 
 ###
@@ -2044,7 +2044,7 @@ function subcmd_vote_for_migration() {
 
   _cluster_must_exist
 
-  "$REPO_ROOT/cluster/scripts/vote-for-migration.sh" "$1"
+  "$SPLICE_ROOT/cluster/scripts/vote-for-migration.sh" "$1"
 }
 
 ###
@@ -2058,7 +2058,7 @@ function subcmd_purge_unused_dbs() {
     fi
 
     local -x PULUMI_CONFIG_PASSPHRASE=''
-    npx --prefix "${REPO_ROOT}/cluster/pulumi" ts-node "${REPO_ROOT}/cluster/pulumi/purge_unused_dbs.ts" "${args[@]}"
+    npx --prefix "${SPLICE_ROOT}/cluster/pulumi" ts-node "${SPLICE_ROOT}/cluster/pulumi/purge_unused_dbs.ts" "${args[@]}"
 }
 
 ###

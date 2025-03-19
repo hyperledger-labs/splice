@@ -12,7 +12,7 @@ PROJECT="da-cn-shared"
 
 gcloud beta run deploy \
   find-backup-before \
-  --source "$REPO_ROOT/cluster/serverless/find-backup-before" \
+  --source "$SPLICE_ROOT/cluster/serverless/find-backup-before" \
   --function main \
   --base-image python312 \
   --region us-central1 \
@@ -21,7 +21,7 @@ gcloud beta run deploy \
 
 gcloud beta run deploy \
   find-cloudsql-backups \
-  --source "$REPO_ROOT/cluster/serverless/find-cloudsql-backups" \
+  --source "$SPLICE_ROOT/cluster/serverless/find-cloudsql-backups" \
   --function main \
   --base-image python312 \
   --region us-central1 \
@@ -30,7 +30,7 @@ gcloud beta run deploy \
 
 gcloud beta run deploy \
   sa-bucket-permissions \
-  --source "$REPO_ROOT/cluster/serverless/sa-bucket-permissions" \
+  --source "$SPLICE_ROOT/cluster/serverless/sa-bucket-permissions" \
   --function main \
   --base-image python312 \
   --region us-central1 \
@@ -42,7 +42,7 @@ gcloud beta run deploy \
 
 gcloud workflows deploy copy-cn-backup-to-bucket \
   --location=us-central1 \
-  --source "$REPO_ROOT/cluster/serverless/workflows/copy-cn-backup-to-bucket.yaml" \
+  --source "$SPLICE_ROOT/cluster/serverless/workflows/copy-cn-backup-to-bucket.yaml" \
   --project "$PROJECT" \
   --service-account "$SERVICE_ACCOUNT" \
   --call-log-level "log-all-calls"

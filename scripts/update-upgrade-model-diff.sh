@@ -5,7 +5,7 @@
 
 set -eou pipefail
 
-cd "$REPO_ROOT"
+cd "$SPLICE_ROOT"
 
 TARGET_DIR=daml/upgrade-diffs
 

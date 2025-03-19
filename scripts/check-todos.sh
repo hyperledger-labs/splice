@@ -5,11 +5,11 @@
 
 set -e
 
-REPO_ROOT=$( git rev-parse --show-toplevel )
+SPLICE_ROOT=$( git rev-parse --show-toplevel )
 
 
 # Call the ammonite repl with the todo checker Scala script
-(cd "$REPO_ROOT"; amm .circleci/todo/src/checkTodos.sc)
+(cd "$SPLICE_ROOT"; amm .circleci/todo/src/checkTodos.sc)
 
 echo ""
-echo "See $REPO_ROOT/todo-out/ for the summary of the todo check."
+echo "See $SPLICE_ROOT/todo-out/ for the summary of the todo check."
