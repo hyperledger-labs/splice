@@ -37,7 +37,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
   protected def svUsername: String
   protected def isDevNet: Boolean
-  protected val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
+  protected def svPassword: String =
+    if (isDevNet) sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD") else sys.env(s"SV_WEB_UI_PASSWORD")
   protected lazy val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
   val scanUrl = s"https://scan.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
 
@@ -45,7 +46,6 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
   "The SV UI of the node is working as expected" in { _ =>
     val svUiUrl = s"https://sv.sv.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     withFrontEnd("sv") { implicit webDriver =>
       testSvUi(svUiUrl, svUsername, svPassword, None, Seq())
     }
@@ -53,7 +53,6 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
   "CometBFT is working" in { _ =>
     val svUiUrl = s"https://sv.sv.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
 
     withFrontEnd("sv") { implicit webDriver =>
       actAndCheck(
@@ -240,7 +239,6 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
   "The Name Service UI is working" in { implicit env =>
     val ansUrl = s"https://cns.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
-    val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     val ansName =
       s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.$ansAcronym"
 
