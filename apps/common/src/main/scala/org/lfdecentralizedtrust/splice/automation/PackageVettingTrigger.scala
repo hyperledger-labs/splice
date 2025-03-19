@@ -3,9 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
-import com.digitalasset.canton.topology.DomainId
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.util.PackageVetting
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
@@ -14,12 +14,16 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     extends PollingTrigger
     with PackageIdResolver.HasAmuletRules {
 
-  def getDomainId()(implicit tc: TraceContext): Future[DomainId]
-
   protected def participantAdminConnection: ParticipantAdminConnection
+
+  // Duration that packages will be pre-vetted by. E.g.,
+  // if this is set to 5 minutes packages will be vetted
+  // 5 minutes before the switch in AmuletConfig.
+  protected def prevetDuration: NonNegativeFiniteDuration
 
   val vetting = new PackageVetting(
     packages,
+    prevetDuration,
     context.clock,
     participantAdminConnection,
     loggerFactory,
@@ -27,9 +31,8 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      domainId <- getDomainId()
       amuletRules <- getAmuletRules()
-      _ <- vetting.vetPackages(domainId, amuletRules)
+      _ <- vetting.vetPackages(amuletRules)
     } yield false
   }
 }

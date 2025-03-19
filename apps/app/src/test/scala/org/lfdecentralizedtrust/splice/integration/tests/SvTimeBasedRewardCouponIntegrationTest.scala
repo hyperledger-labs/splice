@@ -16,10 +16,7 @@ import org.lfdecentralizedtrust.splice.sv.config.BeneficiaryConfig
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultIssuanceCurve
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.validator.automation.{
-  ReceiveFaucetCouponTrigger,
-  ValidatorPackageVettingTrigger,
-}
+import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.TransferTxLogEntry
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransferTransactionSubtype
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -265,12 +262,6 @@ class SvTimeBasedRewardCouponIntegrationTest
       sv4RewardCouponTrigger.pause().futureValue
     }
 
-    clue("Pause alice vetting trigger") {
-      aliceValidatorBackend.validatorAutomation
-        .trigger[ValidatorPackageVettingTrigger]
-        .pause()
-        .futureValue
-    }
     actAndCheck(
       s"Unvet the latest amulet package on Alice's participant with package id: $latestAmuletPackageId",
       aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(

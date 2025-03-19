@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import cats.implicits.catsSyntaxParallelTraverse_
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
@@ -17,7 +18,11 @@ import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
   PruningSchedule,
 }
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
+import com.digitalasset.canton.admin.participant.v30.{
+  DarDescription,
+  ExportAcsResponse,
+  PruningServiceGrpc,
+}
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
@@ -38,6 +43,7 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
@@ -53,7 +59,9 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologyTransactionType,
 }
+import org.lfdecentralizedtrust.splice.util.UploadablePackage
 
+import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 import scala.reflect.ClassTag
@@ -76,7 +84,6 @@ class ParticipantAdminConnection(
       retryProvider,
     )
     with HasParticipantId
-    with ParticipantAdminDarsConnection
     with StatusAdminConnection {
   override val serviceName = "Canton Participant Admin API"
 
@@ -95,7 +102,7 @@ class ParticipantAdminConnection(
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
-  protected val hashOps: HashOps = new HashOps {
+  private val hashOps: HashOps = new HashOps {
     override def defaultHashAlgorithm: com.digitalasset.canton.crypto.HashAlgorithm.Sha256.type =
       HashAlgorithm.Sha256
   }
@@ -440,6 +447,118 @@ class ParticipantAdminConnection(
           reconnectDomain(config.domain)
         } else Future.unit
     } yield ()
+
+  def uploadDarFiles(
+      pkgs: Seq[UploadablePackage],
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    pkgs.parTraverse_(
+      uploadDarFile(_, retryFor)
+    )
+
+  def uploadDarFileLocally(
+      pkg: UploadablePackage,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    uploadDarLocally(
+      pkg.resourcePath,
+      ByteString.readFrom(pkg.inputStream()),
+      retryFor,
+    )
+  def uploadDarFile(
+      pkg: UploadablePackage,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    uploadDarFileInternal(
+      pkg.resourcePath,
+      ByteString.readFrom(pkg.inputStream()),
+      retryFor,
+    )
+
+  def uploadDarFile(
+      path: Path,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    for {
+      darFile <- Future {
+        ByteString.readFrom(Files.newInputStream(path))
+      }
+      _ <- uploadDarFileInternal(path.toString, darFile, retryFor)
+    } yield ()
+
+  def lookupDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[ByteString]] =
+    runCmd(
+      ParticipantAdminConnection.LookupDarByteString(hash)
+    )
+
+  def listDars(limit: PositiveInt = PositiveInt.MaxValue)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[DarDescription]] =
+    runCmd(
+      ParticipantAdminCommands.Package.ListDars(limit)
+    )
+  private def uploadDarLocally(
+      path: String,
+      darFile: => ByteString,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
+    for {
+      _ <- retryProvider
+        .ensureThatO(
+          retryFor,
+          "upload_dar_locally",
+          s"DAR file $path with hash $darHash has been uploaded.",
+          lookupDar(darHash).map(_.map(_ => ())),
+          runCmd(
+            ParticipantAdminCommands.Package
+              .UploadDar(
+                Some(path),
+                vetAllPackages = true,
+                synchronizeVetting = false,
+                logger,
+                Some(darFile),
+              )
+          ).map(_ => ()),
+          logger,
+        )
+    } yield ()
+  }
+
+  private def uploadDarFileInternal(
+      path: String,
+      darFile: => ByteString,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
+    for {
+      _ <- retryProvider
+        .ensureThatO(
+          retryFor,
+          "upload_dar",
+          s"DAR file $path with hash $darHash has been uploaded.",
+          // TODO(#5141) and TODO(#5755): consider if we still need a check here
+          lookupDar(darHash).map(_.map(_ => ())),
+          runCmd(
+            ParticipantAdminCommands.Package
+              .UploadDar(
+                Some(path),
+                vetAllPackages = true,
+                synchronizeVetting = true,
+                logger,
+                Some(darFile),
+              )
+          ).map(_ => ()),
+          logger,
+        )
+    } yield ()
+  }
 
   def ensureInitialPartyToParticipant(
       store: TopologyStoreId,

@@ -24,9 +24,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import monocle.macros.syntax.lens.*
-import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
@@ -213,8 +211,8 @@ class AppUpgradeIntegrationTest
             startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend)
           }
 
-          // SV1 does not vet DAR before the vote goes through
-          val sv1Packages = vettedPackages(sv1Backend.participantClientWithAdminToken)
+          // SV1 does not upload DAR before the vote goes through
+          val sv1Packages = sv1Backend.participantClientWithAdminToken.packages.list()
           forAll(sv1Packages) { pkg =>
             pkg.packageId should not be DarResources.amulet.bootstrap.packageId
           }
@@ -352,16 +350,14 @@ class AppUpgradeIntegrationTest
           )
 
           val sv1PackagesAfterUpgrade =
-            vettedPackages(sv1Backend.participantClientWithAdminToken)
+            sv1Backend.participantClientWithAdminToken.packages.list()
           forExactly(1, sv1PackagesAfterUpgrade) { pkg =>
-            withClue(s"Package ${pkg.packageId}") {
-              pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
-            }
+            pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
           }
 
           actAndCheck(
             "Bob taps after upgrade",
-            eventually() {
+            eventuallySucceeds() {
               bobWalletClient.tap(20)
             },
           )(
@@ -513,17 +509,6 @@ class AppUpgradeIntegrationTest
         })
       }
     }
-  }
-
-  private def vettedPackages(participant: ParticipantClientReference) = {
-    participant.topology.vetted_packages
-      .list(
-        filterParticipant = participant.id.filterString,
-        timeQuery = HeadState,
-        filterStore = "Authorized",
-      )
-      .flatMap(_.item.packages)
-      .filter(_.validFrom.forall(_.isBefore(CantonTimestamp.now())))
   }
 }
 

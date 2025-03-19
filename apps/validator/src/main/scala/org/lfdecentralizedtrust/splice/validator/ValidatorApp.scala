@@ -269,28 +269,6 @@ class ValidatorApp(
             _ <- appInitStep("Ensuring extra domains registered") {
               domainConnector.ensureExtraDomainsRegistered()
             }
-            _ <- appInitStep("Upload dars") {
-              val darFiles = ValidatorPackageVettingTrigger.packages
-                .flatMap(pkg => DarResources.lookupAllPackageVersions(pkg.packageName))
-                .map(dar => UploadablePackage.fromResource(dar))
-                .toSeq
-              participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
-            }
-            // Prevet early to make sure we have the required packages even
-            // before the automation kicks in.
-            _ <- appInitStep("Vet packages") {
-              for {
-                amuletRules <- scanConnection.getAmuletRules()
-                domainId <- scanConnection.getAmuletRulesDomain()(traceContext)
-                packageVetting = new PackageVetting(
-                  ValidatorPackageVettingTrigger.packages,
-                  clock,
-                  participantAdminConnection,
-                  loggerFactory,
-                )
-                _ <- packageVetting.vetCurrentPackages(domainId, amuletRules)
-              } yield ()
-            }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
               case (
                     Some(MigrateValidatorPartyConfig(scanConfig, partiesToMigrate)),
@@ -312,25 +290,28 @@ class ValidatorApp(
                     nodeIdentitiesDump <- ParticipantInitializer.getDump(
                       participantBootstrappingConfig
                     )
-                    _ <- participantPartyMigrator
-                      .migrate(
-                        nodeIdentitiesDump,
-                        validatorPartyHint,
-                        config.ledgerApiUser,
-                        config.domains.global.alias,
-                        partyId =>
-                          getAcsSnapshotFromSingleScan(
-                            scanConfig,
-                            partyId,
-                            logger,
-                            retryProvider,
+                    (_, _) <- (
+                      setupDarsForAcsImport(participantAdminConnection),
+                      participantPartyMigrator
+                        .migrate(
+                          nodeIdentitiesDump,
+                          validatorPartyHint,
+                          config.ledgerApiUser,
+                          config.domains.global.alias,
+                          partyId =>
+                            getAcsSnapshotFromSingleScan(
+                              scanConfig,
+                              partyId,
+                              logger,
+                              retryProvider,
+                            ),
+                          Seq(
+                            DarResources.amulet.bootstrap,
+                            DarResources.amuletNameService.bootstrap,
                           ),
-                        Seq(
-                          DarResources.amulet.bootstrap,
-                          DarResources.amuletNameService.bootstrap,
+                          partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
                         ),
-                        partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
-                      )
+                    ).tupled
                   } yield ()
                 }
               case (Some(_), None) =>
@@ -433,6 +414,21 @@ class ValidatorApp(
     migrationDump
   }
 
+  private def setupDarsForAcsImport(participantAdminConnection: ParticipantAdminConnection)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    // TODO(#11412): This potentially uploads versions that should not yet be uploaded. Consider using PackageVetting instead.
+    logger.info(s"Uploading dars for ACS import.")
+    val darFiles = packages.map(UploadablePackage.fromResource)
+    for {
+      _ <- participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
+    } yield {
+      logger.info(
+        s"Finished Uploading dars for ACS import."
+      )
+    }
+  }
+
   private def getAcsSnapshotFromSingleScan(
       scanConfig: ScanAppClientConfig,
       partyId: PartyId,
@@ -466,7 +462,7 @@ class ValidatorApp(
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar =>
-        participantAdminConnection.uploadDarFileWithVettingOnAllConnectedDomains(
+        participantAdminConnection.uploadDarFile(
           dar,
           RetryFor.WaitingOnInitDependency,
         )
@@ -678,6 +674,21 @@ class ValidatorApp(
           loggerFactory,
         )
       }
+      // Prevet early to make sure we have the required packages even
+      // before the automation kicks in.
+      _ <- appInitStep("Vet packages") {
+        for {
+          amuletRules <- scanConnection.getAmuletRules()
+          packageVetting = new PackageVetting(
+            ValidatorPackageVettingTrigger.packages,
+            config.prevetDuration,
+            clock,
+            participantAdminConnection,
+            loggerFactory,
+          )
+          _ <- packageVetting.vetPackages(amuletRules)
+        } yield ()
+      }
 
       // Register the traffic balance service
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
@@ -805,6 +816,7 @@ class ValidatorApp(
         config.domains.global.buyExtraTraffic.grpcDeadline,
         config.transferPreapproval,
         config.domains.global.url.isEmpty,
+        config.prevetDuration,
         config.svValidator,
         clock,
         domainTimeAutomationService.domainTimeSync,
