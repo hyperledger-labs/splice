@@ -4048,9 +4048,10 @@ jobs:
       - checkout_with_retry
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
-          cmd_name: Deploy serverless workglows
-          gce_authenticate: true
+          cmd_name: Deploy serverless workflows
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
           cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
             ./cluster/serverless/deploy.sh
 
   deploy_operator:

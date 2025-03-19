@@ -10,8 +10,11 @@ import functions_framework
 def main(request: flask.Request) -> flask.typing.ResponseReturnValue:
     if not request.args or "before" not in request.args:
         return "Query parameter 'before' is required", 400
+    if not "project" in request.args:
+        return "Query parameter 'project' is required", 400
     sql = googleapiclient.discovery.build("sqladmin", "v1beta4")
     before = request.args["before"]
+    project = request.args["project"]
     latest = None
     pageToken = None
     if "instance" in request.args:
@@ -20,11 +23,11 @@ def main(request: flask.Request) -> flask.typing.ResponseReturnValue:
     else:
         filter = f"type = ON_DEMAND"
     while True:
-        response = sql.backups().listBackups(parent = "projects/da-cn-ci-2", filter=filter, pageToken = pageToken).execute()
+        response = sql.backups().listBackups(parent = f"projects/{project}", filter=filter, pageToken = pageToken).execute()
         if not "backups" in response:
             return "No backups found", 404
         backups = response["backups"]
-        backupsBefore = [b for b in backups if b["backupInterval"]["endTime"] < before and b["state"] == "SUCCESSFUL" and b["instance"].startswith("sv-1-sequencer")]
+        backupsBefore = [b for b in backups if b["backupInterval"]["endTime"] < before and b["state"] == "SUCCESSFUL"]
         if len(backupsBefore) > 0:
             latestInBatch = max(backupsBefore, key = lambda b: b["backupInterval"]["endTime"])
             print(f'latestInBatch: {latestInBatch["backupInterval"]["endTime"]}')

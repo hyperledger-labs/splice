@@ -8,9 +8,10 @@ main:
         # TODO(#17852): for now, the instance ID is hardcoded to the participant from before the migration to ZRH
         - sourceInstance: sv-1-participant-0-pg-fc951b4
         - sourceProject: da-cn-mainnet
+        - sourceClusterLocation: europe-west4-a
         - bucketName: cn-mainnet-backups
         # TODO(#17852): for now, this is the pre-zrh migration cluster
-        - sourceCluster: cn-mainnet
+        - sourceCluster: main
         - beforeDate: ${args.beforeDate}
     - findBackupBeforeDate:
         call: http.get
@@ -19,6 +20,7 @@ main:
           query:
               before: ${beforeDate}
               instance: ${sourceInstance}
+              project: ${sourceProject}
           auth:
               type: OIDC
         result: sourceBackup
@@ -40,7 +42,7 @@ main:
     - assertExactlyFourBackups:
         switch:
           - condition: ${len(cloudSqlBackups.body) != 4}
-            raise: "There should be 4 backups, but found ${len(cloudSqlBackups.body)}"
+            raise: ${"There should be 4 backups, but found " + len(cloudSqlBackups.body)}
     - copyBackups:
         parallel:
           branches:
@@ -52,7 +54,7 @@ main:
                         cluster: ${sourceCluster}
                         clusterId: ${"cn-" + sourceCluster + "net"}
                         clusterProject: ${sourceProject}
-                        clusterLocation: ${location}
+                        clusterLocation: ${sourceClusterLocation}
                         namespace: sv-1
                         cnBackupRunId: ${cnBackupRunId}
                         bucketName: ${bucketName}
@@ -132,6 +134,7 @@ tryCopyCometBFTBackup:
         args:
           project: ${clusterProject}
           cluster_id: ${clusterId}
+          location: ${clusterLocation}
           path: '${"/apis/snapshot.storage.k8s.io/v1/namespaces/" + namespace + "/volumesnapshots/" + volumeSnapshot}'
           method: GET
         result: volumesnapshots
@@ -148,6 +151,7 @@ tryCopyCometBFTBackup:
         args:
           project: ${clusterProject}
           cluster_id: ${clusterId}
+          location: ${clusterLocation}
           path: '${"/api/v1/namespaces/" + namespace + "/secrets"}'
           method: POST
           body:
@@ -163,6 +167,7 @@ tryCopyCometBFTBackup:
         args:
             project: ${clusterProject}
             cluster_id: ${clusterId}
+            location: ${clusterLocation}
             path: '${"/api/v1/namespaces/" + namespace + "/persistentvolumeclaims"}'
             method: POST
             body:
@@ -287,6 +292,7 @@ cleanCometBFTBackup:
           args:
             project: ${clusterProject}
             cluster_id: ${clusterId}
+            location: ${clusterLocation}
             path: '${"/api/v1/namespaces/" + namespace + "/persistentvolumeclaims/" + pvcName}'
             method: DELETE
         except:
@@ -301,6 +307,7 @@ cleanCometBFTBackup:
           args:
             project: ${clusterProject}
             cluster_id: ${clusterId}
+            location: ${clusterLocation}
             path: '${"/api/v1/namespaces/" + namespace + "/secrets/" + gcpCredsSecretName}'
             method: DELETE
         except:
@@ -431,6 +438,8 @@ tryCopyCloudSqlBackup:
                                 - ${database.name}
                                 fileType: SQL
                                 offload: false  # offloaded exports cannot run in parallel, and do not make sense from the (not-in-use) restore instance
+                        connector_params:
+                          timeout: 36000 # 10 hours
     - cleanup:
         call: cleanCloudSqlBackup
         args:

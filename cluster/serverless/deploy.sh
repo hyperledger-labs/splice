@@ -8,25 +8,7 @@
 set -euo pipefail
 
 SERVICE_ACCOUNT="offline-backups@da-cn-shared.iam.gserviceaccount.com"
-
-# In this script we manage the permissions that the service account needs on the project where
-# the CloudSQL instance with the backups is located. The account also has permissions in da-cn-shared,
-# where it is installed and running, but those were added once manually since they are not
-# in the prod project.
-
-# Grant the SA permission to read from CloudSQL
-gcloud projects add-iam-policy-binding \
-  da-cn-mainnet \
-  --member "serviceAccount:$SERVICE_ACCOUNT" \
-  --role roles/cloudsql.viewer \
-  --condition=None
-
-# Grant the SA permission to deploy resources to clusters in the project
-gcloud projects add-iam-policy-binding \
-  da-cn-mainnet \
-  --member "serviceAccount:$SERVICE_ACCOUNT" \
-  --role roles/container.serviceAgent \
-  --condition=None
+PROJECT="da-cn-shared"
 
 gcloud beta run deploy \
   find-backup-before \
@@ -34,6 +16,7 @@ gcloud beta run deploy \
   --function main \
   --base-image python312 \
   --region us-central1 \
+  --project "$PROJECT" \
   --no-allow-unauthenticated
 
 gcloud beta run deploy \
@@ -42,14 +25,16 @@ gcloud beta run deploy \
   --function main \
   --base-image python312 \
   --region us-central1 \
+  --project "$PROJECT" \
   --no-allow-unauthenticated
 
 gcloud beta run deploy \
-  sa-backup-permissions \
-  --source "$REPO_ROOT/cluster/serverless/sa-backup-permissions" \
+  sa-bucket-permissions \
+  --source "$REPO_ROOT/cluster/serverless/sa-bucket-permissions" \
   --function main \
   --base-image python312 \
   --region us-central1 \
+  --project "$PROJECT" \
   --no-allow-unauthenticated \
   --max-instances 1 \
   --concurrency 1
@@ -58,5 +43,6 @@ gcloud beta run deploy \
 gcloud workflows deploy copy-cn-backup-to-bucket \
   --location=us-central1 \
   --source "$REPO_ROOT/cluster/serverless/workflows/copy-cn-backup-to-bucket.yaml" \
-  --project da-cn-shared \
-  --service-account "$SERVICE_ACCOUNT"
+  --project "$PROJECT" \
+  --service-account "$SERVICE_ACCOUNT" \
+  --call-log-level "log-all-calls"

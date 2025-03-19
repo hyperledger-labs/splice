@@ -38,11 +38,20 @@ def main(request: flask.Request) -> flask.typing.ResponseReturnValue:
     serviceAccount = request.args["serviceAccount"]
     storage = googleapiclient.discovery.build("storage", "v1")
     policy = storage.buckets().getIamPolicy(bucket=bucket).execute()
+    print(f"Policy before removing {serviceAccount}: {json.dumps(policy)}")
     if not "bindings" in policy:
       return "No bindings found", 404
     bindings = policy["bindings"]
-    bindings = [b for b in bindings if not f"serviceAccount:{serviceAccount}" in b["members"]]
-    storage.buckets().setIamPolicy(bucket=bucket, body={"bindings": bindings}).execute()
-    policy["bindings"] = bindings
-    print(f"Policy after removing: {json.dumps(policy)}")
+    newBindings = [b for b in bindings if not b["role"] == "roles/storage.objectAdmin"]
+    objectAdminMembers = [m for b in policy["bindings"] if b["role"] == "roles/storage.objectAdmin" for m in b["members"]]
+    print(f"Members of objectAdmin role: {objectAdminMembers}")
+    if not f"serviceAccount:{serviceAccount}" in objectAdminMembers:
+      return "Service account not found in objectAdmin role", 404
+    newObjectAdminMembers = [m for m in objectAdminMembers if not m == f"serviceAccount:{serviceAccount}"]
+    if len(newObjectAdminMembers) > 0:
+      newBindings.append({"role": "roles/storage.objectAdmin", "members": newObjectAdminMembers})
+    print(f"New members of objectAdmin role: {newObjectAdminMembers}")
+    storage.buckets().setIamPolicy(bucket=bucket, body={"bindings": newBindings}).execute()
+    policy["bindings"] = newBindings
+    print(f"Full policy after removing {serviceAccount}: {json.dumps(policy)}")
   return "done"
