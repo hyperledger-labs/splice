@@ -47,6 +47,7 @@ file_handler.setFormatter(
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
+
 def _default_logger(name, loglevel):
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
@@ -76,6 +77,7 @@ class CSVReport:
             "record_time",
             "provider",
             "sender",
+            "receiver",
             "input_reward_cc_total",
             "input_amulet_cc_total",
             "holding_fees_total",
@@ -2884,7 +2886,7 @@ class State:
 
         self._report_line(
             transaction,
-            "TXBW",
+            "TXPA",
             {
                 "update_id": transaction.update_id,
                 "record_time": transaction.record_time,
