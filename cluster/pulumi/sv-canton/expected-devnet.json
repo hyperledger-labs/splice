@@ -821,11 +821,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -933,11 +933,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": false
+              "value": true
             }
           ],
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -1105,7 +1105,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -1199,7 +1199,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -1465,7 +1465,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -1610,7 +1610,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -1945,11 +1945,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -2066,11 +2066,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": false
+              "value": true
             }
           ],
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -2247,7 +2247,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -2341,7 +2341,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -2607,7 +2607,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -2752,7 +2752,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -3087,11 +3087,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -3208,11 +3208,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": false
+              "value": true
             }
           ],
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -3389,7 +3389,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -3483,7 +3483,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -3749,7 +3749,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -3894,7 +3894,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -4229,11 +4229,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -4350,11 +4350,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": false
+              "value": true
             }
           ],
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -4531,7 +4531,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -4625,7 +4625,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -4891,7 +4891,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -5036,7 +5036,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -5521,11 +5521,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -5627,11 +5627,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": false
+              "value": true
             }
           ],
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -5793,7 +5793,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -5887,7 +5887,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -6153,7 +6153,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -6298,7 +6298,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
