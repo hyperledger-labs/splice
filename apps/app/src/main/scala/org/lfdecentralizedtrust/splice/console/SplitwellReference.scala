@@ -156,7 +156,8 @@ final class SplitwellAppClientReference(
       case ContractWithState(contract, ContractState.Assigned(domain)) =>
         val group = contract.payload
         Option.when(
-          group.owner == groupKey.owner.toProtoPrimitive && group.id.unpack == groupKey.id
+          group.owner == groupKey.owner.toProtoPrimitive
+            && group.id.unpack == groupKey.id
         )((domain, contract.contractId))
       case _ => None
     })
