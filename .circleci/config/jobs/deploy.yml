@@ -379,7 +379,7 @@ jobs:
 
               if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                 # silence specific alerts that may fire due to SV downtime
-                cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                cncluster silence_grafana_alerts "20 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
               fi
 
               cncluster partial_upgrade $(get-snapshot-version) "$images"

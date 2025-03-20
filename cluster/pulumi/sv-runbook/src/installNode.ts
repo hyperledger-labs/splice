@@ -16,7 +16,7 @@ import {
   isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
-  REPO_ROOT,
+  SPLICE_ROOT,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   svKeySecret,
@@ -232,7 +232,7 @@ async function installSvAndValidator(
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 
   const valuesFromYamlFile = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
     {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       YOUR_SV_NAME: onboardingName,
@@ -334,7 +334,7 @@ async function installSvAndValidator(
   );
 
   const defaultScanValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`,
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`,
     {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
@@ -368,7 +368,7 @@ async function installSvAndValidator(
   );
 
   const validatorValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
+    ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
@@ -376,7 +376,7 @@ async function installSvAndValidator(
       YOUR_CONTACT_POINT: daContactPoint,
     }),
     ...loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_HOSTNAME: CLUSTER_HOSTNAME,
         MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),

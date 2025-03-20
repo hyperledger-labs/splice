@@ -430,15 +430,15 @@ All other clusters are set up to use the **Release** artifacts by default, `SPLI
 .. todo:: Cleanup tech debt of confusing public, private and release repositories and registries.
 
 ### Deploy a local build to a cluster
-1. Start from a clean slate: `make -C $REPO_ROOT clean`
-1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
+1. Start from a clean slate: `make -C $SPLICE_ROOT clean`
+1. Ensure docker images are built and pushed to the Docker repository: `make -C $SPLICE_ROOT docker-push -j`
    - Note that this step internally calls `sbt bundle` to build the most recent version of our apps.
      later steps don't call `sbt bundle` automatically, as it takes too long.
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes to the Development Artifactory Docker Registry.
    - If this fails, you may need to run `echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin` to login to the Artifactory docker registry for development.
 1. If you plan on using manual `pulumi` commands for deployment (i.e., calling `cncluster pulumi ...` instead of `cncluster apply`),
-   ensure that pulumi is set up: `make -C $REPO_ROOT cluster/build -j`
+   ensure that pulumi is set up: `make -C $SPLICE_ROOT cluster/build -j`
    - This step is handled automatically by `cncluster apply`. This uses locally built helm charts by default.
 1. Start with a working cluster and change to its deployment directory.
    - You need be authorized to the GCP project for the environment to be loaded successfully after `direnv allow .`.
@@ -1305,7 +1305,7 @@ Alternatively, you can also modify an installed chart, e.g. to change the values
 1. Run `helm list -A` to see a list of all deployed Helm chart in all namespaces, and find the one of interest
 1. Run `helm get values -n <namespace> <name> > vals.yaml` to get the values with which the chart is currently installed
 1. Edit `vals.yaml`: delete the first line ("USER-SUPPLIED VALUES:"), and modify whatever values you wish to change
-1. Run `helm upgrade -n <namespace> <name> $REPO_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml`
+1. Run `helm upgrade -n <namespace> <name> $SPLICE_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml`
 
 ### Manual Cleanup for an Interrupted Deployment
 
@@ -1633,10 +1633,7 @@ However, the following steps don't require an action from us:
 1. **Post-migration:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that makes the following changes:
    * in `config.yaml` remove `synchronizerMigration.active.migratingFrom`
    * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_COMETBFT_STATE_SYNC` to "false".
-   * [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
-     so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
-     is set to reflect the expected migration ID after completing the migration.
-   * Check that the patches worked by triggering the jobs manually once.
+   * Check that the triggers work by triggering the jobs manually once.
 1. Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
@@ -2419,9 +2416,9 @@ Instructions:
         - Do not use this for release line branches, those are published from CI
     - Build and publish docker images
         - This step must be run after changing CHART_VERSION
-        - Run `make -C $REPO_ROOT clean`
-        - Run `make -C $REPO_ROOT build`
-        - Run `make -C $REPO_ROOT docker-push -j`
+        - Run `make -C $SPLICE_ROOT clean`
+        - Run `make -C $SPLICE_ROOT build`
+        - Run `make -C $SPLICE_ROOT docker-push -j`
 - Upgrade nodes as required
     - Run `cncluster apply_sv`
     - Run `SPLICE_MIGRATION_ID=1 SPLICE_SV=? cncluster pulumi sv-canton up` for every deployed SV, using values `sv-1, sv-2, ...` for `?`.

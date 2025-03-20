@@ -70,7 +70,7 @@ for IMAGE_NAME in $IMAGES; do
   for i in {1..10}; do
     # Artifactory has unknown/unknown attestation manifests, which show up as unknown/unknown os/architecture manifests. There is nothing inherently wrong with this.
     # skopeo on nix does not bundle the policy.json file, so we need to provide it.
-    if skopeo copy --policy "${REPO_ROOT}"/build-tools/skopeo_policy.json --all docker://"$SOURCE_IMAGE" docker://"$TARGET_IMAGE"; then
+    if skopeo copy --policy "${SPLICE_ROOT}"/build-tools/skopeo_policy.json --all docker://"$SOURCE_IMAGE" docker://"$TARGET_IMAGE"; then
       echo "Successfully copied $SOURCE_IMAGE to $TARGET_IMAGE"
       break
     else

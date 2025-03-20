@@ -2,12 +2,12 @@ import * as k8s from '@pulumi/kubernetes';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Input } from '@pulumi/pulumi';
-import { REPO_ROOT } from 'splice-pulumi-common';
+import { SPLICE_ROOT } from 'splice-pulumi-common';
 
 export function createGrafanaDashboards(namespace: Input<string>): void {
   createdNestedConfigMapForFolder(
     namespace,
-    `${REPO_ROOT}/cluster/pulumi/infra/grafana-dashboards/`
+    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-dashboards/`
   );
 }
 

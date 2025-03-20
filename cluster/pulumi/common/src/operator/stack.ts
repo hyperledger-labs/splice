@@ -81,7 +81,7 @@ export function createStackCR(
           backend: config.requireEnv('PULUMI_BACKEND_URL'),
           envRefs: {
             ...envRefs,
-            REPO_ROOT: {
+            SPLICE_ROOT: {
               type: 'Literal',
               literal: {
                 value: `/tmp/pulumi-working/operator/${name}/workspace`,

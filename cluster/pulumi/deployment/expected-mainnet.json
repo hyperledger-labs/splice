@@ -76,18 +76,18 @@
             },
             "type": "Literal"
           },
-          "REPO_ROOT": {
-            "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace"
-            },
-            "type": "Literal"
-          },
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
               "name": "deployment-env"
             },
             "type": "Secret"
+          },
+          "SPLICE_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/canton-network/workspace"
+            },
+            "type": "Literal"
           }
         },
         "fluxSource": {
@@ -222,18 +222,18 @@
             },
             "type": "Literal"
           },
-          "REPO_ROOT": {
-            "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace"
-            },
-            "type": "Literal"
-          },
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
               "name": "deployment-env"
             },
             "type": "Secret"
+          },
+          "SPLICE_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/infra/workspace"
+            },
+            "type": "Literal"
           }
         },
         "fluxSource": {
@@ -398,12 +398,6 @@
             },
             "type": "Literal"
           },
-          "REPO_ROOT": {
-            "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace"
-            },
-            "type": "Literal"
-          },
           "SLACK_ACCESS_TOKEN": {
             "secret": {
               "key": "SLACK_ACCESS_TOKEN",
@@ -414,6 +408,12 @@
           "SPLICE_MIGRATION_ID": {
             "literal": {
               "value": "2"
+            },
+            "type": "Literal"
+          },
+          "SPLICE_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace"
             },
             "type": "Literal"
           },

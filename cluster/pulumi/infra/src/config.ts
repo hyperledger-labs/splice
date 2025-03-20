@@ -7,7 +7,7 @@ import {
   isDevNet,
   isMainNet,
   loadJsonFromFile,
-  REPO_ROOT,
+  SPLICE_ROOT,
 } from 'splice-pulumi-common';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
@@ -79,7 +79,7 @@ export function loadIPRanges(): string[] {
       )
     : [];
   const internalIPRangesJson = loadJsonFromFile(
-    REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
+    SPLICE_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
   );
 
   const extraWhitelistedIps =

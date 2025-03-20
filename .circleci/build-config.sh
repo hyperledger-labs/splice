@@ -14,10 +14,10 @@ source "${TOOLS_LIB}/libcli.source"
 
 # get the full path to the directory
 if [ -n "${check-}" ] ; then
-    OUTPUT_CONF="${REPO_ROOT}/.circleci/config-check-output.yml"
+    OUTPUT_CONF="${SPLICE_ROOT}/.circleci/config-check-output.yml"
     _info "Checking Configuration"
 else
-    OUTPUT_CONF="${REPO_ROOT}/.circleci/config.yml"
+    OUTPUT_CONF="${SPLICE_ROOT}/.circleci/config.yml"
     _info "Building Configuration"
 fi
 
@@ -28,30 +28,30 @@ fi
     echo '# relevant fragment in the .circleci/config directory. and'
     echo '# Run .circleci/build-config.sh to update this file.'
     echo '#'
-    cat "${REPO_ROOT}/.circleci/config/prelude.yml"
+    cat "${SPLICE_ROOT}/.circleci/config/prelude.yml"
     echo
     echo "commands:"
     # sed 1d for all the files in the jobs directory
-    for file in "${REPO_ROOT}"/.circleci/config/commands/*.yml; do
+    for file in "${SPLICE_ROOT}"/.circleci/config/commands/*.yml; do
         sed '1d' "${file}"
         echo
     done
     echo "jobs:"
     # sed 1d for all the files in the jobs directory
-    for file in "${REPO_ROOT}"/.circleci/config/jobs/*.yml; do
+    for file in "${SPLICE_ROOT}"/.circleci/config/jobs/*.yml; do
         sed '1d' "${file}"
         echo
     done
     echo "workflows:"
     echo "  version: 2"
-    for file in "${REPO_ROOT}"/.circleci/config/workflows/*.yml; do
+    for file in "${SPLICE_ROOT}"/.circleci/config/workflows/*.yml; do
         sed '1d' "${file}"
         echo
     done
 } > "${OUTPUT_CONF}"
 
 if [ -n "${check-}" ] ; then
-    if ! diff -u "${REPO_ROOT}/.circleci/config-check-output.yml" "${REPO_ROOT}/.circleci/config.yml"; then
+    if ! diff -u "${SPLICE_ROOT}/.circleci/config-check-output.yml" "${SPLICE_ROOT}/.circleci/config.yml"; then
         _error "Config files do not match, please rerun .circleci/build-config.sh, recommit, and try again."
     fi
 

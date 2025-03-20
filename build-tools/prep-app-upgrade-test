@@ -11,7 +11,7 @@ find . -name "*.dar" -not -path "*/test/resources/daml/*" -not -path "*-current.
 
 base_version=$(cat LATEST_RELEASE)
 
-ALL_BUNDLES_DIR="${REPO_ROOT}/apps/app/src/test/resources/bundles"
+ALL_BUNDLES_DIR="${SPLICE_ROOT}/apps/app/src/test/resources/bundles"
 mkdir -p "${ALL_BUNDLES_DIR}"
 tarball="${base_version}_splice-node.tar.gz"
 releases="https://github.com/digital-asset/decentralized-canton-sync/releases"

@@ -8,7 +8,7 @@ set -euo pipefail
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
 # shellcheck disable=SC1091
-source "${REPO_ROOT}/cluster/scripts/utils.source"
+source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 
 function component_to_deployments() {
   local -r component=$1

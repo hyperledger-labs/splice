@@ -7,7 +7,7 @@ dir := $(call current_dir)
 $(dir)/build: $(dir)/.build
 
 $(dir)/.build: $(dir)/package.json
-	cd $(@D) && ${REPO_ROOT}/build-tools/npm-install.sh
+	cd $(@D) && ${SPLICE_ROOT}/build-tools/npm-install.sh
 	touch $@
 
 .PHONY: $(dir)/clean

@@ -198,6 +198,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
+              "1",
               "0"
             ]
           }
@@ -344,7 +345,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 1
+          "domains": 2
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
@@ -400,14 +401,14 @@
           "enable": true
         },
         "migration": {
-          "id": "0"
+          "id": "1"
         },
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "sequencerAddress": "global-domain-0-sequencer",
+        "sequencerAddress": "global-domain-1-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -726,16 +727,16 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "enableBftSequencer": false,
-          "mediatorAddress": "global-domain-0-mediator",
-          "sequencerAddress": "global-domain-0-sequencer",
+          "mediatorAddress": "global-domain-1-mediator",
+          "sequencerAddress": "global-domain-1-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerBftPublicUrlSuffix": "sv.dev.global.canton.network.digitalasset.com",
           "sequencerPruningConfig": {
@@ -743,7 +744,7 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-1.sv.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -762,11 +763,11 @@
           "enable": true
         },
         "migration": {
-          "id": "0"
+          "id": "1"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
@@ -918,7 +919,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -926,10 +927,10 @@
           "enable": true
         },
         "migration": {
-          "id": "0"
+          "id": "1"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
@@ -966,7 +967,8 @@
           "google-oauth2|100515055195029920502",
           "google-oauth2|106265882859845879513",
           "google-oauth2|110432686293453333498",
-          "google-oauth2|100985872861279769661"
+          "google-oauth2|100985872861279769661",
+          "google-oauth2|101034414073429253538"
         ]
       },
       "version": "0.3.16"
