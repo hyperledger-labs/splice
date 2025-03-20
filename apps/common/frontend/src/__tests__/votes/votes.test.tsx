@@ -45,7 +45,9 @@ const provider: VotesHooks = {
   useListDsoRulesVoteRequests(): UseQueryResult<Contract<VoteRequest>[]> {
     return useQuery({
       queryKey: ['useListDsoRulesVoteRequests', constants.votedRequest, constants.unvotedRequest],
-      queryFn: async () => [constants.votedRequest, constants.unvotedRequest],
+      queryFn: async () => {
+        return [constants.votedRequest, constants.unvotedRequest];
+      },
     });
   },
   useListVoteRequestResult(

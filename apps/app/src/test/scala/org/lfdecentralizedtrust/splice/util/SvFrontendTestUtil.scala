@@ -42,17 +42,21 @@ trait SvFrontendTestUtil extends TestCommon {
     }
   }
 
-  def clickVoteRequestSubmitButtonOnceEnabled()(implicit webDriver: WebDriverType) = {
+  def clickVoteRequestSubmitButtonOnceEnabled(
+      enabled: Boolean = true
+  )(implicit webDriver: WebDriverType) = {
     clue("wait for the submit button to become clickable") {
       eventually(5.seconds)(
-        find(id("create-voterequest-submit-button")).value.isEnabled shouldBe true
+        find(id("create-voterequest-submit-button")).value.isEnabled shouldBe enabled
       )
     }
-    clue("click the submit button") {
-      click on "create-voterequest-submit-button"
-    }
-    clue("click accept on the confirmation dialog") {
-      click on "vote-confirmation-dialog-accept-button"
+    if (enabled) {
+      clue("click the submit button") {
+        click on "create-voterequest-submit-button"
+      }
+      clue("click accept on the confirmation dialog") {
+        click on "vote-confirmation-dialog-accept-button"
+      }
     }
   }
 }

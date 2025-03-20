@@ -4,7 +4,8 @@ import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder'
 import { useMutation } from '@tanstack/react-query';
 import {
   ActionView,
-  ConfirmationDialog,
+  Alerting,
+  AlertState,
   DateWithDurationDisplay,
   DisableConditionally,
   SvClientProvider,
@@ -35,14 +36,15 @@ import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useDsoInfos } from '../../contexts/SvContext';
-import { useListDsoRulesVoteRequests } from '../../hooks/useListVoteRequests';
+import { useListDsoRulesVoteRequests } from '../../hooks';
 import { useSvConfig } from '../../utils';
-import { Alerting, AlertState } from '../../utils/Alerting';
+import { hasConflictingFields } from '../../utils/configDiffs';
 import {
   isExpirationBeforeEffectiveDate,
   isScheduleDateTimeValid,
   VoteRequestValidity,
 } from '../../utils/validations';
+import { ConfirmationDialogWithRequestConflictsCheck } from '../ConfirmationDialogWithRequestConflictsCheck';
 import SvListVoteRequests from './SvListVoteRequests';
 import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
@@ -84,7 +86,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
   const [alertMessage, setAlertMessage] = useState<AlertState>({});
 
   const dsoInfosQuery = useDsoInfos();
-  const listVoteRequestsQuery = useListDsoRulesVoteRequests();
+  const voteRequestQuery = useListDsoRulesVoteRequests();
 
   const expirationFromVoteRequestTimeout = dayjs().add(
     Math.floor(
@@ -95,7 +97,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
 
   useEffect(() => {
     setExpiration(expirationFromVoteRequestTimeout);
-    setEffectivity(expirationFromVoteRequestTimeout.add(2, 'day'));
+    setEffectivity(expirationFromVoteRequestTimeout.add(1, 'day'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dsoInfosQuery.isInitialLoading]);
 
@@ -209,7 +211,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
     }
 
     const scheduleValidity: VoteRequestValidity = isScheduleDateTimeValid(
-      listVoteRequestsQuery.data!,
+      voteRequestQuery.data!,
       effectiveDate
     );
     if (!scheduleValidity.isValid) {
@@ -277,6 +279,36 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
     createVoteRequestMutation.mutate();
     setConfirmDialogOpen(false);
   };
+
+  const conflicts = hasConflictingFields(action, voteRequestQuery.data);
+  // @ts-ignore
+  const conditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
+    { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
+    {
+      disabled: !action || actionFromFormIsError(action),
+      reason: !action
+        ? 'No action'
+        : `Action is not valid: ${
+            actionFromFormIsError(action) && JSON.stringify(action.formError)
+          }`,
+    },
+    { disabled: summary === '', reason: 'No summary', severity: 'warning' },
+  ].concat(
+    supportsVoteEffectivityAndSetConfig
+      ? [
+          {
+            disabled: isEffective && expiration.isAfter(effectivity),
+            reason: 'Expiration must be set before effectivity.',
+            severity: 'warning',
+          },
+          {
+            disabled: conflicts.hasConflict,
+            reason: `A Vote Request aiming to change similar fields already exists. You are therefore not allowed to modify the fields: ${conflicts.intersection}`,
+            severity: 'warning',
+          },
+        ]
+      : []
+  );
 
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
@@ -415,7 +447,12 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           {actionName === 'SRARC_RevokeFeaturedAppRight' && (
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
-          {actionName === 'SRARC_SetConfig' && <SetDsoRulesConfig chooseAction={chooseAction} />}
+          {actionName === 'SRARC_SetConfig' && (
+            <SetDsoRulesConfig
+              supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
+              chooseAction={chooseAction}
+            />
+          )}
           {actionName === 'CRARC_SetConfig' && <SetAmuletRulesConfig chooseAction={chooseAction} />}
           {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
             <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
@@ -437,6 +474,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
             <TextField
               error={!summary}
               id="create-reason-summary"
+              inputProps={{ 'data-testid': 'create-reason-summary' }}
               rows={2}
               multiline
               onChange={e => setSummary(e.target.value)}
@@ -478,27 +516,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           <Alerting alertState={alertMessage} />
 
           <Stack direction="column" mb={4} spacing={1}>
-            <DisableConditionally
-              conditions={[
-                { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
-                {
-                  disabled: !action || actionFromFormIsError(action),
-                  reason: !action
-                    ? 'No action'
-                    : `Action is not valid: ${
-                        actionFromFormIsError(action) && JSON.stringify(action.formError)
-                      }`,
-                },
-                { disabled: summary === '', reason: 'No summary' },
-                {
-                  disabled:
-                    supportsVoteEffectivityAndSetConfig &&
-                    isEffective &&
-                    expiration.isAfter(effectivity),
-                  reason: 'Expiration must be set before effectivity.',
-                },
-              ]}
-            >
+            <DisableConditionally conditions={conditions}>
               <Button
                 id="create-voterequest-submit-button"
                 fullWidth
@@ -514,12 +532,16 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           </Stack>
         </CardContent>
       </Card>
-      <ConfirmationDialog
+      <ConfirmationDialogWithRequestConflictsCheck
         showDialog={confirmDialogOpen}
         onAccept={handleConfirmationAccept}
         onClose={() => setConfirmDialogOpen(false)}
         title="Confirm Your Vote Request"
         attributePrefix="vote"
+        action={
+          supportsVoteEffectivityAndSetConfig ? (action as ActionRequiringConfirmation) : undefined
+        }
+        voteRequestQuery={supportsVoteEffectivityAndSetConfig ? voteRequestQuery : undefined}
       >
         <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
         <br />
@@ -530,7 +552,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           <li>You may only edit your vote after creation.</li>
           <li>The vote request will expire in {expirationInDays} days.</li>
         </ul>
-      </ConfirmationDialog>
+      </ConfirmationDialogWithRequestConflictsCheck>
     </Stack>
   );
 };

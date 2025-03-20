@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
 
+import { AlertColor, Stack } from '@mui/material';
 import Tooltip from '@mui/material/Tooltip';
 
+import { Alerting } from './Alerting';
+
 type DisableConditionallyProps = {
-  conditions: { disabled: boolean; reason: string }[];
+  conditions: { disabled: boolean; reason: string; severity?: AlertColor }[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   children: React.ReactElement<{ disabled: boolean }, any>;
 };
@@ -40,10 +43,15 @@ const DisableConditionally: React.FC<DisableConditionallyProps> = props => {
     }
     const disabledChild = React.cloneElement(props.children, { disabled: true });
     return (
-      <Tooltip describeChild title={condition.reason}>
-        {/*Span is needed to make the tooltip work with disabled elements, see https://mui.com/material-ui/react-tooltip/#disabled-elements*/}
-        <span>{disabledChild}</span>
-      </Tooltip>
+      <Stack>
+        {condition.severity && (
+          <Alerting alertState={{ severity: condition.severity, message: condition.reason }} />
+        )}
+        <Tooltip describeChild title={condition.reason}>
+          {/*Span is needed to make the tooltip work with disabled elements, see https://mui.com/material-ui/react-tooltip/#disabled-elements*/}
+          <span>{disabledChild}</span>
+        </Tooltip>
+      </Stack>
     );
   } else {
     return props.children;

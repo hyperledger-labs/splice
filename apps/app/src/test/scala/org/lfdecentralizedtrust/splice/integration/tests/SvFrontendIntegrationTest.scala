@@ -784,7 +784,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("Another vote request for a schedule adjustment")
                 }
               },
@@ -826,7 +826,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("The expiration date must be before the effective date")
                 }
               },
@@ -922,7 +922,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("Another vote request for a schedule adjustment")
                 }
               },
@@ -1014,7 +1014,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("Another vote request for a schedule adjustment")
                 }
               },

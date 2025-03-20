@@ -66,14 +66,14 @@ describe('SV can see AmuletRules config diffs', () => {
     expect(await screen.findByText('Config diffs')).toBeDefined();
 
     // current comparison
-    checkNumberNumberOfDiffs(1);
+    checkNumberNumberOfDiffs(2);
   });
 
   test('in the action needed section.', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Action Needed', deprecatedAction, user);
+    await goToGovernanceTabAndClickOnAction('Action Needed', deprecatedAction, user, 1);
 
     const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '222.2');
     await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
@@ -138,7 +138,7 @@ describe('SV can see DsoRules config diffs', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Action Needed', action, user, 1);
+    await goToGovernanceTabAndClickOnAction('Action Needed', action, user, 2);
     const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1600', '2100');
     await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
 

@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as fs from 'node:fs';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
@@ -8,6 +9,14 @@ import { test, expect, describe } from 'vitest';
 import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId } from './mocks/constants';
+
+function setEmptyVoteRequestsFlag(enable: boolean) {
+  if (enable) {
+    fs.writeFileSync('TMP_EMPTY_REQUESTS', 'This is a test file.');
+  } else {
+    fs.unlinkSync('TMP_EMPTY_REQUESTS');
+  }
+}
 
 const AppWithConfig = () => {
   return (
@@ -96,6 +105,121 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
     expect(await screen.findByDisplayValue('10')).toBeDefined();
   });
+
+  test(
+    'displays a warning when an SV tries to modify a DsoRules field already changed by another request',
+    async () => {
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      const dropdown = screen.getByTestId('display-actions');
+      expect(dropdown).toBeDefined();
+      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+
+      const input = screen.getByTestId(
+        'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
+      );
+      await user.clear(input);
+      await user.type(input, '481516');
+      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+
+      const input2 = screen.getByTestId('create-reason-summary');
+      await user.type(input2, 'summaryABC');
+      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      const warning = screen.getByTestId('voterequest-creation-alert');
+      expect(warning).toBeDefined();
+      expect(warning.textContent).toContain(
+        'A Vote Request aiming to change similar fields already exists. ' +
+          'You are therefore not allowed to modify the fields: decentralizedSynchronizer.synchronizers.acsCommitmentReconciliationInterval'
+      );
+
+      const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+      expect(button.getAttribute('disabled')).toBeDefined();
+    },
+    { timeout: 10000 }
+  );
+
+  test(
+    'displays a warning when an SV tries to modify an AmuletRules field already changed by another request',
+    async () => {
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      const dropdown = screen.getByTestId('display-actions');
+      expect(dropdown).toBeDefined();
+      fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
+
+      const input = screen.getByTestId('transferConfig.createFee.fee-value');
+      await user.clear(input);
+      await user.type(input, '481516');
+      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+
+      const input2 = screen.getByTestId('create-reason-summary');
+      await user.type(input2, 'summaryABC');
+      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      const warning = screen.getByTestId('voterequest-creation-alert');
+      expect(warning).toBeDefined();
+      expect(warning.textContent).toContain(
+        'A Vote Request aiming to change similar fields already exists. ' +
+          'You are therefore not allowed to modify the fields: transferConfig.createFee.fee'
+      );
+
+      const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+      expect(button.getAttribute('disabled')).toBeDefined();
+    },
+    { timeout: 10000 }
+  );
+
+  test(
+    'disables the Proceed button in the confirmation dialog if a conflict arises after request creation',
+    async () => {
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      setEmptyVoteRequestsFlag(true);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      const dropdown = screen.getByTestId('display-actions');
+      expect(dropdown).toBeDefined();
+      fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
+
+      const input = screen.getByTestId('transferConfig.createFee.fee-value');
+      await user.clear(input);
+      await user.type(input, '481516');
+      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+
+      const input2 = screen.getByTestId('create-reason-summary');
+      await user.type(input2, 'summaryABC');
+      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      expect(await screen.findByText('Send Request to Super Validators')).toBeDefined();
+      await user.click(screen.getByText('Send Request to Super Validators'));
+      setEmptyVoteRequestsFlag(false);
+
+      const button = screen.getByRole('button', { name: 'Proceed' });
+      expect(button.getAttribute('disabled')).toBeDefined();
+    },
+    { timeout: 10000 }
+  );
 });
 
 describe('An AddFutureAmuletConfigSchedule request', () => {

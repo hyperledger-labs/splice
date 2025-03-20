@@ -462,8 +462,10 @@ const AddFutureConfigValueTable: React.FC<{
             title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
-                newConfig={amuletRulesAction.value.newScheduleItem._2}
-                actualConfig={amuletConfigToCompareWith[1]}
+                changes={{
+                  newConfig: amuletRulesAction.value.newScheduleItem._2,
+                  actualConfig: amuletConfigToCompareWith[1],
+                }}
               />
             ),
           },
@@ -472,8 +474,10 @@ const AddFutureConfigValueTable: React.FC<{
           title: <DateWithDurationDisplay datetime={vr[0]} />,
           content: (
             <PrettyJsonDiff
-              newConfig={amuletRulesAction.value.newScheduleItem._2}
-              actualConfig={vr[1]}
+              changes={{
+                newConfig: amuletRulesAction.value.newScheduleItem._2,
+                actualConfig: vr[1],
+              }}
             />
           ),
         })),
@@ -524,8 +528,10 @@ const RemoveFutureConfigValueTable: React.FC<{
         ),
         ScheduleItem: (
           <PrettyJsonDiff
-            newConfig={amuletConfigToCompareWith[1]}
-            actualConfig={amuletConfigToCompareWith[1]}
+            changes={{
+              newConfig: amuletConfigToCompareWith[1],
+              actualConfig: amuletConfigToCompareWith[1],
+            }}
           />
         ),
       }}
@@ -599,8 +605,10 @@ const UpdateFutureConfigValueTable: React.FC<{
             title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
-                newConfig={amuletRulesAction.value.scheduleItem._2}
-                actualConfig={amuletConfigToCompareWith[1]}
+                changes={{
+                  newConfig: amuletRulesAction.value.scheduleItem._2,
+                  actualConfig: amuletConfigToCompareWith[1],
+                }}
               />
             ),
           },
@@ -609,8 +617,10 @@ const UpdateFutureConfigValueTable: React.FC<{
           title: <DateWithDurationDisplay datetime={vr[0]} />,
           content: (
             <PrettyJsonDiff
-              newConfig={amuletRulesAction.value.scheduleItem._2}
-              actualConfig={vr[1]}
+              changes={{
+                newConfig: amuletRulesAction.value.scheduleItem._2,
+                actualConfig: vr[1],
+              }}
             />
           ),
         })),
@@ -697,20 +707,27 @@ const SetAmuletConfigValueTable: React.FC<{
             title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
-                newConfig={amuletAction.value.newConfig}
-                baseConfig={amuletAction.value.baseConfig}
-                actualConfig={
-                  AmuletConfig(USD).encode(
+                changes={{
+                  newConfig: amuletAction.value.newConfig,
+                  baseConfig: amuletAction.value.baseConfig,
+                  actualConfig: AmuletConfig(USD).encode(
                     dsoInfosQuery.data.amuletRules.payload.configSchedule.initialValue
-                  ) as AmuletConfig<USD>
-                }
+                  ) as AmuletConfig<USD>,
+                }}
               />
             ),
           },
         ],
         foldedAccordions: inflightVoteRequests.map(vr => ({
           title: <DateWithDurationDisplay datetime={vr[0]} />,
-          content: <PrettyJsonDiff newConfig={amuletAction.value.newConfig} actualConfig={vr[1]} />,
+          content: (
+            <PrettyJsonDiff
+              changes={{
+                newConfig: amuletAction.value.newConfig,
+                actualConfig: vr[1],
+              }}
+            />
+          ),
         })),
       }}
     />
@@ -792,20 +809,27 @@ const SetDsoConfigValueTable: React.FC<{
             title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
-                newConfig={dsoAction.value.newConfig}
-                baseConfig={dsoConfigToCompareWith[1]}
-                actualConfig={
-                  DsoRulesConfig.encode(
+                changes={{
+                  newConfig: dsoAction.value.newConfig,
+                  baseConfig: dsoConfigToCompareWith[1],
+                  actualConfig: DsoRulesConfig.encode(
                     dsoInfosQuery.data.dsoRules.payload.config
-                  ) as DsoRulesConfig
-                }
+                  ) as DsoRulesConfig,
+                }}
               />
             ),
           },
         ],
         foldedAccordions: inflightVoteRequests.map(vr => ({
           title: <DateWithDurationDisplay datetime={vr[0]} />,
-          content: <PrettyJsonDiff newConfig={dsoAction.value.newConfig} actualConfig={vr[1]} />,
+          content: (
+            <PrettyJsonDiff
+              changes={{
+                newConfig: dsoAction.value.newConfig,
+                actualConfig: vr[1],
+              }}
+            />
+          ),
         })),
       }}
     />

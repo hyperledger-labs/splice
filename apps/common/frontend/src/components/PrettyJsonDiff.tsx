@@ -178,9 +178,17 @@ const JsonDiffStyles = () => (
 );
 
 interface PrettyJsonDiffProps {
-  newConfig: DsoRulesConfig | AmuletConfig<USD>;
-  actualConfig: DsoRulesConfig | AmuletConfig<USD>;
-  baseConfig?: DsoRulesConfig | AmuletConfig<USD>;
+  changes:
+    | {
+        newConfig: DsoRulesConfig;
+        actualConfig: DsoRulesConfig;
+        baseConfig?: DsoRulesConfig;
+      }
+    | {
+        newConfig: AmuletConfig<USD>;
+        actualConfig: AmuletConfig<USD>;
+        baseConfig?: AmuletConfig<USD>;
+      };
 }
 
 /**
@@ -195,9 +203,7 @@ interface PrettyJsonDiffProps {
  * @constructor
  */
 export const PrettyJsonDiff: React.FC<PrettyJsonDiffProps> = ({
-  newConfig,
-  baseConfig,
-  actualConfig,
+  changes: { newConfig, baseConfig, actualConfig },
 }) => {
   // baseConfig ensures a fixed delta independent of actualConfig
   const baseForDiff = baseConfig || actualConfig;
@@ -230,3 +236,11 @@ export const PrettyJsonDiff: React.FC<PrettyJsonDiffProps> = ({
     </>
   );
 };
+
+export function computeDiff(
+  changes:
+    | { new: DsoRulesConfig; base: DsoRulesConfig }
+    | { new: AmuletConfig<USD>; base: AmuletConfig<USD> }
+): jsondiffpatch.Delta {
+  return jsondiffpatchInstance.diff(changes.new, changes.base);
+}

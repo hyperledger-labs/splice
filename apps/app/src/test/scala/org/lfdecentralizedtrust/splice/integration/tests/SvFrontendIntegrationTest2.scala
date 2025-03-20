@@ -360,6 +360,7 @@ class SvFrontendIntegrationTest2
             "sv1 can see the create vote request button",
             _ => {
               find(id("create-voterequest-submit-button")) should not be empty
+              find(id("display-actions")) should not be empty
             },
           )
 
@@ -624,6 +625,7 @@ class SvFrontendIntegrationTest2
             "sv1 can see the create vote request button",
             _ => {
               find(id("create-voterequest-submit-button")) should not be empty
+              find(id("display-actions")) should not be empty
             },
           )
 
@@ -727,13 +729,16 @@ class SvFrontendIntegrationTest2
         withFrontEnd("sv1") { implicit webDriver =>
           // If we try to create two vote requests for identical configs,
           // the second request will be rejected with "This vote request has already been created."
-          def submitSetConfigRequest(
-              requestNewNumUnclaimedRewardsThreshold: String,
+          def submitSetDsoConfigRequest(
+              numUnclaimedRewardsThreshold: String,
+              numMemberTrafficContractsThreshold: String = "",
               expiresSoon: Boolean,
+              enabled: Boolean = true,
           ) = {
             // The `eventually` guards against `StaleElementReferenceException`s
             // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
             eventually() {
+              find(id("display-actions")) should not be empty
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("SRARC_SetConfig")
 
@@ -741,7 +746,12 @@ class SvFrontendIntegrationTest2
                 element.underlying.click()
               }
               inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
-                element.underlying.sendKeys(requestNewNumUnclaimedRewardsThreshold)
+                if (numUnclaimedRewardsThreshold != "") element.underlying.clear()
+                element.underlying.sendKeys(numUnclaimedRewardsThreshold)
+              }
+              inside(find(id("numMemberTrafficContractsThreshold-value"))) { case Some(element) =>
+                if (numMemberTrafficContractsThreshold != "") element.underlying.clear()
+                element.underlying.sendKeys(numMemberTrafficContractsThreshold)
               }
               inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
@@ -762,7 +772,7 @@ class SvFrontendIntegrationTest2
                     ),
                 )
               }
-              clickVoteRequestSubmitButtonOnceEnabled()
+              clickVoteRequestSubmitButtonOnceEnabled(enabled)
             }
           }
 
@@ -782,6 +792,7 @@ class SvFrontendIntegrationTest2
             "sv1 can see the create vote request button",
             _ => {
               find(id("create-voterequest-submit-button")) should not be empty
+              find(id("display-actions")) should not be empty
             },
           )
 
@@ -797,7 +808,7 @@ class SvFrontendIntegrationTest2
 
           actAndCheck(
             "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetConfigRequest("41", expiresSoon = true)
+              submitSetDsoConfigRequest(numUnclaimedRewardsThreshold = "41", expiresSoon = true)
             },
           )(
             "sv1 can see the new vote request in the progress tab",
@@ -806,7 +817,11 @@ class SvFrontendIntegrationTest2
 
           val (_, requestId) = actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
-              submitSetConfigRequest("42", expiresSoon = false)
+              submitSetDsoConfigRequest(
+                numUnclaimedRewardsThreshold = "10",
+                numMemberTrafficContractsThreshold = "42",
+                expiresSoon = false,
+              )
             },
           )(
             "sv1 can see the new vote request in the progress tab",
@@ -858,20 +873,28 @@ class SvFrontendIntegrationTest2
         withFrontEnd("sv1") { implicit webDriver =>
           // If we try to create two vote requests for identical configs,
           // the second request will be rejected with "This vote request has already been created."
-          def submitSetConfigRequest(
+          def submitSetAmuletConfigRequest(
               createFee: String,
+              holdingFee: String = "",
               expiresSoon: Boolean,
+              enabled: Boolean = true,
           ) = {
             // The `eventually` guards against `StaleElementReferenceException`s
             // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
             eventually() {
+              find(id("display-actions")) should not be empty
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("CRARC_SetConfig")
               inside(find(id("checkbox-set-effective-at-threshold"))) { case Some(element) =>
                 element.underlying.click()
               }
               inside(find(id("transferConfig.createFee.fee-value"))) { case Some(element) =>
+                if (createFee != "") element.underlying.clear()
                 element.underlying.sendKeys(createFee)
+              }
+              inside(find(id("transferConfig.holdingFee.rate-value"))) { case Some(element) =>
+                if (holdingFee != "") element.underlying.clear()
+                element.underlying.sendKeys(holdingFee)
               }
               inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
@@ -892,7 +915,7 @@ class SvFrontendIntegrationTest2
                     ),
                 )
               }
-              clickVoteRequestSubmitButtonOnceEnabled()
+              clickVoteRequestSubmitButtonOnceEnabled(enabled)
             }
           }
 
@@ -914,6 +937,7 @@ class SvFrontendIntegrationTest2
             "sv1 can see the create vote request button",
             _ => {
               find(id("create-voterequest-submit-button")) should not be empty
+              find(id("display-actions")) should not be empty
             },
           )
 
@@ -931,7 +955,7 @@ class SvFrontendIntegrationTest2
 
           actAndCheck(
             "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetConfigRequest("41", expiresSoon = true)
+              submitSetAmuletConfigRequest(createFee = "41", expiresSoon = true)
             },
           )(
             "sv1 can see the new vote request in the progress tab",
@@ -940,7 +964,11 @@ class SvFrontendIntegrationTest2
 
           val (_, requestId) = actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
-              submitSetConfigRequest("42", expiresSoon = false)
+              submitSetAmuletConfigRequest(
+                createFee = "0.03",
+                holdingFee = "42",
+                expiresSoon = false,
+              )
             },
           )(
             "sv1 can see the new vote request in the progress tab",

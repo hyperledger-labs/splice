@@ -1,5 +1,85 @@
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function getAmuletConfig(createFee: string) {
+import { Contract } from 'common-frontend-utils';
+
+import * as damlTypes from '@daml/types';
+import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
+import {
+  ActionRequiringConfirmation,
+  Vote,
+  VoteRequest,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
+import { ContractId } from '@daml/types';
+
+export function mkVoteRequest(action: ActionRequiringConfirmation): Contract<VoteRequest> {
+  return {
+    templateId:
+      '2790a114f83d5f290261fae1e7e46fba75a861a3dd603c6b4ef6b67b49053948:Splice.DsoRules:VoteRequest',
+    contractId: ContractId(VoteRequest).decoder.runWithException(
+      '10f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca91'
+    ) as ContractId<VoteRequest>,
+    payload: {
+      dso: 'DSO::1220ebe7643fe0617f6f8e1d147137a3b174b350adf0ac2280f967c9abb712c81afb',
+      votes: damlTypes.emptyMap<string, Vote>().set('Digital-Asset-2', {
+        sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da31',
+        accept: true,
+        reason: {
+          url: '',
+          body: 'I accept, as I requested the vote.',
+        },
+      }),
+      voteBefore: '2098-09-11T10:27:52.300591Z',
+      requester: 'Digital-Asset-2',
+      reason: {
+        url: '',
+        body: 'df',
+      },
+      trackingCid: null,
+      action: action,
+      targetEffectiveAt: null,
+    },
+    createdEventBlob: '',
+    createdAt: '2014-09-11T10:28:09.304591Z',
+  };
+}
+
+export function getAmuletRulesAddFutureScheduleAction(
+  effectiveAt: string,
+  createFee: string
+): ActionRequiringConfirmation {
+  return {
+    tag: 'ARC_AmuletRules',
+    value: {
+      amuletRulesAction: {
+        tag: 'CRARC_AddFutureAmuletConfigSchedule',
+        value: {
+          newScheduleItem: {
+            _1: effectiveAt,
+            _2: getAmuletRulesConfig(createFee),
+          },
+        },
+      },
+    },
+  };
+}
+
+export function getAmuletRulesSetConfigAction(createFee: string): ActionRequiringConfirmation {
+  return {
+    tag: 'ARC_AmuletRules',
+    value: {
+      amuletRulesAction: {
+        tag: 'CRARC_SetConfig',
+        value: {
+          newConfig: getAmuletRulesConfig(createFee),
+          baseConfig: getAmuletRulesConfig('0'),
+        },
+      },
+    },
+  };
+}
+
+export function getAmuletRulesConfig(
+  createFee: string,
+  baseRateTrafficLimitsBurstWindow: string = '1200000000'
+): AmuletConfig<USD> {
   return {
     packageConfig: {
       amuletNameService: '0.1.8',
@@ -19,7 +99,8 @@ export function getAmuletConfig(createFee: string) {
             'global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81',
             {},
           ],
-        ],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ] as any,
       },
       activeSynchronizer:
         'global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81',
@@ -27,7 +108,7 @@ export function getAmuletConfig(createFee: string) {
         baseRateTrafficLimits: {
           burstAmount: '400000',
           burstWindow: {
-            microseconds: '1200000000',
+            microseconds: baseRateTrafficLimitsBurstWindow,
           },
         },
         extraTrafficPrice: '16.67',
@@ -140,18 +221,18 @@ export function getAmuletConfig(createFee: string) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function getAmuletRulesAction(action: string, effectiveAt: string, createFee: string) {
+export function getAmuletSetConfigAction(
+  createFee: { new: string; base: string },
+  baseRateTrafficLimitsBurstWindow: { new: string; base: string }
+): ActionRequiringConfirmation {
   return {
     tag: 'ARC_AmuletRules',
     value: {
       amuletRulesAction: {
-        tag: action,
+        tag: 'CRARC_SetConfig',
         value: {
-          newScheduleItem: {
-            _1: effectiveAt,
-            _2: getAmuletConfig(createFee),
-          },
+          newConfig: getAmuletRulesConfig(createFee.new, baseRateTrafficLimitsBurstWindow.new),
+          baseConfig: getAmuletRulesConfig(createFee.base, baseRateTrafficLimitsBurstWindow.base),
         },
       },
     },

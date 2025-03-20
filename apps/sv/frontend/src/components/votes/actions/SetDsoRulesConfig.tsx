@@ -13,8 +13,9 @@ import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
 
 const SetDsoRulesConfig: React.FC<{
+  supportsVoteEffectivityAndSetConfig: boolean;
   chooseAction: (action: ActionFromForm) => void;
-}> = ({ chooseAction }) => {
+}> = ({ supportsVoteEffectivityAndSetConfig, chooseAction }) => {
   const dsoInfosQuery = useDsoInfos();
   // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue> | undefined>(
@@ -89,7 +90,12 @@ const SetDsoRulesConfig: React.FC<{
           value: {
             dsoAction: {
               tag: 'SRARC_SetConfig',
-              value: { newConfig: decoded.result, baseConfig: null },
+              value: {
+                newConfig: decoded.result,
+                baseConfig: supportsVoteEffectivityAndSetConfig
+                  ? dsoInfosQuery.data?.dsoRules.payload.config || null
+                  : null,
+              },
             },
           },
         });

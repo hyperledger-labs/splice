@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as fs from 'node:fs';
 import { validatorLicensesHandler, dsoInfoHandler } from 'common-test-handlers';
 import dayjs from 'dayjs';
 import { rest, RestHandler } from 'msw';
@@ -24,7 +25,11 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
   dsoInfoHandler(svUrl),
   rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
-    return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
+    if (fs.existsSync('TMP_EMPTY_REQUESTS')) {
+      return res(ctx.json<ListDsoRulesVoteRequestsResponse>({ dso_rules_vote_requests: [] }));
+    } else {
+      return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
+    }
   }),
   rest.get(`${svUrl}/v0/admin/sv/voterequests/:id`, (req, res, ctx) => {
     const { id } = req.params;
