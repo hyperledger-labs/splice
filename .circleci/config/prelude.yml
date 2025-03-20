@@ -59,7 +59,6 @@ parameters:
         backup-status-mainnet,
         purge-unused-dbs-cidaily,
         bump-configs,
-        copy-mainnet-backup-to-bucket,
         update-serverless-workflows,
       ]
     default: build
