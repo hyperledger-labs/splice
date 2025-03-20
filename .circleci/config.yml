@@ -4417,6 +4417,7 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Run SV preflight tests
                 additional_nix_args: "--keep SV_DEV_NET_WEB_UI_PASSWORD \
+                  --keep SV_WEB_UI_PASSWORD \
                   --keep VALIDATOR_WEB_UI_PASSWORD \
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD \
