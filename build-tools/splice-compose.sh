@@ -12,8 +12,8 @@ SCRIPTNAME=${0##*/}
 declare -A subcommand_whitelist
 
 DEFAULT_AUDIENCE="https://canton.network.global"
-VALIDATOR_DIR="${REPO_ROOT}/cluster/compose/validator"
-SV_DIR="${REPO_ROOT}/cluster/compose/sv"
+VALIDATOR_DIR="${SPLICE_ROOT}/cluster/compose/validator"
+SV_DIR="${SPLICE_ROOT}/cluster/compose/sv"
 
 function _export_auth0_env_vars {
 
@@ -55,10 +55,10 @@ function _export_auth0_env_vars {
 function _do_start_validator {
   "${VALIDATOR_DIR}/start.sh" \
     "$@" \
-      | tee -a "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
+      | tee -a "${SPLICE_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${SPLICE_ROOT}/log/compose.log for details"
 
   for c in validator participant; do
-    docker logs -f splice-validator-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
+    docker logs -f splice-validator-${c}-1 >> "${SPLICE_ROOT}/log/compose-${c}.clog" 2>&1 &
   done
 
   if [ "$wait" -eq 1 ]; then
@@ -67,7 +67,7 @@ function _do_start_validator {
     "${VALIDATOR_DIR}/start.sh" \
       "$@" \
       "-w" \
-        | tee -a "${REPO_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
+        | tee -a "${SPLICE_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
   fi
 
 }
@@ -119,7 +119,7 @@ function _start_validator {
     exit 1
   fi
 
-  mkdir -p "${REPO_ROOT}/log"
+  mkdir -p "${SPLICE_ROOT}/log"
 
   _info "Starting validator"
   args=( \
@@ -173,7 +173,7 @@ function subcmd_start {
   wait=0
   migration_id=0
   migrating=0
-  IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
+  IMAGE_TAG=$("${SPLICE_ROOT}/build-tools/get-snapshot-version")
   restore_identities_dump=""
   party_hint="$(whoami)-composeValidator-1"
   participant_id=""
@@ -342,7 +342,7 @@ function subcmd_start_network {
     esac
   done
 
-  IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
+  IMAGE_TAG=$("${SPLICE_ROOT}/build-tools/get-snapshot-version")
   export IMAGE_TAG
   # Locally built images (the default when using this script)
   export IMAGE_REPO=""
@@ -351,7 +351,7 @@ function subcmd_start_network {
   "${SV_DIR}/start.sh"
 
   for c in validator participant scan sv-app sequencer-mediator nginx; do
-    docker logs -f splice-sv-${c}-1 >> "${REPO_ROOT}/log/compose-sv-${c}.clog" 2>&1 &
+    docker logs -f splice-sv-${c}-1 >> "${SPLICE_ROOT}/log/compose-sv-${c}.clog" 2>&1 &
   done
 
   # We must wait for the SV to be ready before starting the validator

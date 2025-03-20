@@ -102,15 +102,15 @@ provides a JSON encoded version of the recorded update history. Once you have an
 POST /v1/updates
 ^^^^^^^^^^^^^^^^
 
-Post a paged `UpdateHistoryRequestV1 <https://github.com/hyperledger-labs/splice/blob/7345124f9f05395ab4797c0478c7e1dd37186369/apps/scan/src/main/openapi/scan.yaml#L1672>`_
-request to get all updates up to ``page_size``.
+Post a paged update history request to get all updates up to ``page_size``.
+Please see `POST /v1/updates <scan_openapi.html#post--v1-updates>`_ for more details.
 
 Requesting all updates
 """"""""""""""""""""""
 
 To get the first page of updates from the beginning of the network, omit the ``after`` field in the request body.
 
-An example of a ``UpdateHistoryRequestV1`` request body is shown below, getting a page of max 10 updates from the beginning of the network:
+An example of a request body is shown below, getting a page of max 10 updates from the beginning of the network:
 
 .. code-block:: json
 
@@ -122,7 +122,7 @@ To get the next page of updates, take the ``migration_id`` and the ``record_time
 in a subsequent request in the ``after`` object, to read the next page.
 Once you receive less updates than the requested ``page_size``, you have reached the end of the stream.
 
-An example of a ``UpdateHistoryRequestV1`` request body is shown below, getting a page of max 10 updates after the specified record time:
+An example of a request body is shown below, getting a page of max 10 updates after the specified record time:
 
 .. code-block:: json
 
@@ -143,7 +143,7 @@ and ``after_migration_id`` is the migration ID that was active at that time.
 
 Note that the record time ranges of different migrations may overlap,
 i.e., the record time can go back after a hard domain migration.
-Read the `OpenAPI documentation <https://github.com/hyperledger-labs/splice/blob/893346e70b1220be999d89853a0f9ecae5083b08/apps/scan/src/main/openapi/scan.yaml#L1737>`_
+Read the `OpenAPI documentation <https://github.com/hyperledger-labs/splice/blob/main/apps/scan/src/main/openapi/scan.yaml>`_
 to understand how the ``after_migration_id`` field affects the response.
 
 If you don't know what migration ID was active at the chose time,

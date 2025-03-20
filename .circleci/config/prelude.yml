@@ -60,6 +60,7 @@ parameters:
         purge-unused-dbs-cidaily,
         bump-configs,
         copy-mainnet-backup-to-bucket,
+        update-serverless-workflows,
       ]
     default: build
   # Whether the cluster should be reset before deploying.

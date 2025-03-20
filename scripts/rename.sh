@@ -13,7 +13,7 @@ source "${TOOLS_LIB}/libcli.source"
 
 SCRIPTNAME=${0##*/}
 
-cd "$REPO_ROOT"
+cd "$SPLICE_ROOT"
 
 ### Env var flag defaulting
 

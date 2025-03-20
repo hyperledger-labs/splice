@@ -517,7 +517,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 1
+          "domains": 2
         },
         "enableGcsProxy": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -736,6 +736,7 @@
     "inputs": {
       "apiVersion": "v1",
       "data": {
+        "acknowledgement_alerts.yaml": "apiVersion: 1\ngroups:\n    - orgId: 1\n      name: acknowledgements\n      folder: canton-network\n      interval: 1m\n      rules:\n        - uid: aeg75a4mu72tcc\n          title: Mediator Acknowledgement Lag\n          condition: No recent report\n          data:\n            - refId: Mediator Acknowledgement Lag\n              relativeTimeRange:\n                from: 600\n                to: 0\n              datasourceUid: prometheus\n              model:\n                datasource:\n                    type: prometheus\n                    uid: prometheus\n                editorMode: code\n                expr: time() - (max by (member) (daml_sequencer_block_acknowledgments_micros{member=~\"MED::.*\"}) / 1e6)\n                instant: false\n                interval: \"\"\n                intervalMs: 30000\n                legendFormat: '{{report_publisher}}'\n                maxDataPoints: 43200\n                range: true\n                refId: Mediator Acknowledgement Lag\n            - refId: Latest report time lag\n              relativeTimeRange:\n                from: 600\n                to: 0\n              datasourceUid: __expr__\n              model:\n                conditions:\n                    - evaluator:\n                        params: []\n                        type: gt\n                      operator:\n                        type: and\n                      query:\n                        params:\n                            - B\n                      reducer:\n                        params: []\n                        type: last\n                      type: query\n                datasource:\n                    type: __expr__\n                    uid: __expr__\n                expression: Mediator Acknowledgement Lag\n                intervalMs: 1000\n                maxDataPoints: 43200\n                reducer: last\n                refId: Latest report time lag\n                settings:\n                    mode: dropNN\n                type: reduce\n            - refId: No recent report\n              relativeTimeRange:\n                from: 600\n                to: 0\n              datasourceUid: __expr__\n              model:\n                conditions:\n                    - evaluator:\n                        params:\n                            - 300\n                        type: gt\n                      operator:\n                        type: and\n                      query:\n                        params:\n                            - C\n                      reducer:\n                        params: []\n                        type: last\n                      type: query\n                datasource:\n                    type: __expr__\n                    uid: __expr__\n                expression: Latest report time lag\n                intervalMs: 1000\n                maxDataPoints: 43200\n                refId: No recent report\n                type: threshold\n          dashboardUid: cdlm6c7fn7vuod\n          panelId: 18\n          noDataState: Alerting\n          execErrState: Error\n          for: 5m\n          annotations:\n            __dashboardUid__: cdlm6c7fn7vuod\n            __panelId__: \"18\"\n            description: The mediator {{ $labels.member }} has not submitted a recent acknowledgement\n            severity: critical\n            summary: Mediator Acknowledgement lag\n          labels: {}\n          isPaused: false\n",
         "automation_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: automation\n    folder: canton-network\n    interval: 5m\n    rules:\n      - uid: fe73c0e7-dcb3-4975-a7d1-04ed8da087be\n        title: Automation Failures\n        condition: threshold\n        data:\n          - refId: total\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: sum by(namespace, node_type, trigger_name, migration) (delta(splice_trigger_completed_total{trigger_name=~\".+\", outcome=~\".+\"}[10m]))\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: total\n          - refId: failures\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              editorMode: code\n              expr: sum by(namespace, node_type, trigger_name, migration) (delta(splice_trigger_completed_total{trigger_name=~\".+\", outcome=~\"failure\"}[10m])) or on() vector(0)\n              hide: false\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: failures\n          - refId: failure_pct\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: []\n                  reducer:\n                    params: []\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: ${failures} / ${total} * 100\n              hide: false\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: failure_pct\n              type: math\n          - refId: threshold\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: []\n                  reducer:\n                    params: []\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: failure_pct\n              hide: false\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: threshold\n              type: threshold\n        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6\n        panelId: 14\n        noDataState: Alerting\n        execErrState: Error\n        for: 5m\n        annotations:\n          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6\n          __panelId__: \"14\"\n          description: The {{ index $labels \"trigger_name\" }} for the {{ index $labels \"node_type\" }} app in the {{ index $labels \"namespace\" }} namespace on migration id {{ index $labels \"migration\" }} experienced {{ index $values \"failure_pct\" }}% failures in the last 10 minutes.\n          severity: |-\n            {{- if (gt $values.failure_pct.Value 50.0) -}}\n            critical\n            {{- else -}}\n            warning\n            {{- end -}}\n          summary: '{{ index $values \"failure_pct\" }}% fatal errors occurred in {{ index $labels \"namespace\" }} - {{ index $labels \"trigger_name\" }} automation trigger'\n        labels:\n          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels \"namespace\" }}%22%0A%22{{ index $labels \"trigger_name\" }}%22'\n        isPaused: false\n      - uid: adwt1yr5xuscge\n        title: ACS snapshot taking too long\n        condition: too_long\n        data:\n          - refId: latency\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: histogram_quantile(0.99, rate(splice_trigger_latency_duration_seconds{trigger_name=\"AcsSnapshotTrigger\", namespace=\"sv-1\"}[10m]))\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: latency\n          - refId: too_long\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 600\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: [ ]\n                  reducer:\n                    params: [ ]\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: latency\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: too_long\n              type: threshold\n        noDataState: OK\n        execErrState: Error\n        for: 5m\n        annotations:\n          description: \"\"\n          runbook_url: \"\"\n          severity: warning\n          summary: ACS snapshot took longer than 10m in {{ index $labels \"namespace\" }}'s Scan\n        labels:\n          \"\": \"\"\n          gcloud_filter: resource.labels.namespace_name=%22{{ index  \"namespace\" }}%22%0A%22{{ index  \"trigger_name\" }}%22\n        isPaused: false\n      - uid: ady2ks9ehbw1sb\n        title: Busy task-based automation\n        condition: threshold\n        data:\n          - refId: runs\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_completed_total{trigger_name!~\"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger\"}[5m]))\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: runs\n          - refId: threshold\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                  - evaluator:\n                      params:\n                          - 1\n                          - 0\n                      type: gt\n                    operator:\n                      type: and\n                    query:\n                      params: []\n                    reducer:\n                      params: []\n                      type: avg\n                    type: query\n              datasource:\n                  name: Expression\n                  type: __expr__\n                  uid: __expr__\n              expression: runs\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: threshold\n              type: threshold\n        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6\n        panelId: 14\n        noDataState: OK\n        execErrState: OK\n        for: 5m\n        annotations:\n          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6\n          __panelId__: \"14\"\n          description: The {{ index $labels \"trigger_name\" }} for the {{ index $labels \"node_type\" }} app in the {{ index $labels \"namespace\" }} namespace on migration id {{ index $labels \"migration\" }} experienced {{ index $values \"runs\" }} runs per second in the last 5 minutes.\n          runbook_url: \"\"\n          severity: |-\n              {{- if (gt $values.runs.Value 2) -}}\n              critical\n              {{- else -}}\n              warning\n              {{- end -}}\n          summary: '{{ index $values \"runs\" }} trigger runs per second occurred in {{ index $labels \"namespace\" }} - {{ index $labels \"trigger_name\" }} automation trigger'\n        labels:\n          \"\": \"\"\n          gcloud_filter: resource.labels.namespace_name=%22{{ index  \"namespace\" }}%22%0A%22{{ index  \"trigger_name\" }}%22\n        isPaused: false\n      - uid: edz6eq1kc543ke\n        title: Busy polling-based automation\n        condition: threshold\n        data:\n          - refId: runs\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_iterations_total{trigger_name!~\"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger\"}[5m]))\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: runs\n          - refId: threshold\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                  - evaluator:\n                      params:\n                          - 1\n                          - 0\n                      type: gt\n                    operator:\n                      type: and\n                    query:\n                      params: []\n                    reducer:\n                      params: []\n                      type: avg\n                    type: query\n              datasource:\n                  name: Expression\n                  type: __expr__\n                  uid: __expr__\n              expression: runs\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: threshold\n              type: threshold\n        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6\n        panelId: 14\n        noDataState: OK\n        execErrState: OK\n        for: 5m\n        annotations:\n          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6\n          __panelId__: \"14\"\n          description: The {{ index $labels \"trigger_name\" }} for the {{ index $labels \"node_type\" }} app in the {{ index $labels \"namespace\" }} namespace on migration id {{ index $labels \"migration\" }} experienced {{ index $values \"runs\" }} runs per second in the last 5 minutes.\n          runbook_url: \"\"\n          severity: |-\n              {{- if (gt $values.runs.Value 2) -}}\n              critical\n              {{- else -}}\n              warning\n              {{- end -}}\n          summary: '{{ index $values \"runs\" }} trigger runs per second occurred in {{ index $labels \"namespace\" }} - {{ index $labels \"trigger_name\" }} automation trigger'\n        labels:\n          \"\": \"\"\n          gcloud_filter: resource.labels.namespace_name=%22{{ index  \"namespace\" }}%22%0A%22{{ index  \"trigger_name\" }}%22\n        isPaused: false\n      - uid: fe12i7xur3eo0d\n        title: Backfilling not progressing\n        condition: C\n        data:\n          - refId: Max (rate vs completed)\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: max by(namespace)(splice_history_backfilling_completed + rate(splice_history_backfilling_transaction_count[5m]))\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: Max (rate vs completed)\n          - refId: C\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 1e-11\n                    type: lt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: [ ]\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: Max (rate vs completed)\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: threshold\n        noDataState: OK\n        execErrState: Error\n        for: 5m\n        annotations:\n          description: \"\"\n          runbook_url: \"\"\n          summary: History backfill is not making any progress in {{ index $labels \"namespace\" }}\n        labels:\n          \"\": \"\"\n        isPaused: false\n",
         "cometbft_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: cometbft\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: fa4b8a18-e4be-4d19-a5af-90c7326fd935\n        title: Cometbft Consensus\n        condition: threshold\n        data:\n          - refId: invalid_voting_power\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: max by(chain_id) (cometbft_consensus_missing_validators_power) + max by(chain_id) (cometbft_consensus_byzantine_validators_power)\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              maxDataPoints: 43200\n              range: false\n              refId: invalid_voting_power\n              useBackend: false\n          - refId: total_voting_power\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              disableTextWrap: false\n              editorMode: builder\n              expr: min by(chain_id) (cometbft_consensus_validators_power)\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              maxDataPoints: 43200\n              range: false\n              refId: total_voting_power\n              useBackend: false\n          - refId: acceptable_invalid_voting_power\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: [ ]\n                  reducer:\n                    params: [ ]\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: floor(${total_voting_power} / 3)\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: acceptable_invalid_voting_power\n              type: math\n          - refId: threshold\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: [ ]\n                  reducer:\n                    params: [ ]\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: ${invalid_voting_power} >= ${acceptable_invalid_voting_power} && ${invalid_voting_power} > 0\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: threshold\n              type: math\n        dashboardUid: UJyurCTWz\n        panelId: 48\n        noDataState: Alerting\n        execErrState: OK\n        for: 15m\n        annotations:\n          __dashboardUid__: UJyurCTWz\n          __panelId__: \"48\"\n          description: We're missing {{ index $values \"invalid_voting_power\" }} voting power from a total of {{ index $values \"total_voting_power\" }}. We can tolerate f = {{ index $values \"acceptable_invalid_voting_power\" }}.\n          runbook_url: \"\"\n          severity: |-\n            {{- if (gt (index $values \"invalid_voting_power\").Value (index $values \"acceptable_invalid_voting_power\").Value) -}}\n            critical\n            {{- else -}}\n            warning\n            {{- end -}}\n          summary: |-\n            {{- if (gt (index $values \"invalid_voting_power\").Value (index $values \"acceptable_invalid_voting_power\").Value) -}}\n            CometBFT network voting power is byzantine\n            {{- else -}}\n            CometBFT network voting power close to byzantine status\n            {{- end -}}\n        labels:\n          \"\": \"\"\n        isPaused: false\n      - uid: a3b47fca-0982-491b-80bb-0c70f04dcd8b\n        title: Cometbft Height Not Advancing\n        condition: C\n        data:\n          - refId: height_advances\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: changes(cometbft_consensus_height{active_migration=\"true\"}[5m])\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: height_advances\n              useBackend: false\n          - refId: A\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              disableTextWrap: false\n              editorMode: builder\n              expr: cometbft_consensus_height{active_migration=\"true\"}\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: A\n              useBackend: false\n          - refId: latest_height\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: [ ]\n                  reducer:\n                    params: [ ]\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: A\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: latest_height\n              type: reduce\n          - refId: C\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 1\n                      - 0\n                    type: lt\n                  operator:\n                    type: and\n                  query:\n                    params: [ ]\n                  reducer:\n                    params: [ ]\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: height_advances\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: threshold\n        dashboardUid: UJyurCTWz\n        panelId: 66\n        noDataState: Alerting\n        execErrState: OK\n        for: 10m\n        annotations:\n          __dashboardUid__: UJyurCTWz\n          __panelId__: \"66\"\n          description: Current height {{ index $values \"latest_height\" }} on node {{ $labels.service }} in {{ $labels.namespace }}\n          runbook_url: \"\"\n          severity: critical\n          summary: Blockchain height not advancing\n        labels:\n          \"\": \"\"\n        isPaused: false\n      - uid: a3f23df0-40d5-41d1-8b4b-03aa8c62c030\n        title: Cometbft Not Voting\n        condition: C\n        data:\n          - refId: blocks_not_signed\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: code\n              exemplar: false\n              expr: sum(cometbft_consensus_latest_block_height - on(pod) cometbft_consensus_validator_last_signed_height)\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: false\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: true\n              refId: blocks_not_signed\n              useBackend: false\n          - refId: block_height\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              disableTextWrap: false\n              editorMode: code\n              expr: cometbft_consensus_latest_block_height\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: block_height\n              useBackend: false\n          - refId: signed_height\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              disableTextWrap: false\n              editorMode: builder\n              expr: cometbft_consensus_validator_last_signed_height\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: signed_height\n              useBackend: false\n          - refId: current_blocks_not_signed\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params: [ ]\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - B\n                  reducer:\n                    params: [ ]\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: blocks_not_signed\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: current_blocks_not_signed\n              type: reduce\n          - refId: C\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 50\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: [ ]\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: current_blocks_not_signed\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: threshold\n          - refId: latest_signed_height\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: [ ]\n                  reducer:\n                    params: [ ]\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: signed_height\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: latest_signed_height\n              type: reduce\n          - refId: latest_block_height\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: [ ]\n                  reducer:\n                    params: [ ]\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: block_height\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: latest_block_height\n              type: reduce\n        dashboardUid: UJyurCTWz\n        panelId: 66\n        noDataState: Alerting\n        execErrState: OK\n        for: 5m\n        annotations:\n          __dashboardUid__: UJyurCTWz\n          __panelId__: \"66\"\n          severity: critical\n          description: |-\n            Blocks not signed: {{ index $values \"current_blocks_not_signed\" }}\n            Latest signed block: {{ index $values \"latest_signed_block\" }}\n            Latest block: {{ index $values \"latest_block_height\" }}\n          runbook_url: \"\"\n          summary: Node in namespace {{ $labels.namespace }} didn't sign {{ index $values \"current_blocks_not_signed\" }} in the last 5 minutes\n        labels:\n          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels \"namespace\" }}%22%0A'\n        isPaused: false\n      - uid: adl2npxte6u4gd\n        title: Reached Expected Maximum CometBFT Block Rate\n        condition: C\n        data:\n          - refId: A\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: rate(cometbft_consensus_height[30m])\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: A\n              useBackend: false\n          - refId: B\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params: []\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - B\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: A\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: mean\n              refId: B\n              type: reduce\n          - refId: C\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 5\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: B\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: threshold\n        dashboardUid: UJyurCTWz\n        panelId: 68\n        noDataState: Alerting\n        execErrState: OK\n        for: 120m\n        annotations:\n          __dashboardUid__: UJyurCTWz\n          __panelId__: \"68\"\n          description: This alert triggers when the expected maximum hourly-averaged block rate threshold is reached.\n          runbook_url: \"\"\n          severity: warning\n          summary: The expected maximum hourly-averaged block rate threshold was exceeded in {{ $labels.namespace }} with a value of {{ index $values \"A\" }} c/s.\n        labels:\n          \"\": \"\"\n        isPaused: false\n      - uid: ddlrp7f1f8l4wf\n        title: CometBFT is not pruning old blocks\n        condition: C\n        data:\n          - refId: A\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: splice_sv_cometbft_latest_block_height - splice_sv_cometbft_earliest_block_height\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: A\n              useBackend: false\n          - refId: latest_height_difference\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params: [ ]\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - B\n                  reducer:\n                    params: [ ]\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: A\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: latest_height_difference\n              type: reduce\n          - refId: C\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 5292000\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: [ ]\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: latest_height_difference\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: threshold\n        noDataState: Alerting\n        execErrState: OK\n        for: 5m\n        annotations:\n          description: The block height difference of {{ index $values \"latest_height_difference\" }} is larger than the expected number of retained blocks (5292000) in {{ $labels.namespace }}\n          runbook_url: \"\"\n          severity: critical\n          summary: Blockchain is not being pruned\n        labels:\n          \"\": \"\"\n        isPaused: false\n",
         "deleted_alerts.yaml": "apiVersion: 1\ndeleteRules:\n  - orgId: 1\n    # SV Status - mediator -falling behind\n    uid: f15539f2-f6ea-4de4-8f7c-c56434d5bd52\ndeleteContactPoints:\n  - uid: grafana-default-email\n    orgId: 1\n",
@@ -1227,7 +1228,7 @@
           "istioNamespace": "cluster-ingress"
         }
       },
-      "version": "1.24.2"
+      "version": "1.24.3"
     },
     "name": "istio-base",
     "provider": "",
@@ -1328,7 +1329,7 @@
           "maxReplicas": 10
         },
         "podDisruptionBudget": {
-          "minAvailable": 1
+          "maxUnavailable": 1
         },
         "resources": {
           "limits": {
@@ -1374,7 +1375,7 @@
           }
         ]
       },
-      "version": "1.24.2"
+      "version": "1.24.3"
     },
     "name": "istio-ingress-public",
     "provider": "",
@@ -1413,7 +1414,7 @@
           "maxReplicas": 10
         },
         "podDisruptionBudget": {
-          "minAvailable": 1
+          "maxUnavailable": 1
         },
         "resources": {
           "limits": {
@@ -1456,9 +1457,9 @@
             "46.137.35.133/32",
             "65.21.90.248/32",
             "95.216.213.242/32",
+            "146.59.110.100/32",
             "125.14.139.150/32",
-            "34.170.134.16/32",
-            "35.241.160.235/32",
+            "34.170.227.254/32",
             "44.231.150.226/32",
             "44.240.251.170/32",
             "20.49.221.80/32",
@@ -1513,6 +1514,8 @@
             "34.67.208.200/32",
             "5.29.86.219/32",
             "40.122.69.104/32",
+            "54.161.12.127/32",
+            "100.35.18.66/32",
             "18.168.30.34/32",
             "35.176.78.243/32",
             "3.9.196.105/32",
@@ -1521,6 +1524,7 @@
             "8.52.139.100/32",
             "34.27.39.30/32",
             "15.204.103.241/32",
+            "75.15.7.214/32",
             "35.76.230.119/32",
             "35.223.73.80/32",
             "18.189.190.121/32",
@@ -1528,8 +1532,7 @@
             "23.23.157.199/32",
             "3.214.156.145/32",
             "34.124.196.128/32",
-            "79.125.74.162/32",
-            "54.76.211.194/32",
+            "34.250.95.38/32",
             "54.188.202.74/32",
             "35.161.114.34/32",
             "74.119.41.6/32",
@@ -1553,6 +1556,8 @@
             "54.228.88.217/32",
             "52.50.25.141/32",
             "64.25.219.110/32",
+            "34.170.134.16/32",
+            "35.241.160.235/32",
             "208.127.147.210/32",
             "34.42.137.70/32",
             "146.4.45.122/32",
@@ -1737,6 +1742,66 @@
               "port": 26096,
               "protocol": "TCP",
               "targetPort": 26096
+            },
+            {
+              "name": "cometbft-1-0-gw",
+              "port": 26106,
+              "protocol": "TCP",
+              "targetPort": 26106
+            },
+            {
+              "name": "cometbft-1-1-gw",
+              "port": 26116,
+              "protocol": "TCP",
+              "targetPort": 26116
+            },
+            {
+              "name": "cometbft-1-2-gw",
+              "port": 26126,
+              "protocol": "TCP",
+              "targetPort": 26126
+            },
+            {
+              "name": "cometbft-1-3-gw",
+              "port": 26136,
+              "protocol": "TCP",
+              "targetPort": 26136
+            },
+            {
+              "name": "cometbft-1-4-gw",
+              "port": 26146,
+              "protocol": "TCP",
+              "targetPort": 26146
+            },
+            {
+              "name": "cometbft-1-5-gw",
+              "port": 26156,
+              "protocol": "TCP",
+              "targetPort": 26156
+            },
+            {
+              "name": "cometbft-1-6-gw",
+              "port": 26166,
+              "protocol": "TCP",
+              "targetPort": 26166
+            },
+            {
+              "name": "cometbft-1-7-gw",
+              "port": 26176,
+              "protocol": "TCP",
+              "targetPort": 26176
+            },
+            {
+              "name": "cometbft-1-8-gw",
+              "port": 26186,
+              "protocol": "TCP",
+              "targetPort": 26186
+            },
+            {
+              "name": "cometbft-1-9-gw",
+              "port": 26196,
+              "protocol": "TCP",
+              "targetPort": 26196
             }
           ]
         },
@@ -1748,7 +1813,7 @@
           }
         ]
       },
-      "version": "1.24.2"
+      "version": "1.24.3"
     },
     "name": "istio-ingress",
     "provider": "",
@@ -1926,7 +1991,7 @@
           ]
         }
       },
-      "version": "1.24.2"
+      "version": "1.24.3"
     },
     "name": "istiod",
     "provider": "",
@@ -2236,32 +2301,32 @@
               "control_plane": {
                 "datasource": "Prometheus",
                 "gnetId": 7645,
-                "revision": 239
+                "revision": 243
               },
               "mesh": {
                 "datasource": "Prometheus",
                 "gnetId": 7639,
-                "revision": 239
+                "revision": 243
               },
               "performance": {
                 "datasource": "Prometheus",
                 "gnetId": 11829,
-                "revision": 239
+                "revision": 243
               },
               "service": {
                 "datasource": "Prometheus",
                 "gnetId": 7636,
-                "revision": 239
+                "revision": 243
               },
               "wasm": {
                 "datasource": "Prometheus",
                 "gnetId": 13277,
-                "revision": 196
+                "revision": 200
               },
               "workload": {
                 "datasource": "Prometheus",
                 "gnetId": 7630,
-                "revision": 239
+                "revision": 243
               }
             },
             "k6s": {

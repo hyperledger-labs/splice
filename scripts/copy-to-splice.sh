@@ -25,8 +25,8 @@ function copy_dir() {
 
   mkdir -p "${SPLICE_DIR}/${dir}"
 
-  rsync -ah --delete "${REPO_ROOT}/${dir}/${name}" "${SPLICE_DIR}/${dir}" \
-    --exclude-from=<(git -C "${REPO_ROOT}/${dir}/${name}" ls-files --exclude-standard -oi --directory)
+  rsync -ah --delete "${SPLICE_ROOT}/${dir}/${name}" "${SPLICE_DIR}/${dir}" \
+    --exclude-from=<(git -C "${SPLICE_ROOT}/${dir}/${name}" ls-files --exclude-standard -oi --directory)
 }
 
 function remove_dir() {
@@ -45,7 +45,7 @@ function copy_file() {
   name=$(basename "$path")
 
   mkdir -p "${SPLICE_DIR}/${dir}"
-  cp -a "${REPO_ROOT}/${path}" "${SPLICE_DIR}/${dir}"
+  cp -a "${SPLICE_ROOT}/${path}" "${SPLICE_DIR}/${dir}"
 }
 
 # Source code
@@ -63,7 +63,7 @@ copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
 remove_dir "docs/src/app_dev"
 copy_dir "docs/src/app_dev/daml_api"
-cp "${REPO_ROOT}/docs/src/splice-index.rst" "${SPLICE_DIR}/docs/src/index.rst"
+cp "${SPLICE_ROOT}/docs/src/splice-index.rst" "${SPLICE_DIR}/docs/src/index.rst"
 copy_dir "load-tester"
 
 # Build code / configs
@@ -88,7 +88,7 @@ copy_file "build.sbt"
 # so we just copy the relevant files and subdirectories from `project` individually
 copy_dir "project/ignore-patterns"
 for f in project/*; do
-  if [ -f "${REPO_ROOT}/$f" ]; then
+  if [ -f "${SPLICE_ROOT}/$f" ]; then
     copy_file "$f"
   fi
 done

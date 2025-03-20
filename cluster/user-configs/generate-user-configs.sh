@@ -18,5 +18,5 @@ do
   all_auth0_users="$(auth0 users search -s email:1 -n 1000 --query digitalasset.com --tenant "$tenant" --json | jq 'map({user_id,email,created_at})')"
   jq -n --argjson auth0_users "$all_auth0_users" --argjson approved_users "$users" \
      '$auth0_users | map(select(. as $user | $approved_users | index($user.email)))' > \
-    "$REPO_ROOT/cluster/user-configs/$tenant.json"
+    "$SPLICE_ROOT/cluster/user-configs/$tenant.json"
 done

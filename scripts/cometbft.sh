@@ -44,7 +44,7 @@ function docker_start() {
     --network $DOCKER_COMEBFT_NETWORK_NAME \
     --hostname "sv${container_sv_index}" \
     "$COMETBFT_DOCKER_IMAGE" start --home /cometbft
-  local cometbft_config_path="$REPO_ROOT/apps/sv/src/test/resources/cometbft"
+  local cometbft_config_path="$SPLICE_ROOT/apps/sv/src/test/resources/cometbft"
   # The network must be started with all the nodes as validators to ensure stability
   # This is done to ensure it's an actual BFT network
   # We don't ensure this by enabling the reconciliation loops because it would destabilize the network

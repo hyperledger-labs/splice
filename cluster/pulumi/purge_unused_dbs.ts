@@ -18,7 +18,15 @@ async function getDBsInStack(stack: automation.Stack): Promise<gcp.sql.DatabaseI
   if (!resources) {
     return Promise.resolve([]);
   }
-  return resources.filter((r: any) => r.type === 'gcp:sql/databaseInstance:DatabaseInstance');
+  const res = resources.filter((r: any) => r.type === 'gcp:sql/databaseInstance:DatabaseInstance');
+  console.log(
+    `In ${stack.name} got ${JSON.stringify(
+      res.map((x: any) => x.id),
+      null,
+      2
+    )}`
+  );
+  return res;
 }
 
 async function getAllPulumiDbs(): Promise<gcp.sql.DatabaseInstance[]> {
@@ -32,7 +40,8 @@ async function getAllPulumiDbs(): Promise<gcp.sql.DatabaseInstance[]> {
     async stack => {
       return getDBsInStack(stack);
     },
-    false
+    false,
+    true
   );
   const migrationDbsRet = await Promise.all(readDbsForAllStacks.map(res => res.promise)).then(
     result => Array.from(result.values()).flat()

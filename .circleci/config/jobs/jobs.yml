@@ -149,7 +149,7 @@ jobs:
       - docker_login_artifactory
       - run_bash_command_in_nix:
           cmd_name: Check if release tag is on anything but a release-line branch
-          additional_nix_args: --keep CIRCLE_BRANCH --keep REPO_ROOT
+          additional_nix_args: --keep CIRCLE_BRANCH --keep SPLICE_ROOT
           cmd: ./scripts/halt-on-bad-release-commit-msg.sh .halt-build-step
       - run_bash_command_in_nix:
           cmd_name: Check if images already exist
@@ -712,3 +712,17 @@ jobs:
           name: Store logs
           path: log
           destination: log
+
+  deploy_serverless:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Deploy serverless workflows
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            ./cluster/serverless/deploy.sh

@@ -6,7 +6,7 @@ set -eou pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-(cd "$REPO_ROOT"; sbt --batch damlBuild)
+(cd "$SPLICE_ROOT"; sbt --batch damlBuild)
 ./gen-daml-docs.sh
 
 # Use ISO 8601 date format, which does not contain spaces, to avoid not recognizing wrong spaces in the docs preview

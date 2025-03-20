@@ -30,7 +30,7 @@ successful=""
 
 for scratch in "${scratches[@]}"; do
   echo "Attempting to lock $scratch..."
-  cd "$REPO_ROOT/cluster/deployment/$scratch"
+  cd "$SPLICE_ROOT/cluster/deployment/$scratch"
   locked_scratch="$scratch"
   direnv exec . cncluster lock && successful="true" && break
 done
@@ -43,7 +43,7 @@ if [ -z "$successful" ]; then
 else
   echo "Successfully locked $locked_scratch."
   if (( script_is_not_sourced )) ; then
-      echo "Run 'cd $REPO_ROOT/cluster/deployment/$locked_scratch'."
+      echo "Run 'cd $SPLICE_ROOT/cluster/deployment/$locked_scratch'."
       echo "Tip: next time, if you run the script with 'source lock-first-scratch.sh', you will be put in the scratch directory directly."
   fi
 fi

@@ -10,7 +10,7 @@ import {
   installSpliceHelmChart,
   jmxOptions,
   loadYamlFromFile,
-  REPO_ROOT,
+  SPLICE_ROOT,
   SpliceCustomResourceOptions,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
@@ -36,10 +36,13 @@ export function installSvParticipant(
 ): InstalledHelmChart {
   const name = `participant-${migrationId}`;
   const participantValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
-      MIGRATION_ID: migrationId.toString(),
-      OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
-    }),
+    ...loadYamlFromFile(
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
+      {
+        MIGRATION_ID: migrationId.toString(),
+        OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
+      }
+    ),
   };
 
   const participantValuesWithOverwrites: ChartValues = {

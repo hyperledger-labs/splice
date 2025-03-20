@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Docs
+
+  * Update documentation on configuring SV egress.
+  * Add note about ``.localhost`` addresses used by Docker Compose-based validator deployments.
+
 0.3.16
 ------
 

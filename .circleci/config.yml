@@ -65,6 +65,7 @@ parameters:
         purge-unused-dbs-cidaily,
         bump-configs,
         copy-mainnet-backup-to-bucket,
+        update-serverless-workflows,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -424,7 +425,7 @@ commands:
           gce_authenticate: true
           cmd_retry_count: 5 # we have seen this fail several times, see #13863
           cmd: |
-            $REPO_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
+            $SPLICE_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
@@ -1005,8 +1006,8 @@ commands:
 
               . .envrc.vars
               if [[ "$TARGET_CLUSTER" != none ]]; then
-                . $REPO_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
-                . $REPO_ROOT/build-tools/lib/cluster.envrc.vars
+                . $SPLICE_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
+                . $SPLICE_ROOT/build-tools/lib/cluster.envrc.vars
                 echo "Using cluster hostname suffix: ${GCP_CLUSTER_HOSTNAME}"
               fi
 
@@ -2075,7 +2076,7 @@ jobs:
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "10 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
             cncluster restore_node --force << parameters.namespace_name >> ${ACTIVE_MIGRATION_ID} << parameters.internal_stack >>
@@ -2506,7 +2507,7 @@ jobs:
 
               if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                 # silence specific alerts that may fire due to SV downtime
-                cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                cncluster silence_grafana_alerts "20 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
               fi
 
               cncluster partial_upgrade $(get-snapshot-version) "$images"
@@ -2952,7 +2953,7 @@ jobs:
             # We write the changes to envrc.vars into a separate file first, so we can easily apply
             # the same changes to the update branch later. We do not rely on e.g. `git cherry-pick`
             # to avoid conflicts that cannot be resolved automatically.
-            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars.base"
+            file="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars.base"
             rm -f "$file"
 
             echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
@@ -2964,14 +2965,14 @@ jobs:
             echo "export CHARTS_VERSION=$BASE_VERSION" >> "$file"
             echo "export OVERRIDE_VERSION=$BASE_VERSION" >> "$file"
 
-            cat "$file" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            cat "$file" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
 
             # if the base version is a release version ensure we use the public repository
             # we write this to the .envrc.vars file directly and not to the patch that we also
             # apply later to the upgrade version, because the upgrade version typiclaly is not public
             # in these tests
             if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             fi
 
             git add "$file"
@@ -2988,7 +2989,7 @@ jobs:
             git checkout $DEPLOYMENT_BRANCH
             git push -f origin $DEPLOYMENT_BRANCH
             cncluster set_operator_deployment_reference refs/heads/$DEPLOYMENT_BRANCH
-            echo "export OPERATOR_IMAGE_VERSION=$OPERATOR_IMAGE_VERSION" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            echo "export OPERATOR_IMAGE_VERSION=$OPERATOR_IMAGE_VERSION" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             git add **/config.yaml
             git add **/.envrc.vars
             git commit -m "Set the operator deployment reference to $DEPLOYMENT_BRANCH on << parameters.cluster >>"
@@ -2999,9 +3000,9 @@ jobs:
             # Since the operator images are taken from the branch from which we run this, CIRCLE_BRANCH should
             # be the corresponding branch, so if that's main or a release branch, we use the public repository too.
             if [[ $OPERATOR_IMAGE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$CIRCLE_BRANCH" == main ]] || [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             else
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=private" >> ${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=private" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             fi
 
       - deploy_operator:
@@ -3089,7 +3090,7 @@ jobs:
             rm -f "$basefile"
             git checkout origin/$BASE_VERSION_BRANCH -- "$basefile"
 
-            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            file="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
             cat "$basefile" >> "$file"
             rm "$basefile"
 
@@ -3164,7 +3165,7 @@ jobs:
             # Update the upgrade branch to a "migrating" state
 
             file=$(mktemp)
-            envfile="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            envfile="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
             echo "export CHARTS_VERSION=$UPGRADE_VERSION" >> "$file"
             echo "export OVERRIDE_VERSION=$UPGRADE_VERSION" >> "$file"
             cat $file >> "$envfile"
@@ -3494,7 +3495,7 @@ jobs:
       - docker_login_artifactory
       - run_bash_command_in_nix:
           cmd_name: Check if release tag is on anything but a release-line branch
-          additional_nix_args: --keep CIRCLE_BRANCH --keep REPO_ROOT
+          additional_nix_args: --keep CIRCLE_BRANCH --keep SPLICE_ROOT
           cmd: ./scripts/halt-on-bad-release-commit-msg.sh .halt-build-step
       - run_bash_command_in_nix:
           cmd_name: Check if images already exist
@@ -4057,6 +4058,20 @@ jobs:
           name: Store logs
           path: log
           destination: log
+
+  deploy_serverless:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Deploy serverless workflows
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            ./cluster/serverless/deploy.sh
 
   deploy_operator:
     executor: self_hosted
@@ -4640,7 +4655,7 @@ jobs:
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "10 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
             if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
@@ -4696,7 +4711,7 @@ jobs:
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "20 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
             cncluster ci_pdown_sv
@@ -4735,7 +4750,7 @@ jobs:
             cncluster activate
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "20 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
             cncluster ci_pdown_validator
           cmd_retry_count: 3
@@ -6713,6 +6728,12 @@ workflows:
           deployment_only: true
           requires:
             - set_previews_deployment
+
+  update_serverless_workflows:
+    when:
+      equal: [ update-serverless-workflows, << pipeline.parameters.run-job >> ]
+    jobs:
+      - deploy_serverless
 
   backup_testnet:
     when:

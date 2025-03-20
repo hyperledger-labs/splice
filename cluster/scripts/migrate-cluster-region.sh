@@ -10,13 +10,13 @@ set -euo pipefail
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
 # shellcheck disable=SC1091
-source "${REPO_ROOT}/cluster/scripts/utils.source"
+source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 
 SRC_CLUSTER="scratchnetb"
 DEST_CLUSTER="scratchnete"
 
-SRC_PATH="$REPO_ROOT/cluster/deployment/$SRC_CLUSTER"
-DEST_PATH="$REPO_ROOT/cluster/deployment/$DEST_CLUSTER"
+SRC_PATH="$SPLICE_ROOT/cluster/deployment/$SRC_CLUSTER"
+DEST_PATH="$SPLICE_ROOT/cluster/deployment/$DEST_CLUSTER"
 
 if [ ! -d "$SRC_PATH" ]; then
     _error "Source cluster $SRC_CLUSTER does not exist"
@@ -51,11 +51,11 @@ function scale() {
 # take a backup
 run_prompt \
     "Backup validator1?" \
-    "$REPO_ROOT/cluster/scripts/node-backup.sh" validator validator1 0 true
+    "$SPLICE_ROOT/cluster/scripts/node-backup.sh" validator validator1 0 true
 
 run_prompt \
     "Backup sv-1?" \
-    "$REPO_ROOT/cluster/scripts/node-backup.sh" sv sv-1 0 true
+    "$SPLICE_ROOT/cluster/scripts/node-backup.sh" sv sv-1 0 true
 
 # do a restore
 function restore() {
@@ -65,13 +65,13 @@ function restore() {
 
     shift 2
 
-    backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$namespace" "$migration_id" "$internal")
+    backup_run_id=$("$SPLICE_ROOT"/cluster/scripts/find-recent-backup.sh "$namespace" "$migration_id" "$internal")
     if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
         _error "No recent backup found for $namespace"
     fi
     _info "Found latest backup run ID: $backup_run_id"
 
-    SPLICE_SV="$namespace" SPLICE_MIGRATION_ID="$migration_id" "$REPO_ROOT/cluster/scripts/node-restore.sh" -r "$DEST_CLUSTER" "$namespace" "$migration_id" "$backup_run_id" "$internal" "$@"
+    SPLICE_SV="$namespace" SPLICE_MIGRATION_ID="$migration_id" "$SPLICE_ROOT/cluster/scripts/node-restore.sh" -r "$DEST_CLUSTER" "$namespace" "$migration_id" "$backup_run_id" "$internal" "$@"
 }
 run_prompt \
     "Restore validator1?" \

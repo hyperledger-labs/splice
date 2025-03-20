@@ -22,7 +22,7 @@ import {
   HELM_MAX_HISTORY_SIZE,
   loadJsonFromFile,
   loadYamlFromFile,
-  REPO_ROOT,
+  SPLICE_ROOT,
 } from './utils';
 
 export type InstalledHelmChart = Release | SplicePlaceholderResource;
@@ -215,7 +215,7 @@ export function chartPath(chartName: string, version: CnChartVersion): string {
       ? chartName
       : chartName.replace(/^splice/, 'cn');
   return version.type === 'local'
-    ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${compatibleName}/`
+    ? `${path.relative(process.cwd(), SPLICE_ROOT)}/cluster/helm/${compatibleName}/`
     : compatibleName;
 }
 

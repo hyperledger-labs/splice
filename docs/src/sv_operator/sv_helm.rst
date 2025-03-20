@@ -324,17 +324,17 @@ To setup the wallet, CNS and SV UI, create the following two secrets.
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
 
-Configuring your CometBft node
+Configuring your CometBFT node
 ------------------------------
 
-Every SV node also deploys a CometBft node. This node must be configured to join the existing Global Synchronizer BFT chain.
+Every SV node also deploys a CometBFT node. This node must be configured to join the existing Global Synchronizer BFT chain.
 To do that, you first must generate the keys that will identify the node.
 
 .. _cometbft-identity:
 
-Generating your CometBft node keys
+Generating your CometBFT node keys
 ++++++++++++++++++++++++++++++++++
-To generate the node config you use the CometBft docker image provided through Github Container Registry (ghcr.io/digital-asset/decentralized-canton-sync/docker).
+To generate the node config you use the CometBFT docker image provided through Github Container Registry (ghcr.io/digital-asset/decentralized-canton-sync/docker).
 
 Use the following shell commands to generate the proper keys:
 
@@ -359,10 +359,10 @@ Any other files can be ignored.
 
 .. _helm-cometbft-secrets-config:
 
-Configuring your CometBft node keys
+Configuring your CometBFT node keys
 +++++++++++++++++++++++++++++++++++
 
-The CometBft node is configured with a secret, based on the output from :ref:`Generating the CometBft node identity <cometbft-identity>`
+The CometBFT node is configured with a secret, based on the output from :ref:`Generating the CometBFT node identity <cometbft-identity>`
 The secret is created as follows, with the `node_key.json` and `priv_validator_key.json` files representing the files generated as part of the node identity:
 
 .. code-block:: bash
@@ -373,21 +373,21 @@ The secret is created as follows, with the `node_key.json` and `priv_validator_k
 
 .. _helm-cometbft-state-sync:
 
-Configuring CometBft state sync
+Configuring CometBFT state sync
 +++++++++++++++++++++++++++++++
 
-CometBft has a feature called state sync that allows a new peer to catch up quickly by reading a snapshot of data at or near the head of
-the chain and verifying it instead of fetching and replaying every block. (See `CometBft documentation <https://docs.cometbft.com/v0.34/core/state-sync>`_).
+CometBFT has a feature called state sync that allows a new peer to catch up quickly by reading a snapshot of data at or near the head of
+the chain and verifying it instead of fetching and replaying every block. (See `CometBFT documentation <https://docs.cometbft.com/v0.34/core/state-sync>`_).
 This leads to drastically shorter times to onboard new nodes at the cost of new nodes having a truncated block history.
 Further, when the chain has been pruned, state sync needs to be enabled on new nodes in order to bootstrap them successfully.
 
-There are 3 main configuration parameters that control state sync in CometBft:
+There are 3 main configuration parameters that control state sync in CometBFT:
 
-- `rpc_servers` - The list of CometBft RPC servers to connect to in order to fetch snapshots
+- `rpc_servers` - The list of CometBFT RPC servers to connect to in order to fetch snapshots
 - `trust_height` - Height at which you should trust the chain
 - `trust_hash` - Hash corresponding to the trusted height
 
-A CometBft node installed using our helm charts (see :ref:`helm-sv-install`) with the default values set in
+A CometBFT node installed using our helm charts (see :ref:`helm-sv-install`) with the default values set in
 ``splice-node/examples/sv-helm/cometbft-values.yaml`` automatically uses state sync for bootstrapping
 if:
 
@@ -395,7 +395,7 @@ if:
 - the block chain is mature enough for at least 1 state snapshot to have been taken i.e.
   the height of the latest block is greater than or equal to the configured interval between snapshots
 
-The snapshots are fetched from sv1 which exposes its CometBft RPC API at `https://sv.sv-1.TARGET_HOSTNAME:443/cometbft-rpc/`.
+The snapshots are fetched from your onboarding sponsor which exposes its CometBFT RPC API at `https://sv.sv-X.TARGET_HOSTNAME:443/cometbft-rpc/`.
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
@@ -476,14 +476,14 @@ version of the Helm charts necessary to connect to this environment:
 
 |chart_version_set|
 
-An SV node includes a CometBft node so you also need to configure
+An SV node includes a CometBFT node so you also need to configure
 that. Please modify the file ``splice-node/examples/sv-helm/cometbft-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |splice_cluster|, per the cluster to which you are connecting.
 - Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster. Note that ``MIGRATION_ID`` is also used within port numbers in URLs here!
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
-- Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBft node
+- Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBFT node
 - Replace ``YOUR_HOSTNAME`` with the hostname that will be used for the ingress
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistent storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Uncomment the appropriate `nodeId`, `publicKey` and `keyAddress` values in the `sv1` section as per the cluster to which you are connecting.
@@ -815,23 +815,52 @@ using:
 Configuring the Cluster Egress
 -------------------------------
 
-Here is a list of destinations of all outbound traffic from the Super Validator node.
+Below is a complete list of destinations for outbound traffic from the Super Validator node.
 This list is useful for an SV that wishes to limit egress to only allow the minimum necessary outbound traffic.
 ``M`` will be used a shorthand for ``MIGRATION_ID``.
+The tables below are wide - you might need to scroll vertically to see the rightmost columns.
+
+Connectivity to the following destinations is required throughout operation to ensure the robustness of the ordering layer and scan:
+
+====================== ================================================================================================ ========= ==============
+Destination            Url                                                                                              Protocol  Source pod
+---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
+CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
+All SV Scans           all returned from https://scan.sv-1.<TARGET_HOSTNAME>/api/scan/v0/scans                          HTTPS     scan-app
+====================== ================================================================================================ ========= ==============
+
+Connectivity from the local scan app to the scan instances of all other SVs is required so that the scan app can backfill its data in a :term:`BFT` fashion.
+It might also be required in the future to support the operation of the ordering layer (post CometBFT).
+To get a list of all current scan instances, you can query the ``/api/scan/v0/scans`` endpoint on any scan instances known to you.
+For example using the sponsor's scan instance (and with some optional post-processing using `jq <https://jqlang.org/>`_):
+
+.. code-block:: bash
+
+    curl https://scan.sv-1.<TARGET_HOSTNAME>/api/scan/v0/scans | jq -r '.scans.[].scans.[].publicUrl'
+
+.. _helm-sv-wallet-ui:
+
+
+In addition to above destinations,
+the SV node must be able to reach its onboarding sponsor and all scan instances for onboarding to the network:
 
 ====================== ================================================================================================ ========= ==============
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
 Sponsor SV             sv.sv-1.<TARGET_HOSTNAME>:443                                                                    HTTPS     sv-app
+CometBft JSON RPC      sv.sv-1.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
 Sponsor SV Sequencer   sequencer-<M>.sv-1.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<M>
 Sponsor SV Scan        scan.sv-1.<TARGET_HOSTNAME>:443                                                                  HTTPS     validator-app
-CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
-CometBft JSON RPC      sv.sv-1.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
 ====================== ================================================================================================ ========= ==============
 
-At present, we designate sv1 as the sponsor SV. However, in the long term, any onboarded SV can function as a sponsor SV.
+Note that you need to substitute both ``<TARGET_HOSTNAME>`` and ``sv-1`` in the above table to match the address of your SV onboarding sponsor.
+Note also that the address for the CometBft JSON RPC is configured in ``cometbft-values.yaml`` (under ``stateSync.rpcServers``).
+Any onboarded SV can act as an SV onboarding sponsor.
 
-.. _helm-sv-wallet-ui:
+In general, connectivity to the sponsor SV (outside of scan) is only required during SV onboarding.
+Connectivity to the sponsor SV sequencer is required also for a limited transition time after onboarding
+during which the newly onboarded SV sequencer is not ready for use yet
+(60 seconds with the current Global Synchronizer configuration).
 
 Logging into the wallet UI
 --------------------------

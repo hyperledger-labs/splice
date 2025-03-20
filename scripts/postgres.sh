@@ -9,11 +9,11 @@ DOCKER_POSTGRES_IMAGE_NAME="postgres:14"
 
 # Postgres settings
 DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-splice-node"
-LOCAL_POSTGRES_DATA_DIRECTORY="$REPO_ROOT/temp/postgres"
+LOCAL_POSTGRES_DATA_DIRECTORY="$SPLICE_ROOT/temp/postgres"
 LOCAL_POSTGRES_LOG_FILE="$LOGS_PATH/postgres.log"
 
 # Logging - disabled by default
-# LOG_FILE="$REPO_ROOT/log/postgres-startup-script.log"
+# LOG_FILE="$SPLICE_ROOT/log/postgres-startup-script.log"
 # mkdir -p "$LOG_FILE"
 LOG_FILE="/dev/null"
 

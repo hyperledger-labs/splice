@@ -35,8 +35,8 @@ if [ "$confirmation" != "yes" ]; then
   exit 1
 fi
 
-CLUSTER_IMAGES_DIR="$REPO_ROOT/cluster/images"
-CLUSTER_HELM_DIR="$REPO_ROOT/cluster/helm"
+CLUSTER_IMAGES_DIR="$SPLICE_ROOT/cluster/images"
+CLUSTER_HELM_DIR="$SPLICE_ROOT/cluster/helm"
 
 API_GITHUB_PACKAGES_REPO_HELM="https://api.github.com/orgs/digital-asset/packages/container/decentralized-canton-sync%2Fhelm"
 API_GITHUB_PACKAGES_REPO_DOCKER="https://api.github.com/orgs/digital-asset/packages/container/decentralized-canton-sync%2Fdocker"
