@@ -439,7 +439,7 @@ tryCopyCloudSqlBackup:
                                 fileType: SQL
                                 offload: false  # offloaded exports cannot run in parallel, and do not make sense from the (not-in-use) restore instance
                         connector_params:
-                          timeout: 36000 # 10 hours
+                          timeout: 86400 # 24 hours
     - cleanup:
         call: cleanCloudSqlBackup
         args:
