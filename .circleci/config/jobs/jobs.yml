@@ -336,6 +336,44 @@ jobs:
               --extra_seconds_after_finish << parameters.extra_seconds_after_finish >> \
               cancel_self
 
+  cancel_if_other_pipeline_failed:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$|release-line.*"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 86400  # limit search to pipelines that are 24 hours old
+      extra_seconds_after_finish:
+        type: integer
+        default: 0
+    steps:
+      - checkout_with_retry
+      - run:
+          name: "Cancel self if other pipeline failed"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              --extra_seconds_after_finish << parameters.extra_seconds_after_finish >> \
+              cancel_self_if_pipeline_failed
+
   cancel_previous_pipelines:
     executor: self_hosted
     environment:

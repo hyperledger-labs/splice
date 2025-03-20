@@ -315,6 +315,16 @@ workflow:
             - artifactory
             - slack-context
           workflow_names: "deploy_cidaily cidaily_health_check backup_cidaily restore_sv_cidaily"
+      - cancel_self_if_pipeline_failed:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily"
       - restore_node:
           filters:
             branches:
