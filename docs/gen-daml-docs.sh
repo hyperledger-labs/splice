@@ -36,7 +36,7 @@ ensure_damlc_exists() {
 ensure_damlc_exists
 
 DAML_PROJECT_FILES="\
-  $(find "$SPLICE_ROOT/daml" "$REPO_ROOT/token-standard" -maxdepth 2 \
+  $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" -maxdepth 2 \
     \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
     -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test*' \)  \
     -not -ipath '*splitwell*' \
@@ -44,6 +44,6 @@ DAML_PROJECT_FILES="\
     -print)"
 for project_file in $DAML_PROJECT_FILES
 do
-    project_dir="$(dirname "${project_file#"$REPO_ROOT"/}")"
+    project_dir="$(dirname "${project_file#"$SPLICE_ROOT"/}")"
     gen_project_docs "$project_dir" "$(basename "$project_dir")"
 done
