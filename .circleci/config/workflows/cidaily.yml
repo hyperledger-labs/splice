@@ -315,7 +315,7 @@ workflow:
             - artifactory
             - slack-context
           workflow_names: "deploy_cidaily cidaily_health_check backup_cidaily restore_sv_cidaily"
-      - cancel_self_if_pipeline_failed:
+      - cancel_if_other_pipeline_failed:
           <<: *notify-fail
           filters:
             branches:
