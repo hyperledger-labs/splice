@@ -3,11 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
@@ -34,12 +29,17 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
-import org.scalatest.time.{Minute, Span}
-
+import org.lfdecentralizedtrust.splice.util.{DarUtil, ProcessTestUtil, StandaloneCanton}
+import com.digitalasset.canton.admin.participant.v30.DarDescription
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.google.protobuf.ByteString
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
+import org.scalatest.time.{Minute, Span}
 
 class BootstrapPackageConfigIntegrationTest
     extends IntegrationTest
@@ -139,7 +139,6 @@ class BootstrapPackageConfigIntegrationTest
         sv4Backend.appState.participantAdminConnection,
       ).foreach(
         checkDarVersions(
-          decentralizedSynchronizerId,
           Seq(
             DarResources.amulet -> initialPackageConfig.amuletVersion,
             DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
@@ -153,7 +152,6 @@ class BootstrapPackageConfigIntegrationTest
       )
 
       checkDarVersions(
-        decentralizedSynchronizerId,
         Seq(
           DarResources.amulet -> initialPackageConfig.amuletVersion,
           DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
@@ -242,21 +240,6 @@ class BootstrapPackageConfigIntegrationTest
           },
         )
 
-        clue("vetting topology is update to the new config") {
-          eventuallySucceeds() {
-            val vettingTopologyState = sv1Backend.participantClient.topology.vetted_packages.list(
-              decentralizedSynchronizerId.filterString,
-              filterParticipant = sv1Backend.participantClient.id.filterString,
-            )
-            val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
-              .find(_.packageId == DarResources.amulet.bootstrap.packageId)
-              .value
-            newAmuletVettedPackage.validFrom.value shouldBe CantonTimestamp.assertFromInstant(
-              scheduledTime
-            )
-          }
-        }
-
         // Ensure that the code below really uses the new version. Locally things can be sufficiently
         // fast that you otherwise still end up using the old version.
         env.environment.clock
@@ -277,31 +260,33 @@ class BootstrapPackageConfigIntegrationTest
   }
 
   private def checkDarVersions(
-      domainId: DomainId,
       darsToCheck: Seq[(PackageResource, String)],
       participantAdminConnection: ParticipantAdminConnection,
   ): Unit = {
     eventually() {
-      val vettedPackages: Seq[VettedPackage] =
-        participantAdminConnection.getVettingState(domainId).futureValue.mapping.packages
-      val uploadedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
-        vettedPackages
-          .flatMap { darDesc =>
-            DarResources.lookupPackageId(darDesc.packageId)
-          }
-          .map(dar => dar.metadata.name -> dar.metadata.version)
-      }
+      val uploadedDarDescriptions: Seq[DarDescription] =
+        participantAdminConnection.listDars().futureValue
+      val uploadedDarNameAndVersions: Seq[(PackageName, PackageVersion)] =
+        uploadedDarDescriptions.map { darDesc =>
+          val darBytes: ByteString =
+            participantAdminConnection
+              .lookupDar(Hash.tryFromHexString(darDesc.hash))
+              .futureValue
+              .value
+          val darMetadata = DarUtil.readDarMetadata(darDesc.name, darBytes.newInput())
+          darMetadata.name -> darMetadata.version
+        }
       darsToCheck.foreach { case (packageResource, upToVersion) =>
         withClue(
           s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"
         ) {
-          checkDarLatestVersion(uploadedDarNameAndVersions, packageResource, upToVersion)
+          checkDarVersionsUpTo(uploadedDarNameAndVersions, packageResource, upToVersion)
         }
       }
     }
   }
 
-  private def checkDarLatestVersion(
+  private def checkDarVersionsUpTo(
       uploadedDars: Seq[(PackageName, PackageVersion)],
       packageResource: PackageResource,
       requiredVersion: String,
@@ -314,7 +299,11 @@ class BootstrapPackageConfigIntegrationTest
           name == packageResource.bootstrap.metadata.name
         }
       dars should not be empty
-      dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)
+      dars.foreach { case (_, version) =>
+        version should be <= PackageVersion.assertFromString(
+          requiredVersion
+        )
+      }
     }
   }
 }

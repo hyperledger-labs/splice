@@ -4,7 +4,7 @@
 dir := $(call current_dir)
 
 rpc-script := $(dir)/target/gha-runner-rpc.py
-rpc-source := ${REPO_ROOT}/.github/runners/runner-container-hooks/packages/k8s-workflow/gha-runner-rpc.py
+rpc-source := ${SPLICE_ROOT}/.github/runners/runner-container-hooks/packages/k8s-workflow/gha-runner-rpc.py
 
 target-dir := $(dir)/target
 

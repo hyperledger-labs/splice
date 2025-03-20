@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.migration
 
+import cats.implicits.catsSyntaxParallelTraverse_
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   ParticipantAdminConnection,
@@ -16,6 +17,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -99,14 +101,16 @@ class DomainDataRestorer(
   }
 
   private def importDars(dars: Seq[Dar])(implicit tc: TraceContext) = {
-    val packages = dars
+    dars
       .map { dar =>
         UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
       }
-    participantAdminConnection.uploadDarFiles(
-      packages,
-      RetryFor.WaitingOnInitDependency,
-    )
+      .parTraverse_ { dar =>
+        participantAdminConnection.uploadDarFileLocally(
+          dar,
+          RetryFor.WaitingOnInitDependency,
+        )
+      }
   }
 
 }

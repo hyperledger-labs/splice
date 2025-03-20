@@ -3,110 +3,110 @@
 
 package org.lfdecentralizedtrust.splice.util
 
+import cats.syntax.traverse.*
 import cats.syntax.foldable.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResource,
   DarResources,
   PackageIdResolver,
   ParticipantAdminConnection,
+  RetryFor,
 }
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, UploadablePackage}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 class PackageVetting(
     packages: Set[PackageIdResolver.Package],
+    prevetDuration: NonNegativeFiniteDuration,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def vetCurrentPackages(
-      domainId: DomainId,
-      amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
-  )(implicit tc: TraceContext): Future[Unit] = {
-    val schedule = AmuletConfigSchedule(amuletRules)
-    val currentPackageConfig = schedule.getConfigAsOf(clock.now).packageConfig
-    val currentRequiredPackages =
-      packages.map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
-    currentRequiredPackages.toSeq.traverse_ { case (pkg, packageVersion) =>
-      DarResources
-        .lookupAllPackageVersions(pkg.packageName)
-        .filter(_.metadata.version <= packageVersion)
-        .traverse_(darResource =>
-          vetPackage(
-            domainId,
-            pkg,
-            darResource.metadata.version,
-            None,
-          )
-        )
-    }
-  }
-
   def vetPackages(
-      domainId: DomainId,
-      amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
+      amuletRules: Contract[AmuletRules.ContractId, AmuletRules]
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
-    val vettingSchedule =
-      associatePackageVersionsByEarliestVettingDate(amuletRules.createdAt, schedule)
-    vettingSchedule.toSeq.traverse_ { case ((packageName, packageVersion), validFrom) =>
-      vetPackage(domainId, packageName, packageVersion, Some(validFrom))
-    }
-  }
-
-  private def vetPackage(
-      domainId: DomainId,
-      pkg: PackageIdResolver.Package,
-      packageVersion: PackageVersion,
-      validFrom: Option[Instant],
-  )(implicit tc: TraceContext): Future[Unit] = {
+    val now = clock.now.plus(prevetDuration.asJava)
+    val currentConfig = schedule.getConfigAsOf(now)
     for {
-      // Upload the version required by current config, and log an error if it is not part of the deployed release
-      _ <- DarResources.lookupPackageMetadata(pkg.packageName, packageVersion) match {
-        case None =>
-          validFrom match {
-            case Some(time) =>
-              logger.warn(
-                show"Package ${pkg.packageName} is required in version ${packageVersion.toString()} after $time according to AmuletConfig but this version is not part of the deployed release, upgrade before $time to avoid any issues"
-              )
-            case None =>
-              logger.error(
-                show"Package ${pkg.packageName} is required in version ${packageVersion.toString()} according to AmuletConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
-              )
-          }
+      _ <- vetUpToCurrentConfig(currentConfig)
+      _ <- schedule.futureConfigs.traverse_ { case (time, config) =>
+        val timestamp = CantonTimestamp.assertFromInstant(time)
+        if (timestamp > now) {
+          warnIfFutureConfigUnknown(timestamp, config)
+        } else {
           Future.unit
-        case Some(resource) =>
-          participantAdminConnection.vetDar(
-            domainId,
-            resource,
-            fromDate = validFrom,
-          )
+        }
       }
     } yield ()
   }
 
-  private def associatePackageVersionsByEarliestVettingDate(
-      createdAt: Instant,
-      amuletConfigSchedule: AmuletConfigSchedule,
-  ) = {
-    (amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
-      .flatMap { case (time, config) =>
-        packages.map(pkg =>
-          time -> (pkg -> PackageIdResolver.readPackageVersion(config.packageConfig, pkg))
-        )
-      }
-      .groupMapReduce(_._2)(_._1) { case (time1, time2) =>
-        if (time1.isBefore(time2)) time1 else time2
-      }
+  // The current config must be vetted.
+  private def vetUpToCurrentConfig(
+      config: splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]
+  )(implicit tc: TraceContext): Future[Unit] = {
+    packages.toSeq.traverse_ { pkg =>
+      val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
+      for {
+        // Upload the version required by current config, and log an error if it is not part of the deployed release
+        _ <- DarResources.lookupPackageMetadata(pkg.packageName, version) match {
+          case None =>
+            logger.error(
+              show"Package ${pkg.packageName} is required in version ${version.toString} according to AmuletConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
+            )
+            Future.unit
+          case Some(resource) => uploadDar(resource)
+        }
+        // upload all earlier versions of the same package
+        _ <- DarResources
+          .lookupAllPackageVersions(pkg.packageName)
+          .filter(_.metadata.version < version)
+          .map(uploadDar(_))
+          .sequence
+      } yield ()
+    }
   }
 
+  // Future configs must not be vetted yet but we warn if the app does not know about a package version since this indicates
+  // you must upgrade soon.
+  private def warnIfFutureConfigUnknown(
+      time: CantonTimestamp,
+      config: splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD],
+  )(implicit tc: TraceContext): Future[Unit] =
+    packages.toSeq.traverse_ { pkg =>
+      val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
+      val darResource = DarResources.lookupPackageMetadata(pkg.packageName, version)
+      if (darResource.isEmpty) {
+        logger.warn(
+          show"Package ${pkg.packageName} is required in version ${version.toString} after $time according to AmuletConfig but this version is not part of the deployed release, upgrade before $time to avoid any issues"
+        )
+      }
+      Future.unit
+    }
+
+  private def uploadDar(resource: DarResource)(implicit tc: TraceContext): Future[Unit] =
+    for {
+      // While uploadDarFile is idempotent the logs are fairly noisy (which is useful in other places)
+      // so we do an explicit check here to only upload if it's not already there.
+      darO <- participantAdminConnection.lookupDar(resource.darHash)
+      _ <- darO match {
+        case None =>
+          participantAdminConnection.uploadDarFile(
+            UploadablePackage.fromResource(resource),
+            RetryFor.Automation,
+          )
+        case Some(_) => Future.unit
+      }
+    } yield ()
 }
