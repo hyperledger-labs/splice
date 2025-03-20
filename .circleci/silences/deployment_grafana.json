@@ -44,6 +44,12 @@
         "value": ".*",
         "isEqual": true,
         "isRegex": true
+      },
+      {
+        "name": "alertname",
+        "value": "Mediator Acknowledgement Lag",
+        "isEqual": true,
+        "isRegex": false
       }
     ]
   }
