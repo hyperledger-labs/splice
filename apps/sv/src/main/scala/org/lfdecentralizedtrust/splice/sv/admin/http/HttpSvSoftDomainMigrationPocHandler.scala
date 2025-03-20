@@ -5,7 +5,11 @@ package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  ParticipantAdminConnection,
+  RetryProvider,
+}
 import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc as v0
 import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrationPocResource
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
@@ -14,10 +18,11 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, UniqueIdentifier}
-import com.digitalasset.canton.topology.store.{TopologyStoreId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.Spanning
 import io.grpc.Status
+
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -32,6 +37,7 @@ class HttpSvSoftDomainMigrationPocHandler(
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     val amuletAppParameters: SharedSpliceAppParameters,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContextExecutor
 ) extends v0.SvSoftDomainMigrationPocHandler[TracedUser]
@@ -59,6 +65,7 @@ class HttpSvSoftDomainMigrationPocHandler(
       clock,
       retryProvider,
       logger,
+      packageVersionSupport,
     )
     val node = synchronizerNodes
       .get(synchronizerIdPrefix)

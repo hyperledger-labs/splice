@@ -274,16 +274,21 @@ class SV1Initializer(
         },
         logger,
       )
-
+      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
       dsoAutomation = newSvDsoAutomationService(
         svStore,
         dsoStore,
         Some(localSynchronizerNode),
         extraSynchronizerNodes,
         upgradesConfig,
+        packageVersionSupport,
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
-      withDsoStore = new WithDsoStore(dsoAutomation, decentralizedSynchronizer)
+      withDsoStore = new WithDsoStore(
+        dsoAutomation,
+        decentralizedSynchronizer,
+        packageVersionSupport,
+      )
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
         "bootstrap_dso_rules",
@@ -525,6 +530,7 @@ class SV1Initializer(
   private class WithDsoStore(
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       synchronizerId: SynchronizerId,
+      packageVersionSupport: PackageVersionSupport,
   ) {
 
     private val dsoStore = dsoStoreWithIngestion.store
@@ -537,6 +543,7 @@ class SV1Initializer(
       clock = clock,
       retryProvider = retryProvider,
       logger = logger,
+      packageVersionSupport,
     )
 
     /** The one and only entry-point: found a fresh DSO, given a properly

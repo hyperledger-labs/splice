@@ -128,7 +128,7 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  override def packages =
+  override def packages: Seq[DarResource] =
     super.packages ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit
@@ -838,6 +838,7 @@ class ValidatorApp(
         initialSynchronizerTime,
         config.parameters.enableCantonPackageSelection,
         loggerFactory,
+        new AmuletRulesPackageVersionSupport(scanConnection),
       )
       synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>

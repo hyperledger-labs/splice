@@ -446,6 +446,7 @@ class SvApp(
             }
           } yield res
       }
+      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
 
       (_, _, isDevNet, _, _, _, _) <- (
         // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
@@ -454,7 +455,14 @@ class SvApp(
         //    but could also be imported through the stream of the SV party. By only creating the validator user here
         //    we ensure that the party migration has been completed before the contract is created.
         appInitStep("Initialize validator") {
-          SvApp.initializeValidator(dsoAutomation, config, retryProvider, logger, clock)
+          SvApp.initializeValidator(
+            dsoAutomation,
+            config,
+            retryProvider,
+            logger,
+            clock,
+            packageVersionSupport,
+          )
         },
         // Ensure Daml-level invariants for the SV
         // ----------------------------------------
@@ -549,6 +557,7 @@ class SvApp(
         cometBftClient,
         loggerFactory,
         config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
+        packageVersionSupport,
       )
 
       adminHandler = new HttpSvAdminHandler(
@@ -591,6 +600,7 @@ class SvApp(
               retryProvider,
               loggerFactory,
               amuletAppParameters,
+              packageVersionSupport,
             )
           )
         else Seq.empty
@@ -1238,6 +1248,7 @@ object SvApp {
       retryProvider: RetryProvider,
       logger: TracedLogger,
       clock: Clock,
+      packageVersionSupport: PackageVersionSupport,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
     val store = dsoStoreWithIngestion.store
     val svParty = store.key.svParty
@@ -1259,12 +1270,9 @@ object SvApp {
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
               for {
-                amuletRules <- store.getAmuletRules().map(_.payload)
-                now = clock.now
-                supportsValidatorLicenseMetadata = PackageIdResolver
+                supportsValidatorLicenseMetadata <- packageVersionSupport
                   .supportsValidatorLicenseMetadata(
-                    now,
-                    amuletRules,
+                    clock.now
                   )
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_OnboardValidator(

@@ -3,11 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageRef, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{IdString, PackageName, PackageRef, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -277,7 +276,7 @@ object PackageIdResolver {
   )
 
   sealed abstract class Package extends Product with Serializable {
-    def packageName = {
+    def packageName: IdString.PackageName = {
       val clsName = this.productPrefix
       // Turn CantonAmulet into canton-amulet
       PackageName.assertFromString(
@@ -305,59 +304,4 @@ object PackageIdResolver {
     final case object SpliceWalletPayments extends Package
   }
 
-  def supportsValidatorLicenseMetadata(now: CantonTimestamp, amuletRules: AmuletRules): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val spliceAmuletVersion = PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
-    spliceAmuletVersion >= DarResources.amulet_0_1_3.metadata.version
-  }
-
-  def supportsValidatorLicenseActivity(now: CantonTimestamp, amuletRules: AmuletRules): Boolean =
-    supportsValidatorLicenseMetadata(now, amuletRules)
-
-  def supportsPruneAmuletConfigSchedule(now: CantonTimestamp, amuletRules: AmuletRules): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val dsoGovernanceVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
-    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_5.metadata.version
-  }
-
-  def supportsMergeDuplicatedValidatorLicense(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val dsoGovernanceVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
-    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_8.metadata.version
-  }
-
-  def supportsLegacySequencerConfig(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val dsoGovernanceVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
-    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_7.metadata.version
-  }
-
-  def supportsValidatorLivenessActivityRecord(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val amuletVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
-    amuletVersion >= DarResources.amulet_0_1_5.metadata.version
-  }
-
-  def supportsExternalPartyAmuletRules(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val amuletVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
-    amuletVersion >= DarResources.amulet_0_1_6.metadata.version
-  }
 }

@@ -5,10 +5,11 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{
-  SpliceLedgerClient,
+  PackageVersionSupport,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -26,7 +27,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -112,6 +113,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       localSynchronizerNode: Option[LocalSynchronizerNode],
       extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
       upgradesConfig: UpgradesConfig,
+      packageVersionSupport: PackageVersionSupport,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -135,6 +137,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       upgradesConfig,
       spliceInstanceNamesConfig,
       loggerFactory,
+      packageVersionSupport,
     )
 
   protected def newDsoPartyHosting(

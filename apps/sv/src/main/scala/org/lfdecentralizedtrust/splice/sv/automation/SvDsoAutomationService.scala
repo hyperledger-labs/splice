@@ -79,6 +79,7 @@ class SvDsoAutomationService(
     upgradesConfig: UpgradesConfig,
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -122,6 +123,7 @@ class SvDsoAutomationService(
       clock,
       config,
       retryProvider,
+      packageVersionSupport,
     )
 
   // required for triggers that must run in sim time as well
@@ -404,6 +406,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         connection,
+        packageVersionSupport,
       )
     )
 

@@ -11,7 +11,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerConnection, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -43,6 +47,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
     clock: Clock,
     config: SvAppBackendConfig,
     appLevelRetryProvider: RetryProvider,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -159,6 +164,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
          svTaskContext,
          retryProvider,
          leaderLoggerFactory,
+         packageVersionSupport,
        )
 
        epochStateVar = Some(

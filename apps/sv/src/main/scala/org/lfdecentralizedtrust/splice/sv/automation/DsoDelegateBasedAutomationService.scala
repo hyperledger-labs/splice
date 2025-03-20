@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.automation
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{AutomationService, AutomationServiceCompanion}
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -27,6 +27,7 @@ class DsoDelegateBasedAutomationService(
     svTaskContext: SvTaskBasedTrigger.Context,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -74,9 +75,17 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new ExpiredAnsSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new MergeSvRewardStateContractsTrigger(triggerContext, svTaskContext))
-    registerTrigger(new PruneAmuletConfigScheduleTrigger(triggerContext, svTaskContext))
+    registerTrigger(
+      new PruneAmuletConfigScheduleTrigger(triggerContext, svTaskContext, packageVersionSupport)
+    )
 
-    registerTrigger(new MergeValidatorLicenseContractsTrigger(triggerContext, svTaskContext))
+    registerTrigger(
+      new MergeValidatorLicenseContractsTrigger(
+        triggerContext,
+        svTaskContext,
+        packageVersionSupport,
+      )
+    )
   }
 
 }

@@ -59,6 +59,7 @@ class HttpSvHandler(
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
     isBftSequencer: Boolean,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -742,11 +743,9 @@ class HttpSvHandler(
   )(implicit tc: TraceContext): Future[Unit] =
     for {
       dsoRules <- dsoStore.getDsoRules()
-      amuletRules <- dsoStore.getAmuletRules()
       now = clock.now
-      supportsValidatorLicenseMetadata = PackageIdResolver.supportsValidatorLicenseMetadata(
-        now,
-        amuletRules.payload,
+      supportsValidatorLicenseMetadata <- packageVersionSupport.supportsValidatorLicenseMetadata(
+        now
       )
       cmds = Seq(
         dsoRules.exercise(
