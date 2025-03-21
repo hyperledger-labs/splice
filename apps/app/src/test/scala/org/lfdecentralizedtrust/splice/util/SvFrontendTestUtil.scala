@@ -36,11 +36,9 @@ trait SvFrontendTestUtil extends TestCommon {
         find(id("create-voterequest-submit-button")).value.isEnabled shouldBe true
       )
     }
-
     clue("click the submit button") {
       click on "create-voterequest-submit-button"
     }
-
     clue("click accept on the confirmation dialog") {
       click on "vote-confirmation-dialog-accept-button"
     }
