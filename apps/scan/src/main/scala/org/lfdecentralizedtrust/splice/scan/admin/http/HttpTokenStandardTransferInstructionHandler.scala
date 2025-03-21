@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -40,6 +39,7 @@ class HttpTokenStandardTransferInstructionHandler(
       body: definitions.GetFactoryRequest
   )(extracted: TraceContext): Future[v1.Resource.GetTransferFactoryResponse] = {
     implicit val tc: TraceContext = extracted
+    val now = clock.now
     withSpan(s"$workflowId.getTransferFactory") { _ => _ =>
       for {
         transfer <- Try(
@@ -68,7 +68,7 @@ class HttpTokenStandardTransferInstructionHandler(
             )
           )
         newestOpenRound <- store
-          .lookupLatestUsableOpenMiningRound(CantonTimestamp.now())
+          .lookupLatestUsableOpenMiningRound(now)
           .map(
             _.getOrElse(
               throw io.grpc.Status.NOT_FOUND
@@ -79,7 +79,7 @@ class HttpTokenStandardTransferInstructionHandler(
       } yield {
         val activeSynchronizerId =
           AmuletConfigSchedule(amuletRules.payload.configSchedule)
-            .getConfigAsOf(clock.now)
+            .getConfigAsOf(now)
             .decentralizedSynchronizer
             .activeSynchronizer
         v1.Resource.GetTransferFactoryResponseOK(

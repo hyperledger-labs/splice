@@ -1,0 +1,225 @@
+{
+  "nextOffset": 8,
+  "transactions": [
+    {
+      "updateId": "update-4",
+      "offset": 4,
+      "recordTime": "1970-01-01T00:00:04Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "AmuletRules_Transfer",
+          "contractId": "15",
+          "payload": {
+            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "200.0000000000",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/created-in-round",
+                    "1"
+                  ],
+                  [
+                    "splice.lfdecentralizedtrust.org/rate-per-round",
+                    "0.00380518"
+                  ]
+                ]
+              },
+              "owner": "party::normalized"
+            }
+          },
+          "offset": 4,
+          "templateId": "424159d90a541adf7d39b7527e7fcb8866ffbbc8f791315f0bc35d9a857456c0:Splice.Amulet:Amulet",
+          "packageName": "splice-amulet"
+        }
+      ]
+    },
+    {
+      "updateId": "update-5",
+      "offset": 5,
+      "recordTime": "1970-01-01T00:00:05Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Transfer",
+          "status": "Completed",
+          "input": {
+            "sender": "party::normalized",
+            "receiver": "validator::normalized",
+            "amount": "100.0000000000",
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "senderHoldings": [
+              "15"
+            ],
+            "meta": {
+              "values": []
+            },
+            "extraArgs": {
+              "context": {
+                "values": [
+                  [
+                    "amulet-rules",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "1"
+                    }
+                  ],
+                  [
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "8"
+                    }
+                  ],
+                  [
+                    "transfer-preapproval",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "20"
+                    }
+                  ]
+                ]
+              },
+              "meta": {
+                "values": []
+              }
+            }
+          },
+          "output": {
+            "receiverHoldingCids": [
+              "0"
+            ],
+            "senderHoldingCids": [
+              "21"
+            ],
+            "meta": {
+              "values": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "updateId": "update-6",
+      "offset": 6,
+      "recordTime": "1970-01-01T00:00:06Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "AmuletRules_Mint",
+          "contractId": "2",
+          "payload": {
+            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "20000.0000000000",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/created-in-round",
+                    "1"
+                  ],
+                  [
+                    "splice.lfdecentralizedtrust.org/rate-per-round",
+                    "0.00380518"
+                  ]
+                ]
+              },
+              "owner": "party::normalized"
+            }
+          },
+          "offset": 6,
+          "templateId": "424159d90a541adf7d39b7527e7fcb8866ffbbc8f791315f0bc35d9a857456c0:Splice.Amulet:Amulet",
+          "packageName": "splice-amulet"
+        }
+      ]
+    },
+    {
+      "updateId": "update-7",
+      "offset": 7,
+      "recordTime": "1970-01-01T00:00:07Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "raw API",
+          "contractId": "3",
+          "payload": {
+            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "30.0000000000",
+              "instrumentId": {
+                "admin": "party::normalized",
+                "id": "DummyHolding"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "test",
+                    "test"
+                  ]
+                ]
+              },
+              "owner": "party::normalized"
+            }
+          },
+          "offset": 7,
+          "templateId": "8bee11085163f0029179eaed4a1d8eef088ef53b0076f62d880506bd870e8461:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "packageName": "splice-api-token-sample-holding"
+        }
+      ]
+    },
+    {
+      "updateId": "update-8",
+      "offset": 8,
+      "recordTime": "1970-01-01T00:00:08Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "raw API",
+          "contractId": "4",
+          "payload": {
+            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "40.0000000000",
+              "instrumentId": {
+                "admin": "party::normalized",
+                "id": "DummyHolding"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "test",
+                    "test"
+                  ]
+                ]
+              },
+              "owner": "party::normalized"
+            }
+          },
+          "offset": 8,
+          "templateId": "8bee11085163f0029179eaed4a1d8eef088ef53b0076f62d880506bd870e8461:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "packageName": "splice-api-token-sample-holding"
+        }
+      ]
+    }
+  ]
+}

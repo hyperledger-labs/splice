@@ -1,14 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { LedgerClient } from "../apis/ledger-client";
+import { CommandOptions } from "../cli";
 
-interface ListHoldingsOptions {
-  ledgerUrl: string;
-  authToken: string;
-}
 export async function listHoldings(
   partyId: string,
-  opts: ListHoldingsOptions
+  opts: CommandOptions
 ): Promise<void> {
   try {
     const ledgerClient = new LedgerClient(opts.ledgerUrl, opts.authToken);
@@ -16,7 +13,7 @@ export async function listHoldings(
     const holdings: any[] = await ledgerClient.getActiveContractsOfParty(
       partyId,
       ledgerEnd.offset,
-      "#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding"
+      ["#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding"]
     );
     const prettyHoldings = holdings.map(toPrettyHolding);
     console.log(JSON.stringify(prettyHoldings, null, 2));
