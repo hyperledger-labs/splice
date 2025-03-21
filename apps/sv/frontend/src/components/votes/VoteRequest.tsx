@@ -45,7 +45,6 @@ import {
   isValidVoteRequestUrl,
   VoteRequestValidity,
 } from '../../utils/validations';
-import { ConfirmationDialogWithRequestConflictsCheck } from '../ConfirmationDialogWithRequestConflictsCheck';
 import SvListVoteRequests from './SvListVoteRequests';
 import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
@@ -78,6 +77,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
   const [effectivity, setEffectivity] = useState<Dayjs>(dayjs());
   const [expiration, setExpiration] = useState<Dayjs>(dayjs());
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [disableProceed, setDisableProceed] = useState(false);
 
   // States related to constraints from vote requests
   const [
@@ -285,6 +285,15 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
   };
 
   const conflicts = hasConflictingFields(action, voteRequestQuery.data);
+
+  useEffect(() => {
+    if (conflicts.hasConflict) {
+      setDisableProceed(true);
+    } else {
+      setDisableProceed(false);
+    }
+  }, [conflicts]);
+
   // @ts-ignore
   const conditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
     { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
@@ -527,6 +536,16 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                   // TODO(#16139): get rid of logic to set expiration date for request that don't define effectivity
                   supportsVoteEffectivityAndSetConfig ? effectivity?.toDate() : new Date(expiresAt!)
                 }
+                expirationInDays={expirationInDays}
+                confirmationDialogProps={{
+                  showDialog: confirmDialogOpen,
+                  onAccept: handleConfirmationAccept,
+                  onClose: () => setConfirmDialogOpen(false),
+                  title: 'Confirm Your Vote Request',
+                  attributePrefix: 'vote',
+                  children: null,
+                  disableProceed: disableProceed,
+                }}
               />
             </Stack>
           )}
@@ -550,27 +569,6 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           </Stack>
         </CardContent>
       </Card>
-      <ConfirmationDialogWithRequestConflictsCheck
-        showDialog={confirmDialogOpen}
-        onAccept={handleConfirmationAccept}
-        onClose={() => setConfirmDialogOpen(false)}
-        title="Confirm Your Vote Request"
-        attributePrefix="vote"
-        action={
-          supportsVoteEffectivityAndSetConfig ? (action as ActionRequiringConfirmation) : undefined
-        }
-        voteRequestQuery={supportsVoteEffectivityAndSetConfig ? voteRequestQuery : undefined}
-      >
-        <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
-        <br />
-        Please note:
-        <ul>
-          <li>This action cannot be undone.</li>
-          <li>You will not be able to edit this request afterwards.</li>
-          <li>You may only edit your vote after creation.</li>
-          <li>The vote request will expire in {expirationInDays} days.</li>
-        </ul>
-      </ConfirmationDialogWithRequestConflictsCheck>
     </Stack>
   );
 };
