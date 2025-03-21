@@ -84,6 +84,35 @@ export function getDsoSetConfigAction(
   };
 }
 
+export function getDsoSvOffboardingAction(sv: string): ActionRequiringConfirmation {
+  return {
+    tag: 'ARC_DsoRules',
+    value: {
+      dsoAction: {
+        tag: 'SRARC_OffboardSv',
+        value: {
+          sv: sv,
+        },
+      },
+    },
+  };
+}
+
+export function getUpdateSvRewardWeightAction(sv: string): ActionRequiringConfirmation {
+  return {
+    tag: 'ARC_DsoRules',
+    value: {
+      dsoAction: {
+        tag: 'SRARC_UpdateSvRewardWeight',
+        value: {
+          svParty: sv,
+          newRewardWeight: '1000',
+        },
+      },
+    },
+  };
+}
+
 export function getExpectedDsoRulesConfigDiffsHTML(
   originalAcsCommitmentReconciliationInterval: string,
   replacementAcsCommitmentReconciliationInterval: string

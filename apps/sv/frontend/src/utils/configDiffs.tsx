@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 // @ts-ignore
-import * as jsondiffpatch from 'jsondiffpatch';
 import { computeDiff } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
 
@@ -45,39 +44,53 @@ function filterMostSpecificKeys(keys: string[]): string[] {
   );
 }
 
-function intersectConfigDiffsKeys(
-  currentDiffsKeys: string[],
-  voteRequestsDiffsKeys: string[]
-): string[] {
+function intersectConfigs(currentDiffsKeys: string[], voteRequestsDiffsKeys: string[]): string[] {
   return filterMostSpecificKeys(voteRequestsDiffsKeys).filter(e => currentDiffsKeys.includes(e));
 }
 
 /**
  *
  * @param action current action to be parsed
- * @param currentActionTag Optional argument to specify which action should be parsed
+ * @param selectedActionTag Optional argument to specify which action should be parsed
  */
 function parseDiffs(
   action: ActionRequiringConfirmation,
-  currentActionTag?: string
-): jsondiffpatch.Delta | null {
+  selectedAction: ActionRequiringConfirmation
+): string[] | null {
   let currentDiffsKeys = null;
-  const tag = action.tag;
-  if (action.tag === 'ARC_AmuletRules' && tag === (currentActionTag ?? tag)) {
-    if (action.value.amuletRulesAction.tag === 'CRARC_SetConfig') {
+  if (action.tag === 'ARC_AmuletRules' && selectedAction.tag === 'ARC_AmuletRules') {
+    if (
+      action.value.amuletRulesAction.tag === 'CRARC_SetConfig' &&
+      selectedAction.value.amuletRulesAction.tag === 'CRARC_SetConfig'
+    ) {
       currentDiffsKeys = computeDiff({
         new: action.value.amuletRulesAction.value.newConfig,
         base: action.value.amuletRulesAction.value.baseConfig,
       });
+      currentDiffsKeys = flattenKeys(currentDiffsKeys as object);
     }
-  } else if (action.tag === 'ARC_DsoRules' && tag === (currentActionTag ?? tag)) {
-    if (action.value.dsoAction.tag === 'SRARC_SetConfig') {
+  } else if (action.tag === 'ARC_DsoRules' && selectedAction.tag === 'ARC_DsoRules') {
+    if (
+      action.value.dsoAction.tag === 'SRARC_SetConfig' &&
+      selectedAction.value.dsoAction.tag === 'SRARC_SetConfig'
+    ) {
       currentDiffsKeys =
         action.value.dsoAction.value.baseConfig &&
         computeDiff({
           new: action.value.dsoAction.value.newConfig,
           base: action.value.dsoAction.value.baseConfig,
         });
+      currentDiffsKeys = flattenKeys(currentDiffsKeys as object);
+    } else if (
+      action.value.dsoAction.tag === 'SRARC_OffboardSv' &&
+      selectedAction.value.dsoAction.tag === 'SRARC_OffboardSv'
+    ) {
+      currentDiffsKeys = [action.value.dsoAction.value.sv];
+    } else if (
+      action.value.dsoAction.tag === 'SRARC_UpdateSvRewardWeight' &&
+      selectedAction.value.dsoAction.tag === 'SRARC_UpdateSvRewardWeight'
+    ) {
+      currentDiffsKeys = [action.value.dsoAction.value.svParty];
     }
   }
   return currentDiffsKeys;
@@ -93,18 +106,20 @@ export function hasConflictingFields(
   if (!voteRequests) {
     return { hasConflict: false, intersection: [] };
   }
-  const currentDiffs = parseDiffs(action as ActionRequiringConfirmation);
+  const currentDiffs = parseDiffs(
+    action as ActionRequiringConfirmation,
+    action as ActionRequiringConfirmation
+  );
   if (!currentDiffs) {
     return { hasConflict: false, intersection: [] };
   }
-  const voteRequestsDiffs: jsondiffpatch.Delta[] = voteRequests
-    .map(r => parseDiffs(r.payload.action, (action as ActionRequiringConfirmation).tag))
-    .filter((e): e is jsondiffpatch.Delta => e !== null);
+  const voteRequestsDiffs: string[] = voteRequests
+    .flatMap(r => parseDiffs(r.payload.action, action as ActionRequiringConfirmation))
+    .filter((e): e is string => e !== null);
   if (voteRequestsDiffs.length === 0) {
     return { hasConflict: false, intersection: [] };
   }
-  const voteRequestsDiffsKeys = voteRequestsDiffs.flatMap(e => flattenKeys(e as object));
-  const currentDiffsKeys = flattenKeys(currentDiffs);
-  const intersection = intersectConfigDiffsKeys(currentDiffsKeys, voteRequestsDiffsKeys);
+  const intersection = intersectConfigs(currentDiffs, voteRequestsDiffs);
+  console.log(intersection, voteRequestsDiffs, currentDiffs);
   return { hasConflict: intersection.length > 0, intersection };
 }

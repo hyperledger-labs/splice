@@ -3,6 +3,8 @@
 import {
   getAmuletSetConfigAction,
   getDsoSetConfigAction,
+  getDsoSvOffboardingAction,
+  getUpdateSvRewardWeightAction,
   mkVoteRequest,
 } from 'common-test-handlers';
 import { test, expect, describe } from 'vitest';
@@ -178,6 +180,48 @@ describe('Utility', () => {
         'transferConfig.createFee.fee',
         'decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds',
       ],
+    });
+  });
+
+  test('hasConflictingFields function works as expected for SV Offboarding changes', async () => {
+    const aliceOffboarding = getDsoSvOffboardingAction('alice');
+    const bobOffboarding = getDsoSvOffboardingAction('bob');
+
+    const noChanges = hasConflictingFields(aliceOffboarding, []);
+    expect(noChanges).toStrictEqual({ hasConflict: false, intersection: [] });
+
+    const overlapChanges = hasConflictingFields(aliceOffboarding, [mkVoteRequest(bobOffboarding)]);
+    expect(overlapChanges).toStrictEqual({ hasConflict: false, intersection: [] });
+
+    const intersectChanges = hasConflictingFields(aliceOffboarding, [
+      mkVoteRequest(aliceOffboarding),
+      mkVoteRequest(bobOffboarding),
+    ]);
+    expect(intersectChanges).toStrictEqual({
+      hasConflict: true,
+      intersection: ['alice'],
+    });
+  });
+
+  test('hasConflictingFields function works as expected for UpdateSvRewardWeight changes', async () => {
+    const aliceUpdateSvRewardWeight = getUpdateSvRewardWeightAction('alice');
+    const bobUpdateSvRewardWeight = getUpdateSvRewardWeightAction('bob');
+
+    const noChanges = hasConflictingFields(aliceUpdateSvRewardWeight, []);
+    expect(noChanges).toStrictEqual({ hasConflict: false, intersection: [] });
+
+    const overlapChanges = hasConflictingFields(aliceUpdateSvRewardWeight, [
+      mkVoteRequest(bobUpdateSvRewardWeight),
+    ]);
+    expect(overlapChanges).toStrictEqual({ hasConflict: false, intersection: [] });
+
+    const intersectChanges = hasConflictingFields(aliceUpdateSvRewardWeight, [
+      mkVoteRequest(aliceUpdateSvRewardWeight),
+      mkVoteRequest(bobUpdateSvRewardWeight),
+    ]);
+    expect(intersectChanges).toStrictEqual({
+      hasConflict: true,
+      intersection: ['alice'],
     });
   });
 });
