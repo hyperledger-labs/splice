@@ -22,24 +22,26 @@ main:
           - condition: ${"cnBackupRunId" in args}
             assign:
               - cnBackupRunId: ${args.cnBackupRunId}
-            next: findAllBackups
-    # A backup run ID was not explicitly provided, find the latest backup before the provided date.
-    - initBeforeDate:
-        - beforeDate: ${args.beforeDate}
-    - findBackupBeforeDate:
-        call: http.get
-        args:
-          url: https://find-backup-before-125482597181.us-central1.run.app
-          query:
-              before: ${beforeDate}
-              instance: ${sourceInstance}
-              project: ${sourceProject}
-          auth:
-              type: OIDC
-        result: sourceBackup
-    - getRunIdFromBackup:
-        assign:
-        - cnBackupRunId: ${sourceBackup.body.description}
+          - condition: true #else
+            steps:
+              # A backup run ID was not explicitly provided, find the latest backup before the provided date.
+              - initBeforeDate:
+                  assign:
+                  - beforeDate: ${args.beforeDate}
+              - findBackupBeforeDate:
+                  call: http.get
+                  args:
+                    url: https://find-backup-before-125482597181.us-central1.run.app
+                    query:
+                        before: ${beforeDate}
+                        instance: ${sourceInstance}
+                        project: ${sourceProject}
+                    auth:
+                        type: OIDC
+                  result: sourceBackup
+              - getRunIdFromBackup:
+                  assign:
+                  - cnBackupRunId: ${sourceBackup.body.description}
     - findAllBackups:
         call: http.get
         args:
