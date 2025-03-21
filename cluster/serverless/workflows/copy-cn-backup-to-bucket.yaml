@@ -1,3 +1,7 @@
+# Example arguments:
+# Last backup that finished before 2024/10/13: {"beforeDate": "2024-10-13"}
+# Specific backup run ID: {"cnBackupRunId": "1729083735"}
+
 main:
     params: [args]
     steps:
@@ -12,6 +16,15 @@ main:
         - bucketName: cn-mainnet-backups
         # TODO(#17852): for now, this is the pre-zrh migration cluster
         - sourceCluster: main
+    # If a backup run ID is provided, use it.
+    - getCnBackupRunId:
+        switch:
+          - condition: ${"cnBackupRunId" in args}
+            assign:
+              - cnBackupRunId: ${args.cnBackupRunId}
+            next: findAllBackups
+    # A backup run ID was not explicitly provided, find the latest backup before the provided date.
+    - initBeforeDate:
         - beforeDate: ${args.beforeDate}
     - findBackupBeforeDate:
         call: http.get
