@@ -3,7 +3,7 @@
   "description": "Hourly Preflight of DevNet",
   "attribution-actor": "system",
   "parameters": {
-    "branch": "release-line-0.3.16",
+    "branch": "release-line-0.3.17",
     "run-job": "healthcheck-devnet"
   },
   "timetable": {
