@@ -203,7 +203,7 @@ class SvOffboardingIntegrationTest
         },
       )
 
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 40.seconds)(
         // We need SV4's vote here for immediate offboarding
         "SV3 and SV4 vote on removing sv4", {
           sv3Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")
