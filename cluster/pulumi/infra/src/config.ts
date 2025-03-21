@@ -42,6 +42,11 @@ export const InfraConfigSchema = z.object({
     ipWhitelisting: z.object({
       extraWhitelistedIngress: z.array(z.string()).default([]),
     }),
+    prometheus: z.object({
+      storageSize: z.string(),
+      retentionDuration: z.string(),
+      retentionSize: z.string(),
+    }),
   }),
   monitoring: MonitoringConfigSchema,
 });

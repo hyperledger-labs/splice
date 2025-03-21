@@ -2607,7 +2607,7 @@
                 "memory": "24Gi"
               }
             },
-            "retention": "1y",
+            "retention": "10y",
             "retentionSize": "1500GB",
             "serviceMonitorSelector": {
               "matchLabels": null

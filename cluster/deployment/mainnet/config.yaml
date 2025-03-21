@@ -1,3 +1,6 @@
+infra:
+  prometheus:
+    retentionDuration: "10y"
 synchronizerMigration:
   archived:
     - id: 1
