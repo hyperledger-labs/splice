@@ -2110,10 +2110,6 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
-      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
-      run_upgrade_workarounds:
-        type: boolean
-        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -2140,10 +2136,6 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of SV runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
-            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
-              # TODO (#14721): remove
-              export COMETBFT_STABLE_CHAIN_ID=true
-            fi
             # cncluster update_config makes the repo dirty
             # even if it was on the last run and this is a retry
             # and this breaks get-snapshot-version ...
@@ -2195,10 +2187,6 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
-      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
-      run_upgrade_workarounds:
-        type: boolean
-        default: false
     steps:
       - checkout_with_retry
       - when:
@@ -2225,10 +2213,6 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of Validator runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
-            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
-              # TODO (#14721): remove
-              export COMETBFT_STABLE_CHAIN_ID=true
-            fi
             # cncluster update_config makes the repo dirty
             # even if it was on the last run and this is a retry
             # and this breaks get-snapshot-version ...
@@ -2289,11 +2273,6 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
-      # Load env vars that were unset at a base version, that otherwise break backwards compatibility
-      run_upgrade_workarounds:
-        type: boolean
-        default: false
-
     steps:
       - checkout_with_retry
       - when:
@@ -2343,10 +2322,6 @@ jobs:
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
-            if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
-              # TODO (#14721): remove
-              export COMETBFT_STABLE_CHAIN_ID=true
-            fi
             # cncluster update_config makes the repo dirty
             # even if it was on the last run and this is a retry
             # and this breaks get-snapshot-version ...
@@ -6708,7 +6683,6 @@ workflows:
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
-          run_upgrade_workarounds: true
           requires:
             - reset_cluster
             - autoscaler_prevent_scaledown
@@ -6732,7 +6706,6 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-          run_upgrade_workarounds: true
           requires:
             - deploy_cluster_for_upgrade
       - preflight_sv_check:
@@ -6753,7 +6726,6 @@ workflows:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          run_upgrade_workarounds: true
           requires:
             - deploy_cluster_for_upgrade
       - preflight_validator_check:
