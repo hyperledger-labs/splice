@@ -106,7 +106,7 @@ test_happy_path = script do
   view === Api.Token.TransferInstructionV1.TransferFactoryView registry.dso emptyMetadata
 
   Map.size enrichedChoice.arg.extraArgs.context.values === 4
-  Map.size enrichedChoice.disclosures.disclosures === 6  -- the above plus the referenced holding contract
+  Map.size enrichedChoice.disclosures.disclosures === 5
 
   WalletClient.checkBalanceApprox bob registry.instrumentId 50.0
 
