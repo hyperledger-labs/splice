@@ -12,7 +12,6 @@ import {
   installAuth0Secret,
   installSpliceHelmChart,
   ValidatorTopupConfig,
-  config,
   splitwellDarPath,
   imagePullSecret,
   CnInput,
@@ -158,10 +157,7 @@ export async function installSplitwell(
       auth0AppName: 'splitwell_validator',
     },
     validatorWalletUsers: [validatorWalletUser],
-    // TODO(#14199) Remove this with the next reset
-    validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
-      ? config.requireEnv('CN_SPLITWELL_VALIDATOR_LEGACY_PARTY_HINT')
-      : 'digitalasset-splitwell-1',
+    validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
   });
 

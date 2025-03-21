@@ -2446,10 +2446,6 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
-                    "name": "SPLICE_APP_LEGACY_PARTY_HINT",
-                    "value": ""
-                  },
-                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2822,10 +2818,6 @@
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
                     "value": "sv-support@digitalasset.com"
-                  },
-                  {
-                    "name": "SPLICE_APP_LEGACY_PARTY_HINT",
-                    "value": ""
                   },
                   {
                     "name": "NUM_NODES",
@@ -3202,10 +3194,6 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
-                    "name": "SPLICE_APP_LEGACY_PARTY_HINT",
-                    "value": ""
-                  },
-                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3580,10 +3568,6 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
-                    "name": "SPLICE_APP_LEGACY_PARTY_HINT",
-                    "value": ""
-                  },
-                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3956,10 +3940,6 @@
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
                     "value": "sv-support@digitalasset.com"
-                  },
-                  {
-                    "name": "SPLICE_APP_LEGACY_PARTY_HINT",
-                    "value": ""
                   },
                   {
                     "name": "NUM_NODES",
