@@ -34,6 +34,37 @@ if [[ -z $CIRCLECI_TOKEN ]]; then
 fi
 set -u
 
+BRANCH_VALUE=$(jq -r '.parameters.branch // empty' < "${TRIGGER_DEFINITION_FILE}")
+
+case "$BRANCH_VALUE" in
+    "DEVNET_RELEASE_BRANCH")
+        CONFIG_YAML="$SPLICE_ROOT/cluster/deployment/devnet/config.yaml"
+        ;;
+    "TESTNET_RELEASE_BRANCH")
+        CONFIG_YAML="$SPLICE_ROOT/cluster/deployment/testnet/config.yaml"
+        ;;
+    "MAINNET_RELEASE_BRANCH")
+        CONFIG_YAML="$SPLICE_ROOT/cluster/deployment/mainnet/config.yaml"
+        ;;
+    *)
+        CONFIG_YAML=""
+        ;;
+esac
+
+if [[ -n "$CONFIG_YAML" ]]; then
+    RELEASE_REFERENCE=$(yq eval '.synchronizerMigration.active.releaseReference' "$CONFIG_YAML")
+
+    RELEASE_REFERENCE="${RELEASE_REFERENCE#refs/heads/}"
+
+    echo "Found release reference: $RELEASE_REFERENCE"
+
+    TMP_TRIGGER_FILE=$(mktemp)
+    jq --arg branch "$RELEASE_REFERENCE" '.parameters.branch = $branch' "$TRIGGER_DEFINITION_FILE" > "$TMP_TRIGGER_FILE"
+
+    echo "Updated trigger definition file with branch: $RELEASE_REFERENCE"
+    TRIGGER_DEFINITION_FILE="$TMP_TRIGGER_FILE"
+fi
+
 TRIGGER_NAME=$(jq -c '.name' < "${TRIGGER_DEFINITION_FILE}")
 
 if [[ -z "$TRIGGER_NAME" ]]; then
