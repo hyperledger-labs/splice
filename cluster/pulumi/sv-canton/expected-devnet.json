@@ -1105,7 +1105,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -1199,7 +1198,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -1465,7 +1463,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -1610,7 +1607,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -2247,7 +2243,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -2341,7 +2336,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -2607,7 +2601,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -2752,7 +2745,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -3389,7 +3381,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -3483,7 +3474,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -3749,7 +3739,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -3894,7 +3883,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -4531,7 +4519,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -4625,7 +4612,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -4891,7 +4877,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -5036,7 +5021,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -5793,7 +5777,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -5887,7 +5870,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },
@@ -6153,7 +6135,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
             "id": 0
           }
         },
@@ -6298,7 +6279,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 1
           }
         },

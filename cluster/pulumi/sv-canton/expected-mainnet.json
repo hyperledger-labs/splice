@@ -279,7 +279,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 2
           }
         },
@@ -484,7 +483,6 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
             "id": 2
           }
         },

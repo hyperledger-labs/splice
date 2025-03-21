@@ -174,7 +174,6 @@ export class InStackDecentralizedSynchronizerNode
             enable: true,
             migration: {
               id: migrationId,
-              active: active,
             },
           },
           livenessProbeInitialDelaySeconds: domainLivenessProbeInitialDelaySeconds,

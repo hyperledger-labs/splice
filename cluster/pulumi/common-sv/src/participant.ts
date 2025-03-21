@@ -74,7 +74,6 @@ export function installSvParticipant(
         enable: true,
         migration: {
           id: migrationId,
-          active: isActive,
         },
       },
       additionalJvmOptions: jmxOptions(),
