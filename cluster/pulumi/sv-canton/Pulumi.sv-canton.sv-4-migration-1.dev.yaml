@@ -1,0 +1,2 @@
+secretsprovider: gcpkms://projects/da-cn-devnet/locations/us-central1/keyRings/pulumi/cryptoKeys/dev
+encryptedkey: CiQAv4U9bUAo4Ih47ec+mejQ4W8bGqWr0DyaCuLCzvLzwzlcSzoSSQDciNaLc0/zVg06YNX+HxY23rvtknpEqnSOYsjvrJG19F7Z6N8tARdts3ywoX9jh9wDJ1NA3dXimF19uiOZNKk/q18x59mju6g=

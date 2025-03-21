@@ -228,7 +228,7 @@ commands:
           gce_authenticate: true
           cmd_retry_count: 5 # we have seen this fail several times, see #13863
           cmd: |
-            $REPO_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
+            $SPLICE_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
@@ -401,12 +401,22 @@ commands:
       - run:
           name: clone << parameters.repo_name >> repo
           command: |
+            set -eou pipefail
             cd ..
             for i in $(seq 1 5)
             do
               git clone "<< parameters.repository >>" << parameters.directory >> && s=0 && break || s=$? && sleep 5
             done
-            (exit $s)
+            if [[ $s -ne 0 ]]
+            then
+              exit $s
+            fi
+            cd "<< parameters.directory >>"
+            if git rev-parse "origin/${CIRCLE_BRANCH}"
+            then
+              echo "Branch $CIRCLE_BRANCH already exists, creating PR against that branch."
+              git checkout "$CIRCLE_BRANCH"
+            fi
       - run_bash_command_in_nix:
           cmd_name: dump latest into << parameters.repo_name >>
           cmd: |
@@ -504,7 +514,8 @@ commands:
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
-            cncluster pulumi deployment up --skip-preview --diff
+            cncluster pulumi operator refresh --yes
+            cncluster pulumi operator up --skip-preview --diff
 
   skip_if_flag_set:
     parameters:

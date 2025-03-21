@@ -10,10 +10,10 @@ $(dir)/test-devnet.json: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D); \
 	if [ -n "$$CI" ]; then \
-	    . "${REPO_ROOT}/cluster/deployment/devnet/.envrc.vars"; \
+	    . "${SPLICE_ROOT}/cluster/deployment/devnet/.envrc.vars"; \
 		npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	else \
-		env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="dev" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		env -i PATH="$$PATH" HOME="$$HOME" SPLICE_ROOT="$$SPLICE_ROOT" GCP_CLUSTER_BASENAME="dev" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	fi
 
 .PHONY: $(dir)/test-testnet.json
@@ -21,10 +21,10 @@ $(dir)/test-testnet.json: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D); \
 	if [ -n "$$CI" ]; then \
-	    . "${REPO_ROOT}/cluster/deployment/testnet/.envrc.vars"; \
+	    . "${SPLICE_ROOT}/cluster/deployment/testnet/.envrc.vars"; \
     	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     else \
-        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="testzrh" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+        env -i PATH="$$PATH" HOME="$$HOME" SPLICE_ROOT="$$SPLICE_ROOT" GCP_CLUSTER_BASENAME="testzrh" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
 .PHONY: $(dir)/test-mainnet.json
@@ -32,10 +32,10 @@ $(dir)/test-mainnet.json: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D); \
 	if [ -n "$$CI" ]; then \
-	    . "${REPO_ROOT}/cluster/deployment/mainnet/.envrc.vars"; \
+	    . "${SPLICE_ROOT}/cluster/deployment/mainnet/.envrc.vars"; \
     	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     else \
-        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="mainzrh" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+        env -i PATH="$$PATH" HOME="$$HOME" SPLICE_ROOT="$$SPLICE_ROOT" GCP_CLUSTER_BASENAME="mainzrh" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
 .PHONY: $(dir)/test

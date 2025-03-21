@@ -6,7 +6,7 @@
 set -e
 
 if [ -z "${1:-}" ]; then
-    echo "Usage: $0 <halt_file_in_repo_root>"
+    echo "Usage: $0 <halt_file_in_SPLICE_ROOT>"
 else
     halt_file=$1
 fi
@@ -17,5 +17,5 @@ if [[ "${git_commit_message}" == *"[release]"* ]] && [[ ! "${CIRCLE_BRANCH}" =~ 
   echo "commit message contains [release] but branch '${CIRCLE_BRANCH}' is not a release line"
   # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
   # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
-  touch "$REPO_ROOT"/"$halt_file"
+  touch "$SPLICE_ROOT"/"$halt_file"
 fi

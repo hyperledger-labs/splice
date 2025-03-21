@@ -28,7 +28,7 @@ function start_frontend() {
   local node_name=$4
   local test_auth=$5
 
-  local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
+  local frontend_dir="${SPLICE_ROOT}/apps/${app}/frontend"
 
   # Note: We are sending the content of the whole config.js file as a string to the webpack dev server.
   # There are two issues with this:
@@ -67,7 +67,7 @@ function start_frontend() {
     --tla-str app="$app" \
     --tla-str port="$port" \
     --tla-code spliceInstanceNames="$splice_instance_names" \
-    "$REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet" \
+    "$SPLICE_ROOT/apps/app/src/test/resources/frontend-config.jsonnet" \
     >"$config_file"
 
   # This is the URL the frontend talks to which is then rewritten using th vite proxy to the actual url of the backend
@@ -85,7 +85,7 @@ function start_frontend() {
 
 function start_test() {
   local app=$1
-  local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
+  local frontend_dir="${SPLICE_ROOT}/apps/${app}/frontend"
 
   tmux_cmd "${app}-test" "${frontend_dir}" "npm run test"
 }
@@ -139,9 +139,9 @@ done
 tmux_session="cn-frontends"
 tmux_window=0
 
-LOG_DIR="${REPO_ROOT}/log"
+LOG_DIR="${SPLICE_ROOT}/log"
 
-(cd "$REPO_ROOT" && sbt --batch apps-frontends/compile)
+(cd "$SPLICE_ROOT" && sbt --batch apps-frontends/compile)
 
 tmux new-session -d -s "${tmux_session}"
 mkdir -p "${LOG_DIR}"
@@ -150,10 +150,10 @@ function wait_for_workspace_build() {
   local workspace=$1
   local index=$2 # relative to apps/
 
-  tmux_cmd "$workspace" "$REPO_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee ${LOG_DIR}/npm-$workspace.log"
+  tmux_cmd "$workspace" "$SPLICE_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee ${LOG_DIR}/npm-$workspace.log"
 
   local count=0
-  while [ ! -f "$REPO_ROOT/apps/$index" ]; do
+  while [ ! -f "$SPLICE_ROOT/apps/$index" ]; do
     echo "Waiting for $workspace to start..."
     sleep 1
     count=$((++count))

@@ -1,0 +1,3267 @@
+openapi: 3.0.0
+info:
+  title: Scan API
+  version: 0.0.1
+tags:
+  - name: external
+    description: |
+      These endpoints are intended for public usage and will remain backward-compatible.
+  - name: internal
+    description: |
+      For internal usage only, not guaranteed to be stable or backward-compatible.
+  - name: deprecated
+    description: |
+      These endpoints are deprecated and will be removed in a future release.
+  - name: scan
+    description: |
+      The internal and external endpoints.
+servers:
+  - url: https://example.com/api/scan
+paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
+
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
+
+  /status:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
+
+  /version:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
+
+  /v0/dso:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getDsoInfo"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
+
+  /v0/validators/validator-faucets:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getValidatorFaucetsByValidator"
+      description: |
+        For every argument that is a valid onboarded validator, return
+        statistics on its liveness activity, according to on-ledger state at the
+        time of the request.
+      parameters:
+        - name: validator_ids
+          in: query
+          required: true
+          description: |
+            A list of validator party IDs, one per specification of the parameter.
+            Any party IDs not matching onboarded validators will be ignored
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetValidatorFaucetsByValidatorResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/scans:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "listDsoScans"
+      description: |
+        Retrieve Canton scan configuration for all SVs, grouped by
+        connected synchronizer ID
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListDsoScansResponse"
+
+  /v0/admin/validator/licenses:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "listValidatorLicenses"
+      description: |
+        List all validators currently approved by members of the DSO, paginated,
+        sorted newest-first.
+      parameters:
+        - name: "after"
+          description: |
+            A `next_page_token` from a prior response; if absent, return the first page.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: "limit"
+          description: Maximum number of elements to return, 1000 by default.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListValidatorLicensesResponse"
+
+  /v0/dso-sequencers:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "listDsoSequencers"
+      description: |
+        Retrieve Canton sequencer configuration for all SVs, grouped by
+        connected synchronizer ID
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListDsoSequencersResponse"
+
+  /v0/domains/{domain_id}/parties/{party_id}/participant-id:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getPartyToParticipant"
+      description: |
+        Get the ID of the participant hosting a given party.  This will fail if
+        there are multiple party-to-participant mappings for the given
+        synchronizer and party, which is not currently supported.
+      parameters:
+        - name: "domain_id"
+          description: |
+            The synchronizer ID to look up a mapping for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "party_id"
+          description: |
+            The party ID to lookup a participant ID for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetPartyToParticipantResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/domains/{domain_id}/members/{member_id}/traffic-status:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getMemberTrafficStatus"
+      description: |
+        Get a member's traffic status as reported by the sequencer, according to
+        ledger state at the time of the request.
+      parameters:
+        - name: "domain_id"
+          description: |
+            The synchronizer ID to look up traffic for.
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "member_id"
+          description: |
+            The participant or mediator whose traffic to look up, in the format
+            `code::id::fingerprint` where `code` is `PAR` or `MED`.
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetMemberTrafficStatusResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/closed-rounds:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getClosedRounds"
+      description: |
+        Every closed mining round on the ledger still in post-close process for
+        the connected Splice network, in round number order, earliest-first.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetClosedRoundsResponse"
+
+  /v0/open-and-issuing-mining-rounds:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getOpenAndIssuingMiningRounds"
+      description: |
+        All current open and issuing mining rounds, if the request is empty;
+        passing contract IDs in the request can reduce the response data for
+        polling/client-cache-update efficiency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsResponse"
+
+  /v1/updates:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getUpdateHistoryV1"
+      description: |
+        Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
+        Unlike /v0/updates, this endpoint returns responses that are consistent across different
+        scan instances. Event ids returned by this endpoint are not comparable to event ids returned by /v0/updates.
+
+        Updates are ordered lexicographically by `(migration id, record time)`.
+        For a given migration id, each update has a unique record time.
+        The record time ranges of different migrations may overlap, i.e.,
+        it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
+        and there may be two updates with the same record time but different migration ids.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateHistoryRequestV1"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v1/updates/{update_id}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getUpdateByIdV1"
+      description: |
+        Returns the update with the given update_id.
+        Unlike /v0/updates/{update_id}, this endpoint returns responses that are consistent across different
+        scan instances. Event ids returned by this endpoint are not comparable to event ids returned by /v0/updates.
+      parameters:
+        - name: "update_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItem"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/state/acs/snapshot-timestamp:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getDateOfMostRecentSnapshotBefore"
+      description: |
+        Returns the timestamp of the most recent snapshot before the given date, for the given migration_id.
+        This corresponds to the record time of the last transaction in the snapshot.
+      parameters:
+        - name: "before"
+          in: "query"
+          required: true
+          schema:
+            type: string
+            format: date-time
+            description: |
+              The endpoint will return the record time of the most recent snapshot before this parameter.
+        - name: "migration_id"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int64
+            description: |
+              The endpoint will return the record time of the most recent snapshot for this migration id.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsSnapshotTimestampResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/state/acs:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getAcsSnapshotAt"
+      description: |
+        Returns the ACS in creation date ascending order, paged, for a given migration id and record time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AcsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/state/acs/force:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "forceAcsSnapshotNow"
+      description: |
+        Takes a snapshot of the ACS at the current time.
+        The responses can be used as parameters to `/v0/state/acs` to retrieve the snapshot.
+        Disabled in production environments due to its persistent alteration of
+        the behavior of future invocations of `/v0/state/acs`, as it causes an
+        immediate internal snapshot and delay in the next automatic snapshot.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForceAcsSnapshotResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/holdings/state:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getHoldingsStateAt"
+      description: |
+        Returns the active amulet contracts for a given migration id and record time, in creation date ascending order, paged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsStateRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/holdings/summary:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getHoldingsSummaryAt"
+      description: |
+        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+        This is an aggregate of `/v0/holdings/state` by owner party ID with better performance than client-side computation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HoldingsSummaryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HoldingsSummaryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/ans-entries:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "listAnsEntries"
+      description: |
+        Lists all non-expired ANS entries whose names are prefixed with the
+        `name_prefix`, up to `page_size` entries.
+      parameters:
+        - name: "name_prefix"
+          description: |
+            Every result's name will start with this substring; if empty or absent,
+            all entries will be listed.
+            Does not have to be a whole word or segment; any substring will be accepted.
+          in: "query"
+          schema:
+            type: string
+        - name: "page_size"
+          description: |
+            The maximum number of results returned.
+            Older (but still non-expired) results are listed first.
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListEntriesResponse"
+
+  /v0/ans-entries/by-party/{party}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "lookupAnsEntryByParty"
+      description: |
+        If present, the first ANS entry for user `party` according to
+        `name` lexicographic order.
+      parameters:
+        - name: "party"
+          description: The user party ID that holds the ANS entry.
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/ans-entries/by-name/{name}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "lookupAnsEntryByName"
+      description: If present, the ANS entry named exactly `name`.
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByNameResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/dso-party-id:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getDsoPartyId"
+      description: |
+        The party ID of the DSO for the Splice network connected by this Scan app.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDsoPartyIdResponse"
+
+  /v0/amulet-rules:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getAmuletRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetAmuletRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAmuletRulesResponse"
+
+  /v0/external-party-amulet-rules:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getExternalPartyAmuletRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetExternalPartyAmuletRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetExternalPartyAmuletRulesResponse"
+
+  /v0/ans-rules:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getAnsRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetAnsRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAnsRulesResponse"
+
+  /v0/featured-apps:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "listFeaturedAppRights"
+      description: |
+        List every `FeaturedAppRight` registered with the DSO on the ledger.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
+
+  /v0/featured-apps/{provider_party_id}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "lookupFeaturedAppRight"
+      description: |
+        If `provider_party_id` has a `FeaturedAppRight` registered with the DSO,
+        return it; `featured_app_right` will be empty otherwise.
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
+
+  /v0/top-validators-by-validator-faucets:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByValidatorFaucets"
+      description: |
+        Get a list of top validators by number of rounds in which they collected
+        faucets, and basis statistics on their round collection history
+      parameters:
+        - in: query
+          name: limit
+          description: |
+            Maximum number of validator records that may be returned in the
+            response
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByValidatorFaucetsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/transfer-preapprovals/by-party/{party}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "lookupTransferPreapprovalByParty"
+      description: Lookup a TransferPreapproval by the receiver party.
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupTransferPreapprovalByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/transfer-command-counter/{party}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "lookupTransferCommandCounterByParty"
+      description: Lookup a TransferCommandCounter by the receiver party.
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupTransferCommandCounterByPartyResponse"
+        "404":
+          description: No TransferCommandCounter exists for this party. This means the nonce that should be used is 0.
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/transfer-command/status:
+    get:
+      description: Retrieve the status of all transfer commands (up to a limit of 100) of the given sender for the specified nonce.
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "lookupTransferCommandStatus"
+      parameters:
+        - name: sender
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupTransferCommandStatusResponse"
+        "404":
+          description: No TransferCommand exists with this contract id within the last 24h
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/migrations/schedule:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getMigrationSchedule"
+      description: |
+        If the DSO has scheduled a synchronizer upgrade, return its planned time
+        and the new migration ID.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MigrationSchedule"
+        "404":
+          description: "No migration scheduled"
+
+  # TODO(#13386) Move to SV app
+  /v0/synchronizer-identities/{domain_id_prefix}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan_soft_domain_migration_poc
+      operationId: "getSynchronizerIdentities"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SynchronizerIdentities"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  # TODO(#13386) Move to SV app
+  /v0/synchronizer-bootstrapping-transactions/{domain_id_prefix}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan_soft_domain_migration_poc
+      operationId: "getSynchronizerBootstrappingTransactions"
+      parameters:
+        - name: "domain_id_prefix"
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SynchronizerBootstrappingTransactions"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/splice-instance-names:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getSpliceInstanceNames"
+      description: Retrieve the UI names of various elements of this Splice network.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSpliceInstanceNamesResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/voterequest:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "listVoteRequestsByTrackingCid"
+      description: Look up several `VoteRequest`\ s at once by their contract IDs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/BatchListVotesByVoteRequestsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteRequestByTrackingCidResponse"
+
+  /v0/voterequests/{vote_request_contract_id}:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "lookupDsoRulesVoteRequest"
+      description: Look up a `VoteRequest` by contract ID.
+      parameters:
+        - name: "vote_request_contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "404":
+          description: "VoteRequest contract not found."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/LookupDsoRulesVoteRequestResponse"
+
+  /v0/admin/sv/voterequests:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "listDsoRulesVoteRequests"
+      description: List all active `VoteRequest`\ s.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteRequestsResponse"
+
+  /v0/admin/sv/voteresults:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "listVoteRequestResults"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListVoteResultsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListDsoRulesVoteResultsResponse"
+
+  /v0/backfilling/migration-info:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getMigrationInfo"
+      description: |
+        List all previous synchronizer migrations in this Splice network's history.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetMigrationInfoRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetMigrationInfoResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/backfilling/updates-before:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getUpdatesBefore"
+      description: |
+        Retrieve transactions and synchronizer reassignments prior to the
+        request's specification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetUpdatesBeforeRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetUpdatesBeforeResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/acs/{party}:
+    get:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "getAcsSnapshot"
+      description: "**Deprecated**. Fetch the current SV participant ACS snapshot for the DSO and `party`."
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAcsSnapshotResponse"
+
+  /v0/aggregated-rounds:
+    get:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "getAggregatedRounds"
+      description: "**Deprecated**. Retrieve the current earliest and latest rounds aggregated for this Scan."
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAggregatedRoundsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/round-totals:
+    post:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "listRoundTotals"
+      description: "**Deprecated**. List Amulet statistics for up to 200 closed rounds."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListRoundTotalsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRoundTotalsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/round-party-totals:
+    post:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "listRoundPartyTotals"
+      description: "**Deprecated**. Retrieve per-party Amulet statistics for up to 50 closed rounds."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListRoundPartyTotalsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRoundPartyTotalsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/total-amulet-balance:
+    get:
+      deprecated: true
+      tags: [deprecated, scan]
+      x-jvm-package: scan
+      operationId: "getTotalAmuletBalance"
+      description: "**Deprecated**. Get the total balance of Amulet in the network"
+      parameters:
+        - in: query
+          name: asOfEndOfRound
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTotalAmuletBalanceResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/wallet-balance:
+    get:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "getWalletBalance"
+      description: |
+        **Deprecated**. Get the Amulet balance for a specific party at the end of a closed round
+      parameters:
+        - in: query
+          name: party_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: asOfEndOfRound
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetWalletBalanceResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/amulet-config-for-round:
+    get:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "getAmuletConfigForRound"
+      description: |
+        **Deprecated**. Retrieve some information from the `AmuletRules` selected for the given round
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAmuletConfigForRoundResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/round-of-latest-data:
+    get:
+      deprecated: true
+      tags: [deprecated, scan]
+      x-jvm-package: scan
+      operationId: "getRoundOfLatestData"
+      description: |
+        **Deprecated**. Get the latest round number for which aggregated data is available and
+        the ledger effective time at which the round was closed.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/rewards-collected:
+    get:
+      deprecated: true
+      tags: [deprecated, scan]
+      x-jvm-package: scan
+      operationId: "getRewardsCollected"
+      description: "**Deprecated**. Get the total rewards collected ever"
+      parameters:
+        - in: query
+          name: round
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetRewardsCollectedResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/top-providers-by-app-rewards:
+    get:
+      deprecated: true
+      tags: [deprecated, scan]
+      x-jvm-package: scan
+      operationId: "getTopProvidersByAppRewards"
+      description: |
+        **Deprecated**. Get a list of top-earning app providers, and the total earned app
+        rewards for each
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopProvidersByAppRewardsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/top-validators-by-validator-rewards:
+    get:
+      deprecated: true
+      tags: [deprecated, scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByValidatorRewards"
+      description: |
+        **Deprecated**. Get a list of top-earning validators, and the total earned validator
+        rewards for each
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByValidatorRewardsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/top-validators-by-purchased-traffic:
+    get:
+      deprecated: true
+      tags: [deprecated, scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByPurchasedTraffic"
+      description: |
+        **Deprecated**. Get a list of validators and their domain fees spends, sorted by the
+        amount of extra traffic purchased
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByPurchasedTrafficResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/activities:
+    post:
+      deprecated: true
+      tags: [deprecated, scan]
+      x-jvm-package: scan
+      operationId: "listActivity"
+      description: |
+        **Deprecated**. Lists activities in descending order, paged, optionally starting after a provided event id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListActivityRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListActivityResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/transactions:
+    post:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "listTransactionHistory"
+      description: |
+        **Deprecated**. Lists transactions, by default in ascending order, paged, from ledger begin or optionally starting after a provided event id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TransactionHistoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/updates:
+    post:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "getUpdateHistory"
+      description: |
+        **Deprecated**, use /v1/updates instead.
+        Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateHistoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/updates/{update_id}:
+    get:
+      deprecated: true
+      tags: [deprecated]
+      x-jvm-package: scan
+      operationId: "getUpdateById"
+      description: |
+        **Deprecated**, use /v1/updates/{update_id} instead.
+      parameters:
+        - name: "update_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "lossless"
+          in: "query"
+          description: |
+            Whether contract payload should be encoded into json using a lossless, but much harder to process, encoding.
+            This is mostly used for backend calls, and is not recommended for external users.
+            Optional and defaults to false.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItem"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+components:
+  schemas:
+    GetSpliceInstanceNamesResponse:
+      type: object
+      required:
+        - network_name
+        - network_favicon_url
+        - amulet_name
+        - amulet_name_acronym
+        - name_service_name
+        - name_service_name_acronym
+      properties:
+        network_name:
+          description: What to call this Splice network.
+          type: string
+        network_favicon_url:
+          description: URL of an HTML favicon for this Splice network.
+          type: string
+        amulet_name:
+          description: What this Splice network calls Amulet.
+          type: string
+        amulet_name_acronym:
+          description: The three-letter acronym for Amulet.
+          type: string
+        name_service_name:
+          description: What this Splice network calls the Amulet Name Service.
+          type: string
+        name_service_name_acronym:
+          description: The acronym for `name_service_name`.
+          type: string
+    GetDsoPartyIdResponse:
+      type: object
+      required: ["dso_party_id"]
+      properties:
+        dso_party_id:
+          type: string
+    GetClosedRoundsResponse:
+      type: object
+      required: ["rounds"]
+      properties:
+        rounds:
+          description: |
+            Contracts of the Daml template `Splice.Round:ClosedMiningRound`, one
+            for every closed round that is still in process, i.e. it either has
+            unprocessed rewards or a missing `Splice.DsoRules:Confirmation`.
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    GetOpenAndIssuingMiningRoundsRequest:
+      type: object
+      required:
+        [
+          "cached_open_mining_round_contract_ids",
+          "cached_issuing_round_contract_ids",
+        ]
+      properties:
+        cached_open_mining_round_contract_ids:
+          description: |
+            The contract IDs for `open_mining_rounds` in the response the caller
+            knows about. If unsure, an empty array is fine; only a performance
+            penalty is incurred.
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_issuing_round_contract_ids:
+          description: |
+            The contract IDs for `issuing_mining_rounds` in the response the
+            caller knows about. If unsure, an empty array is fine; only a
+            performance penalty is incurred.
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+    GetOpenAndIssuingMiningRoundsResponse:
+      description: |
+        Daml contracts of the templates `Splice.Round.OpenMiningRound` and
+        `Splice.Round.IssuingMiningRound` representing rounds for which rewards
+        can be registered or are currently being computed, respectively.
+        Contract IDs in the input serve as input sets for the two
+        `MaybeCachedContractWithStateMap`s as described for that structure for
+        `open_mining_rounds` and `issuing_mining_rounds`.
+      type: object
+      required:
+        [
+          "open_mining_rounds",
+          "issuing_mining_rounds",
+          "time_to_live_in_microseconds",
+        ]
+      properties:
+        time_to_live_in_microseconds:
+          description: |
+            Suggested cache TTL for the response; this should expire before the
+            `opensAt` of any open rounds that may not be in this response yet.
+          type: integer
+        open_mining_rounds:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
+        issuing_mining_rounds:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
+    GetAmuletRulesRequest:
+      type: object
+      properties:
+        cached_amulet_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_amulet_rules_domain_id:
+          type: string
+    GetAmuletRulesResponse:
+      description: |
+        Contract of the Daml template `Splice.AmuletRules.AmuletRules`,
+        including the full schedule of `AmuletConfig` changes approved by
+        the DSO. Callers should not assume that `initialValue` is up-to-date,
+        and should instead search `futureValues` for the latest configuration
+        valid as of now. `contract` will be absent if its ID matches the input
+        `cached_amulet_rules_contract_id`.
+      type: object
+      properties:
+        amulet_rules_update:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+      required: ["amulet_rules_update"]
+    GetExternalPartyAmuletRulesRequest:
+      type: object
+      properties:
+        cached_external_party_amulet_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_external_party_amulet_rules_domain_id:
+          type: string
+    GetExternalPartyAmuletRulesResponse:
+      description: |
+        A contract state update of Daml template
+        `Splice.ExternalPartyAmuletRules.ExternalPartyAmuletRules`
+      type: object
+      properties:
+        external_party_amulet_rules_update:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+      required: ["external_party_amulet_rules_update"]
+    GetAnsRulesRequest:
+      type: object
+      properties:
+        cached_ans_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_ans_rules_domain_id:
+          type: string
+    GetAnsRulesResponse:
+      description: |
+        A contract state update of Daml template `Splice.Ans.AnsRules`.
+      type: object
+      properties:
+        ans_rules_update:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+      required: ["ans_rules_update"]
+    ListFeaturedAppRightsResponse:
+      description: |
+        Contracts of Daml template `Splice.Amulet.FeaturedAppRight`.
+      type: object
+      required: ["featured_apps"]
+      properties:
+        featured_apps:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    LookupFeaturedAppRightResponse:
+      description: |
+        If defined, a contract of Daml template `Splice.Amulet.FeaturedAppRight`.
+      type: object
+      properties:
+        featured_app_right:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    GetWalletBalanceResponse:
+      type: object
+      required: ["wallet_balance"]
+      properties:
+        wallet_balance:
+          type: string
+    GetTotalAmuletBalanceResponse:
+      type: object
+      required: ["total_balance"]
+      properties:
+        total_balance:
+          type: string
+    GetAmuletConfigForRoundResponse:
+      type: object
+      required:
+        ["amulet_create_fee", "holding_fee", "lock_holder_fee", "transfer_fee"]
+      properties:
+        amulet_create_fee:
+          type: string
+        holding_fee:
+          type: string
+        lock_holder_fee:
+          type: string
+        transfer_fee:
+          $ref: "#/components/schemas/SteppedRate"
+    SteppedRate:
+      type: object
+      required: ["initial", "steps"]
+      properties:
+        initial:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/RateStep"
+    RateStep:
+      type: object
+      required: ["amount", "rate"]
+      properties:
+        amount:
+          type: string
+        rate:
+          type: string
+    GetRoundOfLatestDataResponse:
+      type: object
+      required: ["round", "effectiveAt"]
+      properties:
+        round:
+          type: integer
+          format: int64
+        effectiveAt:
+          type: string
+          format: date-time
+    GetRewardsCollectedResponse:
+      type: object
+      required: ["amount"]
+      properties:
+        amount:
+          type: string
+    GetValidatorTrafficBalanceResponse:
+      type: object
+      required: ["remainingBalance", "totalPurchased"]
+      properties:
+        remainingBalance:
+          type: number
+          format: double
+        totalPurchased:
+          type: number
+          format: double
+    CheckAndUpdateValidatorTrafficBalanceResponse:
+      type: object
+      required: ["approved"]
+      properties:
+        approved:
+          type: boolean
+    GetTopProvidersByAppRewardsResponse:
+      type: object
+      required: ["providersAndRewards"]
+      properties:
+        providersAndRewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartyAndRewards"
+    GetTopValidatorsByValidatorRewardsResponse:
+      type: object
+      required: ["validatorsAndRewards"]
+      properties:
+        validatorsAndRewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartyAndRewards"
+    PartyAndRewards:
+      type: object
+      required: ["provider", "rewards"]
+      properties:
+        provider:
+          type: string
+        rewards:
+          type: string
+    GetTopValidatorsByValidatorFaucetsResponse:
+      type: object
+      required: ["validatorsByReceivedFaucets"]
+      properties:
+        validatorsByReceivedFaucets:
+          description: |
+            Up to `limit` validators, sorted greatest number of rounds
+            collected first
+          type: array
+          items:
+            $ref: "./scan.yaml#/components/schemas/ValidatorReceivedFaucets"
+    GetTopValidatorsByPurchasedTrafficResponse:
+      type: object
+      required: ["validatorsByPurchasedTraffic"]
+      properties:
+        validatorsByPurchasedTraffic:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidatorPurchasedTraffic"
+    ValidatorPurchasedTraffic:
+      type: object
+      required:
+        [
+          "validator",
+          "numPurchases",
+          "totalTrafficPurchased",
+          "totalCcSpent",
+          "lastPurchasedInRound",
+        ]
+      properties:
+        validator:
+          type: string
+        numPurchases:
+          type: integer
+          format: int64
+        totalTrafficPurchased:
+          type: integer
+          format: int64
+        totalCcSpent:
+          type: string
+        lastPurchasedInRound:
+          type: integer
+          format: int64
+    ListDsoSequencersResponse:
+      type: object
+      required: ["domainSequencers"]
+      properties:
+        domainSequencers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainSequencers"
+    DomainSequencers:
+      type: object
+      required: ["domainId", "sequencers"]
+      properties:
+        domainId:
+          description: the synchronizer ID for the associated sequencers
+          type: string
+        sequencers:
+          description: the sequencers associated with the synchronizer
+          type: array
+          items:
+            $ref: "#/components/schemas/DsoSequencer"
+    DsoSequencer:
+      type: object
+      required: ["migrationId", "id", "url", "svName", "availableAfter"]
+      properties:
+        migrationId:
+          description: |
+            The synchronizer migration id corresponding to this sequencer.
+          type: integer
+          format: int64
+        id:
+          description: The id of the sequencer.
+          type: string
+        url:
+          description: The public accessible url of the sequencer.
+          type: string
+        svName:
+          description: The sequencer's operating SV name.
+          type: string
+        availableAfter:
+          description: |
+            Any participant should subscribe to this sequencer after this time.
+          type: string
+          format: date-time
+    ListDsoScansResponse:
+      type: object
+      required: ["scans"]
+      properties:
+        scans:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainScans"
+    DomainScans:
+      type: object
+      required: ["domainId", "scans"]
+      properties:
+        domainId:
+          type: string
+        scans:
+          description: |
+            SV scans for the associated synchronizer ID; there is at most one
+            scan per SV for each synchronizer ID.
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanInfo"
+    ScanInfo:
+      type: object
+      required: ["publicUrl", "svName"]
+      properties:
+        publicUrl:
+          description: The public accessible url of the scan.
+          type: string
+        svName:
+          description: The sequencer's operating SV name.
+          type: string
+    TransactionHistoryRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        page_end_event_id:
+          type: string
+          description: |
+            Note that all transactions carry some monotonically-increasing event_id.
+            Omit this page_end_event_id to start reading the first page, from the beginning or the end of the ledger, depending on the sort_order column.
+            A subsequent request can fill the page_end_event_id with the last event_id of the TransactionHistoryResponse to continue reading in the same sort_order.
+            The transaction with event_id == page_end_event_id will be skipped in the next response, making it possible to continuously read pages in the same sort_order.
+        sort_order:
+          description: |
+            Sort order for the transactions. For ascending order, from beginning to the end of the ledger, use "asc".
+            For descending order, from end to beginning of the ledger, use "desc".
+            "asc" is used if the sort_order is omitted.
+          type: string
+          enum:
+            - "asc"
+            - "desc"
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int64
+    TransactionHistoryResponse:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionHistoryResponseItem"
+    TransactionHistoryResponseItem:
+      type: object
+      required:
+        - transaction_type
+        - event_id
+        - date
+        - domain_id
+        - amulet_price
+        - round
+      properties:
+        transaction_type:
+          description: |
+            Describes the type of activity that occurred.
+            Determines if the data for the transaction should be read
+            from the `transfer`, `mint`, or `tap` property.
+          type: string
+          enum:
+            - "transfer"
+            - "mint"
+            - "devnet_tap"
+        event_id:
+          description: |
+            The event id.
+          type: string
+        offset:
+          description: |
+            The ledger offset of the event.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
+          type: string
+        date:
+          description: |
+            The effective date of the event.
+          type: string
+          format: date-time
+        domain_id:
+          description: |
+            The id of the domain through which this transaction was sequenced.
+          type: string
+        round:
+          description: |
+            The round for which this transaction was registered.
+          type: integer
+          format: int64
+        amulet_price:
+          description: |
+            The amulet price for the round at which this transfer was executed.
+          type: string
+        transfer:
+          description: |
+            A (batch) transfer from sender to receivers.
+          $ref: "#/components/schemas/Transfer"
+        mint:
+          description: |
+            The DSO mints amulet for the cases where the DSO rules allow for that.
+          $ref: "#/components/schemas/AmuletAmount"
+        tap:
+          description: |
+            A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
+          $ref: "#/components/schemas/AmuletAmount"
+    UpdateHistoryRequestAfter:
+      type: object
+      required:
+        - after_migration_id
+        - after_record_time
+      properties:
+        after_migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id from which to start returning transactions. This is inclusive.
+        after_record_time:
+          type: string
+          description: |
+            The record time to start returning transactions from. This only affects
+            transactions with the same migration id as after_migration_id. Higher migration ids
+            are always considered to be later.
+    UpdateHistoryRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
+          description: |
+            The transactions returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int32
+        lossless:
+          description: |
+            Whether contract payload should be encoded into json using a lossless, but much harder to process, encoding.
+            This is mostly used for backend calls, and is not recommended for external users.
+            Optional and defaults to false.
+          type: boolean
+    UpdateHistoryRequestV1:
+      type: object
+      required:
+        - page_size
+      properties:
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
+          description: |
+            The transactions returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int32
+        daml_value_encoding:
+          $ref: "#/components/schemas/DamlValueEncoding"
+    UpdateHistoryResponse:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateHistoryItem"
+    UpdateHistoryItem:
+      type: object
+      description: |
+        An individual item in the update history. May be a transaction or a contract reassignment.
+      oneOf:
+        - $ref: "#/components/schemas/UpdateHistoryTransaction"
+        - $ref: "#/components/schemas/UpdateHistoryReassignment"
+    UpdateHistoryReassignment:
+      type: object
+      description: A contract reassignment between synchronizer. May be an assignment or unassignment.
+      required:
+        - update_id
+        - offset
+        - record_time
+        - event
+      properties:
+        update_id:
+          description: |
+            The id of the update.
+          type: string
+        offset:
+          description: |
+            The absolute offset.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced.
+          type: string
+        event:
+          description: |
+            The reassignment event. May be an assignment or unassignment.
+          type: object
+          oneOf:
+            - $ref: "#/components/schemas/UpdateHistoryAssignment"
+            - $ref: "#/components/schemas/UpdateHistoryUnassignment"
+    UpdateHistoryAssignment:
+      type: object
+      required:
+        - submitter
+        - source_synchronizer
+        - target_synchronizer
+        - migration_id
+        - unassign_id
+        - created_event
+        - reassignment_counter
+      properties:
+        submitter:
+          description: |
+            The party ID who submitted this reassignment
+          type: string
+        source_synchronizer:
+          description: |
+            The id of the synchronizer from which the contract was reassigned
+          type: string
+        target_synchronizer:
+          description: |
+            The id of the synchronizer to which the contract was reassigned
+          type: string
+        migration_id:
+          description: |
+            The migration id of the target synchronizer
+          type: integer
+          format: int64
+        unassign_id:
+          description: |
+            The id of the corresponding unassign event; this assignment will
+            usually, but not always, occur after the so-identified unassignment
+            event.
+          type: string
+        created_event:
+          description: |
+            The corresponding contract create event
+          $ref: "#/components/schemas/CreatedEvent"
+        reassignment_counter:
+          description: Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter 0.
+          type: integer
+          format: int64
+    UpdateHistoryUnassignment:
+      type: object
+      required:
+        - submitter
+        - source_synchronizer
+        - migration_id
+        - target_synchronizer
+        - unassign_id
+        - reassignment_counter
+        - contract_id
+      properties:
+        submitter:
+          description: |
+            The party who submitted this reassignment
+          type: string
+        source_synchronizer:
+          description: |
+            The id of the synchronizer from which the contract was reassigned
+          type: string
+        migration_id:
+          description: |
+            The migration id of the synchronizer from which the contract was reassigned
+          type: integer
+          format: int64
+        target_synchronizer:
+          description: |
+            The id of the synchronizer to which the contract was reassigned
+          type: string
+        unassign_id:
+          description: |
+            The id of the unassign event, to later be correlated to an assign event
+          type: string
+        reassignment_counter:
+          description: Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter 0.
+          type: integer
+          format: int64
+        contract_id:
+          description: |
+            The id of the unassigned contract
+          type: string
+    UpdateHistoryTransaction:
+      type: object
+      required:
+        - update_id
+        - migration_id
+        - workflow_id
+        - command_id
+        - record_time
+        - synchronizer_id
+        - effective_at
+        - offset
+        - root_event_ids
+        - events_by_id
+      properties:
+        update_id:
+          description: |
+            The id of the update. This is not comparable to other updates; it's
+            meant for correlating with server logs.
+          type: string
+        migration_id:
+          description: |
+            The migration id of the synchronizer.
+          type: integer
+          format: int64
+        workflow_id:
+          description: |
+            This transaction's Daml workflow ID; a workflow ID can be associated
+            with multiple transactions. If empty, no workflow ID was set.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced, with microsecond
+            resolution, using ISO-8601 representation.
+          type: string
+        synchronizer_id:
+          description: |
+            The id of the synchronizer through which this transaction was sequenced.
+          type: string
+        effective_at:
+          description: |
+            Ledger effective time, using ISO-8601 representation. This is the time
+            returned by `getTime` for all Daml executed as part of this transaction,
+            both by the submitting participant and all confirming participants.
+          type: string
+        offset:
+          description: |
+            The absolute offset.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
+            However, within a single SV's scan, it is monotonically, lexicographically increasing.
+          type: string
+        root_event_ids:
+          description: |
+            Roots of the transaction tree. These are guaranteed to occur as keys
+            of the `events_by_id` object.
+          type: array
+          items:
+            type: string
+        events_by_id:
+          description: |
+            Changes to the ledger that were caused by this transaction, keyed by ID.
+            Values are nodes of the transaction tree.
+            Within a transaction, IDs may be referenced by `root_event_ids` or
+            `child_event_ids` in `ExercisedEvent` herein.
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/TreeEvent"
+    TreeEvent:
+      type: object
+      description: |
+        Either a creation or an exercise of a contract.
+      oneOf:
+        - $ref: "#/components/schemas/CreatedEvent"
+        - $ref: "#/components/schemas/ExercisedEvent"
+      discriminator:
+        propertyName: event_type
+        mapping:
+          created_event: "#/components/schemas/CreatedEvent"
+          exercised_event: "#/components/schemas/ExercisedEvent"
+    CreatedEvent:
+      type: object
+      required:
+        - event_type
+        - event_id
+        - contract_id
+        - template_id
+        - package_name
+        - create_arguments
+        - created_at
+        - signatories
+        - observers
+      properties:
+        event_type:
+          type: string
+        event_id:
+          description: |
+            The ID of this particular event. Equal to the key of this element of
+            the containing `events_by_id` if this is part of a `TreeEvent`.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        create_arguments:
+          description: |
+            The arguments that have been used to create the contract, in the
+            form of JSON representation of a Daml record.
+          type: object
+        created_at:
+          description: |
+            Ledger effective time of the transaction that created the contract.
+          type: string
+          format: date-time
+        signatories:
+          description: |
+            Signatories to the contract, in the form of party IDs.
+          type: array
+          items:
+            type: string
+        observers:
+          description: |
+            Observers to the contract, in the form of party IDs.
+          type: array
+          items:
+            type: string
+    ExercisedEvent:
+      type: object
+      required:
+        - event_type
+        - event_id
+        - contract_id
+        - template_id
+        - package_name
+        - choice
+        - choice_argument
+        - child_event_ids
+        - exercise_result
+        - consuming
+        - acting_parties
+      properties:
+        event_type:
+          type: string
+        event_id:
+          description: |
+            The ID of this particular event. Equal to the key of this element of
+            the containing `events_by_id` if this is part of a `TreeEvent`.
+          type: string
+        contract_id:
+          description: |
+            The ID of the created contract.
+          type: string
+        template_id:
+          description: |
+            The template of the created contract.
+          type: string
+        package_name:
+          description: |
+            The package name of the created contract.
+          type: string
+        choice:
+          description: |
+            The choice that was exercised on the target contract, as an unqualified
+            choice name, i.e. with no package or module name qualifiers.
+          type: string
+        choice_argument:
+          description: |
+            The argument of the exercised choice, in the form of JSON
+            representation of a Daml value. This is usually a record with field
+            names being the argument names, even in the case of a single apparent
+            choice argument, which is represented as a single-element Daml record.
+          type: object
+        child_event_ids:
+          description: |
+            References to further events in the same transaction that appeared as a result of this ExercisedEvent.
+            It contains only the immediate children of this event, not all members of the subtree rooted at this node.
+            The order of the children is the same as the event order in the transaction.
+          type: array
+          items:
+            type: string
+        exercise_result:
+          description: |
+            The result of exercising the choice, as the JSON representation of a
+            Daml value.
+          type: object
+        consuming:
+          description: |
+            If true, the target contract may no longer be exercised.
+          type: boolean
+        acting_parties:
+          description: |
+            The parties that exercised the choice, in the form of party IDs.
+          type: array
+          items:
+            type: string
+        interface_id:
+          description: |
+            The interface where the choice is defined, if inherited.
+          type: string
+    AcsSnapshotTimestampResponse:
+      type: object
+      required:
+        - record_time
+      properties:
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The record time of the last transaction in the snapshot.
+    AcsRequest:
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - page_size
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the ACS.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        after:
+          type: integer
+          format: int64
+          description: |
+            Pagination token for the next page of results. For this to be valid,
+            this must be the `next_page_token` from a prior request with identical
+            parameters aside from `after` and `page_size`; the response may be
+            invalid otherwise.
+        page_size:
+          description: |
+            The maximum number of created events returned for this request.
+          type: integer
+          format: int32
+        party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters the ACS by contracts in which these party IDs are stakeholders.
+        templates:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters the ACS by contracts with these template IDs, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
+    HoldingsStateRequest: # subset of AcsRequest
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - page_size
+        - owner_party_ids
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the ACS.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        after:
+          type: integer
+          format: int64
+          description: |
+            Pagination token for the next page of results.
+        page_size:
+          description: |
+            The maximum number of created events returned for this request.
+          type: integer
+          format: int32
+        owner_party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            Filters by contracts in which these party_ids are the owners of the amulets.
+
+    HoldingsSummaryRequest:
+      type: object
+      required:
+        - migration_id
+        - record_time
+        - owner_party_ids
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+          description: |
+            The migration id for which to return the summary.
+        record_time:
+          type: string
+          format: date-time
+          description: |
+            The timestamp at which the contract set was active. Currently, needs to be an exact timestamp, i.e.,
+            needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp`.
+        owner_party_ids:
+          type: array
+          items:
+            type: string
+          description: |
+            The owners for which to compute the summary.
+        as_of_round:
+          type: integer
+          format: int64
+          description: |
+            Compute holding fees as of this round. Defaults to the earliest open mining round.
+
+    ForceAcsSnapshotResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+      properties:
+        record_time:
+          description: |
+            The [recent] time for which this ACS snapshot was persisted.
+          type: string
+          format: date-time
+        migration_id:
+          description: The current migration ID of the Scan.
+          type: integer
+          format: int64
+    AcsResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - created_events
+      properties:
+        record_time:
+          description: The same `record_time` as in the request.
+          type: string
+          format: date-time
+        migration_id:
+          description: The same `migration_id` as in the request.
+          type: integer
+          format: int64
+        created_events:
+          description: |
+            Up to `page_size` contracts in the ACS.
+            `create_arguments` are always encoded as `compact_json`.
+          type: array
+          items:
+            $ref: "#/components/schemas/CreatedEvent"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as `after`
+            to the `AcsRequest` or `HoldingsStateRequest`.
+            Will be absent when there are no more pages.
+
+    HoldingsSummaryResponse:
+      type: object
+      required:
+        - record_time
+        - migration_id
+        - computed_as_of_round
+        - summaries
+      properties:
+        record_time:
+          description: The same `record_time` as in the request.
+          type: string
+          format: date-time
+        migration_id:
+          description: The same `migration_id` as in the request.
+          type: integer
+          format: int64
+        computed_as_of_round:
+          description: The same `as_of_round` as in the request, with the same default.
+          type: integer
+          format: int64
+        summaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/HoldingsSummary"
+    HoldingsSummary:
+      description: Aggregate Amulet totals for a particular owner party ID.
+      type: object
+      required:
+        - party_id
+        - total_unlocked_coin
+        - total_locked_coin
+        - total_coin_holdings
+        - accumulated_holding_fees_unlocked
+        - accumulated_holding_fees_locked
+        - accumulated_holding_fees_total
+        - total_available_coin
+      properties:
+        party_id:
+          description: |
+            Owner party ID of the amulet. Guaranteed to be unique among `summaries`.
+          type: string
+        total_unlocked_coin:
+          description: |
+            Sum of unlocked amulet at time of reception, not counting holding
+            fees deducted since.
+          type: string
+        total_locked_coin:
+          description: |
+            Sum of locked amulet at time of original amulet reception, not
+            counting holding fees deducted since.
+          type: string
+        total_coin_holdings:
+          description: |
+            `total_unlocked_coin` + `total_locked_coin`.
+          type: string
+        accumulated_holding_fees_unlocked:
+          description: |
+            Sum of holding fees as of `computed_as_of_round` that apply to
+            unlocked amulet.
+          type: string
+        accumulated_holding_fees_locked:
+          description: |
+            Sum of holding fees as of `computed_as_of_round` that apply to
+            locked amulet, including fees applied since the amulet's creation
+            round.
+          type: string
+        accumulated_holding_fees_total:
+          description: |
+            Same as `accumulated_holding_fees_unlocked` + `accumulated_holding_fees_locked`.
+          type: string
+        total_available_coin:
+          description:
+            Same as `total_unlocked_coin` - `accumulated_holding_fees_unlocked`.
+          type: string
+
+    ListActivityRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        begin_after_id:
+          type: string
+          description: |
+            Minimal event_id for returned activities.
+            Note that all activities carry some monotonically-increasing event_id. begin_after_id sets the minimum value for event_id's for the query.
+        page_size:
+          description: |
+            The maximum number of activity items returned for this request.
+          type: integer
+          format: int64
+    ListActivityResponse:
+      type: object
+      required:
+        - activities
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListActivityResponseItem"
+    ListActivityResponseItem:
+      type: object
+      required:
+        - activity_type
+        - event_id
+        - date
+        - domain_id
+        - round
+        - amulet_price
+      properties:
+        activity_type:
+          description: |
+            Describes the type of activity that occurred.
+            Determines if the data for the activity should be read
+            from the `transfer`, `mint`, or `tap` property.
+          type: string
+          enum:
+            - "transfer"
+            - "mint"
+            - "devnet_tap"
+        event_id:
+          description: |
+            The event id.
+          type: string
+        offset:
+          description: |
+            The ledger offset of the event.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
+          type: string
+        date:
+          description: |
+            The effective date of the event.
+          type: string
+          format: date-time
+        domain_id:
+          description: |
+            The id of the domain through which this transaction was sequenced.
+          type: string
+        round:
+          description: |
+            The round for which this transaction was registered.
+          type: integer
+          format: int64
+        amulet_price:
+          description: |
+            The amulet price for the round at which this transfer was executed.
+          type: string
+        transfer:
+          description: |
+            A (batch) transfer from sender to receivers.
+          $ref: "#/components/schemas/Transfer"
+        mint:
+          description: |
+            The DSO mints amulet for the cases where the DSO rules allow for that.
+          $ref: "#/components/schemas/AmuletAmount"
+        tap:
+          description: |
+            A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
+          $ref: "#/components/schemas/AmuletAmount"
+    Transfer:
+      description: |
+        A transfer between one sender and possibly many receivers, provided by an application provider.
+      type: object
+      required:
+        - provider
+        - sender
+        - receivers
+        - balance_changes
+      properties:
+        provider:
+          description: |
+            The application provider.
+          type: string
+        sender:
+          description: |
+            The sender amounts and fees.
+          $ref: "#/components/schemas/SenderAmount"
+        receivers:
+          description: |
+            The amounts and fees per receiver.
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiverAmount"
+        balance_changes:
+          description: |
+            Normalized balance changes per party caused by this transfer.
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceChange"
+    BalanceChange:
+      type: object
+      required:
+        - party
+        - change_to_initial_amount_as_of_round_zero
+        - change_to_holding_fees_rate
+      properties:
+        party:
+          description: |
+            The party for which the balance changes.
+          type: string
+        change_to_initial_amount_as_of_round_zero:
+          description: |
+            The change to the total balance introduced by this balance change, normalized to round zero, i.e.,
+            a amulet created in round 3 is treated as a amulet created in round 0 with a higher initial amount.
+          type: string
+        change_to_holding_fees_rate:
+          description: |
+            The change of total holding fees introduced by this balance change.
+          type: string
+    AmuletAmount:
+      type: object
+      required:
+        - amulet_owner
+        - amulet_amount
+      properties:
+        amulet_owner:
+          description: |
+            The party that owns the amulet.
+          type: string
+        amulet_amount:
+          description: |
+            The amulet amount.
+          type: string
+    SenderAmount:
+      type: object
+      required:
+        - party
+        - sender_change_fee
+        - sender_change_amount
+        - sender_fee
+        - holding_fees
+      properties:
+        party:
+          description: |
+            The sender who has transferred amulet.
+          type: string
+        input_amulet_amount:
+          description: |
+            Total amount of amulet input into this transfer, before deducting holding fees.
+          type: string
+        input_app_reward_amount:
+          description: |
+            Total amount of app rewards input into this transfer.
+          type: string
+        input_validator_reward_amount:
+          description: |
+            Total amount of validator rewards input into this transfer.
+          type: string
+        input_sv_reward_amount:
+          description: |
+            Total amount of sv rewards input into this transfer.
+          type: string
+        input_validator_faucet_amount:
+          description: |
+            Total amount of validator faucet coupon issuance input into this transfer.
+          type: string
+        sender_change_fee:
+          description: |
+            Fee charged for returning change to the sender,
+            which is the smaller of the left-over balance after paying for all outputs
+            or one amulet create fee.
+          type: string
+        sender_change_amount:
+          description: |
+            The final amount of amulet returned to the sender after paying for all outputs and fees.
+          type: string
+        sender_fee:
+          description: |
+            Total fees paid by the sender, based on receiver's receiver_fee_ratio on outputs
+          type: string
+        holding_fees:
+          description: |
+            Holding fees paid by the sender on their input amulets.
+          type: string
+    ReceiverAmount:
+      type: object
+      required:
+        - party
+        - amount
+        - receiver_fee
+      properties:
+        party:
+          description: |
+            The receiver who will own the created output amulet.
+          type: string
+        amount:
+          description: |
+            The amount of amulet to receive, before deducting receiver's part of the fees.
+          type: string
+        receiver_fee:
+          description: |
+            Total fees paid by the receiver, based on receiver_fee_ratio on outputs
+          type: string
+    ListEntriesResponse:
+      type: object
+      required: ["entries"]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AnsEntry"
+    LookupEntryByPartyResponse:
+      type: object
+      required: ["entry"]
+      properties:
+        entry:
+          "$ref": "#/components/schemas/AnsEntry"
+    LookupEntryByNameResponse:
+      type: object
+      required: ["entry"]
+      properties:
+        entry:
+          "$ref": "#/components/schemas/AnsEntry"
+    LookupTransferPreapprovalByPartyResponse:
+      description: A Daml contract of template `Splice.AmuletRules:TransferPreapproval`.
+      type: object
+      required: ["transfer_preapproval"]
+      properties:
+        transfer_preapproval:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    LookupTransferCommandCounterByPartyResponse:
+      description: A Daml contract of template `Splice.ExternalPartyAmuletRules:TransferCommandCounter`.
+      type: object
+      required: ["transfer_command_counter"]
+      properties:
+        transfer_command_counter:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    LookupTransferCommandStatusResponse:
+      type: object
+      required: ["transfer_commands_by_contract_id"]
+      properties:
+        transfer_commands_by_contract_id:
+          $ref: "#/components/schemas/TransferCommandMap"
+
+    TransferCommandMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/TransferCommandContractWithStatus"
+
+    TransferCommandContractWithStatus:
+      description: |
+        A contract of Daml template `Splice.ExternalPartyAmuletRules:TransferCommand`,
+        and its status determined by the latest transactions.
+      type: object
+      required: ["contract", "status"]
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        status:
+          $ref: "#/components/schemas/TransferCommandContractStatus"
+
+    TransferCommandContractStatus:
+      type: object
+      oneOf:
+        - "$ref": "#/components/schemas/TransferCommandCreatedResponse"
+        - "$ref": "#/components/schemas/TransferCommandSentResponse"
+        - "$ref": "#/components/schemas/TransferCommandFailedResponse"
+      discriminator:
+        propertyName: status
+        mapping:
+          created: "#/components/schemas/TransferCommandCreatedResponse"
+          sent: "#/components/schemas/TransferCommandSentResponse"
+          failed: "#/components/schemas/TransferCommandFailedResponse"
+    BaseLookupTransferCommandStatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: |
+            The status of the transfer command.
+            created:
+              The transfer command has been created and is waiting for automation to complete it.
+            sent:
+              The transfer command has been completed and the transfer to the receiver has finished.
+            failed:
+              The transfer command has failed permanently and nothing has been transferred. Refer to
+              failure_reason for details. A new transfer command can be created.
+    TransferCommandCreatedResponse:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
+    TransferCommandSentResponse:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
+    TransferCommandFailedResponse:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
+        - type: object
+          required:
+            - failure_kind
+            - reason
+          properties:
+            failure_kind:
+              type: string
+              description: |
+                The reason for the failure of the TransferCommand.
+                failed:
+                  Completing the transfer failed, check the reason for details.
+                withdrawn:
+                  The sender has withdrawn the TransferCommand before it could be completed.
+                expired:
+                  The expiry time on the TransferCommand was reached before it could be completed.
+              enum:
+                - failed
+                - expired
+                - withdrawn
+            reason:
+              type: string
+              description: |
+                Human readable description of the failure
+    GetAcsSnapshotResponse:
+      type: object
+      required: ["acs_snapshot"]
+      properties:
+        acs_snapshot:
+          description: base64-encoded ACS snapshot for the intersection of the DSO party and the requested party’s ACS
+          type: string
+    AnsEntry:
+      type: object
+      required: ["user", "name", "url", "description"]
+      properties:
+        contract_id:
+          description: |
+            If present, Daml contract ID of template `Splice.Ans:AnsEntry`.
+            If absent, this is a DSO-provided entry for either the DSO or an SV.
+          type: string
+        user:
+          description: Owner party ID of this ANS entry.
+          type: string
+        name:
+          description: The ANS entry name.
+          type: string
+        url:
+          description: Either empty, or an http/https URL supplied by the `user`.
+          type: string
+        description:
+          description: Arbitrary description text supplied by `user`; may be empty.
+          type: string
+        expires_at:
+          description: |
+            Time after which this ANS entry expires; if renewed, it will have a
+            new `contract_id` and `expires_at`.
+            If `null` or absent, does not expire; this is the case only for
+            special entries provided by the DSO.
+          type: string
+          format: date-time
+    GetAggregatedRoundsResponse:
+      type: object
+      required: ["start", "end"]
+      properties:
+        start:
+          type: integer
+          format: int64
+        end:
+          type: integer
+          format: int64
+    ListRoundTotalsRequest:
+      type: object
+      required:
+        - start_round
+        - end_round
+      properties:
+        start_round:
+          type: integer
+          format: int64
+        end_round:
+          type: integer
+          format: int64
+    ListRoundPartyTotalsRequest:
+      type: object
+      required:
+        - start_round
+        - end_round
+      properties:
+        start_round:
+          type: integer
+          format: int64
+        end_round:
+          type: integer
+          format: int64
+    ListRoundTotalsResponse:
+      type: object
+      required: ["entries"]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RoundTotals"
+    ListRoundPartyTotalsResponse:
+      type: object
+      required: ["entries"]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RoundPartyTotals"
+    RoundPartyTotals:
+      type: object
+      required:
+        - "closed_round"
+        - "party"
+        - "app_rewards"
+        - "validator_rewards"
+        - "traffic_purchased"
+        - "traffic_purchased_cc_spent"
+        - "traffic_num_purchases"
+        - "cumulative_app_rewards"
+        - "cumulative_validator_rewards"
+        - "cumulative_change_to_initial_amount_as_of_round_zero"
+        - "cumulative_change_to_holding_fees_rate"
+        - "cumulative_traffic_purchased"
+        - "cumulative_traffic_purchased_cc_spent"
+        - "cumulative_traffic_num_purchases"
+      properties:
+        closed_round:
+          type: integer
+          format: int64
+        party:
+          type: string
+        app_rewards:
+          type: string
+        validator_rewards:
+          type: string
+        traffic_purchased:
+          type: integer
+          format: int64
+        traffic_purchased_cc_spent:
+          type: string
+        traffic_num_purchases:
+          type: integer
+          format: int64
+        cumulative_app_rewards:
+          type: string
+        cumulative_validator_rewards:
+          type: string
+        cumulative_change_to_initial_amount_as_of_round_zero:
+          type: string
+        cumulative_change_to_holding_fees_rate:
+          type: string
+        cumulative_traffic_purchased:
+          type: integer
+          format: int64
+        cumulative_traffic_purchased_cc_spent:
+          type: string
+        cumulative_traffic_num_purchases:
+          type: integer
+          format: int64
+    RoundTotals:
+      type: object
+      required:
+        - "closed_round"
+        - "closed_round_effective_at"
+        - "app_rewards"
+        - "validator_rewards"
+        - "change_to_initial_amount_as_of_round_zero"
+        - "change_to_holding_fees_rate"
+        - "cumulative_app_rewards"
+        - "cumulative_validator_rewards"
+        - "cumulative_change_to_initial_amount_as_of_round_zero"
+        - "cumulative_change_to_holding_fees_rate"
+        - "total_amulet_balance"
+      properties:
+        closed_round:
+          type: integer
+          format: int64
+        closed_round_effective_at:
+          type: string
+          format: date-time
+        app_rewards:
+          type: string
+        validator_rewards:
+          type: string
+        change_to_initial_amount_as_of_round_zero:
+          type: string
+        change_to_holding_fees_rate:
+          type: string
+        cumulative_app_rewards:
+          type: string
+        cumulative_validator_rewards:
+          type: string
+        cumulative_change_to_initial_amount_as_of_round_zero:
+          type: string
+        cumulative_change_to_holding_fees_rate:
+          type: string
+        total_amulet_balance:
+          type: string
+    MigrationSchedule:
+      type: object
+      required:
+        - "time"
+        - "migration_id"
+      properties:
+        time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64
+
+    SynchronizerIdentities:
+      type: object
+      required:
+        - sequencer_id
+        - sequencer_identity_transactions
+        - mediator_id
+        - mediator_identity_transactions
+      properties:
+        sequencer_id:
+          type: string
+        sequencer_identity_transactions:
+          type: array
+          items:
+            type: string
+        mediator_id:
+          type: string
+        mediator_identity_transactions:
+          type: array
+          items:
+            type: string
+
+    SynchronizerBootstrappingTransactions:
+      type: object
+      required:
+        - domain_parameters
+        - sequencer_domain_state
+        - mediator_domain_state
+      properties:
+        domain_parameters:
+          type: string
+        sequencer_domain_state:
+          type: string
+        mediator_domain_state:
+          type: string
+
+    GetMigrationInfoRequest:
+      type: object
+      required:
+        - migration_id
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+
+    GetMigrationInfoResponse:
+      type: object
+      required:
+          - record_time_range
+          - complete
+      properties:
+        previous_migration_id:
+          description: |
+            The migration id that was active before the given migration id, if any.
+          type: integer
+          format: int64
+        record_time_range:
+          description: |
+            All domains for which there are updates in the given migration id,
+            along with the record time of the newest and oldest update associated with each domain
+          type: array
+          items:
+            $ref: "#/components/schemas/RecordTimeRange"
+        complete:
+          description: |
+            True if this scan has all updates for given migration id
+          type: boolean
+
+    RecordTimeRange:
+        type: object
+        required:
+          - synchronizer_id
+          - min
+          - max
+        properties:
+          synchronizer_id:
+            type: string
+          min:
+            type: string
+            format: date-time
+          max:
+            type: string
+            format: date-time
+
+    GetUpdatesBeforeRequest:
+      type: object
+      required:
+        - migration_id
+        - synchronizer_id
+        - before
+        - count
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+        synchronizer_id:
+          type: string
+        before:
+          description: |
+            Only return updates with a record time strictly smaller than this time.
+          type: string
+          format: date-time
+        at_or_after:
+          description: |
+            Only return updates with a record time equal to or greater than this time.
+          type: string
+          format: date-time
+        count:
+          description: |
+            Return at most this many updates. The actual number of updates returned may be smaller.
+          type: integer
+          format: int32
+
+    GetUpdatesBeforeResponse:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateHistoryItem"
+
+    DamlValueEncoding:
+      type: string
+      description: |
+        How daml values should be encoded in the response.
+        "compact_json" is a compact, human-readable JSON encoding. It is the same encoding
+        as the one used in the HTTP JSON API or the JavaScript codegen.
+        "protobuf_json" is a verbose JSON encoding that is more difficult to parse,
+        but contains type information, i.e., the values can be parsed losslessly
+        without having access to the Daml source code.
+        Optional and defaults to "compact_json".
+      enum:
+        - "compact_json"
+        - "protobuf_json"
+    GetMemberTrafficStatusResponse:
+      type: object
+      required: [ "traffic_status" ]
+      properties:
+        traffic_status:
+          description: |
+            The current traffic state for the member on the synchronizer under
+            `actual`, and the total purchased traffic under `target`.  The purchased
+            traffic may exceed the `actual` limit as purchases take time to be
+            incorporated into the limit.
+          $ref: "#/components/schemas/MemberTrafficStatus"
+    MemberTrafficStatus:
+      type: object
+      required: [ "actual", "target" ]
+      properties:
+        actual:
+          description: The current traffic state for the member on the synchronizer
+          $ref: "#/components/schemas/ActualMemberTrafficState"
+        target:
+          description: Total purchased traffic; may exceed limit in `actual`
+          $ref: "#/components/schemas/TargetMemberTrafficState"
+    ActualMemberTrafficState:
+      type: object
+      required: [ "total_consumed", "total_limit" ]
+      properties:
+        total_consumed:
+          description: |
+            Total extra traffic consumed by the member on the given synchronizer
+          type: integer
+          format: int64
+        total_limit:
+          description: |
+            Current extra traffic limit set for the member on the given synchronizer.
+            An extra traffic top-up is complete once total_limit matches total_purchased.
+          type: integer
+          format: int64
+    TargetMemberTrafficState:
+      type: object
+      required: [ "total_purchased" ]
+      properties:
+        total_purchased:
+          description: |
+            Total extra traffic purchased for the member on the given
+            synchronizer in bytes.
+          type: integer
+          format: int64
+    GetPartyToParticipantResponse:
+      type: object
+      required: [ "participant_id" ]
+      properties:
+        participant_id:
+          description: |
+            ID of the participant hosting the provided party, in the form
+            `PAR::id::fingerprint`
+          type: string
+    GetValidatorFaucetsByValidatorResponse:
+      type: object
+      required: [ "validatorsReceivedFaucets" ]
+      properties:
+        validatorsReceivedFaucets:
+          description: |
+            Statistics for any party ID arguments found to have valid onboarding
+            licenses; the order in the response is unrelated to argument order.
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidatorReceivedFaucets"
+    ValidatorReceivedFaucets:
+      type: object
+      required:
+        [
+          "validator",
+          "numRoundsCollected",
+          "numRoundsMissed",
+          "firstCollectedInRound",
+          "lastCollectedInRound",
+        ]
+      properties:
+        validator:
+          description: The party ID of the onboarded validator
+          type: string
+        numRoundsCollected:
+          description: |
+            how many rounds the validator has received a faucet for; guaranteed
+            that collected + missed = last - first + 1
+          type: integer
+          format: int64
+        numRoundsMissed:
+          description: |
+            how many rounds between firstCollected and lastCollected in which
+            the validator failed to collect (i.e. was not active or available);
+            can at most be max(0, lastCollected - firstCollected - 1).
+          type: integer
+          format: int64
+        firstCollectedInRound:
+          description: |
+            the round number when this validator started collecting faucets;
+            the validator definitely recorded liveness in this round
+          type: integer
+          format: int64
+        lastCollectedInRound:
+          description: |
+            The most recent round number in which the validator collected a faucet;
+            the validator definitely recorded liveness in this round.  Will equal
+            `firstCollected` if the validator has collected in only one round
+          type: integer
+          format: int64

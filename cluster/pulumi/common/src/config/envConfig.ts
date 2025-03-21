@@ -5,7 +5,7 @@ import { expand } from 'dotenv-expand';
 import Dict = NodeJS.Dict;
 
 export class SpliceConfigContext {
-  readonly deploymentFolderPath = `${process.env.REPO_ROOT}/cluster/deployment`;
+  readonly deploymentFolderPath = `${process.env.SPLICE_ROOT}/cluster/deployment`;
 
   extractGcpClusterFolderName(): string {
     const gcpclusterbasename = requiredValue(
@@ -51,8 +51,8 @@ export class SpliceEnvConfig {
         'CN_PULUMI_LOAD_ENV_CONFIG_FILE'
       )
     ) {
-      const envrcs = [`${process.env.REPO_ROOT}/.envrc.vars`].concat(
-        glob.sync(`${process.env.REPO_ROOT}/.envrc.vars.*`)
+      const envrcs = [`${process.env.SPLICE_ROOT}/.envrc.vars`].concat(
+        glob.sync(`${process.env.SPLICE_ROOT}/.envrc.vars.*`)
       );
       const result = expand(dotenvConfig({ path: envrcs }));
       if (result.error) {

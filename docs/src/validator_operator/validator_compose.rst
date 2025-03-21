@@ -8,7 +8,7 @@
 
 .. _compose_validator:
 
-Docker-Compose Based Deployment of a Validator Node
+Docker Compose-Based Deployment of a Validator Node
 ===================================================
 
 This section describes how to deploy a standalone validator node on a VM or a local machine
@@ -76,6 +76,8 @@ the example here. As long as you have docker-compose 2.26.0 or newer you should 
 
   tar xzvf |version|\_splice-node.tar.gz
 
+.. include:: ../common/backup_suggestion.rst
+
 .. include:: required_network_parameters.rst
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.
@@ -108,6 +110,14 @@ left empty, but the ``-o`` is still mandatory, so a ``-o ""`` argument should be
 
 Logging into the wallet UI
 ++++++++++++++++++++++++++
+
+.. note::
+
+   Docker Compose-based validator deployments use ``.localhost`` subdomains for addressing, such as ``wallet.localhost``.
+   ``.localhost`` URLs reportedly do not work on some browsers.
+   If you encounter issues please try using a different browser such as Firefox or Chrome.
+   If you're encountering issues with reaching APIs from a custom program or script,
+   you may need to set the ``HOST`` header on HTTP requests explicitly to the target ``.localhost`` address.
 
 The wallet UI is accessible at http://wallet.localhost in your browser. The validator administrator's
 username is `administrator`. Insert that name into the username field and click `Log in`, and

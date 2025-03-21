@@ -16,7 +16,7 @@
           "client-id": "validator1-client-id",
           "client-secret": "***",
           "ledger-api-user": "validator1-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -38,7 +38,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "validator1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -60,7 +60,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "validator1-splitwell-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -82,7 +82,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "validator1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -269,7 +269,7 @@
           "client-id": "validator1-client-id",
           "client-secret": "***",
           "ledger-api-user": "validator1-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
@@ -291,7 +291,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "validator1-cns-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -313,7 +313,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "validator1-splitwell-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -335,7 +335,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "validator1-wallet-ui-client-id",
-          "url": "https://auth0Domain"
+          "url": "https://canton-network-dev.us.auth0.com"
         }
       }
     },
@@ -414,7 +414,7 @@
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "4"
+            "activeMigrationId": "1"
           },
           "splitwell": true
         },
@@ -430,7 +430,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -538,7 +538,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 6
+          "domains": 2
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
@@ -549,7 +549,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -562,7 +562,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-1",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -595,7 +595,7 @@
           }
         },
         "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "cluster": {
@@ -633,7 +633,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 1
           }
         },
         "participantAdminUserNameFrom": {
@@ -644,7 +644,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_1",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -657,9 +657,9 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
-    "name": "validator1-participant-4",
+    "name": "validator1-participant-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -782,7 +782,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -899,7 +899,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -916,7 +916,8 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
+          "id": 1,
+          "legacyId": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -927,7 +928,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-1",
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,
@@ -961,9 +962,11 @@
         },
         "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "digitalasset-validator1-1",
-        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
+        "validatorWalletUsers": [
+          "auth0|63e3d75ff4114d87a2c1e4f5"
+        ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

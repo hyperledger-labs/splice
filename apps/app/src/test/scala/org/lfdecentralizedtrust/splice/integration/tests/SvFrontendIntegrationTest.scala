@@ -82,7 +82,7 @@ class SvFrontendIntegrationTest
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
         env: SpliceTestConsoleEnvironment
     ) = {
-      val requestReasonUrl = "This is a request reason url."
+      val requestReasonUrl = "https://vote-request-url.com"
       val requestReasonBody = "This is a request reason."
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
         implicit webDriver =>
@@ -345,7 +345,7 @@ class SvFrontendIntegrationTest
     "can create valid SRARC_GrantFeaturedAppRight and SRARC_RevokeFeaturedAppRight vote requests" in {
       implicit env =>
         val requestProviderParty = "TestProviderParty"
-        val requestReasonUrl = "This is a request reason url."
+        val requestReasonUrl = "https://vote-request-url.com"
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
@@ -455,7 +455,7 @@ class SvFrontendIntegrationTest
 
     "SV1 can create valid SRARC_SetConfig (new DsoRules Configuration) vote requests that can expire and get rejected by other SVs" in {
       implicit env =>
-        val requestReasonUrl = "This is a request reason url."
+        val requestReasonUrl = "https://vote-request-url.com"
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
@@ -583,6 +583,7 @@ class SvFrontendIntegrationTest
     "can create a CRARC_AddFutureAmuletConfigSchedule vote request with only a proposal text and no change" in {
       implicit env =>
         val proposalSummary = "This is a request reason, and everything this is about."
+        val proposalUrl = "https://vote-request-url.com"
 
         withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
@@ -616,6 +617,10 @@ class SvFrontendIntegrationTest
               }
               clue("sv1 modifies the summary") {
                 find(id("create-reason-summary")).value.underlying.sendKeys(proposalSummary)
+              }
+
+              clue("sv1 modifies the proposal url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(proposalUrl)
               }
 
               clue("sv1 creates the vote request") {
@@ -655,7 +660,7 @@ class SvFrontendIntegrationTest
            * */
           val requestNewTransferConfigFeeValue = "42"
           val optValidatorFaucetValue = "420"
-          val requestReasonUrl = "This is a request reason url."
+          val requestReasonUrl = "https://vote-request-url.com"
           val requestReasonBody = "This is a request reason."
 
           withFrontEnd("sv1") { implicit webDriver =>
@@ -712,7 +717,9 @@ class SvFrontendIntegrationTest
                 }
 
                 clue("sv1 modifies the url") {
-                  find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+                  val input = find(id("create-reason-url")).value.underlying
+                  input.clear()
+                  input.sendKeys(requestReasonUrl)
                 }
 
                 clue("sv1 modifies the summary") {
@@ -721,7 +728,7 @@ class SvFrontendIntegrationTest
 
                 setExpirationDate("sv1", "2032-07-11 00:12")
 
-                clue("sv1 creates the vote request") {
+                clue("sv1 submits the vote request") {
                   clickVoteRequestSubmitButtonOnceEnabled()
                 }
               },
@@ -771,6 +778,12 @@ class SvFrontendIntegrationTest
                     .sendKeys(requestNewTransferConfigFeeValue)
                 }
 
+                clue("sv1 modifies the url") {
+                  val input = find(id("create-reason-url")).value.underlying
+                  input.clear()
+                  input.sendKeys(requestReasonUrl)
+                }
+
                 clue("sv1 modifies the summary") {
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
@@ -811,6 +824,12 @@ class SvFrontendIntegrationTest
                 clue("sv1 modifies one value") {
                   find(id("transferConfig.createFee.fee-value")).value.underlying
                     .sendKeys(requestNewTransferConfigFeeValue)
+                }
+
+                clue("sv1 modifies the url") {
+                  val input = find(id("create-reason-url")).value.underlying
+                  input.clear()
+                  input.sendKeys(requestReasonUrl)
                 }
 
                 clue("sv1 modifies the summary") {
@@ -911,6 +930,12 @@ class SvFrontendIntegrationTest
                     .sendKeys(requestNewTransferConfigFeeValue)
                 }
 
+                clue("sv1 modifies the url") {
+                  val input = find(id("create-reason-url")).value.underlying
+                  input.clear()
+                  input.sendKeys(requestReasonUrl)
+                }
+
                 clue("sv1 modifies the summary") {
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
@@ -1001,6 +1026,12 @@ class SvFrontendIntegrationTest
                   new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
                 dropDownAmuletConfigDate.selectByIndex(1)
 
+                clue("sv1 modifies the url") {
+                  val input = find(id("create-reason-url")).value.underlying
+                  input.clear()
+                  input.sendKeys(requestReasonUrl)
+                }
+
                 clue("sv1 modifies the summary") {
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
@@ -1057,7 +1088,7 @@ class SvFrontendIntegrationTest
 
     "if two AddFutureAmuletConfigSchedule actions scheduled at the same time are created concurrently, then only one succeeds" in {
       implicit env =>
-        val requestReasonUrl = "This is a request reason url."
+        val requestReasonUrl = "https://vote-request-url.com"
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>

@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { config } from 'splice-pulumi-common/src/config';
-import { CLUSTER_BASENAME, REPO_ROOT } from 'splice-pulumi-common/src/utils';
+import { CLUSTER_BASENAME, SPLICE_ROOT } from 'splice-pulumi-common/src/utils';
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulumi-'));
 
@@ -72,7 +72,7 @@ export async function stack(
   // safe to use process.env as we check if we're in a CI env
   // eslint-disable-next-line no-process-env
   const stackMustAlreadyExist = process.env.CI !== undefined && requiresExistingStack;
-  const projectDirectory = `${REPO_ROOT}/cluster/pulumi/${project}`;
+  const projectDirectory = `${SPLICE_ROOT}/cluster/pulumi/${project}`;
   const stackOpts: automation.LocalProgramArgs = {
     workDir: projectDirectory,
     stackName: fullStackName,
@@ -175,7 +175,7 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
     data.filter(res => res.status === 'rejected') as PromiseRejectedResult[]
   ).map(res => res.reason);
   if (rejectionReasons.length > 0) {
-    const message = `Ran ${operations.length} operations. ${rejectionReasons.length} failed`;
+    const message = `Ran ${operations.length} operations. ${rejectionReasons.length} failed. Reasons of rejections: ${rejectionReasons}`;
     console.error(message);
     throw new Error(message);
   }

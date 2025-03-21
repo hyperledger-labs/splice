@@ -13,7 +13,7 @@ function get_cloudsql_id() {
   local cluster=${3:-""} # optional, defaults to CWD
 
   if [ -n "$cluster" ]; then
-    local path="$REPO_ROOT/cluster/deployment/$cluster"
+    local path="$SPLICE_ROOT/cluster/deployment/$cluster"
     local cwd; cwd="$(pwd)"
 
     cd "$path" || _error "Failed to enter deployment directory $cluster"

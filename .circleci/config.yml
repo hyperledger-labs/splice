@@ -37,14 +37,11 @@ parameters:
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
         healthcheck-cidaily,
-        healthcheck-cilr,
         healthcheck-devnet,
         redeploy-sv-runbook-cidaily,
         redeploy-validator-runbook-cidaily,
-        reset-sv-runbook-cilr,
         reset-sv-runbook-devnet,
         healthcheck-sv-runbook-devnet,
-        reset-validator-runbook-cilr,
         reset-validator-runbook-devnet,
         healthcheck-validator-runbook-devnet,
         backup-cidaily,
@@ -57,13 +54,14 @@ parameters:
         auth0-user-cleanup,
         cluster-lock-reaper,
         apply-infra,
-        update-deployment,
+        deploy-operator,
         preview-operator,
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
         purge-unused-dbs-cidaily,
         bump-configs,
+        update-serverless-workflows,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -101,6 +99,10 @@ parameters:
   migration-id:
     type: integer
     default: 0
+  # used for copying old backups to a bucket
+  before-date:
+    type: string
+    default: ""
 
 notify-fail: &notify-fail
   context: slack-context
@@ -131,6 +133,7 @@ cluster-parameter: &cluster-parameter
         "ciupgrade",
         "devnet",
         "mainnet",
+        "mainnet-old",
         "testnet",
         "testnet-preview",
         "observability",
@@ -417,7 +420,7 @@ commands:
           gce_authenticate: true
           cmd_retry_count: 5 # we have seen this fail several times, see #13863
           cmd: |
-            $REPO_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
+            $SPLICE_ROOT/.circleci/cn-scripts/display-gcloud-link.sh
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
@@ -590,12 +593,22 @@ commands:
       - run:
           name: clone << parameters.repo_name >> repo
           command: |
+            set -eou pipefail
             cd ..
             for i in $(seq 1 5)
             do
               git clone "<< parameters.repository >>" << parameters.directory >> && s=0 && break || s=$? && sleep 5
             done
-            (exit $s)
+            if [[ $s -ne 0 ]]
+            then
+              exit $s
+            fi
+            cd "<< parameters.directory >>"
+            if git rev-parse "origin/${CIRCLE_BRANCH}"
+            then
+              echo "Branch $CIRCLE_BRANCH already exists, creating PR against that branch."
+              git checkout "$CIRCLE_BRANCH"
+            fi
       - run_bash_command_in_nix:
           cmd_name: dump latest into << parameters.repo_name >>
           cmd: |
@@ -693,7 +706,8 @@ commands:
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
-            cncluster pulumi deployment up --skip-preview --diff
+            cncluster pulumi operator refresh --yes
+            cncluster pulumi operator up --skip-preview --diff
 
   skip_if_flag_set:
     parameters:
@@ -978,8 +992,8 @@ commands:
 
               . .envrc.vars
               if [[ "$TARGET_CLUSTER" != none ]]; then
-                . $REPO_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
-                . $REPO_ROOT/build-tools/lib/cluster.envrc.vars
+                . $SPLICE_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
+                . $SPLICE_ROOT/build-tools/lib/cluster.envrc.vars
                 echo "Using cluster hostname suffix: ${GCP_CLUSTER_HOSTNAME}"
               fi
 
@@ -1137,7 +1151,17 @@ commands:
       pulumi_stack_names:
         type: string
         default: "canton-network"
+      expected_branch:
+        type: string
     steps:
+      - run_bash_command_in_nix:
+          cmd_name: Install pulumi dependencies
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: wait for all pulumi stacks to be updated.
           cluster: << parameters.cluster >>
@@ -1146,7 +1170,8 @@ commands:
           additional_nix_args: "--keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
-            EXPECTED_GIT_COMMIT=$(echo "refs/heads/$(git rev-parse --abbrev-ref HEAD)@sha1:$(git rev-parse HEAD)")
+            sha=$(git rev-parse << parameters.expected_branch >>)
+            EXPECTED_GIT_COMMIT=$(echo "refs/heads/<< parameters.expected_branch >>@sha1:$sha")
             wait_for_stack_updated() {
               local STACK_NAME=$1
               echo "waiting for stack $STACK_NAME being updated with commit $EXPECTED_GIT_COMMIT"
@@ -2037,7 +2062,7 @@ jobs:
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "10 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
             cncluster restore_node --force << parameters.namespace_name >> ${ACTIVE_MIGRATION_ID} << parameters.internal_stack >>
@@ -2439,7 +2464,7 @@ jobs:
 
               if [[ << parameters.silence_deployment_alerts >> == true ]]; then
                 # silence specific alerts that may fire due to SV downtime
-                cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+                cncluster silence_grafana_alerts "20 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
               fi
 
               cncluster partial_upgrade $(get-snapshot-version) "$images"
@@ -2578,7 +2603,15 @@ jobs:
             --keep VPN_USER
             --keep VPN_PASSWORD
           cmd: |
-            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1"
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+              BASE_VERSION=$(build-tools/get-charts-version "$base_version")
+            else
+              base_version=$(build-tools/get-snapshot-version)
+              BASE_VERSION=$base_version
+            fi
+
+            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1" -t "$BASE_VERSION"
           # retry on vpn disconnects.
           # Note that this might break the assumption that the validator spinup is fast enough for the
           # migration not to have to wait for it, but for now we don't want to add more complexity to the workflow.
@@ -2678,6 +2711,7 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:
           cmd_name: Run post-migration steps
+          cluster: << parameters.cluster >>
           cmd: build-tools/splice-compose.sh test_after_migration
       - when:
           condition: << parameters.send_notifications >>
@@ -2832,25 +2866,28 @@ jobs:
         default: true
     steps:
       - checkout_with_retry
-      - when:
-          condition: << parameters.base_version >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.base_version >>
-                command: |
-                  echo "Checking out commit << parameters.base_version >>"
-                  git checkout << parameters.base_version >>
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Push new branch for base version with migration config changes
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+
+            # The operator itself should use images from the branch on which this job is running.
+            OPERATOR_IMAGE_VERSION=$(build-tools/get-snapshot-version)
+
+            if [ -n "<< parameters.base_version >>" ]; then
+              echo "Checking out commit << parameters.base_version >>"
+              git checkout << parameters.base_version >>
+            fi
+
+            # Create a base version branch, with an active migration ID 0 on the base version
+            # (this represents the release-line branch corresponding to the current migration ID in a prod cluster)
 
             BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
             git branch -f $BASE_VERSION_BRANCH HEAD
@@ -2858,15 +2895,23 @@ jobs:
             git push -f origin $BASE_VERSION_BRANCH
             if [ -n "<< parameters.base_version >>" ]; then
               base_version="<< parameters.base_version >>"
+              BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             else
               base_version=$(build-tools/get-snapshot-version)
+              BASE_VERSION=$base_version
             fi
-            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
+
+            echo "Using BASE_VERSION: $BASE_VERSION"
+
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             #TODO(#15759) - remove the internal param after HDM base version is >= 0.3.12
             cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
-            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            # We write the changes to envrc.vars into a separate file first, so we can easily apply
+            # the same changes to the update branch later. We do not rely on e.g. `git cherry-pick`
+            # to avoid conflicts that cannot be resolved automatically.
+            file="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars.base"
+            rm -f "$file"
 
             echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
@@ -2874,21 +2919,56 @@ jobs:
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
             # requires sv1 sv-app to be up so we disable it for faster deployments
             echo "export DISABLE_COMETBFT_STATE_SYNC=true" >> "$file"
+            echo "export CHARTS_VERSION=$BASE_VERSION" >> "$file"
+            echo "export OVERRIDE_VERSION=$BASE_VERSION" >> "$file"
+
+            cat "$file" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+
             # if the base version is a release version ensure we use the public repository
+            # we write this to the .envrc.vars file directly and not to the patch that we also
+            # apply later to the upgrade version, because the upgrade version typiclaly is not public
+            # in these tests
             if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             fi
 
+            git add "$file"
             git add **/.envrc.vars
             git add **/config.yaml
             git commit -m "Add migration config to deploy version $BASE_VERSION to << parameters.cluster >>"
             git push origin $BASE_VERSION_BRANCH
+
+            # Create a deployment branch and configure the deployment stack to follow it
+            # (for prod clusters, this will typically be `main`)
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git branch -f  $DEPLOYMENT_BRANCH HEAD
+            git checkout $DEPLOYMENT_BRANCH
+            git push -f origin $DEPLOYMENT_BRANCH
+            cncluster set_operator_deployment_reference refs/heads/$DEPLOYMENT_BRANCH
+            echo "export OPERATOR_IMAGE_VERSION=$OPERATOR_IMAGE_VERSION" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            git add **/config.yaml
+            git add **/.envrc.vars
+            git commit -m "Set the operator deployment reference to $DEPLOYMENT_BRANCH on << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
+            # if the version for the operator is a release version ensure we use the public repository.
+            # we do not commit this, as this is only for deploying the operator itself which we do only here.
+            # Since the operator images are taken from the branch from which we run this, CIRCLE_BRANCH should
+            # be the corresponding branch, so if that's main or a release branch, we use the public repository too.
+            if [[ $OPERATOR_IMAGE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$CIRCLE_BRANCH" == main ]] || [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            else
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=private" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            fi
+
       - deploy_operator:
           cluster: << parameters.cluster >>
           deploy_retry_count: << parameters.deploy_retry_count >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,sv-runbook,validator-runbook"
+          expected_branch: << parameters.cluster >>-migration-base
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -2940,6 +3020,11 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+
+            # Create a branch for the upgrade version, with a "upgrade" migration ID 1, on the upgrade version
+            # This represents the release-line branch corresponding to the next migration ID in a prod cluster
+
             BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
@@ -2947,43 +3032,51 @@ jobs:
             git push -f origin $UPGRADE_VERSION_BRANCH
             if [ -n "<< parameters.base_version >>" ]; then
               base_version="<< parameters.base_version >>"
+              BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             else
               base_version=$(build-tools/get-snapshot-version)
+              BASE_VERSION=$base_version
             fi
-            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
-            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
-            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
-            echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
-            # We always include the runbook
-            echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
-            echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
-            echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
-            echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            # Apply the same config changes that we applied in the base branch also to the upgrade branch
+            # (we do not cherry-pick the commit, to avoid conflicts that cannot be resolved automatically)
+
+            basefile="cluster/deployment/${TARGET_CLUSTER}/.envrc.vars.base"
+            rm -f "$basefile"
+            git checkout origin/$BASE_VERSION_BRANCH -- "$basefile"
+
+            file="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            cat "$basefile" >> "$file"
+            rm "$basefile"
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
+            # (same as above, we do not cherry-pick the commit, to avoid conflicts that cannot be resolved automatically)
             cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF
             # Add the new entry for the staging nodes.
             cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
-            git add **/config.yaml || true
-            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git add **/config.yaml
+            git commit -m "Add config to deploy upgrade version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
-            # if the base version is a release version ensure we use the public repository
-            # we add this as a workaround for deploying the operator from the upgrade branch
-            # we don't commit it as when we deploy with the upgrade version we actually want to use the  dev repository
-            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
-            fi
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
+            # Add the new entry for the staging nodes also in the deployment branch.
+            # This will trigger the deployment stack to spin up the components for migration ID 1.
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+
+            git add **/.envrc.vars
+            git add **/config.yaml
+            git commit -m "Add config to deploy upgrade version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -3020,22 +3113,44 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
-            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            # Update the upgrade branch to a "migrating" state
+
+            file=$(mktemp)
+            envfile="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            echo "export CHARTS_VERSION=$UPGRADE_VERSION" >> "$file"
+            echo "export OVERRIDE_VERSION=$UPGRADE_VERSION" >> "$file"
+            cat $file >> "$envfile"
             cncluster update_config_to_migrate
 
-            git add **/config.yaml || true
-            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git add **/.envrc.vars
+            git add **/config.yaml
+            git commit -m "Update config to migrate to version $UPGRADE_VERSION on << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
+            # Update also the deployment branch to a "migrating" state (we would typically do this
+            # by back/fwd-porting the commit between the two branches, here we just apply the same
+            # changes to both, to avoid conflicts that cannot be resolved automatically)
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cat $file >> "$envfile"
+            cncluster update_config_to_migrate
+
+            git add **/.envrc.vars
+            git add **/config.yaml || true
+            git commit -m "Update config to migrate to version $UPGRADE_VERSION on << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -3072,23 +3187,30 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
+            # Update the upgrade branch to archive the base version
+
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
-
-            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-
             cncluster update_config_to_archive_legacy_migration
 
             git add **/config.yaml || true
-            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git commit -m "Update config to archive legacy version on << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
+            # Forward-port the same change to the deployment branch
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cncluster update_config_to_archive_legacy_migration
+
+            git add **/config.yaml || true
+            git commit -m "Update config to archive legacy version on << parameters.cluster >>"
+            git push origin $DEPLOYMENT_BRANCH
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -3149,19 +3271,28 @@ jobs:
 
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-
             cncluster update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
             git commit -m "Add migration config to remove migratingFrom" || true
             git push origin $UPGRADE_VERSION_BRANCH
+
+            # Forward-port the same change to the deployment branch
+
+            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
+            git checkout $DEPLOYMENT_BRANCH
+            cncluster update_config_to_remove_migrating_from
+
+            git add **/.envrc.vars
+            git add **/config.yaml || true
+            git commit -m "Add migration config to remove migratingFrom" || true
+            git push origin $DEPLOYMENT_BRANCH
           cmd_retry_count: 3
-      - deploy_operator:
-          cluster: << parameters.cluster >>
-          deploy_retry_count: << parameters.deploy_retry_count >>
+
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          expected_branch: << parameters.cluster >>-migration-upgrade
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -3321,7 +3452,7 @@ jobs:
       - docker_login_artifactory
       - run_bash_command_in_nix:
           cmd_name: Check if release tag is on anything but a release-line branch
-          additional_nix_args: --keep CIRCLE_BRANCH --keep REPO_ROOT
+          additional_nix_args: --keep CIRCLE_BRANCH --keep SPLICE_ROOT
           cmd: ./scripts/halt-on-bad-release-commit-msg.sh .halt-build-step
       - run_bash_command_in_nix:
           cmd_name: Check if images already exist
@@ -3355,7 +3486,9 @@ jobs:
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY \
-           --keep CIRCLE_BRANCH"
+           --keep CIRCLE_BRANCH \
+           --keep CIRCLE_REPOSITORY_URL \
+           --keep CIRCLE_SHA1"
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
@@ -3381,17 +3514,23 @@ jobs:
             set -eou pipefail
             scripts/copy-openapi.sh /tmp/artifacts/openapi.tar.gz
       - run_bash_command_in_nix:
+          cmd_name: Rename release bundles
+          cmd: |
+            # we're renaming in a separate step because the `mv` command is not idempotent
+            VERSION=$(get-snapshot-version)
+            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+      - run_bash_command_in_nix:
           cmd_name: Publish release bundles
           additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
           cmd: |
             echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
             export GOOGLE_CLOUD_PROJECT=da-cn-shared
-            VERSION=$(get-snapshot-version)
-            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
             # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
-            # which would lead to an error due to a misisng `delete` permission
+            # which would lead to an error due to a missing `delete` permission
             gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
-          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
+          # We suspect that in case of concurrent uploads, one of the `gsutil cp` calls will fail with a 412 error,
+          # which is not automatically retried by `gsutil`. Therefore, we retry the command here.
+          cmd_retry_count: 2
       - when:
           condition:
             equal: [ << parameters.is_public >>, true ]
@@ -3499,6 +3638,44 @@ jobs:
               --max_age_seconds << parameters.max_pipeline_age_secs >> \
               --extra_seconds_after_finish << parameters.extra_seconds_after_finish >> \
               cancel_self
+
+  cancel_if_other_pipeline_failed:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$|release-line.*"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 86400  # limit search to pipelines that are 24 hours old
+      extra_seconds_after_finish:
+        type: integer
+        default: 0
+    steps:
+      - checkout_with_retry
+      - run:
+          name: "Cancel self if other pipeline failed"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              --extra_seconds_after_finish << parameters.extra_seconds_after_finish >> \
+              cancel_self_if_pipeline_failed
 
   cancel_previous_pipelines:
     executor: self_hosted
@@ -3804,6 +3981,20 @@ jobs:
               /home/circleci/project/.circleci/create-gh-release.sh ${CIRCLE_BRANCH/release-line-/}
             fi
 
+  update_cilr:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Create branch to point CILR to and update tag
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          cmd: |
+            VERSION="$(get-snapshot-version)"
+            .circleci/update-cilr.sh
+
   # TODO(#14845): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that
   #               it succeeds.
@@ -3853,6 +4044,20 @@ jobs:
           name: Store logs
           path: log
           destination: log
+
+  deploy_serverless:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Deploy serverless workflows
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            ./cluster/serverless/deploy.sh
 
   deploy_operator:
     executor: self_hosted
@@ -4198,6 +4403,7 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Run SV preflight tests
                 additional_nix_args: "--keep SV_DEV_NET_WEB_UI_PASSWORD \
+                  --keep SV_WEB_UI_PASSWORD \
                   --keep VALIDATOR_WEB_UI_PASSWORD \
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD \
@@ -4390,6 +4596,9 @@ jobs:
             - preview_pulumi:
                 cluster: << parameters.cluster >>
                 project: "deployment"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "operator"
 
   reset_cluster:
     executor: self_hosted
@@ -4433,7 +4642,7 @@ jobs:
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "10 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
             if [[ << parameters.cluster >> =~ scratch* ]] && [[ << parameters.unlock_shared_cluster >> == true ]]; then
@@ -4489,7 +4698,7 @@ jobs:
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "20 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
             cncluster ci_pdown_sv
@@ -4528,7 +4737,7 @@ jobs:
             cncluster activate
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
               # silence specific alerts that may fire due to reset downtime
-              cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+              cncluster silence_grafana_alerts "20 minutes" -f "$SPLICE_ROOT/.circleci/silences/deployment_grafana.json"
             fi
             cncluster ci_pdown_validator
           cmd_retry_count: 3
@@ -4809,6 +5018,8 @@ workflows:
           cluster: "cidaily"
           requires:
             - deploy_validator_runbook
+            # TODO(#8300) Remove this once the preflight check doesn't wait for the sv runbook deployment
+            - deploy_sv_runbook
       - backup_cluster:
           name: backup_cidaily
           <<: *main-branch-only
@@ -4819,6 +5030,14 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster_cidaily
+      - update_cilr:
+          name: update_cilr
+          <<: *main-branch-only
+          <<: *notify-fail
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
 
   cidaily_health_check:
     when:
@@ -5023,6 +5242,16 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_cidaily cidaily_health_check backup_cidaily restore_sv_cidaily"
+      - cancel_if_other_pipeline_failed:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily"
       - restore_node:
           filters:
             branches:
@@ -5065,91 +5294,6 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
-          requires:
-            - wait_for_previous_pipeline
-
-  cilr_health_check:
-    when:
-      equal: [ healthcheck-cilr, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cilr
-          context:
-            - artifactory
-            - slack-context
-          # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "reset_sv_runbook_cilr"
-      - cancel_if_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cilr
-          context:
-            - artifactory
-            - slack-context
-          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
-          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
-          workflow_names: "deploy_cilr"
-      - preflight_check:
-          filters:
-            branches:
-              only:
-                - deployment/cilr
-          cluster: "cilr"
-          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-            - cancel_if_previous_pipeline
-
-  reset_sv_runbook_cilr:
-    when:
-      equal: [ reset-sv-runbook-cilr, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "reset_sv_runbook_cilr"
-      - reset_sv_runbook:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cilr"
-          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
-          requires:
-            - wait_for_previous_pipeline
-
-  reset_validator_runbook_cilr:
-    when:
-      equal: [ reset-validator-runbook-cilr, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "reset_validator_runbook_cilr"
-      - reset_validator_runbook:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "cilr"
-          channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:
             - wait_for_previous_pipeline
 
@@ -5578,7 +5722,6 @@ workflows:
       equal: [ purge-unused-dbs-cidaily, << pipeline.parameters.run-job >> ]
     jobs:
       - purge_unused_dbs:
-          <<: *main-branch-only
           <<: *notify-fail
           context:
             - slack-context
@@ -6359,9 +6502,9 @@ workflows:
             - slack-context
             - canton-network-vpn
 
-  update_deployment:
+  redeploy_operator:
     when:
-      equal: [ update-deployment, << pipeline.parameters.run-job >> ]
+      equal: [ deploy-operator, << pipeline.parameters.run-job >> ]
     jobs:
       - deploy_operator:
           context:
@@ -6486,6 +6629,12 @@ workflows:
           deployment_only: true
           requires:
             - set_previews_deployment
+
+  update_serverless_workflows:
+    when:
+      equal: [ update-serverless-workflows, << pipeline.parameters.run-job >> ]
+    jobs:
+      - deploy_serverless
 
   backup_testnet:
     when:

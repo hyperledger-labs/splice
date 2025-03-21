@@ -34,7 +34,7 @@ while getopts ${OPTSTRING} opt; do
 done
 set -u
 
-gh api graphql --paginate --slurp -f query="$(cat "$REPO_ROOT/scripts/monitor-flaky-tests.graphql")" | \
+gh api graphql --paginate --slurp -f query="$(cat "$SPLICE_ROOT/scripts/monitor-flaky-tests.graphql")" | \
     # Step 1: merge result objects of each separate page into 1 array
     jq '. | map(.data.repository.issues.nodes) | flatten' | \
     # Step 2: reshape & simplify result

@@ -117,10 +117,15 @@ This might respond with something like
       }
     }
 
-Key fields are ``round``, ``opensAt``, and ``targetClosesAt``, which gives you an idea of the open window for this round.
+Key fields in the ``contract.payload`` of open and issuing mining rounds are ``round``, ``opensAt``, and ``targetClosesAt``, which gives you an idea of the open window for the round.
 Open rounds also include many fields explaining the assigned fees for that round; see the Daml template ``OpenMiningRound`` for more details.
-
 For followup polling requests, you'll want to pass the keys from the previously-returned maps so Scan responds more efficiently.
+
+Conversion rate
+^^^^^^^^^^^^^^^
+
+The conversion rate for Amulet to USD is set for an open round.
+The conversion rate is found in the ``amuletPrice`` field in the ``contract.payload`` of an open round. In the example above, the conversion rate is 0.005 USD per Amulet.
 
 Closed Mining Rounds
 --------------------

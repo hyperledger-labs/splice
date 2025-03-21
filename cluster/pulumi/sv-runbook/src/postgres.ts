@@ -3,7 +3,7 @@ import {
   clusterSmallDisk,
   ExactNamespace,
   loadYamlFromFile,
-  REPO_ROOT,
+  SPLICE_ROOT,
   config,
   supportsSvRunbookReset,
 } from 'splice-pulumi-common';
@@ -22,7 +22,7 @@ export function installPostgres(
     return new CloudPostgres(xns, name, name, secretName, isActive, supportsSvRunbookReset);
   } else {
     const valuesFromFile = loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`
     );
     const volumeSizeOverride = determineVolumeSizeOverride(valuesFromFile.db?.volumeSize);
     const values = _.merge(valuesFromFile || {}, { db: { volumeSize: volumeSizeOverride } });

@@ -268,8 +268,8 @@ commands:
 
               . .envrc.vars
               if [[ "$TARGET_CLUSTER" != none ]]; then
-                . $REPO_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
-                . $REPO_ROOT/build-tools/lib/cluster.envrc.vars
+                . $SPLICE_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
+                . $SPLICE_ROOT/build-tools/lib/cluster.envrc.vars
                 echo "Using cluster hostname suffix: ${GCP_CLUSTER_HOSTNAME}"
               fi
 

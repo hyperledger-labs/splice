@@ -81,7 +81,13 @@ vote_data='{
 }'
 echo "Casting votes on $vote_request_cid with: $vote_data"
 
-other_svs=('sv-2' 'sv-3' 'sv-4')
+
+DSO_SIZE=${DSO_SIZE:-4}
+other_svs=()
+for ((i=2; i<=DSO_SIZE; i++)); do
+  other_svs+=("sv-$i")
+done
+
 for sv in "${other_svs[@]}"
 do
   token=$(cncluster get_token "$sv" sv)

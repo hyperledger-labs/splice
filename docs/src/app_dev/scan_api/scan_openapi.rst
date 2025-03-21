@@ -8,6 +8,7 @@
 Scan Open API Reference
 =======================
 
-.. openapi:: ../../../../apps/scan/src/main/openapi/scan-external.yaml
-
-.. openapi:: ../../../../apps/scan/src/main/openapi/scan-internal.yaml
+.. openapi:: ../../../../apps/scan/src/main/openapi/scan.yaml
+   :format: markdown
+   :examples:
+   :group:

@@ -611,30 +611,23 @@ lazy val `apps-scan` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "scan-external-openapi",
-        openApiSpec = "scan-external.yaml",
-        directory = "external-openapi-ts-client",
-      ),
-      BuildCommon.TS.openApiSettings(
         npmName = "scan-openapi",
-        openApiSpec = "scan-internal.yaml",
+        openApiSpec = "scan.yaml",
       ),
       Compile / guardrailTasks :=
-        List("external", "internal").flatMap { scope =>
-          List(
-            ScalaServer(
-              new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
-              pkg = "org.lfdecentralizedtrust.splice.http.v0",
-              modules = List("pekko-http-v1.0.0", "circe"),
-              customExtraction = true,
-            ),
-            ScalaClient(
-              new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
-              modules = List("pekko-http-v1.0.0", "circe"),
-              pkg = "org.lfdecentralizedtrust.splice.http.v0",
-            ),
+        List(
+          ScalaServer(
+            new File(s"apps/scan/src/main/openapi/scan.yaml"),
+            pkg = "org.lfdecentralizedtrust.splice.http.v0",
+            modules = List("pekko-http-v1.0.0", "circe"),
+            customExtraction = true,
           ),
-        },
+          ScalaClient(
+            new File(s"apps/scan/src/main/openapi/scan.yaml"),
+            modules = List("pekko-http-v1.0.0", "circe"),
+            pkg = "org.lfdecentralizedtrust.splice.http.v0",
+          ),
+        ),
     )
 
 lazy val `apps-common-frontend` = {

@@ -327,7 +327,15 @@ The `pulumi/deployment` project controls the deployment of production clusters u
 #### Deployment stack configuration
 
 The pulumi operator uses a custom docker image to allow us to use a specific pulumi version and to configure the default pulumi arguments (like parallelism).
-The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
+The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). A flux source allows a pulumi deployment to follow a certain git
+reference (e.g. a branch), and automatically apply changes pushed to that reference.
+
+The `operator` Pulumi project installs the operator, and deploys a `deployment`
+stack, which will typically follow `main`, and deploy the other stacks per the
+versions specified for them in the deployment directory in `main`.
+
+
+These deployment watch the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
 to the cluster.
 Each migration can follow a different release that is upgraded independent of the other migrations. The key `synchronizerMigration.active.releaseReference` controls the release used for all our main deployments and the infra stack.
 The deployment uses `dotenv` to read the cluster specific env configuration files.
@@ -359,8 +367,6 @@ through the following steps:
 3. If the active migration configured in the `cluster.yaml` under the key `synchronizerMigration.active.releaseReference` of
    the corresponding cluster is a Git tag, e.g., `cilr` for CILR, then tag the merged commit on `main` with that tag.
 
-4. In order for the operator to start tracking the new version, and thus apply the upgrade, trigger a CircleCI pipeline on
-   the release branch with `run-job: update-deployment` and `cluster: devnet` (or whatever cluster you are upgrading).
 
 #### The operator
 
@@ -424,15 +430,15 @@ All other clusters are set up to use the **Release** artifacts by default, `SPLI
 .. todo:: Cleanup tech debt of confusing public, private and release repositories and registries.
 
 ### Deploy a local build to a cluster
-1. Start from a clean slate: `make -C $REPO_ROOT clean`
-1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
+1. Start from a clean slate: `make -C $SPLICE_ROOT clean`
+1. Ensure docker images are built and pushed to the Docker repository: `make -C $SPLICE_ROOT docker-push -j`
    - Note that this step internally calls `sbt bundle` to build the most recent version of our apps.
      later steps don't call `sbt bundle` automatically, as it takes too long.
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes to the Development Artifactory Docker Registry.
    - If this fails, you may need to run `echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin` to login to the Artifactory docker registry for development.
 1. If you plan on using manual `pulumi` commands for deployment (i.e., calling `cncluster pulumi ...` instead of `cncluster apply`),
-   ensure that pulumi is set up: `make -C $REPO_ROOT cluster/build -j`
+   ensure that pulumi is set up: `make -C $SPLICE_ROOT cluster/build -j`
    - This step is handled automatically by `cncluster apply`. This uses locally built helm charts by default.
 1. Start with a working cluster and change to its deployment directory.
    - You need be authorized to the GCP project for the environment to be loaded successfully after `direnv allow .`.
@@ -532,6 +538,7 @@ subcommands. A few highlights include the following:
           * `echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> .envrc.vars`
           * `git checkout -b <some_temp_branch>`
           * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
+          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch>`
           * push `config.yaml` and `.envrc.vars` to the temporary branch
           * `cncluster apply_operator`
 * `cncluster pdown` - Take down any installed resources populated with
@@ -1006,6 +1013,9 @@ The hostname can be found by describing the relevant pods that use the database 
 The password can be found in the `postgres-secrets` secret of the namespace:
 (e.g. using `kubectl get secret postgres-secrets -n sv-1 -o jsonpath='{.data.postgresPassword}' | base64 -d`).
 
+If `cncluster debug_shell` fails, use `kubectl describe pod -n default splice-debug` to find out why.
+A common problem is that the `splice-debug` image is missing for your local version.
+
 #### Inspecting daml transactions
 
 Daml transactions are too large to be logged in full, so they are truncated in the cluster logs.
@@ -1295,7 +1305,7 @@ Alternatively, you can also modify an installed chart, e.g. to change the values
 1. Run `helm list -A` to see a list of all deployed Helm chart in all namespaces, and find the one of interest
 1. Run `helm get values -n <namespace> <name> > vals.yaml` to get the values with which the chart is currently installed
 1. Edit `vals.yaml`: delete the first line ("USER-SUPPLIED VALUES:"), and modify whatever values you wish to change
-1. Run `helm upgrade -n <namespace> <name> $REPO_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml`
+1. Run `helm upgrade -n <namespace> <name> $SPLICE_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml`
 
 ### Manual Cleanup for an Interrupted Deployment
 
@@ -1623,10 +1633,7 @@ However, the following steps don't require an action from us:
 1. **Post-migration:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that makes the following changes:
    * in `config.yaml` remove `synchronizerMigration.active.migratingFrom`
    * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_COMETBFT_STATE_SYNC` to "false".
-   * [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
-     so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
-     is set to reflect the expected migration ID after completing the migration.
-   * Check that the patches worked by triggering the jobs manually once.
+   * Check that the triggers work by triggering the jobs manually once.
 1. Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
@@ -2344,6 +2351,79 @@ diff --git a/apps/app/src/test/resources/simple-topology-canton.conf b/apps/app/
    Compare these numbers with the numbers from the cluster sequencer. The numbers should be identical.
 12. Check that there are no sketchy warnings or errors in the Canton logs in `log/canton.clog`
 13. Delete the export `rm -r /tmp/state-export`
+
+
+## Simulate a long-running cluster on a scratchnet
+
+This section describes how to set up a scratchnet where:
+
+1. the network was deployed using a chosen release version
+2. the network has completed one HDM
+3. one SV has joined at some arbitrary time after the HDM
+4. selected nodes have upgraded to the latest version from your local code
+
+Instructions:
+
+- Lock a scratchnet. The instructions below assume you have locked `scratchneta`.
+- Configure the version to deploy
+  The instructions below assume you use release 0.3.12.
+    - Add `export CHARTS_VERSION=0.3.12` to `cluster/deployment/scratchneta/.envrc.vars`
+    - Add `export OVERRIDE_VERSION=0.3.12` to `cluster/deployment/scratchneta/.envrc.vars`
+    - Change `export SPLICE_ARTIFACTS_REPOSITORY=private` in `cluster/deployment/scratchneta/.envrc.vars` to `export SPLICE_ARTIFACTS_REPOSITORY=public`
+    - Run `cncluster update_config active 0 0.3.12` (this will update `cluster/deployment/scratchneta/config.yaml`)
+    - See also section [Versions and Repositories](#versions-and-repositories).
+- Configure the number of SVs in the cluster.
+    - Add `export DSO_SIZE=1` to `cluster/deployment/scratchneta/.envrc.vars` to use a network with 1 SV
+- Deploy the cluster.
+    - Run `CNCLUSTER_SKIP_DOCKER_CHECK=1 cncluster apply`
+    - Use `CNCLUSTER_SKIP_DOCKER_CHECK` in case cncluster complains that your local version is not published, even though we don't use it.
+- Update the config to add staging nodes
+    - Run `cncluster update_config upgrade 1 0.3.12` (this will update `cluster/deployment/scratchneta/config.yaml`)
+- Deploy the staging nodes
+    - Run `CNCLUSTER_SKIP_DOCKER_CHECK=1 cncluster apply`
+    - This only works if the version does not change, otherwise `cncluster apply` will try to tweak the legacy nodes, and you will run into compatibility issue.
+      If you need to change the version together with the HDM, use individual `cncluster pulumi <stack> up` commands.
+- Trigger the HDM vote
+    - Run `cncluster vote_for_migration 1`
+- Wait for domain dumps to be written
+    - Logs should contain "Wrote domain migration dump" [entries](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-scratchanet%22%0A%22Wrote%20domain%20migration%20dump%22;cursorTimestamp=2025-02-26T13:14:08.215863743Z;duration=PT30M?project=da-cn-scratchnet&inv=1&invt=Abqmvg)
+- Wait for apps to catch up
+    - Logs should not contain any recent "Ingested Transaction" [entries](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-scratchanet%22%0A%22Ingested%20Transaction%22;duration=PT30M?project=da-cn-scratchnet&inv=1&invt=Abqmvg)
+- Configure the network to switch to the new migration
+    - Run `cncluster update_config_to_migrate` and inspect `cluster/deployment/scratchneta/config.yaml` to see what it did
+- Execute the migration
+    - Run `SPLICE_MIGRATION_ID=1 SPLICE_SV=? cncluster pulumi sv-canton up` for every deployed SV, using values `sv-1, sv-2, ...` for `?`.
+    - Run `cncluster pulumi canton-network up`
+    - Run `cncluster pulumi validator1 up`
+- Verify that we are running the new migration
+    - Open https://scan.sv-2.scratcha.network.canton.global/dso, check `migrationId` fields
+- Complete the migration
+    - Edit `cluster/deployment/scratchneta/config.yaml`, removing the `migratingFrom` entry from the active migration
+- Add a new SV
+    - Run `cncluster apply_sv`
+- Verify that the new SV is part of the DSO
+    - Open https://scan.sv-2.scratcha.network.canton.global/dso, search for `"svs"`
+- Verify that the new SV has completed long-running background processes
+    - Look for "This history won't need any further backfilling" [log entries](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-scratchanet%22%0A%22This%20history%20won't%20need%20any%20further%20backfilling%22%0Aresource.labels.namespace_name%3D%22sv%22;cursorTimestamp=2025-02-26T14:31:47.457160517Z;duration=PT1H?project=da-cn-scratchnet&inv=1&invt=Abqmvg).
+- Configure the network to use the local release
+    - Undo version changes in `cluster/deployment/scratchneta/.envrc.vars`:
+        - Modify `CHART_VERSION` to `CHART_VERSION=local`
+        - Modify `SPLICE_ARTIFACTS_REPOSITORY` back to `export SPLICE_ARTIFACTS_REPOSITORY=private`
+    - In `cluster/deployment/scratchneta/config.yaml`, remove the version key from the active synchronizerMigration
+- Publish a local release from your local code
+    - Check out the version you want to deploy.
+        - Run `git checkout my-branch`
+        - Do not use this for release line branches, those are published from CI
+    - Build and publish docker images
+        - This step must be run after changing CHART_VERSION
+        - Run `make -C $SPLICE_ROOT clean`
+        - Run `make -C $SPLICE_ROOT build`
+        - Run `make -C $SPLICE_ROOT docker-push -j`
+- Upgrade nodes as required
+    - Run `cncluster apply_sv`
+    - Run `SPLICE_MIGRATION_ID=1 SPLICE_SV=? cncluster pulumi sv-canton up` for every deployed SV, using values `sv-1, sv-2, ...` for `?`.
+    - Run `cncluster pulumi canton-network up`
+    - Run `cncluster pulumi validator1 up`
 
 
 ## Appendix: Kubernetes and Other Deployment Resources

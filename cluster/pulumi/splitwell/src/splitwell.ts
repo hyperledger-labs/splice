@@ -157,7 +157,7 @@ export async function installSplitwell(
       auth0Client: auth0Client,
       auth0AppName: 'splitwell_validator',
     },
-    validatorWalletUser,
+    validatorWalletUsers: [validatorWalletUser],
     // TODO(#14199) Remove this with the next reset
     validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
       ? config.requireEnv('CN_SPLITWELL_VALIDATOR_LEGACY_PARTY_HINT')

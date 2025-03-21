@@ -143,8 +143,8 @@ exports OVERRIDE_VERSION=$VERSION
 Make sure to clean and rebuild the relevant setup before doing anything:
 
 ```
-make -C $REPO_ROOT clean
-make -C $REPO_ROOT cluster/build
+make -C $SPLICE_ROOT clean
+make -C $SPLICE_ROOT cluster/build
 ```
 
 ## Handling Failed Pulumi Operations

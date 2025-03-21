@@ -37,11 +37,11 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
   private def nextAvailableDb = randomDbsIterator.next()
 
   def instanceHasNoRootNamespaceKey(participant: InstanceReference): Unit = {
-    val instanceId = participant.id
-    val participantKeys = participant.keys.secret.list()
-    participantKeys.exists(
-      _.id == instanceId.namespace.fingerprint
-    ) shouldBe false
+    checkInstanceHasRootNamespaceKey(participant) shouldBe false
+  }
+
+  def instanceHasRootNamespaceKey(participant: InstanceReference): Unit = {
+    checkInstanceHasRootNamespaceKey(participant) shouldBe true
   }
 
   def setupOfflineNodeWithKey(
@@ -146,4 +146,13 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
       signedBy = Seq(delegatedNamespaceKey.fingerprint, signingKey.fingerprint),
     )
   }
+
+  private def checkInstanceHasRootNamespaceKey(participant: InstanceReference): Boolean = {
+    val instanceId = participant.id
+    val participantKeys = participant.keys.secret.list()
+    participantKeys.exists(
+      _.id == instanceId.namespace.fingerprint
+    )
+  }
+
 }

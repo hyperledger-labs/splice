@@ -11,8 +11,7 @@ import {
   SvClientProvider,
 } from 'common-frontend';
 import { getUTCWithOffset } from 'common-frontend-utils';
-import { Dayjs } from 'dayjs';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -42,6 +41,7 @@ import { hasConflictingFields } from '../../utils/configDiffs';
 import {
   isExpirationBeforeEffectiveDate,
   isScheduleDateTimeValid,
+  isValidUrl,
   VoteRequestValidity,
 } from '../../utils/validations';
 import { ConfirmationDialogWithRequestConflictsCheck } from '../ConfirmationDialogWithRequestConflictsCheck';
@@ -94,6 +94,8 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
     ),
     'milliseconds'
   );
+
+  const [isValidSynchronizerPauseTime, setIsValidSynchronizerPauseTime] = useState<boolean>(true);
 
   useEffect(() => {
     setExpiration(expirationFromVoteRequestTimeout);
@@ -214,6 +216,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
       voteRequestQuery.data!,
       effectiveDate
     );
+
     if (!scheduleValidity.isValid) {
       setAlertMessage(scheduleValidity.alertMessage);
     }
@@ -293,6 +296,12 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           }`,
     },
     { disabled: summary === '', reason: 'No summary', severity: 'warning' },
+    { disabled: !isValidUrl(url), reason: 'Invalid URL', severity: 'warning' },
+    {
+      disabled: !isValidSynchronizerPauseTime,
+      reason: 'Synchronizer upgrade time is before the expiry/effective date',
+      severity: 'warning',
+    },
   ].concat(
     supportsVoteEffectivityAndSetConfig
       ? [
@@ -451,6 +460,8 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
             <SetDsoRulesConfig
               supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
               chooseAction={chooseAction}
+              setIsValidSynchronizerPauseTime={setIsValidSynchronizerPauseTime}
+              expiration={expiration}
             />
           )}
           {actionName === 'CRARC_SetConfig' && <SetAmuletRulesConfig chooseAction={chooseAction} />}
@@ -487,6 +498,8 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <TextField
+                  autoComplete="off"
+                  error={!isValidUrl(url)}
                   id="create-reason-url"
                   onChange={e => setUrl(e.target.value)}
                   value={url}
@@ -519,6 +532,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
             <DisableConditionally conditions={conditions}>
               <Button
                 id="create-voterequest-submit-button"
+                data-testid="create-voterequest-submit-button"
                 fullWidth
                 type={'submit'}
                 size="large"

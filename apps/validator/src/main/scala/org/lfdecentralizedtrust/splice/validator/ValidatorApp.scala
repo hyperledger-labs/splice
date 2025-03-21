@@ -24,7 +24,11 @@ import org.lfdecentralizedtrust.splice.http.v0.validator_admin.ValidatorAdminRes
 import org.lfdecentralizedtrust.splice.http.v0.validator_public.ValidatorPublicResource
 import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletResource as InternalWalletResource
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
-import org.lfdecentralizedtrust.splice.migration.{DomainDataRestorer, DomainMigrationInfo}
+import org.lfdecentralizedtrust.splice.migration.{
+  DomainDataRestorer,
+  DomainMigrationInfo,
+  ParticipantUsersDataRestorer,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
@@ -202,35 +206,58 @@ class ValidatorApp(
             initialSynchronizerTime = Option.when(!domainAlreadyRegistered)(now)
             _ <- readRestoreDump match {
               case Some(migrationDump) =>
-                val decentralizedSynchronizerInitializer = new DomainDataRestorer(
-                  participantAdminConnection,
-                  config.timeTrackerMinObservationDuration,
-                  loggerFactory,
-                )
-                domainConnector.getDecentralizedSynchronizerSequencerConnections(now).flatMap {
-                  allSequencerConnections =>
-                    val sequencerConnections = allSequencerConnections.values.toSeq match {
-                      case Seq() =>
-                        sys.error("Expected at least one sequencer connection but got 0")
-                      case Seq(connections) => connections
-                      // TODO (#13301) handle this in a cleaner way (or just drop hard domain migration support at some point)
-                      case _ =>
-                        sys.error(
-                          s"Hard domain migrations and soft domain migrations are incompatible, got sequencer connections: $allSequencerConnections"
-                        )
-                    }
-                    appInitStep("Connecting domain and restoring data") {
-                      decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
-                        connection,
-                        config.ledgerApiUser,
-                        config.domains.global.alias,
-                        migrationDump.domainId,
-                        sequencerConnections,
-                        migrationDump.dars,
-                        migrationDump.acsSnapshot,
+                for {
+                  allSequencerConnections <- domainConnector
+                    .getDecentralizedSynchronizerSequencerConnections(now)
+                  sequencerConnections = allSequencerConnections.values.toSeq match {
+                    case Seq() =>
+                      sys.error("Expected at least one sequencer connection but got 0")
+                    case Seq(connections) => connections
+                    // TODO (#13301) handle this in a cleaner way (or just drop hard domain migration support at some point)
+                    case _ =>
+                      sys.error(
+                        s"Hard domain migrations and soft domain migrations are incompatible, got sequencer connections: $allSequencerConnections"
                       )
-                    }
-                }
+                  }
+                  _ <- appInitStep("Connecting domain and restoring data") {
+                    val decentralizedSynchronizerInitializer = new DomainDataRestorer(
+                      participantAdminConnection,
+                      config.timeTrackerMinObservationDuration,
+                      loggerFactory,
+                    )
+                    decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
+                      connection,
+                      config.ledgerApiUser,
+                      config.domains.global.alias,
+                      migrationDump.domainId,
+                      sequencerConnections,
+                      migrationDump.dars,
+                      migrationDump.acsSnapshot,
+                    )
+                  }
+                  _ <- migrationDump.participantUsers match {
+                    case Some(participantUsersData) =>
+                      appInitStep("Restoring participant users data") {
+                        val readWriteConnection = ledgerClient.connection(
+                          this.getClass.getSimpleName,
+                          loggerFactory,
+                          PackageIdResolver.inferFromAmuletRules(
+                            clock,
+                            scanConnection,
+                            loggerFactory,
+                          ),
+                        )
+                        val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
+                          readWriteConnection,
+                          loggerFactory,
+                        )
+                        participantUsersDataRestorer.restoreParticipantUsersData(
+                          participantUsersData
+                        )
+                      }
+                    case None => Future.unit
+                  }
+                } yield ()
               case None =>
                 if (config.svValidator)
                   appInitStep("Ensuring decentralized synchronizer already registered") {
@@ -622,7 +649,7 @@ class ValidatorApp(
       initialSynchronizerTime: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): Future[ValidatorApp.State] =
     for {
-      _ <- Future.successful(())
+      _ <- Future.unit
       readOnlyLedgerConnection = ledgerClient
         .readOnlyConnection(
           this.getClass.getSimpleName,
@@ -840,21 +867,28 @@ class ValidatorApp(
           )
         }
       })
-      _ <- appInitStep(s"Onboard validator") {
-        ValidatorUtil.onboard(
+      _ <- appInitStep(s"Onboard validator wallet users") {
+        val users = if (config.validatorWalletUsers.isEmpty) {
           // TODO(#12764) also onboard ledgerApiUser if both users are set
-          endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
-          knownParty = Some(validatorParty),
-          automation,
-          validatorUserName = config.ledgerApiUser,
-          // we're initializing so AmuletRules is guaranteed to be on domainId
-          getAmuletRulesDomain = () => _ => Future successful domainId,
-          participantAdminConnection,
-          retryProvider,
-          logger,
-          CommandPriority.High,
-          RetryFor.WaitingOnInitDependency,
-        )
+          Seq(config.ledgerApiUser)
+        } else {
+          config.validatorWalletUsers
+        }
+        users.traverse_ { user =>
+          ValidatorUtil.onboard(
+            endUserName = user,
+            knownParty = Some(validatorParty),
+            automation,
+            validatorUserName = config.ledgerApiUser,
+            // we're initializing so AmuletRules is guaranteed to be on domainId
+            getAmuletRulesDomain = () => _ => Future successful domainId,
+            participantAdminConnection,
+            retryProvider,
+            logger,
+            CommandPriority.High,
+            RetryFor.WaitingOnInitDependency,
+          )
+        }
       }
       _ <- appInitStep(s"Ensure validator is onboarded") {
         ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
@@ -880,7 +914,7 @@ class ValidatorApp(
           automation,
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
-          validatorWalletUserName = config.validatorWalletUser,
+          validatorWalletUserNames = config.validatorWalletUsers,
           walletManagerOpt,
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           scanConnection = scanConnection,

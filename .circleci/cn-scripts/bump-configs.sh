@@ -5,6 +5,10 @@
 
 set -euo pipefail
 
+# TODO(#18449) Remove this after all clusters are on >= 0.3.16
+# Backwards compatibility for bumping old branches where make update-expected fails otherwise.
+export REPO_ROOT="$SPLICE_ROOT"
+
 function bump_in_branch() {
   branch=$1
   bump_branch="bump-$branch-$(date +%s)"

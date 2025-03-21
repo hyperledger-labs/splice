@@ -12,7 +12,7 @@ import {
   jmxOptions,
   loadYamlFromFile,
   LogLevel,
-  REPO_ROOT,
+  SPLICE_ROOT,
   sanitizedForPostgres,
   SpliceCustomResourceOptions,
   KmsConfig,
@@ -40,11 +40,14 @@ export function installParticipant(
     defaultPostgres ||
     postgres.installPostgres(xns, `participant-pg`, `participant-pg`, activeVersion, true);
   const participantValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
-      OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
-    }),
     ...loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
+      {
+        OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
+      }
+    ),
+    ...loadYamlFromFile(
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
       { MIGRATION_ID: migrationId.toString() }
     ),
     ...kmsValues,

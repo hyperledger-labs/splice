@@ -30,7 +30,7 @@ spec:
           {{- end }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
             - name: https
               containerPort: 443
@@ -65,7 +65,8 @@ spec:
     app: docs
   ports:
     - name: http
-      port: 80
+      port: {{ .Values.service.http.port }}
+      targetPort: http
       protocol: TCP
     - name: https
       port: 443

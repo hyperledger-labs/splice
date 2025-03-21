@@ -160,7 +160,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -253,7 +253,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 6
+          "domains": 2
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
@@ -264,7 +264,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "loopback",
     "provider": "",
@@ -398,7 +398,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-1",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -442,7 +442,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 1
           }
         },
         "participantAdminUserNameFrom": {
@@ -453,7 +453,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_1",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -467,9 +467,9 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
-    "name": "validator-participant-4",
+    "name": "validator-participant-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -547,7 +547,7 @@
           }
         ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -618,10 +618,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "4"
+          "id": "1"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-1",
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",
@@ -650,9 +650,11 @@
           "targetThroughput": 100000
         },
         "validatorPartyHint": "digitalasset-testValidator-1",
-        "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
+        "validatorWalletUsers": [
+          "auth0|6526fab5214c99a9a8e1e3cc"
+        ]
       },
-      "version": "0.3.12"
+      "version": "0.3.17"
     },
     "name": "validator",
     "provider": "",

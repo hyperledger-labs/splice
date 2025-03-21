@@ -10,7 +10,7 @@ import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan_soft_domain_migration_poc as http}
-import org.lfdecentralizedtrust.splice.http.v0.external.scan as externalHttp
+import org.lfdecentralizedtrust.splice.http.v0.scan as scanHttp
 import org.lfdecentralizedtrust.splice.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
@@ -39,7 +39,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
   }
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = externalHttp.ScanClient
+    override type Client = scanHttp.ScanClient
 
     def createClient(host: String)(implicit
         httpClient: HttpClient,
@@ -47,7 +47,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      externalHttp.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+      scanHttp.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   final case class SynchronizerIdentities(

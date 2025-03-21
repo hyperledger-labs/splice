@@ -29,7 +29,7 @@ import {
   nonSvValidatorTopupConfig,
   participantBootstrapDumpSecretName,
   preApproveValidatorRunbook,
-  REPO_ROOT,
+  SPLICE_ROOT,
   setupBootstrapping,
   spliceInstanceNames,
   validatorSecrets,
@@ -155,7 +155,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
   const postgresValues: ChartValues = _.merge(
     loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
     ),
     { db: { volumeSize: postgresPvcSizeOverride } }
   );
@@ -212,7 +212,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
   );
 
   const validatorValuesFromYamlFiles = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
+    ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
@@ -220,7 +220,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
       YOUR_CONTACT_POINT: daContactPoint,
     }),
     ...loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
+      `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
         MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
