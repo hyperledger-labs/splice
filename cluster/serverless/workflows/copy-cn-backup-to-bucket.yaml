@@ -252,7 +252,7 @@ tryCopyCometBFTBackup:
           location: ${clusterLocation}
           project: ${clusterProject}
           namespace: ${namespace}
-          timeout: 3600  # 1 hour
+          timeout: 10800  # 3 hours
         result: completedJob
     - cleanup:
         call: cleanCometBFTBackup
