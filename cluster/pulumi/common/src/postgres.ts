@@ -6,14 +6,14 @@ import { Resource } from '@pulumi/pulumi';
 
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, config } from './config';
+import { spliceConfig } from './config/config';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
 
-const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
-const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
-// default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
-const cloudSqlDbInstance = config.optionalEnv('CLOUDSQL_DB_INSTANCE') || 'db-custom-2-7680';
+const enableCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.enabled;
+const protectCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.protected;
+const cloudSqlDbInstance = spliceConfig.pulumiProjectConfig.cloudSql.tier;
 
 const project = gcp.organizations.getProjectOutput({});
 

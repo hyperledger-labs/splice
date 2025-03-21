@@ -24,7 +24,7 @@ Scheduled for: *date + time*
 - [ ] Forward-port the PR you prepared above to `main`.
 - [ ] Once merged to main, redeploy the operator through CircleCI: on `main`, trigger `run-jon: deploy-operator`, `cluster: ...`.
 - [ ] Wait for the network to deploy and confirm that the `AmuletRules` `packageConfig` contains the expected DAR versions.
-- [ ] Prepare and merge a second PR to the release branch that configures wallet sweeps to the DA-Wallet party (`SV1_SWEEP`, you need their wallet to be onboarded, you can ask in [#da-wallet](https://daholdings.slack.com/archives/C073K97TL3U)) and (unless you already did this earlier) sets `DISABLE_CLOUD_SQL_PROTECT` back to `false` (example PR: https://github.com/DACH-NY/canton-network-node/pull/16329).
+- [ ] Prepare and merge a second PR to the release branch that configures wallet sweeps to the DA-Wallet party (`SV1_SWEEP`, you need their wallet to be onboarded, you can ask in [#da-wallet](https://daholdings.slack.com/archives/C073K97TL3U)) and (unless you already did this earlier) sets the `cloudSql.protect` back to `false` (example PR: https://github.com/DACH-NY/canton-network-node/pull/16329).
 - [ ] Tell SVs: "You are welcome to join now with migration ID 0 and chain ID X. Please reset your existing nodes completely, clearing out all databases and PVCs, and then onboard afresh." (example text, tweak as needed)
 - [ ] Tell validators: "Please wait until bootstrapping has complete and join in 2h from now, using migration ID 0. Please reset your existing nodes completely, clearing out all databases, and then onboard afresh." (example text, tweak as needed)
 - [ ] Forward port the final state on the release branch to main

@@ -8,6 +8,8 @@ infra:
     storageSize: "600Gi"
 pulumiProjectConfig:
   default:
+    cloudSql:
+      protected: false
     allowedArtifactories:
       - "public"
       - "private"

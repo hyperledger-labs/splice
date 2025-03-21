@@ -2568,16 +2568,6 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.testzrh",
-    "inputs": {
-      "name": "organization/infra/infra.testzrh"
-    },
-    "name": "organization/infra/infra.testzrh",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",

@@ -13,6 +13,8 @@ synchronizerMigration:
 pulumiProjectConfig:
   default:
     isExternalCluster: true
+    cloudSql:
+      enabled: true
 monitoring:
   alerting:
     enableNoDataAlerts: true

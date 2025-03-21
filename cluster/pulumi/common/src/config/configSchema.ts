@@ -6,6 +6,11 @@ const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
   allowedArtifactories: z.array(z.enum(['public', 'private'])),
   isExternalCluster: z.boolean(),
+  cloudSql: z.object({
+    enabled: z.boolean(),
+    protected: z.boolean(),
+    tier: z.string(),
+  }),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
 export const ConfigSchema = z.object({
@@ -17,7 +22,7 @@ export const ConfigSchema = z.object({
     .object({
       default: PulumiProjectConfigSchema,
     })
-    .and(z.record(PulumiProjectConfigSchema)),
+    .and(z.record(PulumiProjectConfigSchema.deepPartial())),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

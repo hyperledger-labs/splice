@@ -643,17 +643,18 @@ repull the image.
 ### CloudSQL and ScratchNet Clusters
 
 
-By default, scratchnet clusters do not enable the `ENABLE_CLOUD_SQL`
-environment variable in their `.envrc.vars` file and instead deploy
+By default, scratchnet clusters do not enable CloudSQL and instead deploy
 self-hosted postgres instances. This is mainly done to speed up
 deployment.
 
 If you explicitly want to test a CloudSQL deployment on scratchnet,
-add the following line to the `.envrc.vars` file of the cluster:
+add the following config to the `config.yaml` file of the cluster:
 
 ```
-export ENABLE_CLOUD_SQL=true
+pulumiProjectConfig.canton-network.cloudSql.enabled: true
 ```
+
+This will enable CloudSQL for all the pulumi projects.
 
 ### Observing Cluster Operation
 

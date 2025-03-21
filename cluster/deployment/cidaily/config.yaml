@@ -1,3 +1,13 @@
+pulumiProjectConfig:
+  default:
+    cloudSql:
+      protected: false
+  canton-network:
+    cloudSql:
+      enabled: true
+  sv-canton:
+    cloudSql:
+      enabled: true
 infra:
   ipWhitelisting:
     extraWhitelistedIngress:

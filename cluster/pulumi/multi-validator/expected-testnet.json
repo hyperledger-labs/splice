@@ -121,15 +121,5 @@
     "name": "multi-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
-    "id": "organization/infra/infra.testzrh",
-    "inputs": {
-      "name": "organization/infra/infra.testzrh"
-    },
-    "name": "organization/infra/infra.testzrh",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
   }
 ]

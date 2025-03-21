@@ -1,7 +1,3 @@
-// Need to import this by path and not through the module, so the module is not
-// initialized when we don't want it to (to avoid pulumi configs trying to being read here)
-import { svRunbookConfig } from 'splice-pulumi-common-sv';
-
 import {
   initDumpConfig,
   SecretsFixtureMap,
@@ -16,6 +12,8 @@ async function main() {
 
   const installNode = await import('./src/installNode');
   const secrets = new SecretsFixtureMap();
+    // Need to import this directly to avoid initializing any configs before the mocks are initialized
+  const { svRunbookConfig } = await import('splice-pulumi-common-sv');
 
   const authOClient = {
     getSecrets: () => Promise.resolve(secrets),

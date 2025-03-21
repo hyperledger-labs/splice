@@ -22,6 +22,14 @@ pulumiProjectConfig:
     allowedArtifactories:
       - "public"
     isExternalCluster: false
+    cloudSql:
+      enabled: false
+      protected: true
+      # default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
+      tier: 'db-custom-2-7680'
+  sv-runbook:
+    cloudSql:
+      enabled: false
 ## in the form <pulumi-project>:
 ##                <settings>
 ## ex:

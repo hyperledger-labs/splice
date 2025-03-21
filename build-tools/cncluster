@@ -1794,10 +1794,6 @@ function subcmd_unprotect_dbs() {
 
   namespaces=("$@")
 
-  if [[ "${ENABLE_CLOUD_SQL:-}" != "true" ]]; then
-    _error "This script is only supported with CloudSQL"
-  fi
-
   _info "The following namespaces' DBs will be unprotected: ${namespaces[*]}"
   _prompt_to_confirm
 

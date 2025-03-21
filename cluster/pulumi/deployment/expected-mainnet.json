@@ -255,16 +255,6 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.mainzrh",
-    "inputs": {
-      "name": "organization/infra/infra.mainzrh"
-    },
-    "name": "organization/infra/infra.mainzrh",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "source.toolkit.fluxcd.io/v1",
