@@ -1,3 +1,7 @@
+pulumiProjectConfig:
+  default:
+    cloudSql:
+      protected: false
 infra:
   ipWhitelisting:
     extraWhitelistedIngress:
