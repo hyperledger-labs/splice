@@ -18,7 +18,7 @@ import {
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   publicPrometheusRemoteWrite,
-  REPO_ROOT,
+  SPLICE_ROOT,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
@@ -790,6 +790,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
                   'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
                 }
               : {}),
+            'acknowledgement_alerts.yaml': readGrafanaAlertingFile('acknowledgement_alerts.yaml'),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
@@ -853,7 +854,7 @@ function grafanaAlertNotificationPolicies() {
 
 function readGrafanaAlertingFile(file: string) {
   const fileContent = fs.readFileSync(
-    `${REPO_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
+    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
     'utf-8'
   );
   // Ignore no data or data source error if the cluster is reset periodically
@@ -863,7 +864,7 @@ function readGrafanaAlertingFile(file: string) {
 }
 
 function readAlertingManagerFile(file: string) {
-  return fs.readFileSync(`${REPO_ROOT}/cluster/pulumi/infra/alert-manager/${file}`, 'utf-8');
+  return fs.readFileSync(`${SPLICE_ROOT}/cluster/pulumi/infra/alert-manager/${file}`, 'utf-8');
 }
 
 function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {

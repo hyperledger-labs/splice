@@ -16,11 +16,11 @@ import {
 import { clusterBasename, loadIPRanges } from './config';
 
 export const istioVersion = {
-  istio: '1.24.2',
+  istio: '1.24.3',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 239,
-    wasm: 196,
+    general: 243,
+    wasm: 200,
   },
 };
 
@@ -160,7 +160,9 @@ function configureInternalGatewayService(
 ) {
   const externalIPRanges = loadIPRanges();
   // see notes when installing a CometBft node in the full deployment
-  const cometBftIngressPorts = Array.from(Array(5).keys()).flatMap((domain: number) => {
+  const cometBftIngressPorts = Array.from(
+    Array(DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1).keys()
+  ).flatMap((domain: number) => {
     return Array.from(Array(10).keys()).map(node => {
       return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
     });
@@ -298,7 +300,7 @@ function configureGatewayService(
           maxReplicas: 10,
         },
         podDisruptionBudget: {
-          minAvailable: 1,
+          maxUnavailable: 1,
         },
         service: {
           loadBalancerIP: ingressIp,

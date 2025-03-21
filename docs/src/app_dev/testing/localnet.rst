@@ -25,8 +25,8 @@ Requirements
 2) The release artifacts that can be downloaded from here: |bundle_download_link|. Extract the bundle once complete.
 
 
-Depoying the nodes
-------------------
+Deploying the nodes
+-------------------
 
 You can spin up a docker-compose based Super-Validator as follows:
 

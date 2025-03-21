@@ -15,7 +15,7 @@ import {
   installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
-  REPO_ROOT,
+  SPLICE_ROOT,
   SpliceCustomResourceOptions,
   withAddedDependencies,
 } from 'splice-pulumi-common';
@@ -72,7 +72,7 @@ export function installCometBftNode(
   opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
     {
       TARGET_CLUSTER: CLUSTER_BASENAME,
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,

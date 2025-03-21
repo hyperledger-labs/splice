@@ -69,7 +69,7 @@ function expect_envvar() {
     fi
 }
 
-export K9S_CONFIG_DIR=$REPO_ROOT/.k9s
+export K9S_CONFIG_DIR=$SPLICE_ROOT/.k9s
 
 if [[ -z "$IGNORE_PRIVATE_ENVRC" ]]; then
     # Expected

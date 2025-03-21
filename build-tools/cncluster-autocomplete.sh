@@ -15,7 +15,7 @@ __cncluster() {
 
     cmds=""
     if [ -n "${GCP_CLUSTER_BASENAME-}" ]; then
-        cmds=$("$REPO_ROOT"/build-tools/cncluster _autocomplete)
+        cmds=$("$SPLICE_ROOT"/build-tools/cncluster _autocomplete)
     fi
 
     # Generate possible matches and store them in the

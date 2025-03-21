@@ -32,14 +32,11 @@ parameters:
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
         healthcheck-cidaily,
-        healthcheck-cilr,
         healthcheck-devnet,
         redeploy-sv-runbook-cidaily,
         redeploy-validator-runbook-cidaily,
-        reset-sv-runbook-cilr,
         reset-sv-runbook-devnet,
         healthcheck-sv-runbook-devnet,
-        reset-validator-runbook-cilr,
         reset-validator-runbook-devnet,
         healthcheck-validator-runbook-devnet,
         backup-cidaily,
@@ -52,13 +49,14 @@ parameters:
         auth0-user-cleanup,
         cluster-lock-reaper,
         apply-infra,
-        update-deployment,
+        deploy-operator,
         preview-operator,
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
         purge-unused-dbs-cidaily,
         bump-configs,
+        update-serverless-workflows,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -96,6 +94,10 @@ parameters:
   migration-id:
     type: integer
     default: 0
+  # used for copying old backups to a bucket
+  before-date:
+    type: string
+    default: ""
 
 notify-fail: &notify-fail
   context: slack-context
@@ -126,6 +128,7 @@ cluster-parameter: &cluster-parameter
         "ciupgrade",
         "devnet",
         "mainnet",
+        "mainnet-old",
         "testnet",
         "testnet-preview",
         "observability",

@@ -35,6 +35,7 @@ import {
   sanitizedForPostgres,
   spliceInstanceNames,
   SvIdKey,
+  svUserIds,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
@@ -47,6 +48,7 @@ import {
   installValidatorApp,
   installValidatorSecrets,
 } from 'splice-pulumi-common-validator/src/validator';
+import { initialAmuletPrice } from 'splice-pulumi-common/src/initialAmuletPrice';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -324,7 +326,9 @@ async function installValidator(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
-    validatorWalletUser: svConfig.validatorWalletUser,
+    validatorWalletUsers: [svConfig.validatorWalletUser].concat(
+      svUserIds(validatorSecrets.auth0Client.getCfg())
+    ),
     dependencies: sv.participant.asDependencies,
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,
@@ -382,6 +386,7 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
+    initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     cometBFT: {
       enabled: true,

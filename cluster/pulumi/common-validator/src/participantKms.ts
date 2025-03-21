@@ -6,7 +6,7 @@ import {
   ExactNamespace,
   KmsConfig,
   loadYamlFromFile,
-  REPO_ROOT,
+  SPLICE_ROOT,
   GcpServiceAccount,
 } from 'splice-pulumi-common';
 
@@ -54,7 +54,7 @@ export const getParticipantKmsHelmResources = (
 
   // Note that our Pulumi code supports only GCP KMS for now
   const kmsValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/kms-participant-gcp-values.yaml`,
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/kms-participant-gcp-values.yaml`,
     {
       LOCATION_ID: kmsConfig.locationId,
       PROJECT_ID: kmsConfig.projectId,

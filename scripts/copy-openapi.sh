@@ -18,8 +18,8 @@ abs_target_dir=$(realpath "$target_dir")
 tmp_dir=$(mktemp -d)
 mkdir -p "$tmp_dir/artifacts"
 mkdir -p "$tmp_dir/openapi"
-cp "$REPO_ROOT/apps/common/src/main/openapi/README.md" "$tmp_dir/openapi";
-find "$REPO_ROOT" -ipath '*/openapi/*.yaml' -exec cp '{}' "$tmp_dir/openapi" \;
+cp "$SPLICE_ROOT/apps/common/src/main/openapi/README.md" "$tmp_dir/openapi";
+find "$SPLICE_ROOT" -ipath '*/openapi/*.yaml' -exec cp '{}' "$tmp_dir/openapi" \;
 cd "$tmp_dir/openapi" || exit
 tar -czvf openapi.tar.gz -- *
 mv openapi.tar.gz "$abs_target_dir/$target_file"

@@ -7,10 +7,10 @@
 
 set -euo pipefail
 
-REPO_ROOT=$( git rev-parse --show-toplevel )
+SPLICE_ROOT=$( git rev-parse --show-toplevel )
 copy_script="scripts/copy-to-splice.sh"
 rename_script="scripts/check-repo-names.sh"
-if [[ -f "$REPO_ROOT/$copy_script" ]]; then
+if [[ -f "$SPLICE_ROOT/$copy_script" ]]; then
   in_copy_src=yes
 else
   in_copy_src=no
@@ -21,6 +21,7 @@ function check_patterns_locally() {
   local disallowed_patterns=(
     '(\b|[`_])(cn|NEVERMATCHES)(\b|[A-Z`_])'
     '(\b|[a-z`_])(CN|NEVERMATCHES)(\b|[A-Z`_])'
+    '(\b|[`_])(GS|NEVERMATCHES)(\b|[`_])' # the GS abbreviation is problematic, write out Global Synchronizer
     '(\b|[`_])(cns|NEVERMATCHES)(\b|[A-Z`_])'
     '(\b|[a-z`_])(CNS|NEVERMATCHES)(\b|[A-Z`_])'
     '(?i)canton network'
@@ -99,7 +100,7 @@ function check_patterns() {
   case "$in_copy_src" in
     yes)
       optstring='h'
-      setup_temp_splice "$REPO_ROOT";;
+      setup_temp_splice "$SPLICE_ROOT";;
     no) optstring='hs:';;
   esac
 

@@ -62,7 +62,7 @@ spec:
         {{- end }}
         name: wallet-web-ui
         ports:
-        - containerPort: 80
+        - containerPort: 8080
           name: http
           protocol: TCP
         resources:
@@ -97,5 +97,6 @@ spec:
     app: {{ $walletWebUiLabel }}
   ports:
   - name: http
-    port: 80
+    port: {{ .Values.service.wallet.port }}
+    targetPort: http
     protocol: TCP

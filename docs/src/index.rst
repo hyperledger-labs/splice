@@ -42,12 +42,19 @@ Global Synchronizer for the Canton Network
    app_dev/daml_api/index
    app_dev/testing/index
 
-.. todo:: Add Background section containing
 
-          - architecture (possibly starting with the architecture currently in the scan bulk api docs)
+.. toctree::
+   :maxdepth: 2
+   :caption: Background
+
+   background/architecture
+
+.. todo:: Add Background sections containing
+
           - security (starting from key usage doc and risk of key compromise)
           - comparison to other chains
           - tokenomics
+
 
 .. toctree::
    :maxdepth: 2

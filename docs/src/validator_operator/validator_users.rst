@@ -48,3 +48,14 @@ In order to associate a user with the party of the validator operator, the follo
    Note that the user should not be greeted with the "Onboard yourself" button, as the user is already
    onboarded through the API call above. If you do see the button, it means that something has gone wrong
    in the process above (do not click the button!).
+
+
+Disable wallet and wallet automation
+-----------------------------------------------
+
+To disable the wallet HTTP server and the wallet automation, update the ``validator-values.yaml`` file with ``enableWallet: false``
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: ENABLEWALLET_START
+    :end-before: ENABLEWALLET_END

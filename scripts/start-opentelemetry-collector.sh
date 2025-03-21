@@ -22,9 +22,9 @@ else
 fi;
 
 mkdir -p "$LOGS_PATH"
-compose_file="$REPO_ROOT"/build-tools/observability/opentelemetry-collector.yml
+compose_file="$SPLICE_ROOT"/build-tools/observability/opentelemetry-collector.yml
 docker compose -f "${compose_file}" create
-docker compose -f "${compose_file}" cp "${REPO_ROOT}"/build-tools/observability/otel-collector-config.yaml otel-collector:/etc/otel-collector-config.yaml
+docker compose -f "${compose_file}" cp "${SPLICE_ROOT}"/build-tools/observability/otel-collector-config.yaml otel-collector:/etc/otel-collector-config.yaml
 JWT=$(mktemp)
 trap 'rm -rf $JWT' EXIT
 # For some reason `docker compose cp` does not like a <() substitution so we use a temp file.

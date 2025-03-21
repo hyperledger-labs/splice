@@ -18,7 +18,7 @@ function subcmd_pulumi() {
         _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
     fi
 
-    if [ ! -d "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" ]; then
+    if [ ! -d "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}" ]; then
         _error "Unknown Pulumi project: ${pulumi_project}"
     fi
 
@@ -33,7 +33,7 @@ function subcmd_pulumi() {
             ;;
     esac
 
-    local args=(--cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}")
+    local args=(--cwd "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}")
 
     case "${pulumi_cmd}" in
         whoami|org)
@@ -107,7 +107,7 @@ function subcmd_apply() {
     subcmd_install_data_export_bucket_key
 
     if [ -n "${preview:-}" ]; then
-        make -C "${REPO_ROOT}" cluster/helm/build -j
+        make -C "${SPLICE_ROOT}" cluster/helm/build -j
         _info "Previewing apply for cluster:"
         subcmd_pulumi cluster preview --show-sames --json "${args[@]}"
         _info "Previewing apply for infra:"
@@ -116,11 +116,11 @@ function subcmd_apply() {
         subcmd_pulumi canton-network preview --show-sames --json "${args[@]}"
     else
         _prompt_to_confirm
-        make -C "${REPO_ROOT}" cluster/build -j
+        make -C "${SPLICE_ROOT}" cluster/build -j
 
         if ! (env-bool CNCLUSTER_SKIP_DOCKER_CHECK); then
             _docker_must_be_running
-            if ! make -C "${REPO_ROOT}" docker-image-reference-exists IMG_REF_EXISTS_ARG=--err-missing -j; then
+            if ! make -C "${SPLICE_ROOT}" docker-image-reference-exists IMG_REF_EXISTS_ARG=--err-missing -j; then
                 _error "Images missing, cannot apply."
             fi
         else
@@ -237,9 +237,9 @@ function subcmd_apply_operator(){
     _prompt_to_confirm
     _cluster_must_exist
 
-    _uses_pulumi_stack deployment
+    _uses_pulumi_stack operator
 
-    subcmd_pulumi deployment up --yes --skip-preview --show-sames "${args[@]}"
+    subcmd_pulumi operator up --yes --skip-preview --show-sames "${args[@]}"
 }
 
 ###
@@ -449,7 +449,7 @@ subcommand_whitelist[infra_up]='Apply the infra Pulumi stack.'
 function subcmd_infra_up() {
     _cluster_must_exist
     _prompt_to_confirm
-    make -C "${REPO_ROOT}" cluster/build -j
+    make -C "${SPLICE_ROOT}" cluster/build -j
     _infra_up
 }
 
@@ -495,7 +495,7 @@ function subcmd_gcp_down() {
 subcommand_whitelist[pulumi_preview_canton]="Preview the changes for the sv-canton migrations"
 
 function subcmd_pulumi_preview_canton() {
-  npm --prefix "${REPO_ROOT}/cluster/pulumi/sv-canton" run preview
+  npm --prefix "${SPLICE_ROOT}/cluster/pulumi/sv-canton" run preview
 }
 
 ###

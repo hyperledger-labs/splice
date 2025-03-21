@@ -14,7 +14,7 @@ function get_digest() {
 }
 
 echo "imageDigests:"
-for dir in "${REPO_ROOT}"/cluster/images/*; do
+for dir in "${SPLICE_ROOT}"/cluster/images/*; do
   app=$(basename "$dir");
   if [ ! -f "$dir" ] && [ "$app" != "common" ]; then
     digest=$(get_digest "$app")

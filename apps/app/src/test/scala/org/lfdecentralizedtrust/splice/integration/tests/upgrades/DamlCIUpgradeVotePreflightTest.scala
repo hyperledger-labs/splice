@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.environment.{EnvironmentImpl, DarResource
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import org.lfdecentralizedtrust.splice.integration.tests.runbook.SvUiIntegrationTestUtil
+import org.lfdecentralizedtrust.splice.integration.tests.runbook.SvUiPreflightIntegrationTestUtil
 import org.lfdecentralizedtrust.splice.util.SvFrontendTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.openqa.selenium.By
@@ -25,7 +25,7 @@ class DamlCIUpgradeVotePreflightTest
       "sv4",
       "sv",
     )
-    with SvUiIntegrationTestUtil
+    with SvUiPreflightIntegrationTestUtil
     with SvFrontendTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false

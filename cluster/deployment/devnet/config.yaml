@@ -9,28 +9,16 @@ validator1:
     projectId: da-cn-devnet
     keyRingId: validator1_dev
 synchronizerMigration:
-  archived:
-    - id: 1
-      provider: internal
-      version: 0.2.4
-    - id: 2
-      provider: external
-      version: 0.2.6
-      releaseReference: "refs/heads/release-line-0.2.6"
-    - id: 3
-      provider: external
-      version: 0.2.8
-      releaseReference: "refs/heads/release-line-0.2.8"
+  legacy:
+    id: 0
+    provider: external
+    version: 0.3.16
+    releaseReference: "refs/heads/release-line-0.3.16"
   active:
-    id: 4
+    id: 1
     provider: external
-    version: 0.3.12
-    releaseReference: "refs/heads/release-line-0.3.12"
-  upgrade:
-    id: 5
-    provider: external
-    version: 0.3.12
-    releaseReference: "refs/heads/release-line-0.3.12"
+    version: 0.3.17
+    releaseReference: "refs/heads/release-line-0.3.17"
 pulumiProjectConfig:
   default:
     isExternalCluster: true
@@ -38,8 +26,14 @@ monitoring:
   alerting:
     enableNoDataAlerts: true
     alerts:
+      trafficWaste:
+        # we expect more frequent timeouts on devnet and therefore sequencer request amplification so we allow a higher threshold"
+        kilobytes: 10
+        overMinutes: 30
       cometbft:
         expectedMaxBlocksPerSecond: 5
       loadTester:
         # DevNet fluctuates a bit more than our internal clusters so we alert only when it drops below 0.9
         minRate: 0.9
+operatorDeployment:
+  reference: refs/heads/main

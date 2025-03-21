@@ -75,7 +75,7 @@ export TESTCONTAINERS_RYUK_DISABLED=true
 ## we explicitly specify it so we can pre-download it when running in CI
 export TESTCONTAINERS_SSHD_CONTAINER_IMAGE="testcontainers/sshd:1.1.0"
 
-export LOGS_PATH=$REPO_ROOT/log
+export LOGS_PATH=$SPLICE_ROOT/log
 
 export OTEL_COLLECTOR_IMAGE="otel/opentelemetry-collector-contrib:0.81.0"
 
@@ -122,3 +122,6 @@ export HELM_MAX_HISTORY_SIZE=10
 
 # default repository for cluster deployments, scratchnet deployments override this
 export SPLICE_ARTIFACTS_REPOSITORY=public
+
+export PRIVATE_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs-private
+export PUBLIC_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs

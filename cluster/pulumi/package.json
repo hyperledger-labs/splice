@@ -16,7 +16,7 @@
     },
     "scripts": {
         "fix": "npm run fix --workspaces --if-present",
-        "check": "npm run check --workspaces --if-present",
+        "check": "npm run check --include-workspace-root --workspaces --if-present",
         "format:fix": "npm run format:fix --workspaces --if-present",
         "format:check": "npm run format:check --workspaces --if-present",
         "lint:fix": "npm run lint:fix --workspaces --if-present",
@@ -37,6 +37,7 @@
         "observability",
         "validator-runbook",
         "deployment",
+        "operator",
         "multi-validator",
         "sv-canton",
         "validator1",

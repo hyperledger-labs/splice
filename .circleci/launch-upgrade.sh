@@ -17,8 +17,8 @@ function usage() {
   echo "  --branch-filter-wait <filter>   parameter for wait_for_previous_pipeline (default: same as branch)"
   echo "  --base-version  <base_version>  set base version. (default: result of find_latest_base_version)"
   echo "  --cluster <cluster>             choose the cluster in which to run. (e.g. ciupgrade, scratchneta)"
-  echo "  --run-daml-upgrade              Whether to run daml upgrades. Recommended when daml code was changed. (default: output of build-tools/changes-vs-base \"\$REPO_ROOT/daml/dars.lock\")"
-  echo "  --run-partial-upgrade           Whether to run a partial upgrade. See cncluster partial_upgrade for more information. (default: output of build-tools/changes-vs-base \"\$REPO_ROOT/cluster\")"
+  echo "  --run-daml-upgrade              Whether to run daml upgrades. Recommended when daml code was changed. (default: output of build-tools/changes-vs-base \"\$SPLICE_ROOT/daml/dars.lock\")"
+  echo "  --run-partial-upgrade           Whether to run a partial upgrade. See cncluster partial_upgrade for more information. (default: output of build-tools/changes-vs-base \"\$SPLICE_ROOT/cluster\")"
 }
 
 if [[ -z ${CIRCLECI_TOKEN:-} ]]; then
@@ -77,7 +77,7 @@ if [ -z "${cluster-}" ]; then
 fi
 
 if [ -z "${base_version-}" ]; then
-  base_version=$("$REPO_ROOT"/build-tools/find_latest_base_version.sh)
+  base_version=$("$SPLICE_ROOT"/build-tools/find_latest_base_version.sh)
   echo "Base version set to $base_version"
 fi
 
@@ -92,7 +92,7 @@ fi
 echo "Branch filter set to $branch_filter"
 
 if [ -z "${run_daml_upgrade-}" ]; then
-  if "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/daml/dars.lock"; then
+  if "$SPLICE_ROOT"/build-tools/changes-vs-base "$SPLICE_ROOT/daml/dars.lock"; then
     echo "Skipping cluster daml upgrade."
     run_daml_upgrade="false"
   else
@@ -102,7 +102,7 @@ if [ -z "${run_daml_upgrade-}" ]; then
 fi
 
 if [ -z "${run_partial_upgrade-}" ]; then
-  if "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/cluster" && "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/runbook"; then
+  if "$SPLICE_ROOT"/build-tools/changes-vs-base "$SPLICE_ROOT/cluster" && "$SPLICE_ROOT"/build-tools/changes-vs-base "$SPLICE_ROOT/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/runbook"; then
     echo "Proceeding with partial upgrade."
     run_partial_upgrade="true"
   else

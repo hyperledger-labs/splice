@@ -8,7 +8,7 @@ set -euo pipefail
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
 # shellcheck disable=SC1091
-source "${REPO_ROOT}/cluster/scripts/utils.source"
+source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 
 function usage() {
   _info "Usage: $0 <namespace> <migration_id> <internal (true|false)>"

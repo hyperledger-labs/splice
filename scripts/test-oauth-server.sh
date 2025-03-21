@@ -5,7 +5,7 @@
 
 set -eou pipefail
 
-cd "$REPO_ROOT"
+cd "$SPLICE_ROOT"
 cd ./scripts/test-oauth-server/
 
 node ./src/index.mjs "$@"

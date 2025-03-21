@@ -57,7 +57,7 @@ spec:
         - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         ports:
-        - containerPort: 80
+        - containerPort: 8080
           name: val1-sw-ui
           protocol: TCP
         {{- with .Values.resources }}
@@ -87,4 +87,5 @@ spec:
   ports:
   - name: val1-sw-ui
     port: 80
+    targetPort: val1-sw-ui
     protocol: TCP

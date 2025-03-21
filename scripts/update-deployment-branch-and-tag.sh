@@ -23,7 +23,7 @@
 set -eou pipefail
 
 . .envrc.vars
-clusters_root_dir="${REPO_ROOT}/cluster/deployment"
+clusters_root_dir="${SPLICE_ROOT}/cluster/deployment"
 
 cluster_name=${1-}
 git_revision=${2-}
@@ -42,7 +42,7 @@ fi
 if [ -z "${git_revision}" ]; then
   echo "No git revision provided as input"
   echo "Retrieving source code version for cluster ${cluster_name}"
-  cluster_version=$("$REPO_ROOT/scripts/fetch-cluster-version.sh" "${cluster_name}")
+  cluster_version=$("$SPLICE_ROOT/scripts/fetch-cluster-version.sh" "${cluster_name}")
   cluster_git_commit=${cluster_version#*v}
   echo "Cluster Git revision: ${cluster_git_commit}"
   git_revision=${cluster_git_commit}

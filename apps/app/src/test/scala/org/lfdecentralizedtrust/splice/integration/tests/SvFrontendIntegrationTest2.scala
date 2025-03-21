@@ -346,7 +346,7 @@ class SvFrontendIntegrationTest2
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
         env: SpliceTestConsoleEnvironment
     ) = {
-      val requestReasonUrl = "This is a request reason url."
+      val requestReasonUrl = "https://vote-request-url.com"
       val requestReasonBody = "This is a request reason."
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
         implicit webDriver =>
@@ -612,7 +612,7 @@ class SvFrontendIntegrationTest2
     "can create valid SRARC_GrantFeaturedAppRight and SRARC_RevokeFeaturedAppRight vote requests" in {
       implicit env =>
         val requestProviderParty = "TestProviderParty"
-        val requestReasonUrl = "This is a request reason url."
+        val requestReasonUrl = "https://vote-request-url.com"
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
@@ -723,7 +723,7 @@ class SvFrontendIntegrationTest2
 
     "SV1 can create valid SRARC_SetConfig (new DsoRules Configuration) vote requests that can expire and get rejected by other SVs" in {
       implicit env =>
-        val requestReasonUrl = "This is a request reason url."
+        val requestReasonUrl = "https://vote-request-url.com"
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
@@ -867,7 +867,7 @@ class SvFrontendIntegrationTest2
 
     "SV1 can create valid CRARC_SetConfig (new AmuletRules Configuration) vote requests that can expire and get rejected by other SVs" in {
       implicit env =>
-        val requestReasonUrl = "This is a request reason url."
+        val requestReasonUrl = "https://vote-request-url.com"
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>

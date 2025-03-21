@@ -416,6 +416,7 @@ class HttpSvAdminHandler(
                 DomainMigrationDump
                   .getDomainMigrationDump(
                     config.domains.global.alias,
+                    svStoreWithIngestion.connection,
                     participantAdminConnection,
                     synchronizerNode,
                     loggerFactory,
@@ -558,6 +559,7 @@ class HttpSvAdminHandler(
                 dump <- DomainMigrationDump
                   .getDomainMigrationDump(
                     config.domains.global.alias,
+                    svStoreWithIngestion.connection,
                     participantAdminConnection,
                     synchronizerNode,
                     loggerFactory,

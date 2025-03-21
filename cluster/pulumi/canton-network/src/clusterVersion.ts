@@ -10,7 +10,7 @@ export function installClusterVersion(): k8s.apiextensions.CustomResource {
     remoteVersion ||
     // cannot be used with the operator
     exec
-      .execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`, {
+      .execSync(`${config.requireEnv('SPLICE_ROOT')}/build-tools/get-snapshot-version`, {
         env: {
           // eslint-disable-next-line no-process-env
           ...process.env,

@@ -52,7 +52,6 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 
 - [ ] unset `synchronizerMigration.active.migratingFrom` on the release branch so that future redeploys don't attempt to migrate
   - [ ] (later) forward-port to branches that may serve as potential future release sources
-  - [ ] (later) forward-port to branches that may serve as potential future release sources
 - [ ] trigger periodic CI jobs manually once to make sure the updates worked
 - [ ] re-enable periodic CI jobs on `main`
 - [ ] recheck above forward-port items (e.g. versions, migration IDs)

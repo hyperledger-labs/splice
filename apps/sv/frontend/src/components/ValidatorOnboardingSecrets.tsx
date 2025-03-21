@@ -34,8 +34,8 @@ const ValidatorOnboardingSecrets: React.FC = () => {
     return <Loading />;
   }
 
-  if (validatorOnboardingsQuery.isError || prepareOnboardingMutation.isError) {
-    return <p>Error, something went wrong.</p>;
+  if (validatorOnboardingsQuery.isError) {
+    return <p>Error, something went wrong while fetching onboarding secrets.</p>;
   }
 
   const validatorOnboardings = validatorOnboardingsQuery.data.sort((a, b) => {
@@ -50,6 +50,13 @@ const ValidatorOnboardingSecrets: React.FC = () => {
       <Typography mt={4} variant="h4">
         Validator Onboarding Secrets
       </Typography>
+
+      {prepareOnboardingMutation.isError && (
+        <Typography variant="body1">
+          Error, something went wrong while preparing onboarding secret.
+        </Typography>
+      )}
+
       <DisableConditionally
         conditions={[{ disabled: prepareOnboardingMutation.isLoading, reason: 'Loading...' }]}
       >
@@ -57,6 +64,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           id="create-validator-onboarding-secret"
           variant="pill"
           fullWidth
+          disabled={prepareOnboardingMutation.isLoading}
           size="large"
           onClick={() => prepareOnboardingMutation.mutate()}
         >
