@@ -42,6 +42,7 @@ import {
   isExpirationBeforeEffectiveDate,
   isScheduleDateTimeValid,
   isValidUrl,
+  isValidVoteRequestUrl,
   VoteRequestValidity,
 } from '../../utils/validations';
 import { ConfirmationDialogWithRequestConflictsCheck } from '../ConfirmationDialogWithRequestConflictsCheck';
@@ -296,7 +297,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           }`,
     },
     { disabled: summary === '', reason: 'No summary', severity: 'warning' },
-    { disabled: !isValidUrl(url), reason: 'Invalid URL', severity: 'warning' },
+    { disabled: !isValidVoteRequestUrl(url), reason: 'Invalid URL', severity: 'warning' },
     {
       disabled: !isValidSynchronizerPauseTime,
       reason: 'Synchronizer upgrade time is before the expiry/effective date',
@@ -364,6 +365,9 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                   slotProps={{
                     textField: {
                       id: 'datetime-picker-vote-request-expiration',
+                      inputProps: {
+                        'data-testid': 'datetime-picker-vote-request-expiration',
+                      },
                     },
                   }}
                   closeOnSelect
