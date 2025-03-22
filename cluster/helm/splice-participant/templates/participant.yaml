@@ -22,7 +22,6 @@ spec:
       labels:
         app: {{ .Release.Name }}
         {{- with $.Values.metrics.migration }}
-        active_migration: {{ .active | quote }}
         migration_id: {{ .id | quote }}
         {{- end }}
     spec:
@@ -174,7 +173,6 @@ metadata:
   labels:
     app: {{ .Release.Name }}
     {{- with $.Values.metrics.migration }}
-    active_migration: {{ .active | quote }}
     migration_id: {{ .id | quote }}
     {{- end }}
 spec:
