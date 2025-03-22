@@ -347,7 +347,7 @@ copyCloudSqlBackup:
             severity: INFO
     - deriveConstants:
         assign:
-        - targetDir: '${"gs://" + bucketName + "/" + sourceCluster + "/" + cnBackupRunId}'
+        - targetDir: '${"gs://" + bucketName + "/" + sourceCluster + "/migration-" + migrationId + "-" + cnBackupRunId}'
         - restoreInstanceName: '${"backup-" + sourceInstance + "-" + cnBackupRunId}'
     - copyCloudSqlBackup:
         try:
