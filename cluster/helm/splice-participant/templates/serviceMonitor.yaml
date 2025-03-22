@@ -25,7 +25,6 @@ spec:
 
   {{- if .Values.metrics.migration }}
   targetLabels:
-    - active_migration
     - migration_id
   {{- end }}
 {{- end }}
