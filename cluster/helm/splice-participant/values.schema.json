@@ -116,9 +116,6 @@
         "migration": {
           "type": "object",
           "properties": {
-            "active": {
-              "type": "boolean"
-            },
             "id": {
               "type": "integer",
               "minimum": 0
