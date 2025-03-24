@@ -18,7 +18,9 @@ if [ "$appname" == "pulumi-kubernetes-operator" ]; then
     version="v${version}"
 fi
 
-if [ -n "${CIRCLE_BRANCH:-}" ]; then
+if [ -n "${PUBLISH_PUBLIC_ARTIFACTS:-}" ]; then
+    echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:${version}"
+elif [ -n "${CIRCLE_BRANCH:-}" ]; then
   if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
     echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:${version}"
   else

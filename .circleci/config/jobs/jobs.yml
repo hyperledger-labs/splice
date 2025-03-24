@@ -186,7 +186,12 @@ jobs:
            --keep CIRCLE_BRANCH \
            --keep CIRCLE_REPOSITORY_URL \
            --keep CIRCLE_SHA1"
-          cmd: make docker-push -j
+          cmd: |
+            if [[ << parameters.is_public >> == true ]]; then
+              echo "Publishing to public docker repo"
+              export PUBLISH_PUBLIC_ARTIFACTS=true
+            fi
+            make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
           additional_nix_args: "--keep ARTIFACTORY_USER \
@@ -194,6 +199,10 @@ jobs:
             --keep CIRCLE_BRANCH"
           cmd_name: Push Helm Artifacts
           cmd: |
+            if [[ << parameters.is_public >> == true ]]; then
+              echo "Publishing to public helm repo"
+              export PUBLISH_PUBLIC_ARTIFACTS=true
+            fi
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
