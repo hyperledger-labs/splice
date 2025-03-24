@@ -3,14 +3,14 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
-          "contractId" : "contractid",
+          "contractId" : "0",
           "contractKey" : null,
           "createArgument" : null,
           "createdAt" : "1970-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "3307064532bf227d72106dbed6a1005813ac0cb8266dd16744010f8b862ad174:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -18,7 +18,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "2000.0000000000",
+                "amount" : "87.0000000000",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"
@@ -49,7 +49,7 @@
             "dso::normalized",
             "party::normalized"
           ],
-          "templateId" : "eabc41a491442ca84d3b97140b67b49e7d8449257ead42972ece4d40003ed428:Splice.Amulet:Amulet",
+          "templateId" : "424159d90a541adf7d39b7527e7fcb8866ffbbc8f791315f0bc35d9a857456c0:Splice.Amulet:Amulet",
           "witnessParties" : [
             "party::normalized"
           ]
@@ -64,14 +64,14 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
-          "contractId" : "contractid",
+          "contractId" : "2",
           "contractKey" : null,
           "createArgument" : null,
           "createdAt" : "1970-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "3307064532bf227d72106dbed6a1005813ac0cb8266dd16744010f8b862ad174:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -79,7 +79,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "4000.0000000000",
+                "amount" : "20000.0000000000",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"
@@ -110,7 +110,7 @@
             "dso::normalized",
             "party::normalized"
           ],
-          "templateId" : "eabc41a491442ca84d3b97140b67b49e7d8449257ead42972ece4d40003ed428:Splice.Amulet:Amulet",
+          "templateId" : "424159d90a541adf7d39b7527e7fcb8866ffbbc8f791315f0bc35d9a857456c0:Splice.Amulet:Amulet",
           "witnessParties" : [
             "party::normalized"
           ]
@@ -125,14 +125,14 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
-          "contractId" : "contractid",
+          "contractId" : "3",
           "contractKey" : null,
           "createArgument" : null,
           "createdAt" : "1970-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "3307064532bf227d72106dbed6a1005813ac0cb8266dd16744010f8b862ad174:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -166,7 +166,7 @@
           "signatories" : [
             "party::normalized"
           ],
-          "templateId" : "168b9a06838a3e3357b02780a235c3f4662d85650c79ffc83d57ea6032657a52:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId" : "8bee11085163f0029179eaed4a1d8eef088ef53b0076f62d880506bd870e8461:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "witnessParties" : [
             "party::normalized"
           ]
@@ -181,14 +181,14 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
-          "contractId" : "contractid",
+          "contractId" : "4",
           "contractKey" : null,
           "createArgument" : null,
           "createdAt" : "1970-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "3307064532bf227d72106dbed6a1005813ac0cb8266dd16744010f8b862ad174:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -222,7 +222,7 @@
           "signatories" : [
             "party::normalized"
           ],
-          "templateId" : "168b9a06838a3e3357b02780a235c3f4662d85650c79ffc83d57ea6032657a52:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId" : "8bee11085163f0029179eaed4a1d8eef088ef53b0076f62d880506bd870e8461:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "witnessParties" : [
             "party::normalized"
           ]

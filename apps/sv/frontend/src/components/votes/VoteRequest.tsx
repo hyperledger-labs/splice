@@ -351,6 +351,7 @@ export const CreateVoteRequest: React.FC = () => {
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <TextField
+                  autoComplete="off"
                   error={!isValidUrl(url)}
                   id="create-reason-url"
                   onChange={e => setUrl(e.target.value)}

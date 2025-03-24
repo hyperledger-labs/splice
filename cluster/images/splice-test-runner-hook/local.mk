@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 dir := $(call current_dir)
-src_dir := ${REPO_ROOT}/.github/runners/runner-container-hooks
+src_dir := ${SPLICE_ROOT}/.github/runners/runner-container-hooks
 package_files := $(src_dir)/package.json $(src_dir)/packages/k8s/package.json $(src_dir)/packages/hooklib/package.json
 source_files :=	$(shell find $(src_dir)/packages/k8s/src -name '*.ts') $(shell find $(src_dir)/packages/hooklib/src -name '*.ts')
 target-dir := $(dir)/target

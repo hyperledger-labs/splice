@@ -10,7 +10,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.dri
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.Uri
-import org.lfdecentralizedtrust.splice.automation.{TaskFailed, TaskOutcome, TaskSuccess}
+import org.lfdecentralizedtrust.splice.automation.{TaskOutcome, TaskSuccess}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.DsoRulesTopologyStateReconciler
@@ -24,11 +24,8 @@ class SequencerBftPeerReconciler(
     override protected val svDsoStore: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
     val loggerFactory: NamedLoggerFactory,
-    migrationId: Long,
 ) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
     with NamedLogging {
-
-  private val sequencerP2pHostPrefix = s"sequencer-p2p-$migrationId"
 
   override protected def diffDsoRulesWithTopology(
       dsoRulesAndState: DsoRulesStore.DsoRulesWithSvNodeStates
@@ -49,7 +46,7 @@ class SequencerBftPeerReconciler(
           .map(uri =>
             P2PEndpoint.fromEndpointConfig(
               P2PEndpointConfig(
-                s"$sequencerP2pHostPrefix.${uri.authority.host.address()}",
+                uri.authority.host.address(),
                 RequireTypes.Port(uri.effectivePort),
                 Option.when(uri.scheme == "https")(
                   TlsClientConfig(
@@ -74,26 +71,13 @@ class SequencerBftPeerReconciler(
   override def reconcileTask(
       task: BftPeerDifference
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[TaskOutcome] = {
-    if (task.toRemove.map(_.address).exists(!_.contains(sequencerP2pHostPrefix))) {
-      val message =
-        s"Not changing sequencer BFT p2p connection as it looks like the old sequencers are not configured for the current migration id, and there's a high chance that the sequencer is for a different migration id. Task: $task"
-      logger.warn(
-        message
-      )
-      Future.successful(
-        TaskFailed(
-          message
-        )
-      )
-    } else {
-      logger.info(
-        s"Reconciling bft peers. Current peers [${task.currentPeers}]. Removing: [${task.toRemove}]. Adding: [${task.toAdd}]"
-      )
-      for {
-        _ <- task.toAdd.toList.traverse(sequencerAdminConnection.addPeerEndpoint)
-        _ <- task.toRemove.toList.traverse(sequencerAdminConnection.removePeerEndpoint)
-      } yield TaskSuccess(s"Finished bft peer reconciling: $task")
-    }
+    logger.info(
+      s"Reconciling bft peers. Current peers [${task.currentPeers}]. Removing: [${task.toRemove}]. Adding: [${task.toAdd}]"
+    )
+    for {
+      _ <- task.toAdd.toList.traverse(sequencerAdminConnection.addPeerEndpoint)
+      _ <- task.toRemove.toList.traverse(sequencerAdminConnection.removePeerEndpoint)
+    } yield TaskSuccess(s"Finished bft peer reconciling: $task")
   }
 }
 

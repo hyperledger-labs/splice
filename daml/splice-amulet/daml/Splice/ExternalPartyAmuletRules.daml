@@ -57,14 +57,22 @@ template ExternalPartyAmuletRules
     interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
       view = Api.Token.TransferInstructionV1.TransferFactoryView with
         admin = dso
+        meta = emptyMetadata
 
       transferFactory_transferImpl self arg = amulet_transferFactory_transferImpl this self arg
+      transferFactory_publicFetchImpl _self arg = do
+        requireExpectedAdminMatch arg.expectedAdmin dso
+        pure (view $ toInterface @Api.Token.TransferInstructionV1.TransferFactory this)
 
     interface instance AllocationFactory for ExternalPartyAmuletRules where
       view = AllocationFactoryView with
         admin = dso
+        meta = emptyMetadata
 
       allocationFactory_allocateImpl self arg = amulet_allocationFactory_allocateImpl this self arg
+      allocationFactory_publicFetchImpl _self arg = do
+        requireExpectedAdminMatch arg.expectedAdmin dso
+        pure (view $ toInterface @Api.Token.AllocationInstructionV1.AllocationFactory this)
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
@@ -237,10 +245,10 @@ amulet_transferFactory_transferImpl
   -> Api.Token.TransferInstructionV1.TransferFactory_Transfer
   -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
 amulet_transferFactory_transferImpl this _self arg = do
-  let Api.Token.TransferInstructionV1.TransferFactory_Transfer {expectedAdmin, transfer, extraArgs} = arg
+  let Api.Token.TransferInstructionV1.TransferFactory_Transfer {transfer, extraArgs} = arg
   let dso = this.dso
   -- validate call to factory and retrieve context
-  require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show this.dso) (expectedAdmin == dso)
+  requireExpectedAdminMatch arg.expectedAdmin dso
   paymentContext <- paymentFromChoiceContext dso extraArgs.context
 
   -- == validate each field of the transfer specification ==
@@ -296,9 +304,9 @@ amulet_allocationFactory_allocateImpl
   -> Update AllocationFactory_AllocateResult
 amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   let dso = externalAmuletRules.dso
-  let AllocationFactory_Allocate {expectedAdmin, allocation, inputHoldings, extraArgs} = arg
+  let AllocationFactory_Allocate {allocation, inputHoldings, extraArgs} = arg
   -- validate call to factory and retrieve context
-  require ("Expected admin " <> show expectedAdmin <> " matches actual admin " <> show dso) (expectedAdmin == dso)
+  requireExpectedAdminMatch arg.expectedAdmin dso
 
   -- We are using an unfeatured payment context, as the locking to self should not be featured.
   -- Ideally we could feature the 'settlement.executor', but at this point we don't have the
@@ -387,3 +395,6 @@ holdingFeesForDuration duration openRound =
     holdingFeesPerDayUsd = ratePerRoundToRatePerDay openRound.transferConfigUsd.holdingFee openRound.tickDuration
     holdingFeesUsd = chargeRatePerDay holdingFeesPerDayUsd duration
     amuletPerUsd = openRound.amuletPrice
+
+requireExpectedAdminMatch : Party -> Party -> Update ()
+requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)

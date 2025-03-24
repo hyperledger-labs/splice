@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SynchronizerNodeConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.{
-  PackageIdResolver,
+  PackageVersionSupport,
   RetryFor,
   RetryProvider,
   SpliceLedgerConnection,
@@ -39,6 +39,7 @@ class SynchronizerNodeReconciler(
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
+    packageVersionSupport: PackageVersionSupport,
 ) {
 
   private val svParty = dsoStore.key.svParty
@@ -98,10 +99,12 @@ class SynchronizerNodeReconciler(
         case SynchronizerNodeState.Onboarding =>
           false
       }
+      supportsLegacySequencerConfig <- packageVersionSupport.supportsLegacySequencerConfig(
+        clock.now
+      )
 
-      amuletRules <- dsoStore.getAssignedAmuletRules()
       updatedSequencerConfigUpdate =
-        if (PackageIdResolver.supportsLegacySequencerConfig(clock.now, amuletRules.payload))
+        if (supportsLegacySequencerConfig)
           updateLegacySequencerConfig(
             existingLegacySequencerConfig,
             existingSequencerConfig,

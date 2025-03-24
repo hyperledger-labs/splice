@@ -52,7 +52,7 @@ mkdir -p "$RELEASE_DIR"/lib "$RELEASE_DIR"/bin
 
 cp -v "$JARFILE" "$RELEASE_DIR"/lib
 
-"${REPO_ROOT}/build-tools/get-snapshot-version" > "$RELEASE_DIR"/VERSION
+"${SPLICE_ROOT}/build-tools/get-snapshot-version" > "$RELEASE_DIR"/VERSION
 
 shift # shift JARFILE argument out-of-scope
 MAIN_CLASS=$1

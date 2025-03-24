@@ -96,17 +96,26 @@ spec:
                   type = "CometBFT"
                 }
         {{- else if eq .Values.sequencer.driver.type "cantonbft"}}
+            # TODO(#15343) - use a different database for the bft storage
+            # TODO(#15343) - re-enable auth support once it's working in canton with external tls
             - name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT
               value: |
                 canton.sequencers.sequencer.sequencer {
                   config {
-                    storage.config.properties {
-                      currentSchema = "sequencer_bft"
-                    }
+                    storage = ${_storage}
+                    storage.config.properties.serverName = ${?CANTON_DOMAIN_POSTGRES_SERVER}
+                    storage.config.properties.password = ${?CANTON_DOMAIN_POSTGRES_PASSWORD}
+                    storage.config.properties.currentSchema = "sequencer"
+                    storage.config.properties.databaseName = ${?CANTON_SEQUENCER_POSTGRES_DB}
                     initial-network {
+                      endpoint-authentication {
+                        enabled = false
+                      }
                       server-endpoint {
                         address="0.0.0.0"
                         port=5010
+                        external-address="{{ .Values.sequencer.driver.externalAddress }}"
+                        external-port={{ .Values.sequencer.driver.externalPort }}
                       }
                       peer-endpoints = []
                     }
@@ -230,29 +239,6 @@ spec:
     - name: cs-metrics
       port: 10013
       protocol: TCP
-# TODO(#15343) - remove when HTTPS support is enabled
-{{- if eq .Values.sequencer.driver.type "cantonbft"}}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: sequencer-p2p-{{$.Values.metrics.migration.id}}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app: {{ .Release.Name }}-sequencer
-    {{- with $.Values.metrics.migration }}
-    active_migration: {{ .active | quote }}
-    migration_id: {{ .id | quote }}
-    {{- end }}
-spec:
-  selector:
-    app: {{ .Release.Name }}-sequencer
-  ports:
-  - name: grpc-cs-p2p-api
-    port: 80
-    targetPort: 5010
-    protocol: TCP
-{{- end }}
 ---
 {{- if .Values.enablePostgresMetrics }}
 {{- include "splice-util-lib.postgres-metrics" (dict "name" (print "postgres-" (.Values.sequencer.persistence.databaseName | replace "_" "-" ) "-e") "namespace" .Release.Namespace "persistence" .Values.sequencer.persistence "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}

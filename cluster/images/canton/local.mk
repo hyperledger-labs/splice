@@ -6,7 +6,7 @@ dir := $(call current_dir)
 target-canton := $(dir)/target/canton.tar
 target-logback := $(dir)/target/logback.xml
 
-include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
+include ${SPLICE_ROOT}/cluster/images/common/entrypoint-image.mk
 
 $(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(target-canton) $(target-logback) $(dir)/target/LICENSE.txt
 
@@ -23,5 +23,5 @@ $(target-canton):
 	sed -i -E 's|#!.*/bin/sh|#!/usr/bin/env sh|' $$DIR/bin/canton ;\
     tar cf $@ -C $$DIR .
 
-$(target-logback): ${REPO_ROOT}/scripts/canton-logback.xml
+$(target-logback): ${SPLICE_ROOT}/scripts/canton-logback.xml
 	cp $< $@

@@ -30,9 +30,7 @@ data AnyValue =
 -- so it should only be used in the form `ContractId AnyContract` and through `coerceContractId`
 -- but not through any of the interface functions like`fetchFromInterface` that check whether the template actually implements the interface.
 interface AnyContract where viewtype AnyContractView
-data AnyContractView = AnyContractView
-  with
-    dummyUnitField : ()
+data AnyContractView = AnyContractView {}
 
 -- | Some contract id. Use `coerceContractId` to convert from and to this type.
 type AnyContractId = ContractId AnyContract

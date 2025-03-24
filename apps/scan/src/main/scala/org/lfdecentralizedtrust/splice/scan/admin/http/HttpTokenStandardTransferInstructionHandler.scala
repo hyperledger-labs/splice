@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -11,8 +10,8 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.environment.DarResources
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0
-import v0.definitions
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1
+import v1.definitions
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
@@ -30,16 +29,17 @@ class HttpTokenStandardTransferInstructionHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.Handler[TraceContext]
+) extends v1.Handler[TraceContext]
     with Spanning
     with NamedLogging {
 
   private val workflowId = this.getClass.getSimpleName
 
-  override def getTransferFactory(respond: v0.Resource.GetTransferFactoryResponse.type)(
+  override def getTransferFactory(respond: v1.Resource.GetTransferFactoryResponse.type)(
       body: definitions.GetFactoryRequest
-  )(extracted: TraceContext): Future[v0.Resource.GetTransferFactoryResponse] = {
+  )(extracted: TraceContext): Future[v1.Resource.GetTransferFactoryResponse] = {
     implicit val tc: TraceContext = extracted
+    val now = clock.now
     withSpan(s"$workflowId.getTransferFactory") { _ => _ =>
       for {
         transfer <- Try(
@@ -68,7 +68,7 @@ class HttpTokenStandardTransferInstructionHandler(
             )
           )
         newestOpenRound <- store
-          .lookupLatestUsableOpenMiningRound(CantonTimestamp.now())
+          .lookupLatestUsableOpenMiningRound(now)
           .map(
             _.getOrElse(
               throw io.grpc.Status.NOT_FOUND
@@ -79,10 +79,10 @@ class HttpTokenStandardTransferInstructionHandler(
       } yield {
         val activeSynchronizerId =
           AmuletConfigSchedule(amuletRules.payload.configSchedule)
-            .getConfigAsOf(clock.now)
+            .getConfigAsOf(now)
             .decentralizedSynchronizer
             .activeSynchronizer
-        v0.Resource.GetTransferFactoryResponseOK(
+        v1.Resource.GetTransferFactoryResponseOK(
           definitions.FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
             definitions.ChoiceContext(

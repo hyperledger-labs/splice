@@ -4,6 +4,15 @@
 
 Major changes:
 
+Polishing changes:
+
+* Add `TransferFactory_PublicFetch`, `AllocationFactory_PublicFetch` and `BurnMintFactory_PublicFetch` choices.
+* Added `meta` field to all interface view types.
+
+## 2025-03-17
+
+Major changes:
+
 * Added a `BurnMintFactory` API to `Splice.Api.Token.HoldingV1` to
   capture generic burns and mints that do not fall under the transfer
   or allocation APIs.
