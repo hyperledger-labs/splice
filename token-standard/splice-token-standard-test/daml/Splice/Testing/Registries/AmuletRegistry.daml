@@ -148,10 +148,8 @@ registryApi_getTransferFactory registry arg = do
   transferC <- getAmuletRulesTransferContext registry
   (preapproval, preapprovalC) <- getPreapprovalWithContext registry arg.transfer.receiver
   featuredAppRightC <- getFeaturedAppRightContext registry preapproval.provider
-  amuletDiscs <- queryAmuletHoldingDisclosures registry arg.transfer.holdingCids
-  let fullContext =
-        withExtraDisclosures (extAmuletRulesD <> amuletDiscs)
-          (transferC <> preapprovalC <> featuredAppRightC)
+  let fullContext = withExtraDisclosures extAmuletRulesD
+        (transferC <> preapprovalC <> featuredAppRightC)
   pure EnrichedFactoryChoice with
     factoryCid = toInterfaceContractId @TransferFactory extAmuletRulesCid
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
@@ -264,13 +262,3 @@ getFeaturedAppRightContext registry provider = do
         disclosures = rightDisc
         choiceContext = mkAmuletContext $
           Map.fromList [ (featuredAppRightContextKey, AV_ContractId (coerceContractId rightCid)) ]
-
-queryAmuletDisclosures : AmuletRegistry -> [ContractId Amulet] -> Script Disclosures'
-queryAmuletDisclosures registry amuletCids = do
-  discs <- forA amuletCids $ \amuletCid -> do
-    _ <- queryContractId @Amulet registry.dso amuletCid
-    queryDisclosure' @Amulet registry.dso amuletCid
-  pure $ mconcat discs
-
-queryAmuletHoldingDisclosures : AmuletRegistry -> [ContractId Api.Token.HoldingV1.Holding] -> Script Disclosures'
-queryAmuletHoldingDisclosures registry = queryAmuletDisclosures registry . map (fromInterfaceContractId @Amulet)

@@ -69,6 +69,8 @@ data AllocationView = AllocationView with
       -- ^ The numeric id of the transfer within the settlement.
     transferLeg : TransferLeg
       -- ^ The transfer for which the assets are being allocated.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation, used for extensibility.
   deriving (Show, Eq)
 
 

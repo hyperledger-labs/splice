@@ -70,6 +70,7 @@ class ValidatorAutomationService(
     initialSynchronizerTime: Option[CantonTimestamp],
     enableCantonPackageSelection: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -138,6 +139,7 @@ class ValidatorAutomationService(
           validatorTopupConfig,
           connection,
           clock,
+          packageVersionSupport,
         )
       )
     }
@@ -216,8 +218,8 @@ class ValidatorAutomationService(
       triggerContext,
       connection,
       store,
-      scanConnection,
       contactPoint,
+      packageVersionSupport,
     )
   )
 
@@ -226,7 +228,7 @@ class ValidatorAutomationService(
       triggerContext,
       connection,
       store,
-      scanConnection,
+      packageVersionSupport,
     )
   )
 

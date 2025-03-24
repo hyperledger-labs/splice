@@ -44,8 +44,6 @@ highlight_language = "scala"
 extensions = [
     "sphinx.ext.todo",
     "sphinx_copybutton",
-    "sphinx_reredirects",
-    "sphinxcontrib.openapi",
     # ^^ Adds a copy-to-clipboard button to code-blocks.
     # It does not (yet) work for `parsed-literal::` directives, which
     # we use to inject version strings.
@@ -54,6 +52,8 @@ extensions = [
     # Note: adjusting the copybutton_selector does not work directly, as
     # parsed_literal blocks just output a single <pre> tag, which does not
     # interact the right way with how copy-buttons are placed.
+    "sphinx_reredirects",
+    "sphinxcontrib.openapi",
 ]
 
 # -- Redirects -----------------------------------------------------------
@@ -96,13 +96,13 @@ html_theme_options = {
 
 html_js_files = ["script.js"]
 
-repo_root = os.getenv("REPO_ROOT")
-with open(repo_root + "/nix/canton-sources.json") as f:
+SPLICE_ROOT = os.getenv("SPLICE_ROOT")
+with open(SPLICE_ROOT + "/nix/canton-sources.json") as f:
     obj = json.load(f)
     canton_version = obj["version"]
     daml_sdk_tooling_version = obj["tooling_sdk_version"]
 
-with open(repo_root + "/daml.yaml") as f:
+with open(SPLICE_ROOT + "/daml.yaml") as f:
     obj = yaml.safe_load(f)
     daml_sdk_version = obj["sdk-version"]
 

@@ -25,10 +25,10 @@ module Splice.Testing.TokenStandard.WalletClient
 
 import DA.Action (unless)
 
-import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
 import Splice.Api.Token.AllocationRequestV1
-
+import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
+import Splice.Api.Token.MetadataV1 (emptyMetadata)
 
 import Daml.Script
 
@@ -103,4 +103,5 @@ listRequestedAllocations p instrumentId = do
           settlement = req.settlement
           transferLegId = tfId
           transferLeg = tf
+          meta = emptyMetadata
   pure amuletAllocs

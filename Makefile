@@ -9,12 +9,12 @@ SHELL=/usr/bin/env bash
 
 current_dir = $(shell dirname $(lastword $(MAKEFILE_LIST)))
 
-app-bundle := ${REPO_ROOT}/apps/app/target/release/splice-node.tar.gz
+app-bundle := ${SPLICE_ROOT}/apps/app/target/release/splice-node.tar.gz
 
-load-tester := ${REPO_ROOT}/load-tester/dist
+load-tester := ${SPLICE_ROOT}/load-tester/dist
 
-canton-amulet-dar := ${REPO_ROOT}/daml/splice-amulet/.daml/dist/splice-amulet-current.dar
-wallet-payments-dar := ${REPO_ROOT}/daml/splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
+canton-amulet-dar := ${SPLICE_ROOT}/daml/splice-amulet/.daml/dist/splice-amulet-current.dar
+wallet-payments-dar := ${SPLICE_ROOT}/daml/splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 
 .PHONY: build
 build: $(app-bundle) $(load-tester) cluster/build ## Build the Splice app bundle and ensure cluster scripts are ready to run.
@@ -26,7 +26,7 @@ $(canton-amulet-dar) $(wallet-payments-dar) &:
 	sbt --batch 'splice-amulet-daml'/damlBuild 'splice-wallet-payments-daml'/damlBuild
 
 $(load-tester):
-	cd "${REPO_ROOT}/load-tester" && npm ci && npm run build
+	cd "${SPLICE_ROOT}/load-tester" && npm ci && npm run build
 
 .PHONY: clean
 clean: cluster/clean

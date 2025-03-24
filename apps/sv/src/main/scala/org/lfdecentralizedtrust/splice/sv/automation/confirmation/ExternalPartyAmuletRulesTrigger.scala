@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateExternalPartyAmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_CreateExternalPartyAmuletRules
-import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -25,6 +25,7 @@ class ExternalPartyAmuletRulesTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
     connection: SpliceLedgerConnection,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -37,9 +38,11 @@ class ExternalPartyAmuletRulesTrigger(
   override def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Unit]] = {
     val now = context.clock.now
     for {
-      amuletRules <- dsoStore.getAmuletRules()
+      supportsExternalPartyAmuletRules <- packageVersionSupport.supportsExternalPartyAmuletRules(
+        now
+      )
       tasks <-
-        if (PackageIdResolver.supportsExternalPartyAmuletRules(now, amuletRules.payload)) {
+        if (supportsExternalPartyAmuletRules) {
           for {
             rulesO <- dsoStore.lookupExternalPartyAmuletRules()
             confirmations <- dsoStore.listExternalPartyAmuletRulesConfirmation(svParty)

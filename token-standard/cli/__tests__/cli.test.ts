@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createProgram } from "../src/cli";
 import expectedHoldings from "./expected/holdings.json";
+import expectedTxs from "./expected/txs.json";
 import { mockLedgerApiServer } from "./mocks/ledger-api";
 import { beforeAll, afterEach, afterAll, test, expect, vi } from "vitest";
 
@@ -31,4 +32,23 @@ test("list holdings", async () => {
   expect(logSpy).toHaveBeenCalledWith(
     JSON.stringify(expectedHoldings, null, 2)
   );
+});
+
+test("list txs", async () => {
+  const logSpy = vi.spyOn(console, "log");
+
+  const program = createProgram();
+
+  await program.parseAsync([
+    "run",
+    "cli",
+    "list-holding-txs",
+    "party::normalized",
+    "-l",
+    "http://localhost:6201",
+    "-a",
+    "valid_token",
+  ]);
+
+  expect(logSpy).toHaveBeenCalledWith(JSON.stringify(expectedTxs, null, 2));
 });

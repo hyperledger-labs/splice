@@ -5,11 +5,11 @@
 
 set -eou pipefail
 
-DOCS_DIR="$REPO_ROOT/docs"
+DOCS_DIR="$SPLICE_ROOT/docs"
 
 gen_project_docs () (
     echo "(docs) generating $1"
-    cd "$REPO_ROOT/$1"
+    cd "$SPLICE_ROOT/$1"
     local -a DAML_FILES
     readarray -t DAML_FILES < <(find daml -name '*.daml')
     "${XDG_CACHE_HOME:-$HOME/.cache}/daml-build/${DAML_COMPILER_VERSION}/damlc/damlc" docs --index-template "$DOCS_DIR/api-templates/$2-index-template.rst" "${DAML_FILES[@]}" --exclude-modules '**.Scripts.**' -f rst -o "$DOCS_DIR/src/app_dev/api/$2"
@@ -36,7 +36,7 @@ ensure_damlc_exists() {
 ensure_damlc_exists
 
 DAML_PROJECT_FILES="\
-  $(find "$REPO_ROOT/daml" "$REPO_ROOT/token-standard" -maxdepth 2 \
+  $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" -maxdepth 2 \
     \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
     -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test*' \)  \
     -not -ipath '*splitwell*' \
@@ -44,6 +44,6 @@ DAML_PROJECT_FILES="\
     -print)"
 for project_file in $DAML_PROJECT_FILES
 do
-    project_dir="$(dirname "${project_file#"$REPO_ROOT"/}")"
+    project_dir="$(dirname "${project_file#"$SPLICE_ROOT"/}")"
     gen_project_docs "$project_dir" "$(basename "$project_dir")"
 done

@@ -36,9 +36,8 @@ spec:
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
-    # TODO(#15343) = enable https support
     - match:
-        - port: 80
+        - port: 443
       route:
         - destination:
             port:

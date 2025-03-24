@@ -220,6 +220,7 @@ class JoiningNodeInitializer(
         ),
         decentralizedSynchronizerId,
       )
+      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
       dsoAutomation <-
         if (dsoPartyIsAuthorized) {
           logger.info("DSO party is authorized to our participant.")
@@ -236,6 +237,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 extraSynchronizerNodes,
                 upgradesConfig,
+                packageVersionSupport,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -259,6 +261,7 @@ class JoiningNodeInitializer(
                 dsoStore,
                 svConnection,
                 joiningConfig,
+                packageVersionSupport,
               )
           } yield dsoAutomation
         }
@@ -290,6 +293,7 @@ class JoiningNodeInitializer(
         dsoAutomation,
         svAutomation,
         Some(withSvStore),
+        packageVersionSupport,
       )
     } yield {
       (
@@ -308,6 +312,7 @@ class JoiningNodeInitializer(
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
       withSvStore: Option[WithSvStore],
+      packageVersionSupport: PackageVersionSupport,
       skipTrafficReconciliationTriggers: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
@@ -319,6 +324,7 @@ class JoiningNodeInitializer(
       clock,
       retryProvider,
       logger,
+      packageVersionSupport,
     )
     for {
       _ <- retryProvider.waitUntil(
@@ -716,6 +722,7 @@ class JoiningNodeInitializer(
         dsoStore: SvDsoStore,
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
+        packageVersionSupport: PackageVersionSupport,
     ): Future[SvDsoAutomationService] = {
       joiningConfig match {
         case SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey) =>
@@ -756,6 +763,7 @@ class JoiningNodeInitializer(
                   localSynchronizerNode,
                   extraSynchronizerNodes,
                   upgradesConfig,
+                  packageVersionSupport,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias

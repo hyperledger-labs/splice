@@ -126,6 +126,12 @@ testDvP = script do
   submitWithDisclosures' bob enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
+  factoryView <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid AllocationFactory_PublicFetch
+    with
+      expectedAdmin = registry.dso
+      actor = alice
+  factoryView === Splice.Api.Token.AllocationInstructionV1.AllocationFactoryView registry.dso emptyMetadata
+
   -- assume the time given to prepare has passed
   passTime (hours 1)
 

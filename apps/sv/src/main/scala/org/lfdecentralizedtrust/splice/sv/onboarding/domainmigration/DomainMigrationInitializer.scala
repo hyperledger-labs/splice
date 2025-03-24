@@ -7,6 +7,7 @@ import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{
+  AmuletRulesPackageVersionSupport,
   BaseLedgerConnection,
   MediatorAdminConnection,
   ParticipantAdminConnection,
@@ -61,7 +62,7 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -198,6 +199,7 @@ class DomainMigrationInitializer(
       newCometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
         new CometBftNode(client, signer, config, loggerFactory, retryProvider)
       )
+      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
       dsoAutomationService =
         new SvDsoAutomationService(
           clock,
@@ -215,6 +217,7 @@ class DomainMigrationInitializer(
           upgradesConfig,
           spliceInstanceNamesConfig,
           loggerFactory,
+          packageVersionSupport,
         )
       // We register the traffic triggers earlier for domain migrations to ensure that SV nodes obtain
       // unlimited traffic and prevent lock-out issues due to lack of traffic (see #13868)
@@ -232,6 +235,7 @@ class DomainMigrationInitializer(
         svAutomation,
         None,
         skipTrafficReconciliationTriggers = true,
+        packageVersionSupport = packageVersionSupport,
       )
       _ <- migrationDump.participantUsers match {
         case Some(participantUsersData) => {

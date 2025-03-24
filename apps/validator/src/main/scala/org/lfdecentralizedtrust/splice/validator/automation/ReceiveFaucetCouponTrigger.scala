@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.{
   CommandPriority,
-  PackageIdResolver,
+  PackageVersionSupport,
   SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -41,6 +41,7 @@ class ReceiveFaucetCouponTrigger(
     validatorTopupConfig: ValidatorTopupConfig,
     spliceLedgerConnection: SpliceLedgerConnection,
     clock: Clock,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -109,15 +110,14 @@ class ReceiveFaucetCouponTrigger(
           clock,
         )
         .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
-      amuletRules <- scanConnection.getAmuletRulesWithState()
+      supportsValidatorLivenessActivityRecord <-
+        packageVersionSupport
+          .supportsValidatorLivenessActivityRecord(clock.now)
       outcome <- spliceLedgerConnection
         .submit(
           actAs = Seq(validatorParty),
           readAs = Seq(validatorParty),
-          if (
-            PackageIdResolver
-              .supportsValidatorLivenessActivityRecord(clock.now, amuletRules.payload)
-          )
+          if (supportsValidatorLivenessActivityRecord)
             license.exercise(
               _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
                 unclaimedRound.contractId
