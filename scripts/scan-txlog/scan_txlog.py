@@ -38,27 +38,28 @@ cli_handler.setFormatter(
         },
     )
 )
-file_handler = logging.FileHandler("log/scan_txlog.log")
-file_handler.setFormatter(
-    logging.Formatter("%(levelname)s:%(name)s:%(asctime)s:%(message)s")
-)
 
 # Set precision and rounding mode
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
 
-def _default_logger(name, loglevel):
+def _setup_logger(name, loglevel, file_path):
+    # Ensure the log directory exists
+    log_directory = os.path.dirname(file_path)
+    if log_directory and not os.path.exists(log_directory):
+      os.makedirs(log_directory)
+
+    file_handler = logging.FileHandler(file_path)
+    file_handler.setFormatter(
+        logging.Formatter("%(levelname)s:%(name)s:%(asctime)s:%(message)s")
+    )
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
     logger.addHandler(file_handler)
     logger.setLevel(loglevel)
 
     return logger
-
-
-# Global logger, always accessible
-LOG = _default_logger("global", "INFO")
 
 
 def _party_enabled(args, p):
@@ -3744,18 +3745,44 @@ class AppState:
 
     def _save_to_cache(self, args):
         if args.cache_file_path:
+            backup = None
             try:
+                if os.path.exists(args.cache_file_path):
+                    backup = _rename_to_backup(args.cache_file_path)
                 with open(args.cache_file_path, "w") as file:
                     data = self.to_json()
                     json.dump(data, file)
                     LOG.debug(f"Saved app state to {args.cache_file_path}")
             except Exception as e:
                 LOG.error(f"Could not save app state to {args.cache_file_path}: {e}")
+                os.replace(backup, args.cache_file_path) # overwrite if present
+                backup = None
+            if backup:
+                os.remove(backup)
 
     def finalize_batch(self, args):
         self._save_to_cache(args)
         self.state.flush_report()
 
+def _rename_to_backup(filename):
+    """Rename FILENAME to a unique name in the same folder with leading and
+    trailing `#`.
+
+    We do this instead of using a tempfile for output and then renaming after
+    because if tempfiles are on a different filesystem, the copy can fail in
+    progress, which would destroy the old file if it was still in place."""
+    target = os.path.join(os.path.dirname(filename), f"#{os.path.basename(filename)}")
+    while True:
+        target = f"{target}#"
+        if not os.path.lexists(target):
+            try:
+                os.rename(filename, target)
+                return target
+            # lexists is 99%; deal with race conditions
+            except FileExistsError:
+                pass
+            except IsADirectoryError:
+                pass
 
 def _parse_cli_args():
     # Parse command line arguments
@@ -3947,11 +3974,7 @@ async def main():
     global file_handler, LOG
     args = _parse_cli_args()
 
-    # Set up logging
-    file_handler = logging.FileHandler(args.log_file_path)
-    file_handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
-    LOG = _default_logger("global", "INFO")
-    LOG.setLevel(args.loglevel.upper())
+    LOG = _setup_logger("global", args.loglevel.upper(), args.log_file_path)
     _log_uncaught_exceptions()
 
     LOG.debug(f"Starting scan_txlog with arguments: {args}")
