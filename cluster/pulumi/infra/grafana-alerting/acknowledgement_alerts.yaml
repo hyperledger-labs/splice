@@ -19,7 +19,7 @@ groups:
                     type: prometheus
                     uid: prometheus
                 editorMode: code
-                expr: time() - (max by (member) (daml_sequencer_block_acknowledgments_micros{member=~"MED::.*"}) / 1e6)
+                expr: time() - (max by (member_prefix) (label_replace(daml_sequencer_block_acknowledgments_micros{member=~"MED::.*"}, "member_prefix", "$1", "member", "(MED::[^:]+::)[^:]+.*")) / 1e6)
                 instant: false
                 interval: ""
                 intervalMs: 30000
