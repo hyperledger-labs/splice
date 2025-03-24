@@ -452,6 +452,15 @@
             }
           },
           {
+            "name": "GITHUB_TOKEN",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "password",
+                "name": "github"
+              }
+            }
+          },
+          {
             "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
             "value": "true"
           },
