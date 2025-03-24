@@ -5,6 +5,7 @@ import {
   CLUSTER_NAME,
   conditionalString,
   config,
+  isDevNet,
   isMainNet,
 } from 'splice-pulumi-common';
 
@@ -91,6 +92,11 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"Request to.*/accept resulted in a timeout")
 -- TODO(#17636): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher
 -(jsonPayload.message=~"signalWhenIngested.* has not completed after .* milliseconds")
+${conditionalString(
+  isDevNet,
+  '-- TODO(#18511) Remove this once the node is fixed\n' +
+    '-(jsonPayload.message=~"ACS_COMMITMENT_MISMATCH.*" AND jsonPayload.remote=~".*sender = PAR::validator-texturecapital-dev::1220982ed049....*")'
+)}
 ${conditionalString(
   !isMainNet,
   '-- TODO(#17025): Stop ignoring these again once we have topology-aware package selection\n' +
