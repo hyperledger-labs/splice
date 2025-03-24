@@ -23,6 +23,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{cometbft, dso}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
+  ParticipantAdminConnection,
+  RetryProvider,
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.{
@@ -30,11 +32,15 @@ import org.lfdecentralizedtrust.splice.sv.{
   LocalSynchronizerNode,
   SynchronizerNode,
 }
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.config.{BeneficiaryConfig, SvScanConfig}
+import org.lfdecentralizedtrust.splice.sv.cometbft.{
+  CometBftClient,
+  CometBftNode,
+  CometBftRequestSigner,
+}
+import org.lfdecentralizedtrust.splice.sv.config.{BeneficiaryConfig, SvCometBftConfig, SvScanConfig}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
-import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -356,4 +362,63 @@ object SvUtil {
             .asRuntimeException()
         )
     }
+
+  def mapToCometBftNode(
+      cometBftClient: Option[CometBftClient],
+      cometBftConfig: Option[SvCometBftConfig],
+      participantAdminConnection: ParticipantAdminConnection,
+      logger: TracedLogger,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Option[CometBftNode]] =
+    (cometBftClient, cometBftConfig) match {
+      case (Some(client), Some(config)) =>
+        SvUtil
+          .getOrGenerateCometBftGovernanceKeySigner(
+            config,
+            participantAdminConnection,
+            logger,
+          )
+          .map(signer =>
+            Some(
+              new CometBftNode(
+                client,
+                signer,
+                config,
+                loggerFactory,
+                retryProvider,
+              )
+            )
+          )
+      case _ => Future.successful(None)
+    }
+
+  def getOrGenerateCometBftGovernanceKeySigner(
+      config: SvCometBftConfig,
+      participantAdminConnection: ParticipantAdminConnection,
+      logger: TracedLogger,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[CometBftRequestSigner] = {
+    config.governanceKey match {
+      case Some(governanceKey) => {
+        logger.info("Using CometBFT governance key from config")
+        Future.successful(
+          new CometBftRequestSigner(governanceKey.publicKey, governanceKey.privateKey)
+        )
+      }
+      case None => {
+        logger.info("Using CometBFT governance key managed by participant")
+        CometBftRequestSigner.getOrGenerateSignerFromParticipant(
+          "cometbft-governance-keys",
+          participantAdminConnection,
+          logger,
+        )
+      }
+    }
+  }
 }
