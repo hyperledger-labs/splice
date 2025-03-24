@@ -20,3 +20,7 @@ validator1:
     maxDuration: "5m"
     retention: "1h" # Keep 1h
   deduplicationDuration: 30m
+synchronizerMigration:
+  active:
+    id: 0
+    version: "0.3.18-snapshot.20250321.8640.0.v05582b27"
