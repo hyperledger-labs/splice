@@ -15,39 +15,35 @@ import scalapb.GeneratedMessage
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
-class CometBftRequestSigner(
-    val PublicKeyBase64: String,
+case class CometBftRequestSigner(
+    publicKeyBase64: String,
     privateKeyBase64: String,
 ) {
 
-  private val Ed25519KeyLength = 32
+  private val privateKeyBytes = Base64.getDecoder.decode(privateKeyBase64)
+  private val privateKey = new Ed25519Sign(privateKeyBytes)
 
-  private val PrivateKeyBytes = Base64.getDecoder.decode(privateKeyBase64)
-  private val PrivateKey = new Ed25519Sign(PrivateKeyBytes.take(Ed25519KeyLength))
+  val pubKeyBytes: Array[Byte] = Base64.getDecoder.decode(publicKeyBase64)
+  val pubKey = new Ed25519Verify(pubKeyBytes)
 
-  val PubKeyBytes: Array[Byte] = Base64.getDecoder.decode(PublicKeyBase64)
-  val Fingerprint: String =
-    CometBftRequestSigner.fingerprintForBase64PublicKey(PublicKeyBase64)
-  val PubKeyBytesFromPrivateKey: Array[Byte] = PrivateKeyBytes.drop(Ed25519KeyLength)
-  val PubKey = new Ed25519Verify(PubKeyBytes)
+  val fingerprint: String =
+    CometBftRequestSigner.fingerprintForBase64PublicKey(publicKeyBase64)
 
   def signRequest(request: GeneratedMessage): Array[Byte] = {
     val requestBytes = request.toByteArray
-    PrivateKey.sign(requestBytes)
+    privateKey.sign(requestBytes)
   }
-
 }
 
 object CometBftRequestSigner {
 
-  private val PubKeyBase64 = "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8="
-  private val PrivateKeyBase64 =
-    "+7VcQfNKGpd/LnjhA1+LQ13xWQLV2A44P8mbpnTy/YSbXqFovO/9386TThKbf0AGTR/QexJZg1nGshSLJD5wrw=="
+  private val genesisPublicKeyBase64 = "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8="
+  private val genesisPrivateKeyBase64 = "+7VcQfNKGpd/LnjhA1+LQ13xWQLV2A44P8mbpnTy/YQ="
 
-  def getGenesisSigner =
-    new CometBftRequestSigner(PubKeyBase64, PrivateKeyBase64)
+  def genesisSigner =
+    new CometBftRequestSigner(genesisPublicKeyBase64, genesisPrivateKeyBase64)
 
-  def getOrGenerateSigner(
+  def getOrGenerateSignerFromParticipant(
       name: String,
       participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
@@ -104,10 +100,9 @@ object CometBftRequestSigner {
               )
               .asRuntimeException()
           )
-        val augmentedPrivKey = privKey ++ pubKey
         new CometBftRequestSigner(
           Base64.getEncoder.encodeToString(pubKey),
-          Base64.getEncoder.encodeToString(augmentedPrivKey),
+          Base64.getEncoder.encodeToString(privKey),
         )
       case _ =>
         throw Status.NOT_FOUND
