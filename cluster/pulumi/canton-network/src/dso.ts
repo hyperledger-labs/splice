@@ -8,8 +8,10 @@ import {
   CnInput,
   ExpectedValidatorOnboarding,
   SvIdKey,
+  SvCometBftGovernanceKey,
   ValidatorTopupConfig,
   svKeyFromSecret,
+  svCometBftGovernanceKeyFromSecret,
   DecentralizedSynchronizerMigrationConfig,
   ApprovedSvIdentity,
   daSupportApprovedIdentities,
@@ -66,7 +68,8 @@ export class Dso extends pulumi.ComponentResource {
     },
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
-    isFirstSv = false
+    isFirstSv = false,
+    cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined
   ) {
     const defaultApprovedSvIdentities = approvedSvIdentities();
 
@@ -105,22 +108,33 @@ export class Dso extends pulumi.ComponentResource {
           this.args.disableOnboardingParticipantPromotionDelay,
         onboardingPollingInterval: this.args.onboardingPollingInterval,
         sweep: svConf.sweep,
+        cometBftGovernanceKey,
       },
       this.args.decentralizedSynchronizerUpgradeConfig
     );
   }
 
   private async installDso() {
-    const [sv1Conf, ...restSvConfs] = svConfigs.slice(0, this.args.dsoSize);
+    const relevantSvConfs = svConfigs.slice(0, this.args.dsoSize);
+    const [sv1Conf, ...restSvConfs] = relevantSvConfs;
 
-    const keys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
+    const svIdKeys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
       return {
         ...acc,
         [conf.onboardingName]: svKeyFromSecret(conf.nodeName.replace('-', '')),
       };
     }, {});
 
-    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(keys)
+    const cometBftGovernanceKeys = relevantSvConfs
+      .filter(conf => conf.participantKms)
+      .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
+        return {
+          ...acc,
+          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(conf.nodeName.replace('-', '')),
+        };
+      }, {});
+
+    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(svIdKeys)
       .map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
         name: onboardingName,
         publicKey: keys.publicKey,
@@ -159,20 +173,29 @@ export class Dso extends pulumi.ComponentResource {
       },
       additionalSvIdentities,
       this.args.expectedValidatorOnboardings,
-      true
+      true,
+      cometBftGovernanceKeys[sv1Conf.onboardingName]
     );
 
     const restSvs = await Promise.all(
       restSvConfs.map(conf => {
         const onboarding: SvOnboarding = runningMigration
           ? { type: 'domain-migration' }
-          : this.joinViaSv1(sv1.svApp, keys[conf.onboardingName]);
+          : this.joinViaSv1(sv1.svApp, svIdKeys[conf.onboardingName]);
         const cometBft = {
           sv1: sv1CometBftConf,
           peers: peerCometBftConfs.filter(c => c.id !== conf.cometBft.id), // remove self from peer list
         };
 
-        return this.installSvNode(conf, onboarding, cometBft, additionalSvIdentities, [], false);
+        return this.installSvNode(
+          conf,
+          onboarding,
+          cometBft,
+          additionalSvIdentities,
+          [],
+          false,
+          cometBftGovernanceKeys[conf.onboardingName]
+        );
       })
     );
 

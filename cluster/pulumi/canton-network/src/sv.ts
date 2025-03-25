@@ -34,6 +34,7 @@ import {
   PersistenceConfig,
   sanitizedForPostgres,
   spliceInstanceNames,
+  svCometBftGovernanceKeySecret,
   SvIdKey,
   svUserIds,
   validatorOnboardingSecretName,
@@ -203,7 +204,12 @@ export async function installSvNode(
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
     .concat([loopback])
-    .concat(imagePullDeps);
+    .concat(imagePullDeps)
+    .concat(
+      config.cometBftGovernanceKey
+        ? svCometBftGovernanceKeySecret(xns, config.cometBftGovernanceKey)
+        : []
+    );
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
@@ -391,6 +397,7 @@ function installSvApp(
     cometBFT: {
       enabled: true,
       connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
+      externalGovernanceKey: config.cometBftGovernanceKey ? true : undefined,
     },
     decentralizedSynchronizerUrl:
       config.onboarding.type == 'found-dso' &&

@@ -22,6 +22,11 @@ export type SvCometBftKeys = {
   validatorPublicKey: string;
 };
 
+export type SvCometBftGovernanceKey = {
+  publicKey: string;
+  privateKey: string;
+};
+
 export type GrafanaKeys = {
   adminUser: string;
   adminPassword: string;
@@ -48,6 +53,20 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
       nodePrivateKey: String(parsed.nodePrivateKey),
       validatorPrivateKey: String(parsed.validatorPrivateKey),
       validatorPublicKey: String(parsed.validatorPublicKey),
+    };
+  });
+}
+
+export function svCometBftGovernanceKeyFromSecret(
+  sv: string
+): pulumi.Output<SvCometBftGovernanceKey> {
+  const keyJson = getSecretVersionOutput({ secret: `${sv}-cometbft-governance-key` });
+  return keyJson.apply(k => {
+    const secretData = k.secretData;
+    const parsed = JSON.parse(secretData);
+    return {
+      publicKey: String(parsed.public),
+      privateKey: String(parsed.private),
     };
   });
 }
@@ -226,6 +245,33 @@ export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.cor
     },
     {
       dependsOn: [ns.ns],
+    }
+  );
+}
+
+export function svCometBftGovernanceKeySecret(
+  xns: ExactNamespace,
+  keys: CnInput<SvCometBftGovernanceKey>
+): k8s.core.v1.Secret {
+  const secretName = 'splice-app-sv-cometbft-governance-key';
+  const data = pulumi.output(keys).apply(ks => {
+    return {
+      public: btoa(ks.publicKey),
+      private: btoa(ks.privateKey),
+    };
+  });
+  return new k8s.core.v1.Secret(
+    `splice-app-${xns.logicalName}-cometbft-governance-key`,
+    {
+      metadata: {
+        name: secretName,
+        namespace: xns.logicalName,
+      },
+      type: 'Opaque',
+      data: data,
+    },
+    {
+      dependsOn: [xns.ns],
     }
   );
 }

@@ -12,8 +12,8 @@ private_key_base64=$(openssl pkey -in cometbft-governance-keys.pem -outform DER 
 
 echo "{"
 # Output the keys
-echo "  \"publicKey\": \"$public_key_base64\","
-echo "  \"privateKey\": \"$private_key_base64\""
+echo "  \"public\": \"$public_key_base64\","
+echo "  \"private\": \"$private_key_base64\""
 echo "}"
 
 # Clean up

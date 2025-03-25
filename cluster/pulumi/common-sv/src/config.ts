@@ -8,6 +8,7 @@ import {
   CnInput,
   ExpectedValidatorOnboarding,
   SvIdKey,
+  SvCometBftGovernanceKey,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
 import { SweepConfig } from 'splice-pulumi-common-validator';
@@ -43,6 +44,9 @@ export interface StaticSvConfig {
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
+  // Currently this only triggers managing the CometBFT governance key externally
+  // TODO(#16783): Make this actually deploy the SV participant with KMS enabled
+  participantKms?: boolean;
 }
 
 export type SequencerPruningConfig = {
@@ -70,6 +74,7 @@ export interface SvConfig extends StaticSvConfig {
   splitPostgresInstances: boolean;
   disableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
+  cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
 }
 
 export const SvConfigSchema = z.object({
