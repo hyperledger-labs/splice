@@ -93,7 +93,7 @@ groups:
           annotations:
             __dashboardUid__: cdlm6c7fn7vuod
             __panelId__: "18"
-            description: The mediator {{ $labels.member }} has not submitted a recent acknowledgement
+            description: The mediator {{ $labels.member_prefix }} has not submitted a recent acknowledgement
             severity: critical
             summary: Mediator Acknowledgement lag
           labels: {}
