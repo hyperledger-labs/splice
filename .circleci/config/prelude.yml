@@ -45,6 +45,7 @@ parameters:
         backup-devnet,
         backup-testnet,
         backup-mainnet,
+        copy-mainnet-backup,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
