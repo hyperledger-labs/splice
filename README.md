@@ -129,7 +129,7 @@ clusters.)
    From your profile on github, go to Settings, Developer Settings, Personal Access Tokens, Tokens (classic), and create a new token with the `write:packages` scope.
    Best would be to add the environment variables to the `.envrc.private` file like the following:
    ```
-   export GITHUB_USER="yourgithubusername"
+   export GH_USER="yourgithubusername"
    export GITHUB_TOKEN="yourgithubtoken"
    ```
 1. After switching to the CC repo you should see a line like
@@ -228,7 +228,7 @@ A list of expected environment definitions is as follows:
    * `ARTIFACTORY_USER`: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
    * `ARTIFACTORY_PASSWORD`: Your identity token at digitalasset.jfrog.io (can be obtained by generating an identity token in your user profile)
 * Github credentials
-   * `GITHUB_USER`: your Github username
+   * `GH_USER`: your Github username
    * `GITHUB_TOKEN`: your Github personal access token
 
 Be aware: The Auth0 tokens allow the requester to perform any

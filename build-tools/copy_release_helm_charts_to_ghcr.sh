@@ -52,12 +52,12 @@ if [ -z "${APP_CHARTS_FILE:-}" ]; then
   APP_CHARTS_FILE="/dev/stdin"
 fi
 
-if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${GITHUB_USER:-}" ]; then
-  echo "Error: you need to set GITHUB_TOKEN and GITHUB_USER."
+if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${GH_USER:-}" ]; then
+  echo "Error: you need to set GITHUB_TOKEN and GH_USER."
   exit 1
 fi
 
-echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
 
 APP_CHARTS=$(<"$APP_CHARTS_FILE")
 

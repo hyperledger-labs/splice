@@ -56,8 +56,8 @@ if [ -z "${IMAGES_FILE:-}" ]; then
   IMAGES_FILE="/dev/stdin"
 fi
 
-if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${GITHUB_USER:-}" ]; then
-  echo "Error: you need to set GITHUB_TOKEN and GITHUB_USER."
+if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${GH_USER:-}" ]; then
+  echo "Error: you need to set GITHUB_TOKEN and GH_USER."
   exit 1
 fi
 
@@ -67,8 +67,8 @@ IMAGES=$(<"$IMAGES_FILE")
 export XDG_RUNTIME_DIR=/tmp/containers
 mkdir -p "$XDG_RUNTIME_DIR"
 
-echo "$GITHUB_TOKEN" | skopeo login "$SRC_REGISTRY" --username "$GITHUB_USER" --password-stdin
-echo "$GITHUB_TOKEN" | skopeo login "$DEST_REGISTRY" --username "$GITHUB_USER" --password-stdin
+echo "$GITHUB_TOKEN" | skopeo login "$SRC_REGISTRY" --username "$GH_USER" --password-stdin
+echo "$GITHUB_TOKEN" | skopeo login "$DEST_REGISTRY" --username "$GH_USER" --password-stdin
 
 if [ -n "$VERSIONS_FILE" ]; then
   VERSIONS=$(<"$VERSIONS_FILE")

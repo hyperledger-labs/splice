@@ -47,7 +47,7 @@ jobs:
           cmd: |
             echo "PR number: $CIRCLE_PULL_REQUEST"
             ./scripts/check-todos.sh
-          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
+          additional_nix_args: "--keep GH_USER --keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
         env:
           # The script assumes CCI env vars, so we map GHA ones to CCI ones here
           GITHUB_USER: ${{ github.actor }}

@@ -186,10 +186,10 @@ jobs:
            --keep CIRCLE_BRANCH \
            --keep CIRCLE_REPOSITORY_URL \
            --keep CIRCLE_SHA1 \
-           --keep GITHUB_USER \
+           --keep GH_USER \
            --keep GITHUB_TOKEN"
           cmd: |
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
@@ -197,11 +197,11 @@ jobs:
             --keep ARTIFACTORY_PASSWORD \
             --keep CIRCLE_BRANCH \
             --keep OCI_DEV_HELM_REGISTRY \
-            --keep GITHUB_USER \
+            --keep GH_USER \
             --keep GITHUB_TOKEN"
           cmd_name: Push Helm Artifacts
           cmd: |
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
@@ -243,7 +243,7 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Copy artifacts to Github Container Registry
                 additional_nix_args: "--keep GITHUB_TOKEN \
-                  --keep GITHUB_USER \
+                  --keep GH_USER \
                   --keep DEV_HELM_REGISTRY \
                   --keep DEV_DOCKER_REGISTRY \
                   --keep RELEASE_HELM_REGISTRY \
@@ -255,9 +255,9 @@ jobs:
                   make cluster/docker/copy_release_to_ghcr
             - run_bash_command_in_nix:
                 cmd_name: tag git
-                additional_nix_args: "--keep GITHUB_TOKEN --keep GITHUB_USER"
+                additional_nix_args: "--keep GITHUB_TOKEN --keep GH_USER"
                 cmd: |
-                  git remote set-url origin https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
                   RELEASE_TAG=$(get-snapshot-version)
 
                   if [ $(git tag -l "${RELEASE_TAG}") ]; then

@@ -29,14 +29,14 @@ function check_docker_creds() {
 
 function check_docker_creds_ghcr() {
   local docker_creds="$1"
-  [[ -z "$docker_creds" || "$docker_creds" == "null" || "$docker_creds" != "$GITHUB_USER:$GITHUB_TOKEN" ]] && \
-  [[ -n "$GITHUB_USER" && -n "$GITHUB_TOKEN" ]]
+  [[ -z "$docker_creds" || "$docker_creds" == "null" || "$docker_creds" != "$GH_USER:$GITHUB_TOKEN" ]] && \
+  [[ -n "$GH_USER" && -n "$GITHUB_TOKEN" ]]
 }
 
 DOCKER_CREDS=$(read_docker_creds "$GHCR")
 if check_docker_creds_ghcr "$DOCKER_CREDS"; then
   echo "Logging into $GHCR"
-  echo $GITHUB_TOKEN | docker login "$GHCR" -u "$GITHUB_USER" --password-stdin
+  echo $GITHUB_TOKEN | docker login "$GHCR" -u "$GH_USER" --password-stdin
 fi
 
 DOCKER_CREDS=$(read_docker_creds "$ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY")
