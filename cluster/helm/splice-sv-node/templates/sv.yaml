@@ -190,6 +190,28 @@ spec:
             - name: SPLICE_APP_SV_COMETBFT_CONNECTION_URI
               value: {{ (.Values.cometBFT).connectionUri }}
             {{- end }}
+            {{- if (.Values.cometBFT).externalGovernanceKey }}
+            - name: ADDITIONAL_CONFIG_SV_COMETBFT_GOVERNANCE_KEY
+              value: |
+                _comet_bft_config {
+                  governance-key {
+                    public-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY}
+                    private-key = ${?SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY}
+                  }
+                }
+            - name: SPLICE_APP_SV_COMETBFT_GOVERNANCE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: public
+                  name: "splice-app-sv-cometbft-governance-key"
+                  optional: false
+            - name: SPLICE_APP_SV_COMETBFT_GOVERNANCE_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: private
+                  name: "splice-app-sv-cometbft-governance-key"
+                  optional: false
+            {{- end }}
             - name: SPLICE_APP_UI_NETWORK_NAME
               value: {{ .Values.spliceInstanceNames.networkName | quote }}
             - name: SPLICE_APP_UI_NETWORK_FAVICON_URL
