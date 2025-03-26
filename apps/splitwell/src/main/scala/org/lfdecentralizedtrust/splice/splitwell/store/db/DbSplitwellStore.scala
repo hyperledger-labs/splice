@@ -26,6 +26,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -47,7 +48,7 @@ class DbSplitwellStore(
       acsTableName = SplitwellTables.acsTableName,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
-      storeDescriptor = StoreDescriptor(
+      acsStoreDescriptor = StoreDescriptor(
         version = 1,
         name = "DbSplitwellStore",
         party = key.providerParty,
@@ -73,7 +74,7 @@ class DbSplitwellStore(
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
-  private def storeId: Int = multiDomainAcsStore.storeId
+  private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def lookupInstallWithOffset(
@@ -87,7 +88,7 @@ class DbSplitwellStore(
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellInstall.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -120,7 +121,7 @@ class DbSplitwellStore(
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.Group.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -150,7 +151,7 @@ class DbSplitwellStore(
           .query(
             selectFromAcsTableWithState(
               SplitwellTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -178,7 +179,7 @@ class DbSplitwellStore(
         .query(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -207,7 +208,7 @@ class DbSplitwellStore(
         .query(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -236,7 +237,7 @@ class DbSplitwellStore(
         .query(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -308,7 +309,7 @@ class DbSplitwellStore(
         .query(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -338,7 +339,7 @@ class DbSplitwellStore(
         .query(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -369,7 +370,7 @@ class DbSplitwellStore(
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -476,7 +477,7 @@ class DbSplitwellStore(
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(

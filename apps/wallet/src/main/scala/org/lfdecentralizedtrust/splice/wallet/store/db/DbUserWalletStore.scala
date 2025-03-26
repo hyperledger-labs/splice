@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapp
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
-import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
@@ -44,6 +44,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.*
@@ -66,7 +67,20 @@ class DbUserWalletStore(
       txLogTableName = WalletTables.txLogTableName,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
-      storeDescriptor = StoreDescriptor(
+      acsStoreDescriptor = StoreDescriptor(
+        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
+        // to version 2 descriptors.
+        version = 2,
+        name = "DbUserWalletStore",
+        party = key.endUserParty,
+        participant = participantId,
+        key = Map(
+          "endUserParty" -> key.endUserParty.toProtoPrimitive,
+          "validatorParty" -> key.validatorParty.toProtoPrimitive,
+          "dsoParty" -> key.dsoParty.toProtoPrimitive,
+        ),
+      ),
+      txLogStoreDescriptor = StoreDescriptor(
         // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
         // to version 2 descriptors.
         version = 2,
@@ -91,7 +105,8 @@ class DbUserWalletStore(
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
-  def storeId: Int = multiDomainAcsStore.storeId
+  private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
+  private def txLogStoreId: TxLogStoreId = multiDomainAcsStore.txLogStoreId
   override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
@@ -201,7 +216,7 @@ class DbUserWalletStore(
                  select
                    #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()},""" ++ ccValue ++ sql"""
                  from #${WalletTables.acsTableName} acs join round_to_issuance rti on acs.reward_coupon_round = rti.round
-                 where acs.store_id = $storeId
+                 where acs.store_id = $acsStoreId
                    and migration_id = $domainMigrationId
                    and acs.template_id_qualified_name = ${QualifiedName(templateId)}
                  order by (acs.reward_coupon_round, -""" ++ ccValue ++ sql""")
@@ -231,19 +246,19 @@ class DbUserWalletStore(
             beginAfterEventIdO.fold(
               selectFromTxLogTable(
                 WalletTables.txLogTableName,
-                storeId,
+                txLogStoreId,
                 where = sql"tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}",
                 orderLimit = sql"order by entry_number desc limit ${sqlLimit(limit)}",
               )
             )(beginAfterEventId =>
               selectFromTxLogTable(
                 WalletTables.txLogTableName,
-                storeId,
+                txLogStoreId,
                 where = sql"""tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}
                   and entry_number < (
                       select entry_number
                       from #${WalletTables.txLogTableName}
-                      where store_id = $storeId
+                      where store_id = $txLogStoreId
                       and tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}
                       and event_id = ${lengthLimited(beginAfterEventId)}
                   )""",
@@ -272,7 +287,7 @@ class DbUserWalletStore(
                   #${WalletTables.acsTableName} st,
                   #${WalletTables.acsTableName} sub
              where """ ++
-        filterStoreMigrationIds("ansEntry.", "ansEntryContext.", "sub.", "st.") ++
+        filterAcsStoreMigrationIds("ansEntry.", "ansEntryContext.", "sub.", "st.") ++
         sql" and " ++ subscriptionFilter(now) ++ sql"""
                and ansEntry.template_id_qualified_name =
                      ${QualifiedName(ansCodegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID)}
@@ -312,7 +327,7 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               domainMigrationId,
-              storeId,
+              txLogStoreId,
               sql"entry_type = ${TxLogEntry.EntryType.TransferOfferTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,
@@ -339,7 +354,7 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               domainMigrationId,
-              storeId,
+              txLogStoreId,
               sql"entry_type = ${TxLogEntry.EntryType.BuyTrafficRequestTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,
@@ -376,7 +391,7 @@ class DbUserWalletStore(
                             then $idleStateFlag
                             else ${idleStateFlag + 1} end) which_state
               from #${WalletTables.acsTableName} st, #${WalletTables.acsTableName} sub
-              where """ ++ filterStoreMigrationIds("st.", "sub.") ++ sql"""
+              where """ ++ filterAcsStoreMigrationIds("st.", "sub.") ++ sql"""
                     and """ ++ subscriptionFilter(now) ++ sql"""
               order by st.event_number
               limit ${sqlLimit(limit)}
@@ -410,9 +425,9 @@ class DbUserWalletStore(
             ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID_WITH_PACKAGE_ID)}
       and (st.create_arguments ->> 'subscription') = sub.contract_id"""
 
-  private[this] def filterStoreMigrationIds(acsPrefixes: String*) =
+  private[this] def filterAcsStoreMigrationIds(acsPrefixes: String*) =
     acsPrefixes
-      .map(p => sql"#${p}store_id = $storeId and #${p}migration_id = $domainMigrationId")
+      .map(p => sql"#${p}store_id = $acsStoreId and #${p}migration_id = $domainMigrationId")
       .intercalate(sql" and ")
 
   def lookupTransferPreapproval(receiver: PartyId)(implicit
@@ -425,7 +440,7 @@ class DbUserWalletStore(
           .querySingle(
             selectFromAcsTableWithOffset(
               WalletTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               sql"""
             template_id_qualified_name = ${QualifiedName(
@@ -457,7 +472,7 @@ class DbUserWalletStore(
           .querySingle(
             selectFromAcsTableWithOffset(
               WalletTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               sql"""
             template_id_qualified_name = ${QualifiedName(

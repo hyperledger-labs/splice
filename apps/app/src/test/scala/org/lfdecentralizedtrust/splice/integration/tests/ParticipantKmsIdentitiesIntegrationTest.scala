@@ -3,7 +3,11 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
 import com.digitalasset.canton.topology.ParticipantId
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllValidatorConfigs
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  updateAllSvAppConfigs,
+  updateAllValidatorConfigs,
+}
+import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -16,6 +20,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
   val aliceParticipantDumpFile = testDumpDir.resolve("alice-kms-id-identity-dump.json")
+  val sv2ParticipantDumpFile = testDumpDir.resolve("sv2-kms-id-identity-dump.json")
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
@@ -24,6 +29,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
       .addConfigTransforms(
         (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
         (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
+        // comment this to generate a fresh dump with fresh keys
         (_, conf) =>
           updateAllValidatorConfigs { case (name, c) =>
             if (name == "aliceValidator") {
@@ -41,6 +47,24 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
               c
             }
           }(conf),
+        // comment this to generate a fresh dump with fresh keys
+        (_, conf) => {
+          updateAllSvAppConfigs { case (name, c) =>
+            if (name == "sv2") {
+              c.copy(
+                participantBootstrappingDump = Some(
+                  ParticipantBootstrapDumpConfig
+                    .File(
+                      sv2ParticipantDumpFile,
+                      Some(s"sv2"),
+                    )
+                )
+              )
+            } else {
+              c
+            }
+          }(conf)
+        },
         // default transforms that look relevant
         (_, config) => ConfigTransforms.makeAllTimeoutsBounded(config),
         (_, config) => ConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(config),
@@ -54,11 +78,11 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
 
   override def dbsSuffix = "identities_kms"
 
-  "We can import and export Canton participant identities dumps with kms enabled" in {
+  "We can import and export Canton participant identities dumps with kms enabled (validator)" in {
     implicit env =>
       withCantonSvNodes(
         (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), None),
-        "kms-identities",
+        "kms-identities-validator",
         // TODO(tech-debt): Refactor so we can start only SV1 nodes
         svs123 = true,
         sv4 = false,
@@ -89,33 +113,10 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
           aliceValidatorBackend.startSync()
         }
 
-        clue("keys are correctly registered") {
-          val keys =
-            aliceValidatorBackend.participantClientWithAdminToken.keys.secret
-              .list()
-          keys should have size predefinedDump.keys.size.toLong
-
-          def checkKmsKeyId(keyName: String) = {
-            val key = keys.find(_.name.exists(_.unwrap == keyName)).value
-            inside(predefinedDump.keys.find(_.name.value == key.name.value.unwrap).value) {
-              case NodeKey.KmsKeyId(keyType, keyId, _) =>
-                key.kmsKeyId.value.unwrap shouldBe keyId
-                key.publicKey match {
-                  case _: SigningPublicKey => keyType shouldBe NodeKey.KeyType.Signing
-                  case _: EncryptionPublicKey => keyType shouldBe NodeKey.KeyType.Encryption
-                  case _ => fail("Unexpected key type")
-                }
-            }
-          }
-
-          checkKmsKeyId("namespace")
-          checkKmsKeyId("signing")
-          checkKmsKeyId("encryption")
-        }
-
-        clue("Participant ID is the same") {
-          aliceValidatorBackend.participantClientWithAdminToken.id shouldBe predefinedDump.id
-        }
+        dumpMatchesParticipantState(
+          predefinedDump,
+          aliceValidatorBackend.participantClientWithAdminToken,
+        )
 
         val dumpFromValidator = aliceValidatorBackend.dumpParticipantIdentities()
         dumpFromValidator.keys.toSet shouldBe predefinedDump.keys.toSet
@@ -149,5 +150,74 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
         // val aliceMigrationDumpPath = testDumpDir.resolve(s"alice-kms-migration-dump.json")
         // better.files.File(aliceMigrationDumpPath).write(fullDumpFromValidator.asJson.spaces2)
       }
+  }
+
+  "We can import and export Canton participant identities dumps with kms enabled (SV)" in {
+    implicit env =>
+      withCantonSvNodes(
+        (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), None),
+        "kms-identities-sv",
+        // TODO(tech-debt): Refactor so we can start only SV1 and SV2
+        svs123 = true,
+        sv4 = false,
+        extraParticipantsConfigFileNames = Seq(
+          "standalone-participant-sv2-enable-kms.conf"
+        ),
+      )(
+        "KMS_TYPE" -> "gcp",
+        "KMS_LOCATION_ID" -> "us-central1",
+        "KMS_PROJECT_ID" -> "da-cn-shared",
+        "KMS_KEY_RING_ID" -> "kms-ci",
+      ) {
+        startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
+
+        val predefinedDump = NodeIdentitiesDump
+          .fromJsonFile(
+            sv2ParticipantDumpFile,
+            ParticipantId.tryFromProtoPrimitive,
+          )
+          .value
+
+        clue("start sv2 with predefined dump") {
+          startAllSync(sv2Backend, sv2ScanBackend, sv2ValidatorBackend)
+        }
+
+        dumpMatchesParticipantState(predefinedDump, sv2Backend.participantClientWithAdminToken)
+
+        val dumpFromSvValidator = sv2ValidatorBackend.dumpParticipantIdentities()
+        dumpFromSvValidator.keys.toSet shouldBe predefinedDump.keys.toSet
+
+        // uncomment this to write out a new dump for this test
+        // better.files.File(sv2ParticipantDumpFile).write(dumpFromSvValidator.toJson.spaces2)
+      }
+  }
+
+  private def dumpMatchesParticipantState(
+      dump: NodeIdentitiesDump,
+      participant: ParticipantClientReference,
+  ) = {
+    clue("Participant ID is the same") {
+      participant.id shouldBe dump.id
+    }
+    clue("keys are correctly registered") {
+      val keys = participant.keys.secret.list()
+      keys should have size dump.keys.size.toLong
+
+      def checkKmsKeyId(keyName: String) = {
+        val key = keys.find(_.name.exists(_.unwrap == keyName)).value
+        inside(dump.keys.find(_.name.value == key.name.value.unwrap).value) {
+          case NodeKey.KmsKeyId(keyType, keyId, _) =>
+            key.kmsKeyId.value.unwrap shouldBe keyId
+            key.publicKey match {
+              case _: SigningPublicKey => keyType shouldBe NodeKey.KeyType.Signing
+              case _: EncryptionPublicKey => keyType shouldBe NodeKey.KeyType.Encryption
+              case _ => fail("Unexpected key type")
+            }
+        }
+      }
+      checkKmsKeyId("namespace")
+      checkKmsKeyId("signing")
+      checkKmsKeyId("encryption")
+    }
   }
 }

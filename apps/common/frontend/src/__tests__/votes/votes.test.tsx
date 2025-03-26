@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { QueryClient, UseQueryResult, useQuery, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
+import { AmuletPriceVote, DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
 import { theme } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
 import { dsoInfo, getExpectedAmuletRulesConfigDiffsHTML } from 'common-test-handlers';
@@ -93,6 +93,14 @@ const provider: VotesHooks = {
             ? []
             : [constants.myVote(cid, cid === constants.rejectedVoteResult.request.trackingCid)];
         });
+      },
+    });
+  },
+  useAmuletPriceVotes(): UseQueryResult<AmuletPriceVote[]> {
+    return useQuery({
+      queryKey: ['useAmuletPriceVotes', constants.amuletPriceVotes],
+      queryFn: async () => {
+        return constants.amuletPriceVotes;
       },
     });
   },
