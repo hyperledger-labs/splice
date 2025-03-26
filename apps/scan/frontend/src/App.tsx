@@ -1,10 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { ErrorRouterPage, theme } from '@lfdecentralizedtrust/splice-common-frontend';
+import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { ScanClientProvider } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ErrorRouterPage, theme } from 'common-frontend';
-import { replaceEqualDeep } from 'common-frontend-utils';
-import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
@@ -18,7 +18,9 @@ import { CssBaseline } from '@mui/material';
 import { ThemeProvider } from '@mui/material';
 
 import ScanListVoteRequests from './components/votes/ScanListVoteRequests';
+import { ScanAppVotesHooksProvider } from './contexts/ScanAppVotesHooksProvider';
 import Activity from './routes/activity';
+import AmuletPriceVotes from './routes/amuletPriceVotes';
 import AppLeaderboard from './routes/appLeaderboard';
 import SynchronizerFeesLeaderboard from './routes/domainFeesLeaderboard';
 import DsoWithContexts from './routes/dso';
@@ -45,7 +47,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <ReactQueryDevtools initialIsOpen={false} />
-      <ScanClientProvider url={config.services.scan.url}>{children}</ScanClientProvider>
+      <ScanClientProvider url={config.services.scan.url}>
+        <ScanAppVotesHooksProvider>{children}</ScanAppVotesHooksProvider>
+      </ScanClientProvider>
     </QueryClientProvider>
   );
 };
@@ -61,6 +65,7 @@ const router = createBrowserRouter(
         <Route path="synchronizer-fees-leaderboard" element={<SynchronizerFeesLeaderboard />} />
         <Route path="validator-faucets-leaderboard" element={<ValidatorFaucetsLeaderboard />} />
       </Route>
+      <Route path="/amulet-price-votes" element={<AmuletPriceVotes />} />
       <Route path="/dso" element={<DsoWithContexts />} />
       <Route path="/governance" element={<ScanListVoteRequests />} />
       <Route path="/validator-licenses" element={<ScanValidatorLicenses />} />

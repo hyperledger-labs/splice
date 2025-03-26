@@ -1,14 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { UseQueryResult } from '@tanstack/react-query';
 import {
   ErrorDisplay,
   getAmuletConfigurationAsOfNow,
   Loading,
   PartyId,
   TitledTable,
-} from 'common-frontend';
-import { Contract, durationToInterval } from 'common-frontend-utils';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract, durationToInterval } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { UseQueryResult } from '@tanstack/react-query';
 import React from 'react';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';

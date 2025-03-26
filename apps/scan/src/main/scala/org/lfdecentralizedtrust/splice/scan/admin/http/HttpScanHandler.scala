@@ -1633,6 +1633,21 @@ class HttpScanHandler(
     }
   }
 
+  override def listAmuletPriceVotes(
+      respond: ScanResource.ListAmuletPriceVotesResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.ListAmuletPriceVotesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listAmuletPriceVotes") { _ => _ =>
+      for {
+        amuletPriceVotes <- votesStore.listAmuletPriceVotes()
+      } yield ScanResource.ListAmuletPriceVotesResponse.OK(
+        definitions.ListAmuletPriceVotesResponse(
+          amuletPriceVotes.map(_.toHttp).toVector
+        )
+      )
+    }
+  }
+
   override def listDsoRulesVoteRequests(
       respond: ScanResource.ListDsoRulesVoteRequestsResponse.type
   )()(extracted: TraceContext): Future[ScanResource.ListDsoRulesVoteRequestsResponse] = {
