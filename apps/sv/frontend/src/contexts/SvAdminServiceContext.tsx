@@ -1,9 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as openapi from 'sv-openapi';
+import { useUserState } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  BaseApiMiddleware,
+  OpenAPILoggingMiddleware,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
-import { useUserState } from 'common-frontend';
-import { BaseApiMiddleware, OpenAPILoggingMiddleware } from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
 import {
   CastVoteRequest,

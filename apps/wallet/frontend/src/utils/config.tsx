@@ -8,8 +8,8 @@ import {
   pollIntervalSchema,
   ConfigProvider,
   useConfig,
-} from 'common-frontend';
-import { PollingStrategy } from 'common-frontend-utils';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { PollingStrategy } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import React from 'react';
 import { z } from 'zod';
 

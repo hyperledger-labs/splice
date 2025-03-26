@@ -1,10 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { ErrorRouterPage, theme } from '@lfdecentralizedtrust/splice-common-frontend';
+import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { ScanClientProvider } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ErrorRouterPage, theme } from 'common-frontend';
-import { replaceEqualDeep } from 'common-frontend-utils';
-import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {

@@ -1,7 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useMutation, UseQueryResult, UseMutationResult } from '@tanstack/react-query';
-import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
   DateDisplay,
@@ -9,7 +7,9 @@ import {
   PartyId,
   AmuletPriceVote,
   DsoInfo,
-} from 'common-frontend';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { useMutation, UseQueryResult, UseMutationResult } from '@tanstack/react-query';
+import BigNumber from 'bignumber.js';
 import React, { useCallback, useState } from 'react';
 
 import EditIcon from '@mui/icons-material/Edit';

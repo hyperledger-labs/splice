@@ -1,9 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
+import {
+  AmountDisplay,
+  DateDisplay,
+  ErrorDisplay,
+  Loading,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DateDisplay, ErrorDisplay, Loading } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
 import { useCallback, useMemo, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';

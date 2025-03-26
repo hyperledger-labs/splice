@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { QueryObserverSuccessResult } from '@tanstack/react-query';
 import {
   BaseVotesHooks,
   findLatestVoteResult,
@@ -12,7 +11,8 @@ import {
   useVotesHooks,
   VotesHooks,
   ConfirmationDialog,
-} from 'common-frontend';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { QueryObserverSuccessResult } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import React from 'react';
 

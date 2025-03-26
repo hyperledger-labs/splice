@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useVotesHooks } from 'common-frontend';
-import { CopyableTypography, PartyId, SvVote } from 'common-frontend';
+import { useVotesHooks } from '@lfdecentralizedtrust/splice-common-frontend';
+import { CopyableTypography, PartyId, SvVote } from '@lfdecentralizedtrust/splice-common-frontend';
 import React, { ReactElement, useCallback } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
