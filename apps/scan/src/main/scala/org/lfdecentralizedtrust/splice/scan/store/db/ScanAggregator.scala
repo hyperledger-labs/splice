@@ -16,22 +16,24 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-
 import slick.jdbc.PostgresProfile
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.SummarizingMiningRound
 import ScanAggregator.*
 import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.EntryType
-import slick.dbio.{DBIO, DBIOAction, NoStream, Effect}
+import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.lifecycle.SyncCloseable
 import com.digitalasset.canton.config.ProcessingTimeout
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 final class ScanAggregator(
     storage: DbStorage,
-    val storeId: Int,
+    val acsStoreId: AcsStoreId,
+    val txLogStoreId: TxLogStoreId,
     isFirstSv: Boolean,
     reader: ScanAggregatesReader,
     val loggerFactory: NamedLoggerFactory,
@@ -45,6 +47,9 @@ final class ScanAggregator(
     with FlagCloseableAsync {
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
   import profile.api.jdbcActionExtensionMethods
+
+  // Round totals are derived from TxLog entries, and are therefore linked to that store
+  private[this] def roundTotalsStoreId: TxLogStoreId = txLogStoreId
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     Seq(SyncCloseable("scan_aggregates_reader", reader.close()))
@@ -138,14 +143,14 @@ final class ScanAggregator(
       .map { lastAggregated =>
         Future.failed(
           Skip(
-            s"Skipped aggregation, no new completely closed rounds to aggregate yet, previously aggregated round: ${lastAggregated.closedRound}, store_id = $storeId"
+            s"Skipped aggregation, no new completely closed rounds to aggregate yet, previously aggregated round: ${lastAggregated.closedRound}, store_id = $roundTotalsStoreId"
           )
         )
       }
       .getOrElse(
         Future.failed(
           Skip(
-            s"Skipped aggregation, no completely closed rounds to aggregate yet, store_id = $storeId"
+            s"Skipped aggregation, no completely closed rounds to aggregate yet, store_id = $roundTotalsStoreId"
           )
         )
       )
@@ -159,12 +164,12 @@ final class ScanAggregator(
       previousRoundTotals <- lastRoundTotals match {
         case Some(prev) =>
           logger.debug(
-            s"Aggregation continues from previously aggregated round: ${prev.closedRound}, store_id = $storeId"
+            s"Aggregation continues from previously aggregated round: ${prev.closedRound}, store_id = $roundTotalsStoreId"
           )
           Future.successful(lastRoundTotals)
         case None =>
           if (isFirstSv) {
-            logger.debug(s"Aggregation starts from round 0, store_id = $storeId")
+            logger.debug(s"Aggregation starts from round 0, store_id = $roundTotalsStoreId")
             Future.successful(None)
           } else {
             for {
@@ -172,27 +177,27 @@ final class ScanAggregator(
               prev <- openRound match {
                 case Some(round) if round == 0L =>
                   logger.debug(
-                    s"Updating aggregates from DSO for round zero, store_id = $storeId"
+                    s"Updating aggregates from DSO for round zero, store_id = $roundTotalsStoreId"
                   )
                   updateRoundAggregateFromDso(0)
                 case Some(round) if round > 0L =>
                   logger.debug(
-                    s"Aggregation starts from round $round once last aggregates are updated from DSO, store_id = $storeId"
+                    s"Aggregation starts from round $round once last aggregates are updated from DSO, store_id = $roundTotalsStoreId"
                   )
                   logger.debug(
-                    s"Updating aggregates from DSO for round ${round - 1}, before the first detected open mining round: $round, store_id = $storeId"
+                    s"Updating aggregates from DSO for round ${round - 1}, before the first detected open mining round: $round, store_id = $roundTotalsStoreId"
                   )
                   updateRoundAggregateFromDso(round - 1)
                 case Some(round) =>
                   Future.failed(
                     CannotAdvance(
-                      s"Unexpected negative open mining round: $round, store_id = $storeId"
+                      s"Unexpected negative open mining round: $round, store_id = $roundTotalsStoreId"
                     )
                   )
                 case None =>
                   // note: getLastCompletelyClosedRoundAfter checks for consecutive closed rounds, so no need to fail here.
                   logger.debug(
-                    s"No first open mining round found yet, store_id = $storeId"
+                    s"No first open mining round found yet, store_id = $roundTotalsStoreId"
                   )
                   Future.successful(None)
               }
@@ -246,7 +251,7 @@ final class ScanAggregator(
         total_amulet_balance
       )
       values (
-        ${storeId},
+        ${roundTotalsStoreId},
         ${rt.closedRound},
         ${rt.closedRoundEffectiveAt},
         ${rt.appRewards},
@@ -286,7 +291,7 @@ final class ScanAggregator(
         cumulative_change_to_holding_fees_rate
       )
       values (
-        ${storeId},
+        ${roundTotalsStoreId},
         ${rpt.closedRound},
         ${lengthLimited(rpt.party)},
         ${rpt.appRewards},
@@ -317,8 +322,8 @@ final class ScanAggregator(
     val q = sql"""
       select #$roundTotalsColumns
       from   round_totals
-      where  store_id = $storeId
-      and    closed_round = (select coalesce(max(closed_round), 0) from round_totals where store_id = $storeId)
+      where  store_id = $roundTotalsStoreId
+      and    closed_round = (select coalesce(max(closed_round), 0) from round_totals where store_id = $roundTotalsStoreId)
     """
     storage
       .querySingle(
@@ -334,8 +339,8 @@ final class ScanAggregator(
     val q = sql"""
       select closed_round
       from   round_totals
-      where  store_id = $storeId
-      and    closed_round = (select coalesce(min(closed_round), 0) from round_totals where store_id = $storeId)
+      where  store_id = $roundTotalsStoreId
+      and    closed_round = (select coalesce(min(closed_round), 0) from round_totals where store_id = $roundTotalsStoreId)
     """
     storage
       .querySingle(
@@ -352,7 +357,7 @@ final class ScanAggregator(
     val q = sql"""
       select #$roundTotalsColumns
       from   round_totals
-      where  store_id = $storeId
+      where  store_id = $roundTotalsStoreId
       and    closed_round = $round
     """
     storage
@@ -369,7 +374,7 @@ final class ScanAggregator(
     val q = sql"""
       select   #$roundPartyTotalsColumns
       from     round_party_totals
-      where    store_id = $storeId
+      where    store_id = $roundTotalsStoreId
       and      closed_round = $round
       order by party
     """
@@ -446,7 +451,7 @@ final class ScanAggregator(
                   Some(lastRound)
                 } else {
                   logger.debug(
-                    s"Cannot start from round zero when not reading from participant-begin, store_id = $storeId"
+                    s"Cannot start from round zero when not reading from participant-begin, store_id = $roundTotalsStoreId"
                   )
                   None
                 }
@@ -465,7 +470,7 @@ final class ScanAggregator(
     val q = sql"""
       select   round
       from     scan_txlog_store
-      where    store_id = $storeId
+      where    store_id = $txLogStoreId
       and      entry_type = ${EntryType.OpenMiningRoundTxLogEntry}
       order by round asc
       limit 1
@@ -493,7 +498,7 @@ final class ScanAggregator(
                      -- TODO (#11316) This query was using the deprecated acs_contract_id which ends up always being null
                      null
             from     scan_txlog_store
-            where    store_id = $storeId
+            where    store_id = $txLogStoreId
             and      entry_type = ${EntryType.ClosedMiningRoundTxLogEntry}
             and      round > $lastAggregatedRound
             order by round asc
@@ -514,7 +519,7 @@ final class ScanAggregator(
             sql"""
                 select   count(1)
                 from     incomplete_reassignments
-                where    store_id = $storeId
+                where    store_id = $acsStoreId
                 and      migration_id = $domainMigrationId
                 and      contract_id = $contractId
               """.as[Int].headOption,
@@ -542,7 +547,7 @@ final class ScanAggregator(
             sql"""
               select   count(1)
               from     scan_acs_store
-              where    store_id = $storeId
+              where    store_id = $acsStoreId
               and      migration_id = $domainMigrationId
               and      round = $round
               and
@@ -594,7 +599,7 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.AppRewardTxLogEntry}
@@ -607,7 +612,7 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.ValidatorRewardTxLogEntry}
@@ -620,7 +625,7 @@ final class ScanAggregator(
                   sum(balance_change_change_to_initial_amount_as_of_round_zero) as change_to_initial_amount_as_of_round_zero,
                   sum(balance_change_change_to_holding_fees_rate) as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.BalanceChangeTxLogEntry}
@@ -633,7 +638,7 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.ClosedMiningRoundTxLogEntry}
@@ -676,7 +681,7 @@ final class ScanAggregator(
                   cumulative_change_to_holding_fees_rate,
                   total_amulet_balance
       )
-      select      $storeId,
+      select      $roundTotalsStoreId,
                   ct.round,
                   ct.closed_round_effective_at,
                   ct.app_rewards,
@@ -723,7 +728,7 @@ final class ScanAggregator(
        */
       sql"""
       with previously_aggregated as(
-        select coalesce(max(closed_round), -1) as last_closed_round from round_party_totals where store_id = $storeId
+        select coalesce(max(closed_round), -1) as last_closed_round from round_party_totals where store_id = $roundTotalsStoreId
       ),
       new_totals_per_entry as(
         select    round,
@@ -736,7 +741,7 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.AppRewardTxLogEntry}
@@ -754,7 +759,7 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.ValidatorRewardTxLogEntry}
@@ -772,7 +777,7 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
@@ -791,7 +796,7 @@ final class ScanAggregator(
                   sum((value ->> 'changeToHoldingFeesRate')::numeric) as change_to_holding_fees_rate
         from      scan_txlog_store,
                   jsonb_each(entry_data -> 'partyBalanceChanges')
-        where     store_id = $storeId
+        where     store_id = $txLogStoreId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
         and       entry_type = ${EntryType.BalanceChangeTxLogEntry}
@@ -823,7 +828,7 @@ final class ScanAggregator(
                   coalesce(cumulative_change_to_holding_fees_rate, 0) as prev_cumulative_change_to_holding_fees_rate,
                   row_number() over (partition by party order by closed_round desc) as row_num
         from      round_party_totals
-        where     store_id = $storeId
+        where     store_id = $roundTotalsStoreId
       ) as previous_totals_with_row
         where row_num = 1),
       cumulative_totals as (
@@ -862,7 +867,7 @@ final class ScanAggregator(
                   cumulative_change_to_initial_amount_as_of_round_zero,
                   cumulative_change_to_holding_fees_rate
       )
-      select      $storeId,
+      select      $roundTotalsStoreId,
                   ct.round,
                   ct.party,
                   ct.app_rewards,

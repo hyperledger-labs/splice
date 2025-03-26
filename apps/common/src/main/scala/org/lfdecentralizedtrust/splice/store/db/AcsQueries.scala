@@ -8,6 +8,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
+  AcsStoreId,
   SelectFromAcsTableResult,
   SelectFromAcsTableWithStateResult,
   SelectFromContractStateResult,
@@ -29,6 +30,7 @@ import io.circe.Json
 import io.grpc.Status
 import slick.jdbc.canton.SQLActionBuilder
 import com.google.protobuf.ByteString
+import scalaz.{@@, Tag}
 
 trait AcsQueries extends AcsJdbcTypes {
 
@@ -37,7 +39,7 @@ trait AcsQueries extends AcsJdbcTypes {
     */
   protected def selectFromAcsTable(
       tableName: String,
-      storeId: Int,
+      storeId: AcsStoreId,
       migrationId: Long,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
@@ -53,7 +55,7 @@ trait AcsQueries extends AcsJdbcTypes {
       import prs.*
       (AcsQueries.SelectFromAcsTableResult.apply _).tupled(
         (
-          <<[Int],
+          <<[AcsStoreId],
           <<[Long],
           <<[Long],
           <<[ContractId[Any]],
@@ -70,7 +72,7 @@ trait AcsQueries extends AcsJdbcTypes {
   /** Similar to [[selectFromAcsTable]], but also returns the contract state (i.e., the domain to which a contract is currently assigned) */
   protected def selectFromAcsTableWithState(
       tableName: String,
-      storeId: Int,
+      storeId: AcsStoreId,
       migrationId: Long,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
@@ -109,7 +111,7 @@ trait AcsQueries extends AcsJdbcTypes {
     */
   protected def selectFromAcsTableWithOffset(
       tableName: String,
-      storeId: Int,
+      storeId: AcsStoreId,
       migrationId: Long,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
@@ -140,7 +142,7 @@ trait AcsQueries extends AcsJdbcTypes {
 
   implicit val GetResultSelectFromAcsTableResultWithOffset
       : GetResult[AcsQueries.SelectFromAcsTableResultWithOffset] = { (pp: PositionedResult) =>
-    val storeIdFromAcsRow = pp.<<[Option[Int]]
+    val storeIdFromAcsRow = pp.<<[Option[AcsStoreId]]
     val migrationIdFromAcsRow = pp.<<[Option[Long]]
     AcsQueries.SelectFromAcsTableResultWithOffset(
       ApiOffset.assertFromStringToLong(pp.<<[String]),
@@ -166,7 +168,7 @@ trait AcsQueries extends AcsJdbcTypes {
     */
   protected def selectFromAcsTableWithStateAndOffset(
       tableName: String,
-      storeId: Int,
+      storeId: AcsStoreId,
       migrationId: Long,
       where: SQLActionBuilder = sql"true",
       orderLimit: SQLActionBuilder = sql"",
@@ -205,7 +207,7 @@ trait AcsQueries extends AcsJdbcTypes {
   implicit val GetResultSelectFromAcsTableResultWithStateOffset
       : GetResult[AcsQueries.SelectFromAcsTableResultWithStateAndOffset] = {
     (pp: PositionedResult) =>
-      val storeIdFromAcsRow = pp.<<[Option[Int]]
+      val storeIdFromAcsRow = pp.<<[Option[AcsStoreId]]
       val migrationIdFromAcsRow = pp.<<[Option[Long]]
       AcsQueries.SelectFromAcsTableResultWithStateAndOffset(
         ApiOffset.assertFromStringToLong(pp.<<[String]),
@@ -303,8 +305,13 @@ trait AcsQueries extends AcsJdbcTypes {
 }
 
 object AcsQueries {
+
+  sealed trait AcsStoreIdTag
+  type AcsStoreId = Int @@ AcsStoreIdTag
+  val AcsStoreId = Tag.of[AcsStoreIdTag]
+
   case class SelectFromAcsTableResult(
-      storeId: Int,
+      storeId: AcsStoreId,
       migrationId: Long,
       eventNumber: Long,
       contractId: ContractId[Any],

@@ -4,13 +4,17 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import org.lfdecentralizedtrust.splice.store.{StoreErrors, TxLogStore}
-import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.SelectFromTxLogTableResult
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.{
+  SelectFromTxLogTableResult,
+  TxLogStoreId,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.DomainId
+import scalaz.{@@, Tag}
 import slick.jdbc.canton.SQLActionBuilder
 
 import scala.reflect.ClassTag
@@ -20,13 +24,18 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
   /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
     *                   This is fine, as all calls to this method should use static string constants.
     */
-  protected def selectFromTxLogTable(
+  def selectFromTxLogTable(
       tableName: String,
-      storeId: Int,
+      storeId: TxLogStoreId,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
   ) =
-    TxLogQueries.selectFromTxLogTable(tableName, storeId, where, orderLimit)
+    (sql"""
+       select #${SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
+       from #$tableName
+       where store_id = $storeId and """ ++ where ++ sql" " ++
+      orderLimit).toActionBuilder
+      .as[TxLogQueries.SelectFromTxLogTableResult]
 
   /** Same as [[selectFromAcsTableWithOffset]], but for tx log tables.
     * Note that the offset might be 0 if the migration is new.
@@ -34,7 +43,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
   protected def selectFromTxLogTableWithOffset(
       tableName: String,
       currentMigrationIdForOffset: Long,
-      storeId: Int,
+      storeId: TxLogStoreId,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
   ) = {
@@ -59,7 +68,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
 
   implicit val GetResultSelectFromTxLogTableWithOffset
       : GetResult[TxLogQueries.SelectFromTxLogTableResultWithOffset] = { (pp: PositionedResult) =>
-    val storeIdFromTxLogRow = pp.<<[Option[Int]]
+    val storeIdFromTxLogRow = pp.<<[Option[TxLogStoreId]]
     TxLogQueries.SelectFromTxLogTableResultWithOffset(
       ApiOffset.assertFromStringToLong(pp.<<[String]),
       storeIdFromTxLogRow.map { storeId =>
@@ -83,11 +92,31 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
       case _ => throw txLogIsOfWrongType(row.entryType.str)
     }
   }
+
+  implicit val GetResultSelectFromTxLogTable: GetResult[TxLogQueries.SelectFromTxLogTableResult] =
+    GetResult { prs =>
+      import prs.*
+      (TxLogQueries.SelectFromTxLogTableResult.apply _).tupled(
+        (
+          <<[TxLogStoreId],
+          <<[Long],
+          ApiOffset.assertFromStringToLong(<<[String]),
+          <<[DomainId],
+          <<[String3],
+          <<[String],
+        )
+      )
+    }
 }
 
 object TxLogQueries {
+
+  sealed trait TxLogStoreIdTag
+  type TxLogStoreId = Int @@ TxLogStoreIdTag
+  val TxLogStoreId = Tag.of[TxLogStoreIdTag]
+
   case class SelectFromTxLogTableResult(
-      storeId: Int,
+      storeId: TxLogStoreId,
       entryNumber: Long,
       offset: Long,
       domainId: DomainId,
@@ -96,20 +125,6 @@ object TxLogQueries {
   )
 
   object SelectFromTxLogTableResult {
-    implicit val GetResultSelectFromTxLogTable: GetResult[TxLogQueries.SelectFromTxLogTableResult] =
-      GetResult { prs =>
-        import prs.*
-        (TxLogQueries.SelectFromTxLogTableResult.apply _).tupled(
-          (
-            <<[Int],
-            <<[Long],
-            ApiOffset.assertFromStringToLong(<<[String]),
-            <<[DomainId],
-            <<[String3],
-            <<[String],
-          )
-        )
-      }
 
     def sqlColumnsCommaSeparated(qualifier: String = "") =
       s"""${qualifier}store_id,
@@ -124,21 +139,4 @@ object TxLogQueries {
       offset: Long,
       row: Option[SelectFromTxLogTableResult],
   )
-
-  /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
-    *                   This is fine, as all calls to this method should use static string constants.
-    */
-  def selectFromTxLogTable(
-      tableName: String,
-      storeId: Int,
-      where: SQLActionBuilder,
-      orderLimit: SQLActionBuilder = sql"",
-  ) =
-    (sql"""
-       select #${SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
-       from #$tableName
-       where store_id = $storeId and """ ++ where ++ sql" " ++
-      orderLimit).toActionBuilder
-      .as[TxLogQueries.SelectFromTxLogTableResult]
-
 }
