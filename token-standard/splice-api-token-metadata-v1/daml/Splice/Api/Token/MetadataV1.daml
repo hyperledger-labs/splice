@@ -41,6 +41,9 @@ data ChoiceContext = ChoiceContext with
     values : Map Text AnyValue
   deriving (Show, Eq)
 
+emptyChoiceContext : ChoiceContext
+emptyChoiceContext = ChoiceContext Map.empty
+
 -- | Machine-readable metadata intended for communicating additional information
 -- using well-known keys between systems. This is mainly used to allow for the post-hoc
 -- expansion of the information associated with contracts and choice arguments and results.

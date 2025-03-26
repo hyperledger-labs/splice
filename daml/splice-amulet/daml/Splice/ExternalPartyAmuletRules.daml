@@ -395,6 +395,3 @@ holdingFeesForDuration duration openRound =
     holdingFeesPerDayUsd = ratePerRoundToRatePerDay openRound.transferConfigUsd.holdingFee openRound.tickDuration
     holdingFeesUsd = chargeRatePerDay holdingFeesPerDayUsd duration
     amuletPerUsd = openRound.amuletPrice
-
-requireExpectedAdminMatch : Party -> Party -> Update ()
-requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)

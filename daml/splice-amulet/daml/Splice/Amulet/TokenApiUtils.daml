@@ -29,6 +29,8 @@ createdInRoundMetaKey = splicePrefix <> "created-in-round"
 ratePerRoundMetaKey : Text
 ratePerRoundMetaKey = splicePrefix <> "rate-per-round"
 
+reasonMetaKey : Text
+reasonMetaKey = splicePrefix <> "reason"
 
 -- Choice contexts
 ------------------
@@ -44,6 +46,15 @@ featuredAppRightContextKey = "featured-app-right"
 
 transferPreapprovalContextKey : Text
 transferPreapprovalContextKey = "transfer-preapproval"
+
+lockContextKey : Text
+lockContextKey = "lock"
+
+lockExpiresAtContextKey : Text
+lockExpiresAtContextKey = "expires-at"
+
+lockHoldersContextKey : Text
+lockHoldersContextKey = "holders"
 
 lookupContextContractId : Template t => ChoiceContext -> Text -> Update (Optional (ContractId t))
 lookupContextContractId context k = do
