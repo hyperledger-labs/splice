@@ -16,6 +16,10 @@ Upcoming
   * ``scan_txlog.py`` will safely save its cache specified with ``--cache-file-path``.
     A failed run will always revert to the prior cache, such as if the disk ran out of space while cache was being written.
 
+* Docs
+
+  * Clarify that the GCP and AWS KMS drivers are available only for licensed users of Canton Enterprise.
+
 0.3.17
 ------
 
