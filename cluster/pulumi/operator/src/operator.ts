@@ -1,11 +1,12 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
+  artifactsRepository,
   config,
   HELM_MAX_HISTORY_SIZE,
   imagePullSecret,
   infraAffinityAndTolerations,
-  DOCKER_REPO,
+  repository,
 } from 'splice-pulumi-common';
 
 import { namespace } from './namespace';
@@ -51,8 +52,8 @@ export const operator = new k8s.helm.v3.Release(
       imagePullSecrets: [{ name: secretName }],
       terminationGracePeriodSeconds: 1800,
       image: {
-        registry: DOCKER_REPO,
-        repository: 'pulumi-kubernetes-operator',
+        registry: repository(artifactsRepository).registry,
+        repository: 'digitalasset/pulumi-kubernetes-operator',
         tag: Version,
         pullPolicy: 'Always',
       },

@@ -5,34 +5,60 @@
 
 set -eou pipefail
 
-oci_helm_repo="${OCI_DEV_HELM_REGISTRY}"
 chart=$1
 
-push_helm_chart() {
+put_helm_chart() {
   source=$1
-  echo "Publishing helm chart ${source} to ${oci_helm_repo}"
-  helm push "${source}" "${oci_helm_repo}"
+  full_path=$2
+  echo "Publishing helm chart ${source} to Artifactory ${full_path}"
+  response=$(curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}" || true)
+  sha=$(echo "$response" | jq .checksums.sha256 || true)
+
+  if [[ -z "$sha" || "$sha" == null ]]; then
+    echo "Failed to publish to artifactory: ${response}"
+    exit 1
+  else
+    echo "Published to ${full_path}, sha256 digest: ${sha}"
+  fi
 }
 
 publish () {
   source=$1
-  if [[ "$chart" == *-dirty.tgz ]]; then
-    push_helm_chart "${source}"
+  full_path=$2
+  if [[ "$full_path" == *-dirty.tgz ]]; then
+    put_helm_chart "${source}" "${full_path}"
   else
-    chart_file=$(basename "${source}")
-
-    chart_name="${chart_file%-[0-9]*.[0-9]*.[0-9]*-*}"
-    chart_name="${chart_name%.tgz}"
-
-    version="${chart_file#"$chart_name"-}"
-    version="${version%.tgz}"
-
-    if helm show chart "${oci_helm_repo}/${chart_name}" --version "${version}" > /dev/null 2>&1; then
-      echo "Helm chart already exists: ${oci_helm_repo}/${chart_name}:${version}"
+    response=$(curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -s -o /dev/null -w "%{http_code}" "${full_path}")
+    if [ "$response" -eq 200 ]; then
+      echo "Helm chart already exists in the repository: ${full_path}"
     else
-      push_helm_chart "${source}"
+      put_helm_chart "${source}" "${full_path}"
     fi
- fi
+  fi
 }
 
-publish "${chart}"
+artifactory_url="https://digitalasset.jfrog.io/artifactory"
+repo="canton-network-helm"
+if [ -n "${PUBLISH_PUBLIC_ARTIFACTS:-}" ]; then
+  repo="canton-network-helm"
+elif [[ "$chart" == *-dirty.tgz ]]; then
+  repo="canton-network-helm-dev"
+else
+  if [ -n "${CIRCLE_BRANCH:-}" ]; then
+    if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
+      repo="canton-network-helm"
+    else
+      repo="canton-network-helm-dev"
+    fi
+  else
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    echo "Current branch: ${current_branch}"
+    if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
+      repo="canton-network-helm"
+    else
+      repo="canton-network-helm-dev"
+    fi
+  fi
+fi
+
+publish "${chart}" "${artifactory_url}/${repo}/digitalasset/$(basename "${chart}")"

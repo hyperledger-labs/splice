@@ -17,6 +17,10 @@ pulumiProjectConfig:
     # skip helm installs and create only non helm resources.
     # this for example lets you create the cloud sql instances without having deployments using them, and restoring them from other sources
     installDataOnly: false
+    # artifactories that resources deployed by this stack should be allowed to pull from
+    # (supported values: public, private)
+    allowedArtifactories:
+      - "public"
     isExternalCluster: false
     cloudSql:
       enabled: false

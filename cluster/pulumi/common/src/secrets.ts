@@ -6,6 +6,7 @@ import { Output } from '@pulumi/pulumi';
 import { ArtifactoryCreds } from './artifactory';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
+import { spliceConfig } from './config/config';
 import { artifactories } from './config/consts';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
@@ -87,12 +88,15 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
     enableServerSideApply: true,
   });
 
+  const allowedArtifactories = spliceConfig.pulumiProjectConfig.allowedArtifactories;
+
   type DockerConfig = { [key: string]: { auth: string; username: string; password: string } };
 
   const dockerConfigJson = pulumi.output(keys).apply(creds => {
     const auths: DockerConfig = {};
 
-    artifactories.forEach(art => {
+    allowedArtifactories.forEach(artName => {
+      const art = artifactories[artName];
       auths[art] = {
         auth: btoa(creds.username + ':' + creds.password),
         username: creds.username,

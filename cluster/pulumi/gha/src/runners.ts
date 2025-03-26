@@ -165,7 +165,7 @@ function installDockerRunnerScaleSet(
               {
                 name: 'runner',
                 image:
-                  'ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-docker-runner:0.3.12',
+                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.12',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -496,7 +496,7 @@ function installK8sRunnerScaleSet(
 
   // TODO(#17841): use a release once 0.3.13 is out
   const runnerImage =
-    'ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-runner-hook:0.3.13-snapshot.20250221.8384.0.v94412fc9';
+    'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-runner-hook:0.3.13-snapshot.20250221.8384.0.v94412fc9';
 
   return new k8s.helm.v3.Release(
     name,

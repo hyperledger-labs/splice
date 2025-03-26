@@ -5,7 +5,7 @@ jobs:
   docs:
     runs-on: self-hosted-k8s-x-small
     container:
-      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12
 
     steps:
 
@@ -39,13 +39,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
         with:
-          additional_nix_args: "--keep GH_USER --keep GITHUB_USER --keep GITHUB_TOKEN"
+          additional_nix_args: "--keep GITHUB_TOKEN"
           cmd: |
             REPO_DIR="$(mktemp -d)"
             export GIT_SSH_COMMAND="/usr/bin/ssh"
             git config --global user.email "splice-maintainers@digitalasset.com"
             git config --global user.name "DA Automation"
-            git clone https://$GITHUB_USER:$GITHUB_TOKEN@github.com/digital-asset/decentralized-canton-sync.git "$REPO_DIR" -b docs
+            git clone https://canton-network-da:$GITHUB_TOKEN@github.com/digital-asset/decentralized-canton-sync.git "$REPO_DIR" -b docs
             # Given that we just wanna overwrite anything an rm + cp seems more straightforward than an rsync.
             rm -rf "$REPO_DIR/docs"
             cp -r "docs/html/html" "$REPO_DIR/docs"

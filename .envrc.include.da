@@ -2,9 +2,8 @@ source "${TOOLS_LIB}/libcli.source"
 
 # Do not tag local docker images with a git commit to simplify referencing these images from helm charts
 export SPLICECLUSTER_STATIC_DIRTY_VERSION=1
-
-export GHCR=ghcr.io
-
+export DEV_ARTIFACTORY_DOCKER_REGISTRY=digitalasset-canton-network-docker-dev.jfrog.io
+export PUBLIC_ARTIFACTORY_DOCKER_REGISTRY=digitalasset-canton-network-docker.jfrog.io
 export ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY=digitalasset-canton-enterprise-docker.jfrog.io
 # Configure docker access for cluster and integration tests
 ## Read current credentials
@@ -27,22 +26,16 @@ function check_docker_creds() {
   [[ -n "$ARTIFACTORY_USER" && -n "$ARTIFACTORY_PASSWORD" ]]
 }
 
-function check_docker_creds_ghcr() {
-  local docker_creds="$1"
-  [[ -z "$docker_creds" || "$docker_creds" == "null" || "$docker_creds" != "$GH_USER:$GITHUB_TOKEN" ]] && \
-  [[ -n "$GH_USER" && -n "$GITHUB_TOKEN" ]]
-}
-
-DOCKER_CREDS=$(read_docker_creds "$GHCR")
-if check_docker_creds_ghcr "$DOCKER_CREDS"; then
-  echo "Logging into $GHCR"
-  echo $GITHUB_TOKEN | docker login "$GHCR" -u "$GH_USER" --password-stdin
-fi
-
 DOCKER_CREDS=$(read_docker_creds "$ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY")
 if check_docker_creds "$DOCKER_CREDS"; then
   echo "Logging into $ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY"
   echo $ARTIFACTORY_PASSWORD | docker login "$ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin
+fi
+
+DOCKER_CREDS=$(read_docker_creds "$DEV_ARTIFACTORY_DOCKER_REGISTRY")
+if check_docker_creds "$DOCKER_CREDS"; then
+    echo "Logging into $DEV_ARTIFACTORY_DOCKER_REGISTRY"
+    echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin
 fi
 
 # ensure the logs directory exists

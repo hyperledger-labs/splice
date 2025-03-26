@@ -1,10 +1,12 @@
 import * as k8s from '@pulumi/kubernetes';
+import * as inputs from '@pulumi/kubernetes/types/input';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
 import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
+import { ArtifactoryCreds } from './artifactory';
 import { CnChartVersion } from './artifacts';
 import { config, imagePullPolicy } from './config';
 import { spliceConfig } from './config/config';
@@ -14,12 +16,10 @@ import {
   ChartValues,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
-  DOCKER_REPO,
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
   HELM_MAX_HISTORY_SIZE,
-  HELM_REPO,
   loadJsonFromFile,
   loadYamlFromFile,
   SPLICE_ROOT,
@@ -85,6 +85,7 @@ function installSpliceHelmChartByNamespaceName(
         namespace: nsMetadataName,
         chart: chartPath(chartName, version),
         version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
+        repositoryOpts: repositoryOpts(version),
         values: {
           ...cnChartValues(version, chartName, values),
           ...affinityAndTolerations,
@@ -136,7 +137,7 @@ function cnChartValues(
     {},
     chartDefaultValues,
     {
-      imageRepo: DOCKER_REPO,
+      imageRepo: version.repository.dockerImages,
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         name: CLUSTER_NAME,
@@ -171,9 +172,10 @@ export function installSpliceRunbookHelmChartByNamespaceName(
         namespace: nsMetadataName,
         chart: chartPath(chartName, version),
         version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
+        repositoryOpts: repositoryOpts(version),
         values: {
           ...values,
-          imageRepo: DOCKER_REPO,
+          imageRepo: version.repository.dockerImages,
           ...appsAffinityAndTolerations,
           // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
           clusterUrl: CLUSTER_HOSTNAME,
@@ -214,7 +216,7 @@ export function chartPath(chartName: string, version: CnChartVersion): string {
       : chartName.replace(/^splice/, 'cn');
   return version.type === 'local'
     ? `${path.relative(process.cwd(), SPLICE_ROOT)}/cluster/helm/${compatibleName}/`
-    : `${HELM_REPO}/${compatibleName}`;
+    : compatibleName;
 }
 
 function versionStringWithPossibleOverride(
@@ -227,6 +229,20 @@ function versionStringWithPossibleOverride(
   } else {
     const versionOverride = getVersionOverrideFromVersionsFile(nsLogicalName, chartPath);
     return versionOverride || version.version;
+  }
+}
+
+// repository opts are not supported for oci charts
+export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.RepositoryOpts | undefined {
+  if (version.type === 'local') {
+    return undefined;
+  } else {
+    const creds = ArtifactoryCreds.getCreds().creds;
+    return {
+      repo: version.repository.helm,
+      username: creds.username,
+      password: creds.password,
+    };
   }
 }
 

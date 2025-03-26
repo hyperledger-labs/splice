@@ -1,4 +1,4 @@
-export const artifactories: string[] = [
-  'digitalasset-canton-network-docker.jfrog.io',
-  'digitalasset-canton-network-docker-dev.jfrog.io',
-];
+export const artifactories = {
+  public: 'digitalasset-canton-network-docker.jfrog.io',
+  private: 'digitalasset-canton-network-docker-dev.jfrog.io',
+};
