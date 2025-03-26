@@ -115,15 +115,16 @@ if not version:
     sys.exit(1)
 chart_version = version
 
-# TODO(#17226): Make the helm_repo_prefix also correct for snapshots (not an OCI one). For this case we'll also need to:
-# - put somewhere the "helm repo add" and "helm repo update" commands.
-# - put somewhere the docker login command to jfrog for docker-compose.
 if re.match(r"^[0-9]+.[0-9]+.[0-9]+$", version):
     # For releases, we download artifacts from GitHub Releases
     download_url = f"https://github.com/digital-asset/decentralized-canton-sync/releases/download/v{version}"
+    helm_repo_prefix = os.getenv("OCI_RELEASE_HELM_REGISTRY")
+    docker_repo_prefix = os.getenv("RELEASE_DOCKER_REGISTRY")
 else:
     # For snapshots, we download artifacts through the gcs proxy on the cluster
     download_url = "/cn-release-bundles"
+    helm_repo_prefix = os.getenv("OCI_DEV_HELM_REGISTRY")
+    docker_repo_prefix = os.getenv("DEV_DOCKER_REGISTRY")
 
 # Sphinx does not allow something like ``|version|``
 # so instead we define a replacement that includes the formatting.
@@ -153,5 +154,6 @@ rst_prolog = f"""
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_openapi.tar.gz">Download OpenAPI specs</a>`
 
-.. |helm_repo_prefix| replace:: oci://ghcr.io/digital-asset/decentralized-canton-sync/helm
+.. |helm_repo_prefix| replace:: {helm_repo_prefix}
+.. |docker_repo_prefix| replace:: {docker_repo_prefix}
 """
