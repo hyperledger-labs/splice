@@ -679,8 +679,16 @@ as they ommit the ``enumerator`` part of the hostname.
 Ingress Configuration
 +++++++++++++++++++++
 
-An IP whitelisting json file ``allowed-ip-ranges.json`` will be provided in each SV operations announcement corresponding to the network to which you are connecting.
-This file contains other clusters' egress IPs that require access to your super validator's components. For example, it contains IPs belonging to peer super-validators and validators.
+An IP whitelisting json file ``allowed-ip-ranges.json`` is maintained for each relevant network (DevNet, TestNet, MainNet) in the
+`private SV configs repo <https://github.com/global-synchronizer-foundation/configs-private>`_.
+This file contains other clusters' egress IPs that require access to your SV's components. For example, it contains IPs belonging to peer super-validators and validators.
+
+.. warning::
+
+  To keep the attack surface on your SV deployment and the Global Synchronizer small,
+  please ensure that only traffic from trusted IPs -
+  IPs from the whitelist file and any IPs that you manually verified and explicitly trust yourself -
+  can reach your SV deployment.
 
 Each SV is required to configure their cluster ingress to allow traffic from these IPs to be operational.
 
@@ -695,6 +703,12 @@ Each SV is required to configure their cluster ingress to allow traffic from the
 * ``https://cns.sv.<YOUR_HOSTNAME>`` should be routed to service ``ans-web-ui`` in the ``sv`` namespace.
 * ``https://cns.sv.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
 * ``https://sequencer-<MIGRATION_ID>.sv.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
+
+.. warning::
+
+  To keep the attack surface on your SV deployment and the Global Synchronizer small,
+  please disallow ingress connections to all other services in your SV deployment.
+  It should be assumed that opening up *any* additional port or service represents a security risk that needs to be carefully evaluated on a case-by-case basis.
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have

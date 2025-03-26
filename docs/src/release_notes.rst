@@ -18,6 +18,7 @@ Upcoming
 
 * Docs
 
+  * SV and validator ingress: Clarify that all traffic not explicitly allowed as per the docs should be blocked for security reasons.
   * Clarify that the GCP and AWS KMS drivers are available only for licensed users of Canton Enterprise.
 
 0.3.17
