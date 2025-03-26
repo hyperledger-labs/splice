@@ -30,7 +30,7 @@ import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1 as tokenStandardHttp
+import org.lfdecentralizedtrust.tokenstandard.{metadata, transferinstruction}
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
@@ -93,8 +93,9 @@ object HttpScanAppClient {
       http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
-  abstract class TokenStandardBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = tokenStandardHttp.Client
+  abstract class TokenStandardTransferInstructionBaseCommand[Res, Result]
+      extends HttpCommand[Res, Result] {
+    override type Client = transferinstruction.v1.Client
 
     override def createClient(host: String)(implicit
         httpClient: HttpClient,
@@ -102,7 +103,20 @@ object HttpScanAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      tokenStandardHttp.Client.httpClient(HttpClientBuilder().buildClient(), host)
+      transferinstruction.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+  }
+
+  abstract class TokenStandardMetadataBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = metadata.v1.Client
+
+    override def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      metadata.v1.Client
+        .httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)), host)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -1342,9 +1356,9 @@ object HttpScanAppClient {
   }
 
   case class GetTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)
-      extends TokenStandardBaseCommand[
-        tokenStandardHttp.GetTransferFactoryResponse,
-        tokenStandardHttp.definitions.FactoryWithChoiceContext,
+      extends TokenStandardTransferInstructionBaseCommand[
+        transferinstruction.v1.GetTransferFactoryResponse,
+        transferinstruction.v1.definitions.FactoryWithChoiceContext,
       ] {
     override def submitRequest(
         client: Client,
@@ -1352,7 +1366,7 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], tokenStandardHttp.GetTransferFactoryResponse] = {
+    ], transferinstruction.v1.GetTransferFactoryResponse] = {
       val json = choiceArgs.toJson
       val circeChoiceArgs = io.circe.parser
         .parse(json)
@@ -1367,10 +1381,84 @@ object HttpScanAppClient {
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ): PartialFunction[
-      tokenStandardHttp.GetTransferFactoryResponse,
-      Either[String, tokenStandardHttp.definitions.FactoryWithChoiceContext],
-    ] = { case tokenStandardHttp.GetTransferFactoryResponse.OK(factory) =>
+      transferinstruction.v1.GetTransferFactoryResponse,
+      Either[String, transferinstruction.v1.definitions.FactoryWithChoiceContext],
+    ] = { case transferinstruction.v1.GetTransferFactoryResponse.OK(factory) =>
       Right(factory)
     }
   }
+
+  final case object GetRegistryInfo
+      extends TokenStandardMetadataBaseCommand[
+        metadata.v1.GetRegistryInfoResponse,
+        metadata.v1.definitions.GetRegistryInfoResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], metadata.v1.GetRegistryInfoResponse] =
+      client.getRegistryInfo(headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      metadata.v1.GetRegistryInfoResponse,
+      Either[String, metadata.v1.definitions.GetRegistryInfoResponse],
+    ] = { case metadata.v1.GetRegistryInfoResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  final case class LookupInstrument(instrumentId: String)
+      extends TokenStandardMetadataBaseCommand[metadata.v1.GetInstrumentResponse, Option[
+        metadata.v1.definitions.Instrument
+      ]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], metadata.v1.GetInstrumentResponse] =
+      client.getInstrument(instrumentId, headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      metadata.v1.GetInstrumentResponse,
+      Either[String, Option[metadata.v1.definitions.Instrument]],
+    ] = {
+      case metadata.v1.GetInstrumentResponse.OK(response) =>
+        Right(Some(response))
+      case metadata.v1.GetInstrumentResponse.NotFound(response) =>
+        Right(None)
+    }
+  }
+
+  final case class ListInstruments(pageSize: Option[Int], pageToken: Option[String])
+      extends TokenStandardMetadataBaseCommand[metadata.v1.ListInstrumentsResponse, Seq[
+        metadata.v1.definitions.Instrument
+      ]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], metadata.v1.ListInstrumentsResponse] =
+      client.listInstruments(pageSize, pageToken, headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      metadata.v1.ListInstrumentsResponse,
+      Either[String, Seq[metadata.v1.definitions.Instrument]],
+    ] = { case metadata.v1.ListInstrumentsResponse.OK(response) =>
+      Right(response.instruments)
+    }
+  }
+
 }

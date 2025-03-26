@@ -20,12 +20,14 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
+import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.splice.http.v0.scan_soft_domain_migration_poc.ScanSoftDomainMigrationPocResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
   HttpScanSoftDomainMigrationPocHandler,
+  HttpTokenStandardMetadataHandler,
   HttpTokenStandardTransferInstructionHandler,
 }
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
@@ -228,6 +230,11 @@ class ScanApp(
         loggerFactory,
       )
 
+      tokenStandardMetadataHandler = new HttpTokenStandardMetadataHandler(
+        store,
+        loggerFactory,
+      )()
+
       softDomainMigrationPocHandler =
         if (config.supportsSoftDomainMigrationPoc)
           Seq(
@@ -255,6 +262,10 @@ class ScanApp(
                   (ScanResource.routes(scanHandler, _ => provide(traceContext)) +:
                     TokenStandardTransferInstructionResource.routes(
                       tokenStandardTransferInstructionHandler,
+                      _ => provide(traceContext),
+                    ) +:
+                    TokenStandardMetadataResource.routes(
+                      tokenStandardMetadataHandler,
                       _ => provide(traceContext),
                     ) +:
                     softDomainMigrationPocHandler.map(handler =>

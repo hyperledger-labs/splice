@@ -129,6 +129,7 @@ components:
             - "holdings=1.0"
             - "transfer-instruction=1.0"
             - "allocation-instruction=1.0"
+        # TODO(#18560) Consider making this mandatory.
         registry_ui_url:
           type: string
           description: |
@@ -137,7 +138,7 @@ components:
             to them.
       required:
         - supported_standards
-        - registry_ui_url
+        - provider_id
 
     InstrumentId:
       type: object
@@ -174,7 +175,6 @@ components:
           format: date-time
       required:
         [
-          "provider_id",
           "instrument_id",
           "name",
           "symbol",

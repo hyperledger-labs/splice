@@ -482,6 +482,21 @@ abstract class ScanAppReference(
     }
   }
 
+  def getRegistryInfo() =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRegistryInfo)
+    }
+
+  def lookupInstrument(instrumentId: String) =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupInstrument(instrumentId))
+    }
+
+  def listInstruments() =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.ListInstruments(pageSize = None, pageToken = None))
+    }
+
 }
 
 final class ScanAppBackendReference(
