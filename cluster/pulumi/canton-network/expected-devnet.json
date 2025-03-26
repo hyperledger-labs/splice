@@ -1914,6 +1914,7 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "delegatelessAutomation": false,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-1-mediator",
@@ -2605,6 +2606,7 @@
         },
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
+        "delegatelessAutomation": false,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-1-mediator",
@@ -3261,6 +3263,7 @@
         },
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
+        "delegatelessAutomation": false,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-1-mediator",
@@ -3917,6 +3920,7 @@
         },
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
+        "delegatelessAutomation": false,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-1-mediator",

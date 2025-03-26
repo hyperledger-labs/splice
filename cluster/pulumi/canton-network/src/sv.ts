@@ -53,6 +53,7 @@ import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
+import { delegatelessAutomation } from '../../common/src/automation';
 import { installCanton } from './canton';
 
 export function installSvKeySecret(
@@ -443,6 +444,7 @@ function installSvApp(
     },
     contactPoint: daContactPoint,
     nodeIdentifier: config.onboardingName,
+    delegatelessAutomation: delegatelessAutomation,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

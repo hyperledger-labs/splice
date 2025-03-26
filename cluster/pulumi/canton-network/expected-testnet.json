@@ -892,6 +892,7 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "delegatelessAutomation": false,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-1-mediator",

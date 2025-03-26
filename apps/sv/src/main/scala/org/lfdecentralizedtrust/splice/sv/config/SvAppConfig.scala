@@ -24,8 +24,8 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeLong,
   NonNegativeNumeric,
-  PositiveNumeric,
   PositiveInt,
+  PositiveNumeric,
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
@@ -264,6 +264,7 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x submissionTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
+    delegatelessAutomation: Boolean = false,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
