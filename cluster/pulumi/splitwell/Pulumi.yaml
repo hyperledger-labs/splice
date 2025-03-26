@@ -1,3 +1,4 @@
 name: splitwell
 runtime: nodejs
 description: Deploy the splitwell service
+stackConfigDir: ../../stacks

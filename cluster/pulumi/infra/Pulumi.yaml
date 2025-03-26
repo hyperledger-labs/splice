@@ -1,3 +1,4 @@
 name: infra
 runtime: nodejs
 description: Infrastructure on GCP
+stackConfigDir: ../../stacks

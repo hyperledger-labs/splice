@@ -1,3 +1,4 @@
 name: multi-validator
 runtime: nodejs
 description: Deploy a set of barebones multiple validators (no UIs)
+stackConfigDir: ../../stacks

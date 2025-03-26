@@ -2,3 +2,4 @@
 name: canton-network
 description: "Deploy Canton Network to Kubernetes"
 runtime: nodejs
+stackConfigDir: ../../stacks
