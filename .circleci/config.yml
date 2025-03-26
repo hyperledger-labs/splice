@@ -472,10 +472,6 @@ commands:
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: |
-           if [[ << parameters.is_public >> == true ]]; then
-             echo "Publishing to public docker repo"
-             export PUBLISH_PUBLIC_ARTIFACTS=true
-           fi
            make docker-build -j
   docker_login_artifactory:
     steps:
@@ -499,8 +495,6 @@ commands:
          cmd_retry_count: 5
          cmd: |
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-           echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-           echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
 
   cancel_entire_workflow_if_this_job_failed:
     steps:
@@ -2880,11 +2874,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
+          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # The operator itself should use images from the branch on which this job is running.
             OPERATOR_IMAGE_VERSION=$(build-tools/get-snapshot-version)
@@ -2931,14 +2925,6 @@ jobs:
             echo "export OVERRIDE_VERSION=$BASE_VERSION" >> "$file"
 
             cat "$file" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
-
-            # if the base version is a release version ensure we use the public repository
-            # we write this to the .envrc.vars file directly and not to the patch that we also
-            # apply later to the upgrade version, because the upgrade version typiclaly is not public
-            # in these tests
-            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
-            fi
 
             git add "$file"
             git add **/.envrc.vars
@@ -3022,11 +3008,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -3115,11 +3101,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -3189,11 +3175,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # Update the upgrade branch to archive the base version
 
@@ -3254,7 +3240,7 @@ jobs:
           cmd_name: Reset SV runbook
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
 
@@ -3270,12 +3256,12 @@ jobs:
           cmd_name: Push new branch with migration config changes
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
@@ -3496,24 +3482,23 @@ jobs:
            --keep NO_PROXY \
            --keep CIRCLE_BRANCH \
            --keep CIRCLE_REPOSITORY_URL \
-           --keep CIRCLE_SHA1"
+           --keep CIRCLE_SHA1 \
+           --keep GITHUB_USER \
+           --keep GITHUB_TOKEN"
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public docker repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
             make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
           additional_nix_args: "--keep ARTIFACTORY_USER \
             --keep ARTIFACTORY_PASSWORD \
-            --keep CIRCLE_BRANCH"
+            --keep CIRCLE_BRANCH \
+            --keep OCI_DEV_HELM_REGISTRY \
+            --keep GITHUB_USER \
+            --keep GITHUB_TOKEN"
           cmd_name: Push Helm Artifacts
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public helm repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
@@ -3555,17 +3540,21 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Copy artifacts to Github Container Registry
                 additional_nix_args: "--keep GITHUB_TOKEN \
+                  --keep GITHUB_USER \
+                  --keep DEV_HELM_REGISTRY \
+                  --keep DEV_DOCKER_REGISTRY \
+                  --keep RELEASE_HELM_REGISTRY \
+                  --keep RELEASE_DOCKER_REGISTRY \
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD"
                 cmd: |
-                  export GITHUB_USER="canton-network-da"
                   make cluster/helm/copy_release_to_ghcr
                   make cluster/docker/copy_release_to_ghcr
             - run_bash_command_in_nix:
                 cmd_name: tag git
-                additional_nix_args: "--keep GITHUB_TOKEN"
+                additional_nix_args: "--keep GITHUB_TOKEN --keep GITHUB_USER"
                 cmd: |
-                  git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  git remote set-url origin https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
                   RELEASE_TAG=$(get-snapshot-version)
 
                   if [ $(git tag -l "${RELEASE_TAG}") ]; then
@@ -4053,8 +4042,6 @@ jobs:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:

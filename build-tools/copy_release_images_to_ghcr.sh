@@ -10,9 +10,12 @@
 set -eou pipefail
 
 VERSION=""
+VERSIONS_FILE=""
 IMAGES_FILE=""
+SRC_REGISTRY="${DEV_DOCKER_REGISTRY}"
+DEST_REGISTRY="${RELEASE_DOCKER_REGISTRY}"
 
-while getopts "v:f:" opt; do
+while getopts "v:f:-:" opt; do
   case $opt in
     v)
       VERSION=$OPTARG
@@ -20,16 +23,32 @@ while getopts "v:f:" opt; do
     f)
       IMAGES_FILE=$OPTARG
       ;;
-    *)
-      echo "Usage: $0 -v <version> [-f <images_file>]"
-      exit 1
+    -)
+      case "${OPTARG}" in
+        versions)
+          VERSIONS_FILE="${!OPTIND}"; OPTIND=$((OPTIND + 1))
+          ;;
+        *)
+          echo "Usage: $0 -v <version> | --versions <versions_file> [-f <images_file>]"
+          exit 1
+          ;;
+      esac
       ;;
-  esac
+    *)
+      echo "Usage: $0 -v <version> | --versions <versions_file> [-f <images_file>]"
+      exit 1
+      ;;  esac
 done
 
-if [ -z "$VERSION" ]; then
-  echo "Error: Version is required."
-  echo "Usage: $0 -v <version> [-f <images_file>]"
+if [ -z "$VERSION" ] && [ -z "$VERSIONS_FILE" ]; then
+  echo "Error: Either -v <version> or --versions <versions_file> must be provided."
+  echo "Usage: $0 -v <version> | --versions <versions_file> [-f <images_file>]"
+  exit 1
+fi
+
+if [ -n "$VERSION" ] && [ -n "$VERSIONS_FILE" ]; then
+  echo "Error: Only one of -v <version> or --versions <versions_file> can be provided."
+  echo "Usage: $0 -v <version> | --versions <versions_file> [-f <images_file>]"
   exit 1
 fi
 
@@ -44,42 +63,46 @@ fi
 
 IMAGES=$(<"$IMAGES_FILE")
 
-# Set the registries
-ARTIFACTORY_REGISTRY_SERVER="digitalasset-canton-network-docker.jfrog.io"
-ARTIFACTORY_REGISTRY="$ARTIFACTORY_REGISTRY_SERVER/digitalasset"
-GITHUB_REGISTRY="ghcr.io/digital-asset/decentralized-canton-sync/docker"
-
 # for skopeo to work, we need to set the XDG_RUNTIME_DIR, in CCI it cannot mkdir /run/containers: permission denied
 export XDG_RUNTIME_DIR=/tmp/containers
 mkdir -p "$XDG_RUNTIME_DIR"
 
-echo "$ARTIFACTORY_PASSWORD" | skopeo login "$ARTIFACTORY_REGISTRY_SERVER" --username "$ARTIFACTORY_USER" --password-stdin
-echo "$GITHUB_TOKEN" | skopeo login ghcr.io --username "$GITHUB_USER" --password-stdin
+echo "$GITHUB_TOKEN" | skopeo login "$SRC_REGISTRY" --username "$GITHUB_USER" --password-stdin
+echo "$GITHUB_TOKEN" | skopeo login "$DEST_REGISTRY" --username "$GITHUB_USER" --password-stdin
 
-# Iterate through the directories in the cluster images directory
-for IMAGE_NAME in $IMAGES; do
-  if [ "$IMAGE_NAME" == "pulumi-kubernetes-operator" ]; then
-    TAG="v${VERSION}"
-  else
-    TAG="$VERSION"
-  fi
-  # Construct the full image names
-  SOURCE_IMAGE="$ARTIFACTORY_REGISTRY/$IMAGE_NAME:$TAG"
-  TARGET_IMAGE="$GITHUB_REGISTRY/$IMAGE_NAME:$TAG"
+if [ -n "$VERSIONS_FILE" ]; then
+  VERSIONS=$(<"$VERSIONS_FILE")
+else
+  VERSIONS="$VERSION"
+fi
 
-  for i in {1..10}; do
-    # Artifactory has unknown/unknown attestation manifests, which show up as unknown/unknown os/architecture manifests. There is nothing inherently wrong with this.
-    # skopeo on nix does not bundle the policy.json file, so we need to provide it.
-    if skopeo copy --policy "${SPLICE_ROOT}"/build-tools/skopeo_policy.json --all docker://"$SOURCE_IMAGE" docker://"$TARGET_IMAGE"; then
-      echo "Successfully copied $SOURCE_IMAGE to $TARGET_IMAGE"
-      break
+for VERSION in $VERSIONS; do
+  # Iterate through the directories in the cluster images directory
+  for IMAGE_NAME in $IMAGES; do
+    if [ "$IMAGE_NAME" == "pulumi-kubernetes-operator" ]; then
+      TAG="v${VERSION}"
     else
-      echo "Failed to copy $SOURCE_IMAGE to $TARGET_IMAGE (attempt $i)"
-      if [ "$i" -eq 10 ]; then
-        echo "Max retries reached. Exiting."
-        exit 1
-      fi
-      sleep 5
+      TAG="$VERSION"
     fi
+    # Construct the full image names
+    SOURCE_IMAGE="$SRC_REGISTRY/$IMAGE_NAME:$TAG"
+    TARGET_IMAGE="$DEST_REGISTRY/$IMAGE_NAME:$TAG"
+
+    for i in {1..10}; do
+      # Some images have been copied before from Artifactory, which is not used anymore.
+      # Artifactory has unknown/unknown attestation manifests, which show up as unknown/unknown os/architecture manifests. There is nothing inherently wrong with this.
+      # skopeo on nix does not bundle the policy.json file, so we need to provide it.
+      if skopeo copy --policy "${SPLICE_ROOT}"/build-tools/skopeo_policy.json --all docker://"$SOURCE_IMAGE" docker://"$TARGET_IMAGE"; then
+        echo "Successfully copied $SOURCE_IMAGE to $TARGET_IMAGE"
+        break
+      else
+        echo "Failed to copy $SOURCE_IMAGE to $TARGET_IMAGE (attempt $i)"
+        if [ "$i" -eq 10 ]; then
+          echo "Max retries reached. Exiting."
+          exit 1
+        fi
+        sleep 5
+      fi
+    done
   done
 done

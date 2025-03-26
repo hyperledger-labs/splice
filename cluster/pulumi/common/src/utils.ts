@@ -5,6 +5,7 @@ import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { config, isDevNet, isMainNet } from './config';
+import { spliceEnvConfig } from './config/envConfig';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 300;
@@ -15,6 +16,9 @@ export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const PUBLIC_CONFIGS_PATH = config.requireEnv('PUBLIC_CONFIGS_PATH');
 export const PRIVATE_CONFIGS_PATH = config.requireEnv('PRIVATE_CONFIGS_PATH');
+
+export const HELM_REPO = spliceEnvConfig.requireEnv('OCI_DEV_HELM_REGISTRY');
+export const DOCKER_REPO = spliceEnvConfig.requireEnv('DEV_DOCKER_REGISTRY');
 
 export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
   const daUrlScheme = 'global.canton.network.digitalasset.com';

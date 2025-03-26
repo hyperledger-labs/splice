@@ -334,7 +334,7 @@ To do that, you first must generate the keys that will identify the node.
 
 Generating your CometBFT node keys
 ++++++++++++++++++++++++++++++++++
-To generate the node config you use the CometBFT docker image provided through Github Container Registry (ghcr.io/digital-asset/decentralized-canton-sync/docker).
+To generate the node config you use the CometBFT docker image provided through Github Container Registry (|docker_repo_prefix|).
 
 Use the following shell commands to generate the proper keys:
 
@@ -344,9 +344,9 @@ Use the following shell commands to generate the proper keys:
   mkdir cometbft
   cd cometbft
   # Init the node
-  docker run --rm -v "$(pwd):/init" ghcr.io/digital-asset/decentralized-canton-sync/docker/cometbft:|version| init --home /init
+  docker run --rm -v "$(pwd):/init" |docker_repo_prefix|/cometbft:|version| init --home /init
   # Read the node id and keep a note of it for the deployment
-  docker run --rm -v "$(pwd):/init" ghcr.io/digital-asset/decentralized-canton-sync/docker/cometbft:|version| show-node-id --home /init
+  docker run --rm -v "$(pwd):/init" |docker_repo_prefix|/cometbft:|version| show-node-id --home /init
 
 Please keep a note of the node ID printed out above.
 

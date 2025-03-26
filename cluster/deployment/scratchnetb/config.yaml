@@ -10,9 +10,6 @@ pulumiProjectConfig:
   default:
     cloudSql:
       protected: false
-    allowedArtifactories:
-      - "public"
-      - "private"
 validator1:
   participantPruningSchedule:
     cron: "0 /10 * * * ?" # Run every 10min

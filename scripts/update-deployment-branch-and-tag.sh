@@ -51,11 +51,11 @@ else
 fi
 
 if [ "${CI-}" ==  true ]; then
-  if [ -z "${GITHUB_TOKEN-}" ]; then
-    echo "Env var GITHUB_TOKEN must be set"
+  if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${GITHUB_USER:-}" ]; then
+    echo "Error: you need to set GITHUB_TOKEN and GITHUB_USER."
     exit 1
   fi
-  git remote set-url origin "https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git"
+  git remote set-url origin "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git"
 fi
 
 git fetch origin --recurse-submodules=no

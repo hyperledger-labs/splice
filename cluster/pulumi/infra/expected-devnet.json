@@ -478,16 +478,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-istio-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-istio-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-gateway",
       "namespace": "cluster-ingress",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -520,7 +515,7 @@
           "domains": 2
         },
         "enableGcsProxy": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
