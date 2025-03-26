@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { UseQueryResult } from '@tanstack/react-query';
-import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
+import { AmuletPriceVote, DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
 import React from 'react';
 
@@ -34,6 +34,9 @@ export const ScanAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ c
         { actionName, requester, effectiveTo, effectiveFrom, executed },
         limit
       );
+    },
+    useAmuletPriceVotes(): UseQueryResult<AmuletPriceVote[]> {
+      return scanHooks.useAmuletPriceVotes();
     },
     useListVotes(contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> {
       return scanHooks.useListVotes(contractIds);

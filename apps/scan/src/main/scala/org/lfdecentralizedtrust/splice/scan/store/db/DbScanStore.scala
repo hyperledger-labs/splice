@@ -105,7 +105,7 @@ class DbScanStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 1, // TODO (#13454): bump when it will backfill.
+        version = 2, // TODO (#13454): bump when it will backfill.
         name = "DbScanStore",
         party = key.dsoParty,
         participant = participantId,

@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 import io.circe.JsonObject
 import org.openqa.selenium.By
 import spray.json.DefaultJsonProtocol.StringJsonFormat
@@ -645,6 +646,34 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
+    "see amulet price votes" in { implicit env =>
+      clue("SVs update amulet prices") {
+        eventuallySucceeds() {
+          sv1Backend.updateAmuletPriceVote(BigDecimal(1.11))
+        }
+      }
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to scan UI homepage",
+          go to s"http://localhost:${scanUIPort}",
+        )(
+          "Switch to the Amulet Prices tab",
+          _ => {
+            inside(find(id("navlink-/amulet-price-votes"))) { case Some(navlink) =>
+              navlink.underlying.click()
+            }
+            val amuletPriceRows = findAll(className("amulet-price-table-row")).toList
+
+            amuletPriceRows.size shouldBe 1
+
+            amuletPriceShouldMatch(amuletPriceRows, sv1Backend.getDsoInfo().svParty, s"1.11 USD")
+          },
+        )
+
+      }
+    }
+
     "see the validator licenses" in { implicit env =>
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
@@ -683,5 +712,16 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
+  }
+
+  private def amuletPriceShouldMatch(
+      rows: Seq[Element],
+      svParty: PartyId,
+      amuletPrice: String,
+  ) = {
+    forExactly(1, rows) { row =>
+      seleniumText(row.childElement(className("sv-party"))) shouldBe svParty.toProtoPrimitive
+      row.childElement(className("amulet-price")).text shouldBe amuletPrice
+    }
   }
 }

@@ -18,7 +18,9 @@ import { CssBaseline } from '@mui/material';
 import { ThemeProvider } from '@mui/material';
 
 import ScanListVoteRequests from './components/votes/ScanListVoteRequests';
+import { ScanAppVotesHooksProvider } from './contexts/ScanAppVotesHooksProvider';
 import Activity from './routes/activity';
+import AmuletPriceVotes from './routes/amuletPriceVotes';
 import AppLeaderboard from './routes/appLeaderboard';
 import SynchronizerFeesLeaderboard from './routes/domainFeesLeaderboard';
 import DsoWithContexts from './routes/dso';
@@ -45,7 +47,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <ReactQueryDevtools initialIsOpen={false} />
-      <ScanClientProvider url={config.services.scan.url}>{children}</ScanClientProvider>
+      <ScanClientProvider url={config.services.scan.url}>
+        <ScanAppVotesHooksProvider>{children}</ScanAppVotesHooksProvider>
+      </ScanClientProvider>
     </QueryClientProvider>
   );
 };
@@ -61,6 +65,7 @@ const router = createBrowserRouter(
         <Route path="synchronizer-fees-leaderboard" element={<SynchronizerFeesLeaderboard />} />
         <Route path="validator-faucets-leaderboard" element={<ValidatorFaucetsLeaderboard />} />
       </Route>
+      <Route path="/amulet-price-votes" element={<AmuletPriceVotes />} />
       <Route path="/dso" element={<DsoWithContexts />} />
       <Route path="/governance" element={<ScanListVoteRequests />} />
       <Route path="/validator-licenses" element={<ScanValidatorLicenses />} />
