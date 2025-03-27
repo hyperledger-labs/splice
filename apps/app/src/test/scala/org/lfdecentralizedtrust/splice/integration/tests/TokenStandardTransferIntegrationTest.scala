@@ -1,7 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
@@ -18,15 +16,6 @@ class TokenStandardTransferIntegrationTest
 
   // TODO (#17384): support token standard choices in the script
   override protected def runUpdateHistorySanityCheck: Boolean = false
-
-  override lazy val updateHistoryIgnoredRootExercises = Seq(
-    (TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID, "Archive")
-  )
-
-  override lazy val updateHistoryIgnoredRootCreates = Seq(
-    TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID,
-    amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
-  )
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
@@ -93,7 +82,7 @@ class TokenStandardTransferIntegrationTest
       .listTransferPreapprovals()
       .map(tp => tp.contract.contractId) should contain(cidBob)
 
-    val (aliceToBobCommands, aliceToBobDisclosedContracts) = transferViaTokenStandardCommands(
+    val aliceToBobFactoryChoice = transferViaTokenStandardCommands(
       aliceValidatorBackend.participantClientWithAdminToken,
       aliceParty,
       bobParty,
@@ -104,10 +93,10 @@ class TokenStandardTransferIntegrationTest
         .prepare(
           actAs = Seq(aliceParty),
           readAs = Seq(aliceParty),
-          commands = aliceToBobCommands.map(javaCommand =>
+          commands = aliceToBobFactoryChoice.commands.map(javaCommand =>
             com.daml.ledger.api.v2.commands.Command.fromJavaProto(javaCommand.toProtoCommand)
           ),
-          disclosedContracts = aliceToBobDisclosedContracts.map(x =>
+          disclosedContracts = aliceToBobFactoryChoice.disclosedContracts.map(x =>
             com.daml.ledger.api.v2.commands.DisclosedContract.fromJavaProto(x)
           ),
           synchronizerId = Some(decentralizedSynchronizerId),

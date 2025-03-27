@@ -145,7 +145,6 @@ class WalletSubscriptionsIntegrationTest
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 readAs = Seq(aliceValidatorParty),
-                optTimeout = None,
                 commands = collectCommand,
                 disclosedContracts = DisclosedContracts
                   .forTesting(
@@ -192,7 +191,6 @@ class WalletSubscriptionsIntegrationTest
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 readAs = Seq(aliceValidatorParty),
-                optTimeout = None,
                 commands = collectCommand2,
                 disclosedContracts = DisclosedContracts
                   .forTesting(

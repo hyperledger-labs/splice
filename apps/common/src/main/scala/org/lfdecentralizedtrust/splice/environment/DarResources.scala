@@ -40,6 +40,10 @@ object DarResources {
       DarResource(s"splice-api-token-allocation-instruction-v1-current.dar"),
       Seq(DarResource(s"splice-api-token-allocation-instruction-v1-0.0.1.dar")),
     )
+    val tokenStandardTest = PackageResource(
+      DarResource(s"splice-token-standard-test-current.dar"),
+      Seq(DarResource(s"splice-token-standard-test-0.0.1.dar")),
+    )
     val allPackageResources = Seq(
       tokenMetadata,
       tokenHolding,
@@ -47,6 +51,7 @@ object DarResources {
       tokenAllocation,
       tokenAllocationRequest,
       tokenAllocationInstruction,
+      tokenStandardTest,
     )
   }
 

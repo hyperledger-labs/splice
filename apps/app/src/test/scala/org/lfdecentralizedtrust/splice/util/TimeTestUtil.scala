@@ -138,7 +138,6 @@ trait TimeTestUtil extends TestCommon {
         .toSeq,
       synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
-      optTimeout = None,
     )
   }
 

@@ -370,8 +370,8 @@ lazy val `splice-token-standard-test-daml` =
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
-      Compile / damlEnableJavaCodegen := false,
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-token-test-dummy-holding-daml` =
   project
@@ -616,6 +616,7 @@ lazy val `apps-common` =
       `splice-api-token-allocation-request-v1-daml`,
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
+      `splice-token-standard-test-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -1638,7 +1639,7 @@ lazy val `apps-app`: Project =
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
 // also used by Canton team
 lazy val printTests = taskKey[Unit](
-  "write full class names of `apps-app` tests to separted files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
+  "write full class names of `apps-app` tests to separated files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
 )
 printTests := {
   import java.io._

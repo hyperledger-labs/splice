@@ -1150,7 +1150,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
 
       userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(userParty, validatorParty),
-        optTimeout = None,
         commands = transferContext.amuletRules
           .exerciseAmuletRules_Transfer(
             new splice.amuletrules.Transfer(

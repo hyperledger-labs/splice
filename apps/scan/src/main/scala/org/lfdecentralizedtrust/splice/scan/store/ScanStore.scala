@@ -476,6 +476,15 @@ object ScanStore {
             walletParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sender)),
           )
         },
+        mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION)(co =>
+          co.payload.allocation.transferLeg.instrumentId.admin == dso
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt =
+              Some(Timestamp.assertFromInstant(contract.payload.allocation.settlement.settleBefore)),
+          )
+        },
       ),
     )
   }

@@ -1,0 +1,193 @@
+
+
+
+isLedgerTimeLessThan : Time -> Update Bool
+
+isLedgerTimeLessThanContractTime : ContractId t -> Update Bool
+
+primContractAgeLT :
+primContractAgeGT :
+
+primCompareLedgerTime : Time -> Update Ordering
+primCompareLedgerTime t = do now <- getTime; pure (compare now t)
+
+primCompareContractCreateTime : ContractId t -> Time -> Update Ordering
+primCompareContractCreateTime cid = do ct <- getCreatedAt cid; pure (compare ct t)
+
+primCompareContractAge : ContractId t -> RelTime -> Update Ordering
+primCompareContractAge cid dt = do
+  ct <- getCreatedAt cid; now <- getTime; pure (compare (subTime ct now) dt)
+
+primCompareContractAgeDelta : ContractId t -> ContractId t -> RelTime -> Update Ordering
+primCompareContractAgeDelta cid1 cid2 dt = do
+  ct1 <- getCreatedAt; ct2 <- getCreatedAt cid2; pure (compare (subTime ct1 ct2) dt)
+
+type Bounds = (Time, Time)
+
+exclToInclUB : Time -> Time
+exclToInclUB t
+  | t == maxBound = t
+  | otherwise = t `subRelTime` microseconds 1
+
+exclToInclLB : Time -> Time
+exclToInclLB t
+  | t == minBound = t
+  | otherwise = t `addReltTime` microseconds 1
+
+-- Implementation outline of the two primitives to compare ledger time against
+-- fixed timepoints.
+
+primLedgerTimeLT : Time -> Bounds -> Update (Bool, Bounds)
+primLedgerTimeLT t (lb, ub) = do
+  now <- getTime
+  if now < t
+    then pure (True, (lb, min ub (t `subRelTime` microseconds 1)))
+    else pure (False, (max lb t, ub))
+
+primLedgerTimeLE : Time -> Bounds -> Update (Bool, Bounds)
+primLedgerTimeLE t bounds =
+  -- Fine to use as a primitive, as we know that the internal Long
+  -- representation of Time is not going to overflow.
+  primLedgerTimeLT (t `addRelTime` microsecond 1) bounds
+
+
+-- Implementation outline of the six primitives to compare the creation time of
+-- contracts against fixed timepoints, ledger time, or the creation time of
+-- another contract.
+
+
+primContractCreateTimeLT : ContractId t -> Time -> Bounds -> Update (Bool, Bounds)
+primContractCreateTimeLT cid t bounds =
+  case engineGetContractCreatedAt cid of
+    None -> primLedgerTimeLT t bounds
+    Some ct -> pure (ct < t, bounds)
+
+primContractCreateTimeLE : ContractId t -> Time -> Bounds -> Update (Bool, Bounds)
+primContractCreateTimeLE cid t bounds =
+  -- fine in the implementation, as we know that the internal Long representation
+  -- of Time is not going to overflow.
+  primContractCreateTimeLT (t `addRelTime` microseconds 1) bounds
+
+-- | Assume there exists this function to access the creation time of an input
+-- contract created in another transaction. Returns `None` for contracts created
+-- in the current transaction.
+engineGetContractCreatedAt : ContractId t -> Optional Time
+
+primContractCreateTimeLT : ContractId t -> Time -> Bounds -> Update (Bool, Bounds)
+primContractCreateTimeLT cid t bounds =
+  case engineGetContractCreatedAt cid of
+    None -> primLedgerTimeLT t bounds
+    Some ct -> pure (ct < t, bounds)
+
+primContractAgeLT : ContractId t -> RelTime -> Bounds -> Update (Bool, Bounds)
+primContractAgeLT cid dt bounds =
+  case engineGetContractCreatedAt cid of
+    None -> pure (0 < dt, bounds)  -- the contract age is 0 independent of ledger time
+    Some ct -> primLedgerTimeLT (ct `addRelTime` dt) bounds
+
+primContractAgeDeltaLT : ContractId t -> ContractId t -> RelTime -> Bounds -> Update (Bool, Bounds)
+primContractAgeDeltaLT cid1 cid2 dt bounds =
+  case engineGetContractCreatedAt cid1 of
+    None -> do
+      -- inlined version of `isContractAgeGT cid (negate dt)`
+      (r, bounds') <- primContractAgeLE cid2 (negate dt) bounds
+      pure (not r, bounds')
+    Some ct1 -> case engineGetContractCreatedAt cid2 of
+      None -> primContractAgeLT cid1 dt bounds
+      Some ct2 -> pure (ct2 - ct1 < dt, bounds)
+
+primContractAgeLE : ContractId t -> RelTime -> Bounds -> Update (Bool, Bounds)
+primContractAgeLE cid dt bounds =
+  -- fine in the implementation, as we know that the internal Long representation
+  -- of Time is not going to overflow.
+  primContractAgeLT cid (dt `addRelTime` microseconds 1) bounds
+
+primContractAgeDeltaLT : ContractId t -> ContractId t -> RelTime -> Bounds -> Update (Bool, Bounds)
+primContractAgeDeltaLT cid1 cid2 dt bounds =
+  case engineGetContractCreatedAt cid1 of
+    None -> primContractAgeLT cid2 dt bounds
+    Some ct1 -> case engineGetContractCreatedAt cid2 of
+      None -> do
+        (r, bounds') <- primContractAgeLE cid1 (negate dt) bounds
+        pure (not r, bounds')
+      Some ct2 -> pure (ct1 - ct2 < dt, bounds)
+
+primContractAgeDeltaLE : ContractId t -> ContractId t -> RelTime -> Bounds -> Update (Bool, Bounds)
+primContractAgeDeltaLE cid1 cid2 dt bounds =
+  -- fine in the implementation, as we know that the internal Long representation
+  -- of Time is not going to overflow.
+  primContractAgeDeltaLT cid1 cid2 (dt `addRelTime` microseconds 1) bounds
+
+primLedgerTimeLT : Time -> Update Bool
+primLedgerTimeLT t = do now <- getTime; pure (now < t)
+
+primContractCreateTimeLT : ContractId t -> Time -> Update Bool
+primContractCreateTimeLT cid = do ct <- getCreatedAt cid; pure (ct < t)
+
+primContractAgeLT : ContractId t -> RelTime -> Update Bool
+primContractAgeLT cid dt = do
+  ct <- getCreatedAt cid; now <- getTime; pure (subTime now ct < dt)
+
+primContractAgeDeltaLT : ContractId t -> ContractId t -> RelTime -> Update Bool
+primContractAgeDeltaLT cid1 cid2 dt = do
+  ct1 <- getCreatedAt; ct2 <- getCreatedAt cid2; pure (subTime ct2 ct1 < dt)
+
+isLedgerTimeLE : Time -> Update Bool
+isLedgerTimeLE t
+  | t == maxBound = pure True
+  | otherwise = primLedgerTimeLT (t `addRelTime` microseconds 1)
+
+isLedgerTimeGE t = not <$> isLedgerTimeLT t
+isLedgerTimeGT t = not <$> isLedgerTimeLE t
+
+
+isLedgerTime(LT|GT|GE|LE) : Time -> Update Bool
+isContractCreateTime(LT|GT|GE|LE) : ContractId t -> Time -> Update Bool
+isContractAge(LT|GT|GE|LE) : ContractId t -> RelTime -> Update Bool
+isContractAgeDelta(LT|GT|GE|LE) : ContractId t -> ContractId t -> RelTime -> Update Bool
+
+
+
+-- less-or-equal variants of the LT functions, are added to avoid the need to
+-- shift the time by 1 microsecond and dealing with overflows in Daml.
+primLedgerTimeLE, primContractCreateTimeLE, primContractAgeLE, primContractAgeDeltaLE
+
+
+assertContractAgeLT : ContractId t -> RelTime -> Update ()
+
+
+assertWithinDeadline : Text -> Time -> Update ()
+assertWithinDeadline name deadline = do
+  deadlineExceeded <- isLedgerTimeGE deadline
+  when deadlineExceeded $ fail $
+    "Ledger time is at or past deadline '" <> name <> "' at " <> show deadline
+
+assertDeadlineExceeded : Text -> Time -> Update
+assertDeadlineExceeded name deadline = do
+  within <- isLedgerTimeGE deadline
+  unless deadlineExceeded $ fail $
+    "Ledger time is before deadline '" <> name <> "' at " <> show deadline
+
+assertWithinDeadline "VoteRequest.expiresAt" 2024-01-01T00:00:00Z
+
+example output:
+  Ledger time is at or past deadline 'VoteRequest.expiresAt' at 2024-01-01T00:00:00Z
+
+
+assertNotExpired : Text -> ContractId t -> RelTime -> Update ()
+assertNotExpired contractName cid dt = do
+  expired <- isContractAgeGE cid dt
+  when expired $ fail $ name <> " expired: age >= " <> show dt
+
+assertExpired : ContractId t -> RelTime -> Update ()
+assertExpired contractName cid dt = do
+  expired <- isContractAgeGE cid dt
+  unless expired $ fail $ contractName <> " not yet expired: age < " <> show dt
+
+
+assertNotExpired "VoteRequest" voteReqCid (hours 24)
+
+example output:
+  VoteRequest expired: age >= 24h
+
+
