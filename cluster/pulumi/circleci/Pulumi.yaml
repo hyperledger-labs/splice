@@ -2,4 +2,3 @@ name: circleci
 runtime:
   name: nodejs
 description: Pulumi circle self hosted runner
-stackConfigDir: ../../stacks

@@ -2,4 +2,3 @@
 name: cluster
 description: "GKE Cluster for Canton Network"
 runtime: nodejs
-stackConfigDir: ../../stacks

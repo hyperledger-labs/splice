@@ -2,4 +2,3 @@
 name: gcp
 description: 'Provision a Google Cloud Platform project'
 runtime: nodejs
-stackConfigDir: ../../stacks

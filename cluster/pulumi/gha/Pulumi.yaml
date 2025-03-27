@@ -2,4 +2,3 @@ name: gha
 runtime:
   name: nodejs
 description: Pulumi GitHub Actions self hosted runner
-stackConfigDir: ../../stacks
