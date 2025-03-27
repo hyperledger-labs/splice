@@ -6,6 +6,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
+    app.kubernetes.io/component: {{ $ansWebUiLabel }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}-{{ $ansWebUiLabel }}
+    app.kubernetes.io/name: splice-{{ .Chart.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    helm.sh/chart: splice-{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    {{- toYaml .Values.pod.labels | nindent 4 }}
     app: {{ $ansWebUiLabel }}
     migration: {{ .Values.migration.id | quote }}
   name: {{ $ansWebUiLabel }}
@@ -22,6 +29,13 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
+        app.kubernetes.io/component: {{ $ansWebUiLabel }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/instance: {{ .Release.Name }}-{{ $ansWebUiLabel }}
+        app.kubernetes.io/name: splice-{{ .Chart.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion }}
+        helm.sh/chart: splice-{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+        {{- toYaml .Values.pod.labels | nindent 8 }}
         app: {{ $ansWebUiLabel }}
         migration: {{ .Values.migration.id | quote }}
     spec:

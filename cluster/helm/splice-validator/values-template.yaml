@@ -5,9 +5,10 @@ imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 
 fixedTokens: false
 
-# -- Annotations for the validator pod
+# -- Annotations and labels for the participant pod
 pod:
   annotations: {}
+  labels: {}
 
 defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 resources:

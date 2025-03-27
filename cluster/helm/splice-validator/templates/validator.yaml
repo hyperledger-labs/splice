@@ -6,11 +6,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $validatorAppLabel }}
-  namespace: {{ .Release.Namespace }}
   labels:
+    app.kubernetes.io/component: {{ $validatorAppLabel }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}-{{ $validatorAppLabel }}
+    app.kubernetes.io/name: splice-{{ .Chart.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    helm.sh/chart: splice-{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    {{- toYaml .Values.pod.labels | nindent 4 }}
     app: {{ $validatorAppLabel }}
     migration: {{ .Values.migration.id | quote }}
+  name: {{ $validatorAppLabel }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -23,6 +30,13 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
+        app.kubernetes.io/component: {{ $validatorAppLabel }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/instance: {{ .Release.Name }}-{{ $validatorAppLabel }}
+        app.kubernetes.io/name: splice-{{ .Chart.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion }}
+        helm.sh/chart: splice-{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+        {{- toYaml .Values.pod.labels | nindent 8 }}
         app: {{ $validatorAppLabel }}
         migration: {{ .Values.migration.id | quote }}
     spec:
