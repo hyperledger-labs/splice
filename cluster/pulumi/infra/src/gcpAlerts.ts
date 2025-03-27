@@ -86,16 +86,14 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name="sv-app" AND jsonPayload.stack_trace=~"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node")
 -- TODO(#15716): Don't just ignore this - investigate!
 -(resource.labels.container_name="splitwell-app" AND jsonPayload.message=~"Waiting for domain Domain 'global' to be connected has not completed after")
--- TODO(#15720): Don't just ignore this - investigate!
--(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
--- TODO(#15720): Don't just ignore this - investigate!
--(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"Request to.*/accept resulted in a timeout")
 -- TODO(#17636): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher
 -(jsonPayload.message=~"signalWhenIngested.* has not completed after .* milliseconds")
 ${conditionalString(
   isDevNet,
-  '-- TODO(#18511) Remove this once the node is fixed\n' +
-    '-(jsonPayload.message=~"ACS_COMMITMENT_MISMATCH.*" AND jsonPayload.remote=~".*sender = PAR::validator-texturecapital-dev::1220982ed049....*")'
+  "-- TODO(#17637): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3\n" +
+    '-(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")\n' +
+    '-- TODO(#8300): Can happen due to random disconnects/reconnects but also in other contexts\n' +
+    '-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")'
 )}
 ${conditionalString(
   !isMainNet,
