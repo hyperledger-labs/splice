@@ -307,6 +307,17 @@ components:
           items:
             $ref: "./common-external.yaml#/components/schemas/Contract"
 
+    ListAmuletPriceVotesResponse:
+      description: Contracts of Daml template `Splice.DSO:AmuletPrice:AmuletPriceVote`.
+      type: object
+      required:
+        - amulet_price_votes
+      properties:
+        amulet_price_votes:
+          type: array
+          items:
+            $ref: "./common-external.yaml#/components/schemas/Contract"
+
     ListVoteResultsRequest:
       type: object
       required:

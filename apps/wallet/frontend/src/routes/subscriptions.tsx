@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
   DisableConditionally,
@@ -9,7 +8,8 @@ import {
   IntervalDisplay,
   Loading,
   unitToCurrency,
-} from 'common-frontend';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import BigNumber from 'bignumber.js';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
 import parseISO from 'date-fns/parseISO';

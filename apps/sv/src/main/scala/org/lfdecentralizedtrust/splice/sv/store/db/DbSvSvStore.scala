@@ -20,6 +20,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,7 +41,7 @@ class DbSvSvStore(
       DbSvSvStore.tableName,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
-      storeDescriptor = StoreDescriptor(
+      acsStoreDescriptor = StoreDescriptor(
         version = 1,
         name = "DbSvSvStore",
         party = key.svParty,
@@ -62,7 +63,7 @@ class DbSvSvStore(
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
-  def storeId: Int = multiDomainAcsStore.storeId
+  private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
   override def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
@@ -74,7 +75,7 @@ class DbSvSvStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DbSvSvStore.tableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
@@ -100,7 +101,7 @@ class DbSvSvStore(
           .querySingle(
             selectFromAcsTableWithOffset(
               DbSvSvStore.tableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               sql"""
                   template_id_qualified_name = ${QualifiedName(

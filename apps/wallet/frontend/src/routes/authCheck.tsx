@@ -8,7 +8,7 @@ import {
   useUserState,
   AuthConfig,
   TestAuthConfig,
-} from 'common-frontend';
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import { Outlet } from 'react-router-dom';
 
 import Onboarding from '../components/Onboarding';

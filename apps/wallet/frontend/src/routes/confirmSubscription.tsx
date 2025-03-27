@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
   Loading,
@@ -8,8 +7,9 @@ import {
   IntervalDisplay,
   DisableConditionally,
   unitToCurrency,
-} from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import BigNumber from 'bignumber.js';
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
