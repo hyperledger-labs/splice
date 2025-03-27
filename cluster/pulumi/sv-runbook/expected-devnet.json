@@ -214,7 +214,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -364,7 +364,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "loopback",
     "provider": "",
@@ -433,7 +433,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "scan",
     "provider": "",
@@ -798,7 +798,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-app",
     "provider": "",
@@ -977,7 +977,7 @@
           "google-oauth2|101034414073429253538"
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "validator",
     "provider": "",
