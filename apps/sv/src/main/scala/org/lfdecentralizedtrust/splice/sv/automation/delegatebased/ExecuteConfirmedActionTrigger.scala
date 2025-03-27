@@ -6,9 +6,9 @@ package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
+  TaskFailed,
   TaskOutcome,
   TaskSuccess,
-  TaskFailed,
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
@@ -44,6 +44,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 class ExecuteConfirmedActionTrigger(
     override protected val context: TriggerContext,
@@ -91,6 +92,7 @@ class ExecuteConfirmedActionTrigger(
             if (uniqueConfirmations.size >= requiredNumConfirmations) {
               for {
                 amuletRules <- store.getAmuletRules()
+                supportsSvController <- supportsSvController()
                 amuletRulesId = amuletRules.contractId
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_ExecuteConfirmedAction(
@@ -100,6 +102,9 @@ class ExecuteConfirmedActionTrigger(
                       uniqueConfirmations
                         .map(_.contractId)
                         .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                      Option
+                        .when(supportsSvController)(dsoRules.payload.dsoDelegate)
+                        .toJava,
                     )
                   )
                 )

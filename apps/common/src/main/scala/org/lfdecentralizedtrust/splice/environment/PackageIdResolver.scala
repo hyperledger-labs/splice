@@ -238,6 +238,15 @@ object PackageIdResolver {
     final case object SpliceWalletPayments extends Package
   }
 
+  def supportsSvController(now: CantonTimestamp, amuletRules: AmuletRules): Boolean = {
+    PackageVersion.assertFromString(
+      AmuletConfigSchedule(amuletRules)
+        .getConfigAsOf(now)
+        .packageConfig
+        .dsoGovernance
+    ) >= DarResources.dsoGovernance_0_1_11.metadata.version
+  }
+
   def supportsValidatorLicenseMetadata(now: CantonTimestamp, amuletRules: AmuletRules): Boolean = {
     val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
     val spliceAmuletVersion = PackageVersion.assertFromString(currentConfig.packageConfig.amulet)

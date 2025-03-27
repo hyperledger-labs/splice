@@ -19,6 +19,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 /** Trigger to merge multiple SvRewardStateContracts for the same SV name.
   * This only exists to cleanup after #12495.
@@ -68,9 +69,11 @@ class MergeSvRewardStateContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       arg = new DsoRules_MergeSvRewardState(
         svName,
         svRewardStates.map(_.contractId).asJava,
+        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeSvRewardState(arg))
       _ <- svTaskContext.connection

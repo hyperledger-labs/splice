@@ -24,6 +24,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class AnsSubscriptionRenewalPaymentTrigger(
     override protected val context: TriggerContext,
@@ -109,6 +110,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
+    supportsSvController <- supportsSvController()
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_CollectEntryRenewalPayment(
         ansContextCId,
@@ -118,6 +120,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
           transferContext,
           ansRules.contractId,
         ),
+        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
       )
     )
     taskOutcome <- connection

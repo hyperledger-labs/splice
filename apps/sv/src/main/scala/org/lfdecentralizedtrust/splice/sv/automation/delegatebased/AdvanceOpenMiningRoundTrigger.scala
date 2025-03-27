@@ -20,6 +20,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -54,6 +55,7 @@ class AdvanceOpenMiningRoundTrigger(
       _ = logger.debug(
         s"Starting work as delegate ${dsoRules.payload.dsoDelegate} for ${task.work}"
       )
+      supportsSvController <- supportsSvController()
       amuletPriceVotes <- store.listSvAmuletPriceVotes()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AdvanceOpenMiningRounds(
@@ -62,6 +64,7 @@ class AdvanceOpenMiningRoundTrigger(
           rounds.middle.contractId,
           rounds.newest.contractId,
           amuletPriceVotes.map(_.contractId).asJava,
+          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
         )
       )
       _ <- svTaskContext.connection

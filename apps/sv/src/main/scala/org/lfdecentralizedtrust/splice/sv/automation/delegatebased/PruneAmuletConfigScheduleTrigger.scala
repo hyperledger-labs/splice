@@ -19,6 +19,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 class PruneAmuletConfigScheduleTrigger(
     override protected val context: TriggerContext,
@@ -60,8 +61,12 @@ class PruneAmuletConfigScheduleTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       cmd = dsoRules.exercise(
-        _.exerciseDsoRules_PruneAmuletConfigSchedule(amuletRules.work.contractId)
+        _.exerciseDsoRules_PruneAmuletConfigSchedule(
+          amuletRules.work.contractId,
+          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+        )
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)

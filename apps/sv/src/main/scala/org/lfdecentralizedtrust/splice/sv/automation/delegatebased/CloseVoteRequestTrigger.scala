@@ -14,6 +14,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class CloseVoteRequestTrigger(
     override protected val context: TriggerContext,
@@ -46,6 +47,7 @@ class CloseVoteRequestTrigger(
     for {
       dsoRules <- svTaskContext.dsoStore.getDsoRules()
       amuletRules <- store.getAmuletRules()
+      supportsSvController <- supportsSvController()
       amuletRulesId = amuletRules.contractId
       res <- for {
         outcome <- svTaskContext.connection
@@ -54,7 +56,13 @@ class CloseVoteRequestTrigger(
             Seq(svTaskContext.dsoStore.key.dsoParty),
             dsoRules.exercise(
               _.exerciseDsoRules_CloseVoteRequest(
-                new DsoRules_CloseVoteRequest(voteRequestCid, java.util.Optional.of(amuletRulesId))
+                new DsoRules_CloseVoteRequest(
+                  voteRequestCid,
+                  java.util.Optional.of(amuletRulesId),
+                  Option
+                    .when(supportsSvController)(dsoRules.payload.dsoDelegate)
+                    .toJava,
+                )
               )
             ),
           )

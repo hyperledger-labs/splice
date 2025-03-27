@@ -20,6 +20,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 /** Trigger to merge multiple ValidatorLicenseContracts for the same validator.
   */
@@ -85,8 +86,10 @@ class MergeValidatorLicenseContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       arg = new DsoRules_MergeValidatorLicense(
-        validatorLicenses.map(_.contractId).asJava
+        validatorLicenses.map(_.contractId).asJava,
+        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorLicense(arg))
       _ <- svTaskContext.connection

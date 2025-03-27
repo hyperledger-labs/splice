@@ -158,6 +158,7 @@ testVoteRequestRejection = do
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid
     amuletRulesCid = None
+    sv = Some sv1
 
   result.completedAt === now
   result.offboardedVoters === []
@@ -235,6 +236,7 @@ testRacingSvRemoval = do
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req1
     amuletRulesCid = None
+    sv = Some sv1
 
   result.completedAt === now
   result.offboardedVoters === []
@@ -246,6 +248,7 @@ testRacingSvRemoval = do
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req2
     amuletRulesCid = None
+    sv = Some sv1
 
   result.completedAt === now
   result.offboardedVoters === ["sv2"]
@@ -257,6 +260,7 @@ testRacingSvRemoval = do
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req3
     amuletRulesCid = None
+    sv = Some sv1
 
   result.completedAt === now
   result.offboardedVoters === ["sv2"]
@@ -284,12 +288,14 @@ testRacingSvRemoval = do
   submitMultiMustFail [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req4
     amuletRulesCid = None
+    sv = Some sv3
 
   -- after enough time has passed the closing works
   passTime (seconds 1)
   result <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req4
     amuletRulesCid = None
+    sv = Some sv3
 
   -- however sv4 is still here, as at least `numSvs / 2 + 1` svs need to accept the offboarding
   result.outcome === VRO_Expired
@@ -316,6 +322,7 @@ testRacingSvRemoval = do
   result <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = req5
     amuletRulesCid = None
+    sv = Some sv3
 
   result.outcome === VRO_Accepted with effectiveAt = now
 
@@ -388,6 +395,7 @@ testOffboardSvAndAmuletPriceVotes = do
   submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_GarbageCollectAmuletPriceVotes with
     nonSvVoteCids = [sv1VoteCid]
     duplicateVoteCids = [[sv2VoteCid1, sv2VoteCid2]]
+    sv = Some sv2
 
   -- there should now be only three votes
   amuletPriceVotes <- query @AmuletPriceVote dso
@@ -398,6 +406,7 @@ testOffboardSvAndAmuletPriceVotes = do
   submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_GarbageCollectAmuletPriceVotes with
     nonSvVoteCids = []
     duplicateVoteCids = [[sv3VoteCid, sv3VoteCid]]
+    sv = Some sv2
 
 -- | vote request contract is archived if it has expired
 testVoteRequestExpire : Script ()
@@ -418,6 +427,7 @@ testVoteRequestExpire = do
   submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = requestResult.voteRequest
     amuletRulesCid = None
+    sv = Some sv1
 
   passTime(days 7)
   now <- getTime
@@ -426,6 +436,7 @@ testVoteRequestExpire = do
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
     requestCid = requestResult.voteRequest
     amuletRulesCid = None
+    sv = Some sv1
 
   -- only sv1 voted to accept as they created the request
   result.completedAt === now
@@ -487,6 +498,7 @@ testAmuletPriceVoting = do
     middleRoundCid
     latestRoundCid
     amuletPriceVoteCids = map fst amuletPriceVotes
+    sv = Some sv1
 
   -- check that the most recent round has the median a amulet price of the votes
   (_, latestRound) <- (last . sortOn (._2.round)) <$> query @OpenMiningRound dso

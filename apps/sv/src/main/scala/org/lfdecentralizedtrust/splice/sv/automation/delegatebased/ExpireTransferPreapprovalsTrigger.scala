@@ -11,6 +11,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class ExpireTransferPreapprovalsTrigger(
     override protected val context: TriggerContext,
@@ -43,8 +44,12 @@ class ExpireTransferPreapprovalsTrigger(
   override def completeTaskAsDsoDelegate(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       cmd = dsoRules.exercise(
-        _.exerciseDsoRules_ExpireTransferPreapproval(co.work.contractId)
+        _.exerciseDsoRules_ExpireTransferPreapproval(
+          co.work.contractId,
+          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+        )
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)

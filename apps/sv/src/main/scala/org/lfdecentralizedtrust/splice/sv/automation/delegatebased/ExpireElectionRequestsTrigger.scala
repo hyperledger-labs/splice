@@ -16,6 +16,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class ExpireElectionRequestsTrigger(
     override protected val context: TriggerContext,
@@ -58,9 +59,11 @@ class ExpireElectionRequestsTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
+    supportsSvController <- supportsSvController()
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ArchiveOutdatedElectionRequest(
-        task.contractId
+        task.contractId,
+        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
       )
     )
     _ <- svTaskContext.connection

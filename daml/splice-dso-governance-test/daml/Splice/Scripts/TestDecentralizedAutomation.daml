@@ -129,7 +129,7 @@ testDsoDelegateElection_ImpersonationAttack = do
 
 testUnclaimedRewardsMerging : Script ()
 testUnclaimedRewardsMerging = do
-  (app, _, _) <- initDevNet
+  (app, _, (sv1, _, _, _)) <- initDevNet
 
   -- onboard a validator
   validator1 <- setupValidator app "validator1"
@@ -143,6 +143,7 @@ testUnclaimedRewardsMerging = do
     DsoRules_MergeUnclaimedRewards with
       amuletRulesCid
       unclaimedRewardCids = (fmap fst unclaimedRewards)
+      sv = Some sv1
 
   unclaimedRewards <- query @UnclaimedReward app.dso
   length unclaimedRewards === 1
@@ -189,6 +190,7 @@ testRequiredNumOfConfirmation = do
       action
       amuletRulesCid = Some amuletRulesCid
       confirmationCids
+      sv = Some sv1
 
   -- check that the `action` was executed
   [(_, dsoRules)] <- query @DsoRules dso
@@ -218,14 +220,14 @@ testConfirmationExpiry = do
 
   -- DSO delegate tries to expire the confirmation, but it's too early
   dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
+    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation (Some sv1)
 
   -- wait for the confirmation TTL to pass
   passTime (minutes 5)
 
   -- DSO delegate expires the confirmation
   dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
-    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
+    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation (Some sv1)
 
   pure ()
 
@@ -280,6 +282,7 @@ testDecentralizedAns = do
       action = collectInitialPaymentAction
       amuletRulesCid = None
       confirmationCids
+      sv = Some sv1
 
   [(entryCid, entry)] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "ans.darth.vader")
   [(subscriptionStateCid, subscriptionState)] <- queryFilter @SubscriptionIdleState app.dso (\state -> state.subscriptionData.sender == alice.primaryParty)
@@ -307,6 +310,7 @@ testDecentralizedAns = do
         entryCid
         transferContext = appContext
         ansRulesCid
+      sv = Some sv1
 
   [(_, renewedEntry)] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "ans.darth.vader")
   [(_, renewedSubscriptionState)] <- queryFilter @SubscriptionIdleState app.dso (\state -> state.subscriptionData.sender == alice.primaryParty)
@@ -354,6 +358,7 @@ testDecentralizedAns = do
       action = rejectInitialPaymentAction
       amuletRulesCid = None
       confirmationCids
+      sv = Some sv1
 
   -- entry is not created
   [] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "reject.darth.vader")
@@ -380,7 +385,7 @@ terminatedSubscriptionCanBeCleanedUp = script do
 
   result <- submit alice.primaryParty $ exerciseCmd ansSummary.requestCid SubscriptionRequest_Reject
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid result.terminatedSubscription)
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid result.terminatedSubscription (Some sv1))
 
   entryContexts <- query @AnsEntryContext app.dso
   entryContexts === []
@@ -411,6 +416,7 @@ testCreateExternalPartyAmuletRules = script do
       action
       amuletRulesCid = None
       confirmationCids
+      sv = Some sv1
 
   _ <- getExternalPartyAmuletRules app
 
@@ -451,6 +457,7 @@ testTransferPreapprovalSend = do
       action
       amuletRulesCid = None
       confirmationCids
+      sv = Some sv1
 
   [(transferCounterCid, _)] <- query @TransferCommandCounter app.dso
 
@@ -484,10 +491,12 @@ testTransferPreapprovalExpiry = do
   -- Fails before expiry
   submitMultiMustFail [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
     transferPreapprovalCid
+    sv = Some sv1
   -- Expire the TransferPreapproval
   passTime (days 1)
   -- Succeeds after expiry
   submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
     transferPreapprovalCid
+    sv = Some sv1
 
   pure ()

@@ -15,7 +15,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.RichOptional
+import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
 class CloseVoteRequestWithEarlyClosingTrigger(
     override protected val context: TriggerContext,
@@ -52,6 +52,7 @@ class CloseVoteRequestWithEarlyClosingTrigger(
         else {
           for {
             dsoRules <- store.getDsoRules()
+            supportsSvController <- supportsSvController()
             votes = voteRequestContract.payload.votes.values().asScala
             requiredNumVotesForEarlyClosing = dsoRules.payload.svs.size()
             taskOutcome <-
@@ -64,6 +65,9 @@ class CloseVoteRequestWithEarlyClosingTrigger(
                       new DsoRules_CloseVoteRequest(
                         currentRequestCid,
                         java.util.Optional.of(amuletRulesId),
+                        Option
+                          .when(supportsSvController)(dsoRules.payload.dsoDelegate)
+                          .toJava,
                       )
                     )
                   )

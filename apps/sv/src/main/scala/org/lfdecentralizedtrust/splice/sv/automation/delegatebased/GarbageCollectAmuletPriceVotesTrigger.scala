@@ -17,6 +17,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 class GarbageCollectAmuletPriceVotesTrigger(
     override protected val context: TriggerContext,
@@ -51,6 +52,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
       (svVotes, nonSvVotes) = amuletPriceVotes.partition(v =>
         dsoRules.payload.svs.asScala.contains(v.payload.sv)
       )
+      supportsSvController <- supportsSvController()
       nonSvVoteCids = nonSvVotes.map(_.contractId)
       svDuplicatedVoteCids =
         svVotes
@@ -65,6 +67,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
             _.exerciseDsoRules_GarbageCollectAmuletPriceVotes(
               nonSvVoteCids.asJava,
               svDuplicatedVoteCids.asJava,
+              Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
             )
           )
           svTaskContext.connection

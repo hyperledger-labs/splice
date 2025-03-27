@@ -3,28 +3,37 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
+import com.digitalasset.canton.lifecycle.UnlessShutdown
+import com.digitalasset.canton.logging.pretty.PrettyPrinting
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
-import com.digitalasset.canton.lifecycle.UnlessShutdown
-import com.digitalasset.canton.logging.pretty.PrettyPrinting
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
-trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
+trait SvTaskBasedTrigger[T <: PrettyPrinting] {
+  this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
+
   protected def svTaskContext: SvTaskBasedTrigger.Context
+
   protected def enableAutomaticDsoDelegateElection: Boolean = false
+
   private val store = svTaskContext.dsoStore
+
+  final protected def supportsSvController()(implicit tc: TraceContext): Future[Boolean] = {
+    for {
+      amuletRules <- store.getAmuletRules()
+    } yield PackageIdResolver.supportsSvController(context.clock.now, amuletRules.payload)
+  }
 
   final protected override def completeTask(
       task: T

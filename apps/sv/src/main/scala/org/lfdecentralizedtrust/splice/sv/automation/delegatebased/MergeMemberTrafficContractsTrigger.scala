@@ -20,6 +20,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 class MergeMemberTrafficContractsTrigger(
     override protected val context: TriggerContext,
@@ -77,10 +78,12 @@ class MergeMemberTrafficContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       amuletRules <- store.getAmuletRules()
       arg = new DsoRules_MergeMemberTrafficContracts(
         amuletRules.contractId,
         memberTraffics.map(_.contractId).asJava,
+        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeMemberTrafficContracts(arg))
       outcome <- svTaskContext.connection
