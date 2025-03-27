@@ -14,7 +14,7 @@ main:
         - sourceInstanceForFindingLatestBackup: sv-1-cn-apps-pg-8f8c7e7
         - sourceProject: da-cn-mainnet
         - sourceClusterLocation: europe-west6-a
-        - bucketName: cn-mainnet-backups
+        - bucketName: da-cn-mainnet-backups
         - sourceCluster: mainzrh
         - migrationId: ${args.migrationId}
     # If a backup run ID is provided, use it.
