@@ -1,8 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { useGetAnsRulesFromResponse } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import { UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend-utils';
-import { useGetAnsRulesFromResponse } from 'common-frontend/scan-api';
 
 import { AnsRules } from '@daml.js/ans/lib/Splice/Ans/';
 

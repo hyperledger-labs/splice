@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { vitest_common_conf } from '@lfdecentralizedtrust/splice-common-test-vite-utils';
 import react from '@vitejs/plugin-react';
-import { vitest_common_conf } from 'common-test-vite-utils';
 import { defineConfig, loadEnv, mergeConfig } from 'vite';
 import viteTsconfigPaths from 'vite-tsconfig-paths';
 

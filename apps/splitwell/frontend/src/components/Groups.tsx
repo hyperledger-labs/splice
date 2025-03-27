@@ -6,8 +6,8 @@ import {
   ErrorDisplay,
   Loading,
   TransferButton,
-} from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 

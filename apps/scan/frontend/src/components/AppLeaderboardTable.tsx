@@ -1,9 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
+import {
+  AmountDisplay,
+  ErrorDisplay,
+  Loading,
+  PartyId,
+  TitledTable,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { useTopAppProviders } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, ErrorDisplay, Loading, PartyId, TitledTable } from 'common-frontend';
-import { useTopAppProviders } from 'common-frontend/scan-api';
 
 import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
