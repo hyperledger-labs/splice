@@ -116,4 +116,6 @@ WARNING: Failed to fetch secret, retrying in 10 seconds
 # This is actually not a warning
 .*No want/action statements, nothing to do
 
+Retried waiting for GCLocker too often allocating
+
 # Make sure to have a trailing newline
