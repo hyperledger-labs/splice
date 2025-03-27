@@ -71,7 +71,7 @@ trait ExternallySignedTxTest
         .party
 
       // Tap some amulets to pay for purchase of transfer pre-approval
-      aliceValidatorWalletClient.tap(50.0)
+      aliceValidatorWalletClient.tap(5000000.0)
 
       runProcess(
         Seq(
@@ -100,10 +100,14 @@ trait ExternallySignedTxTest
           .receiver shouldBe partyId.toProtoPrimitive
       }
 
-      aliceValidatorWalletClient.transferPreapprovalSend(partyId, 40.0, UUID.randomUUID.toString)
+      aliceValidatorWalletClient.transferPreapprovalSend(
+        partyId,
+        4000000.0,
+        UUID.randomUUID.toString,
+      )
       aliceValidatorBackend
         .getExternalPartyBalance(partyId)
-        .totalUnlockedCoin shouldBe "40.0000000000"
+        .totalUnlockedCoin shouldBe "4000000.0000000000"
 
       val partyHint2 = UUID.randomUUID().toString
       val keyName2 = "party-key-2"

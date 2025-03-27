@@ -1,0 +1,10 @@
+{
+  "workspaces": [
+    "cli",
+    "splice-api-token-transfer-instruction-v1/openapi-ts-client"
+  ],
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}

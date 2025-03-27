@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { LedgerClient } from "../apis/ledger-client";
 import { CommandOptions } from "../cli";
+import { HoldingInterface } from "../constants";
 
 export async function listHoldings(
   partyId: string,
@@ -13,7 +14,7 @@ export async function listHoldings(
     const holdings: any[] = await ledgerClient.getActiveContractsOfParty(
       partyId,
       ledgerEnd.offset,
-      ["#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding"]
+      [HoldingInterface]
     );
     const prettyHoldings = holdings.map(toPrettyHolding);
     console.log(JSON.stringify(prettyHoldings, null, 2));

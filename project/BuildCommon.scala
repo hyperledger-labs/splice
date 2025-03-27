@@ -1661,11 +1661,12 @@ object BuildCommon {
         openApiSpec: String,
         cacheFileDependencies: Set[File] = Set.empty[File],
         directory: String,
+        subPath: String = "src/main/openapi/",
     ): Def.Initialize[Task[Seq[File]]] = Def.task {
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory / directory
 
-      val openApiSpecFile = baseDirectory.value / "src/main/openapi/" / openApiSpec
+      val openApiSpecFile = baseDirectory.value / subPath / openApiSpec
       val template = templateDirectory.value
       val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         runCommand(

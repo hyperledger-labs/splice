@@ -13,7 +13,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "commander": "^13.1.0"
+    "commander": "^13.1.0",
+    "dayjs": "^1.11.13",
+    "transfer-instruction-openapi": "file:../splice-api-token-transfer-instruction-v1/openapi-ts-client"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",

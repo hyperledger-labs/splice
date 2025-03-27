@@ -314,6 +314,25 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
       Compile / damlDependencies :=
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val transferInstructionOpenApiFile =
+            baseDirectory.value / "openapi/transfer-instruction.yaml"
+
+          val npmName = "transfer-instruction-openapi"
+
+          BuildCommon.TS.generateOpenApiClient(
+            npmName = npmName,
+            npmModuleName = npmName,
+            npmProjectName = npmName,
+            openApiSpec = "transfer-instruction.yaml",
+            cacheFileDependencies = Set(transferInstructionOpenApiFile),
+            directory = "openapi-ts-client",
+            subPath = "openapi",
+          )
+        },
+      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -389,9 +408,16 @@ lazy val `splice-token-test-dummy-holding-daml` =
 lazy val `token-standard-cli` =
   project
     .in(file("token-standard/cli"))
+    .dependsOn(`splice-api-token-transfer-instruction-v1-daml`)
     .settings(
       Headers.TsHeaderSettings,
-      npmInstallOpenApiDeps := Seq.empty,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
+          false,
+        )
+      ),
       npmInstallDeps := Seq(baseDirectory.value / "package.json"),
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,

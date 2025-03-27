@@ -2,12 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { LedgerClient } from "../apis/ledger-client";
 import { CommandOptions } from "../cli";
-
-// TODO (#18500): include allocations
-const tokenStandardTransactionInterfaces = [
-  "#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding",
-  "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferFactory",
-];
+import { TokenStandardTransactionInterfaces } from "../constants";
 
 export async function listHoldingTransactions(
   partyId: string,
@@ -21,14 +16,14 @@ export async function listHoldingTransactions(
         .participantPrunedUpToInclusive;
     const updates = await ledgerClient.getUpdates(
       partyId,
-      tokenStandardTransactionInterfaces,
+      TokenStandardTransactionInterfaces,
       afterOffset
     );
     const acs = (
       await ledgerClient.getActiveContractsOfParty(
         partyId,
         afterOffset,
-        tokenStandardTransactionInterfaces
+        TokenStandardTransactionInterfaces
       )
     ).map((c) => c.contractEntry.JsActiveContract.createdEvent.contractId);
     console.log(
