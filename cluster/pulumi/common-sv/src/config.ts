@@ -38,7 +38,7 @@ export interface StaticSvConfig {
   nodeName: string;
   ingressName: string;
   onboardingName: string;
-  validatorWalletUser: string;
+  validatorWalletUser?: string;
   auth0ValidatorAppName: string;
   auth0SvAppName: string;
   cometBft: StaticCometBftConfig;

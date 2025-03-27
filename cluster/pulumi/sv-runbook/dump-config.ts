@@ -27,7 +27,8 @@ async function main() {
     disableOnboardingParticipantPromotionDelay: false,
   };
   const validatorAppConfig = {
-    walletUserName: svRunbookConfig.validatorWalletUser,
+    // sv runbook wallet user is always defined
+    walletUserName: svRunbookConfig.validatorWalletUser!,
   };
 
   installNode.installNode(

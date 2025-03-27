@@ -1306,7 +1306,6 @@
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
-          "auth0|663d6fd6902e3665a5dc1ad1",
           "google-oauth2|115021477892550483906",
           "google-oauth2|110899582324745131610",
           "google-oauth2|102407267956826102715",
