@@ -112,6 +112,9 @@ data BurnMintFactory_BurnMintResult = BurnMintFactory_BurnMintResult
   with
     outputCids : [ContractId Holding]
       -- ^ The holdings created by the choice. Must contain exactly the outputs specified in the choice argument in the same order.
+    inputHoldingAmounts : [Decimal]
+      -- ^ The amounts of the input holdings that got consumed. MUST be identical to fetching the contracts in inputHoldingCids,
+      --  and querying the amount on HoldingView and reported in the same order.
   deriving (Show, Eq)
 
 data BurnMintFactoryView = BurnMintFactoryView
