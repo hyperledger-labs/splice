@@ -606,6 +606,7 @@ class SV1Initializer(
                   sv1Config.initialPackageConfig.toPackageConfig,
                   sv1Config.initialHoldingFee,
                   sv1Config.initialTransferPreapprovalFee,
+                  sv1Config.initialFeaturedAppActivityMarkerAmount,
                 )
                 for {
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(

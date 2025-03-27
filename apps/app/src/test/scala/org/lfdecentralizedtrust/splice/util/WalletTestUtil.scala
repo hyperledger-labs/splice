@@ -1169,6 +1169,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
                   expiredDuration,
                 )
               ).asJava,
+              java.util.Optional.empty(),
             ),
             new splice.amuletrules.TransferContext(
               transferContext.openMiningRound,

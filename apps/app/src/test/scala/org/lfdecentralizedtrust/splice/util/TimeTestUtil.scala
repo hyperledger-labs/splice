@@ -124,6 +124,7 @@ trait TimeTestUtil extends TestCommon {
               )
             ).asJava,
             outputs.asJava,
+            java.util.Optional.empty(),
           ),
           new splice.amuletrules.TransferContext(
             transferContext.openMiningRound,

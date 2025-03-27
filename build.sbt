@@ -421,6 +421,17 @@ lazy val `splice-util-daml` =
       `canton-bindings-java`
     )
 
+lazy val `splice-featured-app-api-v1-daml` =
+  project
+    .in(file("daml/splice-api-featured-app-v1"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
 lazy val `splice-amulet-daml` =
   project
     .in(file("daml/splice-amulet"))
@@ -434,7 +445,8 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value,
+          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 

@@ -47,6 +47,7 @@ testTransferExceedsMaxInputs = do
           provider = alice.primaryParty
           inputs = inputAmulets
           outputs = []
+          beneficiaries = None
         context = context
         expectedError = "More than the maximum number of inputs"
     return ()
@@ -66,6 +67,7 @@ testTransferExceedsMaxOutputs = do
           provider = alice.primaryParty
           inputs = [InputAmulet amulet]
           outputs = outputAmulets
+          beneficiaries = None
         context = context
         expectedError = "More than the maximum number of outputs"
     return ()
@@ -97,6 +99,7 @@ testTransferExceedsMaxLockHolders = do
                 expiresAt = now `addRelTime` (minutes 1)
               receiverFeeRatio = 0.0
           ]
+        beneficiaries = None
       context = context
       expectedError = "Fewer than the allowed number of lock holders"
     return ()

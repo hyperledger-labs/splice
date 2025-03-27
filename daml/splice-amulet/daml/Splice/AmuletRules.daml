@@ -17,6 +17,7 @@ import qualified DA.Set as Set
 import DA.Traversable (forA)
 import DA.Time
 
+import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Amulet
@@ -79,6 +80,8 @@ data AmuletRules_RemoveFutureAmuletConfigScheduleResult = AmuletRules_RemoveFutu
 data AmuletRules_UpdateFutureAmuletConfigScheduleResult = AmuletRules_UpdateFutureAmuletConfigScheduleResult with
     newAmuletRules : ContractId AmuletRules
 
+data AmuletRules_ConvertFeaturedAppActivityMarkersResult = AmuletRules_ConvertFeaturedAppActivityMarkersResult with
+    appRewardCouponCids : [ContractId AppRewardCoupon]
 
 -- | The rules governing how Amulet users can modify the Amulet state managed by the DSO party.
 template AmuletRules
@@ -594,6 +597,33 @@ template AmuletRules
         newAmuletRules <- create this with configSchedule = prune now (update scheduleItem this.configSchedule)
         return AmuletRules_UpdateFutureAmuletConfigScheduleResult with ..
 
+    nonconsuming choice AmuletRules_ConvertFeaturedAppActivityMarkers : AmuletRules_ConvertFeaturedAppActivityMarkersResult
+      with
+        markerCids : [ContractId FeaturedAppActivityMarker]
+        openMiningRoundCid : ContractId OpenMiningRound
+      controller dso
+      do now <- getTime
+         markers <- mapA (fetchAndArchive (ForDso dso)) markerCids
+         let groupedMarkers = Map.fromListWithR (+) (map (\m -> ((m.provider, m.beneficiary), m.weight)) markers)
+         round <- fetchReferenceData (ForDso dso) openMiningRoundCid
+         require ("mining round is open: " <> show round) (round.opensAt <= now)
+         let configUsd = getValueAsOf now configSchedule
+         -- If the amount is not set or is <= 0 we just archive the marker contracts.
+         markerCids <- forA (optionalToList configUsd.featuredAppActivityMarkerAmount) $ \amountUsd -> do
+           let amountAmulet = amountUsd / round.amuletPrice
+           if amountAmulet > 0.0
+             then
+               forA (Map.toList groupedMarkers) $ \((provider, beneficiary), weight) ->
+                 create AppRewardCoupon with
+                   dso
+                   provider
+                   beneficiary = Some beneficiary
+                   featured = True
+                   round = round.round
+                   amount = amountAmulet * weight
+             else pure []
+         pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
+
 -- Transfer logic
 -- ==============
 
@@ -613,6 +643,7 @@ scaleAmuletConfig amuletPrice config = AmuletConfig with
   tickDuration = config.tickDuration
   packageConfig = config.packageConfig
   transferPreapprovalFee = config.transferPreapprovalFee
+  featuredAppActivityMarkerAmount = fmap (/amuletPrice) config.featuredAppActivityMarkerAmount
 
 computeFees : Party -> TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
 computeFees dso context sender outputs = do
@@ -676,7 +707,7 @@ executeTransfer self config context dso reason t = do
     Right _ -> pure ()
 
   -- issue rewards for burns
-  issueRewards config csum t.sender t.provider summary
+  issueRewards config csum t.sender t.provider t.beneficiaries summary
   -- record outputs
   let (burnMintOutputs, senderChangeBurnMintOutput) = toBurnMintOutputs t.sender summary osum
 
@@ -997,8 +1028,8 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       senderChangeAmount
       amuletPrice = openRound.amuletPrice
 
-issueRewards : RewardsIssuanceConfig -> TransferContextSummary -> Party -> Party -> TransferSummary -> Update ()
-issueRewards config csum sender provider summary
+issueRewards : RewardsIssuanceConfig -> TransferContextSummary -> Party -> Party -> Optional [AppRewardBeneficiary] -> TransferSummary -> Update ()
+issueRewards config csum sender provider beneficiaries summary
   | usageFees <= 0.0 = pure ()
   | otherwise = do
       when (config.issueValidatorRewards) $
@@ -1008,13 +1039,22 @@ issueRewards config csum sender provider summary
           amount = usageFees
           round = csum.openRound.round
 
-      when (config.issueAppRewards) $
-        void $ create AppRewardCoupon with
-          dso = csum.openRound.dso
-          provider
-          featured
-          amount = usageFees + extraAppReward
-          round = csum.openRound.round
+      if config.issueAppRewards
+        then do
+          let beneficiaries' = fromOptional [AppRewardBeneficiary provider 1.0] beneficiaries
+          validateAppRewardBeneficiaries beneficiaries'
+          let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) beneficiaries')
+              totalAmount = usageFees + extraAppReward
+          forA_ (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+            void $ create AppRewardCoupon with
+              dso = csum.openRound.dso
+              provider
+              beneficiary = Some beneficiary
+              featured
+              amount = totalAmount * weight
+              round = csum.openRound.round
+        else do
+          require "beneficiaries are unset if issueAppRewards is false" (optional True null beneficiaries)
   where
     usageFees = sum summary.outputFees
     featured = Some provider == csum.featuredAppProvider
@@ -1173,7 +1213,10 @@ data Transfer = Transfer with
     provider : Party
     inputs : [TransferInput]
     outputs : [TransferOutput]
+    beneficiaries : Optional [AppRewardBeneficiary]
+      -- ^ Beneficiaries between which the app reward is split.
   deriving (Eq, Ord, Show)
+
 
 -- | An individual output for a batch transfer.
 data TransferOutput = TransferOutput with
@@ -1365,6 +1408,11 @@ template TransferPreapproval
                  amount = amount
                  lock = None
              ]
+           beneficiaries = None
+             -- We don't make this configurable. Rewards should
+             -- go to the party hosting the receiver. Allowing the sender
+             -- to configure arbitrary beneficiaries doesn't make sense.
+             -- If needed, we could extend preapprovals to track beneficiaries later.
          pure (TransferPreapproval_SendResult transferResult)
 
     -- Renew the contract as the provider
@@ -1456,6 +1504,7 @@ splitAndBurn self sender amount inputs context dso usage = do
           amount
           lock = None
       ]
+    beneficiaries = None -- No beneficiaries for self-transfer
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
   amulet <- fetchChecked (ForOwner with dso; owner = sender) amuletCid

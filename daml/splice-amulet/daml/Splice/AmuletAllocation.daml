@@ -67,6 +67,8 @@ transferAmuletAllocation AmuletAllocation{..} extraArgs = do
         provider = allocation.settlement.executor
         inputs = [InputAmulet amuletCid]
         outputs = [ allocationToAmuletOutput allocation ]
+        beneficiaries = None
+          -- This corresponds to a self-transfer, and thus there are no beneficiaries
   result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
   pure Allocation_ExecuteTransferResult
     with

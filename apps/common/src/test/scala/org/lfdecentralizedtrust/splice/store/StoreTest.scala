@@ -322,6 +322,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         featured,
         amount,
         new Round(round),
+        Optional.empty(),
       ),
     )
 

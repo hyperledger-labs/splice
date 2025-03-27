@@ -387,6 +387,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
                expiresAt = expiresAt
              receiverFeeRatio = 0.0
          ]
+       beneficiaries = None -- no beneficiaries for locking step
 
   result <- exercisePaymentTransfer context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
@@ -405,6 +406,7 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
         provider
         inputs = [InputAmulet result.amuletSum.amulet]
         outputs = [mkTransferOutput receiver targetAmount]
+        beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
   result <- exerciseAppTransfer transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
   let [TransferResultAmulet amuletCid] = result.createdAmulets

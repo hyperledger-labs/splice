@@ -127,6 +127,7 @@ testScaledHoldingFees = do
                       amount = 10.0
                       lock = None
                       receiverFeeRatio = 1.0]
+        beneficiaries = None
       context = context.context
 
   -- Actual holding fee should be based on the amulet price when the amulet was created, not the current one

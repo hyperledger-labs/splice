@@ -92,6 +92,7 @@ object SvOnboardingConfig {
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
       initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
+      initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

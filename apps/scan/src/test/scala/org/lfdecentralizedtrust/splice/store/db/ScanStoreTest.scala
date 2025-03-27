@@ -1816,6 +1816,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       receiver.toProtoPrimitive,
       java.util.List.of(mkInputAmulet()),
       java.util.List.of(mkTransferOutput(receiver, amount)),
+      Optional.empty(),
     )
 
   def mkTransferContext() = new splice.amuletrules.TransferContext(
@@ -1842,6 +1843,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       provider.toProtoPrimitive,
       transferInputs.asJava,
       transferOutputs.asJava,
+      Optional.empty(),
     )
 
   def mkAmuletRules_Transfer(transfer: splice.amuletrules.Transfer) =

@@ -4,11 +4,14 @@
 module Splice.Scripts.TestAmuletRulesTransfer where
 
 import DA.Assert
+import DA.Foldable (forA_)
 import DA.List
+import DA.Optional
 import DA.Time
 import qualified DA.Map as Map
 import Daml.Script
 
+import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Expiry
@@ -72,6 +75,7 @@ testUsageFees = do
                       holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
 
                 ]
+      beneficiaries = None
     context = context.context
 
   let config = scaleFees 1.0 defaultTransferConfig
@@ -152,6 +156,7 @@ testAmuletUsedInRoundBeforeItsCreation = do
                       amount = 10.0
                       lock = None
                       receiverFeeRatio = 0.4 ]
+        beneficiaries = None -- test code, no beneficiaries
       context = contextWithRound1.context
 
   -- Input amount is exactly 100.0.
@@ -231,6 +236,7 @@ submitTransfer amuletRulesCid transferContext dso sender receiver amuletCid amou
                       amount
                       lock = None
                       receiverFeeRatio = 1.0]
+        beneficiaries = None -- test code, no beneficiaries
       context = transferContext
 
 testSenderChangeAndOutput: Script ()
@@ -273,6 +279,7 @@ testSenderChangeAndOutput = do
                     amount = outputAmount3
                     lock = None
                 ]
+      beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
   assertMsg "senderChangeAmount > 0"
     (transferResult.summary.senderChangeAmount > 0.0)
@@ -322,6 +329,7 @@ testSenderNoChange = do
                     amount = outputAmount3
                     lock = None
                 ]
+      beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
   assertMsg "senderChangeAmount == 0"
     (transferResult.summary.senderChangeAmount == 0.0)
@@ -363,6 +371,7 @@ testSenderNoChangeNoSenderOutput = do
                     lock = None
 
                 ]
+      beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
   assertMsg "senderChangeAmount == 0"
     (transferResult.summary.senderChangeAmount == 0.0)
@@ -374,3 +383,111 @@ testSenderNoChangeNoSenderOutput = do
   aliceBalanceChange.changeToHoldingFeesRate === negate holdingFee
 
   return ()
+
+testAppRewardBeneficiaries: Script ()
+testAppRewardBeneficiaries = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+
+
+  runNextIssuance app
+  runNextIssuance app
+
+  featuredAppRightCid <- featureApp app alice
+
+  amulet <- tap app alice 100.0
+
+  context <- getPaymentTransferContext app alice
+
+  -- Beneficiary weights don't add up to 1
+  _ <- submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputAmulet c)[amulet]
+      outputs = [
+                  TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = 10.0
+                    lock = None
+                ]
+      beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2]
+    context = context.context
+
+  -- Beneficiary weight < 0.05
+  _ <- submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputAmulet c)[amulet]
+      outputs = [
+                  TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = 10.0
+                    lock = None
+                ]
+      beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.04, AppRewardBeneficiary alice.primaryParty 0.96]
+    context = context.context
+
+  forA_ [False, True] $ \featured -> do
+
+    -- unfeatured without beneficiaries
+    amulet <- tap app alice 100.0
+
+    context <- getPaymentTransferContextFeaturedApp app alice (if featured then Some featuredAppRightCid else None)
+
+    transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = map (\c -> InputAmulet c)[amulet]
+        outputs = [
+                    TransferOutput with
+                      receiver = bob.primaryParty
+                      receiverFeeRatio = 0.0
+                      amount = 10.0
+                      lock = None
+                  ]
+        beneficiaries = None
+      context = context.context
+
+    [(rewardCid, aliceAppRewardCouponUnfeaturedNoBeneficiary)] <- query @AppRewardCoupon alice.primaryParty
+    -- archive to simplify test queries
+    submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd rewardCid
+
+    -- unfeatured with beneficiaries
+
+    submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = map (\c -> InputAmulet c) (optionalToList transferResult.senderChangeAmulet)
+        outputs = [
+                    TransferOutput with
+                      receiver = bob.primaryParty
+                      receiverFeeRatio = 0.0
+                      amount = 10.0
+                      lock = None
+                  ]
+        beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
+      context = context.context
+
+    [(rewardCid1, aliceAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon alice.primaryParty (\r -> r.beneficiary == Some alice.primaryParty)
+
+    [(rewardCid2, bobAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon bob.primaryParty (\r -> r.beneficiary == Some bob.primaryParty)
+
+    -- archive to simplify test queries
+    forA_ [rewardCid1, rewardCid2] $ \cid -> submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd cid
+
+
+    forA_ [aliceAppRewardCouponUnfeaturedNoBeneficiary, aliceAppRewardCouponUnfeaturedBeneficiary, bobAppRewardCouponUnfeaturedBeneficiary] $ \reward -> do
+      reward.featured === featured
+      reward.provider === alice.primaryParty
+    aliceAppRewardCouponUnfeaturedNoBeneficiary.beneficiary === Some alice.primaryParty
+    aliceAppRewardCouponUnfeaturedBeneficiary.beneficiary === Some alice.primaryParty
+    bobAppRewardCouponUnfeaturedBeneficiary.beneficiary === Some bob.primaryParty
+
+    aliceAppRewardCouponUnfeaturedBeneficiary.amount === 0.2 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount
+    bobAppRewardCouponUnfeaturedBeneficiary.amount   === 0.8 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount

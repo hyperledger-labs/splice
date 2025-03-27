@@ -40,6 +40,7 @@ testUnclaimedRewards_withCoupons = do
   appCoupon1 <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
+    beneficiary = None
     amount = 5.7
     round = Round 0
     featured = True
@@ -47,6 +48,7 @@ testUnclaimedRewards_withCoupons = do
   appCoupon2 <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
+    beneficiary = None
     amount = 3.3
     round = Round 0
     featured = False
@@ -137,6 +139,7 @@ testNoUnclaimedRewards = do
   _ <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
+    beneficiary = None
     amount = 4000.0
     round = Round 0
     featured = True
@@ -144,6 +147,7 @@ testNoUnclaimedRewards = do
   _ <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = provider1.primaryParty
+    beneficiary = None
     amount = 1000.0
     round = Round 0
     featured = False

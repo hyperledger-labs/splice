@@ -57,6 +57,9 @@ defaultAmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerCo
   activeSynchronizer = "decentralized-synchronizer-id-0"
   fees = defaultSynchronizerFeesConfig
 
+-- default to 1.0 for testing
+defaultFeaturedAppActivityMarkerAmount : Decimal
+defaultFeaturedAppActivityMarkerAmount = 1.0
 
 -- | Default proposal for issuance curve and tickDuration
 defaultAmuletConfig : AmuletConfig USD
@@ -81,6 +84,9 @@ defaultAmuletConfig = AmuletConfig with
   -- Similar to holding fees, it compensates the SVs for the storage cost of the contract.
   -- Roughly equal to $1/year expressed as a daily rate.
   transferPreapprovalFee = Some defaultTransferPreapprovalFee
+
+  -- Amount of the AppRewardCoupon contract that a FeaturedAppActivityMarker is converted to.
+  featuredAppActivityMarkerAmount = Some defaultFeaturedAppActivityMarkerAmount
 
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)

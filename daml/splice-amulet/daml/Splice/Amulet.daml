@@ -4,17 +4,18 @@
 -- | The contracts representing the long-term state of Splice.
 module Splice.Amulet where
 
-import Prelude hiding (forA)
+import Prelude
 import DA.Action (void)
 import DA.Map as Map
+import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 
 import Splice.Amulet.TokenApiUtils
-
 import Splice.Expiry
 import Splice.Fees
+import qualified Splice.Api.FeaturedAppRightV1
 import Splice.Round
 import Splice.Types
 
@@ -212,6 +213,54 @@ template FeaturedAppRight with
       do return FeaturedAppRight_CancelResult
 
 
+    interface instance Splice.Api.FeaturedAppRightV1.FeaturedAppRight for FeaturedAppRight where
+      view = Splice.Api.FeaturedAppRightV1.FeaturedAppRightView with dso, provider
+
+      featuredAppRight_CreateActivityMarkerImpl _self arg = do
+         validateAppRewardBeneficiaries arg.beneficiaries
+         let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
+         cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+           create FeaturedAppActivityMarker
+             with
+               dso
+               provider
+               beneficiary = beneficiary
+               weight = weight
+         pure (Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
+
+validateAppRewardBeneficiaries : [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary] -> Update ()
+validateAppRewardBeneficiaries beneficiaries = do
+  -- Note: we limit the minimal weight to limit the management overhead of the SVs
+  require "Beneficiary weights are between 0.05 and 1.0" (all (\beneficiary -> 0.05 <= beneficiary.weight && beneficiary.weight <= 1.0) beneficiaries)
+  require "Beneficiary weights add up to 1.0" (sum (map (.weight) beneficiaries) == 1.0)
+
+-- | A marker created by a featured application for activity generated from that app. This is used
+-- to record activity other than amulet transfers where regular AppRewardCoupons are not created directly.
+--
+-- Will be converted to a AppRewardCoupon through automation run by the SVs and can then be
+-- minted as part of the normal minting process.
+template FeaturedAppActivityMarker
+  with
+    dso : Party
+    provider : Party
+      -- ^ The featured app provider that created the activity marker.
+    beneficiary : Party
+      -- ^ The party that has the right to mint the reward.
+    weight : Decimal
+      -- ^ The weight of the marker. This is used to split the rewards
+      -- for a single action, e.g., multiple parties collaborating to enable
+      -- a transfer,
+      -- by creating several FeaturedAppActivityMarkers with different
+      -- beneficiaries such that the weights add up to 1.0.
+  where
+    signatory dso
+    observer provider, beneficiary
+    ensure 0.0 < weight && weight <= 1.0
+
+    interface instance Splice.Api.FeaturedAppRightV1.FeaturedAppActivityMarker for FeaturedAppActivityMarker where
+      view = Splice.Api.FeaturedAppRightV1.FeaturedAppActivityMarkerView with dso, provider, beneficiary, weight
+
+
 -- | A coupon for receiving app rewards proportional to the usage fee paid as part of a
 -- Amulet transfer coordinated by the app of a provider.
 template AppRewardCoupon
@@ -221,13 +270,16 @@ template AppRewardCoupon
     featured : Bool
     amount : Decimal
     round : Round
+    beneficiary : Optional Party
+      -- ^ The party that can mint this reward.
+      -- If not set, this is the provider
   where
     signatory dso
     ensure amount > 0.0
 
     -- The provider is no signatory so their node's unavailability does not hold up the rewards issuance process.
     -- The coupon will be archived once it expired as part of standard DSO.
-    observer provider
+    observer provider, beneficiary
 
     choice AppRewardCoupon_DsoExpire : AppRewardCoupon_DsoExpireResult
       with
@@ -341,7 +393,7 @@ instance HasCheckedFetch LockedAmulet ForOwner where
   contractGroupId lockedAmulet = contractGroupId (lockedAmulet.amulet)
 
 instance HasCheckedFetch AppRewardCoupon ForOwner where
-  contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = provider
+  contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = fromOptional provider beneficiary
 
 instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary
@@ -353,3 +405,9 @@ instance HasCheckedFetch ValidatorRewardCoupon ForDso where
 
 instance HasCheckedFetch UnclaimedReward ForDso where
   contractGroupId UnclaimedReward {..} = ForDso with dso
+
+instance HasCheckedFetch FeaturedAppActivityMarker ForOwner where
+  contractGroupId FeaturedAppActivityMarker {..} = ForOwner with dso; owner = provider
+
+instance HasCheckedFetch FeaturedAppActivityMarker ForDso where
+  contractGroupId FeaturedAppActivityMarker {..} = ForDso with dso

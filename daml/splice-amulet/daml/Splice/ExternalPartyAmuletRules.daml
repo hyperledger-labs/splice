@@ -144,6 +144,7 @@ template TransferCommand
                provider = delegate
                inputs = inputs
                outputs = []
+               beneficiaries = None -- No beneficiaries for self-transfer merge.
              pure (TransferCommandResultFailure error)
 
          if | transferCounter.nextNonce > nonce ->
@@ -373,6 +374,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
                 holders = [dso]
           ]
         inputs = transferInputs
+        beneficiaries = None -- no beneficiaries for self-transfer
 
   result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
 
