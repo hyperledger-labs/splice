@@ -517,7 +517,7 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 2
+          "domains": 3
         },
         "enableGcsProxy": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -1653,6 +1653,66 @@
               "port": 26196,
               "protocol": "TCP",
               "targetPort": 26196
+            },
+            {
+              "name": "cometbft-2-0-gw",
+              "port": 26206,
+              "protocol": "TCP",
+              "targetPort": 26206
+            },
+            {
+              "name": "cometbft-2-1-gw",
+              "port": 26216,
+              "protocol": "TCP",
+              "targetPort": 26216
+            },
+            {
+              "name": "cometbft-2-2-gw",
+              "port": 26226,
+              "protocol": "TCP",
+              "targetPort": 26226
+            },
+            {
+              "name": "cometbft-2-3-gw",
+              "port": 26236,
+              "protocol": "TCP",
+              "targetPort": 26236
+            },
+            {
+              "name": "cometbft-2-4-gw",
+              "port": 26246,
+              "protocol": "TCP",
+              "targetPort": 26246
+            },
+            {
+              "name": "cometbft-2-5-gw",
+              "port": 26256,
+              "protocol": "TCP",
+              "targetPort": 26256
+            },
+            {
+              "name": "cometbft-2-6-gw",
+              "port": 26266,
+              "protocol": "TCP",
+              "targetPort": 26266
+            },
+            {
+              "name": "cometbft-2-7-gw",
+              "port": 26276,
+              "protocol": "TCP",
+              "targetPort": 26276
+            },
+            {
+              "name": "cometbft-2-8-gw",
+              "port": 26286,
+              "protocol": "TCP",
+              "targetPort": 26286
+            },
+            {
+              "name": "cometbft-2-9-gw",
+              "port": 26296,
+              "protocol": "TCP",
+              "targetPort": 26296
             }
           ]
         },

@@ -275,7 +275,7 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 2
+          "domains": 3
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [

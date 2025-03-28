@@ -198,7 +198,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "1"
+              "1",
+              "2"
             ]
           }
         },
@@ -374,7 +375,7 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 2
+          "domains": 3
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
