@@ -4,6 +4,7 @@ import { LedgerClient } from "../apis/ledger-client";
 import { CommandOptions } from "../cli";
 import { TokenStandardTransactionInterfaces } from "../constants";
 
+// TODO (#18634): support verbose flag
 export async function listHoldingTransactions(
   partyId: string,
   opts: CommandOptions & { afterOffset?: string }
@@ -138,6 +139,19 @@ function toPrettyEvents(
               parentChoiceNames,
               exercisedEvent.lastDescendantNodeId // We don't care about a transfer's children
             );
+          case "BurnMintFactory_BurnMint":
+            const burnMint = toPrettyBurnMint(exercisedEvent, partyId);
+            if (burnMint) {
+              mutatingResult.push(burnMint);
+            }
+            return toPrettyEvents(
+              pendingEventsMutatingStack,
+              mutatingResult,
+              partyId,
+              mutatingHoldingAcs,
+              parentChoiceNames,
+              exercisedEvent.lastDescendantNodeId // We don't care about burnmint's children
+            );
           default:
             parentChoiceNames.push(exercisedEvent.choice);
             const result = toPrettyEvents(
@@ -270,6 +284,53 @@ function toPrettyTransfer(exercisedEvent: any): PrettyTransfer {
   };
 }
 
+function toPrettyBurnMint(
+  exercisedEvent: any,
+  partyId: string
+): PrettyBurnMint | null {
+  const choiceArgument = exercisedEvent.choiceArgument;
+  const exerciseResult = exercisedEvent.exerciseResult;
+  if (
+    !choiceArgument.outputs.find((output: any) => output.owner === partyId) &&
+    choiceArgument.sender !== partyId
+  ) {
+    return null;
+  }
+
+  const inputHoldings = choiceArgument.inputHoldingCids.map(
+    (cid: string, idx: number) => {
+      return {
+        [cid]: {
+          amount: exerciseResult.inputHoldingAmounts[idx],
+        },
+      };
+    }
+  );
+  const outputHoldings = choiceArgument.outputs.map(
+    (output: any, idx: number) => {
+      return {
+        [exerciseResult.outputCids[idx]]: {
+          amount: output.amount,
+          context: output.context,
+          owner: output.owner,
+        },
+      };
+    }
+  );
+  return {
+    type: "BurnMint",
+    input: {
+      sender: choiceArgument.sender,
+      inputHoldings,
+      instrumentId: choiceArgument.instrumentId,
+      extraArgs: choiceArgument.extraArgs,
+    },
+    output: {
+      outputHoldings,
+    },
+  };
+}
+
 // a naive implementation like event.X?.nodeId || event.Y?.nodeId || event.Z?.nodeId fails when nodeId=0
 interface NodeIdAndEvent {
   nodeId: number;
@@ -308,7 +369,7 @@ interface PrettyTransaction {
   events: Event[];
 }
 type Event = RawCreatedEvent | RawArchivedEvent | ExercisedEvent;
-type ExercisedEvent = PrettyTransfer;
+type ExercisedEvent = PrettyTransfer | PrettyBurnMint;
 interface RawArchivedEvent {
   type: "Archived";
   parentChoice: string;
@@ -343,5 +404,27 @@ interface PrettyTransfer {
     senderHoldingCids: string[];
     receiverHoldingCids: string[];
     meta: any;
+  };
+}
+interface PrettyBurnMint {
+  type: "BurnMint";
+  input: {
+    sender: string;
+    inputHoldings: {
+      [contractId: string]: {
+        amount: string;
+      };
+    };
+    instrumentId: { admin: string; id: string };
+    extraArgs: any;
+  };
+  output: {
+    outputHoldings: {
+      [contractId: string]: {
+        amount: string;
+        owner: string;
+        context: any;
+      };
+    };
   };
 }

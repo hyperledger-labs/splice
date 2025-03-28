@@ -166,7 +166,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         "holdings and transactions are returned",
         _ => {
           val interfaces =
-            Seq(transferinstructionv1.TransferFactory.TEMPLATE_ID, holdingv1.Holding.TEMPLATE_ID)
+            Seq(
+              transferinstructionv1.TransferFactory.TEMPLATE_ID,
+              holdingv1.Holding.TEMPLATE_ID,
+              holdingv1.BurnMintFactory.TEMPLATE_ID,
+            )
           def filtersByParty(includeWildcard: Boolean) = Map(
             alice.toProtoPrimitive -> Filters(
               interfaces.map(interface =>
