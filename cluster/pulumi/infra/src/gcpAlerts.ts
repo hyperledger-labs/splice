@@ -179,7 +179,7 @@ ${conditionalString(
 }
 
 // https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-upgrades#control_plane_upgrade_logs
-export function installMaintenanceUpdateAlerts(
+export function installClusterMaintenanceUpdateAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel
 ): void {
   const logGkeClusterUpdate = new gcp.logging.Metric('log_gke_cluster_update', {
@@ -205,7 +205,7 @@ jsonPayload.state=~"STARTED"`,
   });
 
   const displayName = `Cluster ${CLUSTER_BASENAME} is being updated`;
-  new gcp.monitoring.AlertPolicy('updateAlert', {
+  new gcp.monitoring.AlertPolicy('updateClusterAlert', {
     alertStrategy: {
       autoClose: '3600s',
       notificationChannelStrategies: [
@@ -232,6 +232,56 @@ jsonPayload.state=~"STARTED"`,
           //retest period
           duration: '60s',
           filter: pulumi.interpolate`resource.type="global" AND metric.type = "logging.googleapis.com/user/${logGkeClusterUpdate.name}"`,
+          trigger: {
+            count: 1,
+          },
+        },
+        displayName: displayName,
+      },
+    ],
+    displayName: displayName,
+    notificationChannels: [notificationChannel.name],
+  });
+}
+
+export function installCloudSQLMaintenanceUpdateAlerts(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
+  const logGkeCloudSQLUpdate = new gcp.logging.Metric('log_gke_cloudsql_update', {
+    name: `log_gke_cloudsql_update_${CLUSTER_BASENAME}`,
+    description: 'Logs with cloudsql databases events',
+    filter: `
+resource.type="cloudsql_database"
+"terminating connection due to administrator command" OR "the database system is shutting down"`,
+  });
+
+  const displayName = `Possible CloudSQL maintenance going on in ${CLUSTER_BASENAME}`;
+  new gcp.monitoring.AlertPolicy('updateCloudSQLAlert', {
+    alertStrategy: {
+      autoClose: '3600s',
+      notificationChannelStrategies: [
+        {
+          notificationChannelNames: [notificationChannel.name],
+          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
+        },
+      ],
+    },
+    combiner: 'OR',
+    conditions: [
+      {
+        conditionThreshold: {
+          aggregations: [
+            {
+              //query period
+              alignmentPeriod: '600s',
+              crossSeriesReducer: 'REDUCE_SUM',
+              perSeriesAligner: 'ALIGN_SUM',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          //retest period
+          duration: '60s',
+          filter: pulumi.interpolate`resource.type="cloudsql_database" AND metric.type = "logging.googleapis.com/user/${logGkeCloudSQLUpdate.name}"`,
           trigger: {
             count: 1,
           },

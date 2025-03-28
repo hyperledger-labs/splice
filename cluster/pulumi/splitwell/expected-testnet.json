@@ -674,6 +674,11 @@
         "locationPreference": {
           "zone": "europe-west6-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "testzrh"
@@ -804,6 +809,11 @@
         "locationPreference": {
           "zone": "europe-west6-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "testzrh"
@@ -863,6 +873,11 @@
         },
         "locationPreference": {
           "zone": "europe-west6-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {

@@ -1279,6 +1279,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -1340,6 +1345,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -1400,6 +1410,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -1545,6 +1560,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -1689,6 +1709,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -1749,6 +1774,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2417,6 +2447,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -2478,6 +2513,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -2538,6 +2578,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2683,6 +2728,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -2827,6 +2877,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -2887,6 +2942,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -3555,6 +3615,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -3616,6 +3681,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -3676,6 +3746,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -3821,6 +3896,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -3965,6 +4045,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -4025,6 +4110,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -4693,6 +4783,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -4754,6 +4849,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -4814,6 +4914,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -4959,6 +5064,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -5103,6 +5213,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -5163,6 +5278,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -5951,6 +6071,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -6012,6 +6137,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -6072,6 +6202,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -6217,6 +6352,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -6361,6 +6501,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
@@ -6421,6 +6566,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {

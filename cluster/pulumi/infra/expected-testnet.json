@@ -1852,6 +1852,18 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "description": "Logs with cloudsql databases events",
+      "filter": "\nresource.type=\"cloudsql_database\"\n\"terminating connection due to administrator command\" OR \"the database system is shutting down\"",
+      "name": "log_gke_cloudsql_update_testzrh"
+    },
+    "name": "log_gke_cloudsql_update",
+    "provider": "",
+    "type": "gcp:logging/metric:Metric"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "description": "Logs with ClusterUpdate events",
       "filter": "\nresource.labels.cluster_name=\"cn-testzrhnet\"\nresource.type=~\"(gke_cluster|gke_nodepool)\"\njsonPayload.state=~\"STARTED\"",
       "labelExtractors": {
@@ -3791,6 +3803,51 @@
               {
                 "alignmentPeriod": "600s",
                 "crossSeriesReducer": "REDUCE_SUM",
+                "perSeriesAligner": "ALIGN_SUM"
+              }
+            ],
+            "comparison": "COMPARISON_GT",
+            "duration": "60s",
+            "filter": "resource.type=\"cloudsql_database\" AND metric.type = \"logging.googleapis.com/user/log_gke_cloudsql_update_testzrh\"",
+            "trigger": {
+              "count": 1
+            }
+          },
+          "displayName": "Possible CloudSQL maintenance going on in testzrh"
+        }
+      ],
+      "displayName": "Possible CloudSQL maintenance going on in testzrh",
+      "notificationChannels": [
+        null
+      ]
+    },
+    "name": "updateCloudSQLAlert",
+    "provider": "",
+    "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "alertStrategy": {
+        "autoClose": "3600s",
+        "notificationChannelStrategies": [
+          {
+            "notificationChannelNames": [
+              null
+            ],
+            "renotifyInterval": "14400s"
+          }
+        ]
+      },
+      "combiner": "OR",
+      "conditions": [
+        {
+          "conditionThreshold": {
+            "aggregations": [
+              {
+                "alignmentPeriod": "600s",
+                "crossSeriesReducer": "REDUCE_SUM",
                 "groupByFields": [
                   "metric.label.cluster"
                 ],
@@ -3812,7 +3869,7 @@
         null
       ]
     },
-    "name": "updateAlert",
+    "name": "updateClusterAlert",
     "provider": "",
     "type": "gcp:monitoring/alertPolicy:AlertPolicy"
   },
