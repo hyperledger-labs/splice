@@ -1026,6 +1026,10 @@ class LfValue:
     def get_amulet_expire_summary_round(self):
         return self.__get_record_field("round").__get_round_number()
 
+    # data AmuletRules_ConvertFeaturedAppActivityMarkers -> openRoundCid
+    def get_amuletrules_convertfeaturedappactivitymarkers_openroundcid(self):
+        return self.__get_record_field("openMiningRoundCid").get_contract_id()
+
     # data SteppedRate
     def __get_stepped_rate(self):
         initial_rate = self.__get_record_field("initialRate").__get_numeric()
@@ -2049,7 +2053,10 @@ class State:
             case TemplateQualifiedNames.dso_bootstrap:
                 pass
             case _:
-                self._fail(transaction, f"Unexpected root CreatedEvent: {event} for transaction: {transaction}")
+                self._fail(
+                    transaction,
+                    f"Unexpected root CreatedEvent: {event} for transaction: {transaction}",
+                )
         return HandleTransactionResult.empty()
 
     def handle_receive_sv_reward_coupon(self, transaction, event):
@@ -3477,6 +3484,31 @@ class State:
         # Not associated with any round so just return an empty result
         return HandleTransactionResult.empty()
 
+    def handle_convert_featured_app_activity_markers(self, transaction, event):
+        # print(event)
+        # print(
+        #     event.exercise_argument.get_dsorules_amuletrules_convertfeaturedappactivitymarkers_openroundcid()
+        # )
+        # open_round = self.active_contracts[
+        #     event.exercise_argument.__get_record_field("openMiningRoundCid")
+        # ]
+        assert len(event.child_event_ids) == 1
+        event = transaction.events_by_id[event.child_event_ids[0]]
+        assert event.choice_name == "AmuletRules_ConvertFeaturedAppActivityMarkers"
+        open_round = self.active_contracts[
+            event.exercise_argument.get_amuletrules_convertfeaturedappactivitymarkers_openroundcid()
+        ]
+        round_number = open_round.payload.get_open_mining_round_round()
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, CreatedEvent)
+                and child_event.template_id.qualified_name
+                == TemplateQualifiedNames.app_reward_coupon
+            ):
+                self.active_contracts[child_event.contract_id] = child_event
+        return HandleTransactionResult.for_open_round(round_number)
+
     def handle_root_exercised_event(self, transaction, event):
         LOG.debug(f"Root exercise: {event.choice_name}")
         match event.choice_name:
@@ -3621,6 +3653,12 @@ class State:
                 return HandleTransactionResult.empty()
             case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()
+            case "FeaturedAppRight_CreateActivityMarker":
+                return HandleTransactionResult.empty()
+            case "DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers":
+                return self.handle_convert_featured_app_activity_markers(
+                    transaction, event
+                )
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"
 

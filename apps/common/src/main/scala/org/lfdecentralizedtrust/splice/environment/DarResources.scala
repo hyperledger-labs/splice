@@ -221,6 +221,11 @@ object DarResources {
     Seq(validatorLifecycle_0_1_0, validatorLifecycle_0_1_1),
   )
 
+  val featuredApp = PackageResource(
+    DarResource("splice-api-featured-app-v1-current.dar"),
+    Seq(DarResource("splice-api-featured-app-v1-1.0.0.dar")),
+  )
+
   private val packageResources: Seq[PackageResource] =
     TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,

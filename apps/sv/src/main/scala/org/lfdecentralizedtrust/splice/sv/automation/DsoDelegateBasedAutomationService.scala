@@ -86,6 +86,13 @@ class DsoDelegateBasedAutomationService(
         packageVersionSupport,
       )
     )
+
+    registerTrigger(
+      new FeaturedAppActivityMarkerTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
   }
 
 }
@@ -118,5 +125,6 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[MergeSvRewardStateContractsTrigger],
     aTrigger[PruneAmuletConfigScheduleTrigger],
     aTrigger[MergeValidatorLicenseContractsTrigger],
+    aTrigger[FeaturedAppActivityMarkerTrigger],
   )
 }

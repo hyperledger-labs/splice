@@ -655,6 +655,7 @@ lazy val `apps-common` =
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
       `splice-token-standard-test-daml`,
+      `splice-featured-app-api-v1-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
