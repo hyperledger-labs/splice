@@ -13,22 +13,24 @@ class TokenStandardMetadataIntegrationTest extends IntegrationTestWithSharedEnvi
     val dso = sv1ScanBackend.getDsoPartyId().toProtoPrimitive
 
     val amuletInstrument = v1.definitions.Instrument(
-      instrumentId = v1.definitions.InstrumentId(
-        providerId = dso,
-        id = "Amulet",
-      ),
+      id = "Amulet",
       name = "Amulet",
       symbol = "Amulet",
+      supportedApis = Map(
+        "splice-api-token-metadata-v1" -> 1,
+        "splice-api-token-holding-v1" -> 1,
+        "splice-api-token-transfer-instruction-v1" -> 1,
+      ),
     )
 
     sv1ScanBackend.getRegistryInfo() shouldBe v1.definitions.GetRegistryInfoResponse(
-      providerId = dso,
-      supportedStandards = Vector("metadata=1.0", "holding=1.0", "transfer-instruction=1.0"),
+      adminId = dso,
+      supportedApis = Map("splice-api-token-metadata-v1" -> 1),
     )
 
     sv1ScanBackend.listInstruments().loneElement shouldBe amuletInstrument
 
-    sv1ScanBackend.lookupInstrument(amuletInstrument.instrumentId.id) shouldBe Some(
+    sv1ScanBackend.lookupInstrument(amuletInstrument.id) shouldBe Some(
       amuletInstrument
     )
     sv1ScanBackend.lookupInstrument("non-existent") shouldBe None

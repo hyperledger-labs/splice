@@ -24,9 +24,8 @@ class HttpTokenStandardMetadataHandler(
     Future.successful(
       v1.Resource.GetRegistryInfoResponse.OK(
         v1.definitions.GetRegistryInfoResponse(
-          providerId = store.key.dsoParty.toProtoPrimitive,
-          // TODO(#17943) Add allocation standards once supported
-          supportedStandards = Vector("metadata=1.0", "holding=1.0", "transfer-instruction=1.0"),
+          adminId = store.key.dsoParty.toProtoPrimitive,
+          supportedApis = Map("splice-api-token-metadata-v1" -> 1),
         )
       )
     )
@@ -45,7 +44,7 @@ class HttpTokenStandardMetadataHandler(
   def getInstrument(
       respond: v1.Resource.GetInstrumentResponse.type
   )(instrumentId: String)(tc: TraceContext): Future[v1.Resource.GetInstrumentResponse] =
-    if (instrumentId == amuletInstrument.instrumentId.id) {
+    if (instrumentId == amuletInstrument.id) {
       Future.successful(
         v1.Resource.GetInstrumentResponse.OK(
           amuletInstrument
@@ -60,11 +59,14 @@ class HttpTokenStandardMetadataHandler(
     }
 
   val amuletInstrument = v1.definitions.Instrument(
-    instrumentId = v1.definitions.InstrumentId(
-      providerId = store.key.dsoParty.toProtoPrimitive,
-      id = "Amulet",
-    ),
+    id = "Amulet",
     name = "Amulet",
     symbol = "Amulet",
+    // TODO(#17943) Add allocation APIs after they are properly supported
+    supportedApis = Map(
+      "splice-api-token-metadata-v1" -> 1,
+      "splice-api-token-holding-v1" -> 1,
+      "splice-api-token-transfer-instruction-v1" -> 1,
+    ),
   )
 }

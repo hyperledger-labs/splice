@@ -5,6 +5,11 @@
 Polishing Changes:
 
 * Switch openapi specs to use camelCase to be consistent with the participant JSON API.
+* Rename `providerId` to `adminId` in token metadata openapi.
+* Remove the admin party from listing instrument ids as it must be the
+  same as the admin party of the overall registry.
+* Replace `supportedStandards` by `supportedApis` in the openapi.
+* Add `supportedApis` to each instrument to support different instruments supporting different APIs.
 
 ## 2025-03-24
 

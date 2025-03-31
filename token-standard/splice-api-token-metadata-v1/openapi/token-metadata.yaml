@@ -115,51 +115,22 @@ components:
     GetRegistryInfoResponse:
       type: object
       properties:
-        providerId:
+        adminId:
           description: "The Daml party representing the registry app"
           type: string
-        supportedStandards:
-          description: "The standards supported by the registry."
-          type: array
-          items:
-            description: "SemVer reference of the most recent RC version supported"
-            type: string
-          example:
-            - "token-metadata=1.0"
-            - "holdings=1.0"
-            - "transfer-instruction=1.0"
-            - "allocation-instruction=1.0"
-        # TODO(#18560) Consider making this mandatory.
-        registryUiUrl:
-          type: string
-          description: |
-            The URL to redirect to for giving the user access to the registry specific
-            functionality; e.g., setting up preapprovals wrt who is allowed to transfer assets
-            to them.
+        supportedApis:
+          description: "The token standard APIs supported by the registry. Note that this only includes the registry-wide APIs. Use the instrument lookup endpoints to see which APIs are supported for a given instrument"
+          $ref: "#/components/schemas/SupportedApis"
       required:
-        - supportedStandards
-        - providerId
-
-    InstrumentId:
-      type: object
-      description: "Globally unique instrument identifier"
-      properties:
-        providerId:
-          description: "The party representing the registry app"
-          type: string
-        id:
-          description: "The unique ID of the instrument used by the registry app for this instrument"
-          type: string
-      required:
-        - providerId
-        - id
+        - adminId
+        - supportedApis
 
     Instrument:
       type: object
       properties:
-        instrumentId:
-          description: "The unique identifier assigned by the registry app to the instrument."
-          $ref: "#/components/schemas/InstrumentId"
+        id:
+          description: "The unique identifier assigned by the admin to the instrument."
+          type: string
         name:
           description: "The display name for the instrument recommended by the instrument admin. This is not necessarily unique."
           type: string
@@ -173,11 +144,14 @@ components:
           description: "The timestamp when the total supply was last computed."
           type: string
           format: date-time
+        supportedApis:
+          $ref: "#/components/schemas/SupportedApis"
       required:
         [
-          "instrumentId",
+          "id",
           "name",
           "symbol",
+          "supportedApis"
         ]
 
     ListInstrumentsResponse:
@@ -200,3 +174,12 @@ components:
       properties:
         error:
           type: string
+
+    SupportedApis:
+      description: |
+        Map from token standard API name to the minor version of the API supported, e.g.,
+        splice-api-token-metadata-v1 -> 1 where the `1` corresponds to the minor version.
+      type: object
+      additionalProperties:
+        type: integer
+        format: int32
