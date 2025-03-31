@@ -10,7 +10,7 @@ import { upOperation, upStack } from './pulumiOperations';
 
 const abortController = new PulumiAbortController();
 
-async function runCantonNetworkAndSvCantonStacksUp() {
+async function runAllStacksUp() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
   let operations: Operation[] = [];
   const mainStackUp = upStack(mainStack, abortController);
@@ -18,6 +18,13 @@ async function runCantonNetworkAndSvCantonStacksUp() {
     name: 'canton-network',
     promise: mainStackUp,
   });
+  // TODO(18683): We really shouldn't deploy that here (semantically), but if we don't things currently break.
+  // Once we resolve this we can think about redoing #18615 again.
+  if (DeploySvRunbook) {
+    const svRunbook = await stack('sv-runbook', 'sv-runbook', true, {});
+    const svRunbookUp = upOperation(svRunbook, abortController);
+    operations.push(svRunbookUp);
+  }
   const cantonStacks = runSvCantonForAllMigrations(
     'up',
     stack => {
@@ -26,11 +33,6 @@ async function runCantonNetworkAndSvCantonStacksUp() {
     false
   );
   operations = operations.concat(cantonStacks);
-  return awaitAllOrThrowAllExceptions(operations);
-}
-
-async function runValidator1AndSplitwellStacksUp() {
-  const operations: Operation[] = [];
   if (mustInstallValidator1) {
     const validator1 = await stack('validator1', 'validator1', true, {});
     operations.push(upOperation(validator1, abortController));
@@ -40,11 +42,6 @@ async function runValidator1AndSplitwellStacksUp() {
     operations.push(upOperation(splitwell, abortController));
   }
   return awaitAllOrThrowAllExceptions(operations);
-}
-
-async function runAllStacksUp() {
-  await runCantonNetworkAndSvCantonStacksUp()
-  return runValidator1AndSplitwellStacksUp()
 }
 
 runAllStacksUp().catch(() => {
