@@ -1516,8 +1516,7 @@
         },
         "maintenanceWindow": {
           "day": 2,
-          "hour": 8,
-          "updateTrack": "production"
+          "hour": 8
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2249,8 +2248,7 @@
         },
         "maintenanceWindow": {
           "day": 2,
-          "hour": 8,
-          "updateTrack": "production"
+          "hour": 8
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2948,8 +2946,7 @@
         },
         "maintenanceWindow": {
           "day": 2,
-          "hour": 8,
-          "updateTrack": "production"
+          "hour": 8
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -3647,8 +3644,7 @@
         },
         "maintenanceWindow": {
           "day": 2,
-          "hour": 8,
-          "updateTrack": "production"
+          "hour": 8
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
