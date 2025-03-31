@@ -260,6 +260,7 @@ getLockedAmuletCmd app owner lockHolder amount lockDuration = do
                 expiresAt = now `addRelTime` lockDuration
               receiverFeeRatio = 0.0
           ]
+        beneficiaries = None -- test code, don't set beneficiaries
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app owner.primaryParty
 

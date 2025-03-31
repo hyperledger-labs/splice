@@ -124,6 +124,7 @@ trait TimeTestUtil extends TestCommon {
               )
             ).asJava,
             outputs.asJava,
+            java.util.Optional.empty(),
           ),
           new splice.amuletrules.TransferContext(
             transferContext.openMiningRound,
@@ -138,7 +139,6 @@ trait TimeTestUtil extends TestCommon {
         .toSeq,
       synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
-      optTimeout = None,
     )
   }
 

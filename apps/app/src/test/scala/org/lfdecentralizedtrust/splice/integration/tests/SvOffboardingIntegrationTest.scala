@@ -111,7 +111,6 @@ class SvOffboardingIntegrationTest
         sv1Backend.participantClient.ledger_api_extensions.commands.submitJava(
           actAs = Seq(sv1Backend.getDsoInfo().svParty),
           readAs = Seq(sv1Backend.getDsoInfo().dsoParty),
-          optTimeout = None,
           commands = externalPartyAmuletRules.contractId
             .exerciseExternalPartyAmuletRules_CreateTransferCommand(
               sv1Backend.getDsoInfo().svParty.toProtoPrimitive,

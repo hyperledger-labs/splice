@@ -12,31 +12,15 @@ import Splice.Api.Token.AllocationRequestV1
 import DA.Optional (fromOptional)
 import DA.Set as Set
 
-template TradingAgreement with
-    venue : Party
-    user : Party
-  where
-    signatory venue, user
-
-    nonconsuming choice TradingAgreement_ProposeTrade : ContractId OTCTradeProposal
-      with
-        transferLegs : [Api.Token.AllocationV1.TransferLeg]
-      controller user
-      do
-        create OTCTradeProposal with
-          venue
-          tradeCid = None
-          transferLegs
-          approvers = Set.singleton user
 
 template OTCTradeProposal with
     venue : Party
     tradeCid : Optional (ContractId OTCTradeProposal) -- Tracking-id for the trade being proposed. Set to None for new trades.
     transferLegs : [Api.Token.AllocationV1.TransferLeg]
-    approvers : Set.Set Party -- ^ Parties that have approved the proposal
+    approvers : [Party] -- ^ Parties that have approved the proposal
   where
-    signatory venue, approvers
-    observer tradingParties transferLegs
+    signatory approvers
+    observer venue, tradingParties transferLegs
 
     -- This is test code, so we don't care about the contention here.
     -- Moreover, likely the number of trading parties is going to be low anyways.
@@ -45,10 +29,10 @@ template OTCTradeProposal with
         approver : Party
       controller approver
       do
-        let newApprovers = Set.insert approver approvers
+        let newApprovers = approver :: approvers
         let traders = tradingParties transferLegs
         require "Approver is a trading party" (approver `Set.member` traders)
-        require "Approver is new" (not $ approver `Set.member` approvers)
+        require "Approver is new" (approver `notElem` approvers)
         create this with
           approvers = newApprovers
           tradeCid = Some (fromOptional self tradeCid)
@@ -65,7 +49,7 @@ template OTCTradeProposal with
         settleBefore : Time
       controller venue
       do
-        require "All trading parties have approved" (approvers == tradingParties transferLegs)
+        require "All trading parties have approved" (Set.fromList approvers == tradingParties transferLegs)
         now <- getTime
         require "Preparation time has not passed" (now < prepareUntil)
         require "Preparation time before settlement time" (prepareUntil < settleBefore)
@@ -105,7 +89,6 @@ template OTCTrade
       do
         -- check timing constraints
         now <- getTime
-        require "Preparation time has passed" (now >= prepareUntil) -- TODO (#17541):consider early settlement
         require "Settlement deadline has not passed" (now < settleBefore)
         -- validate and execute transferLegs
         require "There is one context per transfer" (length extraArgss == length transferLegs)

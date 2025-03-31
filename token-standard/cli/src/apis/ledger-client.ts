@@ -1,6 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 // TODO (#18142): the types are not nice, but this is just temporary until we can replace it with openapi-generated code
+import { randomUUID } from "node:crypto";
+
 export class LedgerClient {
   readonly baseUrl: string;
   readonly token: string;
@@ -114,8 +116,53 @@ export class LedgerClient {
       },
     };
   }
+
+  async prepareSend(
+    actAs: string,
+    commands: any[],
+    synchronizerId: string,
+    disclosedContracts: DisclosedContract[]
+  ): Promise<PreparedTransaction> {
+    const payload = {
+      actAs: [actAs],
+      readAs: [actAs],
+      workflowId,
+      applicationId,
+      commandId: `tscli-${randomUUID()}`,
+      submissionId: "",
+      synchronizerId,
+      commands,
+      disclosedContracts,
+      verboseHashing: true,
+      packageIdSelectionPreference: [],
+    };
+    return this.doFetch("/v2/interactive-submission/prepare", "POST", payload);
+  }
+
+  async executeInteractiveSubmission(
+    preparedTransaction: PreparedTransaction,
+    partySignatures: any
+  ): Promise<unknown> {
+    const payload = {
+      applicationId,
+      submissionId: "",
+      preparedTransaction: preparedTransaction.preparedTransaction,
+      hashingSchemeVersion: preparedTransaction.hashingSchemeVersion,
+      partySignatures,
+      deduplicationPeriod: { Empty: {} },
+    };
+    return this.doFetch("/v2/interactive-submission/execute", "POST", payload);
+  }
 }
 
+const applicationId = "TS-CLI";
+const workflowId = "TS-CLI";
+
+interface PreparedTransaction {
+  preparedTransactionHash: string;
+  preparedTransaction: any;
+  hashingSchemeVersion: any;
+}
 interface GetLedgerEndResponse {
   offset: string;
 }
@@ -123,4 +170,11 @@ interface GetLedgerEndResponse {
 interface LatestPrunedOffsets {
   participantPrunedUpToInclusive: string;
   allDivulgedContractsPrunedUpToInclusive: string;
+}
+
+export interface DisclosedContract {
+  contractId: string;
+  createdEventBlob: string;
+  synchronizerId: string;
+  templateId: string;
 }

@@ -3,28 +3,22 @@
 
 module Splice.AmuletAllocation (
   AmuletAllocation(..),
-
-  allocationToAmuletOutput,
-
-  ) where
-
-import DA.Optional (optionalToList)
+  allocationToTwoStepTransfer,
+) where
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV1
 
 import Splice.Amulet
-import Splice.Amulet.TokenApiUtils
-import Splice.AmuletRules
-import Splice.Round
-import Splice.Types
-import Splice.Util
+import Splice.Amulet.TwoStepTransfer
+
 
 -- | Amulet allocated in locked form to a trade.
 template AmuletAllocation
   with
     lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for the allocation
     allocation : AllocationView
+    requestedAt : Time
   where
     signatory allocationInstrumentAdmin allocation, allocation.transferLeg.sender
     observer allocation.settlement.executor
@@ -40,47 +34,37 @@ allocationInstrumentAdmin : AllocationView -> Party
 allocationInstrumentAdmin AllocationView{..} = transferLeg.instrumentId.admin
 
 
-
 -- Allocation usage
 -------------------
 
-allocationToAmuletOutput : AllocationView -> TransferOutput
-allocationToAmuletOutput allocation =
-  TransferOutput with
+allocationToTwoStepTransfer : Time -> AllocationView -> TwoStepTransfer
+allocationToTwoStepTransfer requestedAt allocation =
+  TwoStepTransfer with
+    dso = allocationInstrumentAdmin allocation
+    sender = allocation.transferLeg.sender
     receiver = allocation.transferLeg.receiver
     amount = allocation.transferLeg.amount
-    receiverFeeRatio = 0.0  -- all fees are paid by the sender
-    lock = None
-
+    provider = allocation.settlement.executor
+    requestedAt
+    transferBefore = allocation.settlement.settleBefore
+    allowFeaturing = True -- TODO(#18638): allow the executor to specify beneficiaries
 
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
-transferAmuletAllocation AmuletAllocation{..} extraArgs = do
-  let dso = allocationInstrumentAdmin allocation
-  paymentContext <- paymentFromChoiceContext dso extraArgs.context
-  let openRoundCid = paymentContext.context.openMiningRound
-  -- unlock amulet
-  unlockResult <- exercise lockedAmulet LockedAmulet_Unlock with openRoundCid
-  let amuletCid = unlockResult.amuletSum.amulet
-  -- execute transfer
-  let transfer = Splice.AmuletRules.Transfer with
-        sender = allocation.transferLeg.sender
-        provider = allocation.settlement.executor
-        inputs = [InputAmulet amuletCid]
-        outputs = [ allocationToAmuletOutput allocation ]
-  result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
+transferAmuletAllocation amuletAllocation extraArgs = do
+  let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.requestedAt amuletAllocation.allocation
+  (senderHoldingCids, receiverHoldingCids) <-
+    executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
   pure Allocation_ExecuteTransferResult
     with
       holdings = AllocationResultHoldings
         with
-          senderHoldingCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
-          receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
+          senderHoldingCids
+          receiverHoldingCids
       meta = emptyMetadata
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update ChoiceExecutionMetadata
-unlockAmuletAllocation amuletAllocation extraArgs = do
-  openRoundCid <- getContextContractId @OpenMiningRound extraArgs.context openRoundContextKey
-  -- prudent engineering: check the DSO party
-  let dso = allocationInstrumentAdmin (amuletAllocation.allocation)
-  _ <- fetchChecked (ForDso with dso) openRoundCid
-  exercise amuletAllocation.lockedAmulet LockedAmulet_Unlock with openRoundCid
+unlockAmuletAllocation AmuletAllocation{..} extraArgs = do
+  let twoStepTransfer = allocationToTwoStepTransfer requestedAt allocation
+  _senderHoldingCid <- abortTwoStepTransfer twoStepTransfer lockedAmulet extraArgs
+  -- TODO(#18632): also return the sender holding here
   pure ChoiceExecutionMetadata with meta = emptyMetadata

@@ -226,6 +226,7 @@ class ExternalPartySetupProposalIntegrationTest
           false,
           appRewardAmount.bigDecimal,
           issuingRound.round,
+          java.util.Optional.empty(),
         ).create,
       ),
     )(

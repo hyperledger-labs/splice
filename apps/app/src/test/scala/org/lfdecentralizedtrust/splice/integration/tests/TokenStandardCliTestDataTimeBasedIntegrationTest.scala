@@ -166,7 +166,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         "holdings and transactions are returned",
         _ => {
           val interfaces =
-            Seq(transferinstructionv1.TransferFactory.TEMPLATE_ID, holdingv1.Holding.TEMPLATE_ID)
+            Seq(
+              transferinstructionv1.TransferFactory.TEMPLATE_ID,
+              holdingv1.Holding.TEMPLATE_ID,
+              holdingv1.BurnMintFactory.TEMPLATE_ID,
+            )
           def filtersByParty(includeWildcard: Boolean) = Map(
             alice.toProtoPrimitive -> Filters(
               interfaces.map(interface =>
@@ -255,7 +259,15 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive -> "validator::normalized",
       )
       val dateFields =
-        Seq("expiresAt", "lastRenewedAt", "validFrom", "executeBefore", "opensAt", "targetClosesAt")
+        Seq(
+          "expiresAt",
+          "lastRenewedAt",
+          "validFrom",
+          "requestedAt",
+          "executeBefore",
+          "opensAt",
+          "targetClosesAt",
+        )
       def replaceStringsInJson(viewValue: Json) = {
         val current = viewValue.spaces2SortKeys
         val allContracts =

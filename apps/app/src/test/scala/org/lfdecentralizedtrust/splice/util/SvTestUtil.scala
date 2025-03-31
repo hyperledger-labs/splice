@@ -189,7 +189,6 @@ trait SvTestUtil extends TestCommon {
         .submitJava(
           actAs = Seq(svPartyId),
           readAs = Seq(dsoParty),
-          optTimeout = None,
           commands = dsoRulesCid
             .exerciseDsoRules_ConfirmAction(svPartyId.toProtoPrimitive, action)
             .commands

@@ -4,6 +4,27 @@
 
 Major changes:
 
+* Added support for two-step transfers based on an offer-accept workflow in the `TransferFactory` API.
+  This allows to transfer tokens to parties that have not pre-approved the receipt of the tokens from
+  the sender. Amulet also implements this two-step transfer flow.
+
+Polishing changes:
+
+* Add a `requestedAt` field to `Transfer` to enable computing the lock duration for two-step transfers w/o
+  relying on `getTime` in Daml, which would introduce a tight one minute prepare-submission delay.
+* Add a `originalInstructionId` field to allocation and transfer instructions to aid wallets in
+  tracking the evolution of an instruction over multiple steps.
+* Switch openapi specs to use camelCase to be consistent with the participant JSON API.
+* Rename `providerId` to `adminId` in token metadata openapi.
+* Remove the admin party from listing instrument ids as it must be the
+  same as the admin party of the overall registry.
+* Replace `supportedStandards` by `supportedApis` in the openapi.
+* Add `supportedApis` to each instrument to support different instruments supporting different APIs.
+
+## 2025-03-24
+
+Major changes:
+
 Polishing changes:
 
 * Add `TransferFactory_PublicFetch`, `AllocationFactory_PublicFetch` and `BurnMintFactory_PublicFetch` choices.

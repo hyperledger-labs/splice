@@ -34,16 +34,22 @@ import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanAp
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
+  ChoiceContextWithDisclosures,
   Contract,
   ContractWithState,
+  FactoryChoiceWithDisclosures,
   PackageQualifiedName,
   SpliceUtil,
 }
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationinstructionv1,
+  allocationv1,
+  transferinstructionv1,
+}
 
 import java.time.Instant
 
@@ -476,12 +482,44 @@ abstract class ScanAppReference(
     }
   }
 
-  def getTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer) = {
+  def getTransferFactory(
+      choiceArgs: transferinstructionv1.TransferFactory_Transfer
+  ): FactoryChoiceWithDisclosures = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTransferFactory(choiceArgs))
     }
   }
 
+  def getRegistryInfo() =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRegistryInfo)
+    }
+
+  def lookupInstrument(instrumentId: String) =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupInstrument(instrumentId))
+    }
+
+  def listInstruments() =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.ListInstruments(pageSize = None, pageToken = None))
+    }
+
+  def getAllocationFactory(
+      choiceArgs: allocationinstructionv1.AllocationFactory_Allocate
+  ): FactoryChoiceWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetAllocationFactory(choiceArgs))
+    }
+  }
+
+  def getAllocationTransferContext(
+      allocationId: allocationv1.Allocation.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetAllocationTransferContext(allocationId))
+    }
+  }
 }
 
 final class ScanAppBackendReference(

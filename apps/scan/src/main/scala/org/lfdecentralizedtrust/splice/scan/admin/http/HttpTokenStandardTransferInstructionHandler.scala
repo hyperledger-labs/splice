@@ -83,8 +83,10 @@ class HttpTokenStandardTransferInstructionHandler(
             .decentralizedSynchronizer
             .activeSynchronizer
         v1.Resource.GetTransferFactoryResponseOK(
-          definitions.FactoryWithChoiceContext(
+          definitions.TransferFactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
+            // TODO(#18643): also implement support for the other kinds of transfers (self, two-step)
+            definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
             definitions.ChoiceContext(
               choiceContextData = Some(
                 io.circe.parser

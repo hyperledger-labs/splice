@@ -428,7 +428,6 @@ class WalletManualRoundsIntegrationTest
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svParty),
       readAs = Seq(dsoParty),
-      optTimeout = None,
       commands = sv1Backend
         .getDsoInfo()
         .dsoRules

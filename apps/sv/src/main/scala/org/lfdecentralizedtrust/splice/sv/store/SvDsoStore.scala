@@ -958,6 +958,14 @@ trait SvDsoStore
   )(implicit tc: TraceContext): Future[
     Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
+
+  def listFeaturedAppActivityMarkers(limit: Int)(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.amulet.FeaturedAppActivityMarker.ContractId,
+    splice.amulet.FeaturedAppActivityMarker,
+  ]]] =
+    multiDomainAcsStore
+      .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
+      .map(_.map(_.contract))
 }
 
 object SvDsoStore {
@@ -1128,6 +1136,12 @@ object SvDsoStore {
           rewardAmount = Some(contract.payload.amount),
           appRewardIsFeatured = Some(contract.payload.featured),
         )
+      },
+      mkFilter(splice.amulet.FeaturedAppActivityMarker.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract
+          )
       },
       mkFilter(splice.amulet.ValidatorRewardCoupon.COMPANION)(co => co.payload.dso == dso) {
         contract =>

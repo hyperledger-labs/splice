@@ -8,36 +8,64 @@
       "synchronizerId": "sync::normalized",
       "events": [
         {
-          "type": "Created",
-          "parentChoice": "AmuletRules_Transfer",
-          "contractId": "15",
-          "payload": {
-            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
-            "viewValue": {
-              "amount": "200.0000000000",
-              "instrumentId": {
-                "admin": "dso::normalized",
-                "id": "Amulet"
-              },
-              "lock": null,
-              "meta": {
+          "type": "BurnMint",
+          "input": {
+            "sender": "validator::normalized",
+            "inputHoldings": [
+              {
+                "14": {
+                  "amount": "199877.3600000000"
+                }
+              }
+            ],
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "extraArgs": {
+              "context": {
                 "values": [
                   [
-                    "splice.lfdecentralizedtrust.org/created-in-round",
-                    "1"
-                  ],
-                  [
-                    "splice.lfdecentralizedtrust.org/rate-per-round",
-                    "0.00380518"
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "8"
+                    }
                   ]
                 ]
               },
-              "owner": "party::normalized"
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/reason",
+                    "transfer"
+                  ]
+                ]
+              }
             }
           },
-          "offset": 4,
-          "templateId": "424159d90a541adf7d39b7527e7fcb8866ffbbc8f791315f0bc35d9a857456c0:Splice.Amulet:Amulet",
-          "packageName": "splice-amulet"
+          "output": {
+            "outputHoldings": [
+              {
+                "15": {
+                  "amount": "200.0000000000",
+                  "context": {
+                    "values": []
+                  },
+                  "owner": "party::normalized"
+                }
+              },
+              {
+                "16": {
+                  "amount": "199663.3600000000",
+                  "context": {
+                    "values": []
+                  },
+                  "owner": "validator::normalized"
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -116,36 +144,49 @@
       "synchronizerId": "sync::normalized",
       "events": [
         {
-          "type": "Created",
-          "parentChoice": "AmuletRules_Mint",
-          "contractId": "2",
-          "payload": {
-            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
-            "viewValue": {
-              "amount": "20000.0000000000",
-              "instrumentId": {
-                "admin": "dso::normalized",
-                "id": "Amulet"
-              },
-              "lock": null,
-              "meta": {
+          "type": "BurnMint",
+          "input": {
+            "sender": "party::normalized",
+            "inputHoldings": [],
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "extraArgs": {
+              "context": {
                 "values": [
                   [
-                    "splice.lfdecentralizedtrust.org/created-in-round",
-                    "1"
-                  ],
-                  [
-                    "splice.lfdecentralizedtrust.org/rate-per-round",
-                    "0.00380518"
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "8"
+                    }
                   ]
                 ]
               },
-              "owner": "party::normalized"
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/reason",
+                    "tap"
+                  ]
+                ]
+              }
             }
           },
-          "offset": 6,
-          "templateId": "424159d90a541adf7d39b7527e7fcb8866ffbbc8f791315f0bc35d9a857456c0:Splice.Amulet:Amulet",
-          "packageName": "splice-amulet"
+          "output": {
+            "outputHoldings": [
+              {
+                "2": {
+                  "amount": "20000.0000000000",
+                  "context": {
+                    "values": []
+                  },
+                  "owner": "party::normalized"
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -160,7 +201,7 @@
           "parentChoice": "raw API",
           "contractId": "3",
           "payload": {
-            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
+            "interfaceId": "90b5a678eb4f42d4eb805140797952732e6289772cd0a3d23db515cd96f8ac96:Splice.Api.Token.HoldingV1:Holding",
             "viewValue": {
               "amount": "30.0000000000",
               "instrumentId": {
@@ -180,7 +221,7 @@
             }
           },
           "offset": 7,
-          "templateId": "8bee11085163f0029179eaed4a1d8eef088ef53b0076f62d880506bd870e8461:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId": "2dfcfe011601bddb2155e59476bb5ff3c6f68e578aef54e28706d2fbec2837be:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }
       ]
@@ -196,7 +237,7 @@
           "parentChoice": "raw API",
           "contractId": "4",
           "payload": {
-            "interfaceId": "76856ffc6f0bc32119db73961dfbcbc339bbef2c840b54b59666043290fd41b9:Splice.Api.Token.HoldingV1:Holding",
+            "interfaceId": "90b5a678eb4f42d4eb805140797952732e6289772cd0a3d23db515cd96f8ac96:Splice.Api.Token.HoldingV1:Holding",
             "viewValue": {
               "amount": "40.0000000000",
               "instrumentId": {
@@ -216,7 +257,7 @@
             }
           },
           "offset": 8,
-          "templateId": "8bee11085163f0029179eaed4a1d8eef088ef53b0076f62d880506bd870e8461:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId": "2dfcfe011601bddb2155e59476bb5ff3c6f68e578aef54e28706d2fbec2837be:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }
       ]

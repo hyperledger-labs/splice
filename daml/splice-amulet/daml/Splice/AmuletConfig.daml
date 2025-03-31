@@ -42,6 +42,7 @@ data AmuletConfig unit = AmuletConfig with
       -- ^ Configuration determining the version of each package
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
+    featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
   deriving (Eq, Show)
 
 -- $1/year specified as a daily rate

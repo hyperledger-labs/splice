@@ -151,6 +151,10 @@ object PackageIdResolver {
                 DarResources.TokenStandard.tokenAllocationRequest
               case Package.TokenStandard.TokenAllocationInstruction =>
                 DarResources.TokenStandard.tokenAllocationInstruction
+              case Package.TokenStandard.TokenStandardTest =>
+                DarResources.TokenStandard.tokenStandardTest
+              case Package.FeaturedApp =>
+                DarResources.featuredApp
             }
         }
     }
@@ -240,6 +244,10 @@ object PackageIdResolver {
         DarResources.TokenStandard.tokenAllocationRequest.bootstrap.metadata.version.toString()
       case TokenStandard.TokenAllocationInstruction =>
         DarResources.TokenStandard.tokenAllocationInstruction.bootstrap.metadata.version.toString()
+      case TokenStandard.TokenStandardTest =>
+        DarResources.TokenStandard.tokenStandardTest.bootstrap.metadata.version.toString()
+      case FeaturedApp =>
+        DarResources.featuredApp.bootstrap.metadata.version.toString()
     }
     PackageVersion.assertFromString(version)
   }
@@ -273,6 +281,8 @@ object PackageIdResolver {
     "Splice.Api.Token.AllocationV1" -> Package.TokenStandard.TokenAllocation,
     "Splice.Api.Token.AllocationRequestV1" -> Package.TokenStandard.TokenAllocationRequest,
     "Splice.Api.Token.AllocationInstructionV1" -> Package.TokenStandard.TokenAllocationInstruction,
+    "Splice.Testing.Apps.TradingApp" -> Package.TokenStandard.TokenStandardTest,
+    "Splice.Api.FeaturedAppRightV1" -> Package.FeaturedApp,
   )
 
   sealed abstract class Package extends Product with Serializable {
@@ -295,6 +305,7 @@ object PackageIdResolver {
       final case object TokenAllocation extends Package
       final case object TokenAllocationRequest extends Package
       final case object TokenAllocationInstruction extends Package
+      final case object TokenStandardTest extends Package
     }
     final case object SpliceAmulet extends Package
     final case object SpliceAmuletNameService extends Package
@@ -302,6 +313,8 @@ object PackageIdResolver {
     final case object SpliceValidatorLifecycle extends Package
     final case object SpliceWallet extends Package
     final case object SpliceWalletPayments extends Package
+
+    final case object FeaturedApp extends Package
   }
 
 }

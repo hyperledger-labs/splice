@@ -138,6 +138,7 @@ template AppPaymentRequest
                       expiresAt = expiresAt
                     receiverFeeRatio = 0.0
                 ]
+              beneficiaries = None -- no beneficiaries for the locking step
          result <- exercisePaymentTransfer context transfer
          let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
          let round = result.round
@@ -220,6 +221,7 @@ template AcceptedAppPayment
               provider
               inputs = [InputAmulet result.amuletSum.amulet]
               outputs = map mkReceiverOutput amuletReceiverAmounts
+              beneficiaries = None -- not set for now, could extend later but we probably prefer investment in allocations through the token standard.
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let amulets = map (\(TransferResultAmulet amuletCid) -> amuletCid) result.createdAmulets

@@ -63,7 +63,6 @@ trait LedgerApiExtensions {
             commands: Seq[javaapi.data.Command],
             synchronizerId: Option[SynchronizerId] = None,
             commandId: String = "",
-            optTimeout: Option[NonNegativeDuration] = Some(ledgerApi.timeouts.ledgerCommand),
             deduplicationPeriod: Option[DeduplicationPeriod] = None,
             submissionId: String = "",
             minLedgerTimeAbs: Option[Instant] = None,
@@ -85,7 +84,13 @@ trait LedgerApiExtensions {
                 deduplicationPeriod = deduplicationPeriod,
                 submissionId = submissionId,
                 minLedgerTimeAbs = minLedgerTimeAbs,
-                disclosedContracts = disclosedContracts.map(DisclosedContract.fromJavaProto(_)),
+                disclosedContracts = disclosedContracts
+                  // We often have duplicates when merging choice contexts from multiple off-ledger APIs.
+                  // Cull them here to avoid sending them twice; and because the Ledger API server
+                  // currently errors out on them.
+                  // TODO(#18566): remove the note wrt the error once that's no longer the case
+                  .distinctBy(_.getContractId)
+                  .map(DisclosedContract.fromJavaProto),
                 synchronizerId = synchronizerId,
                 applicationId = applicationId,
                 packageIdSelectionPreference = Seq.empty,
@@ -94,7 +99,9 @@ trait LedgerApiExtensions {
           }
           JavaTransactionTree.fromProto(
             TransactionTree.toJavaProto(
-              ledgerApi.optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
+              // Never set the timeout, as Canton tries to be too clever and attempts to read the transaction
+              // with an empty 'required_parties' parameter, which then fails.
+              ledgerApi.optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout = None)
             )
           )
         }
@@ -115,7 +122,6 @@ trait LedgerApiExtensions {
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
-            optTimeout = None,
             disclosedContracts = disclosedContracts,
           )
           SpliceLedgerConnection.decodeExerciseResult(
@@ -144,7 +150,6 @@ trait LedgerApiExtensions {
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
-            optTimeout = None,
             disclosedContracts = disclosedContracts,
           )
           val cid = SpliceLedgerConnection

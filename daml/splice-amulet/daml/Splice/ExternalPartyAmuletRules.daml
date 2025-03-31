@@ -4,19 +4,18 @@
 {-# LANGUAGE MultiWayIf #-}
 module Splice.ExternalPartyAmuletRules where
 
+import DA.Foldable (forA_)
 import DA.Optional
-import DA.Time (RelTime, subTime)
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationInstructionV1 as Api.Token.AllocationInstructionV1
 
 import Splice.Amulet.TokenApiUtils
+import Splice.Amulet.TwoStepTransfer
 import Splice.AmuletAllocation
+import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
-import Splice.Expiry
-import Splice.Fees
-import Splice.Round
 import Splice.Types
 import Splice.Util
 
@@ -144,6 +143,7 @@ template TransferCommand
                provider = delegate
                inputs = inputs
                outputs = []
+               beneficiaries = None -- No beneficiaries for self-transfer merge.
              pure (TransferCommandResultFailure error)
 
          if | transferCounter.nextNonce > nonce ->
@@ -243,59 +243,100 @@ amulet_transferFactory_transferImpl
   : ExternalPartyAmuletRules
   -> ContractId Api.Token.TransferInstructionV1.TransferFactory
   -> Api.Token.TransferInstructionV1.TransferFactory_Transfer
-  -> Update Api.Token.TransferInstructionV1.TransferFactory_TransferResult
+  -> Update Api.Token.TransferInstructionV1.TransferInstructionResult
 amulet_transferFactory_transferImpl this _self arg = do
   let Api.Token.TransferInstructionV1.TransferFactory_Transfer {transfer, extraArgs} = arg
   let dso = this.dso
   -- validate call to factory and retrieve context
   requireExpectedAdminMatch arg.expectedAdmin dso
-  paymentContext <- paymentFromChoiceContext dso extraArgs.context
 
   -- == validate each field of the transfer specification ==
   -- sender: nothing to validate
-  -- receiver: validate that it approves the preapproval
-  preapprovalCid <- getContextContractId @TransferPreapproval extraArgs.context transferPreapprovalContextKey
-  preapproval <- fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
-  require "Preapproval receiver matches transfer receiver" (preapproval.receiver == transfer.receiver)
-  -- amount:
-  require "Amount must be positive" (transfer.amount > 0.0)
+  -- receiver: validate preapproval if given
+  optPreapprovalCid <- lookupContextContractId @TransferPreapproval extraArgs.context transferPreapprovalContextKey
+  forA_ optPreapprovalCid \preapprovalCid ->
+    fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
   -- instrumentId:
   let expectedInstrumentId = amuletInstrumentId this.dso
   require
     ("Expected instrumentId " <> show expectedInstrumentId <> " matches actual instrumentId " <> show transfer.instrumentId)
     (expectedInstrumentId == transfer.instrumentId)
-  -- executeBefore:
+  -- amount:
+  require "Amount must be positive" (transfer.amount > 0.0)
+  -- requestedAt:
   now <- getTime
+  require "requestedAt must be in the past" (transfer.requestedAt <= now)
+  -- executeBefore:
   require "Transfer must be executed before expiry" (now < transfer.executeBefore)
   -- holdingCids: note that their detailed validation is done in the transfer itself
-  let holdings = transfer.holdingCids
   require "At least one holding must be provided" (not $ null transfer.holdingCids)
 
-  -- execute transfer
-  result <- exercise preapprovalCid TransferPreapproval_Send
-    with
-      sender = transfer.sender
-      context = paymentContext
-      inputs = [ InputAmulet (coerceContractId holding) | holding <- holdings ]
-      amount = transfer.amount
+  -- execute the right kind of transfer
+  case optPreapprovalCid of
+    None
+      | transfer.receiver == transfer.sender -> do
+          -- execute a self-transfer
+          paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
+          result <- exercisePaymentTransfer paymentContext Transfer with
+            sender = transfer.sender
+            provider = transfer.sender
+            inputs = [ InputAmulet (coerceContractId holding) | holding <- transfer.holdingCids ]
+            outputs = [ TransferOutput with
+              receiver = transfer.sender
+              amount = transfer.amount
+              receiverFeeRatio = 0.0
+              lock = None ]
+            beneficiaries = None
+          pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+            output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
+              with
+                holdings = Api.Token.TransferInstructionV1.TransferInstructionResultHoldings
+                  with
+                    senderHoldingCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
+                    receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
+            meta = emptyMetadata
 
-  -- return result
-  pure Api.Token.TransferInstructionV1.TransferFactory_TransferResult with
-    output = Api.Token.TransferInstructionV1.TransferFactory_TransferResult_Completed
-      with
-        holdings = Api.Token.TransferInstructionV1.TransferResultHoldings
+      | otherwise -> do
+          -- prepare a two-step transfer
+          let twoStepTransfer = standardTransferToTwoStepTransfer arg.transfer.requestedAt arg.transfer
+          paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
+          lockedAmulet <- prepareTwoStepTransfer twoStepTransfer arg.transfer.holdingCids paymentContext
+          -- create the transfer instruction tracking this locked amulet
+          transferInstructionCid <- toInterfaceContractId <$> create AmuletTransferInstruction with
+            transfer = arg.transfer with
+              holdingCids = [toInterfaceContractId lockedAmulet] -- report the locked holding backing the transfer
+            lockedAmulet
+          -- return result
+          pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+            output = Api.Token.TransferInstructionV1.TransferInstructionResult_Pending
+              with
+                transferInstructionCid
+            meta = emptyMetadata
+
+    Some preapprovalCid -> do
+      -- use a payment context with featuring so the preapproval provider can be featured
+      paymentContext <- paymentFromChoiceContext dso extraArgs.context
+      -- execute a direct transfer
+      result <- exercise preapprovalCid TransferPreapproval_Send
+        with
+          sender = transfer.sender
+          context = paymentContext
+          inputs = [ InputAmulet (coerceContractId holding) | holding <- arg.transfer.holdingCids ]
+          amount = transfer.amount
+
+      -- return result
+      pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+        output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
           with
-            senderHoldingCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
-            receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
-    meta = emptyMetadata
+            holdings = Api.Token.TransferInstructionV1.TransferInstructionResultHoldings
+              with
+                senderHoldingCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
+                receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
+        meta = emptyMetadata
+
 
 -- Token standard allocation factory
 ------------------------------------
-
--- | The extra allocation that is made to guard against the transfer fees changing
--- between the time of locking the amulet and the time of executing the actual transfer.
-feeReserveMultiplier : Decimal
-feeReserveMultiplier = 4.0
 
 amulet_allocationFactory_allocateImpl
   : ExternalPartyAmuletRules
@@ -349,52 +390,18 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   -- inputHoldings:
   require "At least one input holding must be provided" (not $ null inputHoldings)
 
-  -- == create allocation
-  -- over-approximate fees that will be due on the actual transfer
-  let receiverOutputForActualTransfer = allocationToAmuletOutput allocation
-  [expectedTransferFees] <- exerciseComputeFees paymentContext transferLeg.sender [receiverOutputForActualTransfer]
-  openRound <- fetchChecked (ForDso with dso) paymentContext.context.openMiningRound
-  let lockDuration = settlement.settleBefore `subTime` now
-  let approximateHoldingFees = holdingFeesForDuration lockDuration openRound
-  let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
-
-  -- lock the amulet
-  let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- inputHoldings ]
-  let transfer = Splice.AmuletRules.Transfer with
-        sender = transferLeg.sender
-        provider = transferLeg.sender -- we do not have a separate app provider
-        outputs =
-          [ TransferOutput with
-              receiver = transferLeg.sender
-              amount = transferLeg.amount + feesReserveAmount
-              receiverFeeRatio = 0.0 -- locking fees are paid by the sender
-              lock = Some TimeLock with
-                expiresAt = settlement.settleBefore
-                holders = [dso]
-          ]
-        inputs = transferInputs
-
-  result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
-
+  -- lock the funds
+  now <- getTime
+  let twoStepTransfer = allocationToTwoStepTransfer now arg.allocation
+  lockedAmulet <- prepareTwoStepTransfer twoStepTransfer inputHoldings paymentContext
   -- create the amulet allocation
-  let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   allocCid <- toInterfaceContractId <$> create AmuletAllocation with
-    allocation
+    allocation = arg.allocation
     lockedAmulet
+    requestedAt = now
 
   -- finaly done: return the result
   pure AllocationFactory_AllocateResult with
     allocationOrInstruction = AOI_Allocation with allocation = allocCid
     meta = emptyMetadata
 
-
-holdingFeesForDuration : RelTime -> OpenMiningRound -> Decimal
-holdingFeesForDuration duration openRound =
-    holdingFeesUsd / amuletPerUsd
-  where
-    holdingFeesPerDayUsd = ratePerRoundToRatePerDay openRound.transferConfigUsd.holdingFee openRound.tickDuration
-    holdingFeesUsd = chargeRatePerDay holdingFeesPerDayUsd duration
-    amuletPerUsd = openRound.amuletPrice
-
-requireExpectedAdminMatch : Party -> Party -> Update ()
-requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)

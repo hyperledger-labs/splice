@@ -8,6 +8,7 @@ import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import com.daml.ledger.api.v2.CommandsOuterClass
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
@@ -30,41 +31,58 @@ import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1 as tokenStandardHttp
+import org.lfdecentralizedtrust.tokenstandard.{
+  allocation,
+  allocationinstruction,
+  metadata,
+  transferinstruction,
+}
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
   ScanClient,
 }
-import org.lfdecentralizedtrust.splice.scan.admin.http.ProtobufJsonScanHttpEncodings
+import org.lfdecentralizedtrust.splice.scan.admin.http.{
+  CompactJsonScanHttpEncodings,
+  ProtobufJsonScanHttpEncodings,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.util.{
+  ChoiceContextWithDisclosures,
   Codec,
   Contract,
   ContractWithState,
   DomainRecordTimeRange,
+  FactoryChoiceWithDisclosures,
   PackageQualifiedName,
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{
-  SynchronizerId,
   Member,
   ParticipantId,
   PartyId,
   SequencerId,
+  SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.GetFactoryRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationinstructionv1,
+  allocationv1,
+  metadatav1,
+  transferinstructionv1,
+}
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.GetFactoryRequest as GetTransferFactoryRequest
+import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.definitions.GetFactoryRequest as GetAllocationFactoryRequest
 
 import java.util.Base64
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 object HttpScanAppClient {
@@ -93,8 +111,9 @@ object HttpScanAppClient {
       http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
-  abstract class TokenStandardBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = tokenStandardHttp.Client
+  abstract class TokenStandardTransferInstructionBaseCommand[Res, Result]
+      extends HttpCommand[Res, Result] {
+    override type Client = transferinstruction.v1.Client
 
     override def createClient(host: String)(implicit
         httpClient: HttpClient,
@@ -102,7 +121,45 @@ object HttpScanAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      tokenStandardHttp.Client.httpClient(HttpClientBuilder().buildClient(), host)
+      transferinstruction.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+  }
+
+  abstract class TokenStandardAllocationInstructionBaseCommand[Res, Result]
+      extends HttpCommand[Res, Result] {
+    override type Client = allocationinstruction.v1.Client
+
+    override def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      allocationinstruction.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+  }
+
+  abstract class TokenStandardMetadataBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = metadata.v1.Client
+
+    override def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      metadata.v1.Client
+        .httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)), host)
+  }
+
+  abstract class TokenStandardAllocationBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = allocation.v1.Client
+
+    override def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      allocation.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -1342,9 +1399,9 @@ object HttpScanAppClient {
   }
 
   case class GetTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)
-      extends TokenStandardBaseCommand[
-        tokenStandardHttp.GetTransferFactoryResponse,
-        tokenStandardHttp.definitions.FactoryWithChoiceContext,
+      extends TokenStandardTransferInstructionBaseCommand[
+        transferinstruction.v1.GetTransferFactoryResponse,
+        FactoryChoiceWithDisclosures,
       ] {
     override def submitRequest(
         client: Client,
@@ -1352,7 +1409,7 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], tokenStandardHttp.GetTransferFactoryResponse] = {
+    ], transferinstruction.v1.GetTransferFactoryResponse] = {
       val json = choiceArgs.toJson
       val circeChoiceArgs = io.circe.parser
         .parse(json)
@@ -1361,16 +1418,268 @@ object HttpScanAppClient {
             s"Failed to parse a just-encoded json: $json. This is not supposed to happen."
           )
         )
-      client.getTransferFactory(GetFactoryRequest(circeChoiceArgs, Some(true)), headers)
+      client.getTransferFactory(GetTransferFactoryRequest(circeChoiceArgs, Some(true)), headers)
     }
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ): PartialFunction[
-      tokenStandardHttp.GetTransferFactoryResponse,
-      Either[String, tokenStandardHttp.definitions.FactoryWithChoiceContext],
-    ] = { case tokenStandardHttp.GetTransferFactoryResponse.OK(factory) =>
-      Right(factory)
+      transferinstruction.v1.GetTransferFactoryResponse,
+      Either[String, FactoryChoiceWithDisclosures],
+    ] = { case transferinstruction.v1.GetTransferFactoryResponse.OK(factory) =>
+      for {
+        data <- Either.fromOption(
+          factory.choiceContext.choiceContextData,
+          "Choice context data not set",
+        )
+        choiceContext <- parseAsChoiceContext(data)
+      } yield {
+        val disclosedContracts =
+          factory.choiceContext.disclosedContracts.map(
+            fromTransferInstructionHttpDisclosedContract
+          )
+        val commands = new transferinstructionv1.TransferFactory.ContractId(factory.factoryId)
+          .exerciseTransferFactory_Transfer(
+            new transferinstructionv1.TransferFactory_Transfer(
+              choiceArgs.expectedAdmin,
+              choiceArgs.transfer,
+              new metadatav1.ExtraArgs(
+                choiceContext,
+                choiceArgs.extraArgs.meta,
+              ),
+            )
+          )
+          .commands()
+          .asScala
+          .toSeq
+        FactoryChoiceWithDisclosures(commands, disclosedContracts)
+      }
     }
+  }
+  case class GetAllocationFactory(choiceArgs: allocationinstructionv1.AllocationFactory_Allocate)
+      extends TokenStandardAllocationInstructionBaseCommand[
+        allocationinstruction.v1.GetAllocationFactoryResponse,
+        FactoryChoiceWithDisclosures,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], allocationinstruction.v1.GetAllocationFactoryResponse] = {
+      val json = choiceArgs.toJson
+      val circeChoiceArgs = io.circe.parser
+        .parse(json)
+        .getOrElse(
+          throw new RuntimeException(
+            s"Failed to parse a just-encoded json: $json. This is not supposed to happen."
+          )
+        )
+      client.getAllocationFactory(GetAllocationFactoryRequest(circeChoiceArgs, Some(true)), headers)
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      allocationinstruction.v1.GetAllocationFactoryResponse,
+      Either[String, FactoryChoiceWithDisclosures],
+    ] = { case allocationinstruction.v1.GetAllocationFactoryResponse.OK(factory) =>
+      for {
+        data <- Either.fromOption(
+          factory.choiceContext.choiceContextData,
+          "Choice context data not set",
+        )
+        choiceContext <- parseAsChoiceContext(data)
+      } yield {
+        val disclosedContracts =
+          factory.choiceContext.disclosedContracts.map(
+            fromAllocationInstructionHttpDisclosedContract
+          )
+        val commands =
+          new allocationinstructionv1.AllocationFactory.ContractId(factory.factoryId)
+            .exerciseAllocationFactory_Allocate(
+              new allocationinstructionv1.AllocationFactory_Allocate(
+                choiceArgs.expectedAdmin,
+                choiceArgs.allocation,
+                choiceArgs.inputHoldings,
+                new metadatav1.ExtraArgs(
+                  choiceContext,
+                  choiceArgs.extraArgs.meta,
+                ),
+              )
+            )
+            .commands()
+            .asScala
+            .toSeq
+        FactoryChoiceWithDisclosures(commands, disclosedContracts)
+      }
+    }
+  }
+
+  case class GetAllocationTransferContext(allocationId: allocationv1.Allocation.ContractId)
+      extends TokenStandardAllocationBaseCommand[
+        allocation.v1.GetAllocationTransferContextResponse,
+        ChoiceContextWithDisclosures,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], allocation.v1.GetAllocationTransferContextResponse] = {
+      client.getAllocationTransferContext(allocationId.contractId, headers)
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      allocation.v1.GetAllocationTransferContextResponse,
+      Either[String, ChoiceContextWithDisclosures],
+    ] = { case allocation.v1.GetAllocationTransferContextResponse.OK(context) =>
+      val disclosedContracts =
+        context.disclosedContracts.map(fromAllocationHttpDisclosedContract)
+      for {
+        data <- Either.fromOption(context.choiceContextData, "Choice context data not set")
+        choiceContext <- parseAsChoiceContext(data)
+      } yield ChoiceContextWithDisclosures(disclosedContracts, choiceContext)
+    }
+  }
+
+  final case object GetRegistryInfo
+      extends TokenStandardMetadataBaseCommand[
+        metadata.v1.GetRegistryInfoResponse,
+        metadata.v1.definitions.GetRegistryInfoResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], metadata.v1.GetRegistryInfoResponse] =
+      client.getRegistryInfo(headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      metadata.v1.GetRegistryInfoResponse,
+      Either[String, metadata.v1.definitions.GetRegistryInfoResponse],
+    ] = { case metadata.v1.GetRegistryInfoResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  final case class LookupInstrument(instrumentId: String)
+      extends TokenStandardMetadataBaseCommand[metadata.v1.GetInstrumentResponse, Option[
+        metadata.v1.definitions.Instrument
+      ]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], metadata.v1.GetInstrumentResponse] =
+      client.getInstrument(instrumentId, headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      metadata.v1.GetInstrumentResponse,
+      Either[String, Option[metadata.v1.definitions.Instrument]],
+    ] = {
+      case metadata.v1.GetInstrumentResponse.OK(response) =>
+        Right(Some(response))
+      case metadata.v1.GetInstrumentResponse.NotFound(response) =>
+        Right(None)
+    }
+  }
+
+  final case class ListInstruments(pageSize: Option[Int], pageToken: Option[String])
+      extends TokenStandardMetadataBaseCommand[metadata.v1.ListInstrumentsResponse, Seq[
+        metadata.v1.definitions.Instrument
+      ]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], metadata.v1.ListInstrumentsResponse] =
+      client.listInstruments(pageSize, pageToken, headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      metadata.v1.ListInstrumentsResponse,
+      Either[String, Seq[metadata.v1.definitions.Instrument]],
+    ] = { case metadata.v1.ListInstrumentsResponse.OK(response) =>
+      Right(response.instruments)
+    }
+  }
+
+  private def parseAsChoiceContext(
+      contextJsonString: io.circe.Json
+  ): Either[String, metadatav1.ChoiceContext] =
+    Either
+      .fromTry(Try(metadatav1.ChoiceContext.fromJson(contextJsonString.noSpaces)))
+      .leftMap(_.toString)
+
+  private def fromAllocationInstructionHttpDisclosedContract(
+      disclosedContract: allocationinstruction.v1.definitions.DisclosedContract
+  ): CommandsOuterClass.DisclosedContract = {
+    CommandsOuterClass.DisclosedContract
+      .newBuilder()
+      .setContractId(disclosedContract.contractId)
+      .setCreatedEventBlob(
+        ByteString.copyFrom(
+          java.util.Base64.getDecoder.decode(disclosedContract.createdEventBlob)
+        )
+      )
+      .setSynchronizerId(disclosedContract.synchronizerId)
+      .setTemplateId(
+        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+      )
+      .build()
+  }
+
+  private def fromAllocationHttpDisclosedContract(
+      disclosedContract: allocation.v1.definitions.DisclosedContract
+  ): CommandsOuterClass.DisclosedContract = {
+    // TODO(#17507): share this parsing code with the above once/if the OpenAPI schemas are shared
+    CommandsOuterClass.DisclosedContract
+      .newBuilder()
+      .setContractId(disclosedContract.contractId)
+      .setCreatedEventBlob(
+        ByteString.copyFrom(
+          java.util.Base64.getDecoder.decode(disclosedContract.createdEventBlob)
+        )
+      )
+      .setSynchronizerId(disclosedContract.synchronizerId)
+      .setTemplateId(
+        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+      )
+      .build()
+  }
+
+  private def fromTransferInstructionHttpDisclosedContract(
+      disclosedContract: transferinstruction.v1.definitions.DisclosedContract
+  ): CommandsOuterClass.DisclosedContract = {
+    // TODO(#17507): share this parsing code with the above once/if the OpenAPI schemas are shared
+    CommandsOuterClass.DisclosedContract
+      .newBuilder()
+      .setContractId(disclosedContract.contractId)
+      .setCreatedEventBlob(
+        ByteString.copyFrom(
+          java.util.Base64.getDecoder.decode(disclosedContract.createdEventBlob)
+        )
+      )
+      .setSynchronizerId(disclosedContract.synchronizerId)
+      .setTemplateId(
+        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+      )
+      .build()
   }
 }

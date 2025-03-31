@@ -34,7 +34,7 @@ paths:
       description:
         List all instruments managed by this instrument admin.
       parameters:
-        - name: page_size
+        - name: pageSize
           in: query
           required: false
           schema:
@@ -42,12 +42,12 @@ paths:
             format: int32
             default: 25
           description: "Number of instruments per page."
-        - name: page_token
+        - name: pageToken
           in: query
           required: false
           schema:
             type: string
-          description: "The `next_page_token` received from the response for the previous page."
+          description: "The `nextPageToken` received from the response for the previous page."
       responses:
         "200":
           description: ok
@@ -60,13 +60,13 @@ paths:
         "500":
           $ref: "#/components/responses/500"
 
-  /registry/instruments/{instrument_id}:
+  /registry/instruments/{instrumentId}:
     get:
       operationId: "getInstrument"
       description:
         Retrieve an instrument's metadata.
       parameters:
-        - name: instrument_id
+        - name: instrumentId
           in: path
           required: true
           schema:
@@ -115,69 +115,43 @@ components:
     GetRegistryInfoResponse:
       type: object
       properties:
-        provider_id:
+        adminId:
           description: "The Daml party representing the registry app"
           type: string
-        supported_standards:
-          description: "The standards supported by the registry."
-          type: array
-          items:
-            description: "SemVer reference of the most recent RC version supported"
-            type: string
-          example:
-            - "token-metadata=1.0"
-            - "holdings=1.0"
-            - "transfer-instruction=1.0"
-            - "allocation-instruction=1.0"
-        registry_ui_url:
-          type: string
-          description: |
-            The URL to redirect to for giving the user access to the registry specific
-            functionality; e.g., setting up preapprovals wrt who is allowed to transfer assets
-            to them.
+        supportedApis:
+          description: "The token standard APIs supported by the registry. Note that this only includes the registry-wide APIs. Use the instrument lookup endpoints to see which APIs are supported for a given instrument"
+          $ref: "#/components/schemas/SupportedApis"
       required:
-        - supported_standards
-        - registry_ui_url
-
-    InstrumentId:
-      type: object
-      description: "Globally unique instrument identifier"
-      properties:
-        provider_id:
-          description: "The party representing the registry app"
-          type: string
-        id:
-          description: "The unique ID of the instrument used by the registry app for this instrument"
-          type: string
-      required:
-        - provider_id
-        - id
+        - adminId
+        - supportedApis
 
     Instrument:
       type: object
       properties:
-        instrument_id:
-          description: "The unique identifier assigned by the registry app to the instrument."
-          $ref: "#/components/schemas/InstrumentId"
+        id:
+          description: "The unique identifier assigned by the admin to the instrument."
+          type: string
         name:
           description: "The display name for the instrument recommended by the instrument admin. This is not necessarily unique."
           type: string
         symbol:
           description: "The symbol for the instrument recommended by the instrument admin. This is not necessarily unique."
           type: string
-        total_supply:
+        totalSupply:
           description: "Decimal encoded current total supply of the instrument."
           type: string
-        total_supply_as_of:
+        totalSupplyAsOf:
           description: "The timestamp when the total supply was last computed."
           type: string
           format: date-time
+        supportedApis:
+          $ref: "#/components/schemas/SupportedApis"
       required:
         [
-          "provider_id",
-          "instrument_id",
+          "id",
           "name",
           "symbol",
+          "supportedApis"
         ]
 
     ListInstrumentsResponse:
@@ -187,9 +161,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Instrument"
-        next_page_token:
+        nextPageToken:
           type: string
-          description: "The token for the next page of results, to be used as the last_instrument_id for the next page."
+          description: "The token for the next page of results, to be used as the lastInstrumentId for the next page."
       required:
         - instruments
 
@@ -200,3 +174,12 @@ components:
       properties:
         error:
           type: string
+
+    SupportedApis:
+      description: |
+        Map from token standard API name to the minor version of the API supported, e.g.,
+        splice-api-token-metadata-v1 -> 1 where the `1` corresponds to the minor version.
+      type: object
+      additionalProperties:
+        type: integer
+        format: int32

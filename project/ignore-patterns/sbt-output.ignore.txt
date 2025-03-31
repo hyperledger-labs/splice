@@ -67,6 +67,8 @@ npm error
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/external-openapi-ts-client/models/ErrorResponse.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/scan-proxy-openapi-ts-client/models/ErrorResponse.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/.*Error.*.ts
+.*o.o.codegen.TemplateManager - writing file .*/token-standard/.*/openapi-ts-client/models/ErrorResponse.ts
+.*o.o.codegen.TemplateManager - writing file .*/token-standard/.*/openapi-ts-client/apis/exception.ts
 
 # Output by guardrail if the yaml file changes because we cache the previous generated code
 ^.\[31mWarning:.\[0m$

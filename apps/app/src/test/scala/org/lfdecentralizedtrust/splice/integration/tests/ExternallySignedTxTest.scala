@@ -71,7 +71,7 @@ trait ExternallySignedTxTest
         .party
 
       // Tap some amulets to pay for purchase of transfer pre-approval
-      aliceValidatorWalletClient.tap(50.0)
+      aliceValidatorWalletClient.tap(5000000.0)
 
       runProcess(
         Seq(
@@ -100,10 +100,14 @@ trait ExternallySignedTxTest
           .receiver shouldBe partyId.toProtoPrimitive
       }
 
-      aliceValidatorWalletClient.transferPreapprovalSend(partyId, 40.0, UUID.randomUUID.toString)
+      aliceValidatorWalletClient.transferPreapprovalSend(
+        partyId,
+        4000000.0,
+        UUID.randomUUID.toString,
+      )
       aliceValidatorBackend
         .getExternalPartyBalance(partyId)
-        .totalUnlockedCoin shouldBe "40.0000000000"
+        .totalUnlockedCoin shouldBe "4000000.0000000000"
 
       val partyHint2 = UUID.randomUUID().toString
       val keyName2 = "party-key-2"
@@ -201,29 +205,6 @@ class ExternallySignedPartyOnboardingTest extends ExternallySignedTxTest {
         s"--nonce=0",
       ),
       aliceValidatorBackend.token.value,
-    )
-  }
-}
-
-class TokenStandardExternallySignedTxTest extends ExternallySignedTxTest {
-  override def prepareAndSubmitTransfer(keyName: String, sender: PartyId, receiver: PartyId)(
-      implicit env: SpliceTestConsoleEnvironment
-  ) = {
-    runProcess(
-      Seq(
-        "python",
-        "scripts/external-signing/external-signing.py",
-        "transfer-preapproval-send-token-standard",
-        s"--scan-url=http://localhost:${sv1ScanBackend.config.adminApi.port}",
-        s"--ledger-url=http://localhost:6201", // the port is not available anywhere in Scala so we hardcode it
-        s"--key-directory=${tempDirectory.path}",
-        s"--key-name=$keyName",
-        s"--sender-party-id=${sender.toProtoPrimitive}",
-        s"--receiver-party-id=${receiver.toProtoPrimitive}",
-        s"--amount=20.0",
-        s"--nonce=0",
-      ),
-      aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
     )
   }
 }

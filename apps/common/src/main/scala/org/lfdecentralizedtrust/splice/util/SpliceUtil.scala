@@ -284,6 +284,7 @@ object SpliceUtil {
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       transferPreapprovalFee: Option[BigDecimal] = None,
+      featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
       nextSynchronizerId: Option[SynchronizerId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
@@ -308,6 +309,7 @@ object SpliceUtil {
       new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
       initialPackageConfig,
       transferPreapprovalFee.map(_.bigDecimal).toJava,
+      featuredAppActivityMarkerAmount.map(_.bigDecimal).toJava,
     )
 
   def defaultAnsConfig(

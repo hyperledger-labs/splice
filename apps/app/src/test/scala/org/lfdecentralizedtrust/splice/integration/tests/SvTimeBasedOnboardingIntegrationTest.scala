@@ -146,7 +146,6 @@ class SvTimeBasedOnboardingIntegrationTest
 
               sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
                 actAs = Seq(sv1Backend.getDsoInfo().svParty),
-                optTimeout = None,
                 commands = validatorOnboarding,
               )
             },
