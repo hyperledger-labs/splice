@@ -78,17 +78,17 @@ export async function transfer(
   };
 
   const transferFactory = await transferRegistryClient.getTransferFactory({
-    choice_arguments: choiceArgs,
+    choiceArguments: choiceArgs,
   });
   choiceArgs.extraArgs.context =
-    transferFactory.choice_context.choice_context_data;
+    transferFactory.choiceContext.choiceContextData;
 
   const commands = [
     {
       ExerciseCommand: {
         templateId:
           "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferFactory",
-        contractId: transferFactory.factory_id,
+        contractId: transferFactory.factoryId,
         choice: "TransferFactory_Transfer",
         choiceArgument: choiceArgs,
       },
@@ -104,16 +104,7 @@ export async function transfer(
       };
     })
     .concat(
-      transferFactory.choice_context.disclosed_contracts.map(
-        (contract: any) => {
-          return {
-            contractId: contract["contract_id"],
-            createdEventBlob: contract["created_event_blob"],
-            synchronizerId: contract["synchronizer_id"],
-            templateId: contract["template_id"],
-          };
-        }
-      )
+      transferFactory.choiceContext.disclosedContracts
     );
 
   const synchronizerId =

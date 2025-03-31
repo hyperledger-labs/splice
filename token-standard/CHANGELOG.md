@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Polishing Changes:
+
+* Switch openapi specs to use camelCase to be consistent with the participant JSON API.
+
 ## 2025-03-24
 
 Major changes:

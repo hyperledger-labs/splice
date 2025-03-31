@@ -10,14 +10,14 @@ info:
   version: 1.0.0
 paths:
 
-  /registry/allocations/{allocation_id}/choice-contexts/execute-transfer:
+  /registry/allocations/{allocationId}/choice-contexts/execute-transfer:
     get:
       operationId: "getAllocationTransferContext"
       description: |
         Get the choice context to execute a transfer on an allocation.
       # TODO(#18152): consider whether the OpenAPI endpoint should accept the metadata that would be passed to the choice; or even just take the full choice argument
       parameters:
-        - name: allocation_id
+        - name: allocationId
           description: "The contract ID of the allocation whose transfer the caller wants to execute."
           in: path
           required: true
@@ -33,13 +33,13 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/allocations/{allocation_id}/choice-contexts/withdraw:
+  /registry/allocations/{allocationId}/choice-contexts/withdraw:
     get:
       operationId: "getAllocationWithdrawContext"
       description: |
         Get the choice context to withdraw an allocation.
       parameters:
-        - name: allocation_id
+        - name: allocationId
           description: "The contract ID of the allocation to withdraw."
           in: path
           required: true
@@ -55,13 +55,13 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/allocations/{allocation_id}/choice-contexts/cancel:
+  /registry/allocations/{allocationId}/choice-contexts/cancel:
     get:
       operationId: "getAllocationCancelContext"
       description: |
         Get the choice context to cancel an allocation.
       parameters:
-        - name: allocation_id
+        - name: allocationId
           description: "The contract ID of the allocation to cancel."
           in: path
           required: true
@@ -90,13 +90,13 @@ components:
       description: |
         The context required to exercise a choice on a contract via an interface.
         Used to retrieve additional reference date that is passed in via disclosed contracts,
-        which are in turn referred to via their contract ID in the `choice_context_data`.
+        which are in turn referred to via their contract ID in the `choiceContextData`.
       type: object
       properties:
-        choice_context_data:
+        choiceContextData:
           description: "The additional data to use when exercising the choice."
           type: object
-        disclosed_contracts:
+        disclosedContracts:
           description: |
             The contracts that are required to be disclosed to the participant node for exercising
             the choice.
@@ -105,50 +105,50 @@ components:
             $ref: "#/components/schemas/DisclosedContract"
       required:
         [
-          "transfer_execution_choice_context",
-          "disclosed_contracts",
+          "transferExecutionChoiceContext",
+          "disclosedContracts",
         ]
 
     # TODO(#83): share with the other usages of disclosed contracts in the other standards.
     DisclosedContract:
       type: object
       properties:
-        template_id:
+        templateId:
           type: string
-        contract_id:
+        contractId:
           type: string
-        created_event_blob:
+        createdEventBlob:
           type: string
-        synchronizer_id:
+        synchronizerId:
           description: |
             The synchronizer to which the contract is currently assigned.
             If the contract is in the process of being reassigned, then a "409" response is returned.
           type: string
-        debug_package_name:
+        debugPackageName:
           description: |
             The name of the Daml package that was used to create the contract.
             Use this data only if you trust the provider, as it might not match the data in the
-            `created_event_blob`.
+            `createdEventBlob`.
           type: string
-        debug_payload:
+        debugPayload:
           description: |
             The contract arguments that were used to create the contract.
             Use this data only if you trust the provider, as it might not match the data in the
-            `created_event_blob`.
+            `createdEventBlob`.
           type: object
-        debug_created_at:
+        debugCreatedAt:
           description: |
             The ledger effective time at which the contract was created.
             Use this data only if you trust the provider, as it might not match the data in the
-            `created_event_blob`.
+            `createdEventBlob`.
           type: string
           format: date-time
       required:
         [
-          "template_id",
-          "contract_id",
-          "created_event_blob",
-          "synchronizer_id"
+          "templateId",
+          "contractId",
+          "createdEventBlob",
+          "synchronizerId"
         ]
 
     ErrorResponse:

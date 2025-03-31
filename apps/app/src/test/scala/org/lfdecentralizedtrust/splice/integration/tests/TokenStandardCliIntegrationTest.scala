@@ -81,7 +81,12 @@ class TokenStandardCliIntegrationTest
       actAndCheck(
         "Transfer 10.0 from Alice to Bob using Token Standard CLI", {
           val readLines = mutable.Buffer[String]()
-          val logProcessor = ProcessLogger(line => readLines.append(line))
+          val logProcessor = ProcessLogger { line =>
+            {
+              logger.debug(s"CLI output: $line")
+              readLines.append(line)
+            }
+          }
           val cwd = new java.io.File("token-standard/cli")
           // npm ci (CI's install) is required for anything to run
           Process(Seq("npm", "ci"), cwd).!(logProcessor)

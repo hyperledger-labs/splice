@@ -34,7 +34,7 @@ paths:
       description:
         List all instruments managed by this instrument admin.
       parameters:
-        - name: page_size
+        - name: pageSize
           in: query
           required: false
           schema:
@@ -42,12 +42,12 @@ paths:
             format: int32
             default: 25
           description: "Number of instruments per page."
-        - name: page_token
+        - name: pageToken
           in: query
           required: false
           schema:
             type: string
-          description: "The `next_page_token` received from the response for the previous page."
+          description: "The `nextPageToken` received from the response for the previous page."
       responses:
         "200":
           description: ok
@@ -60,13 +60,13 @@ paths:
         "500":
           $ref: "#/components/responses/500"
 
-  /registry/instruments/{instrument_id}:
+  /registry/instruments/{instrumentId}:
     get:
       operationId: "getInstrument"
       description:
         Retrieve an instrument's metadata.
       parameters:
-        - name: instrument_id
+        - name: instrumentId
           in: path
           required: true
           schema:
@@ -115,10 +115,10 @@ components:
     GetRegistryInfoResponse:
       type: object
       properties:
-        provider_id:
+        providerId:
           description: "The Daml party representing the registry app"
           type: string
-        supported_standards:
+        supportedStandards:
           description: "The standards supported by the registry."
           type: array
           items:
@@ -130,34 +130,34 @@ components:
             - "transfer-instruction=1.0"
             - "allocation-instruction=1.0"
         # TODO(#18560) Consider making this mandatory.
-        registry_ui_url:
+        registryUiUrl:
           type: string
           description: |
             The URL to redirect to for giving the user access to the registry specific
             functionality; e.g., setting up preapprovals wrt who is allowed to transfer assets
             to them.
       required:
-        - supported_standards
-        - provider_id
+        - supportedStandards
+        - providerId
 
     InstrumentId:
       type: object
       description: "Globally unique instrument identifier"
       properties:
-        provider_id:
+        providerId:
           description: "The party representing the registry app"
           type: string
         id:
           description: "The unique ID of the instrument used by the registry app for this instrument"
           type: string
       required:
-        - provider_id
+        - providerId
         - id
 
     Instrument:
       type: object
       properties:
-        instrument_id:
+        instrumentId:
           description: "The unique identifier assigned by the registry app to the instrument."
           $ref: "#/components/schemas/InstrumentId"
         name:
@@ -166,16 +166,16 @@ components:
         symbol:
           description: "The symbol for the instrument recommended by the instrument admin. This is not necessarily unique."
           type: string
-        total_supply:
+        totalSupply:
           description: "Decimal encoded current total supply of the instrument."
           type: string
-        total_supply_as_of:
+        totalSupplyAsOf:
           description: "The timestamp when the total supply was last computed."
           type: string
           format: date-time
       required:
         [
-          "instrument_id",
+          "instrumentId",
           "name",
           "symbol",
         ]
@@ -187,9 +187,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Instrument"
-        next_page_token:
+        nextPageToken:
           type: string
-          description: "The token for the next page of results, to be used as the last_instrument_id for the next page."
+          description: "The token for the next page of results, to be used as the lastInstrumentId for the next page."
       required:
         - instruments
 

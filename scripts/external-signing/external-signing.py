@@ -125,7 +125,7 @@ class ScanClient:
         return await response.json()
 
     async def get_transfer_factory(self, choice_arguments):
-        payload={"choice_arguments": choice_arguments}
+        payload={"choiceArguments": choice_arguments}
         response = await session_post(self.session, f"{self.url}/registry/transfer-instruction/transfer-factory", payload)
         return await response.json()
 
@@ -376,11 +376,11 @@ async def handle_transfer_preapproval_send_token_standard(args, scan_client: Sca
                     "extraArgs": {"context": {"values": []}, "meta": {"values": []}}}
     transfer_factory = await scan_client.get_transfer_factory(choice_args)
 
-    choice_args["extraArgs"]["context"] = transfer_factory["choice_context"]["choice_context_data"]
+    choice_args["extraArgs"]["context"] = transfer_factory["choiceContext"]["choiceContextData"]
     commands = [
         {"ExerciseCommand": {
             "templateId": "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferFactory",
-            "contractId": transfer_factory["factory_id"],
+            "contractId": transfer_factory["factoryId"],
             "choice": "TransferFactory_Transfer",
             "choiceArgument": choice_args
         }}
@@ -392,15 +392,7 @@ async def handle_transfer_preapproval_send_token_standard(args, scan_client: Sca
         "synchronizerId": h["synchronizerId"],
         "templateId": h["createdEvent"]["templateId"]
     } for h in holdings]
-    disclosed_contracts.extend(
-        [{
-            "contractId": contract["contract_id"],
-            "createdEventBlob": contract["created_event_blob"],
-            "synchronizerId": contract["synchronizer_id"],
-            "templateId": contract["template_id"]
-          } for contract in transfer_factory["choice_context"]["disclosed_contracts"]
-        ]
-    )
+    disclosed_contracts.extend(transfer_factory["choiceContext"]["disclosedContracts"])
 
     prepared = await ledger_client.prepare_send(args.sender_party_id, commands, disclosed_contracts, synchronizer_id)
     [private_key, public_key] = read_key_pair(args.key_directory, args.key_name)
