@@ -1,16 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DisclosedContract, LedgerClient } from "../apis/ledger-client";
-import { CommandOptions } from "../cli";
-import { HoldingInterface } from "../constants";
 import * as crypto from "crypto";
 import dayjs from "dayjs";
 import { readFileSync } from "node:fs";
 import {
-  createConfiguration,
-  ServerConfiguration,
-  DefaultApi as TransferFactoryAPI,
+  createConfiguration, DefaultApi as TransferFactoryAPI, ServerConfiguration
 } from "transfer-instruction-openapi";
+import { DisclosedContract, LedgerClient } from "../apis/ledger-client";
+import { CommandOptions } from "../cli";
+import { HoldingInterface } from "../constants";
 
 interface TransferCommandOptions {
   sender: string;
@@ -59,6 +57,7 @@ export async function transfer(
   );
   const holdingCids = holdings.map((h) => h["createdEvent"]["contractId"]);
 
+  const now = dayjs()
   const choiceArgs: any = {
     expectedAdmin: instrumentAdmin,
     transfer: {
@@ -67,7 +66,8 @@ export async function transfer(
       amount,
       instrumentId: { admin: instrumentAdmin, id: instrumentId },
       lock: null,
-      executeBefore: dayjs().add(24, "hour").toISOString(),
+      requestedAt: now,
+      executeBefore: now.add(24, "hour").toISOString(),
       holdingCids,
       meta: { values: [] },
     },

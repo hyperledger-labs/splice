@@ -18,6 +18,11 @@ import Splice.Api.Token.AllocationV1
 
 -- | View for `AllocationInstruction`.
 data AllocationInstructionView = AllocationInstructionView with
+    originalInstructionCid : Optional (ContractId AllocationInstruction)
+      -- ^ The contract id of the original allocation instruction contract.
+      -- Used by the wallet to track the lineage of allocation instructions through multiple steps.
+      --
+      -- Only set if the registry evolves the allocation instruction in multiple steps.
     allocation : AllocationView
       -- ^ The allocation that this instruction is for.
     pendingActions : Map.Map Party Text
@@ -119,7 +124,6 @@ interface AllocationFactory where
         -- that the execution of the allocation conflicts with any other allocations
         -- using these holdings. Thereby allowing that the sender can use
         -- deliberate contention on holdings to prevent duplicate allocations.
-
       extraArgs : ExtraArgs
         -- ^ Additional choice arguments.
     controller allocation.transferLeg.sender

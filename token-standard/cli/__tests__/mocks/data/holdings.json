@@ -49,7 +49,7 @@
             "dso::normalized",
             "party::normalized"
           ],
-          "templateId" : "9cd13963817b2c0b8ab317c9f4ecd431a18c4f505ce8d3ca1b184cb3ee401d80:Splice.Amulet:Amulet",
+          "templateId" : "4af7911d7d77ee2c7c3c7869717b0d9f2d9dad84e61fc90c9933347b23750b6b:Splice.Amulet:Amulet",
           "witnessParties" : [
             "party::normalized"
           ]
@@ -110,7 +110,7 @@
             "dso::normalized",
             "party::normalized"
           ],
-          "templateId" : "9cd13963817b2c0b8ab317c9f4ecd431a18c4f505ce8d3ca1b184cb3ee401d80:Splice.Amulet:Amulet",
+          "templateId" : "4af7911d7d77ee2c7c3c7869717b0d9f2d9dad84e61fc90c9933347b23750b6b:Splice.Amulet:Amulet",
           "witnessParties" : [
             "party::normalized"
           ]

@@ -32,7 +32,7 @@ template OTCTradeProposal with
         let newApprovers = approver :: approvers
         let traders = tradingParties transferLegs
         require "Approver is a trading party" (approver `Set.member` traders)
-        require "Approver is new" (not $ approver `elem` approvers)
+        require "Approver is new" (approver `notElem` approvers)
         create this with
           approvers = newApprovers
           tradeCid = Some (fromOptional self tradeCid)

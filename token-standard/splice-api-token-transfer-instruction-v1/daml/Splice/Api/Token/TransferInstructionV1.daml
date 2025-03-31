@@ -23,42 +23,83 @@ data Transfer = Transfer with
       -- ^ The amount to transfer.
     instrumentId : InstrumentId
       -- ^ The instrument identifier.
-
+    requestedAt : Time
+      -- ^ Wallet provided timestamp when the transfer was requested.
+      -- MUST be in the past when instructing the transfer.
     executeBefore : Time
-      -- ^ Until when (exclusive) the transfer CAN be executed.
+      -- ^ Until when (exclusive) the transfer may be executed. MUST be in the
+      -- future when instructing the transfer.
       --
-      -- The registry MUST NOT allow execution of a resulting transfer instruction after this time.
-      -- Thereby enabling the sender to enforce a deadline on how long the transfer instruction
-      -- can be pending; and to safely retry creating a new transfer instruction after this deadline.
-
+      -- Registries SHOULD NOT execute the transfer instruction after this time,
+      -- so that senders can retry creating a new transfer instruction after this time.
     holdingCids : [ContractId Holding]
       -- ^ The holding contracts that should be used to fund the transfer.
       --
-      -- MAY be empty if the registry supports automatic selection of holdings for transfers.
+      -- MAY be empty if the registry supports automatic selection of holdings for transfers
+      -- or does not represent holdings on-ledger.
       --
       -- If specified, then the transfer MUST archive all of these holdings, so
       -- that the execution of the transfer conflicts with any other transfers
       -- using these holdings. Thereby allowing that the sender can use
       -- deliberate contention on holdings to prevent duplicate transfers.
-
     meta : Metadata
       -- ^ Metadata.
+  deriving (Show, Eq)
 
+-- | The result of instructing a transfer or advancing the state of a transfer instruction.
+data TransferInstructionResult = TransferInstructionResult with
+  output : TransferInstructionResult_Output
+   -- ^ The output of the step.
+  meta : Metadata
+    -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+
+-- | The output of instructing a transfer or advancing the state of a transfer instruction.
+data TransferInstructionResult_Output
+  = TransferInstructionResult_Completed with
+      holdings : TransferInstructionResultHoldings
+        -- ^ Updated sender and receiver holdings
+  | TransferInstructionResult_Pending with
+      transferInstructionCid : ContractId TransferInstruction
+         -- ^ Contract id of the transfer instruction that will be used to complete the transfer
+  deriving (Show, Eq)
+
+-- | The holdings that were newly created as part of completing the transfer.
+-- MAY be empty for registries that do not track the holdings on-ledger.
+data TransferInstructionResultHoldings = TransferInstructionResultHoldings
+  with
+    senderHoldingCids : [ContractId Holding]
+      -- ^ Newly created holdings owned by the sender. Often used to return "change".
+    receiverHoldingCids : [ContractId Holding]
+      -- ^ The newly created holdings owned by the receiver.
   deriving (Show, Eq)
 
 
 -- TransferInstruction
 ------------------------
 
+-- | Status of a transfer instruction.
+data TransferInstructionStatus
+  = TransferPendingReceiverAcceptance
+      -- ^ The transfer is pending acceptance by the receiver.
+  | TransferPendingInternalWorkflow with pendingActions : Map.Map Party Text
+      -- ^ The transfer is pending actions to be taken by actors as part
+      -- registry internal workflows.
+      --
+      -- This field can by used to report on the progress of registry specific
+      -- workflows that are required to execute the transfer (e.g., confirmation of OFAC checks).
+  deriving (Show, Eq)
+
 -- | View for `TransferInstruction`.
 data TransferInstructionView = TransferInstructionView with
+    originalInstructionCid : Optional (ContractId TransferInstruction)
+      -- ^ The contract id of the original transfer instruction contract.
+      -- Used by the wallet to track the lineage of transfer instructions through multiple steps.
+      --
+      -- Only set if the registry evolves the transfer instruction in multiple steps.
     transfer : Transfer
       -- ^ The transfer specified by the transfer instruction.
-    pendingActions : Map.Map Party Text
-      -- ^ The pending actions to be taken by different actors to execute the transfer.
-      --
-      -- ^ This field can by used to report on the progress of registry specific
-      -- workflows that are required to execute the transfer (e.g., confirmation of OFAC checks).
+    status : TransferInstructionStatus
+      -- ^ The status of the transfer instruction.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., more detailed status information.
   deriving (Show, Eq)
@@ -66,44 +107,60 @@ data TransferInstructionView = TransferInstructionView with
 -- | An interface for tracking the status of a transfer instruction,
 -- i.e., a request to a registry app to execute a transfer.
 --
--- Registries MAY evolve the transfer instruction in multiple steps. They
--- MUST though ensure that the final archival of the transfer instruction happens
--- via the choices on this interface, so that the sender can determine whether the instruction
--- ultimately succeeded or failed.
+-- Registries MAY evolve the transfer instruction in multiple steps. They MUST
+-- ensure that the final archival of the transfer instruction happens via the
+-- choices on this interface, so that the sender's wallet can parse the transaction
+-- history and determine whether instruction ultimately succeeded or failed.
 interface TransferInstruction where
   viewtype TransferInstructionView
 
-  transferInstruction_reportSuccessImpl : ContractId TransferInstruction -> TransferInstruction_ReportSuccess -> Update ChoiceExecutionMetadata
-  transferInstruction_abortImpl : ContractId TransferInstruction -> TransferInstruction_Abort -> Update ChoiceExecutionMetadata
+  transferInstruction_acceptImpl : ContractId TransferInstruction -> TransferInstruction_Accept -> Update TransferInstructionResult
+  transferInstruction_rejectImpl : ContractId TransferInstruction -> TransferInstruction_Reject -> Update TransferInstructionResult
+  transferInstruction_withdrawImpl : ContractId TransferInstruction -> TransferInstruction_Withdraw -> Update TransferInstructionResult
+  transferInstruction_reportOutcomeImpl : ContractId TransferInstruction -> TransferInstruction_ReportOutcome -> Update TransferInstruction_ReportOutcomeResult
 
-  choice TransferInstruction_ReportSuccess : ChoiceExecutionMetadata
-    -- ^ Report that the transfer instruction was successfully executed
-    -- by a registry-internal workflow.
+  choice TransferInstruction_Accept : TransferInstructionResult
+    -- ^ Accept the transfer as the receiver.
     --
-    -- This choice is provided to enable wallets to parse the transaction history via the
-    -- choices on this interface.
+    -- This choice is only available if the instruction is in
+    -- `TransferPendingReceiverAcceptance` state.
+    --
+    -- The result `TransferInstructionResult_Completed` indicates that the
+    -- transfer succeeded, while `TransferInstructionResult_Pending` indicates
+    -- that the transfer is still pending further steps.
     with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).transfer.receiver
+    do transferInstruction_acceptImpl this self arg
+
+  choice TransferInstruction_Reject : TransferInstructionResult
+    -- ^ Reject the transfer as the receiver.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).transfer.receiver
+    do transferInstruction_rejectImpl this self arg
+
+  choice TransferInstruction_Withdraw : TransferInstructionResult
+    -- ^ Withdraw the transfer instruction as the sender.
+    with
+      extraArgs : ExtraArgs
+        -- ^ Additional context required in order to exercise the choice.
+    controller (view this).transfer.sender
+    do transferInstruction_withdrawImpl this self arg
+
+  choice TransferInstruction_ReportOutcome : TransferInstruction_ReportOutcomeResult
+    -- ^ Report the outcome of the transfer instruction. Used by the registry
+    -- to aid the wallet in parsing the transaction history.
+    with
+      success : Bool
+        -- ^ Whether the transfer was successful. If not, then the reason is
+        -- given in the metadata.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
     controller (view this).transfer.instrumentId.admin
-    do
-      transferInstruction_reportSuccessImpl this self arg
-
-  choice TransferInstruction_Abort : ChoiceExecutionMetadata
-    -- ^ Abort the transfer instruction for the reason given in the extra argument's metadata.
-    --
-    -- Implementors MUST ensure that the transfer does not complete in case this choice is exercised.
-    -- Implementors SHOULD decide which actors are allowed to abort a transfer instruction,
-    -- and add corresponding checks to the implementation of this choice.
-    --
-    -- At least the sender SHOULD be allowed to abort a transfer instruction.
-    with
-      actor : Party
-        -- ^ The party that aborts the transfer instruction.
-      extraArgs : ExtraArgs
-        -- ^ Additional context required in order to exercise the choice.
-    controller actor
-    do transferInstruction_abortImpl this self arg
+    do transferInstruction_reportOutcomeImpl this self arg
 
 
 -- Transfer Factory
@@ -113,18 +170,17 @@ interface TransferInstruction where
 interface TransferFactory where
   viewtype TransferFactoryView
 
-  transferFactory_transferImpl : ContractId TransferFactory -> TransferFactory_Transfer -> Update TransferFactory_TransferResult
+  transferFactory_transferImpl : ContractId TransferFactory -> TransferFactory_Transfer -> Update TransferInstructionResult
   transferFactory_publicFetchImpl : ContractId TransferFactory -> TransferFactory_PublicFetch -> Update TransferFactoryView
 
-  -- Instruct the registry to execute a transfer, if possible, the registry SHOULD execute
-  -- the transfer in a single atomic transaction. If that is not possible, then this choice
-  -- MAY result in the creation of a transfer instruction that is pending further actions.
-  nonconsuming choice TransferFactory_Transfer : TransferFactory_TransferResult
+  -- Instruct the registry to execute a transfer.
+  -- Implementations MUST ensure that this choice fails if `executeBefore` is in the past.
+  nonconsuming choice TransferFactory_Transfer : TransferInstructionResult
     with
       expectedAdmin : Party
         -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
         -- the admin of the factory.
-        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
         -- their own participant. That way they can ensure that it is safe to exercise a choice
         -- on a factory contract acquired from an untrusted source *provided*
         -- all vetted Daml packages only contain interface implementations
@@ -142,7 +198,7 @@ interface TransferFactory where
       expectedAdmin : Party
         -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
         -- the admin of the factory.
-        -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
+        -- Callers SHOULD ensure they get `expectedAdmin` from a trusted source, e.g., a read against
         -- their own participant. That way they can ensure that it is safe to exercise a choice
         -- on a factory contract acquired from an untrusted source *provided*
         -- all vetted Daml packages only contain interface implementations
@@ -150,35 +206,6 @@ interface TransferFactory where
       actor : Party
     controller actor
     do transferFactory_publicFetchImpl this self arg
-
--- | Result of requesting a transfer.
-data TransferFactory_TransferResult = TransferFactory_TransferResult with
-  output : TransferFactory_TransferResult_Output
-   -- ^ The output of the transfer. Can either be the updated holdings or a transfer instruction if their
-   -- transfer cannot be completed atomically.
-  meta : Metadata
-    -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
-
-data TransferFactory_TransferResult_Output
-  = TransferFactory_TransferResult_Completed
-      with
-        holdings : TransferResultHoldings
-          -- ^ Updated sender and receiver holdings
-  | TransferFactory_TransferResult_Pending
-      with
-        transferInstructionCid : ContractId TransferInstruction
-          -- ^ Contract id of the transfer instruction that will be used to complete the transfer
-  deriving (Show, Eq)
-
--- | The holdings that were newly created as part of completing the transfer.
--- MAY be empty for registries that do not track the holdings on-ledger.
-data TransferResultHoldings = TransferResultHoldings
-  with
-    senderHoldingCids : [ContractId Holding]
-      -- ^ Newly created holdings owned by the sender. Often used to return "change".
-    receiverHoldingCids : [ContractId Holding]
-      -- ^ The newly created holdings owned by the receiver.
-  deriving (Show, Eq)
 
 -- | View for `TransferFactory`.
 data TransferFactoryView = TransferFactoryView
@@ -190,9 +217,9 @@ data TransferFactoryView = TransferFactoryView
       -- ^ Additional metadata specific to the transfer factory, used for extensibility.
   deriving (Show, Eq)
 
-data TransferInstruction_ReportSuccessResult = TransferInstruction_ReportSuccessResult
+data TransferInstruction_ReportOutcomeResult = TransferInstruction_ReportOutcomeResult
   with
-    holdings : TransferResultHoldings
+    holdings : TransferInstructionResultHoldings
       -- ^ Newly created sender and receiver holdings
     meta : Metadata
       -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.

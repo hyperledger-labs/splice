@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.util.FactoryChoiceWithDisclosures
 
-import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
@@ -77,6 +76,7 @@ trait TokenStandardTest extends IntegrationTest {
             )
           )
         )
+      val now = env.environment.clock.now.toInstant
       val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
         dsoParty.toProtoPrimitive,
         new transferinstructionv1.Transfer(
@@ -84,7 +84,8 @@ trait TokenStandardTest extends IntegrationTest {
           receiver.toProtoPrimitive,
           amount.bigDecimal,
           new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-          Instant.now().plus(10, ChronoUnit.MINUTES),
+          now,
+          now.plus(10, ChronoUnit.MINUTES),
           senderHoldings
             .map(senderHolding => new holdingv1.Holding.ContractId(senderHolding.contractId))
             .asJava,

@@ -262,7 +262,7 @@ function toPrettyTransfer(exercisedEvent: any): PrettyTransfer {
   return {
     type: "Transfer",
     status:
-      exerciseResult.output.tag === "TransferFactory_TransferResult_Completed"
+      exerciseResult.output.tag === "TransferInstructionResult_Completed"
         ? "Completed"
         : "Pending",
     input: {

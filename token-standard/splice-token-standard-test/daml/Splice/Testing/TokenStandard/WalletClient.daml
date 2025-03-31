@@ -10,13 +10,18 @@ module Splice.Testing.TokenStandard.WalletClient
     -- * Reading/checking holdings
     listHoldings,
     listHoldingCids,
+    listLockedHoldings,
 
     checkHoldingWithAmountExists,
     checkBalanceBounds,
     checkBalance,
     checkBalanceApprox,
+    checkHolding,
     checkHoldingBounds,
     checkHoldingApprox,
+
+    -- * Reading transfer instructions
+    listTransferOffers,
 
     -- * Reading allocations
     listRequestedAllocations,
@@ -24,8 +29,10 @@ module Splice.Testing.TokenStandard.WalletClient
   ) where
 
 import DA.Action (unless)
+import DA.Optional (isSome)
 
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
+import Splice.Api.Token.TransferInstructionV1
 import Splice.Api.Token.AllocationRequestV1
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
 import Splice.Api.Token.MetadataV1 (emptyMetadata)
@@ -42,6 +49,10 @@ listHoldings p instrumentId = do
         guard (holding.owner == p)
         pure (cid, holding)
   pure instrumendHoldings
+
+listLockedHoldings : Party -> InstrumentId -> Script [(ContractId Holding, HoldingView)]
+listLockedHoldings p instrumentId =
+  filter (\(_, holding) -> isSome (holding.lock)) <$> listHoldings p instrumentId
 
 -- | List the cids of the hodlings of a party of a specific instrument.
 listHoldingCids : Party -> InstrumentId -> Script [ContractId Holding]
@@ -62,6 +73,10 @@ checkBalanceBounds p instrumentId (lb, ub) = do
   unless (total >= lb && total <= ub) $ fail $
     "Wallet " <> show p <> ": balance of " <> show total <> " for " <> show instrumentId <>
     " is not within the expected range [" <> show lb <> ", " <> show ub <> "]"
+
+-- | Check the exact value of on an individual holding's amount.
+checkHolding : Party -> ContractId Holding -> Decimal -> Script ()
+checkHolding p holdingCid amount = checkHoldingBounds p holdingCid (amount, amount)
 
 -- | Check the bounds on an individual holding's amount.
 checkHoldingBounds : Party -> ContractId Holding -> (Decimal, Decimal) -> Script ()
@@ -88,6 +103,18 @@ checkHoldingApprox p holdingCid approximateAmount = checkHoldingBounds p holding
 checkBalance : Party -> InstrumentId -> Decimal -> Script ()
 checkBalance p instrumentId balance =
   checkBalanceBounds p instrumentId (balance, balance)
+
+-- | List pending transfer offers (as sender or receiver)
+listTransferOffers : Party -> InstrumentId -> Script [(ContractId TransferInstruction, TransferInstructionView)]
+listTransferOffers p instrumentId = do
+  instrs <- queryInterface @TransferInstruction p
+  let pendingOffers = do
+        (cid, Some instr) <- instrs
+        guard (instr.transfer.instrumentId == instrumentId)
+        guard (instr.status == TransferPendingReceiverAcceptance)
+        guard (p == instr.transfer.sender || p == instr.transfer.receiver)
+        pure (cid, instr)
+  pure pendingOffers
 
 -- | List all allocations requested from the owner for a specific instrument.
 listRequestedAllocations : Party -> InstrumentId -> Script [AllocationView]

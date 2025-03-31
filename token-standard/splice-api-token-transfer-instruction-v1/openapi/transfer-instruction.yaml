@@ -27,11 +27,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FactoryWithChoiceContext"
+                $ref: "#/components/schemas/TransferFactoryWithChoiceContext"
         "400":
           $ref: "#/components/responses/400"
         "404":
           $ref: "#/components/responses/404"
+
+# TODO(#18643): add endpoints for withdraw, reject, accept
 
 components:
   responses:
@@ -76,9 +78,9 @@ components:
           "choiceArguments",
         ]
 
-    FactoryWithChoiceContext:
+    TransferFactoryWithChoiceContext:
       description: |
-        A factory contract together with the choice context required to exercise the choice
+        The transfer factory contract together with the choice context required to exercise the choice
         provided by the factory. Typically used to implement the generic initiation of on-ledger workflows
         via a Daml interface.
 
@@ -89,6 +91,19 @@ components:
         factoryId:
           description: "The contract ID of the contract implementing the factory interface."
           type: string
+        transferKind:
+          description: |
+            The kind of transfer workflow that will be used:
+            * `offer`: offer a transfer to the receiver and only transfer if they accept
+            * `direct`: transfer directly to the receiver without asking them for approval.
+              Only chosen if the receiver has pre-approved direct transfers.
+            * `self`: a self-transfer where the sender and receiver are the same party.
+              No approval is required, and the transfer is typically immediate.
+          type: string
+          enum:
+            - "self"
+            - "direct"
+            - "offer"
         choiceContext:
           $ref: "#/components/schemas/ChoiceContext"
         validUntil:
@@ -103,6 +118,7 @@ components:
         [
           "factoryId",
           "choiceContext",
+          "transferKind",
           "validUntil",
         ]
 

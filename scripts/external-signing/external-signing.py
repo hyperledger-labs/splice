@@ -360,8 +360,12 @@ async def handle_transfer_preapproval_send_token_standard(args, scan_client: Sca
     raw_holdings = await ledger_client.get_active_contracts_of_party(args.sender_party_id, ledger_end_offset, interface)
     holdings = [holding["contractEntry"]["JsActiveContract"] for holding in raw_holdings]
     holding_cids = [h["createdEvent"]["contractId"] for h in holdings]
+    now=datetime.now()
+    requested_at = (
+        f"{now.isoformat()}Z"
+    )
     expires_at = (
-        f"{(datetime.now() + timedelta(hours=24)).isoformat()}Z"
+        f"{(now + timedelta(hours=24)).isoformat()}Z"
     )
 
     choice_args = { "expectedAdmin": dso_party,
@@ -370,6 +374,7 @@ async def handle_transfer_preapproval_send_token_standard(args, scan_client: Sca
                                  "amount": args.amount,
                                  "instrumentId": {"admin": dso_party, "id": "Amulet"},
                                  "lock": None,
+                                 "requestedAt": requested_at,
                                  "executeBefore": expires_at,
                                  "holdingCids": holding_cids,
                                  "meta": {"values": []}},
