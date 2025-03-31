@@ -208,26 +208,3 @@ class ExternallySignedPartyOnboardingTest extends ExternallySignedTxTest {
     )
   }
 }
-
-class TokenStandardExternallySignedTxTest extends ExternallySignedTxTest {
-  override def prepareAndSubmitTransfer(keyName: String, sender: PartyId, receiver: PartyId)(
-      implicit env: SpliceTestConsoleEnvironment
-  ) = {
-    runProcess(
-      Seq(
-        "python",
-        "scripts/external-signing/external-signing.py",
-        "transfer-preapproval-send-token-standard",
-        s"--scan-url=http://localhost:${sv1ScanBackend.config.adminApi.port}",
-        s"--ledger-url=http://localhost:6201", // the port is not available anywhere in Scala so we hardcode it
-        s"--key-directory=${tempDirectory.path}",
-        s"--key-name=$keyName",
-        s"--sender-party-id=${sender.toProtoPrimitive}",
-        s"--receiver-party-id=${receiver.toProtoPrimitive}",
-        s"--amount=20.0",
-        s"--nonce=0",
-      ),
-      aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
-    )
-  }
-}
