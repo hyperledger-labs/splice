@@ -1,11 +1,13 @@
 import {
   ActionRequiringConfirmation,
   DsoRulesConfig,
+  SynchronizerUpgradeSchedule,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 export function getDsoRulesConfig(
   numMemberTrafficContractsThreshold: string,
-  acsCommitmentReconciliationInterval: string
+  acsCommitmentReconciliationInterval: string,
+  nextScheduledSynchronizerUpgrade?: SynchronizerUpgradeSchedule
 ): DsoRulesConfig {
   return {
     numMemberTrafficContractsThreshold: numMemberTrafficContractsThreshold,
@@ -15,7 +17,9 @@ export function getDsoRulesConfig(
     svOnboardingRequestTimeout: {
       microseconds: '3600000000',
     },
-    nextScheduledSynchronizerUpgrade: null,
+    nextScheduledSynchronizerUpgrade: nextScheduledSynchronizerUpgrade
+      ? nextScheduledSynchronizerUpgrade
+      : null,
     actionConfirmationTimeout: {
       microseconds: '3600000000',
     },

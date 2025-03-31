@@ -125,8 +125,11 @@ describe('SV can see DsoRules config diffs', () => {
     expect(dropdown).toBeDefined();
     fireEvent.change(dropdown!, { target: { value: action } });
 
-    const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
-    await user.click(checkBox);
+    const input = screen.getByTestId(
+      'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
+    );
+    await user.clear(input);
+    await user.type(input, '481516');
 
     expect(await screen.findByText('Config diffs')).toBeDefined();
 

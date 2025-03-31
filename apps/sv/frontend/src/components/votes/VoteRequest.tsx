@@ -396,6 +396,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                     checked={!isEffective}
                     onChange={e => setIsEffective(!e.target.checked)}
                     id={'checkbox-set-effective-at-threshold'}
+                    data-testid="checkbox-set-effective-at-threshold"
                   />
                 }
                 label="Effective at threshold"
@@ -416,6 +417,9 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                     slotProps={{
                       textField: {
                         id: 'datetime-picker-vote-request-effectivity',
+                        inputProps: {
+                          'data-testid': 'datetime-picker-vote-request-effectivity',
+                        },
                       },
                     }}
                     closeOnSelect
@@ -475,6 +479,8 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
               chooseAction={chooseAction}
               setIsValidSynchronizerPauseTime={setIsValidSynchronizerPauseTime}
               expiration={expiration}
+              effectivity={effectivity}
+              isEffective={isEffective}
             />
           )}
           {actionName === 'CRARC_SetConfig' && <SetAmuletRulesConfig chooseAction={chooseAction} />}
@@ -514,6 +520,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                   autoComplete="off"
                   error={!isValidUrl(url)}
                   id="create-reason-url"
+                  inputProps={{ 'data-testid': 'create-reason-url' }}
                   onChange={e => setUrl(e.target.value)}
                   value={url}
                 />
