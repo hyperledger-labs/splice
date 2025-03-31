@@ -14,6 +14,7 @@ dependencies:
 data-dependencies:
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
+  - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
   - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
 build-options:
   - --ghc-option=-Wunused-binds

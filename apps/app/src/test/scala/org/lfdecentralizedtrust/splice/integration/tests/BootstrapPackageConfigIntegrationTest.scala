@@ -200,6 +200,7 @@ class BootstrapPackageConfigIntegrationTest
             DarResources.walletPayments.bootstrap.metadata.version.toString(),
           ),
           java.util.Optional.empty(),
+          java.util.Optional.empty(),
         )
 
         val upgradeAction = new ARC_AmuletRules(

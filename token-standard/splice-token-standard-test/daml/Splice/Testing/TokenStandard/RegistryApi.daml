@@ -34,3 +34,12 @@ class RegistryApi app where
   -- TODO(#18152): consider whether the OpenAPI endpoint should accept the metadata that would be passed to the choice; or even just take the full choice argument
   getAllocationTransferContext
     : app -> ContractId Allocation -> Script OpenApiChoiceContext
+
+  getTransferInstruction_AcceptContext
+    : app -> ContractId TransferInstruction -> Script OpenApiChoiceContext
+
+  getTransferInstruction_RejectContext
+    : app -> ContractId TransferInstruction -> Script OpenApiChoiceContext
+
+  getTransferInstruction_WithdrawContext
+    : app -> ContractId TransferInstruction -> Script OpenApiChoiceContext

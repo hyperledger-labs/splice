@@ -77,10 +77,13 @@ interface BurnMintFactory where
         -- ^ The holdings that should be burnt. All holdings in `inputHoldingCids` MUST be archived by this choice.
       outputs : [BurnMintOutput]
         -- ^ The holdings that should be created. The choice MUST create new holdings with the given amounts.
+      extraActors : [Party]
+        -- ^ Extra actors, the full actors required are the admin + extraActors. This is often the sender and the receivers
+        -- but we allow different sets of actors to support token implementations with different authorization setups.
       extraArgs : ExtraArgs
         -- ^ Additional context. Implementations SHOULD include a `splice.lfdecentralizedtrust.org/reason` key in the metadata
         -- to provide a human readable description that can be used by wallets.
-    controller (view this).admin, sender, map (.owner) outputs
+    controller (view this).admin :: extraActors
     do burnMintFactory_burnMintImpl this self arg
 
   nonconsuming choice BurnMintFactory_PublicFetch : BurnMintFactoryView
@@ -101,12 +104,17 @@ data BurnMintOutput = BurnMintOutput
   with
     owner : Party
     amount : Decimal
+    context : ChoiceContext
+      -- ^ Context specific to this output which can be used to support locking or other implementation specific features.
   deriving (Show, Eq)
 
 data BurnMintFactory_BurnMintResult = BurnMintFactory_BurnMintResult
   with
     outputCids : [ContractId Holding]
       -- ^ The holdings created by the choice. Must contain exactly the outputs specified in the choice argument in the same order.
+    inputHoldingAmounts : [Decimal]
+      -- ^ The amounts of the input holdings that got consumed. MUST be identical to fetching the contracts in inputHoldingCids,
+      --  and querying the amount on HoldingView and reported in the same order.
   deriving (Show, Eq)
 
 data BurnMintFactoryView = BurnMintFactoryView

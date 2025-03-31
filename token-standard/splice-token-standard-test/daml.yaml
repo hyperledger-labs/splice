@@ -35,3 +35,8 @@ build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
   - -Wno-template-interface-depends-on-daml-script # This is test-only code, not intended to be uploaded to the ledger
+codegen:
+  java:
+    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceTokenTransferTest
+    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java

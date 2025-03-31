@@ -1069,7 +1069,7 @@ object SigningKeyPair {
 
 final case class SigningPublicKey private[crypto] (
     format: CryptoKeyFormat,
-    protected[crypto] val key: ByteString,
+    key: ByteString,
     keySpec: SigningKeySpec,
     usage: NonEmpty[Set[SigningKeyUsage]],
     override protected val dataForFingerprintO: Option[ByteString] = None,
@@ -1310,7 +1310,7 @@ object SigningPublicKeyWithName {
 final case class SigningPrivateKey private (
     id: Fingerprint,
     format: CryptoKeyFormat,
-    protected[crypto] val key: ByteString,
+    val key: ByteString,
     keySpec: SigningKeySpec,
     usage: NonEmpty[Set[SigningKeyUsage]],
 )(

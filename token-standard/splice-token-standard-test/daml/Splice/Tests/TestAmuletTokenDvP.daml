@@ -50,12 +50,6 @@ testDvP = script do
   AmuletRegistry.tapFaucet registry alice 1000.0
   AmuletRegistry.tapFaucet registry bob 1000.0
 
-  -- setup trading venue
-  -- done as a multi-party submission to save writing out the propose-accept dance for the test
-  agreementCid <- submitMulti [alice, provider] [] $ createCmd TradingAgreement with
-    venue = provider
-    user = alice
-
   let amuletId = registry.instrumentId
   let mkTransfer sender receiver amount = Api.Token.AllocationV1.TransferLeg with
         sender
@@ -70,8 +64,11 @@ testDvP = script do
   let bobLeg = mkTransfer bob alice 20.0
 
   -- alice proposes trade with bob
-  proposalCid <- submit alice $ exerciseCmd agreementCid TradingAgreement_ProposeTrade with
+  proposalCid <- submit alice $ createCmd OTCTradeProposal with
+    venue = provider
+    tradeCid = None
     transferLegs = [aliceLeg, bobLeg]
+    approvers = [alice]
 
   -- bob accepts
   proposalCid <- submit bob $ exerciseCmd proposalCid OTCTradeProposal_Accept with

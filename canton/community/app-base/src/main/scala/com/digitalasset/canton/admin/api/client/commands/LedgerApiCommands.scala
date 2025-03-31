@@ -1777,7 +1777,11 @@ object LedgerApiCommands {
               ) ++ interfaceFilter.map(id =>
                 CumulativeFilter(
                   IdentifierFilter.InterfaceFilter(
-                    InterfaceFilter(Some(id), includeCreatedEventBlob = includeCreatedEventBlob)
+                    InterfaceFilter(
+                      Some(id),
+                      includeCreatedEventBlob = includeCreatedEventBlob,
+                      includeInterfaceView = true,
+                    )
                   )
                 )
               )

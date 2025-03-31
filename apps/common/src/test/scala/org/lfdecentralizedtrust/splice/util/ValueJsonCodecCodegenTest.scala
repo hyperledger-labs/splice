@@ -141,6 +141,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
     "convert between choice arguments/results that come from interfaces and JSON values" in {
       val sender = providerParty(1).toProtoPrimitive
       val receiver = providerParty(2).toProtoPrimitive
+      val now = Instant.now()
       val originalArgument: JavaApi.DamlRecord = new transferinstructionv1.TransferFactory_Transfer(
         dsoParty.toProtoPrimitive,
         new transferinstructionv1.Transfer(
@@ -148,7 +149,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
           receiver,
           numeric(6.12947561),
           new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-          /*executeBefore =*/ Instant.now().plusMillis(1000L),
+          /*requestedAt =*/ now,
+          /*executeBefore =*/ now.plusMillis(1000L),
           /*holdingCids =*/ List(validContractId(1), validContractId(2))
             .map(new holdingv1.Holding.ContractId(_))
             .asJava,
@@ -160,8 +162,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
         ),
       ).toValue
       val originalResult: JavaApi.DamlRecord =
-        new transferinstructionv1.TransferFactory_TransferResult(
-          new transferinstructionv1.transferfactory_transferresult_output.TransferFactory_TransferResult_Pending(
+        new transferinstructionv1.TransferInstructionResult(
+          new transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending(
             new transferinstructionv1.TransferInstruction.ContractId(validContractId(333))
           ),
           someMetadata,

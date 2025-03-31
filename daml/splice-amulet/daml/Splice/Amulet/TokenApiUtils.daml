@@ -29,6 +29,8 @@ createdInRoundMetaKey = splicePrefix <> "created-in-round"
 ratePerRoundMetaKey : Text
 ratePerRoundMetaKey = splicePrefix <> "rate-per-round"
 
+reasonMetaKey : Text
+reasonMetaKey = splicePrefix <> "reason"
 
 -- Choice contexts
 ------------------
@@ -45,6 +47,20 @@ featuredAppRightContextKey = "featured-app-right"
 transferPreapprovalContextKey : Text
 transferPreapprovalContextKey = "transfer-preapproval"
 
+lockContextKey : Text
+lockContextKey = "lock"
+
+lockExpiresAtContextKey : Text
+lockExpiresAtContextKey = "expires-at"
+
+lockHoldersContextKey : Text
+lockHoldersContextKey = "holders"
+
+-- | Key used to signal to a choice whether an expired locked amulet should be
+-- unlocked.
+expireLockKey : Text
+expireLockKey = "expire-lock"
+
 lookupContextContractId : Template t => ChoiceContext -> Text -> Update (Optional (ContractId t))
 lookupContextContractId context k = do
   case Map.lookup k context.values of
@@ -58,3 +74,17 @@ getContextContractId context k = do
   case optCid of
     None -> fail $ "Missing context entry for: " <> k
     Some cid -> pure cid
+
+lookupContextBool : ChoiceContext -> Text -> Update (Optional Bool)
+lookupContextBool context k = do
+  case Map.lookup k context.values of
+    None -> pure None
+    Some (AV_Bool b) -> pure (Some b)
+    Some value -> fail $ "Expected bool: " <> k <> ", got: " <> show value
+
+getContextBool : ChoiceContext -> Text -> Update Bool
+getContextBool context k = do
+  optBool <- lookupContextBool context k
+  case optBool of
+    None -> fail $ "Missing context entry for: " <> k
+    Some b -> pure b

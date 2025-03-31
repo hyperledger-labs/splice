@@ -257,6 +257,7 @@ export const amuletRules = {
               ],
             },
             transferPreapprovalFee: null,
+            featuredAppActivityMarkerAmount: null,
           },
           futureValues: [],
         },

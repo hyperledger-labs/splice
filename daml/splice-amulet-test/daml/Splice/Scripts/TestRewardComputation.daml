@@ -23,10 +23,11 @@ testRewardComputation = do
       unfeaturedAppRewardCoupon = 3.3
       validatorRewardCoupon = 2.3
 
-  -- bare-create all three kinds of rewards for Alice
+  -- bare-create all five kinds of rewards for Alice
   appCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
+    beneficiary = None
     amount = featuredAppRewardCoupon
     round = Round 0
     featured = True
@@ -34,9 +35,27 @@ testRewardComputation = do
   appCoupon2 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
     dso = app.dso
     provider = aliceValidator.primaryParty
+    beneficiary = None
     amount = unfeaturedAppRewardCoupon
     round = Round 0
     featured = False
+
+  appCoupon3 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = aliceValidator.primaryParty
+    beneficiary = Some bobValidator.primaryParty
+    amount = featuredAppRewardCoupon
+    round = Round 0
+    featured = True
+
+  appCoupon4 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = aliceValidator.primaryParty
+    beneficiary = Some bobValidator.primaryParty
+    amount = unfeaturedAppRewardCoupon
+    round = Round 0
+    featured = False
+
 
   validatorCoupon1 <- submitMulti [app.dso, aliceValidator.primaryParty] [] $ createCmd ValidatorRewardCoupon with
     dso = app.dso
@@ -91,6 +110,7 @@ testRewardComputation = do
       provider = provider1.primaryParty
       inputs = [ InputSvRewardCoupon svRewardBob2 ]
       outputs = [ ]
+      beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
 
 
@@ -102,6 +122,7 @@ testRewardComputation = do
       provider = bob.primaryParty
       inputs = [ InputSvRewardCoupon svRewardBob2 ]
       outputs = [ ]
+      beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
   transferResult.summary.senderChangeAmount ===
     ( intToDecimal bob2Weight * issuingMiningRound0.issuancePerSvRewardCoupon - createFee)
@@ -126,6 +147,7 @@ testRewardComputation = do
                     amount = 8.0
                     lock = None
                 ]
+      beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
 
   let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
@@ -157,5 +179,24 @@ testRewardComputation = do
 
   coupons <- query @SvRewardCoupon app.dso
   sort (map (._2.beneficiary) coupons) === sort [provider1.primaryParty, provider2.primaryParty]
+
+  -- Bob can redeem the coupons they are a beneficiary on
+  context <- getPaymentTransferContext app bobValidator
+  transferResult <- submitMulti [bobValidator.primaryParty, bobValidator.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = bobValidator.primaryParty
+      provider = bobValidator.primaryParty
+      inputs = [
+          InputAppRewardCoupon appCoupon3,
+          InputAppRewardCoupon appCoupon4
+        ]
+      outputs = []
+      beneficiaries = None -- test code, don't set beneficiaries
+    context = context.context
+
+  -- collected both featured and unfeatured
+  transferResult.summary.inputAppRewardAmount ===
+    featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
+    + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
 
   return ()

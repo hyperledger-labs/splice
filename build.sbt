@@ -314,6 +314,25 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
       Compile / damlDependencies :=
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val transferInstructionOpenApiFile =
+            baseDirectory.value / "openapi/transfer-instruction.yaml"
+
+          val npmName = "transfer-instruction-openapi"
+
+          BuildCommon.TS.generateOpenApiClient(
+            npmName = npmName,
+            npmModuleName = npmName,
+            npmProjectName = npmName,
+            openApiSpec = "transfer-instruction.yaml",
+            cacheFileDependencies = Set(transferInstructionOpenApiFile),
+            directory = "openapi-ts-client",
+            subPath = "openapi",
+          )
+        },
+      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -370,8 +389,8 @@ lazy val `splice-token-standard-test-daml` =
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
-      Compile / damlEnableJavaCodegen := false,
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `splice-token-test-dummy-holding-daml` =
   project
@@ -389,9 +408,16 @@ lazy val `splice-token-test-dummy-holding-daml` =
 lazy val `token-standard-cli` =
   project
     .in(file("token-standard/cli"))
+    .dependsOn(`splice-api-token-transfer-instruction-v1-daml`)
     .settings(
       Headers.TsHeaderSettings,
-      npmInstallOpenApiDeps := Seq.empty,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
+          false,
+        )
+      ),
       npmInstallDeps := Seq(baseDirectory.value / "package.json"),
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
@@ -421,6 +447,17 @@ lazy val `splice-util-daml` =
       `canton-bindings-java`
     )
 
+lazy val `splice-featured-app-api-v1-daml` =
+  project
+    .in(file("daml/splice-api-featured-app-v1"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
 lazy val `splice-amulet-daml` =
   project
     .in(file("daml/splice-amulet"))
@@ -434,7 +471,8 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value,
+          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -616,6 +654,8 @@ lazy val `apps-common` =
       `splice-api-token-allocation-request-v1-daml`,
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
+      `splice-token-standard-test-daml`,
+      `splice-featured-app-api-v1-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -1638,7 +1678,7 @@ lazy val `apps-app`: Project =
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
 // also used by Canton team
 lazy val printTests = taskKey[Unit](
-  "write full class names of `apps-app` tests to separted files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
+  "write full class names of `apps-app` tests to separated files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
 )
 printTests := {
   import java.io._

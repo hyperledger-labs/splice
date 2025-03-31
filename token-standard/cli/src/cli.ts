@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { listHoldingTransactions } from "./commands/listHoldingTransactions";
 import { listHoldings } from "./commands/listHoldings";
+import { transfer } from "./commands/transfer";
+import { HoldingInterface } from "./constants";
 import { Command } from "commander";
 
 export interface CommandOptions {
@@ -35,6 +37,34 @@ export function createProgram() {
         "Get transactions after this offset (exclusive)."
       )
   ).action(listHoldingTransactions);
+
+  addSharedOptions(
+    program
+      .command("transfer")
+      .description("Send a transfer of holdings")
+      .requiredOption("-s, --sender <value>", "The sender party of holdings")
+      .requiredOption(
+        "-r --receiver <value>",
+        "The receiver party of the holdings"
+      )
+      .requiredOption("--amount <value>", "The amount to be transferred")
+      // TODO (#18611): remove this option
+      .requiredOption(
+        "-e --instrument-admin <value>",
+        `The expected admin of the instrument.`
+      )
+      .requiredOption(
+        "-d --instrument-id <value>",
+        `The instrument id of the holding, e.g. "Amulet"`
+      )
+      .requiredOption("--public-key <value>", "Path to the public key file")
+      .requiredOption("--private-key <value>", "Path to the private key file")
+      .requiredOption(
+        "-R --transfer-factory-registry-url <value>",
+        "The URL to a transfer registry."
+      )
+      .action(transfer)
+  );
 
   return program;
 }

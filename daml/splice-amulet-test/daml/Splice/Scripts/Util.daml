@@ -13,6 +13,7 @@ import DA.Exception
 import DA.Foldable (forA_)
 import qualified DA.Map as Map
 import DA.List.Total
+import DA.Optional (fromOptional)
 import DA.Time
 import DA.Assert
 import Splice.Amulet
@@ -358,6 +359,7 @@ payWithTransferFeeRatio app sender recipient amuletAmount transferFeeRatio = do
               receiverFeeRatio = transferFeeRatio
               lock = None
           ]
+        beneficiaries = None -- test code only, don't set beneficiaries
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, recipient] readAs
@@ -386,6 +388,7 @@ lockTo1 app sender lockHolder amuletAmount lockDuration = do
                 expiresAt = now `addRelTime` lockDuration
               receiverFeeRatio = 0.0
           ]
+        beneficiaries = None -- no beneficiaries for self-transfer
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, lockHolder] readAs
@@ -423,7 +426,7 @@ runAmuletDepositBots app = do
     let user = validatorRight.user
     validatorRights <- getValidatorRights user
     appRewardCoupons <- queryFilter @AppRewardCoupon app.dso $ \c ->
-      c.round `elem` issuingRoundNumbers && c.provider == user
+      c.round `elem` issuingRoundNumbers && fromOptional c.provider c.beneficiary == user
 
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso $ \c ->
       c.round `elem` issuingRoundNumbers && c.user `Map.member` validatorRights
@@ -455,6 +458,7 @@ runAmuletDepositBots app = do
               map (InputSvRewardCoupon . fst) svRewardCoupons ++
               amulets
           outputs = []
+          beneficiaries = None -- no beneficiaries for self-transfer
     -- merge multiple amulets or rewards and claim rewards even if there are no amulets yet
     when (length transfer.inputs > 1 || (length transfer.inputs == 1 && null amulets)) $ void $
       submitExerciseAmuletRulesByKey app [user] readAs AmuletRules_Transfer with

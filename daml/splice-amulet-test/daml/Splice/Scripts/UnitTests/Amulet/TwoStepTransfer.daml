@@ -1,7 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
-module Splice.Scripts.UnitTests.ExternalPartyAmuletRules where
+module Splice.Scripts.UnitTests.Amulet.TwoStepTransfer where
 
 
 import DA.Assert
@@ -11,12 +11,11 @@ import DA.Optional
 
 import Daml.Script
 
-import Splice.ExternalPartyAmuletRules
+import Splice.Amulet.TwoStepTransfer (holdingFeesForDuration)
 import Splice.Types
 import Splice.Round
 
 import Splice.Testing.Registries.AmuletRegistry.Parameters
-
 
 
 defaultTickDuration : RelTime

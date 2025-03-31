@@ -27,11 +27,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FactoryWithChoiceContext"
+                $ref: "#/components/schemas/TransferFactoryWithChoiceContext"
         "400":
           $ref: "#/components/responses/400"
         "404":
           $ref: "#/components/responses/404"
+
+# TODO(#18643): add endpoints for withdraw, reject, accept
 
 components:
   responses:
@@ -53,7 +55,7 @@ components:
     GetFactoryRequest:
       type: object
       properties:
-        choice_arguments:
+        choiceArguments:
           type: object
           description: |
             The arguments that are intended to be passed to the choice provided by the factory.
@@ -65,20 +67,20 @@ components:
             specific contracts, e.g., the configuration for a specific instrument-id.
 
             The registry MAY react to such a request by creating extra contracts required to enable the exercising
-            of the choice. In that case the `valid_until` field of the returned choice context should be set
+            of the choice. In that case the `validUntil` field of the returned choice context should be set
             to the time until which these contracts expire.
-        exclude_debug_fields:
+        excludeDebugFields:
           description: "If set to true, the response will not include debug fields."
           default: false
           type: boolean
       required:
         [
-          "choice_arguments",
+          "choiceArguments",
         ]
 
-    FactoryWithChoiceContext:
+    TransferFactoryWithChoiceContext:
       description: |
-        A factory contract together with the choice context required to exercise the choice
+        The transfer factory contract together with the choice context required to exercise the choice
         provided by the factory. Typically used to implement the generic initiation of on-ledger workflows
         via a Daml interface.
 
@@ -86,12 +88,25 @@ components:
         as the choice context MAY be specific to the choice being exercised.
       type: object
       properties:
-        factory_id:
+        factoryId:
           description: "The contract ID of the contract implementing the factory interface."
           type: string
-        choice_context:
+        transferKind:
+          description: |
+            The kind of transfer workflow that will be used:
+            * `offer`: offer a transfer to the receiver and only transfer if they accept
+            * `direct`: transfer directly to the receiver without asking them for approval.
+              Only chosen if the receiver has pre-approved direct transfers.
+            * `self`: a self-transfer where the sender and receiver are the same party.
+              No approval is required, and the transfer is typically immediate.
+          type: string
+          enum:
+            - "self"
+            - "direct"
+            - "offer"
+        choiceContext:
           $ref: "#/components/schemas/ChoiceContext"
-        valid_until:
+        validUntil:
           description: |
             The time until which the choice context can be expected to be valid, and can thus be used to exercise the
             choice. However concurrent activity can invalidate the choice context earlier;
@@ -101,22 +116,23 @@ components:
           format: date-time
       required:
         [
-          "factory_id",
-          "choice_context",
-          "valid_until",
+          "factoryId",
+          "choiceContext",
+          "transferKind",
+          "validUntil",
         ]
 
     ChoiceContext:
       description: |
         The context required to exercise a choice on a contract via an interface.
         Used to retrieve additional reference data that is passed in via disclosed contracts,
-        which are in turn referred to via their contract ID in the `choice_context_data`.
+        which are in turn referred to via their contract ID in the `choiceContextData`.
       type: object
       properties:
-        choice_context_data:
+        choiceContextData:
           description: "The additional data to use when exercising the choice."
           type: object
-        disclosed_contracts:
+        disclosedContracts:
           description: |
             The contracts that are required to be disclosed to the participant node for exercising
             the choice.
@@ -125,50 +141,50 @@ components:
             $ref: "#/components/schemas/DisclosedContract"
       required:
         [
-          "transfer_execution_choice_context",
-          "disclosed_contracts",
+          "transferExecutionChoiceContext",
+          "disclosedContracts",
         ]
 
     # TODO(#83): share with the other usages of disclosed contracts in the other standards.
     DisclosedContract:
       type: object
       properties:
-        template_id:
+        templateId:
           type: string
-        contract_id:
+        contractId:
           type: string
-        created_event_blob:
+        createdEventBlob:
           type: string
-        synchronizer_id:
+        synchronizerId:
           description: |
             The synchronizer to which the contract is currently assigned.
             If the contract is in the process of being reassigned, then a "409" response is returned.
           type: string
-        debug_package_name:
+        debugPackageName:
           description: |
             The name of the Daml package that was used to create the contract.
             Use this data only if you trust the provider, as it might not match the data in the
-            `created_event_blob`.
+            `createdEventBlob`.
           type: string
-        debug_payload:
+        debugPayload:
           description: |
             The contract arguments that were used to create the contract.
             Use this data only if you trust the provider, as it might not match the data in the
-            `created_event_blob`.
+            `createdEventBlob`.
           type: object
-        debug_created_at:
+        debugCreatedAt:
           description: |
             The ledger effective time at which the contract was created.
             Use this data only if you trust the provider, as it might not match the data in the
-            `created_event_blob`.
+            `createdEventBlob`.
           type: string
           format: date-time
       required:
         [
-          "template_id",
-          "contract_id",
-          "created_event_blob",
-          "synchronizer_id"
+          "templateId",
+          "contractId",
+          "createdEventBlob",
+          "synchronizerId"
         ]
 
     ErrorResponse:

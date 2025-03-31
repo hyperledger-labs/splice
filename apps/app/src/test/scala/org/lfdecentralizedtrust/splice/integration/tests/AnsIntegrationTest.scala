@@ -129,7 +129,6 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
                 testEntryDescription,
                 Instant.now().plus(1, ChronoUnit.SECONDS),
               ).create.commands.asScala.toSeq,
-              optTimeout = None,
             )
           clue("Created entry is expired") {
             eventually() {
