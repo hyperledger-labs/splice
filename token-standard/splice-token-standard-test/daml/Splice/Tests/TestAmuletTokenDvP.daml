@@ -34,6 +34,7 @@ import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
 import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
 
+
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP : Script ()
 testDvP = script do
@@ -101,6 +102,7 @@ testDvP = script do
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- alice accepts allocation request directly via her wallet
+  -- TODO(#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc

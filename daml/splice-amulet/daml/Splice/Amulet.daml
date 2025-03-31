@@ -148,8 +148,7 @@ template LockedAmulet
         openRoundCid : ContractId OpenMiningRound
       controller amulet.owner
       do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
-         t <- getTime
-         require "Lock is expired" (lock.expiresAt < t)
+         assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
          amuletCid <- create amulet
          let amuletSum = AmuletCreateSummary with
                amulet = amuletCid
@@ -161,8 +160,8 @@ template LockedAmulet
       with
         roundCid : ContractId OpenMiningRound
       controller amulet.dso
-      do t <- getTime
-         require "Lock is expired" (lock.expiresAt < t)
+      do
+         assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
          requireAmuletExpiredForAllOpenRounds roundCid amulet
          let expireSum = AmuletExpireSummary with
                owner = amulet.owner

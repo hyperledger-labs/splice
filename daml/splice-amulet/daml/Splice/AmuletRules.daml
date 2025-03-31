@@ -190,8 +190,7 @@ template AmuletRules
       controller provider
       do
         -- validate choice parameters
-        now <- getTime
-        let configUsd = getValueAsOf now configSchedule
+        configUsd <- getValueAsOfLedgerTime configSchedule
         case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
           Left err -> throw (InvalidTransfer err)
           Right _ -> pure ()
@@ -781,10 +780,9 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
 
 summarizeAndValidateContext : TransferContext -> Party -> Transfer -> Update TransferContextSummary
 summarizeAndValidateContext context dso tf = do
-  now <- getTime
   -- check that the current mining round is open
   openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
-  require ("mining round is open: " <> show openRound) (openRound.opensAt <= now)
+  assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
 
   -- check the featured app right, if present
   featuredAppProvider <- forA context.featuredAppRight $ \featuredAppRightCid -> do
@@ -794,8 +792,7 @@ summarizeAndValidateContext context dso tf = do
   -- pre-resolve issuing mining rounds
   issuingMiningRounds <- forA (Map.toList context.issuingMiningRounds) $ \(round, issuingRoundCid) -> do
     issuingRound <- fetchReferenceData (ForRound with dso; round) issuingRoundCid
-    now <- getTime
-    require "issuing round is open" (issuingRound.opensAt <= now)
+    assertDeadlineExceeded ("issuingRound[" <> show round.number <> "].opensAt") issuingRound.opensAt
     pure (round, issuingRound)
 
   -- pre-resolve validator rights
@@ -963,9 +960,7 @@ preprocessOutputs transferConfigAmulet sender outs =
       | otherwise = do
           -- check validity of locking request
           forA_ lock $ \l -> do
-            now <- getTime
-            let lockDuration = subTime l.expiresAt now
-            require "Positive lock duration" (days 0 <= lockDuration)
+            assertWithinDeadline "lock.expiresAt" l.expiresAt
             require "Fewer than the allowed number of lock holders"
               (length l.holders <= transferConfigAmulet.maxNumLockHolders)
           -- compute output
@@ -1107,8 +1102,7 @@ validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
 computeSynchronizerFees : Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
 computeSynchronizerFees validator trafficAmount amuletRules context = do
   -- compute traffic cost in USD
-  now <- getTime
-  let configUsd = getValueAsOf now amuletRules.configSchedule
+  configUsd <- getValueAsOfLedgerTime amuletRules.configSchedule
   let extraTrafficPrice = configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
   -- compute traffic cost in Amulet
@@ -1394,8 +1388,8 @@ template TransferPreapproval
         amount : Decimal
         sender : Party
       controller sender
-      do now <- getTime
-         require "Contract is not expired" (now < expiresAt)
+      do
+         assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
          _ <- fetchChecked (ForDso dso) context.amuletRules
          transferResult <- exercisePaymentTransfer context Transfer with
            sender
@@ -1449,8 +1443,7 @@ template TransferPreapproval
         p : Party
       controller p
       do require ("Controller " <> show p <> " is either receiver or provider") (p `elem` [receiver, provider])
-         now <- getTime
-         require "Contract has not expired" (now < expiresAt)
+         assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
          pure TransferPreapproval_CancelResult
 
 instance HasCheckedFetch TransferPreapproval ForOwner where

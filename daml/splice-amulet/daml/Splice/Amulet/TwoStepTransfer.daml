@@ -38,6 +38,7 @@ data TwoStepTransfer = TwoStepTransfer with
     amount : Decimal
     requestedAt : Time
     transferBefore : Time
+    transferBeforeDeadline : Text -- ^ Name of the deadline for the transfer
     provider : Party
       -- ^ Provider that should be marked as the app provider on the second step.
     allowFeaturing : Bool
@@ -87,8 +88,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} inputHoldingCids paymentContext = do
 
 executeTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update ([ContractId Holding], [ContractId Holding])
 executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
-  now <- getTime
-  require "Before deadline transferBefore" (now < transferBefore)
+  assertWithinDeadline transferBeforeDeadline transferBefore
   paymentContext <-
     if allowFeaturing
       then paymentFromChoiceContext dso extraArgs.context
@@ -124,8 +124,7 @@ abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
       pure [toInterfaceContractId result.amuletSum.amulet]
     else do
       -- scan is telling us to not expire the lock, this is OK if the transfer expired
-      now <- getTime
-      require "After transferBefore" (now >= transferBefore)
+      assertDeadlineExceeded transferBeforeDeadline transferBefore
       pure []
 
 holdingFeesForDuration : RelTime -> OpenMiningRound -> Decimal

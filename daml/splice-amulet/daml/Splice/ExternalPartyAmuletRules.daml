@@ -42,13 +42,15 @@ template ExternalPartyAmuletRules
         expiresAt : Time
         nonce : Int
       controller sender
-      do cmd <- create TransferCommand with
+      do -- TODO(#18633): once the `isLedgerTimeXX` primitives are in, enforce that `expiresAt` is in the future
+         -- We don't do that yet, as otherwise this would be a regression, as it would introduce a time-bound
+         -- on the prepared transaction creating the transfer command.
+         cmd <- create TransferCommand with
            dso
            sender
            receiver
            delegate
            amount
-           -- We cannot enforce a max expiry as we cannot call getTime.
            expiresAt
            nonce
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
@@ -100,9 +102,7 @@ instance HasCheckedFetch TransferCommandCounter ForOwner where
 --
 -- We externally sign this instead of the transfer itself to support a longer delay between
 -- prepare/execute which would be prevented by signing the transfer directly as that one pins
--- down the mining rounds that are relatively short lived and relies on `getTime` which
--- means it would fail due to the max allowed skew between ledger effective time and record
--- time.
+-- down the mining rounds that are relatively short lived.
 template TransferCommand
   with
     dso : Party
@@ -175,8 +175,7 @@ template TransferCommand
                   -- Verify that receiver and DSO party match. We don't validate that the reeiver's provider matches
                  -- as changing that should be up to the receiver and not require the sender to resign.
                   _ <- fetchChecked (ForOwner with owner = receiver, dso) transferPreapprovalCid
-                  now <- getTime -- This is run by the DSO party where getTime is fine
-                  require ("Current time " <> show now <> " is before expiry of TransferCommand " <> show expiresAt) (expiresAt > now)
+                  assertWithinDeadline "TransferCommand.expiresAt" expiresAt
                   result <-
                     try do
                       TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
@@ -200,8 +199,7 @@ template TransferCommand
         p : Party
       controller p
       do require "Controller is a stakeholder" (p `elem` stakeholder this)
-         now <- getTime
-         require "TransferCommand is expired" (expiresAt <= now)
+         assertDeadlineExceeded "TransferCommand.expiresAt" expiresAt
          pure TransferCommand_ExpireResult with
            sender
            nonce
@@ -264,10 +262,9 @@ amulet_transferFactory_transferImpl this _self arg = do
   -- amount:
   require "Amount must be positive" (transfer.amount > 0.0)
   -- requestedAt:
-  now <- getTime
-  require "requestedAt must be in the past" (transfer.requestedAt <= now)
+  assertDeadlineExceeded "Transfer.requestedAt" transfer.requestedAt
   -- executeBefore:
-  require "Transfer must be executed before expiry" (now < transfer.executeBefore)
+  assertWithinDeadline "Transfer.executeBefore" transfer.executeBefore
   -- holdingCids: note that their detailed validation is done in the transfer itself
   require "At least one holding must be provided" (not $ null transfer.holdingCids)
 
@@ -361,21 +358,14 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   let settlement = allocation.settlement
   let transferLeg = allocation.transferLeg
 
-  -- NOTE: this dependency on getTime should be avoided in other implementations, and replaced
-  -- with inequalities against the sequencing time. It is part of the Amulet implementation,
-  -- as its holding fees currently require the current time to estimate the fees. However,
-  -- that is planned to be changed, so we recommend not copying the very strict checks below,
-  -- which are in principle not necessary.
-  now <- getTime
-
   -- settlement.executor: no check
   -- settlement.settlementRef: no check
   -- settlement.requestedAt:
-  require "Requested at must be in the past" (settlement.requestedAt <= now)
+  assertDeadlineExceeded "Allocation.settlement.requestedAt" settlement.requestedAt
   -- settlement.allocateBefore:
-  require "Allocate before must be in the future" (now <= settlement.allocateBefore)
+  assertWithinDeadline "Allocation.settlement.allocateBefore" settlement.allocateBefore
   -- settlement.settleBefore:
-  require "settlement.allocateBefore <= settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
+  require "Allocation.settlement.allocateBefore <= Allocation.settlement.settleBefore" (settlement.allocateBefore <= settlement.settleBefore)
 
   -- transferLegId: no check
 
@@ -391,14 +381,12 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   require "At least one input holding must be provided" (not $ null inputHoldings)
 
   -- lock the funds
-  now <- getTime
-  let twoStepTransfer = allocationToTwoStepTransfer now arg.allocation
+  let twoStepTransfer = allocationToTwoStepTransfer arg.allocation
   lockedAmulet <- prepareTwoStepTransfer twoStepTransfer inputHoldings paymentContext
   -- create the amulet allocation
   allocCid <- toInterfaceContractId <$> create AmuletAllocation with
     allocation = arg.allocation
     lockedAmulet
-    requestedAt = now
 
   -- finaly done: return the result
   pure AllocationFactory_AllocateResult with
