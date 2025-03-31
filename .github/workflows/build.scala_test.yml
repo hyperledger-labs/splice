@@ -81,11 +81,11 @@ jobs:
         runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12
+      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
 
     services:
       postgres:
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.4
+        image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-postgres:0.3.12
         env:
           POSTGRES_PASSWORD: postgres
 

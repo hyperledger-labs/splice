@@ -340,7 +340,6 @@ to the cluster.
 Each migration can follow a different release that is upgraded independent of the other migrations. The key `synchronizerMigration.active.releaseReference` controls the release used for all our main deployments and the infra stack.
 The deployment uses `dotenv` to read the cluster specific env configuration files.
 The version used for the deployment is set using `synchronizerMigration.active.version` in `config.yaml` or defaults to `CHARTS_VERSION`.
-The use of artifactory release artifacts can be controlled through `SPLICE_ARTIFACTS_REPOSITORY`.
 
 The infra stack and the canton network stack are included by default.
 The other stacks can be included through the use of env variables:
@@ -409,25 +408,17 @@ infrastructure script.
 ### Versions and Repositories
 
 The version is set to `${next-version}-${user}-dirty` by default for images and helm charts that are built locally.
-Images and helm charts with a `*-dirty` version are pushed respectively to the **Development** Artifactory Docker Registry at
-digitalasset-canton-network-docker-dev.jfrog.io and the **Development** Helm chart Repository at https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm-dev.
-PR branch snapshots built through CCI are also pushed to **Development** registry and repository.
 
-Release versions are pushed to the **Release** Artifactory Docker Registry at digitalasset-canton-network-docker.jfrog.io
-and the **Release** Helm chart Repository at https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm.
-These versions are also pushed to the **Public** Github Container Registry at ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm,
-respectively for docker images and helm charts. The deployment scripts do not use the **Public** Github Container Registry at this time.
+All images and Helm charts are pushed to the **Development** Github Container Registry at
+ghcr.io/digital-asset/decentralized-canton-sync-dev/docker and ghcr.io/digital-asset/decentralized-canton-sync-dev/helm.
+This includes artifacts pushed manually, snapshots created in CCI, and release versions.
+
+Releases are copied to
+ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm
+when they are published using the `publish-public-artifacts` CCI workflow.
 
 If you want to deploy a specific release or snapshot version instead of a locally built one,
 you can set the `CHARTS_VERSION` and `OVERRIDE_VERSION` environment variables in the `.envrc.vars` file of the corresponding cluster.
-
-You will need to set the `SPLICE_ARTIFACTS_REPOSITORY` environment variable to `public` to use the **release** artifacts from the
-**Release** Artifactory Docker Registry and the **Release** Helm chart Repository if needed for a snapshot built from main or daily builds, or for release versions.
-
-All scratchnet clusters define `SPLICE_ARTIFACTS_REPOSITORY` as `private` to use the **Development** artifacts by default.
-All other clusters are set up to use the **Release** artifacts by default, `SPLICE_ARTIFACTS_REPOSITORY` is set to `public` in the default `.envrc.vars.da` file.
-
-.. todo:: Cleanup tech debt of confusing public, private and release repositories and registries.
 
 ### Deploy a local build to a cluster
 1. Start from a clean slate: `make -C $SPLICE_ROOT clean`
@@ -436,7 +427,7 @@ All other clusters are set up to use the **Release** artifacts by default, `SPLI
      later steps don't call `sbt bundle` automatically, as it takes too long.
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes to the Development Artifactory Docker Registry.
-   - If this fails, you may need to run `echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin` to login to the Artifactory docker registry for development.
+   - If this fails, you may need to run `echo $GITHUB_TOKEN | docker login "$GHCR" -u "$GH_USER" --password-stdin` to login to the Github Container Registry.
 1. If you plan on using manual `pulumi` commands for deployment (i.e., calling `cncluster pulumi ...` instead of `cncluster apply`),
    ensure that pulumi is set up: `make -C $SPLICE_ROOT cluster/build -j`
    - This step is handled automatically by `cncluster apply`. This uses locally built helm charts by default.
@@ -484,8 +475,9 @@ compute service account within the new cluster.
 
 ### Docker Image Hosting
 
-Docker images for both local and GCE clusters are stored in the [private development artifactory docker registry](digitalasset-canton-network-docker-dev.jfrog.io) and
-the [releases artifactory docker registry](digitalasset-canton-network-docker.jfrog.io) as well as [public releases Github Container Registry](ghcr.io/digital-asset/decentralized-canton-sync/docker) for public releases, which does not require credentials.
+Docker images for both local and GCE clusters are stored in the
+[development Github container registry](ghcr.io/digital-asset/decentralized-canton-sync-dev/docker), public releases are mirrored at
+[public releases Github Container Registry](ghcr.io/digital-asset/decentralized-canton-sync/docker). These registries do not require credentials.
 
 Amongst others, the following environment
 variables are defined in [`.envrc.vars`](.envrc.vars):
@@ -534,8 +526,6 @@ subcommands. A few highlights include the following:
           * cd into your scratchnet's deployment directory
           * `export OPERATOR_IMAGE_VERSION=X.X.X`
           * `export GOOGLE_CREDENTIALS=$(cat "$HOME/.config/gcloud/application_default_credentials.json")`
-          * `export SPLICE_ARTIFACTS_REPOSITORY=public`
-          * `echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> .envrc.vars`
           * `git checkout -b <some_temp_branch>`
           * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
           * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch>`
@@ -2378,7 +2368,6 @@ Instructions:
   The instructions below assume you use release 0.3.12.
     - Add `export CHARTS_VERSION=0.3.12` to `cluster/deployment/scratchneta/.envrc.vars`
     - Add `export OVERRIDE_VERSION=0.3.12` to `cluster/deployment/scratchneta/.envrc.vars`
-    - Change `export SPLICE_ARTIFACTS_REPOSITORY=private` in `cluster/deployment/scratchneta/.envrc.vars` to `export SPLICE_ARTIFACTS_REPOSITORY=public`
     - Run `cncluster update_config active 0 0.3.12` (this will update `cluster/deployment/scratchneta/config.yaml`)
     - See also section [Versions and Repositories](#versions-and-repositories).
 - Configure the number of SVs in the cluster.
@@ -2417,7 +2406,6 @@ Instructions:
 - Configure the network to use the local release
     - Undo version changes in `cluster/deployment/scratchneta/.envrc.vars`:
         - Modify `CHART_VERSION` to `CHART_VERSION=local`
-        - Modify `SPLICE_ARTIFACTS_REPOSITORY` back to `export SPLICE_ARTIFACTS_REPOSITORY=private`
     - In `cluster/deployment/scratchneta/config.yaml`, remove the version key from the active synchronizerMigration
 - Publish a local release from your local code
     - Check out the version you want to deploy.

@@ -185,24 +185,23 @@ jobs:
            --keep NO_PROXY \
            --keep CIRCLE_BRANCH \
            --keep CIRCLE_REPOSITORY_URL \
-           --keep CIRCLE_SHA1"
+           --keep CIRCLE_SHA1 \
+           --keep GH_USER \
+           --keep GITHUB_TOKEN"
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public docker repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
           additional_nix_args: "--keep ARTIFACTORY_USER \
             --keep ARTIFACTORY_PASSWORD \
-            --keep CIRCLE_BRANCH"
+            --keep CIRCLE_BRANCH \
+            --keep OCI_DEV_HELM_REGISTRY \
+            --keep GH_USER \
+            --keep GITHUB_TOKEN"
           cmd_name: Push Helm Artifacts
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public helm repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
@@ -244,17 +243,21 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Copy artifacts to Github Container Registry
                 additional_nix_args: "--keep GITHUB_TOKEN \
+                  --keep GH_USER \
+                  --keep DEV_HELM_REGISTRY \
+                  --keep DEV_DOCKER_REGISTRY \
+                  --keep RELEASE_HELM_REGISTRY \
+                  --keep RELEASE_DOCKER_REGISTRY \
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD"
                 cmd: |
-                  export GITHUB_USER="canton-network-da"
                   make cluster/helm/copy_release_to_ghcr
                   make cluster/docker/copy_release_to_ghcr
             - run_bash_command_in_nix:
                 cmd_name: tag git
-                additional_nix_args: "--keep GITHUB_TOKEN"
+                additional_nix_args: "--keep GITHUB_TOKEN --keep GH_USER"
                 cmd: |
-                  git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
                   RELEASE_TAG=$(get-snapshot-version)
 
                   if [ $(git tag -l "${RELEASE_TAG}") ]; then
@@ -742,8 +745,6 @@ jobs:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:

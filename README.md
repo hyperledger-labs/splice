@@ -119,11 +119,19 @@ clusters.)
       ```
    1. For access to the canton enterprise docker repo and for sbt to download internal dependencies
       To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` must be configured.
-      Best would be to add the to the `.envrc.private` file like so:
+      Best would be to add the environment variables to the `.envrc.private` file like so:
       ```
       export ARTIFACTORY_USER="yourartifactoryusername"
       export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
       ```
+1. Configure Github Container Registry (GHCR) credentials
+   The build pushes images to GHCR. You need to create a personal access token if you want to push images from your local machine.
+   From your profile on github, go to Settings, Developer Settings, Personal Access Tokens, Tokens (classic), and create a new token with the `write:packages` scope.
+   Best would be to add the environment variables to the `.envrc.private` file like the following:
+   ```
+   export GH_USER="yourgithubusername"
+   export GITHUB_TOKEN="yourgithubtoken"
+   ```
 1. After switching to the CC repo you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-amulet/.envrc is blocked. Run `direnv allow` to approve its content
@@ -219,6 +227,9 @@ A list of expected environment definitions is as follows:
 * Artifactory credentials
    * `ARTIFACTORY_USER`: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
    * `ARTIFACTORY_PASSWORD`: Your identity token at digitalasset.jfrog.io (can be obtained by generating an identity token in your user profile)
+* Github credentials
+   * `GH_USER`: your Github username
+   * `GITHUB_TOKEN`: your Github personal access token
 
 Be aware: The Auth0 tokens allow the requester to perform any
 administrative action against the Auth0 tenant! Use caution and keep

@@ -7,7 +7,6 @@ set -e
 
 SPLICE_ROOT=$( git rev-parse --show-toplevel )
 
-
 # Call the ammonite repl with the todo checker Scala script
 (cd "$SPLICE_ROOT"; amm .circleci/todo/src/checkTodos.sc)
 

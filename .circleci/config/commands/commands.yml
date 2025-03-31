@@ -279,10 +279,6 @@ commands:
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: |
-           if [[ << parameters.is_public >> == true ]]; then
-             echo "Publishing to public docker repo"
-             export PUBLISH_PUBLIC_ARTIFACTS=true
-           fi
            make docker-build -j
   docker_login_artifactory:
     steps:

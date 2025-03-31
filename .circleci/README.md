@@ -4,11 +4,13 @@ In the Canton Network team, we use CircleCI to manage continuous integration wit
 
 Currently we run our DevNet in a kubernetes cluster hosted on Google's GCE/GKE platform.
 
-All images we build are pushed to Artifactory docker registries,
-digitalasset-canton-network-docker-dev.jfrog.io for private developer releases
-and digitalasset-canton-network-docker.jfrog.io for releases.
+All images and Helm charts are pushed to the **Development** Github Container Registry at
+ghcr.io/digital-asset/decentralized-canton-sync-dev/docker and ghcr.io/digital-asset/decentralized-canton-sync-dev/helm.
+This includes artifacts pushed manually, snapshots created in CCI, and release versions.
 
-Public releases are copied to Github Container Registry for public access at ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm.
+Releases are copied to
+ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm
+when they are published using the `publish-public-artifacts` CCI workflow.
 
 Along the way, we have the ability to issue Slack notifications from within a job to our team channel based upon the end result of a workflow.
 

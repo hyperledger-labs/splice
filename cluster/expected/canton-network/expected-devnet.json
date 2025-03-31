@@ -749,7 +749,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
         }
       },
       "type": "kubernetes.io/dockerconfigjson"
@@ -762,16 +762,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-docs",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/cn-docs",
       "compat": "true",
       "maxHistory": 10,
       "name": "docs",
       "namespace": "docs",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -798,7 +793,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enableGcsProxy": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "networkName": "dev",
         "tolerations": [
           {
@@ -1571,7 +1566,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
         }
       },
       "type": "kubernetes.io/dockerconfigjson"
@@ -1584,16 +1579,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
       "namespace": "sv-1",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -1621,7 +1611,7 @@
           "svNamespace": "sv-1"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -1652,16 +1642,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv-1",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -1690,7 +1675,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1709,16 +1694,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
       "namespace": "sv-1",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -1747,7 +1727,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
         "metrics": {
           "enable": true
@@ -1791,16 +1771,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv-1",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -2000,7 +1975,7 @@
           },
           "prefix": "dev/sv-1"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.6\",\"amuletNameServiceVersion\": \"0.1.6\",\"dsoGovernanceVersion\": \"0.1.9\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.6\",\"walletPaymentsVersion\": \"0.1.6\"}",
         "initialSynchronizerFeesConfig": {
@@ -2063,16 +2038,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-1",
       "namespace": "sv-1",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -2110,7 +2080,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -2303,7 +2273,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
         }
       },
       "type": "kubernetes.io/dockerconfigjson"
@@ -2316,16 +2286,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
       "namespace": "sv-2",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -2353,7 +2318,7 @@
           "svNamespace": "sv-2"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -2384,16 +2349,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv-2",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -2422,7 +2382,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2441,16 +2401,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
       "namespace": "sv-2",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -2479,7 +2434,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -2523,16 +2478,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv-2",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -2712,7 +2662,7 @@
           },
           "prefix": "dev/sv-2"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -2768,16 +2718,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-2",
       "namespace": "sv-2",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -2815,7 +2760,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -3001,7 +2946,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
         }
       },
       "type": "kubernetes.io/dockerconfigjson"
@@ -3014,16 +2959,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
       "namespace": "sv-3",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -3051,7 +2991,7 @@
           "svNamespace": "sv-3"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -3082,16 +3022,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv-3",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -3120,7 +3055,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3139,16 +3074,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
       "namespace": "sv-3",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -3177,7 +3107,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -3221,16 +3151,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv-3",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -3410,7 +3335,7 @@
           },
           "prefix": "dev/sv-3"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -3466,16 +3391,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-3",
       "namespace": "sv-3",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -3513,7 +3433,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -3699,7 +3619,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
         }
       },
       "type": "kubernetes.io/dockerconfigjson"
@@ -3712,16 +3632,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
       "namespace": "sv-4",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -3749,7 +3664,7 @@
           "svNamespace": "sv-4"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -3780,16 +3695,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv-4",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "affinity": {
@@ -3818,7 +3728,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3837,16 +3747,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
       "namespace": "sv-4",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -3875,7 +3780,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -3919,16 +3824,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv-4",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -4108,7 +4008,7 @@
           },
           "prefix": "dev/sv-4"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -4164,16 +4064,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-4",
       "namespace": "sv-4",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
       "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -4211,7 +4106,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
