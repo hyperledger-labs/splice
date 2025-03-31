@@ -125,3 +125,4 @@ export SPLICE_ARTIFACTS_REPOSITORY=public
 
 export PRIVATE_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs-private
 export PUBLIC_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs
+export EXPECTED_FILES_DIR=${SPLICE_ROOT}/cluster/expected
