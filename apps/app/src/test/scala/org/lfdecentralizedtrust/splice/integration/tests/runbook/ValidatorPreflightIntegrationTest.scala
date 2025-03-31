@@ -100,7 +100,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   protected def limitValidatorUsers() = {
-    val users = validatorClient.listUsers()
+    val users = eventuallySucceeds()(validatorClient.listUsers())
 
     val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
     val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
@@ -114,7 +114,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         .foreach { user =>
           {
             logger.debug(s"Offboarding user: ${user}")
-            validatorClient.offboardUser(user)
+            eventuallySucceeds()(validatorClient.offboardUser(user))
           }
         }
     } else {
