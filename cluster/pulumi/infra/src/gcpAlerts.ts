@@ -63,7 +63,7 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -- sequencer down
 -(resource.labels.namespace_name=~"validator|splitwell"
   AND resource.labels.container_name=~"participant"
-  AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
+  AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Sequencer shutting down|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
 -(resource.labels.container_name="postgres-exporter" AND jsonPayload.msg=~"Error loading config|Excluded databases")
 -jsonPayload.message=~"UnknownHostException"
 -(resource.labels.container_name=~"participant|mediator" AND jsonPayload.message=~"Late processing \\(or clock skew\\) of batch")
