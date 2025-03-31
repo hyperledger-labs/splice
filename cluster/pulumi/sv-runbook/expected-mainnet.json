@@ -757,6 +757,44 @@
         },
         "approvedSvIdentities": [
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "validator_GSF-1::12201725270d497ab23ceffd0d2acce46cc9da44586fd494786ef53cc58b6e4abd79",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "validator_Broadridge::1220b0008ea5531b9e47d3315a822ca8b923b5bdd568c934557402d7160b8af4815d",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "the_tie_validator::1220d3016091c253f526645cce3a0633837b685da083bac4459dad63e61d5c97b5fa",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-mainnet-validator::122038dd7fcbdd68bde47034abfd582cbe38854d94dec10c18a7589706914e2b6e61",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "validator_DFNS::122055a1a137eacd142f00d72a7bd9c6b83ad00f65d97cb79a343d42c2077ae29ca6",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-validator-1::122021b7624f77a1a095714acc74337bebb0f49cf0f8ea565d4f0b12e09bb5deb1e1",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-mainnet1-1::12208a2c7404062865085b75b9e8a3cbca56f272c0103bc55b0e65ca7c2dd855294a",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-mainnet-validator::122038dd7fcbdd68bde47034abfd582cbe38854d94dec10c18a7589706914e2b6e61",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::12205ddf609265d68ee694480f86331de14766bdac30800d04e491b93aca1a81d629",
+                "weight": "5000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
             "rewardWeightBps": 285000
@@ -787,11 +825,31 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "auth0_007c66f47b4f7dbebab8f2af6967::12204783725aa3adcd787311531134baed8b9b28ccf76b100c62b8d4995842aabd6b",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "auth0_007c6747419ddfb5909b9802bba9::1220c75867697df9fc5fed191b34ee931be05aa4b6fcc465927d81c841baa75f2ab5",
+                "weight": "100000"
+              }
+            ],
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPuCFe1z5+ZzVb9y78ewt9yYm7KjGlCk36nF5ZrkkoO+lZvAXmr0IEWEgtBHxienC2IIDGT49aQM6M8ukvbxYLA==",
             "rewardWeightBps": 110000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "auth0_007c67acae90ab8ef9d344b817b4::12205d4d358e9de3351c74419d9746ea9083854c113f826240fe2b2ce808a51a3a7e",
+                "weight": "50000"
+              },
+              {
+                "beneficiary": "auth0_007c6723cbcc5cee3153df57da4d::122039b0120dda65f350bbd22731b636ffe2eb757a4f04bf41a18d689c6e9351633a",
+                "weight": "50000"
+              }
+            ],
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYSpqOpqB6lWVLfu7ojM/GTSALZK2X1MAKhJoZIJP+G7WkDo0Hap4VZtaSyrKiTqlcKu4ycgJ5UEG1WAkoKYjOA==",
             "rewardWeightBps": 100000
