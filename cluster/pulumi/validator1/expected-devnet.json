@@ -222,16 +222,6 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.dev",
-    "inputs": {
-      "name": "organization/infra/infra.dev"
-    },
-    "name": "organization/infra/infra.dev",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -430,7 +420,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -549,7 +539,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -657,7 +647,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator1-participant-1",
     "provider": "",
@@ -712,6 +702,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -782,7 +777,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -837,6 +832,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -895,7 +895,14 @@
           }
         },
         "appDars": [
-          "splice-node/dars/splitwell-current.dar"
+          "splice-node/dars/splitwell-0.1.0.dar",
+          "splice-node/dars/splitwell-0.1.1.dar",
+          "splice-node/dars/splitwell-0.1.2.dar",
+          "splice-node/dars/splitwell-0.1.3.dar",
+          "splice-node/dars/splitwell-0.1.4.dar",
+          "splice-node/dars/splitwell-0.1.5.dar",
+          "splice-node/dars/splitwell-0.1.6.dar",
+          "splice-node/dars/splitwell-0.1.7.dar"
         ],
         "auth": {
           "audience": "https://canton.network.global",
@@ -966,7 +973,7 @@
           "auth0|63e3d75ff4114d87a2c1e4f5"
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

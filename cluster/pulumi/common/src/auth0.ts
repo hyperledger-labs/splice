@@ -14,8 +14,13 @@ import type {
   Auth0ClusterConfig,
 } from './auth0types';
 import { config, isMainNet } from './config';
-import { infraStack } from './stackReferences';
-import { ExactNamespace, fixedTokens, loadJsonFromFile, SPLICE_ROOT } from './utils';
+import {
+  CLUSTER_BASENAME,
+  ExactNamespace,
+  fixedTokens,
+  loadJsonFromFile,
+  SPLICE_ROOT,
+} from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
@@ -426,6 +431,7 @@ export enum Auth0ClientType {
 }
 
 export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> {
+  const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
   const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
   switch (clientType) {
     case Auth0ClientType.RUNBOOK:

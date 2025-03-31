@@ -179,16 +179,6 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.dev",
-    "inputs": {
-      "name": "organization/infra/infra.dev"
-    },
-    "name": "organization/infra/infra.dev",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -399,7 +389,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -525,7 +515,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -606,7 +596,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "splitwell-participant-1",
     "provider": "",
@@ -661,6 +651,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -736,7 +731,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -791,6 +786,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -852,6 +852,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev"
@@ -878,7 +883,7 @@
       },
       "timeout": 300,
       "values": {
-        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-current.dar\"]\n}",
+        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\"]\n}",
         "additionalEnvVars": [
           {
             "name": "ONBOARDING_SECRET_ONLY_FOR_TESTING",
@@ -994,7 +999,7 @@
           "auth0|65de04b385816c4a38cc044f"
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

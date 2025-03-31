@@ -12,8 +12,7 @@ import {
   installAuth0Secret,
   installSpliceHelmChart,
   ValidatorTopupConfig,
-  config,
-  splitwellDarPath,
+  splitwellDarPaths,
   imagePullSecret,
   CnInput,
   activeVersion,
@@ -131,8 +130,8 @@ export async function installSplitwell(
       'canton.validator-apps.validator_backend.app-instances.splitwell = {',
       '  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
       '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
-      // We vet both versions to easily test upgrades.
-      `  dars = ["${splitwellDarPath}"]`,
+      // We vet all versions to easily test upgrades.
+      `  dars = ["${splitwellDarPaths.join('", "')}"]`,
       '}',
     ].join('\n'),
     onboardingSecret,
@@ -158,10 +157,7 @@ export async function installSplitwell(
       auth0AppName: 'splitwell_validator',
     },
     validatorWalletUsers: [validatorWalletUser],
-    // TODO(#14199) Remove this with the next reset
-    validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
-      ? config.requireEnv('CN_SPLITWELL_VALIDATOR_LEGACY_PARTY_HINT')
-      : 'digitalasset-splitwell-1',
+    validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
   });
 

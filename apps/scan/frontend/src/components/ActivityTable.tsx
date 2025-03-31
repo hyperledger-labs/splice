@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
   AnsEntry,
@@ -9,8 +8,9 @@ import {
   Loading,
   RateDisplay,
   TitledTable,
-} from 'common-frontend';
-import { useActivity } from 'common-frontend/scan-api';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { useActivity } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
+import BigNumber from 'bignumber.js';
 import { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { ListActivityResponseItem, SenderAmount, Transfer, AmuletAmount } from 'scan-openapi';

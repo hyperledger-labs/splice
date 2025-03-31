@@ -142,11 +142,11 @@ object CometBftClientIntegrationTest {
       changedSvNodeId: String,
       pubKey: String,
   ) = {
-    val cometBftRequestSigner = CometBftRequestSigner.GenesisSigner
+    val cometBftRequestSigner = CometBftRequestSigner.genesisSigner
     val request = NetworkConfigChangeRequest(
       chainId = chainId,
       submitterSvNodeId = submitterSvNodeId,
-      submitterKeyId = cometBftRequestSigner.Fingerprint,
+      submitterKeyId = cometBftRequestSigner.fingerprint,
       submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
       kind = NodeConfigChangeRequest(
         SvNodeConfigChangeRequest.of(

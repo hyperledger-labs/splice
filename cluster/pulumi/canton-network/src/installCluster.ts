@@ -7,7 +7,6 @@ import {
   ExpectedValidatorOnboarding,
   isDevNet,
   sequencerPruningConfig,
-  SplitPostgresInstances,
   svOnboardingPollingInterval,
   svValidatorTopupConfig,
 } from 'splice-pulumi-common';
@@ -20,6 +19,7 @@ import {
   standaloneValidatorOnboarding,
   validator1Onboarding,
 } from 'splice-pulumi-common-validator/src/validators';
+import { SplitPostgresInstances } from 'splice-pulumi-common/src/config/configs';
 
 import { activeVersion } from '../../common';
 import { installChaosMesh } from './chaosMesh';

@@ -443,6 +443,10 @@ function installK8sRunnerScaleSet(
             containers: [
               {
                 name: '$job',
+                env: [
+                  // TODO (#18641): remove from here, already defined in splice-test-ci/Dockerfile
+                  { name: 'CI', value: 'true' },
+                ],
                 volumeMounts: [
                   {
                     name: 'cache',

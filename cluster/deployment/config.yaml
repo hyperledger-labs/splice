@@ -6,6 +6,10 @@
 infra:
   ipWhitelisting:
     extraWhitelistedIngress: [ ]
+  prometheus:
+    retentionDuration: "1y"
+    retentionSize: "1500GB"
+    storageSize: "2Ti"
 # configs specific for the pulumi project
 # will be applied to all the stacks in the project
 pulumiProjectConfig:
@@ -19,6 +23,14 @@ pulumiProjectConfig:
       - "public"
     isExternalCluster: false
     hasPublicDocs: false
+    cloudSql:
+      enabled: false
+      protected: true
+      # default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
+      tier: 'db-custom-2-7680'
+  sv-runbook:
+    cloudSql:
+      enabled: false
 ## in the form <pulumi-project>:
 ##                <settings>
 ## ex:

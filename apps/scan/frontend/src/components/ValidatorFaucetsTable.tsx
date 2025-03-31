@@ -1,8 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { ErrorDisplay, Loading, PartyId, TitledTable } from 'common-frontend';
-import { useGetTopValidatorsByValidatorFaucets } from 'common-frontend/scan-api';
+import {
+  ErrorDisplay,
+  Loading,
+  PartyId,
+  TitledTable,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { useGetTopValidatorsByValidatorFaucets } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 
 import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 

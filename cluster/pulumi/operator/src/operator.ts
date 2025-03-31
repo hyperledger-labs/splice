@@ -93,6 +93,17 @@ export const operator = new k8s.helm.v3.Release(
           },
         },
         {
+          // Avoids rate-limiting pulumi access of public repositories
+          name: 'GITHUB_TOKEN',
+          valueFrom: {
+            secretKeyRef: {
+              // This secret is created flux/github-secret.ts for the flux controller
+              name: 'github',
+              key: 'password',
+            },
+          },
+        },
+        {
           name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
           value: 'true',
         },

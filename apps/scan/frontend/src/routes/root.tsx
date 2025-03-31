@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useGetRoundOfLatestData } from 'common-frontend/scan-api';
+import { useGetRoundOfLatestData } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import React, { useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 

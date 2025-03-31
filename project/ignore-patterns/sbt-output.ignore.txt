@@ -124,4 +124,6 @@ Generating daml-prim-DA-Exception-PreconditionFailed
 Generating daml-prim-DA-Exception-ArithmeticError
 Generating daml-prim-DA-Exception-GeneralError
 
+Retried waiting for GCLocker too often allocating
+
 # Make sure to have a trailing newline

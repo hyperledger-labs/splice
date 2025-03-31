@@ -808,7 +808,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "docs-docs",
     "provider": "",
@@ -886,16 +886,6 @@
     "name": "k8s-imgpull-sv-4-default",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "organization/infra/infra.dev",
-    "inputs": {
-      "name": "organization/infra/infra.dev"
-    },
-    "name": "organization/infra/infra.dev",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,
@@ -1524,6 +1514,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev"
@@ -1648,7 +1643,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -1705,7 +1700,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -1787,7 +1782,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1873,9 +1868,47 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 385000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2021,7 +2054,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -2141,7 +2174,7 @@
           }
         }
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -2213,6 +2246,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2338,7 +2376,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -2395,7 +2433,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -2477,7 +2515,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -2563,9 +2601,47 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 385000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2684,7 +2760,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -2797,7 +2873,7 @@
           "google-oauth2|101034414073429253538"
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -2869,6 +2945,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -2994,7 +3075,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -3051,7 +3132,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -3133,7 +3214,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -3219,9 +3300,47 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 385000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -3340,7 +3459,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -3453,7 +3572,7 @@
           "google-oauth2|101034414073429253538"
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -3525,6 +3644,11 @@
         },
         "locationPreference": {
           "zone": "us-central1-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -3650,7 +3774,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -3707,7 +3831,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -3789,7 +3913,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -3875,9 +3999,47 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 385000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -3996,7 +4158,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -4109,7 +4271,7 @@
           "google-oauth2|101034414073429253538"
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",

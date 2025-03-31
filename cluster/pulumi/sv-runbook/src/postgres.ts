@@ -4,12 +4,10 @@ import {
   ExactNamespace,
   loadYamlFromFile,
   SPLICE_ROOT,
-  config,
   supportsSvRunbookReset,
 } from 'splice-pulumi-common';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
-
-const cloudSqlEnabled = config.envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
 
 export function installPostgres(
   xns: ExactNamespace,
@@ -18,7 +16,7 @@ export function installPostgres(
   selfHostedValuesFile: string,
   isActive: boolean = true
 ): SplicePostgres | CloudPostgres {
-  if (cloudSqlEnabled) {
+  if (spliceConfig.pulumiProjectConfig.cloudSql.enabled) {
     return new CloudPostgres(xns, name, name, secretName, isActive, supportsSvRunbookReset);
   } else {
     const valuesFromFile = loadYamlFromFile(

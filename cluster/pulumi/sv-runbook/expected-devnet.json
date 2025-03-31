@@ -214,7 +214,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -290,6 +290,14 @@
   },
   {
     "custom": true,
+    "id": "projects/test-project/global/networks/default",
+    "inputs": {},
+    "name": "default",
+    "provider": "",
+    "type": "gcp:compute/network:Network"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "enableServerSideApply": "true"
@@ -356,7 +364,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "loopback",
     "provider": "",
@@ -425,7 +433,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "scan",
     "provider": "",
@@ -597,6 +605,11 @@
         "locationPreference": {
           "zone": "us-central1-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev"
@@ -686,9 +699,47 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 385000
+            "rewardWeightBps": 285000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -792,7 +843,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "sv-app",
     "provider": "",
@@ -971,7 +1022,7 @@
           "google-oauth2|101034414073429253538"
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator",
     "provider": "",
