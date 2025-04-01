@@ -253,6 +253,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         } else idx
       }
 
+      val replaceTemplateIdR = "^[^:]+".r
+      def stableTemplateId(templateId: String) = {
+        replaceTemplateIdR.replaceFirstIn(templateId, "#package-name")
+      }
+
       val expectedParties = Map(
         alice.toProtoPrimitive -> "party::normalized",
         dsoParty.toProtoPrimitive -> "dso::normalized",
@@ -308,15 +313,17 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               createdEvent = active.createdEvent.copy(
                 contractId =
                   replaceContractIdWithStableString(active.createdEvent.contractId).toString,
+                templateId = stableTemplateId(active.createdEvent.templateId),
                 createdAt = protobuf.timestamp.Timestamp.of(0, 0),
                 createdEventBlob = ByteString.empty(),
                 interfaceViews = active.createdEvent.interfaceViews.map(iv =>
-                  iv.copy(viewValue =
-                    Some(
+                  iv.copy(
+                    viewValue = Some(
                       replaceStringsInJson(
                         iv.viewValue.valueOrFail("Expected view value to be available.")
                       )
-                    )
+                    ),
+                    interfaceId = stableTemplateId(iv.interfaceId),
                   )
                 ),
                 nodeId = 1,
@@ -364,15 +371,17 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   created.copy(
                     offset = idx.toLong,
                     contractId = replaceContractIdWithStableString(created.contractId).toString,
+                    templateId = stableTemplateId(created.templateId),
                     createArgument = created.createArgument.map(replaceStringsInJson),
                     createdEventBlob = ByteString.empty(),
                     interfaceViews = created.interfaceViews.map(view =>
-                      view.copy(viewValue =
-                        Some(
+                      view.copy(
+                        viewValue = Some(
                           replaceStringsInJson(
                             view.viewValue.valueOrFail("Expected view value to be available.")
                           )
-                        )
+                        ),
+                        interfaceId = stableTemplateId(view.interfaceId),
                       )
                     ),
                     witnessParties = created.witnessParties.map(expectedParties),
@@ -384,16 +393,22 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   archived.copy(
                     offset = idx.toLong,
                     contractId = replaceContractIdWithStableString(archived.contractId).toString,
+                    templateId = stableTemplateId(archived.templateId),
                     witnessParties = archived.witnessParties.map(expectedParties),
+                    implementedInterfaces = archived.implementedInterfaces.map(stableTemplateId),
                   )
                 case (exercised: JsEvent.ExercisedEvent, _) =>
                   exercised.copy(
                     offset = idx.toLong,
                     contractId = replaceContractIdWithStableString(exercised.contractId).toString,
+                    templateId = exercised.templateId.copy(packageId = "#package-name"),
                     choiceArgument = replaceStringsInJson(exercised.choiceArgument),
                     actingParties = exercised.actingParties.map(expectedParties),
                     witnessParties = exercised.witnessParties.map(expectedParties),
                     exerciseResult = replaceStringsInJson(exercised.exerciseResult),
+                    interfaceId = exercised.interfaceId.map(_.copy(packageId = "#package-name")),
+                    implementedInterfaces =
+                      exercised.implementedInterfaces.map(_.copy(packageId = "#package-name")),
                   )
               },
             )

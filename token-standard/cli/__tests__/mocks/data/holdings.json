@@ -10,7 +10,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -49,7 +49,7 @@
             "dso::normalized",
             "party::normalized"
           ],
-          "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+          "templateId" : "#package-name:Splice.Amulet:Amulet",
           "witnessParties" : [
             "party::normalized"
           ]
@@ -71,7 +71,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -110,7 +110,7 @@
             "dso::normalized",
             "party::normalized"
           ],
-          "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+          "templateId" : "#package-name:Splice.Amulet:Amulet",
           "witnessParties" : [
             "party::normalized"
           ]
@@ -132,7 +132,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -166,7 +166,7 @@
           "signatories" : [
             "party::normalized"
           ],
-          "templateId" : "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId" : "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "witnessParties" : [
             "party::normalized"
           ]
@@ -188,7 +188,7 @@
           "createdEventBlob" : "",
           "interfaceViews" : [
             {
-              "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+              "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
               "viewStatus" : {
                 "code" : 0,
                 "details" : [
@@ -222,7 +222,7 @@
           "signatories" : [
             "party::normalized"
           ],
-          "templateId" : "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId" : "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "witnessParties" : [
             "party::normalized"
           ]

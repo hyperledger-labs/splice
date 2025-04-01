@@ -29,7 +29,7 @@
                   "validator::normalized",
                   "party::normalized"
                 ],
-                "templateId" : "db212d6ee212415b71f4835a0b54550aed485fb8682ab88eb922e189a8f21792:Splice.Wallet.Install:WalletAppInstall",
+                "templateId" : "#package-name:Splice.Wallet.Install:WalletAppInstall",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -75,7 +75,7 @@
                   "validator::normalized",
                   "party::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:ValidatorRight",
+                "templateId" : "#package-name:Splice.Amulet:ValidatorRight",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -120,7 +120,7 @@
                 "signatories" : [
                   "party::normalized"
                 ],
-                "templateId" : "db212d6ee212415b71f4835a0b54550aed485fb8682ab88eb922e189a8f21792:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal",
+                "templateId" : "#package-name:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -218,7 +218,7 @@
                 "nodeId" : 1,
                 "offset" : 3,
                 "packageName" : "splice-wallet",
-                "templateId" : "db212d6ee212415b71f4835a0b54550aed485fb8682ab88eb922e189a8f21792:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal",
+                "templateId" : "#package-name:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -301,7 +301,7 @@
                 "nodeId" : 2,
                 "offset" : 3,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -381,7 +381,7 @@
                 "nodeId" : 3,
                 "offset" : 3,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Round:OpenMiningRound",
+                "templateId" : "#package-name:Splice.Round:OpenMiningRound",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -458,12 +458,12 @@
                 },
                 "implementedInterfaces" : [
                 ],
-                "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:BurnMintFactory",
+                "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:BurnMintFactory",
                 "lastDescendantNodeId" : 11,
                 "nodeId" : 6,
                 "offset" : 3,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -485,14 +485,14 @@
                   
                 },
                 "implementedInterfaces" : [
-                  "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding"
+                  "#package-name:Splice.Api.Token.HoldingV1:Holding"
                 ],
                 "interfaceId" : null,
                 "lastDescendantNodeId" : 9,
                 "nodeId" : 9,
                 "offset" : 3,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -519,7 +519,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -558,7 +558,7 @@
                   "dso::normalized",
                   "validator::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -585,7 +585,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -624,7 +624,7 @@
                   "dso::normalized",
                   "validator::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -682,12 +682,12 @@
                 },
                 "implementedInterfaces" : [
                 ],
-                "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:BurnMintFactory",
+                "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:BurnMintFactory",
                 "lastDescendantNodeId" : 16,
                 "nodeId" : 13,
                 "offset" : 3,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -709,14 +709,14 @@
                   
                 },
                 "implementedInterfaces" : [
-                  "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding"
+                  "#package-name:Splice.Api.Token.HoldingV1:Holding"
                 ],
                 "interfaceId" : null,
                 "lastDescendantNodeId" : 16,
                 "nodeId" : 16,
                 "offset" : 3,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -747,7 +747,7 @@
                 "signatories" : [
                   "dso::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:ValidatorRewardCoupon",
+                "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -779,7 +779,7 @@
                   "validator::normalized",
                   "party::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:TransferPreapproval",
+                "templateId" : "#package-name:Splice.AmuletRules:TransferPreapproval",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -883,7 +883,7 @@
                 "nodeId" : 3,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:TransferPreapproval",
+                "templateId" : "#package-name:Splice.AmuletRules:TransferPreapproval",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -976,7 +976,7 @@
                 "nodeId" : 5,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1007,7 +1007,7 @@
                 "signatories" : [
                   "dso::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:ValidatorRewardCoupon",
+                "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1040,7 +1040,7 @@
                 "signatories" : [
                   "dso::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:AppRewardCoupon",
+                "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1118,12 +1118,12 @@
                 },
                 "implementedInterfaces" : [
                 ],
-                "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:BurnMintFactory",
+                "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:BurnMintFactory",
                 "lastDescendantNodeId" : 15,
                 "nodeId" : 10,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1145,14 +1145,14 @@
                   
                 },
                 "implementedInterfaces" : [
-                  "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding"
+                  "#package-name:Splice.Api.Token.HoldingV1:Holding"
                 ],
                 "interfaceId" : null,
                 "lastDescendantNodeId" : 13,
                 "nodeId" : 13,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1179,7 +1179,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -1218,7 +1218,7 @@
                   "dso::normalized",
                   "party::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1245,7 +1245,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -1284,7 +1284,7 @@
                   "dso::normalized",
                   "validator::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1389,12 +1389,12 @@
                 },
                 "implementedInterfaces" : [
                 ],
-                "interfaceId" : "72ceb54220b8d07305dbedaac1147f119671220c2b82c11642cc9d9e8bac0410:Splice.Api.Token.TransferInstructionV1:TransferFactory",
+                "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferFactory",
                 "lastDescendantNodeId" : 15,
                 "nodeId" : 0,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules",
+                "templateId" : "#package-name:Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1480,7 +1480,7 @@
                 "nodeId" : 3,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:TransferPreapproval",
+                "templateId" : "#package-name:Splice.AmuletRules:TransferPreapproval",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1573,7 +1573,7 @@
                 "nodeId" : 5,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1604,7 +1604,7 @@
                 "signatories" : [
                   "dso::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:ValidatorRewardCoupon",
+                "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1637,7 +1637,7 @@
                 "signatories" : [
                   "dso::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:AppRewardCoupon",
+                "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1715,12 +1715,12 @@
                 },
                 "implementedInterfaces" : [
                 ],
-                "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:BurnMintFactory",
+                "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:BurnMintFactory",
                 "lastDescendantNodeId" : 15,
                 "nodeId" : 10,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1742,14 +1742,14 @@
                   
                 },
                 "implementedInterfaces" : [
-                  "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding"
+                  "#package-name:Splice.Api.Token.HoldingV1:Holding"
                 ],
                 "interfaceId" : null,
                 "lastDescendantNodeId" : 13,
                 "nodeId" : 13,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1776,7 +1776,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -1815,7 +1815,7 @@
                   "dso::normalized",
                   "validator::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1842,7 +1842,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -1881,7 +1881,7 @@
                   "dso::normalized",
                   "party::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1957,7 +1957,7 @@
                 "nodeId" : 0,
                 "offset" : 6,
                 "packageName" : "splice-wallet",
-                "templateId" : "db212d6ee212415b71f4835a0b54550aed485fb8682ab88eb922e189a8f21792:Splice.Wallet.Install:WalletAppInstall",
+                "templateId" : "#package-name:Splice.Wallet.Install:WalletAppInstall",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -1992,7 +1992,7 @@
                 "nodeId" : 1,
                 "offset" : 6,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -2028,7 +2028,7 @@
                 "nodeId" : 2,
                 "offset" : 6,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -2094,12 +2094,12 @@
                 },
                 "implementedInterfaces" : [
                 ],
-                "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:BurnMintFactory",
+                "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:BurnMintFactory",
                 "lastDescendantNodeId" : 6,
                 "nodeId" : 4,
                 "offset" : 6,
                 "packageName" : "splice-amulet",
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.AmuletRules:AmuletRules",
+                "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -2126,7 +2126,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -2165,7 +2165,7 @@
                   "dso::normalized",
                   "party::normalized"
                 ],
-                "templateId" : "c65529d61aaa33d161d435cd22b1e3ca109c1b104ca59062ef0c6b2549cd907a:Splice.Amulet:Amulet",
+                "templateId" : "#package-name:Splice.Amulet:Amulet",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -2202,7 +2202,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -2236,7 +2236,7 @@
                 "signatories" : [
                   "party::normalized"
                 ],
-                "templateId" : "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+                "templateId" : "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
                 "witnessParties" : [
                   "party::normalized"
                 ]
@@ -2273,7 +2273,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                   {
-                    "interfaceId" : "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+                    "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
                     "viewStatus" : {
                       "code" : 0,
                       "details" : [
@@ -2307,7 +2307,7 @@
                 "signatories" : [
                   "party::normalized"
                 ],
-                "templateId" : "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+                "templateId" : "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
                 "witnessParties" : [
                   "party::normalized"
                 ]

@@ -11,7 +11,9 @@
           "type": "BurnMint",
           "input": {
             "sender": "validator::normalized",
-            "inputHoldings": ["14"],
+            "inputHoldings": [
+              "14"
+            ],
             "instrumentId": {
               "admin": "dso::normalized",
               "id": "Amulet"
@@ -195,7 +197,7 @@
           "parentChoice": "raw API",
           "contractId": "3",
           "payload": {
-            "interfaceId": "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
             "viewValue": {
               "amount": "30.0000000000",
               "instrumentId": {
@@ -215,7 +217,7 @@
             }
           },
           "offset": 7,
-          "templateId": "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }
       ]
@@ -231,7 +233,7 @@
           "parentChoice": "raw API",
           "contractId": "4",
           "payload": {
-            "interfaceId": "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
+            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
             "viewValue": {
               "amount": "40.0000000000",
               "instrumentId": {
@@ -251,7 +253,7 @@
             }
           },
           "offset": 8,
-          "templateId": "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }
       ]
