@@ -216,3 +216,8 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
+
+export const splitwellDarPaths = fs
+  .readdirSync(`${SPLICE_ROOT}/daml/dars`)
+  .filter(file => file.match(/splitwell.*\.dar/))
+  .map(file => `splice-node/dars/${file}`);

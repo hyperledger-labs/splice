@@ -179,7 +179,6 @@ abstract class InStackDecentralizedSynchronizerNode
             enable: true,
             migration: {
               id: this.migrationId,
-              active: active,
             },
           },
           livenessProbeInitialDelaySeconds: domainLivenessProbeInitialDelaySeconds,

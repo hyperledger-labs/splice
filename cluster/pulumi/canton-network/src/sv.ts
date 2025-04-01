@@ -34,6 +34,7 @@ import {
   PersistenceConfig,
   sanitizedForPostgres,
   spliceInstanceNames,
+  svCometBftGovernanceKeySecret,
   SvIdKey,
   svUserIds,
   validatorOnboardingSecretName,
@@ -205,7 +206,12 @@ export async function installSvNode(
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
     .concat([loopback])
-    .concat(imagePullDeps);
+    .concat(imagePullDeps)
+    .concat(
+      config.cometBftGovernanceKey
+        ? svCometBftGovernanceKeySecret(xns, config.cometBftGovernanceKey)
+        : []
+    );
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
@@ -328,9 +334,10 @@ async function installValidator(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
-    validatorWalletUsers: [svConfig.validatorWalletUser].concat(
-      svUserIds(validatorSecrets.auth0Client.getCfg())
-    ),
+    validatorWalletUsers: (svConfig.validatorWalletUser
+      ? [svConfig.validatorWalletUser]
+      : []
+    ).concat(svUserIds(validatorSecrets.auth0Client.getCfg())),
     dependencies: sv.participant.asDependencies,
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,
@@ -397,6 +404,7 @@ function installSvApp(
           cometBFT: {
             enabled: true,
             connectionUri: pulumi.interpolate`http://${(decentralizedSynchronizer as unknown as CometbftSynchronizerNode).cometbftRpcServiceName}:26657`,
+            externalGovernanceKey: config.cometBftGovernanceKey ? true : undefined,
           },
         }),
     decentralizedSynchronizerUrl:

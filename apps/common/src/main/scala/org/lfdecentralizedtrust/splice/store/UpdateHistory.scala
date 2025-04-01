@@ -48,6 +48,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import slick.jdbc.canton.SQLActionBuilder
 
 import java.util.concurrent.atomic.AtomicReference
@@ -163,7 +164,7 @@ class UpdateHistory(
 
       override def initialize()(implicit
           traceContext: TraceContext
-      ): Future[Option[Long]] = {
+      ): Future[IngestionStart] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         // Notes:
@@ -236,10 +237,13 @@ class UpdateHistory(
           lastIngestedOffset match {
             case Some(offset) =>
               logger.info(s"${description()} resumed at offset $offset")
+              IngestionStart.ResumeAtOffset(offset)
             case None =>
               logger.info(s"${description()} initialized")
+              // In case the latest offset is not the beginning of the network,
+              // missing updates will be later backfilled using `ScanHistoryBackfillingTrigger`.
+              IngestionStart.InitializeAcsAtLatestOffset
           }
-          lastIngestedOffset
         }
       }
 

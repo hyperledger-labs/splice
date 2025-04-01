@@ -8,8 +8,26 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.18
+------
+
+* Scan
+
+  * ``scan_txlog.py`` will safely save its cache specified with ``--cache-file-path``.
+    A failed run will always revert to the prior cache, such as if the disk ran out of space while cache was being written.
+
+* Docs
+
+  * SV and validator ingress: Clarify that all traffic not explicitly allowed as per the docs should be blocked for security reasons.
+  * Clarify that the GCP and AWS KMS drivers are available only for licensed users of Canton Enterprise.
+
+0.3.17
+------
+
+.. important::
+
+    * This release fixes an issue where the Validator app would uploads dars before being vetted. This can result in ledger API command submissions that target those DARs directly (as opposed to a third-party DAR that depends on them) breaking.
+       If you are upgrading from 0.3.15, please upgrade directly to 0.3.17. If you don't submit any commands directly against the ledger API (as opposed to the validator APIs) for the amulet DARs you are not affected.
 
 * Docs
 

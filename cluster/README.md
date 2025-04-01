@@ -643,17 +643,18 @@ repull the image.
 ### CloudSQL and ScratchNet Clusters
 
 
-By default, scratchnet clusters do not enable the `ENABLE_CLOUD_SQL`
-environment variable in their `.envrc.vars` file and instead deploy
+By default, scratchnet clusters do not enable CloudSQL and instead deploy
 self-hosted postgres instances. This is mainly done to speed up
 deployment.
 
 If you explicitly want to test a CloudSQL deployment on scratchnet,
-add the following line to the `.envrc.vars` file of the cluster:
+add the following config to the `config.yaml` file of the cluster:
 
 ```
-export ENABLE_CLOUD_SQL=true
+pulumiProjectConfig.canton-network.cloudSql.enabled: true
 ```
+
+This will enable CloudSQL for all the pulumi projects.
 
 ### Observing Cluster Operation
 
@@ -1584,6 +1585,7 @@ However, the following steps don't require an action from us:
    You can optionally disable backups and backup status checks. If you don't, they will just fail with no further consequences,
    at least let people on monitoring rotation know that this is expected until HDM/DR is done.
 1. Take down the `multi-validator` stack if it exists. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
+1. For a disaster recovery, test the `cncluster take_disaster_recovery_dumps` step below, against a timestamp determined from `sv-1` as with below.
 1. Request PAM access some time before the scheduled time.
    Keep in mind a PAM request lasts for 4h, so you want to ensure you'll have PAM for the duration of the meeting.
 1. Wait until the scheduled time has arrived. For hard domain migrations, the domain should be paused and a migration dump should be exported.
@@ -1606,11 +1608,15 @@ However, the following steps don't require an action from us:
    Our backups are slow, specifically the SV backups can take upto 10 mins. So you want to get started early and launch the commands in parallel.
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
-1. In the event of a disaster recovery, you need to agree on a timestamp (in the format “2024-04-17T19:12:02Z”) with the byzantine majority of the SVs and execute the following commands:
+1. For MainNet: take note of the backup RUN_ID (you will find it in the success message of
+   the backup, which will be of form "Completed all backups for namespace sv-1, RUN_ID = ...")
+1. In the event of a disaster recovery, you need to agree on a timestamp (in the format “2024-04-17T19:12:02Z”) with the byzantine majority of the SVs.
+   For Digital-Asset-2, only `sv-1` logs; you can use [mentions of other SVs in its logs](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Aresource.labels.container_name%3D%22participant%22%0AjsonPayload.message%3D~%22Commitment%20correct.*PAR::%2528DA-Helm%7CDigital-Asset-%25282%7CEng%2529%2529.*toInclusive%22;duration=PT1H?project=da-cn-devnet) to determine the minimum time for SVs 2-4 and DA-Helm-Test-Node.
+   Then, execute the following commands:
     - `cncluster take_disaster_recovery_dumps <timestamp> <new_migration_id> <output_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
     - `cncluster copy_disaster_recovery_dumps <dump_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
 1. Note (or take a screenshot of) the amulet balance of one of our SVs (for post-migration [sanity check](#new-domain-readiness-checks))
-1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following config for your target cluster:
+1. **Migrate:** Merge two PRs, against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) and a forward-port to `main`, that modify the following config for your target cluster:
    * in `config.yaml` change `synchronizerMigration.active` to `synchronizerMigration.legacy`
    * in `config.yaml` change `synchronizerMigration.upgrade` to `synchronizerMigration.active`
    * in `config.yaml` set `synchronizerMigration.active.migratingFrom` to the migration ID we're migrating away from
@@ -1637,6 +1643,9 @@ However, the following steps don't require an action from us:
 1. Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
+1. For MainNet: Copy the very last backup you took from the old migration ID (after
+   pausing the synchronizer) by running:
+   `gcloud workflows execute copy-cn-backup-to-bucket --project da-cn-shared --location us-central1 --data '{"migrationId": <OLD migration ID>, "cnBackupRunId": "<backup run ID you took note of above>"}'`
 1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps:
    * in `config.yaml`, remove the `synchronizerMigration.legacy` section or move it to `synchronizerMigration.archived` if state from the old synchronizer should be preserved
 

@@ -17,11 +17,16 @@ synchronizerMigration:
   active:
     id: 1
     provider: external
-    version: 0.3.16
-    releaseReference: "refs/heads/release-line-0.3.16"
+    version: 0.3.18
+    releaseReference: "refs/heads/release-line-0.3.18"
 pulumiProjectConfig:
   default:
     isExternalCluster: true
+    cloudSql:
+      enabled: true
+  sv-runbook:
+    cloudSql:
+      enabled: true
 monitoring:
   alerting:
     enableNoDataAlerts: true

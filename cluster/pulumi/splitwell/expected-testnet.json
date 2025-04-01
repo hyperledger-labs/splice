@@ -201,16 +201,6 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.testzrh",
-    "inputs": {
-      "name": "organization/infra/infra.testzrh"
-    },
-    "name": "organization/infra/infra.testzrh",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -684,6 +674,11 @@
         "locationPreference": {
           "zone": "europe-west6-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "testzrh"
@@ -814,6 +809,11 @@
         "locationPreference": {
           "zone": "europe-west6-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "testzrh"
@@ -874,6 +874,11 @@
         "locationPreference": {
           "zone": "europe-west6-a"
         },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8,
+          "updateTrack": "production"
+        },
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "testzrh"
@@ -900,7 +905,7 @@
       },
       "timeout": 300,
       "values": {
-        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-current.dar\"]\n}",
+        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\"]\n}",
         "additionalEnvVars": [
           {
             "name": "ONBOARDING_SECRET_ONLY_FOR_TESTING",

@@ -1,3 +1,13 @@
+pulumiProjectConfig:
+  default:
+    cloudSql:
+      enabled: true
+      protected: false
+      tier: "db-custom-4-7680"
+  sv-runbook:
+    cloudSql:
+      enabled: true
+
 infra:
   ipWhitelisting:
     extraWhitelistedIngress:

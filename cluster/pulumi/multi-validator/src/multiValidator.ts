@@ -1,7 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   DecentralizedSynchronizerMigrationConfig,
-  config,
   daContactPoint,
   generatePortSequence,
   numNodesPerInstance,
@@ -87,10 +86,6 @@ export class MultiValidator extends MultiNodeDeployment {
             {
               name: 'SPLICE_APP_CONTACT_POINT',
               value: daContactPoint,
-            },
-            {
-              name: 'SPLICE_APP_LEGACY_PARTY_HINT',
-              value: config.envFlag('MULTI_VALIDATOR_LEGACY_PARTY_HINT') ? 'true' : '',
             },
           ],
           ports: ports.map(port => ({

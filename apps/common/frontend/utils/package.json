@@ -1,5 +1,5 @@
 {
-  "name": "common-frontend-utils",
+  "name": "@lfdecentralizedtrust/splice-common-frontend-utils",
   "version": "0.1.0",
   "browserslist": {
     "production": [

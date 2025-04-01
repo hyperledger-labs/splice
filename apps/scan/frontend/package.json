@@ -1,5 +1,5 @@
 {
-  "name": "scan-frontend",
+  "name": "@lfdecentralizedtrust/splice-scan-frontend",
   "version": "0.1.0",
   "browserslist": {
     "production": [
@@ -20,7 +20,7 @@
     "@mui/material": "^5.14.10",
     "@tanstack/react-query": "4.29.5",
     "bignumber.js": "9.1.1",
-    "common-frontend": "0.1.0",
+    "@lfdecentralizedtrust/splice-common-frontend": "0.1.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-helmet-async": "^2.0.5",

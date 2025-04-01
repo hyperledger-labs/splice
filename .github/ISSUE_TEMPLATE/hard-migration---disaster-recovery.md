@@ -25,6 +25,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 - [ ] (only if hard migration) vote on scheduled downtime
 - [ ] disable periodic CI jobs (including sv and validator runbook resets) on `main`
 - [ ] (only if DevNet) take down multi-validator stack (does not handle hard domain migrations in its current form): `cncluster pulumi multi-validator down` from release branch
+- [ ] (only if disaster recovery) test the `cncluster take_disaster_recovery_dumps` step
 - [ ] take backups with `cncluster backup_nodes` (all nodes in parallel!) as you would during the meeting - to confirm that the commands work for you and to have them ready
 - [ ] (shortly before the call) request PAM in case you'll need it later
 
@@ -33,8 +34,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 - [ ] wait for current synchronizer to pause and dumps to be taken (`Wrote domain migration dump` in SV app / validator app logs)
 - [ ] ensure that apps are sufficiently caught up
 - [ ] take backups with `cncluster backup_nodes`
-- [ ] merge PR to migrate to higher migration ID
-  - [ ] (later) forward-port to branches that may serve as potential future release sources
+- [ ] merge PRs for deployment branch & `main` to migrate to higher migration ID
 - [ ] check: domain is healthy
 
 ### Call with all SVs (DR version; remove me if hard migration)
@@ -44,8 +44,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 - [ ] agree on a timestamp based on logs (e.g., ask everyone for the `toInclusive` value of their latest `Commitment correct for sender and period CommitmentPeriod(fromExclusive = X, toInclusive = THIS)` log entry on the participant and use the min of that)
 - [ ] get the dumps with `cncluster take_disaster_recovery_dumps`
 - [ ] copy the dumps into our PVCs with `cncluster copy_disaster_recovery_dumps`
-- [ ] merge PR to migrate to higher migration ID
-  - [ ] (later) forward-port to branches that may serve as potential future release sources
+- [ ] merge PRs for deployment branch & `main` to migrate to higher migration ID
 - [ ] check: domain is healthy
 
 ### Cleanup

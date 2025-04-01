@@ -44,7 +44,6 @@ export const svConfigs: StaticSvConfig[] = isMainNet
         onboardingName: 'Digital-Asset-2',
         auth0ValidatorAppName: 'validator',
         auth0SvAppName: 'sv',
-        validatorWalletUser: 'auth0|663d6fd6902e3665a5dc1ad1',
         cometBft: {
           nodeIndex: 1,
           id: '4c7c99516fb3309b89b7f8ed94690994c8ec0ab0',
@@ -311,6 +310,7 @@ export const svConfigs: StaticSvConfig[] = isMainNet
             publicKey: '6ltWNxHRrwPj9qPYB3HQWL4hpeFTCjHSW2m+7rCYWAw=',
           },
         },
+        participantKms: true,
       },
       {
         nodeName: 'sv-14',

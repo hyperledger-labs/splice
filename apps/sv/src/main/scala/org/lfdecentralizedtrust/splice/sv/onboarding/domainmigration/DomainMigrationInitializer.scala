@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
-import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{
@@ -30,13 +29,9 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.cometbft.{
-  CometBftClient,
-  CometBftNode,
-  CometBftRequestSigner,
-}
+import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftClient, CometBftNode}
 import org.lfdecentralizedtrust.splice.sv.config.{
-  CometBftConfig,
+  SvCometBftConfig,
   SvAppBackendConfig,
   SvOnboardingConfig,
 }
@@ -53,6 +48,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -80,7 +76,7 @@ class DomainMigrationInitializer(
     extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
-    cometBftConfig: Option[CometBftConfig],
+    cometBftConfig: Option[SvCometBftConfig],
     cometBftClient: Option[CometBftClient],
     override protected val config: SvAppBackendConfig,
     upgradesConfig: UpgradesConfig,
@@ -191,13 +187,13 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
-      signer <- CometBftRequestSigner.getOrGenerateSigner(
-        "cometbft-governance-keys",
+      newCometBftNode <- SvUtil.mapToCometBftNode(
+        cometBftClient,
+        cometBftConfig,
         participantAdminConnection,
         logger,
-      )
-      newCometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-        new CometBftNode(client, signer, config, loggerFactory, retryProvider)
+        loggerFactory,
+        retryProvider,
       )
       packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
       dsoAutomationService =

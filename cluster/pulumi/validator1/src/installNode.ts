@@ -4,7 +4,6 @@ import {
   isDevNet,
   nonDevNetNonSvValidatorTopupConfig,
   nonSvValidatorTopupConfig,
-  SplitPostgresInstances,
 } from 'splice-pulumi-common';
 import { readBackupConfig } from 'splice-pulumi-common-validator/src/backup';
 import { autoAcceptTransfersConfigFromEnv } from 'splice-pulumi-common-validator/src/validator';
@@ -12,6 +11,7 @@ import {
   mustInstallSplitwell,
   validator1Onboarding,
 } from 'splice-pulumi-common-validator/src/validators';
+import { SplitPostgresInstances } from 'splice-pulumi-common/src/config/configs';
 
 import { installValidator1 } from './validator1';
 

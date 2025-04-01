@@ -1012,31 +1012,31 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-frontend-utils",
+              "@lfdecentralizedtrust/splice-common-frontend-utils",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-test-utils",
+              "@lfdecentralizedtrust/splice-common-test-utils",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-test-handlers",
+              "@lfdecentralizedtrust/splice-common-test-handlers",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-test-vite-utils",
+              "@lfdecentralizedtrust/splice-common-test-vite-utils",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-frontend",
+              "@lfdecentralizedtrust/splice-common-frontend",
               log,
             )
             (baseDirectory.value / "lib" ** "*").get.toSet
@@ -1072,11 +1072,11 @@ lazy val `apps-common-frontend` = {
         npmInstall.value
         for (
           workspace <- Seq(
-            "common-test-vite-utils",
-            "common-frontend-utils",
-            "common-test-utils",
-            "common-test-handlers",
-            "common-frontend",
+            "@lfdecentralizedtrust/splice-common-test-vite-utils",
+            "@lfdecentralizedtrust/splice-common-frontend-utils",
+            "@lfdecentralizedtrust/splice-common-test-utils",
+            "@lfdecentralizedtrust/splice-common-test-handlers",
+            "@lfdecentralizedtrust/splice-common-frontend",
           )
         )
           BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", workspace, log)
@@ -1119,7 +1119,7 @@ lazy val `apps-wallet-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "wallet-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-wallet-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1130,7 +1130,7 @@ lazy val `apps-scan-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "scan-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-scan-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1152,7 +1152,7 @@ lazy val `apps-ans-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "ans-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-ans-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1163,7 +1163,7 @@ lazy val `apps-sv-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "sv-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-sv-frontend",
       sharedFrontendSettings,
     )
 }

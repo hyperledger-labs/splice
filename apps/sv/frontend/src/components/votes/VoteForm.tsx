@@ -1,12 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useMutation } from '@tanstack/react-query';
 import {
   ConfirmationDialog,
   DisableConditionally,
   SvClientProvider,
   SvVote,
-} from 'common-frontend';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';

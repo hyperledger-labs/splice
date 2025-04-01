@@ -838,7 +838,7 @@ Your new package will need its own `tsconfig.json` file that inherits from the r
 
 #### Common libs
 
-In `apps/common/frontend` we have an NPM package containing common code. This package (named `common-frontend`) can be installed with `npm install common-frontend -w my-workspace-pkg`. You can import anything from it with `import { ... } from 'common-frontend'` in your package's source code.
+In `apps/common/frontend` we have an NPM package containing common code. This package (named `common-frontend`) can be installed with `npm install @lfdecentralizedtrust/splice-common-frontend -w my-workspace-pkg`. You can import anything from it with `import { ... } from '@lfdecentralizedtrust/splice-common-frontend'` in your package's source code.
 
 You're also free to add more things in `common-frontend` to use across multiple frontend apps. This can really include anything: utility functions, reusable React components, shared config, etc. Just ensure whatever you add is exposed via the lib's entrypoint, `index.ts` (we use the [barreling](https://basarat.gitbook.io/typescript/main-1/barrel) technique to expose all modules from the root of the library).
 

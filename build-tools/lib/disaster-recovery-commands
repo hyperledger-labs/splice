@@ -241,6 +241,7 @@ function take_validator_disaster_recovery_dump() {
     local namespace="$4"
     echo "Taking dump of validator $namespace"
     token=$(subcmd_get_token "$namespace" validator)
+    mkdir -p "$output_directory"
     dump="$(curl -sSLf "https://wallet.$namespace.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" \
             -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq .data_snapshot)"
     echo "$dump" > "$output_directory/${namespace}_dump.json"

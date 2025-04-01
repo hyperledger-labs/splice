@@ -1,7 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import {
+  AmountDisplay,
+  ErrorDisplay,
+  Loading,
+  RateDisplay,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 

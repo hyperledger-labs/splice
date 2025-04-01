@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.sv
 
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvSequencerConfig}
+import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSequencerConfig}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PEndpointConfig
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -28,7 +28,7 @@ sealed trait SequencerConfig {
 object SequencerConfig {
   def fromConfig(
       sequencerConfig: SvSequencerConfig,
-      cometbftConfig: Option[CometBftConfig],
+      cometbftConfig: Option[SvCometBftConfig],
   ): SequencerConfig = {
     if (sequencerConfig.isBftSequencer) {
       BftSequencerConfig(

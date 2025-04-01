@@ -11,7 +11,7 @@ import {
   installAuth0UISecret,
   installSpliceHelmChart,
   spliceInstanceNames,
-  splitwellDarPath,
+  splitwellDarPaths,
   imagePullSecret,
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
@@ -25,7 +25,6 @@ import {
   installValidatorApp,
   installValidatorSecrets,
 } from 'splice-pulumi-common-validator/src/validator';
-import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 import { validator1Config } from './config';
 
@@ -107,11 +106,8 @@ export async function installValidator1(
     xns,
     dependencies: [],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
-    appDars: [splitwellDarPath],
-    // TODO(#14199) Remove this with the next reset
-    validatorPartyHint: spliceEnvConfig.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
-      ? `${name}_validator_service_user`
-      : `digitalasset-${name}-1`,
+    appDars: splitwellDarPaths,
+    validatorPartyHint: `digitalasset-${name}-1`,
     svSponsorAddress: `http://sv-app.sv-1:5014`,
     onboardingSecret,
     persistenceConfig: {

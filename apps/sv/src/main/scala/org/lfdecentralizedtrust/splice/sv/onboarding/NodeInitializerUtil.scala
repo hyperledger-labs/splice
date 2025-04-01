@@ -182,8 +182,9 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                   synchronizerNodeConfig.cometBft.governanceKeys.asScala.map(_.pubKey).toSeq
                 case None => Seq.empty
               }
+              genesisKeysPubKey = CometBftRequestSigner.genesisSigner.publicKeyBase64
               governanceKeyNotUpdatedInDsoState = governanceKeysPubKey.contains(
-                CometBftRequestSigner.GenesisPubKeyBase64
+                genesisKeysPubKey
               )
               _ = if (governanceKeyNotUpdatedInDsoState) {
                 for {

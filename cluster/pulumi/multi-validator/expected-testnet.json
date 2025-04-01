@@ -46,7 +46,7 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometbftPorts": {
-          "domains": 2
+          "domains": 3
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
@@ -121,15 +121,5 @@
     "name": "multi-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
-    "id": "organization/infra/infra.testzrh",
-    "inputs": {
-      "name": "organization/infra/infra.testzrh"
-    },
-    "name": "organization/infra/infra.testzrh",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
   }
 ]

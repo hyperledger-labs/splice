@@ -1,36 +1,53 @@
+# Example arguments:
+# Last backup that finished before 2024/10/13: {"beforeDate": "2024-10-13", "migrationId": 0}
+# Specific backup run ID: {"cnBackupRunId": "1729083735", "migrationId": 0}
+
 main:
     params: [args]
     steps:
     - init:
         assign:
         - projectId: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+        - projectNumber: ${sys.get_env("GOOGLE_CLOUD_PROJECT_NUMBER")}
         - location: ${sys.get_env("GOOGLE_CLOUD_LOCATION")}
-        # TODO(#17852): for now, the instance ID is hardcoded to the participant from before the migration to ZRH
-        - sourceInstance: sv-1-participant-0-pg-fc951b4
+        # We find the latest backup from the cn-apps DB, which is migration-agnostic,
+        # so that we have one less thing to update in HDMs.
+        - sourceInstanceForFindingLatestBackup: sv-1-cn-apps-pg-8f8c7e7
         - sourceProject: da-cn-mainnet
-        - sourceClusterLocation: europe-west4-a
-        - bucketName: cn-mainnet-backups
-        # TODO(#17852): for now, this is the pre-zrh migration cluster
-        - sourceCluster: main
-        - beforeDate: ${args.beforeDate}
-    - findBackupBeforeDate:
-        call: http.get
-        args:
-          url: https://find-backup-before-125482597181.us-central1.run.app
-          query:
-              before: ${beforeDate}
-              instance: ${sourceInstance}
-              project: ${sourceProject}
-          auth:
-              type: OIDC
-        result: sourceBackup
-    - getRunIdFromBackup:
-        assign:
-        - cnBackupRunId: ${sourceBackup.body.description}
+        - sourceClusterLocation: europe-west6-a
+        - bucketName: da-cn-mainnet-backups
+        - sourceCluster: mainzrh
+        - migrationId: ${args.migrationId}
+    # If a backup run ID is provided, use it.
+    - getCnBackupRunId:
+        switch:
+          - condition: ${"cnBackupRunId" in args}
+            assign:
+              - cnBackupRunId: ${args.cnBackupRunId}
+          - condition: true #else
+            steps:
+              # A backup run ID was not explicitly provided, find the latest backup before the provided date.
+              - initBeforeDate:
+                  assign:
+                  - beforeDate: ${args.beforeDate}
+              - findBackupBeforeDate:
+                  call: http.get
+                  args:
+                    url: ${"https://find-backup-before-" + projectNumber + ".us-central1.run.app"}
+                    query:
+                        before: ${beforeDate}
+                        instance: ${sourceInstanceForFindingLatestBackup}
+                        project: ${sourceProject}
+                    auth:
+                        type: OIDC
+                  result: sourceBackup
+              - getRunIdFromBackup:
+                  assign:
+                  - cnBackupRunId: ${sourceBackup.body.description}
     - findAllBackups:
         call: http.get
         args:
-          url: https://find-cloudsql-backups-125482597181.us-central1.run.app
+          url: ${"https://find-cloudsql-backups-" + projectNumber + ".us-central1.run.app"}
           query:
             cluster: ${sourceCluster}
             namespace: sv-1
@@ -58,6 +75,7 @@ main:
                         namespace: sv-1
                         cnBackupRunId: ${cnBackupRunId}
                         bucketName: ${bucketName}
+                        migrationId: ${migrationId}
             - cloudSql:
                 steps:
                   - copyCloudSqlBackups:
@@ -76,10 +94,11 @@ main:
                                   backupName: ${backup.backup}
                                   cnBackupRunId: ${cnBackupRunId}
                                   bucketName: ${bucketName}
+                                  migrationId: ${migrationId}
 
 
 copyCometBFTBackup:
-  params: [cluster, clusterId, clusterProject, clusterLocation, namespace, cnBackupRunId, bucketName]
+  params: [cluster, clusterId, clusterProject, clusterLocation, namespace, cnBackupRunId, bucketName, migrationId]
   steps:
     - log:
         call: sys.log
@@ -90,10 +109,9 @@ copyCometBFTBackup:
         assign:
           - pvcName: ${"pvc-backup-" + cnBackupRunId}
           - jobName: ${"backup-" + cnBackupRunId}
-          # TODO(#17852): For now, hardcoding migration ID 0 here, which is good enough for the first few months of backups
-          - volumeSnapshot: ${"global-domain-0-cometbft-cometbft-data-" + cnBackupRunId}
+          - volumeSnapshot: ${"global-domain-" + migrationId + "-cometbft-cometbft-data-" + cnBackupRunId}
           - gcpCredsSecretName: ${"gcp-credentials-" + cnBackupRunId}
-          - targetDir: '${"gs://" + bucketName + "/" + cluster + "/" + cnBackupRunId}'
+          - targetDir: '${"gs://" + bucketName + "/" + cluster + "/migration-" + migrationId + "-" + cnBackupRunId}'
     - copyCometBFTBackup:
         try:
           call: tryCopyCometBFTBackup
@@ -252,7 +270,7 @@ tryCopyCometBFTBackup:
           location: ${clusterLocation}
           project: ${clusterProject}
           namespace: ${namespace}
-          timeout: 3600  # 1 hour
+          timeout: 10800  # 3 hours
         result: completedJob
     - cleanup:
         call: cleanCometBFTBackup
@@ -319,7 +337,7 @@ cleanCometBFTBackup:
 
 
 copyCloudSqlBackup:
-  params: [sourceCluster, restoreInstanceProject, location, sourceInstance, backupName, cnBackupRunId, bucketName]
+  params: [sourceCluster, restoreInstanceProject, location, sourceInstance, backupName, cnBackupRunId, bucketName, migrationId]
   steps:
     - log:
         call: sys.log
@@ -328,7 +346,7 @@ copyCloudSqlBackup:
             severity: INFO
     - deriveConstants:
         assign:
-        - targetDir: '${"gs://" + bucketName + "/" + sourceCluster + "/" + cnBackupRunId}'
+        - targetDir: '${"gs://" + bucketName + "/" + sourceCluster + "/migration-" + migrationId + "-" + cnBackupRunId}'
         - restoreInstanceName: '${"backup-" + sourceInstance + "-" + cnBackupRunId}'
     - copyCloudSqlBackup:
         try:
@@ -343,6 +361,7 @@ copyCloudSqlBackup:
             bucketName: ${bucketName}
             targetDir: ${targetDir}
             restoreInstanceName: ${restoreInstanceName}
+            migrationId: ${migrationId}
         except:
           as: e
           steps:
@@ -356,7 +375,7 @@ copyCloudSqlBackup:
                 raise: ${e}
 
 tryCopyCloudSqlBackup:
-  params: [sourceCluster, restoreInstanceProject, location, sourceInstance, backupName, cnBackupRunId, bucketName, targetDir, restoreInstanceName]
+  params: [sourceCluster, restoreInstanceProject, location, sourceInstance, backupName, cnBackupRunId, bucketName, targetDir, restoreInstanceName, migrationId]
   steps:
     - createRestoreInstance:
         call: googleapis.sqladmin.v1.instances.insert
@@ -383,7 +402,7 @@ tryCopyCloudSqlBackup:
         try:
           call: http.get
           args:
-            url: https://sa-bucket-permissions-125482597181.us-central1.run.app
+            url: ${"https://sa-bucket-permissions-" + sys.get_env("GOOGLE_CLOUD_PROJECT_NUMBER") + ".us-central1.run.app"}
             query:
               bucket: ${bucketName}
               serviceAccount: ${restoreInstance.serviceAccountEmailAddress}
@@ -423,23 +442,60 @@ tryCopyCloudSqlBackup:
                 value: database
                 in: ${databases.items}
                 steps:
-                - getFilename:
-                    assign:
-                    - filename: ${targetDir + "/" + restoreInstanceName + "/" + database.name + ".sql.gz"}
-                - exportDatabase:
-                    call: googleapis.sqladmin.v1.instances.export
-                    args:
-                        project: ${restoreInstanceProject}
-                        instance: ${restoreInstanceName}
-                        body:
-                            exportContext:
-                                uri: ${filename}
-                                databases:
-                                - ${database.name}
-                                fileType: SQL
-                                offload: false  # offloaded exports cannot run in parallel, and do not make sense from the (not-in-use) restore instance
-                        connector_params:
-                          timeout: 36000 # 10 hours
+
+                - testCopyConditions:
+                    switch:
+                      - condition: ${text.match_regex(sourceInstance, ".*mediator.*")}
+                        switch:
+                          - condition: ${text.match_regex(database.name, ".*mediator.*")}
+                            assign:
+                              - dbMigrationId: ${text.replace_all_regex(database.name, "global_domain_|_mediator", "")}
+                              - copy: ${dbMigrationId == string(migrationId)}
+                          - condition: true # else, i.e. not the main mediator database, we always copy those
+                            assign:
+                              - copy: true
+                      - condition: ${text.match_regex(sourceInstance, ".*sequencer.*")}
+                        switch:
+                          - condition: ${text.match_regex(database.name, ".*sequencer.*")}
+                            assign:
+                              - dbMigrationId: ${text.replace_all_regex(database.name, "global_domain_|_sequencer", "")}
+                              - copy: ${dbMigrationId == string(migrationId)}
+                          - condition: true # else, i.e. not the main sequencer database, we always copy those
+                            assign:
+                              - copy: true
+                      - condition:  ${text.match_regex(sourceInstance, ".*participant.*")}
+                        switch:
+                          - condition: ${text.match_regex(database.name, ".*participant.*")}
+                            assign:
+                              - dbMigrationId: ${text.replace_all(database.name, "participant_", "")}
+                              - copy: ${dbMigrationId == string(migrationId)}
+                          - condition: true # else, i.e. not the main participant database, we always copy those
+                            assign:
+                              - copy: true
+                      - condition: true # else, i.e. not a mediator, sequencer, or participant instance, so the apps instance. We copy all its DBs
+                        assign:
+                          - copy: true
+                - copyIfNeeded:
+                    switch:
+                      - condition: ${copy}
+                        steps:
+                          - getFilename:
+                              assign:
+                              - filename: ${targetDir + "/" + restoreInstanceName + "/" + database.name + ".sql.gz"}
+                          - exportDatabase:
+                              call: googleapis.sqladmin.v1.instances.export
+                              args:
+                                  project: ${restoreInstanceProject}
+                                  instance: ${restoreInstanceName}
+                                  body:
+                                      exportContext:
+                                          uri: ${filename}
+                                          databases:
+                                          - ${database.name}
+                                          fileType: SQL
+                                          offload: false  # offloaded exports cannot run in parallel, and do not make sense from the (not-in-use) restore instance
+                                  connector_params:
+                                    timeout: 86400 # 24 hours
     - cleanup:
         call: cleanCloudSqlBackup
         args:
@@ -463,7 +519,7 @@ cleanCloudSqlBackup:
               try:
                 call: http.get
                 args:
-                  url: https://sa-bucket-permissions-125482597181.us-central1.run.app
+                  url: ${"https://sa-bucket-permissions-" + sys.get_env("GOOGLE_CLOUD_PROJECT_NUMBER") + ".us-central1.run.app"}
                   query:
                     bucket: ${bucketName}
                     serviceAccount: ${restoreInstance.serviceAccountEmailAddress}

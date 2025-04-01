@@ -160,7 +160,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -264,21 +264,11 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "organization/infra/infra.dev",
-    "inputs": {
-      "name": "organization/infra/infra.dev"
-    },
-    "name": "organization/infra/infra.dev",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,
@@ -467,7 +457,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator-participant-1",
     "provider": "",
@@ -547,7 +537,7 @@
           }
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -654,7 +644,7 @@
           "auth0|6526fab5214c99a9a8e1e3cc"
         ]
       },
-      "version": "0.3.16"
+      "version": "0.3.18"
     },
     "name": "validator",
     "provider": "",
