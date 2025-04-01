@@ -714,11 +714,15 @@
               {
                 "beneficiary": "Elliptic-validator-1::",
                 "weight": "5000"
+              },
+              {
+                "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
+                "weight": "10000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 285000
+            "rewardWeightBps": 295000
           },
           {
             "name": "MPC-Holding-Inc",

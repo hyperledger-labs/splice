@@ -1083,11 +1083,15 @@
               {
                 "beneficiary": "Elliptic-validator-1::12205ddf609265d68ee694480f86331de14766bdac30800d04e491b93aca1a81d629",
                 "weight": "5000"
+              },
+              {
+                "beneficiary": "ObsidianSystems-validator-1::1220f8a24f975dc3d070e3111279bc2bf2d713a77c5570cbdd2064acb6a4d8d6feea",
+                "weight": "10000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 285000
+            "rewardWeightBps": 295000
           },
           {
             "name": "Digital-Asset-1",
