@@ -297,7 +297,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val amuletTemplate = amulet(owner, amount, createdAtRound, ratePerRound).payload
     val template = new amuletCodegen.LockedAmulet(
       amuletTemplate,
-      new expiryCodegen.TimeLock(java.util.List.of(), Instant.now().truncatedTo(ChronoUnit.MICROS)),
+      new expiryCodegen.TimeLock(
+        java.util.List.of(),
+        Instant.now().truncatedTo(ChronoUnit.MICROS),
+        None.toJava,
+      ),
     )
     contract(
       identifier = templateId,

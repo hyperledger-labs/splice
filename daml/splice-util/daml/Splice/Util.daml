@@ -12,6 +12,7 @@ module Splice.Util
 
   HasCheckedFetch(..),
   fetchChecked,
+  fetchCheckedInterface,
   fetchAndArchive,
   fetchReferenceData,
   fetchPublicReferenceData,
@@ -52,22 +53,38 @@ require msg invariant =
 --
 -- We aim to always fetch with a specific contract group identifier to ensure that we do not mixup
 -- contracts from different groups.
-class (HasFetch t, Show t, Eq cgid, Show cgid) => HasCheckedFetch t cgid where
+--
+-- Note that we are not requiring `HasFetch` here, so that we can use this typeclass also for
+-- contract groups that are not templates, e.g., interface views.
+class (Show t, Eq cgid, Show cgid) => HasCheckedFetch t cgid where
   contractGroupId : t -> cgid
 
 -- | Fetch a contract that is part of a specific contract group.
 --
 -- The group is typically chosen by the caller to match its own group, or a more specific group.
-fetchChecked : HasCheckedFetch t cgid => cgid -> ContractId t -> Update t
+fetchChecked : (HasFetch t, HasCheckedFetch t cgid) => cgid -> ContractId t -> Update t
 fetchChecked expectedcgid cid = do
   co <- fetch cid
   checkContractGroupId expectedcgid cid co
+
+-- | Fetch a contract that is part of a specific contract group defined by its interface view.
+--
+-- The group is typically chosen by the caller to match its own group, or a more specific group.
+fetchCheckedInterface : (HasFetch i, HasInterfaceView i v, HasCheckedFetch v cgid) => cgid -> ContractId i -> Update i
+fetchCheckedInterface expectedcgid cid = do
+  co <- fetch cid
+  let v = view co
+  let cgid = contractGroupId v
+  unless (expectedcgid == cgid) $ fail $
+    "Contract group identifier mismatch: expected " <> show expectedcgid <>
+    ", got " <> show cgid <> " for " <> show (cid, v)
+  return co
 
 -- | Fetch and archive a contract in one go.
 --
 -- Use this when implementing choices that mutate another contract by
 -- fetching, archiving, and then creating the updated contract.
-fetchAndArchive : (HasCheckedFetch t cgid, HasArchive t) => cgid -> ContractId t -> Update t
+fetchAndArchive : (HasFetch t, HasCheckedFetch t cgid, HasArchive t) => cgid -> ContractId t -> Update t
 fetchAndArchive cgid cid = do
   co <- fetchChecked cgid cid
   archive cid
@@ -76,13 +93,13 @@ fetchAndArchive cgid cid = do
 -- | Fetch a contract that serves as reference data.
 --
 -- Use this whenever you need to fetch a contract that you do not intend to mutate.
-fetchReferenceData : HasCheckedFetch t cgid => cgid -> ContractId t -> Update t
+fetchReferenceData : (HasFetch t, HasCheckedFetch t cgid) => cgid -> ContractId t -> Update t
 fetchReferenceData = fetchChecked
 
 -- | Fetch a contract that is not reference data, and should be archived later in some cases.
 --
 -- Prefer `fetchAndArchive` over this function, as it avoids forgetting to archive the contract.
-fetchButArchiveLater : HasCheckedFetch t cgid => cgid -> ContractId t -> Update t
+fetchButArchiveLater : (HasFetch t, HasCheckedFetch t cgid) => cgid -> ContractId t -> Update t
 fetchButArchiveLater = fetchChecked
 
 
@@ -132,7 +149,7 @@ potentiallyUnsafeArchive = archive
 -- Internal functions
 ---------------------
 
-checkContractGroupId : HasCheckedFetch t cgid => cgid -> ContractId t -> t -> Update t
+checkContractGroupId : HasCheckedFetch t cgid => cgid -> ContractId i -> t -> Update t
 checkContractGroupId expectedcgid cid co = do
   let cgid = contractGroupId co
   unless (expectedcgid == cgid) $ fail $

@@ -744,7 +744,7 @@ burnMintExtraArgs openMiningRound reason = ExtraArgs with
   meta = Metadata (Map.fromList [(reasonMetaKey, reason)])
 
 toCreatedAmulet : Api.Token.HoldingV1.BurnMintOutput -> ContractId Api.Token.HoldingV1.Holding -> CreatedAmulet
-toCreatedAmulet Api.Token.HoldingV1.BurnMintOutput{context} holdingCid = case lookupContextLock context of
+toCreatedAmulet Api.Token.HoldingV1.BurnMintOutput{context} holdingCid = case getContextLock context of
   None -> TransferResultAmulet (fromInterfaceContractId holdingCid)
   Some _ -> TransferResultLockedAmulet (fromInterfaceContractId holdingCid)
 
@@ -945,10 +945,11 @@ dedupOutputLockHolders out =
     out with lock = fmap (dedupLockHolders out.receiver) out.lock
   where
     dedupLockHolders : Party -> TimeLock -> TimeLock
-    dedupLockHolders receiver (TimeLock with expiresAt; holders) =
+    dedupLockHolders receiver (TimeLock with expiresAt; holders, optContext) =
       TimeLock with
         expiresAt
         holders = dedupSort $ filter (receiver /=) holders
+        optContext
 
 preprocessOutputs : TransferConfig Amulet -> Party -> [TransferOutput] -> Update TransferOutputsSummary
 preprocessOutputs transferConfigAmulet sender outs =
@@ -1073,7 +1074,8 @@ toBurnMintOutputs sender summary preprocessedOutputs =
     createOutput out = Api.Token.HoldingV1.BurnMintOutput with
         owner = out.owner
         amount = out.amount
-        context = ChoiceContext (Map.fromList (optionalToList $ fmap (\l -> (lockContextKey, lockToAnyValue l)) out.lock))
+        context = ChoiceContext with
+          values = addOptionalAnyValue lockContextKey out.lock Map.empty
 
 -- | Scale the 'AmuletConfig' such that the fees charged are scaled by the same scale factor.
 scaleFees : Decimal -> TransferConfig Unit.USD -> TransferConfig Amulet
@@ -1532,9 +1534,9 @@ splitAndBurn self sender amount inputs context dso usage = do
 paymentFromChoiceContext : Party -> Api.Token.MetadataV1.ChoiceContext -> Update PaymentTransferContext
 paymentFromChoiceContext dso context = do
   -- extract context contracts
-  amuletRulesCid <- getContextContractId @AmuletRules context amuletRulesContextKey
-  openRoundCid <- getContextContractId @OpenMiningRound context openRoundContextKey
-  optFeaturedAppRightCid <- lookupContextContractId @FeaturedAppRight context featuredAppRightContextKey
+  amuletRulesCid <- getFromContextU @(ContractId AmuletRules) context amuletRulesContextKey
+  openRoundCid <- getFromContextU @(ContractId OpenMiningRound) context openRoundContextKey
+  optFeaturedAppRightCid <- lookupFromContextU @(ContractId FeaturedAppRight) context featuredAppRightContextKey
   -- check the AmuletRules contract's DSO party, which in turn ensures that all other contracts use the same DSO party
   _ <- fetchChecked (ForDso with dso) amuletRulesCid
   pure PaymentTransferContext with
@@ -1558,10 +1560,10 @@ amulet_burnMintFactory_burnMintImpl this _self Api.Token.HoldingV1.BurnMintFacto
   requireExpectedAdminMatch expectedAdmin this.dso
   require "extraActors contains sender, receivers and lock holders"
     (all
-       (`elem` extraActors) (sender :: concatMap (\o -> o.owner :: optional [] (.holders) (lookupContextLock o.context))
+       (`elem` extraActors) (sender :: concatMap (\o -> o.owner :: optional [] (.holders) (getContextLock o.context))
        outputs))
   require "Instrument-id must match the factory" (instrumentId == amuletInstrumentId this.dso)
-  openRoundCid <- getContextContractId @OpenMiningRound extraArgs.context openRoundContextKey
+  openRoundCid <- getFromContextU @(ContractId OpenMiningRound) extraArgs.context openRoundContextKey
   openRound <- fetchChecked (ForDso this.dso) openRoundCid
   let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
   let amuletInputs = map (fromInterfaceContractId @Amulet) inputHoldingCids
@@ -1574,7 +1576,7 @@ amulet_burnMintFactory_burnMintImpl this _self Api.Token.HoldingV1.BurnMintFacto
             initialAmount = output.amount
             createdAt = openRound.round
             ratePerRound = transferConfigAmulet.holdingFee
-    case lookupContextLock output.context of
+    case getContextLock output.context of
       None -> do
         toInterfaceContractId @Api.Token.HoldingV1.Holding <$> create amulet
       Some lock -> do
@@ -1592,17 +1594,9 @@ amulet_burnMintFactory_burnMintImpl this _self Api.Token.HoldingV1.BurnMintFacto
 requireExpectedAdminMatch : Party -> Party -> Update ()
 requireExpectedAdminMatch expected actual = require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
 
-lockToAnyValue : TimeLock -> AnyValue
-lockToAnyValue lock = AV_Map (Map.fromList [(lockExpiresAtContextKey, AV_Time lock.expiresAt), (lockHoldersContextKey, AV_List (map AV_Party lock.holders))])
-
-lookupContextLock : ChoiceContext -> Optional TimeLock
-lookupContextLock (ChoiceContext values) = case Map.lookup lockContextKey values of
-  None -> None
-  Some (AV_Map lockValues) -> case (Map.lookup lockExpiresAtContextKey lockValues, Map.lookup lockHoldersContextKey lockValues) of
-    (Some (AV_Time expiresAt), Some (AV_List holders)) -> do
-      holders <- forA holders $ \case
-        AV_Party p -> pure p
-        holder -> error ("Expected holder to be of type party but got: " <> show holder)
-      pure (TimeLock holders expiresAt)
-    _ -> error ("Expected expiresAt and holders values but got: " <> show lockValues)
-  Some v -> error ("Expected lock to be of type map but got: " <> show v)
+-- | Convenience function that throws an error if the lock fails to parse.
+getContextLock : ChoiceContext -> Optional TimeLock
+getContextLock choiceContext =
+  case lookupFromContext choiceContext lockContextKey of
+    Left err -> error $ "Failed to parse lock context: " <> show err
+    Right optLock -> optLock

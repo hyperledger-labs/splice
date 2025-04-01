@@ -879,8 +879,8 @@
                 "implementedInterfaces" : [
                 ],
                 "interfaceId" : null,
-                "lastDescendantNodeId" : 15,
-                "nodeId" : 3,
+                "lastDescendantNodeId" : 16,
+                "nodeId" : 4,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.AmuletRules:TransferPreapproval",
@@ -972,8 +972,8 @@
                 "implementedInterfaces" : [
                 ],
                 "interfaceId" : null,
-                "lastDescendantNodeId" : 15,
-                "nodeId" : 5,
+                "lastDescendantNodeId" : 16,
+                "nodeId" : 6,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
@@ -998,7 +998,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                 ],
-                "nodeId" : 8,
+                "nodeId" : 9,
                 "observers" : [
                   "validator::normalized"
                 ],
@@ -1031,7 +1031,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                 ],
-                "nodeId" : 9,
+                "nodeId" : 10,
                 "observers" : [
                   "validator::normalized"
                 ],
@@ -1119,8 +1119,8 @@
                 "implementedInterfaces" : [
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:BurnMintFactory",
-                "lastDescendantNodeId" : 15,
-                "nodeId" : 10,
+                "lastDescendantNodeId" : 16,
+                "nodeId" : 11,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
@@ -1148,8 +1148,8 @@
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
                 ],
                 "interfaceId" : null,
-                "lastDescendantNodeId" : 13,
-                "nodeId" : 13,
+                "lastDescendantNodeId" : 14,
+                "nodeId" : 14,
                 "offset" : 4,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -1209,7 +1209,7 @@
                     }
                   }
                 ],
-                "nodeId" : 14,
+                "nodeId" : 15,
                 "observers" : [
                 ],
                 "offset" : 4,
@@ -1275,7 +1275,7 @@
                     }
                   }
                 ],
-                "nodeId" : 15,
+                "nodeId" : 16,
                 "observers" : [
                 ],
                 "offset" : 4,
@@ -1390,7 +1390,7 @@
                 "implementedInterfaces" : [
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferFactory",
-                "lastDescendantNodeId" : 15,
+                "lastDescendantNodeId" : 16,
                 "nodeId" : 0,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
@@ -1476,8 +1476,8 @@
                 "implementedInterfaces" : [
                 ],
                 "interfaceId" : null,
-                "lastDescendantNodeId" : 15,
-                "nodeId" : 3,
+                "lastDescendantNodeId" : 16,
+                "nodeId" : 4,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.AmuletRules:TransferPreapproval",
@@ -1569,8 +1569,8 @@
                 "implementedInterfaces" : [
                 ],
                 "interfaceId" : null,
-                "lastDescendantNodeId" : 15,
-                "nodeId" : 5,
+                "lastDescendantNodeId" : 16,
+                "nodeId" : 6,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
@@ -1595,7 +1595,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                 ],
-                "nodeId" : 8,
+                "nodeId" : 9,
                 "observers" : [
                   "party::normalized"
                 ],
@@ -1628,7 +1628,7 @@
                 "createdEventBlob" : "",
                 "interfaceViews" : [
                 ],
-                "nodeId" : 9,
+                "nodeId" : 10,
                 "observers" : [
                   "validator::normalized"
                 ],
@@ -1716,8 +1716,8 @@
                 "implementedInterfaces" : [
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:BurnMintFactory",
-                "lastDescendantNodeId" : 15,
-                "nodeId" : 10,
+                "lastDescendantNodeId" : 16,
+                "nodeId" : 11,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.AmuletRules:AmuletRules",
@@ -1745,8 +1745,8 @@
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
                 ],
                 "interfaceId" : null,
-                "lastDescendantNodeId" : 13,
-                "nodeId" : 13,
+                "lastDescendantNodeId" : 14,
+                "nodeId" : 14,
                 "offset" : 5,
                 "packageName" : "splice-amulet",
                 "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -1806,7 +1806,7 @@
                     }
                   }
                 ],
-                "nodeId" : 14,
+                "nodeId" : 15,
                 "observers" : [
                 ],
                 "offset" : 5,
@@ -1872,7 +1872,7 @@
                     }
                   }
                 ],
-                "nodeId" : 15,
+                "nodeId" : 16,
                 "observers" : [
                 ],
                 "offset" : 5,

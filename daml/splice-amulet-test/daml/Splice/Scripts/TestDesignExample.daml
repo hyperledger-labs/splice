@@ -50,6 +50,7 @@ template Escrow
                      lock = Some TimeLock with
                        holders = [arbiter]
                        expiresAt = lock.expiresAt `addRelTime` days 90
+                       optContext = None
                      receiverFeeRatio = 0.0
                  , TransferOutput with
                      receiver = arbiter
@@ -188,6 +189,7 @@ test_designExample= do
     lock = TimeLock with
       holders = [arbiter.primaryParty]
       expiresAt = t0 `addRelTime` days 180
+      optContext = None
     amulet = Amulet with
       dso = app.dso
       owner = alice.primaryParty

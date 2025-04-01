@@ -1127,6 +1127,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         new TimeLock(
           lockHolders.map(_.toProtoPrimitive).asJava,
           expiration.toInstant,
+          None.toJava,
         )
       ).toJava,
     )

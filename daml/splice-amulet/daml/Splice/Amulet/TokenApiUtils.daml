@@ -5,6 +5,7 @@
 
 module Splice.Amulet.TokenApiUtils where
 
+import DA.Time
 import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1
@@ -32,8 +33,8 @@ ratePerRoundMetaKey = splicePrefix <> "rate-per-round"
 reasonMetaKey : Text
 reasonMetaKey = splicePrefix <> "reason"
 
--- Choice contexts
-------------------
+-- Choice context keys for splice
+---------------------------------
 
 amuletRulesContextKey : Text
 amuletRulesContextKey = "amulet-rules"
@@ -47,6 +48,7 @@ featuredAppRightContextKey = "featured-app-right"
 transferPreapprovalContextKey : Text
 transferPreapprovalContextKey = "transfer-preapproval"
 
+-- | The key used to embed all the lock specification in the choice context.
 lockContextKey : Text
 lockContextKey = "lock"
 
@@ -56,35 +58,140 @@ lockExpiresAtContextKey = "expires-at"
 lockHoldersContextKey : Text
 lockHoldersContextKey = "holders"
 
+-- | The context description of a lock.
+lockContextContextKey : Text
+lockContextContextKey = "lock-context"
+
 -- | Key used to signal to a choice whether an expired locked amulet should be
 -- unlocked.
 expireLockKey : Text
 expireLockKey = "expire-lock"
 
-lookupContextContractId : Template t => ChoiceContext -> Text -> Update (Optional (ContractId t))
-lookupContextContractId context k = do
+
+-- Choice context creation and parsing
+--------------------------------------
+
+-- | Values that can be converted to AnyValue
+class ToAnyValue a where
+  toAnyValue : a -> AnyValue
+
+-- | Convenience function to create maps that contain an optional value if it is
+-- set. See its use sites for examples.
+addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> Map.Map Text AnyValue -> Map.Map Text AnyValue
+addOptionalAnyValue _k None m = m
+addOptionalAnyValue k (Some value) m = Map.insert k (toAnyValue value) m
+
+-- | Attempt to parse a value from AnyValue.
+--
+-- If a type implements both `ToAnyValue` and `FromAnyValue` then it must hold that
+-- `fromAnyValue (toAnyValue x) = Right x` for all `x`.
+class FromAnyValue a where
+  fromAnyValue : AnyValue -> Either Text a
+
+-- | Lookup and decode a value within a choice context.
+lookupFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text (Optional a)
+lookupFromContext context k = do
   case Map.lookup k context.values of
     None -> pure None
-    Some (AV_ContractId anyCid) -> pure (Some (coerceContractId anyCid))
-    Some value -> fail $ "Expected contract id for: " <> k <> ", got: " <> show value
+    Some av -> case fromAnyValue av of
+      Left err -> fail $ "Failed to decode context value for '" <> k <> "': " <> err
+      Right v -> pure (Some v)
 
-getContextContractId : Template t => ChoiceContext -> Text -> Update (ContractId t)
-getContextContractId context k = do
-  optCid <- lookupContextContractId context k
-  case optCid of
+-- | Get a value from a choice context, failing if it is not present or fails to parse.
+getFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text a
+getFromContext context k = do
+  optValue <- lookupFromContext context k
+  case optValue of
     None -> fail $ "Missing context entry for: " <> k
-    Some cid -> pure cid
+    Some v -> pure v
 
-lookupContextBool : ChoiceContext -> Text -> Update (Optional Bool)
-lookupContextBool context k = do
-  case Map.lookup k context.values of
-    None -> pure None
-    Some (AV_Bool b) -> pure (Some b)
-    Some value -> fail $ "Expected bool: " <> k <> ", got: " <> show value
+-- | Convenience version of `lookupFromContext` that raises the failure within the `Update`.
+lookupFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update (Optional a)
+lookupFromContextU context k = either fail pure $ lookupFromContext context k
 
-getContextBool : ChoiceContext -> Text -> Update Bool
-getContextBool context k = do
-  optBool <- lookupContextBool context k
-  case optBool of
-    None -> fail $ "Missing context entry for: " <> k
-    Some b -> pure b
+-- | Convenience version of `getFromContext` that raises the failure within the `Update`.
+getFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update a
+getFromContextU context k = either fail pure $ getFromContext context k
+
+
+-- instances for ToAnyValue
+---------------------------
+
+instance ToAnyValue Text where
+  toAnyValue t = AV_Text t
+
+instance ToAnyValue Int where
+  toAnyValue x = AV_Int x
+
+instance ToAnyValue Decimal where
+  toAnyValue t = AV_Decimal t
+
+instance ToAnyValue Bool where
+  toAnyValue x = AV_Bool x
+
+instance ToAnyValue Date where
+  toAnyValue x = AV_Date x
+
+instance ToAnyValue Time where
+  toAnyValue x = AV_Time x
+
+instance ToAnyValue RelTime where
+  toAnyValue x = AV_RelTime x
+instance ToAnyValue Party where
+  toAnyValue p = AV_Party p
+
+instance ToAnyValue (ContractId t) where
+  toAnyValue x = AV_ContractId $ coerceContractId x
+
+instance ToAnyValue a => ToAnyValue [a] where
+  toAnyValue = AV_List . map toAnyValue
+
+instance ToAnyValue ChoiceContext where
+  toAnyValue (ChoiceContext values) = AV_Map values
+
+
+-- FromAnyValue instances
+-------------------------
+
+instance FromAnyValue Text where
+  fromAnyValue (AV_Text t) = Right t
+  fromAnyValue av = Left $ "expected Text, got: " <> show av
+
+instance FromAnyValue Int where
+  fromAnyValue (AV_Int i) = Right i
+  fromAnyValue av = Left $ "expected Int, got: " <> show av
+
+instance FromAnyValue Decimal where
+  fromAnyValue (AV_Decimal i) = Right i
+  fromAnyValue av = Left $ "expected Decimal, got: " <> show av
+
+instance FromAnyValue Bool where
+  fromAnyValue (AV_Bool b) = Right b
+  fromAnyValue av = Left $ "expected bool, got: " <> show av
+
+instance FromAnyValue Date where
+  fromAnyValue (AV_Date p) = Right p
+  fromAnyValue av = Left $ "expected Date, got: " <> show av
+
+instance FromAnyValue Time where
+  fromAnyValue (AV_Time t) = Right t
+  fromAnyValue av = Left $ "expected Time, got: " <> show av
+instance FromAnyValue RelTime where
+  fromAnyValue (AV_RelTime t) = Right t
+  fromAnyValue av = Left $ "expected RelTime, got: " <> show av
+
+instance FromAnyValue Party where
+  fromAnyValue (AV_Party p) = Right p
+  fromAnyValue av = Left $ "expected Party, got: " <> show av
+
+instance Template t => FromAnyValue (ContractId t) where
+  fromAnyValue (AV_ContractId av) = Right (coerceContractId av)
+  fromAnyValue av = Left $ "expected contract id, got: " <> show av
+
+instance FromAnyValue a => FromAnyValue [a] where
+  fromAnyValue (AV_List avs) = mapA fromAnyValue avs
+  fromAnyValue av = Left $ "expected list, got: " <> show av
+
+instance FromAnyValue ChoiceContext where
+  fromAnyValue (AV_Map values) = Right $ ChoiceContext with values
+  fromAnyValue av = Left $ "expected map, got: " <> show av

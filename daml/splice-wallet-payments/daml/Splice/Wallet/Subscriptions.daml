@@ -385,6 +385,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
              lock = Some TimeLock with
                holders = dedupSort [provider, receiver]
                expiresAt = expiresAt
+               optContext = Some $ "amulet-subscription: " <> subscriptionData.description
              receiverFeeRatio = 0.0
          ]
        beneficiaries = None -- no beneficiaries for locking step

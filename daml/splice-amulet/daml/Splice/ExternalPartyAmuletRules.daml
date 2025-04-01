@@ -251,7 +251,7 @@ amulet_transferFactory_transferImpl this _self arg = do
   -- == validate each field of the transfer specification ==
   -- sender: nothing to validate
   -- receiver: validate preapproval if given
-  optPreapprovalCid <- lookupContextContractId @TransferPreapproval extraArgs.context transferPreapprovalContextKey
+  optPreapprovalCid <- lookupFromContextU @(ContractId TransferPreapproval) extraArgs.context transferPreapprovalContextKey
   forA_ optPreapprovalCid \preapprovalCid ->
     fetchChecked (ForOwner with dso; owner = transfer.receiver) preapprovalCid
   -- instrumentId:
@@ -274,10 +274,11 @@ amulet_transferFactory_transferImpl this _self arg = do
       | transfer.receiver == transfer.sender -> do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
+          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.holdingCids
           result <- exercisePaymentTransfer paymentContext Transfer with
             sender = transfer.sender
             provider = transfer.sender
-            inputs = [ InputAmulet (coerceContractId holding) | holding <- transfer.holdingCids ]
+            inputs
             outputs = [ TransferOutput with
               receiver = transfer.sender
               amount = transfer.amount
@@ -314,11 +315,12 @@ amulet_transferFactory_transferImpl this _self arg = do
       -- use a payment context with featuring so the preapproval provider can be featured
       paymentContext <- paymentFromChoiceContext dso extraArgs.context
       -- execute a direct transfer
+      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.holdingCids
       result <- exercise preapprovalCid TransferPreapproval_Send
         with
           sender = transfer.sender
           context = paymentContext
-          inputs = [ InputAmulet (coerceContractId holding) | holding <- arg.transfer.holdingCids ]
+          inputs
           amount = transfer.amount
 
       -- return result

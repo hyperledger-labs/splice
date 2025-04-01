@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-Polisihng changes
+Major changes:
+
+- Extended the lock information on a `Holding` with an optional human-readable context description,
+  and optional lock expiry information.
+- Populate this information in the `LockedAmulet` implementation and allow using amulet `Holding`s
+  with expired locks as inputs to transfers and allocations. Thereby enabling a combined unlock and
+  use of amulet tokens in a single transaction.
+
+Polishing changes
 
 - Removed `inputHoldingsAmount` from
   `BurnMintFactory_BurnMintResult`. If you need that information, use
