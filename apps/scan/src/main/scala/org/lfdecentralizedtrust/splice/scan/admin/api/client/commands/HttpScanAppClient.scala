@@ -1648,7 +1648,6 @@ object HttpScanAppClient {
   private def fromAllocationHttpDisclosedContract(
       disclosedContract: allocation.v1.definitions.DisclosedContract
   ): CommandsOuterClass.DisclosedContract = {
-    // TODO(#17507): share this parsing code with the above once/if the OpenAPI schemas are shared
     CommandsOuterClass.DisclosedContract
       .newBuilder()
       .setContractId(disclosedContract.contractId)
@@ -1667,7 +1666,6 @@ object HttpScanAppClient {
   private def fromTransferInstructionHttpDisclosedContract(
       disclosedContract: transferinstruction.v1.definitions.DisclosedContract
   ): CommandsOuterClass.DisclosedContract = {
-    // TODO(#17507): share this parsing code with the above once/if the OpenAPI schemas are shared
     CommandsOuterClass.DisclosedContract
       .newBuilder()
       .setContractId(disclosedContract.contractId)

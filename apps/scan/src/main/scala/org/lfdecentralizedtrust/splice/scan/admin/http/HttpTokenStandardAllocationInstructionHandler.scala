@@ -32,7 +32,6 @@ class HttpTokenStandardAllocationInstructionHandler(
 
   private val workflowId = this.getClass.getSimpleName
 
-  // TODO(#17507): consider how / whether to share the retrieval of the choice context with the other handlers
   override def getAllocationFactory(respond: v1.Resource.GetAllocationFactoryResponse.type)(
       body: definitions.GetFactoryRequest
   )(extracted: TraceContext): Future[v1.Resource.GetAllocationFactoryResponse] = {
@@ -96,7 +95,6 @@ class HttpTokenStandardAllocationInstructionHandler(
   }
 
   // The HTTP definition of the standard differs from any other
-  // TODO(#17507): consider sharing this with the other context handlers once the types align
   private def toTokenStandardDisclosedContract[TCId, T](
       contract: Contract[TCId, T],
       synchronizerId: String,
