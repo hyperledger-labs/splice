@@ -107,7 +107,7 @@ groups:
               refId: D
               type: threshold
         noDataState: $NODATA
-        execErrState: Error
+        execErrState: Alerting
         for: 1m
         annotations:
           description: ''
@@ -195,7 +195,7 @@ groups:
         dashboardUid: ccbb2351-2ae2-462f-ae0e-f2c893ad1028
         panelId: 28
         noDataState: $NODATA
-        execErrState: Error
+        execErrState: Alerting
         for: 1m
         annotations:
           __dashboardUid__: ccbb2351-2ae2-462f-ae0e-f2c893ad1028

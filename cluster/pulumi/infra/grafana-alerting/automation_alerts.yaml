@@ -98,7 +98,7 @@ groups:
         dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
         panelId: 14
         noDataState: $NODATA
-        execErrState: Error
+        execErrState: Alerting
         for: 5m
         annotations:
           __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
@@ -162,7 +162,7 @@ groups:
               refId: too_long
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: Alerting
         for: 5m
         annotations:
           description: ""
@@ -356,7 +356,7 @@ groups:
               refId: C
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: Alerting
         for: 5m
         annotations:
           description: ""
