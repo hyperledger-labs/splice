@@ -11,13 +11,7 @@
           "type": "BurnMint",
           "input": {
             "sender": "validator::normalized",
-            "inputHoldings": [
-              {
-                "14": {
-                  "amount": "199877.3600000000"
-                }
-              }
-            ],
+            "inputHoldings": ["14"],
             "instrumentId": {
               "admin": "dso::normalized",
               "id": "Amulet"
@@ -201,7 +195,7 @@
           "parentChoice": "raw API",
           "contractId": "3",
           "payload": {
-            "interfaceId": "90b5a678eb4f42d4eb805140797952732e6289772cd0a3d23db515cd96f8ac96:Splice.Api.Token.HoldingV1:Holding",
+            "interfaceId": "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
             "viewValue": {
               "amount": "30.0000000000",
               "instrumentId": {
@@ -221,7 +215,7 @@
             }
           },
           "offset": 7,
-          "templateId": "2dfcfe011601bddb2155e59476bb5ff3c6f68e578aef54e28706d2fbec2837be:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId": "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }
       ]
@@ -237,7 +231,7 @@
           "parentChoice": "raw API",
           "contractId": "4",
           "payload": {
-            "interfaceId": "90b5a678eb4f42d4eb805140797952732e6289772cd0a3d23db515cd96f8ac96:Splice.Api.Token.HoldingV1:Holding",
+            "interfaceId": "cc7f8bc6bbc38d9a9cf156c124cbdaef73421e2634273599a3d644b3d17efc38:Splice.Api.Token.HoldingV1:Holding",
             "viewValue": {
               "amount": "40.0000000000",
               "instrumentId": {
@@ -257,7 +251,7 @@
             }
           },
           "offset": 8,
-          "templateId": "2dfcfe011601bddb2155e59476bb5ff3c6f68e578aef54e28706d2fbec2837be:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "templateId": "bdb1da704ebe08491eade0953840aef077753a41a62d390b5ec8df99fd09ce46:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }
       ]

@@ -297,15 +297,8 @@ function toPrettyBurnMint(
     return null;
   }
 
-  const inputHoldings = choiceArgument.inputHoldingCids.map(
-    (cid: string, idx: number) => {
-      return {
-        [cid]: {
-          amount: exerciseResult.inputHoldingAmounts[idx],
-        },
-      };
-    }
-  );
+  // TODO(#18607) Resolve cid through event query service
+  const inputHoldings = choiceArgument.inputHoldingCids;
   const outputHoldings = choiceArgument.outputs.map(
     (output: any, idx: number) => {
       return {

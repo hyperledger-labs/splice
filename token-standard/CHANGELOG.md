@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+Polisihng changes
+
+- Removed `inputHoldingsAmount` from
+  `BurnMintFactory_BurnMintResult`. If you need that information, use
+  the ledger API's `GetEventsByContractId` endpoint to lookup the
+  holding by contract id.
+
+## 2025-03-31
+
 Major changes:
 
 * Added support for two-step transfers based on an offer-accept workflow in the `TransferFactory` API.

@@ -1565,7 +1565,7 @@ amulet_burnMintFactory_burnMintImpl this _self Api.Token.HoldingV1.BurnMintFacto
   openRound <- fetchChecked (ForDso this.dso) openRoundCid
   let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
   let amuletInputs = map (fromInterfaceContractId @Amulet) inputHoldingCids
-  inputs <- forA amuletInputs (fetchAndArchive (ForOwner with dso = this.dso, owner = sender))
+  _ <- forA amuletInputs (fetchAndArchive (ForOwner with dso = this.dso, owner = sender))
   outputCids <- forA outputs $ \output -> do
     let amulet = Amulet with
           dso = this.dso
@@ -1587,7 +1587,6 @@ amulet_burnMintFactory_burnMintImpl this _self Api.Token.HoldingV1.BurnMintFacto
           lock
   pure Api.Token.HoldingV1.BurnMintFactory_BurnMintResult with
     outputCids = map toInterfaceContractId outputCids
-    inputHoldingAmounts = map (.amount.initialAmount) inputs
 
 
 requireExpectedAdminMatch : Party -> Party -> Update ()
