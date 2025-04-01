@@ -1,22 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as fs from 'node:fs';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
+import { ListDsoRulesVoteRequestsResponse } from 'sv-openapi';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
-import { svPartyId } from './mocks/constants';
-
-function setEmptyVoteRequestsFlag(enable: boolean) {
-  if (enable) {
-    fs.writeFileSync('TMP_EMPTY_REQUESTS', 'This is a test file.');
-  } else {
-    fs.unlinkSync('TMP_EMPTY_REQUESTS');
-  }
-}
+import { svPartyId, voteRequests } from './mocks/constants';
+import { server, svUrl } from './setup/setup';
 
 const AppWithConfig = () => {
   return (
@@ -165,10 +159,14 @@ describe('An SetConfig request', () => {
   test(
     'disables the Proceed button in the confirmation dialog if a conflict arises after request creation',
     async () => {
+      server.use(
+        rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+          return res(ctx.json<ListDsoRulesVoteRequestsResponse>({ dso_rules_vote_requests: [] }));
+        })
+      );
+
       const user = userEvent.setup();
       render(<AppWithConfig />);
-
-      setEmptyVoteRequestsFlag(true);
 
       expect(await screen.findByText('Governance')).toBeDefined();
       await user.click(screen.getByText('Governance'));
@@ -191,7 +189,12 @@ describe('An SetConfig request', () => {
 
       expect(await screen.findByText('Send Request to Super Validators')).toBeDefined();
       await user.click(screen.getByText('Send Request to Super Validators'));
-      setEmptyVoteRequestsFlag(false);
+
+      server.use(
+        rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+          return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
+        })
+      );
 
       const button = screen.getByRole('button', { name: 'Proceed' });
       expect(button.getAttribute('disabled')).toBeDefined();
