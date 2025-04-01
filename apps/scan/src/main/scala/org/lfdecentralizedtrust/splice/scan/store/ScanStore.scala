@@ -219,7 +219,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Long]
 
-  def findFeaturedAppRight(providerPartyId: PartyId)(implicit
+  def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 

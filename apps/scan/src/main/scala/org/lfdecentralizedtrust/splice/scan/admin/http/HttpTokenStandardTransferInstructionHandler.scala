@@ -67,6 +67,8 @@ class HttpTokenStandardTransferInstructionHandler(
                 .asRuntimeException()
             )
           )
+        provider = PartyId.tryFromProtoPrimitive(transferPreapproval.payload.provider)
+        optFeaturedAppRight <- store.lookupFeaturedAppRight(provider)
         newestOpenRound <- store
           .lookupLatestUsableOpenMiningRound(now)
           .map(
@@ -82,6 +84,13 @@ class HttpTokenStandardTransferInstructionHandler(
             .getConfigAsOf(now)
             .decentralizedSynchronizer
             .activeSynchronizer
+        val contextEntries = Seq(
+          "amulet-rules" -> amuletRules.contractId.contractId,
+          "open-round" -> newestOpenRound.contractId.contractId,
+          "transfer-preapproval" -> transferPreapproval.contractId.contractId,
+        ).appendedAll(
+          optFeaturedAppRight.map(co => "featured-app-right" -> co.contractId.contractId)
+        )
         v1.Resource.GetTransferFactoryResponseOK(
           definitions.TransferFactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
@@ -92,13 +101,12 @@ class HttpTokenStandardTransferInstructionHandler(
                 io.circe.parser
                   .parse(
                     new metadatav1.ChoiceContext(
-                      Map(
-                        "amulet-rules" -> amuletRules.contractId.contractId,
-                        "open-round" -> newestOpenRound.contractId.contractId,
-                        "transfer-preapproval" -> transferPreapproval.contractId.contractId,
-                      ).map[String, metadatav1.AnyValue] { case (k, v) =>
-                        k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
-                      }.asJava
+                      contextEntries
+                        .map[(String, metadatav1.AnyValue)] { case (k, v) =>
+                          k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
+                        }
+                        .toMap
+                        .asJava
                     ).toJson
                   )
                   .getOrElse(
@@ -113,6 +121,10 @@ class HttpTokenStandardTransferInstructionHandler(
                 toTokenStandardDisclosedContract(amuletRules, activeSynchronizerId),
                 toTokenStandardDisclosedContract(newestOpenRound.contract, activeSynchronizerId),
                 toTokenStandardDisclosedContract(transferPreapproval.contract, activeSynchronizerId),
+              ).appendedAll(
+                optFeaturedAppRight.map(co =>
+                  toTokenStandardDisclosedContract(co.contract, activeSynchronizerId)
+                )
               ),
             ),
             validUntil = newestOpenRound.payload.targetClosesAt.atOffset(

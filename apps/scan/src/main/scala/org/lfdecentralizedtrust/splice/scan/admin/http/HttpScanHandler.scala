@@ -362,7 +362,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupFeaturedAppRight") { _ => _ =>
       for {
-        right <- store.findFeaturedAppRight(
+        right <- store.lookupFeaturedAppRight(
           PartyId.tryFromProtoPrimitive(providerPartyId)
         )
       } yield {

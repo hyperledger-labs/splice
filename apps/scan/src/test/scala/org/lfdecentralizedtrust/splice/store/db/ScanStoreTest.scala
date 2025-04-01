@@ -921,7 +921,7 @@ abstract class ScanStoreTest
           _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
         } yield {
           store
-            .findFeaturedAppRight(userParty(1))
+            .lookupFeaturedAppRight(userParty(1))
             .futureValue should be(expectedResult)
         }
       }

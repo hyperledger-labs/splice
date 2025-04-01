@@ -488,7 +488,7 @@ class DbScanStore(
 
     }
 
-  override def findFeaturedAppRight(
+  override def lookupFeaturedAppRight(
       providerPartyId: PartyId
   )(implicit
       tc: TraceContext
