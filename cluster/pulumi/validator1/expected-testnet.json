@@ -924,7 +924,8 @@
           "splice-node/dars/splitwell-0.1.4.dar",
           "splice-node/dars/splitwell-0.1.5.dar",
           "splice-node/dars/splitwell-0.1.6.dar",
-          "splice-node/dars/splitwell-0.1.7.dar"
+          "splice-node/dars/splitwell-0.1.7.dar",
+          "splice-node/dars/splitwell-0.1.8.dar"
         ],
         "auth": {
           "audience": "https://canton.network.global",
