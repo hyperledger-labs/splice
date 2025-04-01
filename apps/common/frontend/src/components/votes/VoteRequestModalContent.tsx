@@ -17,6 +17,7 @@ interface VoteRequestModalProps {
     voteRequestContractId: ContractId<VoteRequest>,
     currentSvVote: SvVote | undefined
   ) => React.ReactNode;
+  expiresAt?: Date;
   effectiveAt?: Date;
 }
 
@@ -24,6 +25,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
   voteRequestContractId,
   handleClose,
   voteForm,
+  expiresAt,
   effectiveAt,
 }) => {
   const votesHooks = useVotesHooks();
@@ -85,6 +87,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
       acceptedVotes={acceptedVotes}
       voteForm={voteForm}
       curSvVote={curSvVote}
+      expiresAt={expiresAt}
       effectiveAt={effectiveAt}
     />
   );

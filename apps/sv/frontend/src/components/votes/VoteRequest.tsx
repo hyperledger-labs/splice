@@ -539,6 +539,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                     action as ActionRequiringConfirmation
                   ) as ActionRequiringConfirmation
                 }
+                expiresAt={new Date(expiresAt!)}
                 effectiveAt={
                   // TODO(#16139): get rid of logic to set expiration date for request that don't define effectivity
                   supportsVoteEffectivityAndSetConfig ? effectivity?.toDate() : new Date(expiresAt!)

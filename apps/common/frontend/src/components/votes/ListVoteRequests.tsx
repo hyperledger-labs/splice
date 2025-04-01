@@ -100,7 +100,12 @@ export type VoteResultModalState =
 
 export type VoteRequestModalState =
   | { open: false }
-  | { open: true; voteRequestContractId: ContractId<VoteRequest>; effectiveAt: Date };
+  | {
+      open: true;
+      voteRequestContractId: ContractId<VoteRequest>;
+      expiresAt: Date;
+      effectiveAt: Date;
+    };
 
 export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
   supportsVoteEffectivityAndSetConfig,
@@ -354,6 +359,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
                     voteRequestContractId={voteRequestModalState.voteRequestContractId}
                     handleClose={handleClose}
                     voteForm={voteForm}
+                    expiresAt={voteRequestModalState.expiresAt}
                     effectiveAt={voteRequestModalState.effectiveAt}
                   />
                 )}

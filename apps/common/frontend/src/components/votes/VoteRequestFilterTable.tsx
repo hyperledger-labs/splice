@@ -132,7 +132,8 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
     openModalWithVoteRequest({
       open: true,
       voteRequestContractId: params.row.trackingCid,
-      effectiveAt: params.row.expiresAt,
+      expiresAt: params.row.expiresAt,
+      effectiveAt: params.row.effectiveAt,
     });
   };
 

@@ -15,6 +15,12 @@ trait SvFrontendTestUtil extends TestCommon {
     setDateTime(party, "datetime-picker-vote-request-expiration", dateTime)
   }
 
+  def setEffectiveDate(party: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    setDateTime(party, "datetime-picker-vote-request-effectivity", dateTime)
+  }
+
   def setAmuletConfigDate(party: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ) = {

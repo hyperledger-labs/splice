@@ -44,6 +44,7 @@ interface VoteModalProps {
   ) => React.ReactNode;
   curSvVote?: SvVote;
   tableType?: VoteRequestResultTableType;
+  expiresAt?: Date;
   effectiveAt?: Date;
 }
 
@@ -58,6 +59,7 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
   voteForm,
   curSvVote,
   tableType,
+  expiresAt,
   effectiveAt,
 }) => {
   const votesHooks = useVotesHooks();
@@ -80,6 +82,7 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
           <ActionView
             action={actionReq}
             voteRequestResultTableType={tableType}
+            expiresAt={expiresAt}
             effectiveAt={effectiveAt}
           />
         </Stack>
@@ -130,22 +133,30 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
                 </TableRow>
                 <TableRow>
                   <TableCell>
-                    <Typography variant="h6">Effective At</Typography>
+                    <Typography variant="h6">Expires At</Typography>
                   </TableCell>
                   <TableCell>
-                    {effectiveAt ? (
-                      <DateWithDurationDisplay datetime={effectiveAt} enableDuration />
-                    ) : (
-                      <Typography>threshold</Typography>
-                    )}
+                    <DateWithDurationDisplay
+                      datetime={voteBefore}
+                      enableDuration
+                      id="vote-request-modal-expires-at"
+                    />
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>
-                    <Typography variant="h6">Expires At</Typography>
+                    <Typography variant="h6">Effective At</Typography>
                   </TableCell>
                   <TableCell>
-                    <DateWithDurationDisplay datetime={voteBefore} enableDuration />
+                    {effectiveAt ? (
+                      <DateWithDurationDisplay
+                        datetime={effectiveAt}
+                        enableDuration
+                        id="vote-request-modal-effective-at"
+                      />
+                    ) : (
+                      <Typography id="vote-request-modal-effective-at">threshold</Typography>
+                    )}
                   </TableCell>
                 </TableRow>
                 <TableRow>

@@ -158,12 +158,14 @@ function findAmuletRulesScheduleItemToCompareAgainst(
 export const ActionView: React.FC<{
   action: ActionRequiringConfirmation;
   voteRequestResultTableType?: VoteRequestResultTableType;
+  expiresAt?: Date;
   effectiveAt?: Date;
   expirationInDays?: number;
   confirmationDialogProps?: ConfirmationDialogProps;
 }> = ({
   action,
   voteRequestResultTableType,
+  expiresAt,
   effectiveAt,
   expirationInDays,
   confirmationDialogProps,
@@ -242,6 +244,7 @@ export const ActionView: React.FC<{
               dsoInfosQuery={dsoInfosQuery}
               actionType={actionType}
               dsoAction={dsoAction}
+              expiresAt={expiresAt}
               effectiveAt={effectiveAt}
               expirationInDays={expirationInDays}
               voteRequestResultTableType={voteRequestResultTableType}
@@ -325,6 +328,7 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletAction={amuletRulesAction}
+            expiresAt={expiresAt}
             effectiveAt={effectiveAt}
             voteRequestResultTableType={voteRequestResultTableType}
             expirationInDays={expirationInDays!}
@@ -682,6 +686,7 @@ const SetAmuletConfigValueTable: React.FC<{
   dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
   actionType: string;
   amuletAction: { tag: 'CRARC_SetConfig'; value: AmuletRules_SetConfig };
+  expiresAt?: Date;
   effectiveAt?: Date;
   voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
   confirmationDialogProps?: ConfirmationDialogProps;
@@ -691,6 +696,7 @@ const SetAmuletConfigValueTable: React.FC<{
   dsoInfosQuery,
   actionType,
   amuletAction,
+  expiresAt,
   effectiveAt,
   voteRequestResultTableType,
   confirmationDialogProps,
@@ -728,7 +734,7 @@ const SetAmuletConfigValueTable: React.FC<{
             AmuletConfig<USD>
           ];
         })
-        .filter(v => !dayjs(v[0]).isSame(dayjs(effectiveAt)))
+        .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
     : [];
 
   const unfoldedAccordions = [
@@ -792,6 +798,7 @@ const SetDsoConfigValueTable: React.FC<{
   dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
   actionType: string;
   dsoAction: { tag: 'SRARC_SetConfig'; value: DsoRules_SetConfig };
+  expiresAt?: Date;
   effectiveAt?: Date;
   voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
   confirmationDialogProps?: ConfirmationDialogProps;
@@ -801,6 +808,7 @@ const SetDsoConfigValueTable: React.FC<{
   dsoInfosQuery,
   actionType,
   dsoAction,
+  expiresAt,
   effectiveAt,
   voteRequestResultTableType,
   confirmationDialogProps,
@@ -838,7 +846,7 @@ const SetDsoConfigValueTable: React.FC<{
             DsoRulesConfig
           ];
         })
-        .filter(v => !dayjs(v[0]).isSame(dayjs(effectiveAt)))
+        .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
     : [];
 
   const unfoldedAccordions = [

@@ -341,13 +341,16 @@ class SvFrontendIntegrationTest2
       }
     }
 
-    def testCreateAndVoteDsoRulesAction(action: String)(
+    def testCreateAndVoteDsoRulesAction(action: String, effectiveAtThreshold: Boolean = true)(
         fillUpForm: WebDriverType => Unit
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
         env: SpliceTestConsoleEnvironment
     ) = {
       val requestReasonUrl = "https://vote-request-url.com"
       val requestReasonBody = "This is a request reason."
+      val expirationDate = "2034-07-12 00:12"
+      val effectiveDate = "2034-07-13 00:12"
+
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
         implicit webDriver =>
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
@@ -371,19 +374,27 @@ class SvFrontendIntegrationTest2
 
               fillUpForm(webDriver)
 
-              inside(find(id("checkbox-set-effective-at-threshold"))) { case Some(element) =>
-                element.underlying.click()
+              if (effectiveAtThreshold) {
+                inside(find(id("checkbox-set-effective-at-threshold"))) { case Some(element) =>
+                  element.underlying.click()
+                }
+              } else {
+                setEffectiveDate("sv1", effectiveDate)
               }
+
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
+
               clue("sv1 operator can't click submit before adding a summary") {
                 find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
               }
+
               inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
-              setExpirationDate("sv1", "2034-07-12 00:12")
+
+              setExpirationDate("sv1", expirationDate)
 
               clickVoteRequestSubmitButtonOnceEnabled()
             },
@@ -468,6 +479,16 @@ class SvFrontendIntegrationTest2
             }
             inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
               element.text should matchText("1")
+            }
+            inside(find(id("vote-request-modal-expires-at"))) { case Some(element) =>
+              element.text.startsWith(expirationDate) shouldBe true
+            }
+            inside(find(id("vote-request-modal-effective-at"))) { case Some(element) =>
+              if (effectiveAtThreshold) {
+                element.text should matchText("threshold")
+              } else {
+                element.text should startWith(effectiveDate)
+              }
             }
           },
         )
@@ -587,6 +608,20 @@ class SvFrontendIntegrationTest2
           .flatMap(_.findChildElement(tagName("input")))
           .flatMap(_.attribute("value")) should be(Some(sv3PartyId))
       }
+    }
+
+    "can create a valid SRARC_OffboardSv vote request not effective at threshold and cast vote on it" in {
+      implicit env =>
+        val sv4PartyId = sv4Backend.getDsoInfo().svParty.toProtoPrimitive
+        testCreateAndVoteDsoRulesAction("SRARC_OffboardSv", effectiveAtThreshold = false) {
+          webDriver =>
+            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+            dropDownMember.selectByValue(sv4PartyId)
+        } { implicit webDriver =>
+          find(id("srarc_offboardsv-member"))
+            .flatMap(_.findChildElement(tagName("input")))
+            .flatMap(_.attribute("value")) should be(Some(sv4PartyId))
+        }
     }
 
     "can create a valid SRARC_UpdateSvRewardWeight vote request and cast vote on it" in {
