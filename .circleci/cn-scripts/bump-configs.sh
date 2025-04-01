@@ -51,7 +51,7 @@ EOF
   done
 
   make cluster/pulumi/update-expected -j8
-  git add -u cluster/pulumi
+  git add .
   git commit -m "[static] Bump submodules to latest"
   git push origin "$bump_branch"
 
