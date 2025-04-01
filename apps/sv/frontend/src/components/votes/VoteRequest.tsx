@@ -22,7 +22,6 @@ import {
   CardContent,
   Checkbox,
   FormControl,
-  FormControlLabel,
   NativeSelect,
   Stack,
   TextField,
@@ -390,17 +389,20 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                   />
                 </Typography>
               </Stack>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={!isEffective}
-                    onChange={e => setIsEffective(!e.target.checked)}
-                    id={'checkbox-set-effective-at-threshold'}
-                    data-testid="checkbox-set-effective-at-threshold"
-                  />
-                }
-                label="Effective at threshold"
-              />
+
+              <Stack direction="row" mb={1}>
+                <Checkbox
+                  sx={{ pl: 0 }}
+                  checked={!isEffective}
+                  onChange={e => setIsEffective(!e.target.checked)}
+                  id={'checkbox-set-effective-at-threshold'}
+                  data-testid="checkbox-set-effective-at-threshold"
+                />
+                <Typography variant="h6" mt={1}>
+                  Effective at threshold
+                </Typography>
+              </Stack>
+
               {isEffective && (
                 <Stack direction="column" mb={4} spacing={1}>
                   <Typography variant="h6" mt={4}>
