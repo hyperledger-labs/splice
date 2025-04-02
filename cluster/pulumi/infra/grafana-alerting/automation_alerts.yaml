@@ -355,13 +355,13 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Alerting
         for: 5m
         annotations:
           description: ""
           runbook_url: ""
-          summary: History backfill is not making any progress in {{ index $labels "namespace" }}
+          summary: History backfilling is not making any progress in {{ index $labels "namespace" }}
         labels:
           "": ""
         isPaused: false
