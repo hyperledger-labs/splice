@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider, useQuery, UseQueryResult } from '@tan
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DsoInfo, SvVote, theme, VotesHooks, VotesHooksContext } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
-import { dsoInfo } from 'common-test-handlers';
+import { dsoInfo, getDsoSvOffboardingAction } from 'common-test-handlers';
+import dayjs from 'dayjs';
 import React from 'react';
 import { describe, expect, test } from 'vitest';
 
@@ -20,6 +21,7 @@ import { ContractId } from '@daml/types';
 
 import * as constants from '../mocks/constants';
 import { ListVoteRequests } from '../../components';
+import VoteModalContent from '../../components/votes/VoteModalContent';
 
 const queryClient = new QueryClient();
 // The linter wants me to add the constants.X in the queryKey,
@@ -159,5 +161,58 @@ describe('Votes list should', () => {
 
     const plannedRows = await screen.findAllByText('SRARC_UpdateSvRewardWeight');
     expect(plannedRows).toHaveLength(1);
+  });
+});
+
+describe('Vote Modal', () => {
+  test('displays a valid expiry date when vote request expires in the future', async () => {
+    const expiryDate = dayjs().add(1, 'day');
+    const expected = `${expiryDate.format('YYYY-MM-DD HH:mm')} (in a day)`;
+
+    render(
+      <ThemeProvider theme={theme}>
+        <QueryClientProvider client={queryClient}>
+          <VotesHooksContext.Provider value={provider}>
+            <VoteModalContent
+              voteRequestContractId={'contractId' as ContractId<VoteRequest>}
+              actionReq={getDsoSvOffboardingAction('sv1')}
+              requester="sv1"
+              getMemberName={() => 'sv1'}
+              reason={{ body: 'reason', url: 'url' }}
+              voteBefore={expiryDate.toDate()}
+              rejectedVotes={[]}
+              acceptedVotes={[]}
+            />
+          </VotesHooksContext.Provider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    );
+
+    const expiryDateField = await screen.findByTestId('vote-request-modal-expires-at');
+    expect(expiryDateField.textContent).toEqual(expected);
+  });
+
+  test('displays Did not expire when vote request is past expiry date but threshold was reached', async () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <QueryClientProvider client={queryClient}>
+          <VotesHooksContext.Provider value={provider}>
+            <VoteModalContent
+              voteRequestContractId={'contractId' as ContractId<VoteRequest>}
+              actionReq={getDsoSvOffboardingAction('sv1')}
+              requester="sv1"
+              getMemberName={() => 'sv1'}
+              reason={{ body: 'reason', url: 'url' }}
+              voteBefore={dayjs().subtract(1, 'day').toDate()}
+              rejectedVotes={[]}
+              acceptedVotes={[]}
+            />
+          </VotesHooksContext.Provider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    );
+
+    const expiryDate = await screen.findByTestId('vote-request-modal-expires-at');
+    expect(expiryDate.textContent).toEqual('Did not expire');
   });
 });

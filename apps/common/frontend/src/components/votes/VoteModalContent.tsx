@@ -1,8 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useVotesHooks } from 'common-frontend';
 import { CopyableTypography, PartyId, SvVote } from 'common-frontend';
-import React, { ReactElement, useCallback } from 'react';
+import dayjs from 'dayjs';
+import React, { ReactElement } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -34,6 +34,7 @@ interface VoteModalProps {
   voteRequestContractId: ContractId<VoteRequest>;
   actionReq: ActionRequiringConfirmation;
   requester: Party;
+  getMemberName: (partyId: string) => string;
   reason: Reason;
   voteBefore: Date;
   rejectedVotes: SvVote[];
@@ -52,6 +53,7 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
   voteRequestContractId,
   actionReq,
   requester,
+  getMemberName,
   reason,
   voteBefore,
   rejectedVotes,
@@ -62,18 +64,6 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
   expiresAt,
   effectiveAt,
 }) => {
-  const votesHooks = useVotesHooks();
-
-  const dsoInfosQuery = votesHooks.useDsoInfos();
-
-  const getMemberName = useCallback(
-    (partyId: string) => {
-      const member = dsoInfosQuery.data?.dsoRules.payload.svs.get(partyId);
-      return member ? member.name : '';
-    },
-    [dsoInfosQuery.data]
-  );
-
   return (
     <>
       <CardContent sx={{ paddingX: '64px' }}>
@@ -136,11 +126,22 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
                     <Typography variant="h6">Expires At</Typography>
                   </TableCell>
                   <TableCell>
-                    <DateWithDurationDisplay
-                      datetime={voteBefore}
-                      enableDuration
-                      id="vote-request-modal-expires-at"
-                    />
+                    {dayjs().isAfter(voteBefore) ? (
+                      <Typography
+                        variant="h6"
+                        id="vote-request-modal-expires-at"
+                        data-testid="vote-request-modal-expires-at"
+                      >
+                        Did not expire
+                      </Typography>
+                    ) : (
+                      <DateWithDurationDisplay
+                        datetime={voteBefore}
+                        enableDuration
+                        id="vote-request-modal-expires-at"
+                        data-testid="vote-request-modal-expires-at"
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
                 <TableRow>

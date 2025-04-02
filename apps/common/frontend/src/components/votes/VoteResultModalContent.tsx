@@ -15,10 +15,12 @@ import VoteModalContent from './VoteModalContent';
 
 interface VoteResultModalStateInterface {
   voteResultModalState: VoteResultModalState;
+  getMemberName: (partyId: string) => string;
 }
 
 export const VoteResultModalContent: React.FC<VoteResultModalStateInterface> = ({
   voteResultModalState,
+  getMemberName,
 }) => {
   if (!voteResultModalState.open) {
     return <>no voteResultModalState defined</>;
@@ -55,6 +57,7 @@ export const VoteResultModalContent: React.FC<VoteResultModalStateInterface> = (
       voteRequestContractId={encodedResult.request.trackingCid as ContractId<VoteRequest>}
       actionReq={encodedResult.request.action}
       requester={encodedResult.request.requester}
+      getMemberName={getMemberName}
       reason={encodedResult.request.reason}
       voteBefore={dayjs(encodedResult.request.voteBefore).toDate()}
       rejectedVotes={rejectedVotes}

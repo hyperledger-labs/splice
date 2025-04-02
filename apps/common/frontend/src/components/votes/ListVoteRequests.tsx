@@ -4,7 +4,7 @@ import { Loading, SvVote } from 'common-frontend';
 import { useVotesHooks } from 'common-frontend';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ClickAwayListener } from '@mui/base';
 import CloseIcon from '@mui/icons-material/Close';
@@ -158,6 +158,14 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
 
   const svPartyId = dsoInfosQuery.data?.svPartyId;
 
+  const getMemberName = useCallback(
+    (partyId: string) => {
+      const member = dsoInfosQuery.data?.dsoRules.payload.svs.get(partyId);
+      return member ? member.name : '';
+    },
+    [dsoInfosQuery.data]
+  );
+
   const alreadyVotedRequestIds: Set<ContractId<VoteRequest>> = useMemo(() => {
     return svPartyId && votesQuery.data
       ? new Set(votesQuery.data.filter(v => v.voter === svPartyId).map(v => v.requestCid))
@@ -235,6 +243,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
             label="In Progress"
             {...tabProps('in-progress')}
             id={'tab-panel-in-progress'}
+            data-testid={'tab-panel-in-progress'}
           />
         ),
         () => (
@@ -359,6 +368,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
                     voteRequestContractId={voteRequestModalState.voteRequestContractId}
                     handleClose={handleClose}
                     voteForm={voteForm}
+                    getMemberName={getMemberName}
                     expiresAt={voteRequestModalState.expiresAt}
                     effectiveAt={voteRequestModalState.effectiveAt}
                   />
@@ -387,7 +397,10 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
                     </IconButton>
                   }
                 />
-                <VoteResultModalContent voteResultModalState={voteResultModalState} />
+                <VoteResultModalContent
+                  voteResultModalState={voteResultModalState}
+                  getMemberName={getMemberName}
+                />
               </Card>
             </Container>
           </ClickAwayListener>

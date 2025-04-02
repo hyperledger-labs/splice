@@ -5,7 +5,7 @@ import { Contract } from 'common-frontend-utils';
 import dayjs from 'dayjs';
 import React from 'react';
 
-import { Chip } from '@mui/material';
+import { Chip, Typography } from '@mui/material';
 import { DataGrid, GridEventListener, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 
 import {
@@ -82,9 +82,11 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
       renderCell: (params: GridRenderCellParams) => {
         const now = dayjs();
         return dayjs(params.value).isBefore(now) ? (
-          <>Expired</>
+          <Typography variant="h6" data-testid="vote-row-expiry-date">
+            Did not expire
+          </Typography>
         ) : (
-          <DateDisplay datetime={params.value} />
+          <DateDisplay datetime={params.value} id="vote-row-expiry-date" />
         );
       },
     },
@@ -95,7 +97,7 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
       width: 250,
       renderCell: (params: GridRenderCellParams) => {
         return typeof params.value === 'object' ? (
-          <DateDisplay datetime={params.value} />
+          <DateDisplay datetime={params.value} id="vote-row-effective-at" />
         ) : (
           'threshold'
         );
@@ -138,7 +140,7 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
   };
 
   return (
-    <div style={{ height: 450, width: '100%' }} id={tableBodyId}>
+    <div style={{ height: 450, width: '100%' }} id={tableBodyId} data-testid={tableBodyId}>
       <DataGrid
         rows={rows}
         columns={columns}

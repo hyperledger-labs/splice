@@ -17,6 +17,7 @@ interface VoteRequestModalProps {
     voteRequestContractId: ContractId<VoteRequest>,
     currentSvVote: SvVote | undefined
   ) => React.ReactNode;
+  getMemberName: (partyId: string) => string;
   expiresAt?: Date;
   effectiveAt?: Date;
 }
@@ -25,6 +26,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
   voteRequestContractId,
   handleClose,
   voteForm,
+  getMemberName,
   expiresAt,
   effectiveAt,
 }) => {
@@ -81,6 +83,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
       voteRequestContractId={voteRequestContractId}
       actionReq={voteRequestQuery.data.payload.action}
       requester={voteRequestQuery.data.payload.requester}
+      getMemberName={getMemberName}
       reason={voteRequestQuery.data.payload.reason}
       voteBefore={dayjs(voteRequestQuery.data.payload.voteBefore).toDate()}
       rejectedVotes={rejectedVotes}
