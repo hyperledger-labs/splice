@@ -54,19 +54,6 @@ export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
 
 export type LogLevel = 'INFO' | 'DEBUG';
 
-export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
-
-export const daSupportApprovedIdentities: ApprovedSvIdentity[] = approveDaSupportSvNode
-  ? [
-      {
-        name: 'Digital-Asset-Support-SV',
-        publicKey:
-          'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAED20NyAmxCu7clk65HyRQlqXO0GrPeDqVhNWPNyPvOjLwnwwyVXiwBB5yVJTldOi6AJKZM8bowIcLSwoccIiPKA==',
-        rewardWeightBps: 10000, // dummy weight
-      },
-    ]
-  : [];
-
 export type ApprovedSvIdentity = {
   name: string;
   publicKey: string | pulumi.Output<string>;

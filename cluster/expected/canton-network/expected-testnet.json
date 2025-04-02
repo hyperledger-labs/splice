@@ -4,122 +4,6 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv-ledger-api-auth",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "sv-1-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "sv-1-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-sv-1-sv-1",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-ledger-api-auth",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "sv1-validator-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "sv1-validator-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-sv-1-sv1_validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-cns-ui-auth",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "sv-1-cns-ui-client-id",
-          "url": "https://canton-network-dev.us.auth0.com"
-        }
-      }
-    },
-    "name": "auth0-ui-secret-sv-1-cns",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv-ui-auth",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "sv-1-sv-ui-client-id",
-          "url": "https://canton-network-dev.us.auth0.com"
-        }
-      }
-    },
-    "name": "auth0-ui-secret-sv-1-sv-1",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-wallet-ui-auth",
-        "namespace": "sv-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "sv-1-wallet-ui-client-id",
-          "url": "https://canton-network-dev.us.auth0.com"
-        }
-      }
-    },
-    "name": "auth0-ui-secret-sv-1-wallet",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
@@ -242,7 +126,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableGcsProxy": true,
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "networkName": "test",
@@ -614,7 +497,6 @@
           "svIngressName": "sv-2",
           "svNamespace": "sv-1"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
@@ -675,7 +557,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometbftPorts": {
           "domains": 3
         },
@@ -728,7 +609,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
@@ -929,7 +809,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometBFT": {
           "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
           "enabled": true
@@ -1077,7 +956,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.test.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,

@@ -1,7 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import util from 'node:util';
 import {
-  approveDaSupportSvNode,
   config,
   isDevNet,
   isMainNet,
@@ -68,7 +67,7 @@ console.error(
 export const infraConfig = fullConfig.infra;
 export const monitoringConfig = fullConfig.monitoring;
 
-const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
+const daSupportNodeIpRanges: string[] = [];
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 

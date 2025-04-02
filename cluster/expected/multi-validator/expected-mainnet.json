@@ -39,7 +39,6 @@
         "cluster": {
           "hostname": "global.canton.network.digitalasset.com"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "cometbftPorts": {
           "domains": 3
         },

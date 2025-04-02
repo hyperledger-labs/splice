@@ -196,13 +196,6 @@ export class InStackDecentralizedSynchronizerNode
           dbs.mediatorPostgres,
         ]),
         parent: this,
-        // TODO(#14507) - remove alias once latest release is 0.2.0
-        aliases: [
-          {
-            name: `global-domain-${migrationId}`,
-            parent: undefined,
-          },
-        ],
       }
     );
   }

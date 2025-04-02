@@ -191,8 +191,7 @@ export function uiSecret(
   appName: string,
   clientId: string
 ): k8s.core.v1.Secret {
-  installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId, 'cn');
-  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId, 'splice');
+  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId);
 }
 
 export type AppAndUiSecrets = {
@@ -205,9 +204,8 @@ export async function validatorSecrets(
   auth0Client: Auth0Client,
   clientId: string
 ): Promise<AppAndUiSecrets> {
-  await installAuth0Secret(auth0Client, ns, 'validator', 'validator', 'cn');
   return {
-    appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator', 'splice'),
+    appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
     uiSecret: uiSecret(auth0Client, ns, 'wallet', clientId),
   };
 }

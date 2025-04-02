@@ -1,7 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
@@ -143,8 +142,6 @@ function cnChartValues(
         fixedTokens: fixedTokens(),
         dnsName: CLUSTER_HOSTNAME,
       },
-      // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
-      clusterUrl: CLUSTER_HOSTNAME,
     },
     overrideValues,
     (a, b) => (_.isArray(b) ? b : undefined)
@@ -175,8 +172,6 @@ export function installSpliceRunbookHelmChartByNamespaceName(
           ...values,
           imageRepo: DOCKER_REPO,
           ...appsAffinityAndTolerations,
-          // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
-          clusterUrl: CLUSTER_HOSTNAME,
         },
         timeout,
         maxHistory: HELM_MAX_HISTORY_SIZE,
@@ -208,13 +203,9 @@ export function installSpliceRunbookHelmChart(
 }
 
 export function chartPath(chartName: string, version: CnChartVersion): string {
-  const compatibleName =
-    version.type === 'local' || semver.gt(version.version, '0.2.1')
-      ? chartName
-      : chartName.replace(/^splice/, 'cn');
   return version.type === 'local'
-    ? `${path.relative(process.cwd(), SPLICE_ROOT)}/cluster/helm/${compatibleName}/`
-    : `${HELM_REPO}/${compatibleName}`;
+    ? `${path.relative(process.cwd(), SPLICE_ROOT)}/cluster/helm/${chartName}/`
+    : `${HELM_REPO}/${chartName}`;
 }
 
 function versionStringWithPossibleOverride(

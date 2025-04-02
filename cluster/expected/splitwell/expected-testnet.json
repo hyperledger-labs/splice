@@ -4,100 +4,6 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-ledger-api-auth",
-        "namespace": "splitwell"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "splitwell-validator-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "splitwell-validator-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-splitwell-splitwell_validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-splitwell-ledger-api-auth",
-        "namespace": "splitwell"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "splitwell-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "splitwell-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-splitwell-splitwell",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-cns-ui-auth",
-        "namespace": "splitwell"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "splitwell-cns-ui-client-id",
-          "url": "https://canton-network-dev.us.auth0.com"
-        }
-      }
-    },
-    "name": "auth0-ui-secret-splitwell-cns",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-wallet-ui-auth",
-        "namespace": "splitwell"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "splitwell-wallet-ui-client-id",
-          "url": "https://canton-network-dev.us.auth0.com"
-        }
-      }
-    },
-    "name": "auth0-ui-secret-splitwell-wallet",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
@@ -349,7 +255,6 @@
           "name": "cn-testzrhnet",
           "svNamespace": "splitwell"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "opts": {
           "dependsOn": [
@@ -517,7 +422,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
@@ -571,7 +475,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
@@ -706,7 +609,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "failOnAppVersionMismatch": true,
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
@@ -934,7 +836,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,

@@ -189,11 +189,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     );
     const password = generatePassword(`${logicalName}-passwd`, {
       parent: this,
-      aliases: [
-        { name: `${logicalNameAlias}-passwd` },
-        // allow for refactoring where the secret was created outside of the resources, can be removed once base version > 0.2.1
-        { name: `${logicalName}-passwd`, parent: undefined },
-      ],
+      aliases: [{ name: `${logicalNameAlias}-passwd` }],
     }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
     this.secretName = passwordSecret.metadata.name;
@@ -216,11 +212,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
       }),
       version,
       {
-        aliases: [
-          { name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' },
-          // can be removed once version is > 0.2.1
-          { name: alias, type: 'kubernetes:helm.sh/v3:Release' },
-        ],
+        aliases: [{ name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' }],
         dependsOn: [passwordSecret],
       }
     );

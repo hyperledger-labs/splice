@@ -510,7 +510,6 @@
           "hostname": "dev.global.canton.network.digitalasset.com",
           "name": "cn-devnet"
         },
-        "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometbftPorts": {
           "domains": 2
         },

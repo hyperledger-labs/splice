@@ -14,7 +14,6 @@ import {
   svCometBftGovernanceKeyFromSecret,
   DecentralizedSynchronizerMigrationConfig,
   ApprovedSvIdentity,
-  daSupportApprovedIdentities,
   config,
   approvedSvIdentities,
 } from 'splice-pulumi-common';
@@ -135,13 +134,13 @@ export class Dso extends pulumi.ComponentResource {
         };
       }, {});
 
-    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(svIdKeys)
-      .map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
-        name: onboardingName,
-        publicKey: keys.publicKey,
-        rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
-      }))
-      .concat(daSupportApprovedIdentities);
+    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(
+      svIdKeys
+    ).map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
+      name: onboardingName,
+      publicKey: keys.publicKey,
+      rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
+    }));
 
     const sv1CometBftConf = {
       ...sv1Conf.cometBft,

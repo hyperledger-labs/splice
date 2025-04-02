@@ -510,7 +510,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometbftPorts": {
           "domains": 3
         },

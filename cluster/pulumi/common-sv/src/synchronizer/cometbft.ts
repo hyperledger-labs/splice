@@ -92,8 +92,6 @@ export function installCometBftNode(
   const stateSyncEnabled = !isSv1 && enableStateSync && !isRunningMigration && isActiveDomain;
   const cometbftChartValues = _.mergeWith(cometBftValues, {
     sv1: nodeConfigs.sv1,
-    // TODO (#13845) remove when ciperiodic version >= 0.1.18
-    founder: nodeConfigs.sv1,
     istioVirtualService: {
       enabled: true,
       gateway: 'cluster-ingress/cn-apps-gateway',

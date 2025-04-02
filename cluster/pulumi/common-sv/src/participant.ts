@@ -94,8 +94,6 @@ export function installSvParticipant(
     {
       ...(customOptions || {}),
       dependsOn: (customOptions?.dependsOn || []).concat([db]).concat(gkeCredentialsSecret),
-      // TODO(#14507) - remove alias once latest release is 0.2.0
-      aliases: [{ name: `participant-${migrationId}` }],
     }
   );
 }

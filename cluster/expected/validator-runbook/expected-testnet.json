@@ -4,75 +4,6 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-ledger-api-auth",
-        "namespace": "validator"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://ledger_api.example.com",
-          "client-id": "validator-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "validator-client-id@clients",
-          "url": "https://auth0Domain/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-validator-validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-cns-ui-auth",
-        "namespace": "validator"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "cns-client-id",
-          "url": "https://auth0Domain"
-        }
-      }
-    },
-    "name": "auth0-ui-secret-validator-cns",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-wallet-ui-auth",
-        "namespace": "validator"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "wallet-client-id",
-          "url": "https://auth0Domain"
-        }
-      }
-    },
-    "name": "auth0-ui-secret-validator-wallet",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
       "imagePullSecrets": [
         {
           "name": "docker-reg-cred"
@@ -141,7 +72,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "svNamespace": "validator"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "spliceDomainNames": {
           "nameServiceDomain": "cns"
@@ -263,7 +193,6 @@
         "cluster": {
           "hostname": "test.global.canton.network.digitalasset.com"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometbftPorts": {
           "domains": 3
         },
@@ -431,7 +360,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
@@ -523,7 +451,6 @@
           "hostname": "test.global.canton.network.digitalasset.com",
           "name": "cn-testzrhnet"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {
           "volumeSize": "50Gi"
         },
@@ -593,7 +520,6 @@
           "audience": "https://validator.example.com/api",
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
         "db": {},
         "enablePostgresMetrics": true,

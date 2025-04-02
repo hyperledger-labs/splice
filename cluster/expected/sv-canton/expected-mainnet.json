@@ -108,14 +108,7 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainzrhnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
-        "founder": {
-          "externalAddress": "global.canton.network.digitalasset.com:26216",
-          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
-          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
-          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
-        },
         "genesis": {
           "chainId": "main-2",
           "chainIdSuffix": "2"
@@ -254,7 +247,6 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainzrhnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "DEBUG",
@@ -468,7 +460,6 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainzrhnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",

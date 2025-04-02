@@ -1,5 +1,4 @@
 import * as pulumi from '@pulumi/pulumi';
-import * as semver from 'semver';
 import {
   Auth0Client,
   BackupConfig,
@@ -243,22 +242,12 @@ async function installSvAndValidator(
     }
   );
 
-  const supportsBeneficiariesWeight =
-    activeVersion.type == 'local' ||
-    (activeVersion.type == 'remote' && activeVersion.version.startsWith('0.1.13')) ||
-    semver.gt(activeVersion.version, '0.1.13');
-
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
-        supportsBeneficiariesWeight
-          ? {
-              beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
-              weight: '3333',
-            }
-          : {
-              partyId: pulumi.Output.create(resolveValidator1PartyId()),
-              percentage: '33.33',
-            },
+        {
+          beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
+          weight: '3333',
+        },
       ]
     : [];
   const svValues: ChartValues = {

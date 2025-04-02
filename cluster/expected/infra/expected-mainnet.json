@@ -454,7 +454,6 @@
           "hostname": "global.canton.network.digitalasset.com",
           "name": "cn-mainzrhnet"
         },
-        "clusterUrl": "global.canton.network.digitalasset.com",
         "cometbftPorts": {
           "domains": 3
         },
