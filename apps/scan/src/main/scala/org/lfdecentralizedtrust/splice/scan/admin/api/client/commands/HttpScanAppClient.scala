@@ -51,6 +51,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
 
 import java.util.Base64
 import java.time.Instant
@@ -1309,6 +1313,130 @@ object HttpScanAppClient {
             ProtobufJsonScanHttpEncodings.httpToLapiUpdate(http).update
           )
         )
+    }
+  }
+
+  case object ListVoteRequests
+      extends InternalBaseCommand[http.ListDsoRulesVoteRequestsResponse, Seq[
+        Contract[VoteRequest.ContractId, VoteRequest]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListDsoRulesVoteRequestsResponse] =
+      client.listDsoRulesVoteRequests(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListDsoRulesVoteRequestsResponse.OK(response) =>
+      response.dsoRulesVoteRequests
+        .traverse(req => Contract.fromHttp(VoteRequest.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
+  case class LookupVoteRequest(trackingCid: VoteRequest.ContractId)
+      extends InternalBaseCommand[
+        http.LookupDsoRulesVoteRequestResponse,
+        Option[Contract[VoteRequest.ContractId, VoteRequest]],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupDsoRulesVoteRequestResponse] =
+      client.lookupDsoRulesVoteRequest(
+        trackingCid.contractId,
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.LookupDsoRulesVoteRequestResponse.NotFound(_) =>
+        Right(None)
+      case http.LookupDsoRulesVoteRequestResponse.OK(response) =>
+        Contract
+          .fromHttp(VoteRequest.COMPANION)(response.dsoRulesVoteRequest)
+          .map(Some(_))
+          .leftMap(_.toString)
+    }
+  }
+
+  case class ListVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: BigInt,
+  ) extends InternalBaseCommand[http.ListVoteRequestResultsResponse, Seq[
+        DsoRules_CloseVoteRequestResult
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListVoteRequestResultsResponse] =
+      client.listVoteRequestResults(
+        body = definitions.ListVoteResultsRequest(
+          actionName,
+          accepted,
+          requester,
+          effectiveFrom,
+          effectiveTo,
+          limit,
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListVoteRequestResultsResponse.OK(response) =>
+      Right(
+        response.dsoRulesVoteResults
+          .map(e =>
+            decoder.decodeValue(
+              DsoRules_CloseVoteRequestResult.valueDecoder(),
+              DsoRules_CloseVoteRequestResult._packageId,
+              "Splice.DsoRules",
+              "DsoRules_CloseVoteRequestResult",
+            )(e)
+          )
+          .toSeq
+      )
+    }
+  }
+
+  case class ListVoteRequestsByTrackingCid(
+      voteRequestCids: Seq[VoteRequest.ContractId]
+  ) extends InternalBaseCommand[http.ListVoteRequestsByTrackingCidResponse, Seq[
+        Contract[VoteRequest.ContractId, VoteRequest]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListVoteRequestsByTrackingCidResponse] =
+      client.listVoteRequestsByTrackingCid(
+        body = definitions.BatchListVotesByVoteRequestsRequest(
+          voteRequestContractIds = voteRequestCids.map(_.contractId).toVector
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListVoteRequestsByTrackingCidResponse.OK(response) =>
+      response.voteRequests
+        .traverse(voteRequest => Contract.fromHttp(VoteRequest.COMPANION)(voteRequest))
+        .leftMap(_.toString)
     }
   }
 }

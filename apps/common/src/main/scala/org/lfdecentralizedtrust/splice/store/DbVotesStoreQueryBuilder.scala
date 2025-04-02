@@ -18,9 +18,8 @@ import slick.sql.SqlStreamingAction
 
 /** All column names will be unsafely interpolated, as they're expected to be constant strings.
   */
-trait DbVotesStoreQueryBuilder[TXE]
-    extends AcsQueries
-    with TxLogQueries[TXE]
+trait DbVotesTxLogStoreQueryBuilder[TXE]
+    extends TxLogQueries[TXE]
     with LimitHelpers
     with NamedLogging {
 
@@ -90,6 +89,11 @@ trait DbVotesStoreQueryBuilder[TXE]
       orderLimit = sql"""order by #$effectiveAtColumnName desc limit ${sqlLimit(limit)}""",
     )
   }
+}
+
+/** All column names will be unsafely interpolated, as they're expected to be constant strings.
+  */
+trait DbVotesAcsStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLogging {
 
   def listVoteRequestsByTrackingCidQuery(
       acsTableName: String,
