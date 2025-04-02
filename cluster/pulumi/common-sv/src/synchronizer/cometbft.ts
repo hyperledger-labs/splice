@@ -21,7 +21,7 @@ import {
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
-import { svsConfiguration } from '../clusterSvConfig';
+import { clusterSvsConfiguration } from '../clusterSvConfig';
 import { svConfig } from '../config';
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync } from './cometbftConfig';
@@ -145,7 +145,7 @@ export function installCometBftNode(
   });
   const svIdentifier = nodeConfigs.selfSvNodeName;
   const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;
-  const svConfiguration = svsConfiguration[svIdentifier];
+  const svConfiguration = clusterSvsConfiguration[svIdentifier];
   let volumeDependecies: Resource[] = [];
   if (svConfiguration?.cometbft) {
     const volumeSize = cometbftChartValues.db.volumeSize;

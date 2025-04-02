@@ -19,5 +19,6 @@ export * from './packageConfig';
 export * from './artifacts';
 export * from './kms';
 export * from './serviceAccount';
+export * from './participantKms';
 export * from './config/migrationSchema';
 export * from './pruning';

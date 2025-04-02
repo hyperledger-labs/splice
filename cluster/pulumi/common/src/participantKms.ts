@@ -17,15 +17,23 @@ export type ParticipantKmsHelmResources = {
   extraVolumes: { name: string; secret: { secretName: string } }[];
 };
 
-const createKmsServiceAccount = (xns: ExactNamespace) => {
+const createKmsServiceAccount = (xns: ExactNamespace, kmsConfig: KmsConfig) => {
+  const condition = {
+    title: `"${kmsConfig.keyRingId}" keyring`,
+    description: '(managed by Pulumi)',
+    expression: `resource.name.startsWith("projects/${kmsConfig.projectId}/locations/${kmsConfig.locationId}/keyRings/${kmsConfig.keyRingId}")`,
+  };
   const kmsServiceAccount = new GcpServiceAccount(`${CLUSTER_BASENAME}-${xns.logicalName}-kms`, {
     accountId: `${CLUSTER_BASENAME}-${xns.logicalName}-kms`,
     displayName: `KMS Service Account (${CLUSTER_BASENAME} ${xns.logicalName})`,
     description: '(managed by Pulumi)',
-    roles: ['roles/cloudkms.admin', 'roles/cloudkms.cryptoOperator'],
+    roles: [
+      { id: 'roles/cloudkms.admin', condition },
+      { id: 'roles/cloudkms.cryptoOperator', condition },
+    ],
   });
 
-  return new gcp.serviceaccount.Key('kmsKey', {
+  return new gcp.serviceaccount.Key('participantKmsServiceAccountKey', {
     serviceAccountId: kmsServiceAccount.name,
   });
 };
@@ -46,7 +54,7 @@ export const getParticipantKmsHelmResources = (
     stringData: {
       googleCredentials: std
         .base64decodeOutput({
-          input: createKmsServiceAccount(xns).privateKey,
+          input: createKmsServiceAccount(xns, kmsConfig).privateKey,
         })
         .apply(invoke => invoke.result),
     },

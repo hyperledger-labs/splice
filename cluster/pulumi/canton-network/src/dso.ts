@@ -20,10 +20,11 @@ import {
 } from 'splice-pulumi-common';
 import { StaticCometBftConfigWithNodeName, svConfigs } from 'splice-pulumi-common-sv';
 import {
+  clusterSvsConfiguration,
   SequencerPruningConfig,
   StaticSvConfig,
   SvOnboarding,
-} from 'splice-pulumi-common-sv/src/config';
+} from 'splice-pulumi-common-sv';
 
 import { InstalledSv, installSvNode } from './sv';
 
@@ -126,7 +127,7 @@ export class Dso extends pulumi.ComponentResource {
     }, {});
 
     const cometBftGovernanceKeys = relevantSvConfs
-      .filter(conf => conf.participantKms)
+      .filter(conf => clusterSvsConfiguration[conf.nodeName]?.participant?.kms)
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
         return {
           ...acc,

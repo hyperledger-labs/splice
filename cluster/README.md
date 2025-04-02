@@ -101,13 +101,13 @@
   - [Backup and Recovery](#backup-and-recovery)
     - [Backup](#backup)
     - [Restore](#restore)
-  - [Security](#security)
   - [Chaos Mesh](#chaos-mesh)
   - [Maintenance Windows](#maintenance-windows)
   - [Multi-architecture Docker Images](#multi-architecture-docker-images)
   - [Docker-compose](#docker-compose)
   - [Testing Performance-Critical Changes](#testing-performance-critical-changes)
   - [Testing compatibility of Dev/Test/Mainnet topology with the next major Canton version](#testing-compatibility-of-devtestmainnet-topology-with-the-next-major-canton-version)
+  - [Deploying with KMS](#deploying-with-kms)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -2422,6 +2422,30 @@ Instructions:
     - Run `cncluster pulumi canton-network up`
     - Run `cncluster pulumi validator1 up`
 
+## Deploying with KMS
+
+KMS support (for SVs, validators) is actively being worked on, so expect changes.
+
+Currently we support:
+
+- Deploying `validator1` with participant KMS. You need to set `validator1.kms` in the deployment directory `config.yaml`.
+- Deploying any SV from the main `canton-network` stack with participant KMS. You need to set `svs.sv-X.participant.kms` in the deployment directory `config.yaml` (`sv-X` being your target SV).
+
+In both cases, the format for `kms` is:
+
+```
+kms:
+  type: gcp // the default and only supported value here at the moment
+  locationId: us-central1 // or whatever matches your keyring
+  projectId: // defaults to current cluster's project
+  keyRingId: // you must set this to a keyring that already exists
+```
+
+Current gotcha until we improve this: The keyring is managed manually, so you might need to create it for example [through the UI](https://console.cloud.google.com/security/kms/keyrings).
+Pick a single-region keyring that matches the region of your deployment.
+
+The more general gotcha around migrating (a Canton node) to using KMS also applies: [you can't](https://dev.network.canton.global/validator_operator/validator_security.html#migrating-an-existing-validator-to-use-an-external-kms).
+For non-MainNet deployments it's recommended to just `down` the existing deployment, including all databases, and then redeploy (and reonboard) with the fresh KMS-enabled deployment.
 
 ## Appendix: Kubernetes and Other Deployment Resources
 

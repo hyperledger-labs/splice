@@ -198,7 +198,7 @@
     "custom": true,
     "id": "",
     "inputs": {},
-    "name": "kmsKey",
+    "name": "participantKmsServiceAccountKey",
     "provider": "",
     "type": "gcp:serviceaccount/key:Key"
   },
@@ -319,9 +319,14 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
+        "title": "\"validator1_test\" keyring"
+      },
       "role": "roles/cloudkms.admin"
     },
-    "name": "testzrh-validator1-kms-roles/cloudkms.admin-iam",
+    "name": "testzrh-validator1-kms-roles/cloudkms.admin-\"validator1_test\"-keyring-iam",
     "provider": "",
     "type": "gcp:projects/iAMMember:IAMMember"
   },
@@ -329,9 +334,14 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
+        "title": "\"validator1_test\" keyring"
+      },
       "role": "roles/cloudkms.cryptoOperator"
     },
-    "name": "testzrh-validator1-kms-roles/cloudkms.cryptoOperator-iam",
+    "name": "testzrh-validator1-kms-roles/cloudkms.cryptoOperator-\"validator1_test\"-keyring-iam",
     "provider": "",
     "type": "gcp:projects/iAMMember:IAMMember"
   },
