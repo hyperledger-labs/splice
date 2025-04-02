@@ -3,8 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
-import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.Outcome.{
   BackfillingIsComplete,
   MoreWorkAvailableLater,
@@ -50,16 +48,9 @@ final class HistoryBackfilling[T](
     currentMigrationId: Long,
     batchSize: Int,
     override protected val loggerFactory: NamedLoggerFactory,
-    metricsFactory: LabeledMetricsFactory,
 )(implicit
     ec: ExecutionContext
 ) extends NamedLogging {
-
-  private val historyMetrics = new HistoryMetrics(metricsFactory)(
-    MetricsContext(
-      "current_migration_id" -> currentMigrationId.toString
-    )
-  )
 
   /** Backfill a small part of the destination history, making sure that the destination history won't have any gaps.
     *
@@ -136,17 +127,7 @@ final class HistoryBackfilling[T](
             s"Backfilling domain ${domainId} from ${backfillFrom} for migration ${migrationId}"
           )
           backfillDomain(migrationId, domainId, backfillFrom).map { insertResult =>
-            historyMetrics.Backfilling.latestRecordTime.updateValue(
-              insertResult.lastBackfilledRecordTime.toMicros
-            )
-            // Using MetricsContext.Empty is okay, because it's merged with the StoreMetrics context
-            historyMetrics.Backfilling.updateCount.inc(
-              insertResult.backfilledUpdates
-            )(MetricsContext.Empty)
-            historyMetrics.Backfilling.eventCount.inc(insertResult.backfilledUpdates)(
-              MetricsContext.Empty
-            )
-            MoreWorkAvailableNow
+            MoreWorkAvailableNow(insertResult)
           }
         case None =>
           if (backfillFrom.missingData) {
@@ -169,7 +150,6 @@ final class HistoryBackfilling[T](
                     "This history won't need any further backfilling."
                 )
                 destination.markBackfillingComplete().map { _ =>
-                  historyMetrics.Backfilling.completed.updateValue(1)
                   BackfillingIsComplete
                 }
             }
@@ -280,12 +260,13 @@ final class HistoryBackfilling[T](
 object HistoryBackfilling {
 
   sealed trait Outcome extends Product with Serializable
+
   object Outcome {
 
     /** Backfilling is not complete, and there is more work to do right now.
       * Call backfill() again immediately.
       */
-    final case object MoreWorkAvailableNow extends Outcome
+    final case class MoreWorkAvailableNow(workDone: DestinationHistory.InsertResult) extends Outcome
 
     /** Backfilling is not complete, but cannot proceed right now.
       * Call backfill() again after a short delay.

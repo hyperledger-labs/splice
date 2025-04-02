@@ -50,6 +50,10 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.MapHasAsJava
@@ -256,6 +260,36 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       tc: TraceContext,
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
 
+  def listDsoRulesVoteRequests()(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]]
+
+  def listVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Int,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
+
+  def listVoteRequestsByTrackingCid(
+      voteRequestCids: Seq[VoteRequest.ContractId]
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+  ]
+
+  def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
 }
 
 object ScanConnection {

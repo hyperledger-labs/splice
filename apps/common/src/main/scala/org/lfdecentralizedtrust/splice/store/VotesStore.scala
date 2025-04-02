@@ -15,7 +15,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.Future
 
-trait VotesStore extends AppStore {
+/** Vote information that can be determined from active ledger contracts */
+trait ActiveVotesStore extends AppStore {
 
   def listAmuletPriceVotes(
       limit: Limit = Limit.DefaultLimit
@@ -35,17 +36,6 @@ trait VotesStore extends AppStore {
     multiDomainAcsStore
       .listContracts(splice.dsorules.VoteRequest.COMPANION, limit)
       .map(_ map (_.contract))
-
-  def listVoteRequestResults(
-      actionName: Option[String],
-      accepted: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
   def listVoteRequestsByTrackingCid(
       voteRequestCids: Seq[splice.dsorules.VoteRequest.ContractId],
@@ -72,5 +62,20 @@ trait VotesStore extends AppStore {
       )
     )
   }
+
+}
+
+trait VotesStore extends ActiveVotesStore {
+
+  def listVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
 }
