@@ -2,12 +2,13 @@ import * as pulumi from '@pulumi/pulumi';
 import util from 'node:util';
 import {
   approveDaSupportSvNode,
-  svPrivateConfigsClusterDirectory,
   config,
   isDevNet,
   isMainNet,
   loadJsonFromFile,
   SPLICE_ROOT,
+  PRIVATE_CONFIGS_PATH,
+  clusterDirectory,
 } from 'splice-pulumi-common';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
@@ -78,9 +79,15 @@ function extractIpRanges(x: IpRangesDict): string[] {
 }
 
 export function loadIPRanges(): string[] {
+  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !PRIVATE_CONFIGS_PATH) {
+    throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
+  }
+
   const externalIpRanges = spliceConfig.pulumiProjectConfig.isExternalCluster
     ? extractIpRanges(
-        loadJsonFromFile(`${svPrivateConfigsClusterDirectory}/allowed-ip-ranges.json`)
+        loadJsonFromFile(
+          `${PRIVATE_CONFIGS_PATH}/configs/${clusterDirectory}/allowed-ip-ranges.json`
+        )
       )
     : [];
   const internalIPRangesJson = loadJsonFromFile(

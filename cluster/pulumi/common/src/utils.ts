@@ -14,7 +14,7 @@ export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
-export const PUBLIC_CONFIGS_PATH = config.requireEnv('PUBLIC_CONFIGS_PATH');
+export const PUBLIC_CONFIGS_PATH = config.optionalEnv('PUBLIC_CONFIGS_PATH');
 export const PRIVATE_CONFIGS_PATH = config.requireEnv('PRIVATE_CONFIGS_PATH');
 
 export const HELM_REPO = spliceEnvConfig.requireEnv('OCI_DEV_HELM_REGISTRY');
@@ -187,14 +187,16 @@ export function fixedTokens(): boolean {
   return _fixedTokens;
 }
 
-const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
-
-export const svPublicConfigsClusterDirectory = `${PUBLIC_CONFIGS_PATH}/configs/${clusterDirectory}`;
-export const svPrivateConfigsClusterDirectory = `${PRIVATE_CONFIGS_PATH}/configs/${clusterDirectory}`;
+export const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
-    .approvedSvIdentities;
+  if (PUBLIC_CONFIGS_PATH) {
+    const svPublicConfigsClusterDirectory = `${PUBLIC_CONFIGS_PATH}/configs/${clusterDirectory}`;
+    return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
+      .approvedSvIdentities;
+  } else {
+    return [];
+  }
 }
 
 // Typically used for overriding chart values.
