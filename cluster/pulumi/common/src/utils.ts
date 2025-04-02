@@ -8,7 +8,7 @@ import { config, isDevNet, isMainNet } from './config';
 import { spliceEnvConfig } from './config/envConfig';
 
 /// Environment variables
-export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 300;
+export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
 export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY_SIZE')) || 0; // 0 => no limit
 
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');

@@ -427,7 +427,7 @@ you can set the `CHARTS_VERSION` and `OVERRIDE_VERSION` environment variables in
      later steps don't call `sbt bundle` automatically, as it takes too long.
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes to the Development Artifactory Docker Registry.
-   - If this fails, you may need to run `echo $GITHUB_TOKEN | docker login "$GHCR" -u "$GH_USER" --password-stdin` to login to the Github Container Registry.
+   - If this fails, you may need to run `echo $GH_TOKEN | docker login "$GHCR" -u "$GH_USER" --password-stdin` to login to the Github Container Registry.
 1. If you plan on using manual `pulumi` commands for deployment (i.e., calling `cncluster pulumi ...` instead of `cncluster apply`),
    ensure that pulumi is set up: `make -C $SPLICE_ROOT cluster/build -j`
    - This step is handled automatically by `cncluster apply`. This uses locally built helm charts by default.

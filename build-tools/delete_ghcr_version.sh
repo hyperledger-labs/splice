@@ -19,8 +19,8 @@ while getopts "v:" opt; do
       ;;
   esac
 done
-if [ -z "$GITHUB_TOKEN" ]; then
-  echo "Error: you need to set $GITHUB_TOKEN."
+if [ -z "$GH_TOKEN" ]; then
+  echo "Error: you need to set $GH_TOKEN."
   exit 1
 fi
 if [ -z "$VERSION_TO_DELETE" ]; then
@@ -52,7 +52,7 @@ function delete_version(){
     if [ ! -f "$dir" ] && [ "$IMAGE_NAME" != "common" ] && [ "$IMAGE_NAME" != "splice-util-lib" ] && [ "$IMAGE_NAME" != "target" ]; then
       tags_found=$(curl -L -s \
                          -H "Accept: application/vnd.github+json" \
-                         -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                         -H "Authorization: Bearer ${GH_TOKEN}" \
                          -H "X-GitHub-Api-Version: 2022-11-28" \
                          "${packages_repo}%2F${IMAGE_NAME}/versions" \
                          | jq --arg tag_pattern "$VERSION_TO_DELETE" '.[] | select(any(.metadata.container.tags[]; . == $tag_pattern)) | .metadata.container.tags' || true)
@@ -61,7 +61,7 @@ function delete_version(){
         echo "Tags found: $tags_found"
         version_ids=$(curl -L -s \
                            -H "Accept: application/vnd.github+json" \
-                           -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                           -H "Authorization: Bearer ${GH_TOKEN}" \
                            -H "X-GitHub-Api-Version: 2022-11-28" \
                            "${packages_repo}%2F${IMAGE_NAME}/versions" \
                            | jq  --arg tag_pattern "$VERSION_TO_DELETE" '.[] | select(any(.metadata.container.tags[]; . == $tag_pattern)) | .id' || true)
@@ -75,7 +75,7 @@ function delete_version(){
               curl -L \
                 -X DELETE \
                 -H "Accept: application/vnd.github+json" \
-                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
                 -H "X-GitHub-Api-Version: 2022-11-28" \
                 "$url"
             done

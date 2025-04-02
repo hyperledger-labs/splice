@@ -337,11 +337,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # The operator itself should use images from the branch on which this job is running.
             OPERATOR_IMAGE_VERSION=$(build-tools/get-snapshot-version)
@@ -471,11 +471,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -564,11 +564,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -638,11 +638,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # Update the upgrade branch to archive the base version
 
@@ -703,7 +703,7 @@ jobs:
           cmd_name: Reset SV runbook
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
 
@@ -719,12 +719,12 @@ jobs:
           cmd_name: Push new branch with migration config changes
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH

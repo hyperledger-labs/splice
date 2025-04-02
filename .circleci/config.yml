@@ -339,7 +339,7 @@ commands:
       - run_bash_command_in_nix:
           when: always
           cmd: ./scripts/check-todos.sh
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
       - store_artifacts:
           name: Store To-dos as artifacts
           when: always
@@ -541,7 +541,7 @@ commands:
           cmd_name: Running << parameters.project >> preview on cluster << parameters.cluster >>
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep SLACK_ACCESS_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
@@ -583,7 +583,7 @@ commands:
           name: Setting TARGET_BRANCH env var
           command: |
             PR_NUMBER=$(echo $CIRCLE_PULL_REQUEST | sed 's|.*/pull/\([0-9]*\)|\1|')
-            TARGET_BRANCH=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
+            TARGET_BRANCH=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
             echo "PR target branch: $TARGET_BRANCH"
             echo export "TARGET_BRANCH=\"$TARGET_BRANCH\"" >> "$BASH_ENV"
 
@@ -687,7 +687,7 @@ commands:
           cmd_name: Apply the deployment stack
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep SLACK_ACCESS_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
@@ -2325,7 +2325,7 @@ jobs:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
@@ -2382,7 +2382,7 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Update deployment branch and tag for the cluster
                 cluster: << parameters.cluster >>
-                additional_nix_args: "--keep GITHUB_TOKEN"
+                additional_nix_args: "--keep GH_TOKEN"
                 cmd: |
                   # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
                   if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]]; then
@@ -2435,7 +2435,7 @@ jobs:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
@@ -2508,7 +2508,7 @@ jobs:
           cmd_name: Apply the pulumi infra stack
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
@@ -2876,11 +2876,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # The operator itself should use images from the branch on which this job is running.
             OPERATOR_IMAGE_VERSION=$(build-tools/get-snapshot-version)
@@ -3010,11 +3010,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -3103,11 +3103,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -3177,11 +3177,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # Update the upgrade branch to archive the base version
 
@@ -3242,7 +3242,7 @@ jobs:
           cmd_name: Reset SV runbook
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
 
@@ -3258,12 +3258,12 @@ jobs:
           cmd_name: Push new branch with migration config changes
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
@@ -3373,7 +3373,7 @@ jobs:
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Bump configs
-          additional_nix_args: "--keep GITHUB_TOKEN"
+          additional_nix_args: "--keep GH_TOKEN"
           cmd: |
             .circleci/cn-scripts/bump-configs.sh
 
@@ -3486,9 +3486,9 @@ jobs:
            --keep CIRCLE_REPOSITORY_URL \
            --keep CIRCLE_SHA1 \
            --keep GH_USER \
-           --keep GITHUB_TOKEN"
+           --keep GH_TOKEN"
           cmd: |
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
@@ -3497,10 +3497,10 @@ jobs:
             --keep CIRCLE_BRANCH \
             --keep OCI_DEV_HELM_REGISTRY \
             --keep GH_USER \
-            --keep GITHUB_TOKEN"
+            --keep GH_TOKEN"
           cmd_name: Push Helm Artifacts
           cmd: |
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
@@ -3541,7 +3541,7 @@ jobs:
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Copy artifacts to Github Container Registry
-                additional_nix_args: "--keep GITHUB_TOKEN \
+                additional_nix_args: "--keep GH_TOKEN \
                   --keep GH_USER \
                   --keep DEV_HELM_REGISTRY \
                   --keep DEV_DOCKER_REGISTRY \
@@ -3554,9 +3554,9 @@ jobs:
                   make cluster/docker/copy_release_to_ghcr
             - run_bash_command_in_nix:
                 cmd_name: tag git
-                additional_nix_args: "--keep GITHUB_TOKEN --keep GH_USER"
+                additional_nix_args: "--keep GH_TOKEN --keep GH_USER"
                 cmd: |
-                  git remote set-url origin https://${GH_USER}:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
                   RELEASE_TAG=$(get-snapshot-version)
 
                   if [ $(git tag -l "${RELEASE_TAG}") ]; then
@@ -3969,17 +3969,17 @@ jobs:
       - clone_and_update_open_source
       - run_bash_command_in_nix:
           cmd_name: Push changes to DA OSS
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/oss
       - run_bash_command_in_nix:
           cmd_name: Push changes to Splice
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/splice
       - run_bash_command_in_nix:
           cmd_name: Create release in DA OSS
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
           working_dir: "/home/circleci/oss"
           cmd: |
             if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
@@ -3998,7 +3998,7 @@ jobs:
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Create branch to point CILR to and update tag
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             VERSION="$(get-snapshot-version)"
             .circleci/update-cilr.sh

@@ -370,7 +370,7 @@
       "maxHistory": 10,
       "name": "cluster-ingress-validator1",
       "namespace": "validator1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -492,7 +492,7 @@
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "validator1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -544,7 +544,7 @@
       "maxHistory": 10,
       "name": "participant-1",
       "namespace": "validator1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalEnvVars": [
           {
@@ -711,7 +711,7 @@
       "maxHistory": 10,
       "name": "splitwell-web-ui",
       "namespace": "validator1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -835,7 +835,7 @@
       "maxHistory": 10,
       "name": "validator-validator1",
       "namespace": "validator1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalEnvVars": [
           {

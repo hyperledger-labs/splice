@@ -768,7 +768,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-0",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -875,7 +875,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -1050,7 +1050,7 @@
       "maxHistory": 10,
       "name": "global-domain-0",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1138,7 +1138,7 @@
       "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1413,7 +1413,7 @@
       "maxHistory": 10,
       "name": "participant-0",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1556,7 +1556,7 @@
       "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1882,7 +1882,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-0",
       "namespace": "sv-2",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -1998,7 +1998,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv-2",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -2182,7 +2182,7 @@
       "maxHistory": 10,
       "name": "global-domain-0",
       "namespace": "sv-2",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -2270,7 +2270,7 @@
       "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv-2",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -2545,7 +2545,7 @@
       "maxHistory": 10,
       "name": "participant-0",
       "namespace": "sv-2",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -2688,7 +2688,7 @@
       "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv-2",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -3014,7 +3014,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-0",
       "namespace": "sv-3",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -3130,7 +3130,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv-3",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -3314,7 +3314,7 @@
       "maxHistory": 10,
       "name": "global-domain-0",
       "namespace": "sv-3",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -3402,7 +3402,7 @@
       "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv-3",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -3677,7 +3677,7 @@
       "maxHistory": 10,
       "name": "participant-0",
       "namespace": "sv-3",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -3820,7 +3820,7 @@
       "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv-3",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -4146,7 +4146,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-0",
       "namespace": "sv-4",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -4262,7 +4262,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv-4",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -4446,7 +4446,7 @@
       "maxHistory": 10,
       "name": "global-domain-0",
       "namespace": "sv-4",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -4534,7 +4534,7 @@
       "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv-4",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -4809,7 +4809,7 @@
       "maxHistory": 10,
       "name": "participant-0",
       "namespace": "sv-4",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -4952,7 +4952,7 @@
       "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv-4",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -5428,7 +5428,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-0",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -5529,7 +5529,7 @@
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -5698,7 +5698,7 @@
       "maxHistory": 10,
       "name": "global-domain-0",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -5786,7 +5786,7 @@
       "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -6061,7 +6061,7 @@
       "maxHistory": 10,
       "name": "participant-0",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -6204,7 +6204,7 @@
       "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {

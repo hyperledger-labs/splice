@@ -284,7 +284,7 @@
       "maxHistory": 10,
       "name": "docs",
       "namespace": "docs",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -640,7 +640,7 @@
       "maxHistory": 10,
       "name": "ingress-sv",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -702,7 +702,7 @@
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -884,7 +884,7 @@
       "maxHistory": 10,
       "name": "scan",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1026,7 +1026,7 @@
       "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1264,7 +1264,7 @@
       "maxHistory": 10,
       "name": "validator-sv-1",
       "namespace": "sv-1",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],

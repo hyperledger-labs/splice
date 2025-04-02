@@ -31,7 +31,7 @@ def parse_args() -> FailureArgs:
   parser.add_argument('--slack_channel', default="C05DT77QF5M")
   parser.add_argument('--branch_pattern', default=".*")
   parser.add_argument('--dry_run', action='store_true')
-  parser.add_argument('--github_token', default=os.environ.get('GITHUB_TOKEN'))
+  parser.add_argument('--github_token', default=os.environ.get('GH_TOKEN'))
 
   if os.environ.get('GITHUB_ACTION'):
     parser.add_argument('--gha_run_id', default=os.environ.get('GITHUB_RUN_ID'))

@@ -166,7 +166,7 @@
       "maxHistory": 10,
       "name": "cluster-ingress-sv",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -407,7 +407,7 @@
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -456,7 +456,7 @@
       "maxHistory": 10,
       "name": "scan",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -657,7 +657,7 @@
       "maxHistory": 10,
       "name": "apps-pg",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -712,7 +712,7 @@
       "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -991,7 +991,7 @@
       "maxHistory": 10,
       "name": "mediator-pg",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -1066,7 +1066,7 @@
       "maxHistory": 10,
       "name": "participant-pg",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -1139,7 +1139,7 @@
       "maxHistory": 10,
       "name": "sequencer-pg",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -1209,7 +1209,7 @@
       "maxHistory": 10,
       "name": "validator",
       "namespace": "sv",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {

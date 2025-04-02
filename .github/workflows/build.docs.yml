@@ -38,15 +38,15 @@ jobs:
         if: github.ref == 'refs/heads/main'
         env:
           GH_USER: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+          GH_TOKEN: ${{ secrets.GH_ISSUES }}
         with:
-          additional_nix_args: "--keep GH_USER --keep GITHUB_TOKEN"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN"
           cmd: |
             REPO_DIR="$(mktemp -d)"
             export GIT_SSH_COMMAND="/usr/bin/ssh"
             git config --global user.email "splice-maintainers@digitalasset.com"
             git config --global user.name "DA Automation"
-            git clone https://$GH_USER:$GITHUB_TOKEN@github.com/digital-asset/decentralized-canton-sync.git "$REPO_DIR" -b docs
+            git clone https://$GH_USER:$GH_TOKEN@github.com/digital-asset/decentralized-canton-sync.git "$REPO_DIR" -b docs
             # Given that we just wanna overwrite anything an rm + cp seems more straightforward than an rsync.
             rm -rf "$REPO_DIR/docs"
             cp -r "docs/html/html" "$REPO_DIR/docs"
@@ -68,5 +68,5 @@ jobs:
         shell: bash
         env:
           SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+          GH_TOKEN: ${{ secrets.GH_ISSUES }}
         run: ./.circleci/notification-scripts/failure_notification.py

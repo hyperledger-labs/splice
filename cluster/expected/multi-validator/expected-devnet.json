@@ -128,7 +128,7 @@
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "multi-validator",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -4291,7 +4291,7 @@
       "maxHistory": 10,
       "name": "postgres-0",
       "namespace": "multi-validator",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -4349,7 +4349,7 @@
       "maxHistory": 10,
       "name": "postgres-1",
       "namespace": "multi-validator",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -4407,7 +4407,7 @@
       "maxHistory": 10,
       "name": "postgres-2",
       "namespace": "multi-validator",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -4465,7 +4465,7 @@
       "maxHistory": 10,
       "name": "postgres-3",
       "namespace": "multi-validator",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -4523,7 +4523,7 @@
       "maxHistory": 10,
       "name": "postgres-4",
       "namespace": "multi-validator",
-      "timeout": 300,
+      "timeout": 600,
       "values": {
         "affinity": {
           "nodeAffinity": {
