@@ -52,7 +52,7 @@ else
     # Local builds (which may be on an M1) are explicitly constrained
     # to x86.
     platform_opt := --platform=linux/amd64
-    repo = NoRepoForLocalBuild
+    repo = "https://github.com/digital-asset/decentralized-canton-sync-dev"
     commit_sha = NoShaForLocalBuild
 endif
 
