@@ -423,7 +423,7 @@ object MultiDomainAcsStore {
 
     def toTransactionFilter: LapiTransactionFilter =
       LapiTransactionFilter(
-        Map(
+        filtersByParty = Map(
           primaryParty.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
             Seq(
               CumulativeFilter(
@@ -433,7 +433,8 @@ object MultiDomainAcsStore {
               )
             )
           )
-        )
+        ),
+        filtersForAnyParty = None,
       )
   }
 

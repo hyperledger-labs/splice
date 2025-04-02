@@ -106,6 +106,18 @@ trait Sequencer
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.EventSource]
 
+  def readV2(member: Member, timestampInclusive: Option[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.EventSource]
+
+  /** Return the last timestamp of the containing block of the provided timestamp. This is needed to
+    * determine the effective timestamp to observe in topology processing, required to produce a
+    * correct snapshot.
+    */
+  def awaitContainingBlockLastTimestamp(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SequencerError, CantonTimestamp]
+
   /** Return a snapshot state that other newly onboarded sequencers can use as an initial state from
     * which to support serving events. This state depends on the provided timestamp and will contain
     * registered members, counters per member, latest timestamp (which will be greater than or equal
@@ -115,6 +127,12 @@ trait Sequencer
     * is the point in time where it can effectively sign events.
     */
   def snapshot(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SequencerError, SequencerSnapshot]
+
+  /** Wait for and return the sequencer snapshot that contains the provided timestamp.
+    */
+  def awaitSnapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerError, SequencerSnapshot]
 

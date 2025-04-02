@@ -27,6 +27,8 @@ test("list holdings", async () => {
     "http://localhost:6201",
     "-a",
     "valid_token",
+    "-u",
+    "ledger_api_user"
   ]);
 
   expect(logSpy).toHaveBeenCalledWith(
@@ -48,6 +50,8 @@ test("list txs", async () => {
     "http://localhost:6201",
     "-a",
     "valid_token",
+    "-u",
+    "ledger_api_user",
   ]);
 
   expect(logSpy).toHaveBeenCalledWith(JSON.stringify(expectedTxs, null, 2));

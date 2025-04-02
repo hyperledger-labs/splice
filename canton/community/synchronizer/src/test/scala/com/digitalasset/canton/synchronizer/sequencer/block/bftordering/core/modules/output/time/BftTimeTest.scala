@@ -7,10 +7,9 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime.MinimumBlockTimeGranularity
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
   ViewNumber,
@@ -52,9 +51,9 @@ class BftTimeTest extends AnyWordSpec with BaseTest {
           (
             CanonicalCommitSet(
               Set(
-                createCommit(BaseTimestamp.immediateSuccessor),
-                createCommit(BaseTimestamp.immediatePredecessor),
-                createCommit(BaseTimestamp),
+                createCommit(BaseTimestamp.immediateSuccessor, BftNodeId("node-1")),
+                createCommit(BaseTimestamp.immediatePredecessor, BftNodeId("node-2")),
+                createCommit(BaseTimestamp, BftNodeId("node-3")),
               )
             ),
             CantonTimestamp.Epoch,
@@ -63,10 +62,13 @@ class BftTimeTest extends AnyWordSpec with BaseTest {
           (
             CanonicalCommitSet(
               Set(
-                createCommit(BaseTimestamp.immediateSuccessor),
-                createCommit(BaseTimestamp.immediatePredecessor),
-                createCommit(BaseTimestamp.immediateSuccessor.immediateSuccessor),
-                createCommit(BaseTimestamp),
+                createCommit(BaseTimestamp.immediateSuccessor, BftNodeId("node-1")),
+                createCommit(BaseTimestamp.immediatePredecessor, BftNodeId("node-2")),
+                createCommit(
+                  BaseTimestamp.immediateSuccessor.immediateSuccessor,
+                  BftNodeId("node-3"),
+                ),
+                createCommit(BaseTimestamp, BftNodeId("node-4")),
               )
             ),
             CantonTimestamp.Epoch,
@@ -100,14 +102,14 @@ object BftTimeTest {
   private val BaseTimestamp =
     CantonTimestamp.assertFromInstant(Instant.parse("2024-02-16T12:00:00.000Z"))
 
-  private def createCommit(timestamp: CantonTimestamp) =
+  private def createCommit(timestamp: CantonTimestamp, from: BftNodeId = BftNodeId.Empty) =
     Commit
       .create(
         BlockMetadata.mk(EpochNumber.First, BlockNumber.First),
         ViewNumber.First,
         Hash.digest(HashPurpose.BftOrderingPbftBlock, ByteString.EMPTY, HashAlgorithm.Sha256),
         timestamp,
-        from = fakeSequencerId(""),
+        from,
       )
       .fakeSign
 }

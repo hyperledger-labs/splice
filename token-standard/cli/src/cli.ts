@@ -9,6 +9,7 @@ import { Command } from "commander";
 export interface CommandOptions {
   ledgerUrl: string;
   authToken: string;
+  userId: string;
 }
 
 export function createProgram() {
@@ -79,5 +80,9 @@ function addSharedOptions(program: Command) {
     .requiredOption(
       "-a, --auth-token <value>",
       "The ledger JSON API auth token"
+    )
+    .requiredOption(
+      "-u, --user-id <value>",
+      "The user id, must match the user in the token"
     );
 }

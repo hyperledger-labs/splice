@@ -36,8 +36,9 @@ export async function transfer(
     authToken,
     ledgerUrl,
     transferFactoryRegistryUrl,
+    userId,
   } = opts;
-  const ledgerClient = new LedgerClient(ledgerUrl, authToken);
+  const ledgerClient = new LedgerClient(ledgerUrl, authToken, userId);
   const transferRegistryConfig = createConfiguration({
     baseServer: new ServerConfiguration(transferFactoryRegistryUrl, {}),
   });

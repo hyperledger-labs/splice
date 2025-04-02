@@ -123,7 +123,7 @@ class SvOffboardingIntegrationTest
             .commands
             .asScala
             .toSeq,
-          applicationId = sv1Backend.config.ledgerApiUser,
+          userId = sv1Backend.config.ledgerApiUser,
         ),
       )(
         "Wait for 4 confirmations to be created for creating transfer command counter",

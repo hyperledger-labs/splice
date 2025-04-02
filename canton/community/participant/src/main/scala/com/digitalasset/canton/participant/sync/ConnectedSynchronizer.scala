@@ -635,7 +635,7 @@ class ConnectedSynchronizer(
               tc =>
                 participantNodePersistentState.value.ledgerApiStore
                   .cleanSynchronizerIndex(synchronizerId)(tc, ec)
-                  .map(_.flatMap(_.sequencerIndex).map(_.timestamp)),
+                  .map(_.flatMap(_.sequencerIndex).map(_.sequencerTimestamp)),
             )(initializationTraceContext)
           )
 
@@ -889,10 +889,10 @@ class ConnectedSynchronizer(
   // We must run this even before the invocation `closeAsync`,
   // because it will abort tasks that need to complete
   // before `closeAsync` is invoked.
-  runOnShutdown_(new RunOnShutdown {
+  runOnOrAfterClose_(new RunOnClosing {
     override def name: String = "Cancel promises of ConnectedSynchronizer.promiseUSFactory"
     override def done: Boolean = promiseUSFactory.isClosing
-    override def run(): Unit = promiseUSFactory.close()
+    override def run()(implicit traceContext: TraceContext): Unit = promiseUSFactory.close()
   })(TraceContext.empty)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =

@@ -5,12 +5,12 @@ package com.digitalasset.canton.platform.apiserver.services.command.interactive
 
 import cats.Applicative
 import cats.syntax.either.*
-import com.daml.error.ContextualizedErrorLogger
+import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.tracing.TraceContext
-import io.scalaland.chimney.partial.Result
+import io.scalaland.chimney.partial.{Error, Path, Result}
 
 import scala.concurrent.Future
 
@@ -34,8 +34,13 @@ object PreparedTransactionCodec {
     ): Future[A] = Future.fromTry {
       result.asEither
         .leftMap { err =>
-          logger.info(s"$description: ${err.errors.mkString("\n")}")
-          s"$description: ${err.errors.mkString("\n")}"
+          val errorsAsString = err.errors
+            .map { case Error(err, path) =>
+              s"${err.asString}${Option.when(path != Path.Empty)(s" at path ${path.asString}").getOrElse("")}"
+            }
+            .mkString(", ")
+          logger.info(s"$description: $errorsAsString")
+          s"$description: $errorsAsString"
         }
         .leftMap(CommandExecutionErrors.InteractiveSubmissionPreparationError.Reject(_))
         .leftMap(_.asGrpcError)

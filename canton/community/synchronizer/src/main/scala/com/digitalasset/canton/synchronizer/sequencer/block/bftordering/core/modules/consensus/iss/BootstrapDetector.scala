@@ -5,10 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModule.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.{
-  GenesisEpoch,
-  GenesisPreviousEpochMaxBftTime,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.EpochInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.snapshot.SequencerSnapshotAdditionalInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
@@ -17,7 +14,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 object BootstrapDetector {
 
   /** Onboarding is currently assumed if a sequencer snapshot with additional info is provided, the
-    * node hasn't completed any epoch, and the node is not the only peer in the ordering topology.
+    * node hasn't completed any epoch, and the node is not the only node in the ordering topology.
     * The latter is queried based on a topology activation timestamp from the sequencer snapshot
     * additional info when a snapshot is provided.
     *
@@ -36,8 +33,8 @@ object BootstrapDetector {
   )(abort: String => Nothing): BootstrapKind =
     snapshotAdditionalInfo match {
       case Some(additionalInfo)
-          if latestCompletedEpoch == GenesisEpoch && membership.otherPeers.sizeIs > 0 =>
-        val activeAt = additionalInfo.peerActiveAt
+          if latestCompletedEpoch == GenesisEpoch && membership.otherNodes.sizeIs > 0 =>
+        val activeAt = additionalInfo.nodeActiveAt
           .getOrElse(
             membership.myId,
             abort(s"New node ${membership.myId} not found in sequencer snapshot additional info"),
@@ -54,7 +51,6 @@ object BootstrapDetector {
           activeAt.epochTopologyQueryTimestamp.getOrElse(
             abort("No starting epoch's topology query timestamp found for new node onboarding")
           ),
-          GenesisPreviousEpochMaxBftTime,
         )
 
         BootstrapKind.Onboarding(startEpochInfo)

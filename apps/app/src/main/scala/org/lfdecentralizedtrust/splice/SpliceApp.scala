@@ -6,17 +6,18 @@ package org.lfdecentralizedtrust.splice
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.environment.{
   BuildInfo,
+  SpliceEnvironment,
   SpliceEnvironmentFactory,
-  EnvironmentImpl,
 }
 import com.digitalasset.canton.CantonAppDriver
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.environment.EnvironmentFactory
 
 // TODO(#736): generalize. e.g. custom Cli class for Splice Node for the console
-object SpliceApp extends CantonAppDriver[EnvironmentImpl] {
+object SpliceApp extends CantonAppDriver {
 
   override type Config = SpliceConfig
+  override type E = SpliceEnvironment
 
   override protected def printVersion(): Unit = {
     Console.out.println(s"Splice: ${BuildInfo.compiledVersion}")
@@ -28,7 +29,7 @@ object SpliceApp extends CantonAppDriver[EnvironmentImpl] {
   ): Either[CantonConfigError, SpliceConfig] =
     SpliceConfig.load(config)
 
-  override protected def environmentFactory: EnvironmentFactory[SpliceConfig, EnvironmentImpl] =
+  override protected def environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
     SpliceEnvironmentFactory
 
   override protected def withManualStart(config: SpliceConfig): SpliceConfig =

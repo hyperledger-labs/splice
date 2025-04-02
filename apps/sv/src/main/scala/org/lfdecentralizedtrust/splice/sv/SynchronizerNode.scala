@@ -7,7 +7,7 @@ import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSequencerConfig}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PEndpointConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
 import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.time.Duration

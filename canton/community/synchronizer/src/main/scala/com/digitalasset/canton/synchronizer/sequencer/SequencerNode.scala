@@ -111,19 +111,6 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
 
 object SequencerNodeBootstrap {
-  trait Factory {
-    def create(
-        arguments: NodeFactoryArguments[
-          SequencerNodeConfig,
-          SequencerNodeParameters,
-          SequencerMetrics,
-        ]
-    )(implicit
-        executionContext: ExecutionContextIdlenessExecutorService,
-        scheduler: ScheduledExecutorService,
-        actorSystem: ActorSystem,
-    ): Either[String, SequencerNodeBootstrap]
-  }
 
   val LoggerFactoryKeyName: String = "sequencer"
 }
@@ -778,6 +765,12 @@ class SequencerNodeBootstrap(
             EitherT
               .right[String](sequencer.firstSequencerCounterServeableForSequencer)
 
+          _ <- EitherT.right[String](
+            sequencedEventStore.reinitializeFromDbOrSetLowerBound(
+              firstSequencerCounterServeableForSequencer - 1L
+            )
+          )
+
           _ = addCloseable(sequencedEventStore)
           sequencerClient = new SequencerClientImplPekko[
             DirectSequencerClientTransport.SubscriptionError
@@ -830,7 +823,6 @@ class SequencerNodeBootstrap(
             config.timeTracker,
             clock,
             sequencerClient,
-            staticSynchronizerParameters.protocolVersion,
             timeouts,
             loggerFactory,
           )

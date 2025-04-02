@@ -200,7 +200,7 @@ private[environment] class LedgerClient(
 
   def submitAndWait[Z](
       synchronizerId: String,
-      applicationId: String,
+      userId: String,
       commandId: String,
       deduplicationConfig: DedupConfig,
       actAs: Seq[String],
@@ -213,7 +213,7 @@ private[environment] class LedgerClient(
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
       .setSynchronizerId(synchronizerId)
       .setCommandId(commandId)
-      .setApplicationId(applicationId)
+      .setUserId(userId)
       .addAllActAs(actAs.asJava)
       .addAllReadAs(readAs.asJava)
       .addAllCommands {
@@ -251,7 +251,7 @@ private[environment] class LedgerClient(
 
   def prepareSubmission(
       synchronizerId: Option[String],
-      applicationId: String,
+      userId: String,
       commandId: String,
       actAs: Seq[String],
       readAs: Seq[String],
@@ -271,7 +271,7 @@ private[environment] class LedgerClient(
             lapi.commands.DisclosedContract.fromJavaProto(_)
           ),
           synchronizerId = synchronizerId.getOrElse(""),
-          applicationId = applicationId,
+          userId = userId,
           commandId = commandId,
           actAs = actAs,
           readAs = readAs,
@@ -284,7 +284,7 @@ private[environment] class LedgerClient(
   def executeSubmission(
       preparedTransaction: interactive.interactive_submission_service.PreparedTransaction,
       partySignatures: Map[PartyId, LedgerClient.Signature],
-      applicationId: String,
+      userId: String,
       submissionId: String,
   )(implicit
       ec: ExecutionContext,
@@ -311,7 +311,7 @@ private[environment] class LedgerClient(
                 )
               })
           ),
-          applicationId = applicationId,
+          userId = userId,
           submissionId = submissionId,
           hashingSchemeVersion =
             lapi.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V1,
@@ -558,7 +558,7 @@ private[environment] class LedgerClient(
   }
 
   def submitReassignment(
-      applicationId: String,
+      userId: String,
       commandId: String,
       submissionId: String,
       submitter: PartyId,
@@ -570,7 +570,7 @@ private[environment] class LedgerClient(
         .submitReassignment(
           LedgerClient
             .ReassignmentSubmitRequest(
-              applicationId,
+              userId,
               commandId,
               submissionId,
               submitter,
@@ -582,7 +582,7 @@ private[environment] class LedgerClient(
     } yield res
 
   def completions(
-      applicationId: String,
+      userId: String,
       parties: Seq[PartyId],
       begin: Long,
   )(implicit tc: TraceContext): Source[CompletionStreamResponse, NotUsed] =
@@ -591,7 +591,7 @@ private[environment] class LedgerClient(
         stub <- withCredentialsAndTraceContext(multidomainCompletionServiceStub)
       } yield ClientAdapter.serverStreaming(
         lapi.command_completion_service.CompletionStreamRequest(
-          applicationId = applicationId,
+          userId = userId,
           parties = parties.map(_.toProtoPrimitive),
           beginExclusive = begin,
         ),
@@ -780,8 +780,6 @@ object LedgerClient {
 
         case TU.OffsetCheckpoint(_) => None
 
-        case TU.TopologyTransaction(_) => None
-
         case TU.Empty => sys.error("uninitialized update service result (update)")
       }
     }
@@ -829,7 +827,7 @@ object LedgerClient {
   }
 
   final case class ReassignmentSubmitRequest(
-      applicationId: String,
+      userId: String,
       commandId: String,
       submissionId: String,
       submitter: PartyId,
@@ -837,7 +835,7 @@ object LedgerClient {
   ) {
     def toProto: lapi.command_submission_service.SubmitReassignmentRequest = {
       val baseCommand = lapi.reassignment_command.ReassignmentCommand(
-        applicationId = applicationId,
+        userId = userId,
         commandId = commandId,
         submissionId = submissionId,
         submitter = submitter.toProtoPrimitive,
@@ -884,19 +882,19 @@ object LedgerClient {
     }
   }
 
-  import com.daml.error.utils.ErrorDetails
+  import com.digitalasset.base.error.utils.ErrorDetails
   import ErrorDetails.ErrorDetail
 
   final case class Completion(
-      applicationId: String,
+      userId: String,
       commandId: String,
       submissionId: String,
       updateId: String,
       status: GrpcStatus,
       errorDetails: Seq[ErrorDetail],
   ) {
-    def matchesSubmission(applicationId: String, commandId: String, submissionId: String): Boolean =
-      this.applicationId == applicationId &&
+    def matchesSubmission(userId: String, commandId: String, submissionId: String): Boolean =
+      this.userId == userId &&
         commandId == this.commandId &&
         submissionId == this.submissionId
   }
@@ -909,7 +907,7 @@ object LedgerClient {
         spb.status map parseStatusScalapb getOrElse ((GrpcStatus.Code.UNKNOWN.toStatus, Seq.empty))
 
       Completion(
-        applicationId = spb.applicationId,
+        userId = spb.userId,
         commandId = spb.commandId,
         submissionId = spb.submissionId,
         updateId = spb.updateId,

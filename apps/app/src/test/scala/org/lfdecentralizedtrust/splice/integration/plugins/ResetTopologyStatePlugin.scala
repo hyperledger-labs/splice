@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.plugins
 
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
+import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.CommandFailure
@@ -15,8 +15,7 @@ import scala.util.control.NonFatal
 abstract class ResetTopologyStatePlugin
     extends EnvironmentSetupPlugin[
       SpliceConfig,
-      EnvironmentImpl,
-      SpliceTests.SpliceTestConsoleEnvironment,
+      SpliceEnvironment,
     ]
     with BaseTest {
 

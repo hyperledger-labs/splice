@@ -7,8 +7,8 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
 }
 import org.lfdecentralizedtrust.splice.environment.{
-  EnvironmentImpl,
   SpliceConsoleEnvironment,
+  SpliceEnvironment,
   SpliceEnvironmentFactory,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -45,7 +45,7 @@ case class EnvironmentDefinition(
     val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
     val configTransformsWithContext: (String => Seq[SpliceConfig => SpliceConfig]) = (_: String) =>
       ConfigTransforms.defaults(),
-) extends BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment](
+) extends BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment](
       baseConfig,
       testingConfig,
       List(preSetup, setup),
@@ -334,17 +334,17 @@ case class EnvironmentDefinition(
       )
       .withSequencerConnectionsFromScanDisabled(10_000)
 
-  override lazy val environmentFactory: EnvironmentFactory[SpliceConfig, EnvironmentImpl] =
+  override lazy val environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
     SpliceEnvironmentFactory
 
   override def createTestConsole(
-      environment: EnvironmentImpl,
+      environment: SpliceEnvironment,
       loggerFactory: NamedLoggerFactory,
-  ): TestConsoleEnvironment[SpliceConfig, EnvironmentImpl] =
+  ): TestConsoleEnvironment[SpliceConfig, SpliceEnvironment] =
     new SpliceConsoleEnvironment(
       environment,
       new TestConsoleOutput(loggerFactory),
-    ) with TestEnvironment[SpliceConfig, EnvironmentImpl] {
+    ) with TestEnvironment[SpliceConfig] {
       override val actorSystem = super[TestEnvironment].actorSystem
       override val actualConfig: SpliceConfig = this.environment.config
 

@@ -116,6 +116,8 @@ class TokenStandardCliIntegrationTest
             "http://localhost:6201", // not available in any config
             "-a",
             aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
+            "-u",
+            "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
           )
           val exitCode = Process(args, cwd).!(logProcessor)
           // TODO (#18610): check that recordtime and updateid are present

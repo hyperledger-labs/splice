@@ -6,12 +6,12 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 import cats.instances.map.*
 import cats.syntax.functor.*
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation.ViewChangeMessageValidator
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
   ViewNumber,
@@ -29,7 +29,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SignedPrePrepares,
   ViewChange,
 }
-import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.mutable
@@ -39,7 +38,7 @@ import IssConsensusModuleMetrics.emitNonCompliance
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.IterableOps"))
 class PbftViewChangeState(
     membership: Membership,
-    leader: SequencerId,
+    leader: BftNodeId,
     epoch: EpochNumber,
     view: ViewNumber,
     blockNumbers: Seq[BlockNumber],
@@ -48,13 +47,13 @@ class PbftViewChangeState(
 )(implicit mc: MetricsContext)
     extends NamedLogging {
   private val messageValidator = new ViewChangeMessageValidator(membership, blockNumbers)
-  private val viewChangeMap = mutable.HashMap[SequencerId, SignedMessage[ViewChange]]()
+  private val viewChangeMap = mutable.HashMap[BftNodeId, SignedMessage[ViewChange]]()
   private var viewChangeFromSelfWasFromRehydration = false
   private var signedPrePreparesForSegment: Option[Seq[SignedMessage[PrePrepare]]] = None
   private var newView: Option[SignedMessage[NewView]] = None
 
   def viewChangeMessageReceivedStatus: Seq[Boolean] =
-    membership.sortedPeers.map(viewChangeMap.contains)
+    membership.sortedNodes.map(viewChangeMap.contains)
 
   /** Compute which view change messages we must retransmit based on which view change messages the
     * remote node already has
@@ -68,10 +67,10 @@ class PbftViewChangeState(
         viewChangeMap.values.toSeq
       else
         // otherwise we give the ones we have that they don't have
-        membership.sortedPeers
+        membership.sortedNodes
           .zip(remoteNodeViewChangeMessages)
-          .flatMap { case (peer, hasIt) =>
-            if (!hasIt) viewChangeMap.get(peer) else None
+          .flatMap { case (node, hasIt) =>
+            if (!hasIt) viewChangeMap.get(node) else None
           }
 
     (messagesRemoteDoesNotHave
@@ -104,12 +103,13 @@ class PbftViewChangeState(
       setSignedPrePrepares(abort)(viewNumber, signedMessages)
   }
 
-  def reachedWeakQuorum: Boolean = membership.orderingTopology.hasWeakQuorum(viewChangeMap.size)
+  private def reachedWeakQuorum: Boolean =
+    membership.orderingTopology.hasWeakQuorum(viewChangeMap.size)
 
   def shouldAdvanceViewChange: Boolean = {
-    val enoughViewChangeMessagesFromPeersToStartViewChange = reachedWeakQuorum
+    val enoughViewChangeMessagesFromNodesToStartViewChange = reachedWeakQuorum
     val hasReceivedNewViewMessage = newView.isDefined
-    enoughViewChangeMessagesFromPeersToStartViewChange || hasReceivedNewViewMessage || viewChangeFromSelf.isDefined
+    enoughViewChangeMessagesFromNodesToStartViewChange || hasReceivedNewViewMessage || viewChangeFromSelf.isDefined
   }
 
   def viewChangeFromSelf: Option[SignedMessage[ViewChange]] = viewChangeMap.get(membership.myId)
@@ -132,8 +132,7 @@ class PbftViewChangeState(
     signedPrePreparesForSegment
 
   def constructPrePreparesForNewView(
-      metadata: BlockMetadata,
-      timestamp: CantonTimestamp,
+      metadata: BlockMetadata
   ): Seq[Either[PrePrepare, SignedMessage[PrePrepare]]] = {
 
     val viewChangeSet =
@@ -152,7 +151,6 @@ class PbftViewChangeState(
             PrePrepare.create(
               metadata.copy(blockNumber = blockNum),
               view,
-              timestamp,
               OrderingBlock.empty,
               // We define the correct canonical commit set of bottom blocks as the empty set,
               //  because the previous ordered block from which to grab a canonical commit set is non-trivial
@@ -168,11 +166,10 @@ class PbftViewChangeState(
   def createNewViewMessage(
       metadata: BlockMetadata,
       segmentIdx: Int,
-      timestamp: CantonTimestamp,
       prePrepares: Seq[SignedMessage[PrePrepare]],
   ): NewView = {
 
-    // (Strong) quorum of validated view change messages collected from peers
+    // (Strong) quorum of validated view change messages collected from nodes
     val viewChangeSet =
       viewChangeMap.values.toSeq.sortBy(_.from).take(membership.orderingTopology.strongQuorum)
 
@@ -180,7 +177,6 @@ class PbftViewChangeState(
       metadata,
       segmentIdx,
       view,
-      timestamp,
       viewChangeSet,
       prePrepares,
       from = membership.myId,
@@ -210,7 +206,7 @@ class PbftViewChangeState(
               metrics.security.noncompliant.labels.violationType.values.ConsensusInvalidMessage,
             )
             logger.warn(
-              s"Invalid view change message from ${vc.from}, ignoring vote. Reason: $error"
+              s"Invalid view change message from '${vc.from}', ignoring vote. Reason: $error"
             )
         }
     }

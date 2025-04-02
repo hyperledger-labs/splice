@@ -10,7 +10,7 @@ export async function listHoldingTransactions(
   opts: CommandOptions & { afterOffset?: string }
 ): Promise<void> {
   try {
-    const ledgerClient = new LedgerClient(opts.ledgerUrl, opts.authToken);
+    const ledgerClient = new LedgerClient(opts.ledgerUrl, opts.authToken, opts.userId);
     const afterOffset =
       opts.afterOffset ||
       (await ledgerClient.getLatestPrunedOffsets())

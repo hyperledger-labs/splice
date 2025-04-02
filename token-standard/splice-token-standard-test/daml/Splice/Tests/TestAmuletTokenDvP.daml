@@ -93,6 +93,8 @@ testDvP = script do
 
   -- alice accepts allocation request directly via her wallet
   inputHoldings <- WalletClient.listHoldingCids alice amuletId
+  holdings <- WalletClient.listHoldings alice amuletId
+  debug holdings
 
   -- test that using the wrong admin party fails
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
@@ -105,6 +107,7 @@ testDvP = script do
 
   -- alice accepts allocation request directly via her wallet
   -- TODO(#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
+  debug inputHoldings
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc

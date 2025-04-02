@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.EitherT
 import cats.syntax.foldable.*
-import com.daml.error.utils.ErrorDetails
+import com.digitalasset.base.error.utils.ErrorDetails
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,

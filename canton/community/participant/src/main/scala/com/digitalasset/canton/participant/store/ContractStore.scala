@@ -66,7 +66,31 @@ trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
 
   def contractCount()(implicit traceContext: TraceContext): FutureUnlessShutdown[Int]
 
+  // TODO(i24535): implement this on db level
   def hasActiveContracts(
+      partyId: PartyId,
+      contractIds: Iterator[LfContractId],
+      batchSize: Int = 10,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Boolean] = {
+    val lfParty = partyId.toLf
+
+    contractIds
+      .grouped(batchSize)
+      .toList
+      .findM(cids =>
+        lookupStakeholders(cids.toSet).value.map {
+          case Right(x) =>
+            x.exists { case (_, listParties) => listParties.contains(lfParty) }
+          case Left(_) => false
+        }
+      )
+      .map(_.nonEmpty)
+  }
+
+  // TODO(i24535): implement this on db level
+  def isSignatoryOnActiveContracts(
       partyId: PartyId,
       contractIds: Iterator[LfContractId],
       batchSize: Int = 10,
@@ -78,7 +102,7 @@ trait ContractStore extends ContractLookup with Purgeable with FlagCloseable {
       .grouped(batchSize)
       .toList
       .findM(cids =>
-        lookupStakeholders(cids.toSet).value.map {
+        lookupSignatories(cids.toSet).value.map {
           case Right(x) =>
             x.exists { case (_, listParties) => listParties.contains(lfParty) }
           case Left(_) => false

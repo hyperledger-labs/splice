@@ -3,8 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import com.daml.error.ErrorCategory
-import com.daml.error.utils.ErrorDetails
+import com.digitalasset.base.error.ErrorCategory
+import com.digitalasset.base.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.{MetricInfo, MetricQualification, MetricsContext}
@@ -15,7 +15,7 @@ import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
-  RunOnShutdown,
+  RunOnClosing,
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
@@ -72,10 +72,10 @@ final class RetryProvider(
     )
   private val shutdown = new AtomicBoolean(false)
 
-  runOnShutdown_(new RunOnShutdown {
+  runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"trigger promise for shutdown signal"
     override def done: Boolean = promisesRunningThatAreShutdownAware.isEmpty && shutdown.get()
-    override def run(): Unit = {
+    override def run()(implicit tc: TraceContext): Unit = {
       logger.debug("Sending node-level shutdown signal (via future).")(
         TraceContext.empty
       )

@@ -5,26 +5,25 @@ package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.StorageConfig
+import com.digitalasset.canton.config.{CantonConfig, StorageConfig}
 import com.digitalasset.canton.console.InstanceReference
-import com.digitalasset.canton.integration.CommunityTests.{
-  CommunityIntegrationTest,
-  SharedCommunityEnvironment,
-}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.UseCommunityReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
-  CommunityConfigTransforms,
-  CommunityEnvironmentDefinition,
+  CommunityIntegrationTest,
+  ConfigTransforms,
+  EnvironmentDefinition,
+  SharedEnvironment,
 }
 
 sealed trait SimplestPingCommunityIntegrationTest
     extends CommunityIntegrationTest
-    with SharedCommunityEnvironment {
+    with SharedEnvironment[CantonConfig, CantonEnvironment] {
 
-  override def environmentDefinition: CommunityEnvironmentDefinition =
-    CommunityEnvironmentDefinition.simpleTopology
-      .addConfigTransforms(CommunityConfigTransforms.uniquePorts)
-      .addConfigTransforms(CommunityConfigTransforms.setProtocolVersion(testedProtocolVersion)*)
+  override def environmentDefinition: EnvironmentDefinition =
+    EnvironmentDefinition.simpleTopology
+      .addConfigTransforms(ConfigTransforms.globallyUniquePorts)
+      .addConfigTransforms(ConfigTransforms.setProtocolVersion(testedProtocolVersion)*)
       .withManualStart
 
   "we can run a trivial ping" in { implicit env =>
@@ -48,8 +47,7 @@ sealed trait SimplestPingCommunityIntegrationTest
       Seq(mediator1),
       Seq[InstanceReference](sequencer1, mediator1),
       PositiveInt.two,
-      staticSynchronizerParameters =
-        CommunityEnvironmentDefinition.defaultStaticSynchronizerParameters,
+      staticSynchronizerParameters = EnvironmentDefinition.defaultStaticSynchronizerParameters,
     )
 
     sequencer1.health.status shouldBe a[NodeStatus.Success[?]]

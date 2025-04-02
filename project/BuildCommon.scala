@@ -367,6 +367,27 @@ object BuildCommon {
       )
   }
 
+  lazy val `canton-base-errors` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-base-errors", file("canton/base/errors"))
+      .dependsOn(
+        `canton-google-common-protos-scala`,
+        `canton-wartremover-extension` % "compile->compile;test->test",
+      )
+      .settings(
+        sharedCantonSettings,
+        libraryDependencies ++= Seq(
+          slf4j_api,
+          grpc_api,
+          reflections,
+          scalatest % Test,
+          scalacheck % Test,
+          scalatestScalacheck % Test,
+        ),
+      )
+  }
+
   lazy val `canton-daml-tls` = {
     import CantonDependencies._
     sbt.Project
@@ -471,7 +492,7 @@ object BuildCommon {
     sbt.Project
       .apply("canton-util-logging", file("canton/community/util-logging"))
       .dependsOn(
-        `canton-daml-errors`,
+        `canton-base-errors` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
@@ -730,6 +751,10 @@ object BuildCommon {
         // depend on incompatible versions of `scala-xml` -- not ideal but only causes possible
         // runtime errors while testing and none have been found so far, so this should be fine for now
         dependencyOverrides += "org.scala-lang.modules" %% "scala-xml" % "2.0.1",
+        libraryDependencies ++= Seq(
+          toxiproxy_java,
+          opentelemetry_proto,
+        ),
 
         // This library contains a lot of testing helpers that previously existing in testing scope
         // As such, in order to minimize the diff when creating this library, the same rules that
@@ -1198,6 +1223,7 @@ object BuildCommon {
     sbt.Project
       .apply("canton-ledger-api-core", file("canton/community/ledger/ledger-api-core"))
       .dependsOn(
+        `canton-base-errors` % "test->test",
         `canton-ledger-common` % "compile->compile;test->test",
         `canton-community-common` % "compile->compile;test->test",
         `canton-daml-adjustable-clock` % "test->test",

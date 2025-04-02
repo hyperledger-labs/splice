@@ -12,7 +12,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.block.BlockFormat
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.BlockNumber
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BlockNumber
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   BlockSubscription,
   Env,
@@ -70,7 +70,7 @@ class PekkoBlockSubscription[E <: Env[E]](
   override def subscription(): Source[BlockFormat.Block, KillSwitch] =
     source
       .statefulMapConcat { () =>
-        val blocksPeanoQueue = new PeanoQueue[BlockFormat.Block](initialHeight)(abort)
+        val blocksPeanoQueue = new PeanoQueue[BlockNumber, BlockFormat.Block](initialHeight)(abort)
         block => {
           val blockHeight = block.blockHeight
           logger.debug(

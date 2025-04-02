@@ -35,7 +35,7 @@ import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil.condUnitET
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{BytesUnit, ErrorUtil, retry}
+import com.digitalasset.canton.util.{BytesUnit, ErrorUtil, MonadUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{ProtoDeserializationError, SequencerCounter, checked}
 import com.google.common.annotations.VisibleForTesting
@@ -604,7 +604,8 @@ trait SequencerStore extends SequencerMemberValidator with NamedLogging with Aut
 
   /** Reset the watermark to an earlier value, i.e. in case of working as a part of block sequencer.
     * Also sets the sequencer as offline. If current watermark value is before `ts`, it will be left
-    * unchanged.
+    * unchanged. If a watermark doesn't yet exist, it won't be inserted, because it would
+    * effectively mean setting it to a future value.
     */
   def resetWatermark(instanceIndex: Int, ts: CantonTimestamp)(implicit
       traceContext: TraceContext
@@ -737,12 +738,12 @@ trait SequencerStore extends SequencerMemberValidator with NamedLogging with Aut
     }
   }
 
-  /** Delete all events that are ahead of the watermark of this sequencer. These events will not
-    * have been read and should be removed before returning the sequencer online. Should not be
-    * called alongside updating the watermark for this sequencer and only while the sequencer is
-    * offline. Returns the watermark that was used for the deletion.
+  /** Delete all events and checkpoints that are ahead of the watermark of this sequencer. These
+    * events will not have been read and should be removed before returning the sequencer online.
+    * Should not be called alongside updating the watermark for this sequencer and only while the
+    * sequencer is offline. Returns the watermark that was used for the deletion.
     */
-  def deleteEventsPastWatermark(instanceIndex: Int)(implicit
+  def deleteEventsAndCheckpointsPastWatermark(instanceIndex: Int)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[CantonTimestamp]]
 
@@ -769,6 +770,19 @@ trait SequencerStore extends SequencerMemberValidator with NamedLogging with Aut
   def fetchClosestCheckpointBefore(memberId: SequencerMemberId, counter: SequencerCounter)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[CounterCheckpoint]]
+
+  /** Fetch a checkpoint with a counter value less than the provided counter. */
+  def fetchClosestCheckpointBeforeV2(
+      memberId: SequencerMemberId,
+      timestamp: Option[CantonTimestamp],
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CounterCheckpoint]]
+
+  /** Fetch previous event timestamp for a member for a given inclusive timestamp. */
+  def fetchPreviousEventTimestamp(memberId: SequencerMemberId, timestampInclusive: CantonTimestamp)(
+      implicit traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CantonTimestamp]]
 
   def fetchLatestCheckpoint()(implicit
       traceContext: TraceContext
@@ -818,6 +832,32 @@ trait SequencerStore extends SequencerMemberValidator with NamedLogging with Aut
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SaveLowerBoundError, Unit]
 
+  /** Set the "pruned" previous event timestamp for a member. This timestamp is used to serve the
+    * oldest (earliest) event that sequencer has for the member:
+    *   - after pruning
+    *   - after the sequencer's onboarding
+    */
+  def updatePrunedPreviousEventTimestamps(
+      updatedPreviousTimestamps: Map[Member, Option[CantonTimestamp]]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+    MonadUtil
+      .sequentialTraverse(
+        updatedPreviousTimestamps.toList
+          .collect { case (member, Some(timestamp)) =>
+            member -> timestamp // None is set by default by registration
+          }
+      ) { case (member, timestamp) =>
+        lookupMember(member).map {
+          case Some(registeredMember) => registeredMember.memberId -> timestamp
+          case _ => ErrorUtil.invalidState(s"Member $member should be registered")
+        }
+      }
+      .flatMap(idTimestamps => updatePrunedPreviousEventTimestampsInternal(idTimestamps.toMap))
+
+  protected def updatePrunedPreviousEventTimestampsInternal(
+      updatedPreviousTimestamps: Map[SequencerMemberId, CantonTimestamp]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
+
   /** Prevents member from sending and reading from the sequencer, and allows unread data for this
     * member to be pruned. It however won't stop any sends addressed to this member.
     */
@@ -835,7 +875,7 @@ trait SequencerStore extends SequencerMemberValidator with NamedLogging with Aut
       _ = memberCache.invalidate(member)
     } yield ()
 
-  def disableMemberInternal(member: SequencerMemberId)(implicit
+  protected def disableMemberInternal(member: SequencerMemberId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit]
 
@@ -1017,6 +1057,7 @@ trait SequencerStore extends SequencerMemberValidator with NamedLogging with Aut
           } yield counterCheckpoint
       })
       _ <- EitherT.right(saveCounterCheckpoints(memberCheckpoints))
+      _ <- EitherT.right(updatePrunedPreviousEventTimestamps(snapshot.previousTimestamps))
       _ <- saveLowerBound(lastTs).leftMap(_.toString)
       _ <- saveWatermark(0, lastTs).leftMap(_.toString)
     } yield ()

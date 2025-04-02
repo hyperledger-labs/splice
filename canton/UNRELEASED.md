@@ -3,6 +3,31 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+## Until 2025-03-25 (Exclusive)
+- `_recordId` removed from Daml records in Json API
+- Removed `default-close-delay` from `ws-config` (websocket config) in `http-service` configuration (close delay is no longer necessary).
+
+## Until 2025-03-20 (Exclusive)
+### Smart-contract upgrading
+- A new query endpoint for supporting topology-aware package selection in command submission construction is added to the Ledger API:
+    - gRPC: `com.daml.ledger.api.v2.interactive.InteractiveSubmissionService.GetPreferredPackageVersion`
+    - JSON: `/v2/interactive-submission/preferred-package-version`
+
+## Until 2025-03-19 (Exclusive)
+### Application ID rename to User ID
+
+- **BREAKING CHANGE** Ledger API, Canton console, Canton, and Ledger API DB schemas changed in a non-backwards compatible manner. This is a pure rename that keeps all the associated semantics intact, with the exception of format, and validation thereof, of the user_id field. (Please see value.proto for the differences)
+- For the detailed list of changed Ledger API proto messages please see docs-open/src/sphinx/reference/lapi-migration-guide.rst
+
+## Until 2025-03-12 (Exclusive)
+### External Signing
+
+- **BREAKING CHANGE** The `ProcessedDisclosedContract` message in the `Metadata` message of the `interactive_submission_service.proto` file has been renamed to `InputContract`, and the
+  field `disclosed_events` in the same `Metadata` message renamed to `input_contracts` to better represent its content.
+- Input contracts available on the preparing participant can now be used to prepare a command (it was previously required to explicitly disclose all input contracts in the `prepare` request)
+  If some input contracts are missing from both the participant local store and the explicitly disclosed contracts, the `prepare` call will fail.
+- The synchronizer ID is now optional and can be omitted in the prepare request. If left empty, a suitable sychronizer will be selected automatically.
+
 ## Until 2025-03-05 (Exclusive)
 - Fixed slow sequencer shapshot query on the aggregate submission tables in the case when sequencer onboarding state
   is requested much later and there's more data accumulated in the table:
@@ -12,6 +37,20 @@ Please also consult the [full documentation of this release](https://docs.daml.c
   **NOTE** Currently, this parameter is only used by the `DbStorageSingle` component, which is only used by the sequencer.
 - Addressing a DAR on the admin api is simplified: Instead of the DAR ID concept, we directly use the main package-id, which is synonymous.
   - Renamed all `darId` arguments to `mainPackageId`
+- Topology-aware package selection has been introduced to enhance package selection for smart contract upgrades during command interpretation.
+  When enabled, the new logic leverages the topology state of connected synchronizers to optimally select packages for transactions, ensuring they pass vetting checks on counter-participants.
+  This feature is disabled by default and can be enabled with the following configuration: `participant.ledger-api.topology-aware-package-selection.enabled = true`
+
+## Until 2025-03-03 (Exclusive)
+- The SubmitAndWaitForTransaction endpoint has been changed to expect a SubmitAndWaitForTransactionRequest instead of a
+  SubmitAndWaitRequest.
+- The SubmitAndWaitForTransactionRequest message was added which additionally to the Commands contains the required
+  transaction_format field that defines the format of the transaction that will be returned. To retain the old
+  behavior, the transaction_format field should be defined with:
+    - transaction_shape set to ACS_DELTA
+    - event_format defined with:
+      - filters_by_party containing wildcard-template filter for all original Commands.act_as parties
+      - verbose flag set
 
 ## Until 2025-02-26 (Exclusive)
 - The interactive submission service and external signing authorization logic are now always enabled. The following configuration fields must be removed from the participant's configuration:

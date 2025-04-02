@@ -8,9 +8,8 @@ import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation.ViewChangeMessageValidator
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
   ViewNumber,
@@ -36,13 +35,12 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Prepare,
   ViewChange,
 }
-import com.digitalasset.canton.topology.SequencerId
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
 
 class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTest {
-  private val myId = fakeSequencerId("self")
-  private val otherId = fakeSequencerId("otherId")
+  private val myId = BftNodeId("self")
+  private val otherId = BftNodeId("otherId")
   private val membership = Membership.forTesting(myId, Set(otherId))
   private val epochNumber = EpochNumber(0L)
   private val blockNumbers = NonEmpty(Seq, 1L, 3L, 5L).map(BlockNumber(_))
@@ -65,7 +63,6 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
     .create(
       BlockMetadata.mk(epochNumber, blockNumber),
       ViewNumber(viewNumber),
-      CantonTimestamp.Epoch,
       block,
       CanonicalCommitSet(Set.empty),
       from = myId,
@@ -77,14 +74,13 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
       blockNumber: Long,
       hash: Hash,
       viewNumber: Long = view0,
-      from: SequencerId = myId,
+      from: BftNodeId = myId,
   ) =
     Prepare
       .create(
         BlockMetadata.mk(epochNumber, blockNumber),
         ViewNumber(viewNumber),
         hash,
-        CantonTimestamp.Epoch,
         from,
       )
       .fakeSign
@@ -94,7 +90,7 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
       blockNumber: Long,
       hash: Hash,
       viewNumber: Long = ViewNumber.First,
-      from: SequencerId = myId,
+      from: BftNodeId = myId,
   ) =
     Commit
       .create(
@@ -111,13 +107,12 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
       consensusCerts: Seq[ConsensusCertificate],
       epochNumber: Long = 0L,
       segment: Long = 0L,
-      from: SequencerId = myId,
+      from: BftNodeId = myId,
   ) =
     ViewChange.create(
       BlockMetadata(EpochNumber(epochNumber), BlockNumber(segment)),
       0,
       viewNumber,
-      CantonTimestamp.Epoch,
       consensusCerts,
       from,
     )
@@ -126,12 +121,11 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
       viewNumber: ViewNumber,
       viewChanges: Seq[SignedMessage[ViewChange]],
       prePrepares: Seq[SignedMessage[PrePrepare]],
-      from: SequencerId = myId,
+      from: BftNodeId = myId,
   ): NewView = NewView.create(
     BlockMetadata(EpochNumber(0), BlockNumber(0)),
     0,
     viewNumber,
-    CantonTimestamp.Epoch,
     viewChanges,
     prePrepares,
     from,
@@ -440,7 +434,7 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
       val result = validator.validateNewViewMessage(newView)
 
       result shouldBe Left(
-        "there are more than one view change messages from the same sender for the following nodes: SEQ::ns::fake_self"
+        "there are more than one view change messages from the same sender for the following nodes: self"
       )
     }
 
@@ -484,7 +478,7 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
       val result = validator.validateNewViewMessage(newView)
 
       result shouldBe Left(
-        "view change message from SEQ::ns::fake_otherId is invalid: there are consensus certs for the wrong epoch (1)"
+        "view change message from 'otherId' is invalid: there are consensus certs for the wrong epoch (1)"
       )
     }
 
@@ -604,7 +598,7 @@ class ViewChangeMessageValidatorTest extends AnyWordSpec with BftSequencerBaseTe
               ProofOfAvailability(
                 BatchId.createForTesting("hash"),
                 Seq.empty,
-                CantonTimestamp.MaxValue,
+                epochNumber,
               )
             )
           ),

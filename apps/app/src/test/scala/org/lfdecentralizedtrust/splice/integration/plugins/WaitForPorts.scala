@@ -3,8 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.plugins
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.metrics.MetricsReporterConfig
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
+import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
@@ -21,8 +20,7 @@ import sys.process.*
 case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     extends EnvironmentSetupPlugin[
       SpliceConfig,
-      EnvironmentImpl,
-      SpliceTests.SpliceTestConsoleEnvironment,
+      SpliceEnvironment,
     ]
     with BaseTest {
 

@@ -8,8 +8,8 @@ import cats.data.EitherT
 import cats.implicits.toBifunctorOps
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.daml.error.utils.DecodedCantonError
 import com.daml.metrics.api.MetricHandle.Gauge
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.FloatingUpdate
@@ -78,13 +78,10 @@ class InFlightSubmissionTracker(
               messageId = MessageId.fromUuid(messageUuid),
             )
 
-          case PublishSource.Sequencer(requestSequencerCounter, sequencerTimestamp) =>
+          case PublishSource.Sequencer(sequencerTimestamp) =>
             InFlightBySequencingInfo(
               synchronizerId = publication.submissionSynchronizerId,
-              sequenced = SequencedSubmission(
-                sequencerCounter = requestSequencerCounter,
-                sequencingTime = sequencerTimestamp,
-              ),
+              sequenced = SequencedSubmission(sequencerTimestamp),
             )
         }
       )

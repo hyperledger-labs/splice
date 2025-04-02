@@ -17,7 +17,7 @@ import com.digitalasset.canton.console.Help.{Description, Summary, Topic}
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.{CantonEnvironment, Environment}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
@@ -55,11 +55,14 @@ object NodeReferences {
     NodeReferences[ParticipantReference, RemoteParticipantReference, LocalParticipantReference]
 }
 
-/** The environment in which console commands are evaluated.
-  */
-@SuppressWarnings(Array("org.wartremover.warts.Any")) // required for `Binding[_]` usage
 trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing {
-  type Env <: Environment
+  type Config <: SharedCantonConfig[Config]
+
+  val environment: Environment[Config]
+
+  val consoleOutput: ConsoleOutput
+
+  override protected val loggerFactory: NamedLoggerFactory = environment.loggerFactory
 
   def consoleLogger: Logger = super.noTracingLogger
 
@@ -68,19 +71,12 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   private lazy val health_ = new CantonHealthAdministration(this)
   def health: CantonHealthAdministration = health_
 
-  /** the underlying Canton runtime environment */
-  val environment: Env
-
   /** determines the control exception thrown on errors */
-  val errorHandler: ConsoleErrorHandler = ThrowErrorHandler
-
-  /** the console for user facing output */
-  val consoleOutput: ConsoleOutput
+  private val errorHandler: ConsoleErrorHandler = ThrowErrorHandler
 
   /** The predef code itself which is executed before any script or repl command */
   private[console] def predefCode(interactive: Boolean, noTty: Boolean = false): String =
-    consoleEnvironmentBindings.predefCode(interactive, noTty)
-  protected def consoleEnvironmentBindings: ConsoleEnvironmentBinding
+    ConsoleEnvironmentBinding.predefCode(interactive, noTty)
 
   val tracer: Tracer = environment.tracerProvider.tracer
 
@@ -115,8 +111,6 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
       apiName: String,
   ): GrpcAdminCommandRunner = GrpcAdminCommandRunner(consoleEnvironment, apiName)
 
-  protected override val loggerFactory: NamedLoggerFactory = environment.loggerFactory
-
   private val commandTimeoutReference: AtomicReference[ConsoleCommandTimeout] =
     new AtomicReference[ConsoleCommandTimeout](environment.config.parameters.timeouts.console)
 
@@ -146,7 +140,10 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
   }
 
-  protected def timeouts: ProcessingTimeout = environment.config.parameters.timeouts.processing
+  def environmentTimeouts: ProcessingTimeout = timeouts
+
+  override protected val timeouts: ProcessingTimeout =
+    environment.config.parameters.timeouts.processing
 
   /** @return
     *   maximum runtime of a console command
@@ -511,6 +508,20 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   def startAll(): Unit = runE(environment.startAll())
 
   def stopAll(): Unit = runE(environment.stopAll())
+}
+
+/** The environment in which console commands are evaluated.
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any")) // required for `Binding[_]` usage
+class CantonConsoleEnvironment(
+    override val environment: CantonEnvironment,
+    val consoleOutput: ConsoleOutput = StandardConsoleOutput,
+) extends ConsoleEnvironment
+    with NamedLogging
+    with FlagCloseable
+    with NoTracing {
+
+  override type Config = CantonConfig
 
 }
 

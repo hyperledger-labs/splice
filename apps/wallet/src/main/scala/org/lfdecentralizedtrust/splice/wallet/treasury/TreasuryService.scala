@@ -62,7 +62,7 @@ import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
-  RunOnShutdown,
+  RunOnClosing,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{
@@ -146,10 +146,10 @@ class TreasuryService(
     queue
   }
 
-  retryProvider.runOnShutdown_(new RunOnShutdown {
+  retryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"terminate amulet operation batch executor"
     override def done: Boolean = queueTerminationResult.isCompleted
-    override def run(): Unit = {
+    override def run()(implicit tc: TraceContext): Unit = {
       logger.debug("Terminating amulet operation batch executor, as we are shutting down.")(
         TraceContext.empty
       )

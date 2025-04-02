@@ -110,7 +110,7 @@ trait TimeTestUtil extends TestCommon {
     val disclosure = DisclosedContracts.forTesting(amuletRules, openRound)
 
     userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-      applicationId = userId,
+      userId = userId,
       actAs = authorizers.distinct,
       readAs = Seq.empty,
       commands = transferContext.amuletRules

@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.ledger.client
 
-import com.daml.error.NoLogging
 import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.javaapi.data.Party
+import com.digitalasset.base.error.NoLogging
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.client.ResilientLedgerSubscriptionTest.SubscriptionState
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.ParticipantPrunedDataAccessed
@@ -118,7 +118,7 @@ class ResilientLedgerSubscriptionTest extends AnyWordSpec with BaseTest with Has
 
     val initialOffset: Long = 0L
     val reSubscriptionOffset: Long = 7L
-    val tx = Transaction(offset = reSubscriptionOffset)
+    val tx = Transaction.defaultInstance.copy(offset = reSubscriptionOffset)
 
     private[client] val subscriber = new AtomicReference[Option[SubscriptionState]](
       None

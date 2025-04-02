@@ -4,16 +4,14 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.syntax.either.*
-import com.digitalasset.canton.config.TestingConfigInternal
+import com.digitalasset.canton.config.{CommunityCantonEdition, TestingConfigInternal}
 import com.digitalasset.canton.console.ConsoleOutput
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.ParticipantNodeBootstrap
-import com.digitalasset.canton.participant.config.LocalParticipantConfig
-import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
-import com.digitalasset.canton.synchronizer.mediator.{MediatorNodeBootstrap, MediatorNodeConfig}
-import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
+import com.digitalasset.canton.participant.CommunityParticipantNodeBootstrapFactory
+import com.digitalasset.canton.resource.CommunityDbMigrationsMetaFactory
+import com.digitalasset.canton.synchronizer.mediator.CommunityMediatorNodeBootstrapFactory
+import com.digitalasset.canton.synchronizer.sequencer.CommunitySequencerNodeBootstrapFactory
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.metrics.SpliceMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.ScanAppBootstrap
@@ -25,10 +23,23 @@ import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.validator.ValidatorAppBootstrap
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 
-trait SpliceEnvironment extends Environment {
+class SpliceEnvironment(
+    config: SpliceConfig,
+    testingConfig: TestingConfigInternal,
+    loggerFactory: NamedLoggerFactory,
+) extends Environment[SpliceConfig](
+      config,
+      CommunityCantonEdition,
+      testingConfig,
+      CommunityParticipantNodeBootstrapFactory,
+      CommunitySequencerNodeBootstrapFactory,
+      CommunityMediatorNodeBootstrapFactory,
+      new CommunityDbMigrationsMetaFactory(loggerFactory),
+      loggerFactory,
+    ) {
 
-  override type Config = SpliceConfig
-  override type Console = SpliceConsoleEnvironment
+  // dump config (without sensitive data) to ease debugging
+  logger.info(s"SpliceEnvironment with config = {\n${config.dumpString}\n}")
 
   private lazy val metrics = SpliceMetricsFactory(
     metricsRegistry,
@@ -60,7 +71,7 @@ trait SpliceEnvironment extends Environment {
 
   lazy val validators = new ValidatorApps(
     createValidator,
-    migrationsFactory,
+    migrationsFactoryFactory.create(clock),
     timeouts,
     config.validatorsByString,
     config.tryValidatorAppParametersByString,
@@ -92,7 +103,7 @@ trait SpliceEnvironment extends Environment {
 
   lazy val svs = new SvApps(
     createSv,
-    migrationsFactory,
+    migrationsFactoryFactory.create(clock),
     timeouts,
     config.svsByString,
     config.trySvAppParametersByString,
@@ -124,7 +135,7 @@ trait SpliceEnvironment extends Environment {
 
   lazy val scans = new ScanApps(
     createScan,
-    migrationsFactory,
+    migrationsFactoryFactory.create(clock),
     timeouts,
     config.scansByString,
     config.tryScanAppParametersByString,
@@ -156,7 +167,7 @@ trait SpliceEnvironment extends Environment {
 
   lazy val splitwells = new SplitwellApps(
     createSplitwell,
-    migrationsFactory,
+    migrationsFactoryFactory.create(clock),
     timeouts,
     config.splitwellsByString,
     config.trySplitwellAppParametersByString,
@@ -170,49 +181,21 @@ trait SpliceEnvironment extends Environment {
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allSplices
 
-}
-
-object SpliceEnvironmentFactory extends EnvironmentFactory[SpliceConfig, EnvironmentImpl] {
-  override def create(
-      config: SpliceConfig,
-      loggerFactory: NamedLoggerFactory,
-      testingConfigInternal: TestingConfigInternal,
-  ): EnvironmentImpl = {
-    val envLoggerFactory = config.name.fold(loggerFactory)(loggerFactory.append("config", _))
-    new EnvironmentImpl(config, testingConfigInternal, envLoggerFactory)
-  }
-}
-
-class EnvironmentImpl(
-    override val config: SpliceConfig,
-    override val testingConfig: TestingConfigInternal,
-    override val loggerFactory: NamedLoggerFactory,
-) extends SpliceEnvironment {
-  override type Config = SpliceConfig
-
-  // dump config (without sensitive data) to ease debugging
-  logger.info(s"SpliceEnvironment with config = {\n${config.dumpString}\n}")
+  override type Console = SpliceConsoleEnvironment
 
   override def _createConsole(
       consoleOutput: ConsoleOutput
   ): SpliceConsoleEnvironment =
     new SpliceConsoleEnvironment(this, consoleOutput)
+}
 
-  override protected def participantNodeFactory
-      : ParticipantNodeBootstrap.Factory[LocalParticipantConfig, ParticipantNodeBootstrap] = ???
-
-  override protected lazy val migrationsFactory: DbMigrationsFactory =
-    new CommunityDbMigrationsFactory(loggerFactory)
-
-  override protected def createMediator(
-      name: String,
-      mediatorConfig: MediatorNodeConfig,
-  ): MediatorNodeBootstrap = ???
-
-  override protected def createSequencer(
-      name: String,
-      sequencerConfig: SequencerNodeConfig,
-  ): SequencerNodeBootstrap = ???
-
-  override def isEnterprise: Boolean = false
+object SpliceEnvironmentFactory extends EnvironmentFactory[SpliceConfig, SpliceEnvironment] {
+  override def create(
+      config: SpliceConfig,
+      loggerFactory: NamedLoggerFactory,
+      testingConfigInternal: TestingConfigInternal,
+  ): SpliceEnvironment = {
+    val envLoggerFactory = config.name.fold(loggerFactory)(loggerFactory.append("config", _))
+    new SpliceEnvironment(config, testingConfigInternal, envLoggerFactory)
+  }
 }

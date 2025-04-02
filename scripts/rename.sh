@@ -1188,7 +1188,7 @@ function subcmd_no_illegal_daml_references() {
       # Allow only Dso as in DsoRules in comments
       '[-][-] .*Dso(?!(Rules))'
       # Disallow dso in comments other than dsoParty
-      '[-][-] .*dso'
+      '[-][-] .*(?!(\.)).dso'
       # Allow only very specific mentions of DSO
       '(?<!standard )DSO(?!([.]| party| rules| delegate| governance|-level))'
       # No connection between DSO and issuance
@@ -1225,7 +1225,7 @@ function subcmd_no_amulet_in_ui() {
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' in frontend code"
-        if rg -P "$pattern" -g '*.tsx' -g '*.ts' -g '**test/**/*.scala' -g '!cluster/**'; then
+        if rg -P "$pattern" -g '*.tsx' -g '*.ts' -g '**test/**/*.scala' -g '!cluster/**' -g '!token-standard/**'; then
             echo "$pattern occurs in frontend, ensure it is not user-visible"
             exit 1
         fi

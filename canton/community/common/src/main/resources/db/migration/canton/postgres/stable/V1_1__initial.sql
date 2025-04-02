@@ -191,7 +191,7 @@ create table med_response_aggregations (
   request_id bigint not null primary key,
   mediator_confirmation_request bytea not null,
   -- UTC timestamp is stored in microseconds relative to EPOCH
-  version bigint not null,
+  finalization_time bigint not null,
   verdict bytea not null,
   request_trace_context bytea not null
 );
@@ -272,7 +272,6 @@ create table par_reassignments (
   -- defined if reassignment was completed
   -- UTC timestamp in microseconds relative to EPOCH
   assignment_timestamp bigint,
-  source_protocol_version integer not null,
   contract bytea not null
 );
 
@@ -471,6 +470,10 @@ create table sequencer_members (
     member varchar collate "C" primary key,
     id serial unique,
     registered_ts bigint not null,
+    -- we keep the latest event's timestamp below the pruning timestamp,
+    -- so that we can produce a valid first event above the pruning timestamp with previousTimestamp populated
+    -- also used in sequencer state transfer
+    pruned_previous_event_timestamp bigint,
     enabled bool not null default true
 );
 
@@ -583,9 +586,6 @@ create table par_in_flight_submission (
   -- Sequencer timestamp after which this submission will not be sequenced any more, in microsecond precision relative to EPOCH
   -- If set, this submission is considered unsequenced.
   sequencing_timeout bigint,
-  -- Sequencer counter assigned to this submission.
-  -- Must be set iff sequencing_timeout is not set.
-  sequencer_counter bigint,
   -- Sequencer timestamp assigned to this submission, in microsecond precision relative to EPOCH
   -- Must be set iff sequencing_timeout is not set.
   sequencing_time bigint,
@@ -615,11 +615,11 @@ create table par_settings(
 );
 
 create table par_command_deduplication (
-  -- hash of the change ID (application_id + command_id + act_as) as a hex string
+  -- hash of the change ID (user_id + command_id + act_as) as a hex string
   change_id_hash varchar collate "C" primary key,
 
-  -- the application ID that requested the change
-  application_id varchar collate "C" not null,
+  -- the user ID that requested the change
+  user_id varchar collate "C" not null,
   -- the command ID
   command_id varchar collate "C" not null,
   -- the act as parties serialized as a Protobuf blob
@@ -817,8 +817,6 @@ create table ord_epochs (
   epoch_length bigint not null,
   -- Sequencing instant of the topology snapshot in force for the epoch
   topology_ts bigint not null,
-  -- the bft time of the last transaction of the last block from the previous epoch
-  previous_epoch_max_ts bigint not null,
   -- whether the epoch is in progress
   in_progress bool not null
 );
@@ -826,6 +824,8 @@ create table ord_epochs (
 create table ord_availability_batch (
   id varchar collate "C" not null,
   batch bytea not null,
+  -- assigned at batch creation and used to calculate epoch expiration
+  epoch_number bigint not null,
   primary key (id)
 );
 
@@ -889,6 +889,16 @@ create table ord_metadata_output_blocks (
 create table ord_metadata_output_epochs (
   epoch_number bigint not null primary key,
   could_alter_ordering_topology bool not null
+);
+
+-- inclusive lower bound of when blocks can be read.
+-- if empty it means all blocks can be read.
+-- is updated when bft-sequencer is pruned meaning that
+-- only events from later epochs can be served (earlier events have probably been pruned)
+create table ord_output_lower_bound (
+  single_row_lock char(1) not null default 'X' primary key check(single_row_lock = 'X'),
+  epoch_number bigint not null,
+  block_number bigint not null
 );
 
 -- Stores P2P endpoints from the configuration or admin command

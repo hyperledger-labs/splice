@@ -10,22 +10,21 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
-import com.daml.error.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.{CantonRpcError, ContextualizedErrorLogger, DamlRpcError}
 import com.digitalasset.canton.*
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.{CryptoPureApi, SyncCryptoApiParticipantProvider}
-import com.digitalasset.canton.data.{
-  CantonTimestamp,
-  Offset,
-  ProcessedDisclosedContract,
-  ReassignmentSubmitterMetadata,
-}
+import com.digitalasset.canton.data.{CantonTimestamp, Offset, ReassignmentSubmitterMetadata}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.*
+import com.digitalasset.canton.error.TransactionRoutingError.{
+  MalformedInputErrors,
+  RoutingInternalError,
+}
 import com.digitalasset.canton.health.MutableHealthComponent
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.error.CommonErrors
@@ -58,8 +57,10 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.{
 }
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentCoordination
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.ReassignmentProcessorError
+import com.digitalasset.canton.participant.protocol.submission.TopologyPackageMapBuilder
 import com.digitalasset.canton.participant.protocol.submission.routing.{
-  RoutingSynchronizerState,
+  AdmissibleSynchronizersComputation,
+  RoutingSynchronizerStateFactory,
   TransactionRoutingProcessor,
 }
 import com.digitalasset.canton.participant.pruning.{AcsCommitmentProcessor, PruningProcessor}
@@ -82,6 +83,7 @@ import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.Schedulers
@@ -104,6 +106,7 @@ import com.digitalasset.daml.lf.archive.DamlLf
 import com.digitalasset.daml.lf.data.Ref.{PackageId, Party, SubmissionId}
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
 import com.digitalasset.daml.lf.engine.Engine
+import com.digitalasset.daml.lf.transaction.FatContractInstance
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -279,15 +282,17 @@ class CantonSyncService(
   ): Option[ConnectedSynchronizer] =
     connectedSynchronizersMap.get(synchronizerId).filter(_.ready)
 
-  private def existsReadySynchronizer: Boolean = connectedSynchronizersMap.exists {
-    case (_, sync) =>
-      sync.ready
-  }
-
   private[canton] def connectedSynchronizerForAlias(
       alias: SynchronizerAlias
   ): Option[ConnectedSynchronizer] =
     aliasManager.synchronizerIdForAlias(alias).flatMap(connectedSynchronizersMap.get)
+
+  private val admissibleSynchronizers =
+    new AdmissibleSynchronizersComputation(participantId, loggerFactory)
+  private val topologyPackageMapBuilder = new TopologyPackageMapBuilder(
+    admissibleSynchronizersComputation = admissibleSynchronizers,
+    loggerFactory = loggerFactory,
+  )
 
   private val transactionRoutingProcessor = TransactionRoutingProcessor(
     connectedSynchronizersLookup = connectedSynchronizersLookup,
@@ -417,7 +422,7 @@ class CantonSyncService(
     commandProgressTracker
       .findHandle(
         submitterInfo.commandId,
-        submitterInfo.applicationId,
+        submitterInfo.userId,
         submitterInfo.actAs,
         submitterInfo.submissionId,
       )
@@ -425,13 +430,14 @@ class CantonSyncService(
 
   // Submit a transaction (write service implementation)
   override def submitTransaction(
-      submitterInfo: SubmitterInfo,
-      optSynchronizerId: Option[SynchronizerId],
-      transactionMeta: TransactionMeta,
       transaction: LfSubmittedTransaction,
+      synchronizerRank: SynchronizerRank,
+      routingSynchronizerState: RoutingSynchronizerState,
+      submitterInfo: SubmitterInfo,
+      transactionMeta: TransactionMeta,
       _estimatedInterpretationCost: Long,
       keyResolver: LfKeyResolver,
-      disclosedContracts: ImmArray[ProcessedDisclosedContract],
+      processedDisclosedContracts: ImmArray[FatContractInstance],
   )(implicit
       traceContext: TraceContext
   ): CompletionStage[SubmissionResult] = {
@@ -439,14 +445,16 @@ class CantonSyncService(
     withSpan("CantonSyncService.submitTransaction") { implicit traceContext => span =>
       span.setAttribute("command_id", submitterInfo.commandId)
       logger.debug(s"Received submit-transaction ${submitterInfo.commandId} from ledger-api server")
+
       trackSubmission(submitterInfo, transaction)
       submitTransactionF(
-        submitterInfo,
-        optSynchronizerId,
-        transactionMeta,
-        transaction,
-        keyResolver,
-        disclosedContracts,
+        synchronizerRank = synchronizerRank,
+        routingSynchronizerState = routingSynchronizerState,
+        transaction = transaction,
+        submitterInfo = submitterInfo,
+        transactionMeta = transactionMeta,
+        keyResolver = keyResolver,
+        explicitlyDisclosedContracts = processedDisclosedContracts,
       )
     }.map(result =>
       result.map { _ =>
@@ -502,7 +510,7 @@ class CantonSyncService(
 
   def pruneInternally(
       pruneUpToInclusive: Offset
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, CantonError, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, CantonRpcError, Unit] =
     (for {
       _pruned <- pruningProcessor.pruneLedgerEvents(pruneUpToInclusive)
     } yield ()).transform(pruningErrorToCantonError)
@@ -543,12 +551,13 @@ class CantonSyncService(
   }
 
   private def submitTransactionF(
-      submitterInfo: SubmitterInfo,
-      optSynchronizerId: Option[SynchronizerId],
-      transactionMeta: TransactionMeta,
+      synchronizerRank: SynchronizerRank,
+      routingSynchronizerState: RoutingSynchronizerState,
       transaction: LfSubmittedTransaction,
+      submitterInfo: SubmitterInfo,
+      transactionMeta: TransactionMeta,
       keyResolver: LfKeyResolver,
-      explicitlyDisclosedContracts: ImmArray[ProcessedDisclosedContract],
+      explicitlyDisclosedContracts: ImmArray[FatContractInstance],
   )(implicit
       traceContext: TraceContext
   ): Future[Either[SubmissionResult, FutureUnlessShutdown[_]]] = {
@@ -557,7 +566,7 @@ class CantonSyncService(
         error: TransactionError
     ): Either[SubmissionResult, FutureUnlessShutdown[_]] = {
       error.logWithContext(
-        Map("commandId" -> submitterInfo.commandId, "applicationId" -> submitterInfo.applicationId)
+        Map("commandId" -> submitterInfo.commandId, "userId" -> submitterInfo.userId)
       )
       Left(SubmissionResult.SynchronousError(error.rpcStatus()))
     }
@@ -567,26 +576,58 @@ class CantonSyncService(
     } else if (!isActive()) {
       // this is the only error we can not really return with a rejection, as this is the passive replica ...
       val err = SyncServiceInjectionError.PassiveReplica.Error(
-        submitterInfo.applicationId,
+        submitterInfo.userId,
         submitterInfo.commandId,
       )
       err.logWithContext(
-        Map("commandId" -> submitterInfo.commandId, "applicationId" -> submitterInfo.applicationId)
+        Map("commandId" -> submitterInfo.commandId, "userId" -> submitterInfo.userId)
       )
       Future.successful(Left(SubmissionResult.SynchronousError(err.rpcStatus())))
-    } else if (!existsReadySynchronizer) {
+    } else if (!routingSynchronizerState.existsReadySynchronizer()) {
       Future.successful(
         processSubmissionError(SyncServiceInjectionError.NotConnectedToAnySynchronizer.Error())
       )
     } else {
-      val submittedFF = transactionRoutingProcessor.submitTransaction(
-        submitterInfo,
-        optSynchronizerId,
-        transactionMeta,
-        keyResolver,
-        transaction,
-        explicitlyDisclosedContracts,
-      )
+
+      val submittedFF = for {
+        metadata <- EitherT
+          .fromEither[FutureUnlessShutdown](
+            TransactionMetadata.fromTransactionMeta(
+              metaLedgerEffectiveTime = transactionMeta.ledgerEffectiveTime,
+              metaSubmissionTime = transactionMeta.submissionTime,
+              metaOptNodeSeeds = transactionMeta.optNodeSeeds,
+            )
+          )
+          .leftMap(RoutingInternalError.IllformedTransaction.apply)
+
+        // TODO(#23334):: Consider removing this check as it is redundant
+        //                      (performed as well in normalizeAndCheck)
+        // do some sanity checks for invalid inputs (to not conflate these with broken nodes)
+        _ <- EitherT.fromEither[FutureUnlessShutdown](
+          WellFormedTransaction.sanityCheckInputs(transaction).leftMap {
+            case WellFormedTransaction.InvalidInput.InvalidParty(err) =>
+              MalformedInputErrors.InvalidPartyIdentifier.Error(err)
+          }
+        )
+
+        // TODO(#23334):: Consider moving before SyncService, so that the result of command interpretation
+        //                      is already sanity checked wrt Canton TX normalization rules
+        wfTransaction <- EitherT.fromEither[FutureUnlessShutdown](
+          WellFormedTransaction
+            .normalizeAndCheck(transaction, metadata, WithoutSuffixes)
+            .leftMap(RoutingInternalError.IllformedTransaction.apply)
+        )
+        submitted <- transactionRoutingProcessor.submitTransaction(
+          submitterInfo = submitterInfo,
+          synchronizerRankTarget = synchronizerRank,
+          synchronizerState = routingSynchronizerState,
+          wfTransaction = wfTransaction,
+          transactionMeta = transactionMeta,
+          keyResolver = keyResolver,
+          explicitlyDisclosedContracts = explicitlyDisclosedContracts,
+        )
+      } yield submitted
+
       submittedFF.value.unwrap.transform { result =>
         val loggedResult = result match {
           case Success(UnlessShutdown.Outcome(Right(sequencedF))) =>
@@ -625,7 +666,7 @@ class CantonSyncService(
           case Failure(PassiveInstanceException(_)) |
               Success(UnlessShutdown.AbortedDueToShutdown) =>
             val err = SyncServiceInjectionError.PassiveReplica.Error(
-              submitterInfo.applicationId,
+              submitterInfo.userId,
               submitterInfo.commandId,
             )
             Left(SubmissionResult.SynchronousError(err.rpcStatus()))
@@ -1291,7 +1332,7 @@ class CantonSyncService(
       )
 
     def handleCloseDegradation(connectedSynchronizer: ConnectedSynchronizer, fatal: Boolean)(
-        err: CantonError
+        err: CantonRpcError
     ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
       if (fatal && parameters.exitOnFatalFailures) {
         FatalError.exitOnFatalError(err, logger)
@@ -1359,7 +1400,6 @@ class CantonSyncService(
                   synchronizerConnectionConfig.config.timeTracker,
                   clock,
                   synchronizerHandle.sequencerClient,
-                  synchronizerHandle.staticParameters.protocolVersion,
                   timeouts,
                   synchronizerLoggerFactory,
                 )
@@ -1647,8 +1687,12 @@ class CantonSyncService(
   override def currentHealth(): HealthStatus = HealthStatus.healthy
 
   // Write health requires the ability to transact, i.e. connectivity to at least one synchronizer and HA-activeness.
-  def currentWriteHealth(): HealthStatus =
+  def currentWriteHealth(): HealthStatus = {
+    val existsReadySynchronizer = connectedSynchronizersMap.exists { case (_, sync) =>
+      sync.ready
+    }
     if (existsReadySynchronizer && isActive()) HealthStatus.healthy else HealthStatus.unhealthy
+  }
 
   def computeTotalLoad: Int = connectedSynchronizersMap.foldLeft(0) {
     case (acc, (_, connectedSynchronizer)) =>
@@ -1709,7 +1753,7 @@ class CantonSyncService(
 
   override def submitReassignment(
       submitter: Party,
-      applicationId: Ref.ApplicationId,
+      userId: Ref.UserId,
       commandId: Ref.CommandId,
       submissionId: Option[SubmissionId],
       workflowId: Option[Ref.WorkflowId],
@@ -1733,14 +1777,14 @@ class CantonSyncService(
           connectedSynchronizer <- EitherT.fromOption[Future](
             readyConnectedSynchronizerById(synchronizerId),
             ifNone = RequestValidationErrors.InvalidArgument
-              .Reject(s"Synchronizer id not found: $synchronizerId"): DamlError,
+              .Reject(s"Synchronizer id not found: $synchronizerId"): DamlRpcError,
           )
           _ <- reassign(connectedSynchronizer)
             .leftMap(error =>
               RequestValidationErrors.InvalidArgument
                 .Reject(
                   error.message
-                ): DamlError // TODO(i13240): Improve reassignment-submission Ledger API errors
+                ): DamlRpcError // TODO(i13240): Improve reassignment-submission Ledger API errors
             )
             .mapK(FutureUnlessShutdown.outcomeK)
             .semiflatMap(Predef.identity)
@@ -1773,7 +1817,7 @@ class CantonSyncService(
               _.submitUnassignment(
                 submitterMetadata = ReassignmentSubmitterMetadata(
                   submitter = submitter,
-                  applicationId = applicationId,
+                  userId = userId,
                   submittingParticipant = participantId,
                   commandId = commandId,
                   submissionId = submissionId,
@@ -1793,7 +1837,7 @@ class CantonSyncService(
             _.submitAssignment(
               submitterMetadata = ReassignmentSubmitterMetadata(
                 submitter = submitter,
-                applicationId = applicationId,
+                userId = userId,
                 submittingParticipant = participantId,
                 commandId = commandId,
                 submissionId = submissionId,
@@ -1873,13 +1917,13 @@ class CantonSyncService(
       transactionMeta: TransactionMeta,
       disclosedContractIds: List[LfContractId],
       optSynchronizerId: Option[SynchronizerId],
-      // TODO(#23334): Wire-up in topology-aware package selection roll-out
-      _transactionUsedForExternalSigning: Boolean,
+      transactionUsedForExternalSigning: Boolean,
+      synchronizerState: RoutingSynchronizerState,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CantonBaseError, SynchronizerRank] =
-    if (existsReadySynchronizer) {
-      val synchronizerState = RoutingSynchronizerState(connectedSynchronizersLookup)
+  ): EitherT[FutureUnlessShutdown, TransactionError, SynchronizerRank] =
+    if (synchronizerState.existsReadySynchronizer()) {
+      // Capture the synchronizer state that should be used for the entire phase 1 of the transaction protocol
       transactionRoutingProcessor
         .selectRoutingSynchronizer(
           submitterInfo,
@@ -1888,12 +1932,55 @@ class CantonSyncService(
           CantonTimestamp(transactionMeta.ledgerEffectiveTime),
           disclosedContractIds,
           optSynchronizerId,
+          transactionUsedForExternalSigning,
         )
-        .leftWiden[CantonBaseError]
+        .leftWiden[TransactionError]
     } else
-      EitherT.leftT[FutureUnlessShutdown, SynchronizerRank](
+      EitherT.leftT(
         SyncServiceInjectionError.NotConnectedToAnySynchronizer.Error()
       )
+
+  override def packageMapFor(
+      submitters: Set[LfPartyId],
+      informees: Set[LfPartyId],
+      vettingValidityTimestamp: CantonTimestamp,
+      prescribedSynchronizer: Option[SynchronizerId],
+      routingSynchronizerState: RoutingSynchronizerState,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[SynchronizerId, Map[LfPartyId, Set[LfPackageId]]]] =
+    topologyPackageMapBuilder.packageMapFor(
+      submitters,
+      informees,
+      vettingValidityTimestamp,
+      prescribedSynchronizer,
+      routingSynchronizerState,
+    )
+
+  override def computeHighestRankedSynchronizerFromAdmissible(
+      submitterInfo: SubmitterInfo,
+      transaction: LfSubmittedTransaction,
+      transactionMeta: TransactionMeta,
+      admissibleSynchronizers: NonEmpty[Set[SynchronizerId]],
+      disclosedContractIds: List[LfContractId],
+      routingSynchronizerState: RoutingSynchronizerState,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerId] =
+    transactionRoutingProcessor
+      .computeHighestRankedSynchronizerFromAdmissible(
+        submitterInfo,
+        transaction,
+        transactionMeta,
+        admissibleSynchronizers,
+        disclosedContractIds,
+        routingSynchronizerState,
+      )
+
+  override def getRoutingSynchronizerState(implicit
+      traceContext: TraceContext
+  ): RoutingSynchronizerState =
+    RoutingSynchronizerStateFactory.create(connectedSynchronizersLookup)
 }
 
 object CantonSyncService {

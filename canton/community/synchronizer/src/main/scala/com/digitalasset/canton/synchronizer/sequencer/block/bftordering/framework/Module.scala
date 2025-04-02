@@ -11,12 +11,12 @@ import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, O
 import com.digitalasset.canton.lifecycle.{FlagCloseable, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Consensus,
   Output,
   P2PNetworkOut,
 }
-import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.dispatch.ControlMessage
 
@@ -173,9 +173,9 @@ trait ClientP2PNetworkManager[E <: Env[E], -P2PMessageT] {
 
   def createNetworkRef[ActorContextT](
       context: E#ActorContextT[ActorContextT],
-      peer: P2PEndpoint,
+      endpoint: P2PEndpoint,
   )(
-      onSequencerId: (P2PEndpoint.Id, SequencerId) => Unit
+      onSequencerId: (P2PEndpoint.Id, BftNodeId) => Unit
   ): P2PNetworkRef[P2PMessageT]
 }
 
@@ -189,33 +189,10 @@ trait CancellableEvent {
   def cancel(): Boolean
 }
 
-/** An abstraction of actor contexts for deterministic simulation testing purposes.
+/** FutureContext contains functions for creating and combining E#FutureUnlessShutdown that will be
+  * safe to use in pipeToSelf.
   */
-trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging {
-
-  // Client API, used by system construction logic
-
-  def newModuleRef[NewModuleMessageT](
-      moduleName: ModuleName
-  ): E#ModuleRefT[NewModuleMessageT]
-
-  /** Spawns a new module. The `module` handler object must not be spawned more than once, lest it
-    * potentially cause a violation of the actor model, as its state could be accessed concurrently.
-    */
-  def setModule[OtherModuleMessageT](
-      moduleRef: E#ModuleRefT[OtherModuleMessageT],
-      module: Module[E, OtherModuleMessageT],
-  ): Unit
-
-  // Handler API, used by module implementations
-
-  def self: E#ModuleRefT[MessageT]
-
-  def delayedEvent(delay: FiniteDuration, message: MessageT): CancellableEvent
-
-  /** Similar to TraceContext.withNewTraceContext but can be deterministically simulated
-    */
-  def withNewTraceContext[A](fn: TraceContext => A): A
+trait FutureContext[E <: Env[E]] {
 
   def timeFuture[X](timer: Timer, futureUnlessShutdown: => E#FutureUnlessShutdownT[X])(implicit
       mc: MetricsContext
@@ -236,14 +213,93 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging {
       future2: E#FutureUnlessShutdownT[Y],
   ): E#FutureUnlessShutdownT[(X, Y)]
 
+  def zipFuture[X, Y, Z](
+      future1: E#FutureUnlessShutdownT[X],
+      future2: E#FutureUnlessShutdownT[Y],
+      future3: E#FutureUnlessShutdownT[Z],
+  ): E#FutureUnlessShutdownT[(X, Y, Z)]
+
   def sequenceFuture[A, F[_]](futures: F[E#FutureUnlessShutdownT[A]])(implicit
       ev: Traverse[F]
   ): E#FutureUnlessShutdownT[F[A]]
 
+  /** [[flatMapFuture]] requires a [[PureFun]] instead of a normal [[scala.Function1]] for similar
+    * reason as [[mapFuture]]
+    */
   def flatMapFuture[R1, R2](
       future1: E#FutureUnlessShutdownT[R1],
       future2: PureFun[R1, E#FutureUnlessShutdownT[R2]],
   ): E#FutureUnlessShutdownT[R2]
+}
+
+/** An abstraction of actor contexts for deterministic simulation testing purposes.
+  */
+trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureContext[E] {
+
+  // Client API, used by system construction logic
+
+  def newModuleRef[NewModuleMessageT](
+      moduleName: ModuleName
+  ): E#ModuleRefT[NewModuleMessageT]
+
+  /** Spawns a new module. The `module` handler object must not be spawned more than once, lest it
+    * potentially cause a violation of the actor model, as its state could be accessed concurrently.
+    */
+  def setModule[OtherModuleMessageT](
+      moduleRef: E#ModuleRefT[OtherModuleMessageT],
+      module: Module[E, OtherModuleMessageT],
+  ): Unit
+
+  // Handler API, used by module implementations
+
+  def self: E#ModuleRefT[MessageT]
+
+  def delayedEvent(delay: FiniteDuration, message: MessageT): CancellableEvent =
+    delayedEventTraced(delay, message)(TraceContext.empty)
+
+  def delayedEventTraced(delay: FiniteDuration, messageT: MessageT)(implicit
+      traceContext: TraceContext
+  ): CancellableEvent
+
+  /** Similar to TraceContext.withNewTraceContext but can be deterministically simulated
+    */
+  def withNewTraceContext[A](fn: TraceContext => A): A
+
+  def futureContext: FutureContext[E]
+
+  final override def timeFuture[X](
+      timer: Timer,
+      futureUnlessShutdown: => E#FutureUnlessShutdownT[X],
+  )(implicit
+      mc: MetricsContext
+  ): E#FutureUnlessShutdownT[X] =
+    futureContext.timeFuture(timer, futureUnlessShutdown)
+
+  final override def pureFuture[X](x: X): E#FutureUnlessShutdownT[X] = futureContext.pureFuture(x)
+
+  final override def mapFuture[X, Y](future: E#FutureUnlessShutdownT[X])(
+      fun: PureFun[X, Y]
+  ): E#FutureUnlessShutdownT[Y] = futureContext.mapFuture(future)(fun)
+
+  final override def zipFuture[X, Y](
+      future1: E#FutureUnlessShutdownT[X],
+      future2: E#FutureUnlessShutdownT[Y],
+  ): E#FutureUnlessShutdownT[(X, Y)] = futureContext.zipFuture(future1, future2)
+
+  final override def zipFuture[X, Y, Z](
+      future1: E#FutureUnlessShutdownT[X],
+      future2: E#FutureUnlessShutdownT[Y],
+      future3: E#FutureUnlessShutdownT[Z],
+  ): E#FutureUnlessShutdownT[(X, Y, Z)] = futureContext.zipFuture(future1, future2, future3)
+
+  final override def sequenceFuture[A, F[_]](futures: F[E#FutureUnlessShutdownT[A]])(implicit
+      ev: Traverse[F]
+  ): E#FutureUnlessShutdownT[F[A]] = futureContext.sequenceFuture(futures)
+
+  final override def flatMapFuture[R1, R2](
+      future1: E#FutureUnlessShutdownT[R1],
+      future2: PureFun[R1, E#FutureUnlessShutdownT[R2]],
+  ): E#FutureUnlessShutdownT[R2] = futureContext.flatMapFuture(future1, future2)
 
   def pipeToSelf[X](futureUnlessShutdown: E#FutureUnlessShutdownT[X])(
       fun: Try[X] => Option[MessageT]
@@ -307,6 +363,8 @@ trait ModuleSystem[E <: Env[E]] {
 
   def rootActorContext: E#ActorContextT[?]
 
+  def futureContext: FutureContext[E]
+
   def newModuleRef[AcceptedMessageT](
       moduleName: ModuleName
   ): E#ModuleRefT[AcceptedMessageT]
@@ -344,7 +402,7 @@ object Module {
     * of the concrete actors framework, such as Pekko or the simulation testing framework, as to
     * further reduce the gap between what is run and what is deterministically simulation-tested.
     *
-    * Inputs are a module system and a network manager; the latter defines how peers connect.
+    * Inputs are a module system and a network manager; the latter defines how nodes connect.
     */
   trait SystemInitializer[E <: Env[E], P2PMessageT, InputMessageT] {
     def initialize(

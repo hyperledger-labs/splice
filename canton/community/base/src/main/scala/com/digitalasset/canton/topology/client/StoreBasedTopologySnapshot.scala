@@ -63,7 +63,7 @@ class StoreBasedTopologySnapshot(
         filterNamespace,
       )
 
-  override private[client] def loadVettedPackages(
+  override def loadVettedPackages(
       participant: ParticipantId
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[PackageId, VettedPackage]] =
     findTransactions(
@@ -75,6 +75,27 @@ class StoreBasedTopologySnapshot(
         TopologyMapping.Code.VettedPackages,
         transactions.collectOfMapping[VettedPackages].result,
       ).toList.flatMap(_.packages.map(vp => (vp.packageId, vp))).toMap
+    }
+
+  override def loadVettedPackages(participants: Seq[ParticipantId])(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[ParticipantId, Map[PackageId, VettedPackage]]] =
+    findTransactions(
+      types = Seq(TopologyMapping.Code.VettedPackages),
+      filterUid = Some(participants.map(_.uid)),
+      filterNamespace = None,
+    ).map { transactions =>
+      transactions
+        .collectOfMapping[VettedPackages]
+        .result
+        .groupBy(_.mapping.participantId)
+        .view
+        .mapValues { txs =>
+          collectLatestMapping(TopologyMapping.Code.VettedPackages, txs).toList
+            .flatMap(_.packages.map(vp => (vp.packageId, vp)))
+            .toMap
+        }
+        .toMap
     }
 
   override private[client] def loadUnvettedPackagesOrDependenciesUsingLoader(
@@ -401,7 +422,7 @@ class StoreBasedTopologySnapshot(
       filterOwnerType: Option[MemberCode],
       limit: Int,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[Member, KeyCollection]] = {
-    val (idFilter, namespaceFilter) = UniqueIdentifier.splitFilter(filterOwner)
+    val (idFilter, namespaceFilterO) = UniqueIdentifier.splitFilter(filterOwner)
     store
       .inspect(
         proposals = false,
@@ -410,7 +431,7 @@ class StoreBasedTopologySnapshot(
         op = Some(TopologyChangeOp.Replace),
         types = Seq(TopologyMapping.Code.OwnerToKeyMapping),
         idFilter = Some(idFilter),
-        namespaceFilter = Some(namespaceFilter),
+        namespaceFilter = namespaceFilterO,
       )
       .map(
         _.collectOfMapping[OwnerToKeyMapping]

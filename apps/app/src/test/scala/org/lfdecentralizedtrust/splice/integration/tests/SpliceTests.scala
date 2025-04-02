@@ -17,6 +17,7 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
+import com.digitalasset.canton.environment.EnvironmentFactory
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.GrpcError
@@ -36,7 +37,11 @@ import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, 
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.config.{AuthTokenSourceConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.console.*
-import org.lfdecentralizedtrust.splice.environment.{EnvironmentImpl, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  SpliceEnvironment,
+  SpliceEnvironmentFactory,
+  RetryProvider,
+}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.{
   ResetDecentralizedNamespace,
@@ -115,22 +120,25 @@ object SpliceTests extends LazyLogging {
         .openTelemetry
     } else OpenTelemetry.noop()
 
-  type SpliceTestConsoleEnvironment = TestConsoleEnvironment[SpliceConfig, EnvironmentImpl]
+  type SpliceTestConsoleEnvironment = TestConsoleEnvironment[SpliceConfig, SpliceEnvironment]
   type SharedSpliceEnvironment =
-    SharedEnvironment[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
+    SharedEnvironment[SpliceConfig, SpliceEnvironment]
   type IsolatedSpliceEnvironments =
-    IsolatedEnvironments[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
+    IsolatedEnvironments[SpliceConfig, SpliceEnvironment]
 
   trait IntegrationTest
-      extends BaseIntegrationTest[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
+      extends BaseIntegrationTest[SpliceConfig, SpliceEnvironment]
       with IsolatedSpliceEnvironments
       with TestCommon
       with LedgerApiExtensions {
 
+    override def environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
+      SpliceEnvironmentFactory
+
     override val edition: CantonEdition = CommunityCantonEdition
 
     type SpliceEnvironmentDefinition =
-      BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
+      BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
     override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
       new OpenTelemetryMetricsFactory(
@@ -167,23 +175,25 @@ object SpliceTests extends LazyLogging {
       registerPlugin(new ResetSequencerSynchronizerStateThreshold())
     }
 
-    override def environmentDefinition
-        : BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    override def environmentDefinition: BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment] =
       EnvironmentDefinition
         .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 
   trait IntegrationTestWithSharedEnvironment
-      extends BaseIntegrationTest[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
+      extends BaseIntegrationTest[SpliceConfig, SpliceEnvironment]
       with SharedSpliceEnvironment
       with BeforeAndAfterEach
       with TestCommon
       with LedgerApiExtensions {
 
+    override def environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
+      SpliceEnvironmentFactory
+
     override val edition: CantonEdition = CommunityCantonEdition
 
     type SpliceEnvironmentDefinition =
-      BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment]
+      BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
@@ -222,8 +232,7 @@ object SpliceTests extends LazyLogging {
       registerPlugin(new ResetSequencerSynchronizerStateThreshold())
     }
 
-    override def environmentDefinition
-        : BaseEnvironmentDefinition[SpliceConfig, EnvironmentImpl, SpliceTestConsoleEnvironment] =
+    override def environmentDefinition: BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment] =
       EnvironmentDefinition
         .simpleTopology1Sv(this.getClass.getSimpleName)
 
@@ -519,7 +528,7 @@ object SpliceTests extends LazyLogging {
     }
 
     def registerHttpConnectionPoolsCleanup(implicit
-        env: TestEnvironment[SpliceConfig, EnvironmentImpl]
+        env: TestEnvironment[SpliceConfig]
     ): Unit = {
       implicit val sys = env.actorSystem
       implicit val ec = env.executionContext

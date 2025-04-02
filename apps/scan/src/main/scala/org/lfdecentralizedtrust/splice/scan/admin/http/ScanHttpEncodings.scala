@@ -521,7 +521,7 @@ object ScanHttpEncodings {
           .map(mapping)
       case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
     }
-    val eventsById = tree.getEventsById.asScala.map {
+    val eventsById: Iterable[(Int, javaApi.TreeEvent)] = tree.getEventsById.asScala.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
           created.getWitnessParties,
@@ -569,9 +569,12 @@ object ScanHttpEncodings {
       tree.getWorkflowId,
       tree.getEffectiveAt,
       1L, // tree.getOffset not used as the values are participant local and we want consistency across svs
-      eventsById.map { case (key, value) =>
-        Integer.valueOf(key) -> value
-      }.asJava,
+      eventsById
+        .map { case (key, value) =>
+          Integer.valueOf(key) -> value
+        }
+        .toMap
+        .asJava,
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,

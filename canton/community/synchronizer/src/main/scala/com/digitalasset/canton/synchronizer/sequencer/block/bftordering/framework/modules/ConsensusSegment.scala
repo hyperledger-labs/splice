@@ -10,7 +10,8 @@ import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
   FutureId,
@@ -33,7 +34,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SignedMessage,
 }
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
-import com.digitalasset.canton.topology.{SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   HasRepresentativeProtocolVersion,
@@ -65,11 +65,12 @@ object ConsensusSegment {
         viewNumber: ViewNumber,
     ) extends Message {
       private val prePrepare = commitCertificate.prePrepare
-      val orderedBlock = OrderedBlock(
-        prePrepare.message.blockMetadata,
-        prePrepare.message.block.proofs,
-        prePrepare.message.canonicalCommitSet,
-      )
+      val orderedBlock: OrderedBlock =
+        OrderedBlock(
+          prePrepare.message.blockMetadata,
+          prePrepare.message.block.proofs,
+          prePrepare.message.canonicalCommitSet,
+        )
     }
 
     final case class AsyncException(e: Throwable) extends Message
@@ -80,7 +81,7 @@ object ConsensusSegment {
   object RetransmissionsMessage {
     final case class StatusRequest(segmentIndex: Int) extends RetransmissionsMessage
     final case class RetransmissionRequest(
-        from: SequencerId,
+        from: BftNodeId,
         fromStatus: ConsensusStatus.SegmentStatus.Incomplete,
     ) extends RetransmissionsMessage
   }
@@ -115,7 +116,7 @@ object ConsensusSegment {
         extends PbftMessagesStored
 
     final case class RetransmittedCommitCertificate(
-        from: SequencerId,
+        from: BftNodeId,
         commitCertificate: CommitCertificate,
     ) extends PbftEvent {
       override def blockMetadata: BlockMetadata = commitCertificate.prePrepare.message.blockMetadata
@@ -132,7 +133,6 @@ object ConsensusSegment {
         with MessageFrom {
       def blockMetadata: BlockMetadata
       def viewNumber: ViewNumber
-      def localTimestamp: CantonTimestamp
       def toProto: v30.ConsensusMessage
     }
 
@@ -160,8 +160,7 @@ object ConsensusSegment {
       final case class Header(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
-          from: SequencerId,
-          timestamp: CantonTimestamp,
+          from: BftNodeId,
       )
       def headerFromProto(
           message: v30.ConsensusMessage
@@ -171,57 +170,37 @@ object ConsensusSegment {
             .required("blockMetadata", message.blockMetadata)
           blockMetadata <- BlockMetadata.fromProto(protoBlockMetadata)
           viewNumber = ViewNumber(message.viewNumber)
-          from <- UniqueIdentifier
-            .fromProtoPrimitive(message.fromSequencerUid, "from_sequencer_uid")
-            .map(SequencerId(_))
-          timestamp <- CantonTimestamp
-            .fromProtoPrimitive(message.localTimestamp)
-        } yield Header(blockMetadata, viewNumber, from, timestamp)
+          from = BftNodeId(message.from)
+        } yield Header(blockMetadata, viewNumber, from)
     }
 
     final case class PrePrepare private (
         blockMetadata: BlockMetadata,
         viewNumber: ViewNumber,
-        localTimestamp: CantonTimestamp,
         block: OrderingBlock,
         canonicalCommitSet: CanonicalCommitSet,
-        from: SequencerId,
+        from: BftNodeId,
     )(
         override val representativeProtocolVersion: RepresentativeProtocolVersion[PrePrepare.type],
         override val deserializedFrom: Option[ByteString],
     ) extends PbftNormalCaseMessage
         with HasProtocolVersionedWrapper[PrePrepare] {
 
-      lazy val stored = PrePrepareStored(blockMetadata, viewNumber)
+      lazy val stored: PrePrepareStored = PrePrepareStored(blockMetadata, viewNumber)
 
+      /** The hash of the PrePrepare covers all fields of the message, including both the:
+        *   - originating node's chosen content (e.g., OrderingBlock, CanonicalCommitSet)
+        *   - common block metadata (e.g., BlockNumber, EpochNumber, ViewNumber)
+        *
+        * While only the originating node's chosen content is required, it is safe and convenient to
+        * use a hash over the entire PrePrepare because we (a) ensure that the content of the
+        * PrePrepare does not change across views (if the PrePrepare is bound), and (b) can leverage
+        * the `getCryptographicEvidence` paradigm for efficiency and determinism.
+        */
       lazy val hash: Hash = {
         val builder = Hash
           .build(HashPurpose.BftOrderingPbftBlock, HashAlgorithm.Sha256)
-          .add(blockMetadata.blockNumber)
-          .add(blockMetadata.epochNumber)
-          .add(localTimestamp.toMicros)
-          .add(from.toProtoPrimitive)
-          .add(block.proofs.size)
-          .add(canonicalCommitSet.sortedCommits.size)
-
-        block.proofs
-          .foreach { proof =>
-            builder.add(proof.batchId.hash.getCryptographicEvidence)
-            builder.add(proof.acks.size)
-            proof.acks.foreach { ack =>
-              builder.add(ack.from.toProtoPrimitive)
-              // TODO(#17337): We should probably not rely on Protobuf when calculating hashes (due to a potential non-determinism).
-              builder.add(ack.signature.toByteString(ProtocolVersion.dev))
-            }
-          }
-
-        canonicalCommitSet.sortedCommits.foreach { commit =>
-          builder.add(commit.message.blockMetadata.blockNumber)
-          builder.add(commit.message.blockMetadata.epochNumber)
-          builder.add(commit.message.hash.getCryptographicEvidence)
-          builder.add(commit.message.localTimestamp.toMicros)
-        }
-
+          .add(getCryptographicEvidence)
         builder.finish()
       }
 
@@ -229,8 +208,7 @@ object ConsensusSegment {
         v30.ConsensusMessage.of(
           Some(blockMetadata.toProto),
           viewNumber,
-          from.uid.toProtoPrimitive,
-          localTimestamp.toMicros,
+          from,
           v30.ConsensusMessage.Message.PrePrepare(
             v30.PrePrepare.of(
               Some(block.toProto),
@@ -251,12 +229,11 @@ object ConsensusSegment {
       def create(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
-          localTimestamp: CantonTimestamp,
           block: OrderingBlock,
           canonicalCommitSet: CanonicalCommitSet,
-          from: SequencerId,
+          from: BftNodeId,
       ): PrePrepare =
-        PrePrepare(blockMetadata, viewNumber, localTimestamp, block, canonicalCommitSet, from)(
+        PrePrepare(blockMetadata, viewNumber, block, canonicalCommitSet, from)(
           protocolVersionRepresentativeFor(ProtocolVersion.minimum): RepresentativeProtocolVersion[
             PrePrepare.this.type
           ], // TODO(#23248)
@@ -274,7 +251,6 @@ object ConsensusSegment {
           prePrepare <- ConsensusSegment.ConsensusMessage.PrePrepare.fromProto(
             header.blockMetadata,
             header.viewNumber,
-            header.timestamp,
             protoPrePrepare,
             header.from,
           )(originalByteString)
@@ -283,9 +259,8 @@ object ConsensusSegment {
       def fromProto(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
-          timestamp: CantonTimestamp,
           prePrepare: v30.PrePrepare,
-          from: SequencerId,
+          from: BftNodeId,
       )(originalByteString: OriginalByteString): ParsingResult[PrePrepare] =
         for {
           protoCanonicalCommitSet <- ProtoConverter
@@ -300,7 +275,6 @@ object ConsensusSegment {
         } yield ConsensusSegment.ConsensusMessage.PrePrepare(
           blockMetadata,
           viewNumber,
-          timestamp,
           OrderingBlock(proofs),
           canonicalCommitSet,
           from,
@@ -323,8 +297,7 @@ object ConsensusSegment {
         blockMetadata: BlockMetadata,
         viewNumber: ViewNumber,
         hash: Hash,
-        localTimestamp: CantonTimestamp,
-        from: SequencerId,
+        from: BftNodeId,
     )(
         override val representativeProtocolVersion: RepresentativeProtocolVersion[Prepare.type],
         override val deserializedFrom: Option[ByteString],
@@ -334,8 +307,7 @@ object ConsensusSegment {
         v30.ConsensusMessage.of(
           Some(blockMetadata.toProto),
           viewNumber,
-          from.uid.toProtoPrimitive,
-          localTimestamp.toMicros,
+          from,
           v30.ConsensusMessage.Message.Prepare(
             v30.Prepare.of(
               hash.getCryptographicEvidence
@@ -351,17 +323,15 @@ object ConsensusSegment {
 
     object Prepare extends VersioningCompanionMemoization[Prepare] {
       override def name: String = "Prepare"
-      implicit val ordering: Ordering[Prepare] =
-        Ordering.by(prepare => (prepare.from, prepare.localTimestamp))
+      implicit val ordering: Ordering[Prepare] = Ordering.by(prepare => prepare.from)
 
       def create(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
           hash: Hash,
-          localTimestamp: CantonTimestamp,
-          from: SequencerId,
+          from: BftNodeId,
       ): Prepare =
-        Prepare(blockMetadata, viewNumber, hash, localTimestamp, from)(
+        Prepare(blockMetadata, viewNumber, hash, from)(
           protocolVersionRepresentativeFor(ProtocolVersion.minimum), // TODO(#23248)
           None,
         )
@@ -377,7 +347,6 @@ object ConsensusSegment {
           prepare <- Prepare.fromProto(
             header.blockMetadata,
             header.viewNumber,
-            header.timestamp,
             protoPrepare,
             header.from,
           )(originalByteString)
@@ -386,9 +355,8 @@ object ConsensusSegment {
       def fromProto(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
-          timestamp: CantonTimestamp,
           prepare: v30.Prepare,
-          from: SequencerId,
+          from: BftNodeId,
       )(originalByteString: OriginalByteString): ParsingResult[Prepare] =
         for {
           hash <- Hash.fromProtoPrimitive(prepare.blockHash)
@@ -397,7 +365,6 @@ object ConsensusSegment {
           blockMetadata,
           viewNumber,
           hash,
-          timestamp,
           from,
         )(rpv, Some(originalByteString))
 
@@ -419,7 +386,7 @@ object ConsensusSegment {
         viewNumber: ViewNumber,
         hash: Hash,
         localTimestamp: CantonTimestamp,
-        from: SequencerId,
+        from: BftNodeId,
     )(
         override val representativeProtocolVersion: RepresentativeProtocolVersion[Commit.type],
         override val deserializedFrom: Option[ByteString],
@@ -429,10 +396,9 @@ object ConsensusSegment {
         v30.ConsensusMessage.of(
           Some(blockMetadata.toProto),
           viewNumber,
-          from.uid.toProtoPrimitive,
-          localTimestamp.toMicros,
+          from,
           v30.ConsensusMessage.Message.Commit(
-            v30.Commit.of(hash.getCryptographicEvidence)
+            v30.Commit.of(hash.getCryptographicEvidence, localTimestamp.toMicros)
           ),
         )
 
@@ -452,7 +418,7 @@ object ConsensusSegment {
           viewNumber: ViewNumber,
           hash: Hash,
           localTimestamp: CantonTimestamp,
-          from: SequencerId,
+          from: BftNodeId,
       ): Commit = Commit(blockMetadata, viewNumber, hash, localTimestamp, from)(
         protocolVersionRepresentativeFor(ProtocolVersion.minimum), // TODO(#23248)
         None,
@@ -469,7 +435,6 @@ object ConsensusSegment {
           commit <- Commit.fromProto(
             header.blockMetadata,
             header.viewNumber,
-            header.timestamp,
             protoCommit,
             header.from,
           )(originalByteString)
@@ -478,12 +443,12 @@ object ConsensusSegment {
       def fromProto(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
-          timestamp: CantonTimestamp,
           commit: v30.Commit,
-          from: SequencerId,
+          from: BftNodeId,
       )(originalByteString: OriginalByteString): ParsingResult[Commit] =
         for {
           hash <- Hash.fromProtoPrimitive(commit.blockHash)
+          timestamp <- CantonTimestamp.fromProtoPrimitive(commit.localTimestamp)
           rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
         } yield ConsensusSegment.ConsensusMessage.Commit(
           blockMetadata,
@@ -510,9 +475,8 @@ object ConsensusSegment {
         blockMetadata: BlockMetadata,
         segmentIndex: Int,
         viewNumber: ViewNumber,
-        localTimestamp: CantonTimestamp,
         consensusCerts: Seq[ConsensusCertificate],
-        from: SequencerId,
+        from: BftNodeId,
     )(
         override val representativeProtocolVersion: RepresentativeProtocolVersion[ViewChange.type],
         override val deserializedFrom: Option[ByteString],
@@ -522,8 +486,7 @@ object ConsensusSegment {
         v30.ConsensusMessage.of(
           Some(blockMetadata.toProto),
           viewNumber,
-          from.uid.toProtoPrimitive,
-          localTimestamp.toMicros,
+          from,
           v30.ConsensusMessage.Message.ViewChange(
             v30.ViewChange.of(
               segmentIndex,
@@ -551,11 +514,10 @@ object ConsensusSegment {
           blockMetadata: BlockMetadata,
           segmentIndex: Int,
           viewNumber: ViewNumber,
-          localTimestamp: CantonTimestamp,
           consensusCerts: Seq[ConsensusCertificate],
-          from: SequencerId,
+          from: BftNodeId,
       ): ViewChange =
-        ViewChange(blockMetadata, segmentIndex, viewNumber, localTimestamp, consensusCerts, from)(
+        ViewChange(blockMetadata, segmentIndex, viewNumber, consensusCerts, from)(
           protocolVersionRepresentativeFor(ProtocolVersion.minimum), // TODO(#23248)
           None,
         )
@@ -571,7 +533,6 @@ object ConsensusSegment {
           viewChange <- ViewChange.fromProto(
             header.blockMetadata,
             header.viewNumber,
-            header.timestamp,
             protoViewChange,
             header.from,
           )(originalByteString)
@@ -580,9 +541,8 @@ object ConsensusSegment {
       def fromProto(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
-          timestamp: CantonTimestamp,
           viewChange: v30.ViewChange,
-          from: SequencerId,
+          from: BftNodeId,
       )(originalByteString: OriginalByteString): ParsingResult[ViewChange] =
         for {
           certs <- viewChange.consensusCerts.traverse(ConsensusCertificate.fromProto)
@@ -591,7 +551,6 @@ object ConsensusSegment {
           blockMetadata,
           viewChange.segmentIndex,
           viewNumber,
-          timestamp,
           certs,
           from,
         )(rpv, Some(originalByteString))
@@ -613,10 +572,9 @@ object ConsensusSegment {
         blockMetadata: BlockMetadata,
         segmentIndex: Int,
         viewNumber: ViewNumber,
-        localTimestamp: CantonTimestamp,
         viewChanges: Seq[SignedMessage[ViewChange]],
         prePrepares: Seq[SignedMessage[PrePrepare]],
-        from: SequencerId,
+        from: BftNodeId,
     )(
         override val representativeProtocolVersion: RepresentativeProtocolVersion[NewView.type],
         override val deserializedFrom: Option[ByteString],
@@ -635,8 +593,7 @@ object ConsensusSegment {
         v30.ConsensusMessage.of(
           Some(blockMetadata.toProto),
           viewNumber,
-          from.uid.toProtoPrimitive,
-          localTimestamp.toMicros,
+          from,
           v30.ConsensusMessage.Message.NewView(
             v30.NewView.of(
               segmentIndex,
@@ -660,15 +617,13 @@ object ConsensusSegment {
           blockMetadata: BlockMetadata,
           segmentIndex: Int,
           viewNumber: ViewNumber,
-          localTimestamp: CantonTimestamp,
           viewChanges: Seq[SignedMessage[ViewChange]],
           prePrepares: Seq[SignedMessage[PrePrepare]],
-          from: SequencerId,
+          from: BftNodeId,
       ): NewView = NewView(
         blockMetadata,
         segmentIndex,
         viewNumber,
-        localTimestamp,
         viewChanges,
         prePrepares,
         from,
@@ -676,8 +631,7 @@ object ConsensusSegment {
         protocolVersionRepresentativeFor(ProtocolVersion.minimum), // TODO(#23248)
         None,
       )
-      implicit val ordering: Ordering[ViewChange] =
-        Ordering.by(viewChange => (viewChange.from, viewChange.localTimestamp))
+      implicit val ordering: Ordering[ViewChange] = Ordering.by(viewChange => viewChange.from)
 
       def fromProtoConsensusMessage(
           value: v30.ConsensusMessage
@@ -690,7 +644,6 @@ object ConsensusSegment {
           newView <- NewView.fromProto(
             header.blockMetadata,
             header.viewNumber,
-            header.timestamp,
             protoNewView,
             header.from,
           )(originalByteString)
@@ -699,9 +652,8 @@ object ConsensusSegment {
       def fromProto(
           blockMetadata: BlockMetadata,
           viewNumber: ViewNumber,
-          timestamp: CantonTimestamp,
           newView: v30.NewView,
-          from: SequencerId,
+          from: BftNodeId,
       )(originalByteString: OriginalByteString): ParsingResult[NewView] =
         for {
           viewChanges <- newView.viewChanges.traverse(
@@ -715,7 +667,6 @@ object ConsensusSegment {
           blockMetadata,
           newView.segmentIndex,
           viewNumber,
-          timestamp,
           viewChanges,
           prePrepares,
           from,

@@ -13,8 +13,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   EpochInProgress,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
   ViewNumber,
@@ -364,7 +364,7 @@ trait EpochStoreTest extends AsyncWordSpec {
             pbftMessagesInProgress = 4,
           ))
 
-          _ <- store.prune(epochNumberInclusive = EpochNumber.First)
+          _ <- store.prune(epochNumberExclusive = EpochNumber(1L))
           numberOfRecordsAfterPrune1 <- store.loadNumberOfRecords
           _ = numberOfRecordsAfterPrune1 shouldBe (EpochStore.NumberOfRecords(
             epochs = 2L,
@@ -372,7 +372,7 @@ trait EpochStoreTest extends AsyncWordSpec {
             pbftMessagesInProgress = 4,
           ))
 
-          _ <- store.prune(epochNumberInclusive = EpochNumber(1L))
+          _ <- store.prune(epochNumberExclusive = EpochNumber(2L))
           numberOfRecordsAfterPrune2 <- store.loadNumberOfRecords
           _ = numberOfRecordsAfterPrune2 shouldBe (EpochStore.NumberOfRecords(
             epochs = 1L,
@@ -380,7 +380,7 @@ trait EpochStoreTest extends AsyncWordSpec {
             pbftMessagesInProgress = 4,
           ))
 
-          _ <- store.prune(epochNumberInclusive = EpochNumber(2L))
+          _ <- store.prune(epochNumberExclusive = EpochNumber(3L))
           numberOfRecordsAfterPrune3 <- store.loadNumberOfRecords
           _ = numberOfRecordsAfterPrune3 shouldBe (EpochStore.NumberOfRecords(
             epochs = 0L,
@@ -404,10 +404,9 @@ object EpochStoreTest {
     .create(
       BlockMetadata.mk(epochNumber, blockNumber),
       ViewNumber(viewNumber),
-      CantonTimestamp.Epoch,
       OrderingBlock(Seq.empty),
       CanonicalCommitSet(Set.empty),
-      from = fakeSequencerId("address"),
+      from = BftNodeId("address"),
     )
     .fakeSign
 
@@ -421,8 +420,7 @@ object EpochStoreTest {
         BlockMetadata.mk(epochNumber, blockNumber),
         ViewNumber(viewNumber),
         Hash.digest(HashPurpose.BftOrderingPbftBlock, ByteString.EMPTY, HashAlgorithm.Sha256),
-        CantonTimestamp.Epoch,
-        from = fakeSequencerId("address"),
+        from = BftNodeId("address"),
       )
       .fakeSign
 
@@ -437,7 +435,7 @@ object EpochStoreTest {
         ViewNumber(viewNumber),
         Hash.digest(HashPurpose.BftOrderingPbftBlock, ByteString.EMPTY, HashAlgorithm.Sha256),
         CantonTimestamp.Epoch,
-        from = fakeSequencerId(s"address$i"),
+        from = BftNodeId(s"address$i"),
       )
       .fakeSign
   }
@@ -452,9 +450,8 @@ object EpochStoreTest {
         BlockMetadata.mk(epochNumber, segmentNumber),
         0,
         ViewNumber(viewNumber),
-        CantonTimestamp.Epoch,
         consensusCerts = Seq.empty,
-        fakeSequencerId("address"),
+        BftNodeId("address"),
       )
       .fakeSign
 
@@ -468,10 +465,9 @@ object EpochStoreTest {
         BlockMetadata.mk(epochNumber, segmentNumber),
         segmentIndex = 0,
         viewNumber = ViewNumber(viewNumber),
-        localTimestamp = CantonTimestamp.Epoch,
         viewChanges = Seq.empty,
         prePrepares = Seq.empty,
-        fakeSequencerId("address"),
+        BftNodeId("address"),
       )
       .fakeSign
 
@@ -482,7 +478,8 @@ object EpochStoreTest {
         batchRefs = Seq.empty,
         CanonicalCommitSet.empty,
       ),
-      fakeSequencerId("address"),
+      ViewNumber.First,
+      BftNodeId("address"),
       isLastInEpoch,
       mode = OrderedBlockForOutput.Mode.FromConsensus,
     )

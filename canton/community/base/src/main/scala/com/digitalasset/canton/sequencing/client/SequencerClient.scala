@@ -175,6 +175,8 @@ trait SequencerClient extends SequencerClientSend with FlagCloseable {
 
   /** The sequencer counter at which the first subscription starts */
   protected def initialCounterLowerBound: SequencerCounter
+
+  def protocolVersion: ProtocolVersion
 }
 
 trait RichSequencerClient extends SequencerClient {
@@ -365,6 +367,7 @@ abstract class SequencerClientImpl(
             SendResult.Success(
               Deliver.create(
                 SequencerCounter.Genesis,
+                previousTimestamp = None,
                 CantonTimestamp.now(),
                 synchronizerId,
                 messageIdO = None,
@@ -1700,7 +1703,8 @@ class SequencerClientImplPekko[E: Pretty](
           .map(_.map(_.map { withPromise =>
             val completion = withPromise.value match {
               case Outcome(Left(error)) => Failure(SequencerClientSubscriptionException(error))
-              case _ => Success(())
+              case _ => TryUtil.unit
+
             }
             withPromise.promise.tryComplete(completion).discard[Boolean]
             withPromise

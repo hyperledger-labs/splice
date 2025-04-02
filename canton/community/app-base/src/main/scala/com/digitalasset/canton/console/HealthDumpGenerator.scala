@@ -11,7 +11,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   SequencerAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{CantonStatus, NodeStatus}
-import com.digitalasset.canton.config.LocalNodeConfig
+import com.digitalasset.canton.config.{LocalNodeConfig, SharedCantonConfig}
 import com.digitalasset.canton.console.CommandErrors.CommandError
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.metrics.MetricsSnapshot
@@ -24,7 +24,7 @@ import io.circe.syntax.*
   * the core of the implementation of the HealthDump gRPC endpoint.
   */
 class HealthDumpGenerator(
-    val environment: Environment,
+    val environment: Environment[_ <: SharedCantonConfig[_]],
     val grpcAdminCommandRunner: GrpcAdminCommandRunner,
 ) {
   private implicit val statusEncoder: Encoder[CantonStatus] = {

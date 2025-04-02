@@ -3,22 +3,30 @@
 
 package com.digitalasset.canton.platform.apiserver.execution
 
+import cats.data.EitherT
+import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationDuration
-import com.digitalasset.canton.data.{DeduplicationPeriod, ProcessedDisclosedContract}
 import com.digitalasset.canton.ledger.api.{CommandId, Commands}
 import com.digitalasset.canton.ledger.participant.state.index.MaximumLedgerTime
-import com.digitalasset.canton.ledger.participant.state.{SubmitterInfo, TransactionMeta}
+import com.digitalasset.canton.ledger.participant.state.{
+  RoutingSynchronizerState,
+  SubmitterInfo,
+  SynchronizerRank,
+  TransactionMeta,
+}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.apiserver.FatContractInstanceHelper
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.LedgerTime
+import com.digitalasset.canton.protocol.LfTransactionVersion
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{BaseTest, FailOnShutdown}
 import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName}
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -59,65 +67,73 @@ class LedgerTimeAwareCommandExecutorSpec
     )
   )
 
+  private val alice = Ref.Party.assertFromString("alice")
+
   private val processedDisclosedContracts = ImmArray(
-    ProcessedDisclosedContract(
+    FatContractInstanceHelper.buildFatContractInstance(
       templateId = Identifier.assertFromString("some:pkg:identifier"),
       packageName = PackageName.assertFromString("pkg-name"),
-      packageVersion = Some(PackageVersion.assertFromString("1.0.0")),
+      packageVersion = None,
       contractId = cid,
       argument = Value.ValueNil,
       createdAt = Time.Timestamp.Epoch,
       driverMetadata = Bytes.Empty,
-      signatories = Set.empty,
-      stakeholders = Set.empty,
+      signatories = Set(alice),
+      stakeholders = Set(alice),
       keyOpt = None,
-      // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
-      version = LanguageVersion.v2_dev,
+      version = LfTransactionVersion.minVersion,
     )
   )
-
+  private val synchronizerRank = SynchronizerRank.single(SynchronizerId.tryFromString("some::sync"))
+  private val routingSynchronizerState = mock[RoutingSynchronizerState]
   private def runExecutionTest(
       dependsOnLedgerTime: Boolean,
       resolveMaximumLedgerTimeResults: List[MaximumLedgerTime],
       finalExecutionResult: Either[ErrorCause, Time.Timestamp],
+      usedForExternalSigning: Boolean = false,
   ): FutureUnlessShutdown[Assertion] = {
 
     def commandExecutionResult(let: Time.Timestamp) = CommandExecutionResult(
-      SubmitterInfo(
-        Nil,
-        Nil,
-        Ref.ApplicationId.assertFromString("foobar"),
-        Ref.CommandId.assertFromString("foobar"),
-        DeduplicationDuration(Duration.ofMinutes(1)),
-        None,
+      commandInterpretationResult = CommandInterpretationResult(
+        SubmitterInfo(
+          Nil,
+          Nil,
+          Ref.UserId.assertFromString("foobar"),
+          Ref.CommandId.assertFromString("foobar"),
+          DeduplicationDuration(Duration.ofMinutes(1)),
+          None,
+          None,
+        ),
+        TransactionMeta(
+          let,
+          None,
+          Time.Timestamp.Epoch,
+          submissionSeed,
+          None,
+          None,
+          None,
+        ),
+        transaction,
+        dependsOnLedgerTime,
+        5L,
+        Map.empty,
+        processedDisclosedContracts,
         None,
       ),
-      None,
-      TransactionMeta(
-        let,
-        None,
-        Time.Timestamp.Epoch,
-        submissionSeed,
-        None,
-        None,
-        None,
-      ),
-      transaction,
-      dependsOnLedgerTime,
-      5L,
-      Map.empty,
-      processedDisclosedContracts,
+      synchronizerRank = SynchronizerRank.single(SynchronizerId.tryFromString("some::sync")),
+      routingSynchronizerState = routingSynchronizerState,
     )
 
     val mockExecutor = mock[CommandExecutor]
     when(
-      mockExecutor.execute(any[Commands], any[Hash])(
-        any[LoggingContextWithTrace],
-        any[ExecutionContext],
+      mockExecutor.execute(any[Commands], any[Hash], eqTo(routingSynchronizerState), anyBoolean)(
+        any[LoggingContextWithTrace]
       )
     )
       .thenAnswer((c: Commands) =>
-        FutureUnlessShutdown.pure(Right(commandExecutionResult(c.commands.ledgerEffectiveTime)))
+        EitherT[FutureUnlessShutdown, ErrorCause, CommandExecutionResult](
+          FutureUnlessShutdown.pure(Right(commandExecutionResult(c.commands.ledgerEffectiveTime)))
+        )
       )
 
     val mockResolveMaximumLedgerTime = mock[ResolveMaximumLedgerTime]
@@ -138,7 +154,7 @@ class LedgerTimeAwareCommandExecutorSpec
 
     val commands = Commands(
       workflowId = None,
-      applicationId = Ref.ApplicationId.assertFromString("applicationId"),
+      userId = Ref.UserId.assertFromString("userId"),
       commandId = CommandId(Ref.CommandId.assertFromString("commandId")),
       submissionId = None,
       actAs = Set.empty,
@@ -163,43 +179,57 @@ class LedgerTimeAwareCommandExecutorSpec
       loggerFactory,
     )
 
-    instance.execute(commands, submissionSeed)(loggingContext, executionContext).map { actual =>
-      val expectedResult = finalExecutionResult.map(let =>
-        CommandExecutionResult(
-          SubmitterInfo(
-            Nil,
-            Nil,
-            Ref.ApplicationId.assertFromString("foobar"),
-            Ref.CommandId.assertFromString("foobar"),
-            DeduplicationDuration(Duration.ofMinutes(1)),
-            None,
-            None,
-          ),
-          None,
-          TransactionMeta(
-            let,
-            None,
-            Time.Timestamp.Epoch,
-            submissionSeed,
-            None,
-            None,
-            None,
-          ),
-          transaction,
-          dependsOnLedgerTime,
-          5L,
-          Map.empty,
-          processedDisclosedContracts,
+    instance
+      .execute(
+        commands,
+        submissionSeed,
+        usedForExternallySigningTransaction = usedForExternalSigning,
+        routingSynchronizerState = routingSynchronizerState,
+      )(loggingContext)
+      .value
+      .map { actual =>
+        val expectedResult = finalExecutionResult.map(let =>
+          CommandExecutionResult(
+            CommandInterpretationResult(
+              SubmitterInfo(
+                Nil,
+                Nil,
+                Ref.UserId.assertFromString("foobar"),
+                Ref.CommandId.assertFromString("foobar"),
+                DeduplicationDuration(Duration.ofMinutes(1)),
+                None,
+                None,
+              ),
+              TransactionMeta(
+                let,
+                None,
+                Time.Timestamp.Epoch,
+                submissionSeed,
+                None,
+                None,
+                None,
+              ),
+              transaction,
+              dependsOnLedgerTime,
+              5L,
+              Map.empty,
+              processedDisclosedContracts,
+              None,
+            ),
+            synchronizerRank = synchronizerRank,
+            routingSynchronizerState = routingSynchronizerState,
+          )
         )
-      )
 
-      verify(mockExecutor, times(resolveMaximumLedgerTimeResults.size)).execute(
-        any[Commands],
-        any[Hash],
-      )(any[LoggingContextWithTrace], any[ExecutionContext])
+        verify(mockExecutor, times(resolveMaximumLedgerTimeResults.size)).execute(
+          any[Commands],
+          any[Hash],
+          eqTo(routingSynchronizerState),
+          eqTo(usedForExternalSigning),
+        )(any[LoggingContextWithTrace])
 
-      actual shouldEqual expectedResult
-    }
+        actual shouldEqual expectedResult
+      }
   }
 
   private val missingCid: MaximumLedgerTime = MaximumLedgerTime.Archived(Set(cid))

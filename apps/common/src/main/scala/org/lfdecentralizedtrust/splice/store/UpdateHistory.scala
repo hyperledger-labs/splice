@@ -7,7 +7,13 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  Identifier,
+  TransactionTree,
+  TreeEvent,
+}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -1196,7 +1202,7 @@ class UpdateHistory(
         /*implementedInterfaces = */ java.util.Collections.emptyList(),
       )
     }.toMap
-    val eventsById = createEventsById ++ exerciseEventsById
+    val eventsById: Map[Integer, TreeEvent] = createEventsById ++ exerciseEventsById
 
     LedgerClient.GetTreeUpdatesResponse(
       update = TransactionTreeUpdate(

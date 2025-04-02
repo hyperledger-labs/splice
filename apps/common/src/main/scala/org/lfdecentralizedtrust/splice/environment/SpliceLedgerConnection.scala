@@ -8,9 +8,9 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import cats.syntax.traverse.*
-import com.daml.error.ErrorResource
-import com.daml.error.utils.ErrorDetails
-import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
+import com.digitalasset.base.error.ErrorResource
+import com.digitalasset.base.error.utils.ErrorDetails
+import com.digitalasset.base.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
 import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
@@ -69,13 +69,13 @@ import com.digitalasset.daml.lf.data.Ref
   */
 class BaseLedgerConnection(
     client: LedgerClient,
-    applicationId: String,
+    userId: String,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends NamedLogging {
 
-  logger.debug(s"Created connection with applicationId=$applicationId")(
+  logger.debug(s"Created connection with userId=$userId")(
     TraceContext.empty
   )
 
@@ -691,7 +691,7 @@ class SpliceLedgerSubscription[S](
 /** A ledger connection with full submission functionality */
 class SpliceLedgerConnection(
     client: LedgerClient,
-    applicationId: String,
+    userId: String,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
@@ -702,7 +702,7 @@ class SpliceLedgerConnection(
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends BaseLedgerConnection(
       client,
-      applicationId,
+      userId,
       loggerFactory,
       retryProvider,
     ) {
@@ -959,7 +959,7 @@ class SpliceLedgerConnection(
               client.submitAndWait(
                 synchronizerId =
                   disclosedContracts.overwriteDomain(synchronizerId).toProtoPrimitive,
-                applicationId = applicationId,
+                userId = userId,
                 commandId = commandId,
                 deduplicationConfig = deduplicationConfig,
                 actAs = actAs.map(_.toProtoPrimitive),
@@ -1002,12 +1002,12 @@ class SpliceLedgerConnection(
     ledgerEnd().flatMap { ledgerEnd =>
       val (ks, completion) = cancelIfFailed(
         client
-          .completions(applicationId, Seq(submitter), begin = ledgerEnd)
+          .completions(userId, Seq(submitter), begin = ledgerEnd)
           .wireTap(csr => logger.trace(s"completions while awaiting reassignment $commandId: $csr"))
       )(
         awaitCompletion(
           "reassignment",
-          applicationId = applicationId,
+          userId = userId,
           commandId = commandId,
           submissionId = commandId,
         )
@@ -1017,7 +1017,7 @@ class SpliceLedgerConnection(
         callCallbacksOnCompletionNoWaitForOffset(
           client
             .submitReassignment(
-              applicationId,
+              userId,
               commandId,
               submissionId = commandId,
               submitter,
@@ -1060,7 +1060,7 @@ class SpliceLedgerConnection(
   ): Future[lapi.interactive.interactive_submission_service.PrepareSubmissionResponse] = {
     client.prepareSubmission(
       synchronizerId = synchronizerId.map(_.toProtoPrimitive),
-      applicationId = applicationId,
+      userId = userId,
       // Command dedup with external submissions isn't required for our use atm.
       commandId = UUID.randomUUID().toString(),
       actAs = actAs.map(_.toProtoPrimitive),
@@ -1085,11 +1085,11 @@ class SpliceLedgerConnection(
     ledgerEnd().flatMap { ledgerEnd =>
       val (ks, completion) = cancelIfFailed(
         client
-          .completions(applicationId, Seq(submitter), begin = ledgerEnd)
+          .completions(userId, Seq(submitter), begin = ledgerEnd)
       )(
         awaitCompletion(
           "reassignment",
-          applicationId = applicationId,
+          userId = userId,
           commandId = commandId,
           submissionId = submissionId,
         )
@@ -1101,7 +1101,7 @@ class SpliceLedgerConnection(
             .executeSubmission(
               preparedTransaction,
               partySignatures,
-              applicationId = applicationId,
+              userId = userId,
               submissionId = submissionId,
             )
             .map { _ =>
@@ -1140,7 +1140,7 @@ class SpliceLedgerConnection(
   // successfully if the completion was OK
   private[this] def awaitCompletion(
       description: String,
-      applicationId: String,
+      userId: String,
       commandId: String,
       submissionId: String,
   )(implicit
@@ -1162,7 +1162,7 @@ class SpliceLedgerConnection(
       }
       .collect {
         case LedgerClient.CompletionStreamResponse(laterOffset, completion)
-            if completion.matchesSubmission(applicationId, commandId, submissionId) =>
+            if completion.matchesSubmission(userId, commandId, submissionId) =>
           (laterOffset, completion)
       }
       .take(1)

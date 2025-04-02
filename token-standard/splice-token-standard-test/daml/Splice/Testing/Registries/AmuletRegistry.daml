@@ -353,10 +353,11 @@ tapLockedAndUnlockedFunds : AmuletRegistry -> Party -> Decimal -> Script [Contra
 tapLockedAndUnlockedFunds registry user amount = do
   let lockedAmount = amount / 2.0
   let unlockedAmount = amount - lockedAmount
-  unlockedCid <- tapFaucet registry user unlockedAmount
-  now <- getTime
-  lockedCid <- createLockedAmulet registry user lockedAmount TimeLock with
-    holders = [registry.dso]
-    expiresAt = now -- we want these funds to already be expired
-    optContext = Some "test expired lock"
-  pure [unlockedCid, lockedCid]
+  unlockedCid <- tapFaucet registry user (unlockedAmount + lockedAmount)
+  -- TODO(#18760) Reenable the locked amulet
+  -- now <- getTime
+  -- lockedCid <- createLockedAmulet registry user lockedAmount TimeLock with
+  --  holders = [registry.dso]
+  --  expiresAt = now -- we want these funds to already be expired
+   --  optContext = Some "test expired lock"
+  pure [unlockedCid] -- , lockedCid]

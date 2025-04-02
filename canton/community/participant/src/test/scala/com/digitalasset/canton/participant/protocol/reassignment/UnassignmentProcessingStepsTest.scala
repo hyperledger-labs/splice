@@ -85,8 +85,8 @@ import com.digitalasset.canton.{
   BaseTest,
   FailOnShutdown,
   HasExecutorService,
-  LedgerApplicationId,
   LedgerCommandId,
+  LedgerUserId,
   LfPackageId,
   LfPartyId,
   ReassignmentCounter,
@@ -141,7 +141,7 @@ final class UnassignmentProcessingStepsTest
       submittingParticipant,
       LedgerCommandId.assertFromString("unassignment-processing-steps-command-id"),
       submissionId = None,
-      LedgerApplicationId.assertFromString("tests"),
+      LedgerUserId.assertFromString("tests"),
       workflowId = None,
     )
 
@@ -857,6 +857,7 @@ final class UnassignmentProcessingStepsTest
             Batch.of(testedProtocolVersion, (signedResult, Recipients.cc(submittingParticipant)))
           Deliver.create(
             SequencerCounter(0),
+            None,
             CantonTimestamp.Epoch,
             sourceSynchronizer.unwrap,
             Some(MessageId.tryCreate("msg-0")),

@@ -85,21 +85,21 @@ class ExternalPartyWalletManager(
     }
   }
 
-  retryProvider.runOnShutdownWithPriority_(new RunOnShutdown {
+  retryProvider.runOnShutdownWithPriority_(new RunOnClosing {
     override def name = s"set per-party retry providers as closed"
     override def done = false
-    override def run() = {
+    override def run()(implicit tc: TraceContext) = {
       externalPartyWalletsMap.values.foreach { case (externalPartyRetryProvider, _) =>
         externalPartyRetryProvider.setAsClosing()
       }
     }
-  })(TraceContext.empty)
+  })
 
-  retryProvider.runOnShutdown_(new RunOnShutdown {
+  retryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name = s"shutdown per-party retry providers"
     // this is not perfectly precise, but RetryProvider.close is idempotent
     override def done = false
-    override def run() = {
+    override def run()(implicit tc: TraceContext) = {
       externalPartyWalletsMap.values.foreach { case (externalPartyRetryProvider, _) =>
         externalPartyRetryProvider.close()
       }

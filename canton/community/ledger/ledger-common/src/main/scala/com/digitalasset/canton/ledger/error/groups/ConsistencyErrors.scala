@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.ledger.error.groups
 
-import com.daml.error.{
+import com.digitalasset.base.error.{
   ContextualizedErrorLogger,
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
@@ -243,7 +243,7 @@ object ConsistencyErrors extends ConsistencyErrorGroup {
   }
 
   @Explanation(
-    "Another command submission with the same change ID (application ID, command ID, actAs) is already being processed."
+    "Another command submission with the same change ID (user ID, command ID, actAs) is already being processed."
   )
   @Resolution(
     """Listen to the command completion stream until a completion for the in-flight command submission is published.

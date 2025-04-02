@@ -6,10 +6,13 @@ import { randomUUID } from "node:crypto";
 export class LedgerClient {
   readonly baseUrl: string;
   readonly token: string;
+  // We pass the user id separately as in tests we use the Canton admin token which does not have a user id.
+  readonly userId: string;
 
-  constructor(baseUrl: string, accessToken: string) {
+  constructor(baseUrl: string, accessToken: string, userId: string) {
     this.token = accessToken;
     this.baseUrl = baseUrl;
+    this.userId = userId;
   }
 
   private async doFetch<T>(
@@ -127,7 +130,7 @@ export class LedgerClient {
       actAs: [actAs],
       readAs: [actAs],
       workflowId,
-      applicationId,
+      userId: this.userId,
       commandId: `tscli-${randomUUID()}`,
       submissionId: "",
       synchronizerId,
@@ -144,7 +147,7 @@ export class LedgerClient {
     partySignatures: any
   ): Promise<unknown> {
     const payload = {
-      applicationId,
+      userId: this.userId,
       submissionId: "",
       preparedTransaction: preparedTransaction.preparedTransaction,
       hashingSchemeVersion: preparedTransaction.hashingSchemeVersion,
@@ -155,7 +158,6 @@ export class LedgerClient {
   }
 }
 
-const applicationId = "TS-CLI";
 const workflowId = "TS-CLI";
 
 interface PreparedTransaction {

@@ -6,22 +6,23 @@ package com.digitalasset.canton
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.{CantonConfig, CommunityCantonEdition}
 import com.digitalasset.canton.environment.{
-  CommunityEnvironment,
+  CantonEnvironment,
   CommunityEnvironmentFactory,
   EnvironmentFactory,
 }
 
-object CantonCommunityApp extends CantonAppDriver[CommunityEnvironment] {
+object CantonCommunityApp extends CantonAppDriver {
 
   override type Config = CantonConfig
+
+  override type E = CantonEnvironment
 
   override def loadConfig(
       config: com.typesafe.config.Config
   ): Either[CantonConfigError, CantonConfig] =
     CantonConfig.loadAndValidate(config, CommunityCantonEdition)
 
-  override protected def environmentFactory
-      : EnvironmentFactory[CantonConfig, CommunityEnvironment] =
+  override protected def environmentFactory: EnvironmentFactory[CantonConfig, CantonEnvironment] =
     CommunityEnvironmentFactory
 
   override def withManualStart(config: CantonConfig): CantonConfig =

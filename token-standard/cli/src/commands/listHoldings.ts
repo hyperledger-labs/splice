@@ -9,7 +9,7 @@ export async function listHoldings(
   opts: CommandOptions
 ): Promise<void> {
   try {
-    const ledgerClient = new LedgerClient(opts.ledgerUrl, opts.authToken);
+    const ledgerClient = new LedgerClient(opts.ledgerUrl, opts.authToken, opts.userId);
     const ledgerEnd = await ledgerClient.getLedgerEnd();
     const holdings: any[] = await ledgerClient.getActiveContractsOfParty(
       partyId,

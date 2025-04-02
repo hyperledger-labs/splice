@@ -129,13 +129,13 @@ class InitializeSynchronizerTrigger(
       bootstrappingStates = task.bootstrappingTransactions
       domainParameters = bootstrappingStates
         .map(_.domainParameters)
-        .reduceLeft((a, b) => a.addSignatures(b.signatures.toSeq))
+        .reduceLeft((a, b) => a.addSignatures(b.signatures))
       sequencerDomainState = bootstrappingStates
         .map(_.sequencerSynchronizerState)
-        .reduceLeft((a, b) => a.addSignatures(b.signatures.toSeq))
+        .reduceLeft((a, b) => a.addSignatures(b.signatures))
       mediatorDomainState = bootstrappingStates
         .map(_.mediatorDomainState)
-        .reduceLeft((a, b) => a.addSignatures(b.signatures.toSeq))
+        .reduceLeft((a, b) => a.addSignatures(b.signatures))
       node = synchronizerNodes(task.synchronizerId.identifier.unwrap)
       bootstrapTransactions = toStoredTopologyBootstrapTransactions(
         decentralizedNamespaceTxs ++

@@ -22,7 +22,6 @@ import com.digitalasset.canton.crypto.{
   SynchronizerCryptoClient,
   SynchronizerCryptoPureApi,
 }
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.health.*
 import com.digitalasset.canton.health.admin.data.{WaitingForExternalInput, WaitingForInitialization}
@@ -63,6 +62,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{
   InitialTopologySnapshotValidator,
+  SequencedTime,
   TopologyTransactionProcessor,
 }
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
@@ -678,7 +678,6 @@ class MediatorNodeBootstrap(
         config.timeTracker,
         clock,
         sequencerClient,
-        synchronizerConfig.synchronizerParameters.protocolVersion,
         timeouts,
         loggerFactory,
       )
@@ -686,7 +685,7 @@ class MediatorNodeBootstrap(
 
       topologyStoreIsEmpty <- EitherT.right(
         synchronizerTopologyStore
-          .maxTimestamp(CantonTimestamp.MaxValue, includeRejected = true)
+          .maxTimestamp(SequencedTime.MaxValue, includeRejected = true)
           .map(_.isEmpty)
       )
       // TODO(i12076): Request topology information from all sequencers and reconcile

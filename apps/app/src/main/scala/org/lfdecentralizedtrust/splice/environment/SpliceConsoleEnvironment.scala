@@ -6,14 +6,13 @@ package org.lfdecentralizedtrust.splice.environment
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
-  ConsoleEnvironmentBinding,
   ConsoleOutput,
   LocalInstanceReference,
   NodeReferences,
   StandardConsoleOutput,
-  ThrowErrorHandler,
 }
 import org.apache.pekko.actor.ActorSystem
+import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
@@ -25,13 +24,12 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 
 class SpliceConsoleEnvironment(
-    val environment: EnvironmentImpl,
+    override val environment: SpliceEnvironment,
     val consoleOutput: ConsoleOutput = StandardConsoleOutput,
 ) extends ConsoleEnvironment // TODO(#736): Generalize this.
     {
 
-  override val errorHandler: com.digitalasset.canton.console.ThrowErrorHandler.type =
-    ThrowErrorHandler
+  override type Config = SpliceConfig
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
     DarResources.TokenStandard.allPackageResources.flatMap(_.all) ++
@@ -50,8 +48,6 @@ class SpliceConsoleEnvironment(
     environment.config.parameters.timeouts.console,
     environment.config.parameters.timeouts.requestTimeout,
   )(this.tracer, templateDecoder)
-
-  override type Env = EnvironmentImpl
 
   def mergeLocalSpliceInstances(
       locals: Seq[AppBackendReference]*
@@ -336,8 +332,6 @@ class SpliceConsoleEnvironment(
       )
 
   }
-
-  override protected val consoleEnvironmentBindings = new ConsoleEnvironmentBinding()
 
   override def startupOrderPrecedence(instance: LocalInstanceReference): Int =
     instance match {

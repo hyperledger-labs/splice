@@ -31,7 +31,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
-import com.digitalasset.canton.lifecycle.RunOnShutdown
+import com.digitalasset.canton.lifecycle.RunOnClosing
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.lifecycle.SyncCloseable
 import com.digitalasset.canton.lifecycle.LifeCycle
@@ -78,16 +78,17 @@ class RestartDsoDelegateBasedAutomationTrigger(
 
   def epochState: Option[EpochState] = epochStateVar
 
-  appLevelRetryProvider.runOnShutdownWithPriority_(new RunOnShutdown {
+  appLevelRetryProvider.runOnShutdownWithPriority_(new RunOnClosing {
     override def name = s"set per-epoch retry provider as closing"
     override def done = false
-    override def run() = epochStateVar.foreach(_.retryProvider.setAsClosing())
-  })(TraceContext.empty)
+    override def run()(implicit tc: TraceContext) =
+      epochStateVar.foreach(_.retryProvider.setAsClosing())
+  })
 
-  appLevelRetryProvider.runOnShutdown_(new RunOnShutdown {
+  appLevelRetryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name = s"shutdown per-epoch retry provider"
     override def done = false
-    override def run() = closeRetryProvider()
+    override def run()(implicit tc: TraceContext) = closeRetryProvider()
   })(TraceContext.empty)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =

@@ -1,7 +1,7 @@
 asyncapi: 2.6.0
 info:
   title: JSON Ledger API WebSocket endpoints
-  version: 2.5.0
+  version: 3.3.0-SNAPSHOT
 channels:
   /v2/commands/completions:
     description: Get completions stream
@@ -113,15 +113,15 @@ components:
       title: CompletionStreamRequest
       type: object
       required:
-      - applicationId
+      - userId
       - beginExclusive
       properties:
-        applicationId:
+        userId:
           description: |-
-            Only completions of commands submitted with the same application_id will be visible in the stream.
-            Must be a valid ApplicationIdString (as described in ``value.proto``).
-            Required unless authentication is used with a user token or a custom token specifying an application-id.
-            In that case, the token's user-id, respectively application-id, will be used for the request's application_id.
+            Only completions of commands submitted with the same user_id will be visible in the stream.
+            Must be a valid UserIdString (as described in ``value.proto``).
+            Required unless authentication is used with a user token or a custom token specifying an user-id.
+            In that case, the token's user-id, respectively user-id, will be used for the request's user_id.
           type: string
         parties:
           description: |-
@@ -198,7 +198,7 @@ components:
       required:
       - commandId
       - updateId
-      - applicationId
+      - userId
       - submissionId
       - deduplicationPeriod
       - offset
@@ -221,10 +221,10 @@ components:
             Only set for successfully executed commands.
             Must be a valid LedgerString (as described in ``value.proto``).
           type: string
-        applicationId:
+        userId:
           description: |-
-            The application-id or user-id that was used for the submission, as described in ``commands.proto``.
-            Must be a valid ApplicationIdString (as described in ``value.proto``).
+            The user-id or user-id that was used for the submission, as described in ``commands.proto``.
+            Must be a valid UserIdString (as described in ``value.proto``).
             Optional for historic completions where this data is not available.
           type: string
         actAs:
@@ -311,7 +311,7 @@ components:
     DeduplicationPeriod:
       title: DeduplicationPeriod
       description: |-
-        Specifies the deduplication period for the change ID.
+        Specifies the deduplication period for the change ID (See PrepareSubmissionRequest).
         If omitted, the participant will assume the configured maximum deduplication time.
       oneOf:
       - type: object
@@ -1839,12 +1839,6 @@ components:
             $ref: '#/components/schemas/Reassignment1'
       - type: object
         required:
-        - TopologyTransaction
-        properties:
-          TopologyTransaction:
-            $ref: '#/components/schemas/TopologyTransaction1'
-      - type: object
-        required:
         - TransactionTree
         properties:
           TransactionTree:
@@ -1871,14 +1865,6 @@ components:
       properties:
         value:
           $ref: '#/components/schemas/JsReassignment'
-    TopologyTransaction1:
-      title: TopologyTransaction
-      type: object
-      required:
-      - value
-      properties:
-        value:
-          $ref: '#/components/schemas/JsTopologyTransaction'
     TransactionTree:
       title: TransactionTree
       description: |-

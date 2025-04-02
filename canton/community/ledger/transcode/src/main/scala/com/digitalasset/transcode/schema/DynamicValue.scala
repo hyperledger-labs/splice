@@ -42,6 +42,9 @@ object DynamicValue {
     * labels here are not necessary, as codecs knows about field names at the time of construction.
     * We store them in order to recreate some error conditions (for instance wrong labels) and reuse
     * gRPC API error handling.
+    *
+    * We do not preserver recordId from gRPC versbose records, we do not consider them practically
+    * useful
     */
 
   final case class Record(fields: IterableOnce[(Option[String], DynamicValue)]) extends Adt {
