@@ -12,6 +12,7 @@ export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIME
 export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY_SIZE')) || 0; // 0 => no limit
 
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');
+export const PULUMI_STACKS_DIR = config.requireEnv('PULUMI_STACKS_DIR');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const PUBLIC_CONFIGS_PATH = config.optionalEnv('PUBLIC_CONFIGS_PATH');

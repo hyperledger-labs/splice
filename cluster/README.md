@@ -388,6 +388,21 @@ The operator exposes a basic set of prometheus metrics, that we use to create al
 There's also a dashboard that allow to easily view the current state/historical state.
 The dashboard is available in grafana, for exampel for CILR: [Pulumi Operator Dashboard](https://grafana.cilr.network.canton.global/d/QP_wDqDnz/pulumi-operator-stacks-dashboard?orgId=1&from=now-1h&to=now&refresh=30s)
 
+#### Stack files
+
+We normally store our stack files (Pulumi.<project>.<stack>.yaml files) separately from
+Pulumi sources, and refer from the stack file directories to the sources through a
+`main: <path>` entry in a `Pulumi.yaml` file next to the stack files. This requires that
+we run `npm install` from the Pulumi project directory and not the stacks directory, which
+we do locally and in CI through `make cluster/pulumi/build`. Unfortunately, the operator
+does not do that, and it runs the `npm install` command in the working directory, i.e.
+where the stacks are, which then fails with `pulumi SDK does not seem to be installed`
+messages.
+
+Therefore, in operator deployments, we first copy the stack files into the Pulumi project
+directory, using [Flux's `Include` feature](https://fluxcd.io/flux/components/source/gitrepositories/#include), see [flux-source.ts](../cluster/pulumi/common/src/operator/flux-source.ts#L63).
+
+
 ## Pulumi and Helm
 
 Canton Network is generally deployed by installing a collection of

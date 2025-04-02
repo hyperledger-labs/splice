@@ -325,12 +325,92 @@
       "kind": "GitRepository",
       "metadata": {
         "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-active-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "5m",
+        "recurseSubmodules": false,
+        "ref": {
+          "name": "refs/heads/release-line-0.3.18"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node-active-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
           "notifications": "true"
         },
         "name": "splice-node-active",
         "namespace": "operator"
       },
       "spec": {
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/sv-runbook/Pulumi.sv-runbook.dev.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/sv-runbook/Pulumi.sv-runbook.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/multi-validator/Pulumi.multi-validator.dev.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/multi-validator/Pulumi.multi-validator.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/validator-runbook/Pulumi.validator-runbook.dev.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/validator-runbook/Pulumi.validator-runbook.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/validator1/Pulumi.validator1.dev.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/validator1/Pulumi.validator1.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/splitwell/Pulumi.splitwell.dev.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/splitwell/Pulumi.splitwell.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/infra/Pulumi.infra.dev.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/infra/Pulumi.infra.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/canton-network/Pulumi.canton-network.dev.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/canton-network/Pulumi.canton-network.dev.yaml"
+          }
+        ],
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -354,12 +434,78 @@
       "kind": "GitRepository",
       "metadata": {
         "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-migration-0-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "5m",
+        "recurseSubmodules": false,
+        "ref": {
+          "name": "refs/heads/release-line-0.3.16"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node-migration-0-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
           "notifications": "true"
         },
         "name": "splice-node-migration-0",
         "namespace": "operator"
       },
       "spec": {
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-0.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-0-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-1-migration-0.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-2-migration-0.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-0-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-2-migration-0.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-3-migration-0.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-0-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-3-migration-0.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-4-migration-0.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-0-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-4-migration-0.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-migration-0.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-0-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-migration-0.dev.yaml"
+          }
+        ],
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -383,12 +529,78 @@
       "kind": "GitRepository",
       "metadata": {
         "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-migration-1-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "5m",
+        "recurseSubmodules": false,
+        "ref": {
+          "name": "refs/heads/release-line-0.3.18"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node-migration-1-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
           "notifications": "true"
         },
         "name": "splice-node-migration-1",
         "namespace": "operator"
       },
       "spec": {
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-1.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-1-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-1-migration-1.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-2-migration-1.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-1-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-2-migration-1.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-3-migration-1.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-1-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-3-migration-1.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-4-migration-1.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-1-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-4-migration-1.dev.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-migration-1.dev.yaml",
+            "repository": {
+              "name": "splice-node-migration-1-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-migration-1.dev.yaml"
+          }
+        ],
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {

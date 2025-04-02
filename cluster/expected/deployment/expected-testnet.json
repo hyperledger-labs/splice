@@ -231,12 +231,71 @@
       "kind": "GitRepository",
       "metadata": {
         "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-active-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "5m",
+        "recurseSubmodules": false,
+        "ref": {
+          "name": "refs/heads/release-line-0.3.17"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node-active-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
           "notifications": "true"
         },
         "name": "splice-node-active",
         "namespace": "operator"
       },
       "spec": {
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/validator1/Pulumi.validator1.testzrh.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/validator1/Pulumi.validator1.testzrh.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/splitwell/Pulumi.splitwell.testzrh.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/splitwell/Pulumi.splitwell.testzrh.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/infra/Pulumi.infra.testzrh.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/infra/Pulumi.infra.testzrh.yaml"
+          },
+          {
+            "fromPath": "cluster/stacks/prod/canton-network/Pulumi.canton-network.testzrh.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "cluster/pulumi/canton-network/Pulumi.canton-network.testzrh.yaml"
+          }
+        ],
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -260,12 +319,50 @@
       "kind": "GitRepository",
       "metadata": {
         "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-migration-1-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "5m",
+        "recurseSubmodules": false,
+        "ref": {
+          "name": "refs/heads/release-line-0.3.17"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node-migration-1-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
           "notifications": "true"
         },
         "name": "splice-node-migration-1",
         "namespace": "operator"
       },
       "spec": {
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-1.testzrh.yaml",
+            "repository": {
+              "name": "splice-node-migration-1-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-1-migration-1.testzrh.yaml"
+          }
+        ],
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -289,12 +386,50 @@
       "kind": "GitRepository",
       "metadata": {
         "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-migration-2-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "5m",
+        "recurseSubmodules": false,
+        "ref": {
+          "name": "refs/heads/release-line-0.3.17"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node-migration-2-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
           "notifications": "true"
         },
         "name": "splice-node-migration-2",
         "namespace": "operator"
       },
       "spec": {
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-2.testzrh.yaml",
+            "repository": {
+              "name": "splice-node-migration-2-base"
+            },
+            "toPath": "cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-1-migration-2.testzrh.yaml"
+          }
+        ],
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {

@@ -568,10 +568,48 @@
         "labels": {
           "notifications": "false"
         },
+        "name": "splice-node-deployment-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "interval": "5m",
+        "recurseSubmodules": false,
+        "ref": {
+          "name": "refs/heads/main"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-node"
+      }
+    },
+    "name": "splice-node-deployment-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
+          "notifications": "false"
+        },
         "name": "splice-node-deployment",
         "namespace": "operator"
       },
       "spec": {
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/deployment/Pulumi.deployment.testzrh.yaml",
+            "repository": {
+              "name": "splice-node-deployment-base"
+            },
+            "toPath": "cluster/pulumi/deployment/Pulumi.deployment.testzrh.yaml"
+          }
+        ],
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
