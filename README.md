@@ -639,7 +639,7 @@ Initial setup:
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
 2. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`. This can be added to your private env vars.
 
-Current Canton commit: `5bcf5d330f89c4e990b9e1798272a91e1b24ad53`
+Current Canton commit: `c7a3aebafe7b9e0fd2fbd5b4ac407877733de9ce`
 
 1. Checkout the **current Canton commit listed above** in the Canton open source repo from above, so we can diff our current fork against this checkout.
 2. Change to your checkout of the canton coin repo and execute the following steps:

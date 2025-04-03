@@ -62,13 +62,14 @@ class ServerRunner[C <: SharedCantonConfig[C]](
 class ConsoleInteractiveRunner[C <: SharedCantonConfig[C]](
     noTty: Boolean = false,
     bootstrapScript: Option[CantonScript],
+    postScriptCallback: => Unit,
     override val loggerFactory: NamedLoggerFactory,
 ) extends Runner[C] {
   def run(environment: Environment[C]): Unit = {
     val success =
       try {
         val consoleEnvironment = environment.createConsole()
-        InteractiveConsole(consoleEnvironment, noTty, bootstrapScript, logger)
+        InteractiveConsole(consoleEnvironment, noTty, bootstrapScript, logger, postScriptCallback)
       } catch {
         case NonFatal(e) =>
           logger.error(e.getMessage)(TraceContext.empty)

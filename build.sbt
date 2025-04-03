@@ -35,6 +35,7 @@ lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
 lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
+lazy val `canton-scalatest-addon` = BuildCommon.`canton-scalatest-addon`
 lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`

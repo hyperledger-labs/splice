@@ -540,6 +540,7 @@ object BuildCommon {
         // commented out from Canton OS repo as settings don't apply to us
         //      sharedAppSettings,
         disableTests,
+        removeTestSources,
         libraryDependencies ++= Seq(
           scala_logging,
           jul_to_slf4j,
@@ -625,6 +626,7 @@ object BuildCommon {
         `canton-bindings-java`,
         `canton-community-admin-api`,
         `canton-kms-driver-api`,
+        `canton-scalatest-addon` % "compile->test",
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -754,6 +756,7 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           toxiproxy_java,
           opentelemetry_proto,
+          daml_http_test_utils,
         ),
 
         // This library contains a lot of testing helpers that previously existing in testing scope
@@ -1122,6 +1125,18 @@ object BuildCommon {
         ),
       )
 
+  }
+
+  lazy val `canton-scalatest-addon` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-scalatest-addon", file("canton/community/lib/scalatest"))
+      .settings(
+        sharedSettings,
+        libraryDependencies += scalatest,
+        // Exclude to apply our license header to any Scala files
+        headerSources / excludeFilter := "*.scala",
+      )
   }
 
   lazy val `canton-daml-errors` = {

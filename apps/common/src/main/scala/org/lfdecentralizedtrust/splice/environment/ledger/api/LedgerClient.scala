@@ -765,11 +765,19 @@ object LedgerClient {
           Some(GetTreeUpdatesResponse(update, SynchronizerId.tryFromString(tree.synchronizerId)))
 
         case TU.Reassignment(x) =>
-          val synchronizerIdP = x.event match {
-            case lapi.reassignment.Reassignment.Event.Empty =>
+          // TODO(#18782) Support reassignment batching
+          val event: lapi.reassignment.ReassignmentEvent = x.events match {
+            case Seq(event) => event
+            case events =>
+              throw GrpcStatus.INTERNAL
+                .withDescription(s"Reassignment batching is not currently supported: $events")
+                .asRuntimeException
+          }
+          val synchronizerIdP = event.event match {
+            case lapi.reassignment.ReassignmentEvent.Event.Empty =>
               sys.error("uninitialized update service result (event)")
-            case lapi.reassignment.Reassignment.Event.UnassignedEvent(unassign) => unassign.source
-            case lapi.reassignment.Reassignment.Event.AssignedEvent(assign) => assign.target
+            case lapi.reassignment.ReassignmentEvent.Event.Unassigned(unassign) => unassign.source
+            case lapi.reassignment.ReassignmentEvent.Event.Assigned(assign) => assign.target
           }
           Some(
             GetTreeUpdatesResponse(
@@ -793,8 +801,8 @@ object LedgerClient {
         source: SynchronizerId,
         target: SynchronizerId,
     ) extends ReassignmentCommand {
-      def toProto: lapi.reassignment_command.UnassignCommand =
-        lapi.reassignment_command.UnassignCommand(
+      def toProto: lapi.reassignment_commands.UnassignCommand =
+        lapi.reassignment_commands.UnassignCommand(
           contractId = contractId.contractId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
@@ -817,8 +825,8 @@ object LedgerClient {
         source: SynchronizerId,
         target: SynchronizerId,
     ) extends ReassignmentCommand {
-      def toProto: lapi.reassignment_command.AssignCommand =
-        lapi.reassignment_command.AssignCommand(
+      def toProto: lapi.reassignment_commands.AssignCommand =
+        lapi.reassignment_commands.AssignCommand(
           unassignId = unassignId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
@@ -834,20 +842,27 @@ object LedgerClient {
       command: ReassignmentCommand,
   ) {
     def toProto: lapi.command_submission_service.SubmitReassignmentRequest = {
-      val baseCommand = lapi.reassignment_command.ReassignmentCommand(
+      val commands = lapi.reassignment_commands.ReassignmentCommands(
         userId = userId,
         commandId = commandId,
         submissionId = submissionId,
         submitter = submitter.toProtoPrimitive,
+        commands = Seq(
+          command match {
+            case unassign: ReassignmentCommand.Unassign =>
+              lapi.reassignment_commands.ReassignmentCommand(
+                lapi.reassignment_commands.ReassignmentCommand.Command
+                  .UnassignCommand(unassign.toProto)
+              )
+            case assign: ReassignmentCommand.Assign =>
+              lapi.reassignment_commands.ReassignmentCommand(
+                lapi.reassignment_commands.ReassignmentCommand.Command.AssignCommand(assign.toProto)
+              )
+          }
+        ),
       )
-      val updatedCommand = command match {
-        case unassign: ReassignmentCommand.Unassign =>
-          baseCommand.withUnassignCommand(unassign.toProto)
-        case assign: ReassignmentCommand.Assign =>
-          baseCommand.withAssignCommand(assign.toProto)
-      }
       lapi.command_submission_service.SubmitReassignmentRequest(
-        Some(updatedCommand)
+        Some(commands)
       )
     }
   }
