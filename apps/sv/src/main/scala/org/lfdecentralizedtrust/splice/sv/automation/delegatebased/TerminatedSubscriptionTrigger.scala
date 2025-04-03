@@ -42,7 +42,8 @@ class TerminatedSubscriptionTrigger(
       task: AssignedContract[
         subsCodegen.TerminatedSubscription.ContractId,
         subsCodegen.TerminatedSubscription,
-      ]
+      ],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       ansEntryContextO <- svTaskContext.dsoStore.lookupAnsEntryContext(
@@ -68,7 +69,7 @@ class TerminatedSubscriptionTrigger(
                     ansEntryContext.contractId,
                     task.contractId,
                     Option
-                      .when(supportsSvController)(dsoRules.payload.dsoDelegate)
+                      .when(supportsSvController)(controller)
                       .toJava,
                   )
                 ),
@@ -81,4 +82,5 @@ class TerminatedSubscriptionTrigger(
       "Archived AnsEntryContext because corresponding subscription got terminated"
     )
   }
+
 }

@@ -63,8 +63,8 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           )(config)
       )
 
-  def dsoDelegateExpiredAnsEntryTrigger(implicit env: SpliceTestConsoleEnvironment) =
-    sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger]
+  def dsoDelegateExpiredAnsEntryTriggers(implicit env: SpliceTestConsoleEnvironment) =
+    activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger])
 
   // created by the expiry test
   override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
@@ -360,7 +360,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
       setTriggersWithin[Assertion](
         triggersToPauseAtStart = Seq(aliceSubscriptionReadyForPaymentTrigger),
-        triggersToResumeAtStart = Seq(dsoDelegateExpiredAnsEntryTrigger),
+        triggersToResumeAtStart = dsoDelegateExpiredAnsEntryTriggers,
       ) {
 
         val ansRules = sv1ScanBackend.getAnsRules()
@@ -411,7 +411,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
         setTriggersWithin(
           Seq.empty,
           triggersToResumeAtStart =
-            Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
+            activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
         ) {
           withClue("contracts removed with subscription trigger reenabled") {
             // Wait for subscription to be expired.

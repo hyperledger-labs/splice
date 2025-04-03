@@ -104,10 +104,10 @@ class WalletTimeBasedIntegrationTest
         },
         cancelAllSubscriptions(aliceWalletClient),
       ) {
-        val ansSubscriptionRenewalPaymentTrigger =
-          sv1Backend.dsoDelegateBasedAutomation.trigger[AnsSubscriptionRenewalPaymentTrigger]
+        val ansSubscriptionRenewalPaymentTriggers =
+          activeSvs.map(_.dsoDelegateBasedAutomation.trigger[AnsSubscriptionRenewalPaymentTrigger])
         setTriggersWithin(
-          triggersToPauseAtStart = Seq(ansSubscriptionRenewalPaymentTrigger),
+          triggersToPauseAtStart = ansSubscriptionRenewalPaymentTriggers,
           triggersToResumeAtStart = Seq.empty,
         ) {
           actAndCheck(
@@ -210,7 +210,7 @@ class WalletTimeBasedIntegrationTest
       setTriggersWithin(
         Seq.empty,
         triggersToResumeAtStart =
-          Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
+          activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
       ) {
         clue("Check wallet after advancing to next 2 rounds") {
           eventually()(aliceWalletClient.list().lockedAmulets shouldBe empty)

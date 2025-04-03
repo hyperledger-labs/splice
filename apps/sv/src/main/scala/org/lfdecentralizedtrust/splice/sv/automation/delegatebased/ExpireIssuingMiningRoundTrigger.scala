@@ -41,7 +41,8 @@ class ExpireIssuingMiningRoundTrigger(
   val store = svTaskContext.dsoStore
 
   override protected def completeTaskAsDsoDelegate(
-      task: Task
+      task: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
     for {
@@ -52,7 +53,7 @@ class ExpireIssuingMiningRoundTrigger(
         _.exerciseDsoRules_MiningRound_Close(
           amuletRules.contractId,
           round.contractId,
-          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       cid <- svTaskContext.connection

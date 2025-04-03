@@ -6,13 +6,13 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
-  SRARC_OffboardSv,
   SRARC_CreateTransferCommandCounter,
+  SRARC_OffboardSv,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  updateAutomationConfig,
   ConfigurableApp,
+  updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -34,6 +34,10 @@ import org.scalatest.time.{Minute, Span}
 import cats.syntax.foldable.*
 import cats.instances.future.*
 import cats.instances.seq.*
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
+  pauseAllDsoDelegateTriggers,
+  resumeAllDsoDelegateTriggers,
+}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -104,10 +108,8 @@ class SvOffboardingIntegrationTest
         )
       }
 
-      sv1Backend.dsoDelegateBasedAutomation
-        .trigger[ExecuteConfirmedActionTrigger]
-        .pause()
-        .futureValue
+      pauseAllDsoDelegateTriggers[ExecuteConfirmedActionTrigger]
+
       val externalPartyAmuletRules = sv1ScanBackend.getExternalPartyAmuletRules()
       // Create TransferCommand to trigger creation of confirmations for creating the transfer command counter.
       // We don't want to test external parties in this test so we just create it directly from SV1.
@@ -241,7 +243,7 @@ class SvOffboardingIntegrationTest
       ) shouldBe None
       actAndCheck(timeUntilSuccess = 60.seconds)(
         "Resume ExecuteConfirmedActionTrigger",
-        sv1Backend.dsoDelegateBasedAutomation.trigger[ExecuteConfirmedActionTrigger].resume(),
+        resumeAllDsoDelegateTriggers[ExecuteConfirmedActionTrigger],
       )(
         "TransferCommandCounter gets created",
         (_: Unit) =>

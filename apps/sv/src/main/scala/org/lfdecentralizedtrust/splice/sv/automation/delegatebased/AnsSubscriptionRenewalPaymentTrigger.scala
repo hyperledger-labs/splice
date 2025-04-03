@@ -58,7 +58,8 @@ class AnsSubscriptionRenewalPaymentTrigger(
       subscriptionPayment: AssignedContract[
         SubscriptionPayment.ContractId,
         SubscriptionPayment,
-      ]
+      ],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val AssignedContract(payment, _) = subscriptionPayment
     dsoStore.lookupAnsEntryContext(subscriptionPayment.contract.payload.reference).flatMap {
@@ -74,6 +75,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
                     payment.contractId,
                     entry,
                     transferContext,
+                    controller,
                   )
                 case None =>
                   if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
@@ -107,6 +109,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
       paymentCid: SubscriptionPayment.ContractId,
       entry: AssignedContract[AnsEntry.ContractId, AnsEntry],
       transferContext: AppTransferContext,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
@@ -120,7 +123,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
           transferContext,
           ansRules.contractId,
         ),
-        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
     )
     taskOutcome <- connection

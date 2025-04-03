@@ -62,7 +62,8 @@ class ExecuteConfirmedActionTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      confirmationContract: AssignedContract[Confirmation.ContractId, Confirmation]
+      confirmationContract: AssignedContract[Confirmation.ContractId, Confirmation],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val action = confirmationContract.payload.action
     isStaleAction(confirmationContract).flatMap { isStale =>
@@ -103,7 +104,7 @@ class ExecuteConfirmedActionTrigger(
                         .map(_.contractId)
                         .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
                       Option
-                        .when(supportsSvController)(dsoRules.payload.dsoDelegate)
+                        .when(supportsSvController)(controller)
                         .toJava,
                     )
                   )

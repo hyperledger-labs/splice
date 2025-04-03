@@ -33,7 +33,8 @@ class CloseVoteRequestWithEarlyClosingTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      voteRequestContract: AssignedContract[VoteRequest.ContractId, VoteRequest]
+      voteRequestContract: AssignedContract[VoteRequest.ContractId, VoteRequest],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val trackingCid =
       voteRequestContract.payload.trackingCid.toScala.getOrElse(voteRequestContract.contractId)
@@ -66,7 +67,7 @@ class CloseVoteRequestWithEarlyClosingTrigger(
                         currentRequestCid,
                         java.util.Optional.of(amuletRulesId),
                         Option
-                          .when(supportsSvController)(dsoRules.payload.dsoDelegate)
+                          .when(supportsSvController)(controller)
                           .toJava,
                       )
                     )

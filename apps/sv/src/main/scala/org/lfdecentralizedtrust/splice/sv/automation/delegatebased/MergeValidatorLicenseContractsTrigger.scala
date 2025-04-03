@@ -42,7 +42,8 @@ class MergeValidatorLicenseContractsTrigger(
   private val MAX_VALIDATOR_LICENSE_CONTRACTS = PageLimit.tryCreate(10)
 
   override def completeTaskAsDsoDelegate(
-      validatorLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense]
+      validatorLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validator = validatorLicense.payload.validator
     for {
@@ -65,7 +66,7 @@ class MergeValidatorLicenseContractsTrigger(
           logger.warn(
             s"Validator $validator has ${validatorLicenses.length} Validator License contracts."
           )
-          mergeValidatorLicenseContracts(validator, validatorLicenses)
+          mergeValidatorLicenseContracts(validator, validatorLicenses, controller)
         } else if (supportsPruneAmuletConfigSchedule) {
           Future.successful(
             TaskSuccess(s"Only one Validator License contract for $validator, nothing to merge.")
@@ -83,13 +84,14 @@ class MergeValidatorLicenseContractsTrigger(
   private def mergeValidatorLicenseContracts(
       validator: String,
       validatorLicenses: Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
       supportsSvController <- supportsSvController()
       arg = new DsoRules_MergeValidatorLicense(
         validatorLicenses.map(_.contractId).asJava,
-        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorLicense(arg))
       _ <- svTaskContext.connection

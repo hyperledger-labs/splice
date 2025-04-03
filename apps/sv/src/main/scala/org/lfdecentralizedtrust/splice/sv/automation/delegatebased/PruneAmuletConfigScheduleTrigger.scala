@@ -57,7 +57,8 @@ class PruneAmuletConfigScheduleTrigger(
   override def completeTaskAsDsoDelegate(
       amuletRules: ScheduledTaskTrigger.ReadyTask[
         AssignedContract[AmuletRules.ContractId, AmuletRules]
-      ]
+      ],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
@@ -65,7 +66,7 @@ class PruneAmuletConfigScheduleTrigger(
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_PruneAmuletConfigSchedule(
           amuletRules.work.contractId,
-          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       _ <- svTaskContext.connection

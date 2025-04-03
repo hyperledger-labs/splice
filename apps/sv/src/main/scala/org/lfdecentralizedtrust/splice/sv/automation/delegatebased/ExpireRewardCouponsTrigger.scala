@@ -52,7 +52,8 @@ class ExpireRewardCouponsTrigger(
   )
 
   override def completeTaskAsDsoDelegate(
-      expiredRewardsTask: ExpiredRewardCouponsBatch
+      expiredRewardsTask: ExpiredRewardCouponsBatch,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
@@ -63,6 +64,7 @@ class ExpireRewardCouponsTrigger(
         dsoRules,
         amuletRules,
         supportsSvController,
+        controller,
       )
     } yield TaskSuccess(
       show"Expired ${numCoupons} old reward coupons for closed round ${expiredRewardsTask}"
@@ -74,6 +76,7 @@ class ExpireRewardCouponsTrigger(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       supportsSvController: Boolean,
+      controller: String,
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
@@ -89,7 +92,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
-          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorCoupons.nonEmpty)
@@ -105,7 +108,7 @@ class ExpireRewardCouponsTrigger(
             Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
             None.toJava,
           ),
-          Optional.of(dsoRules.payload.dsoDelegate),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorFaucets.nonEmpty)
@@ -121,7 +124,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             Some(expiredRewardsTask.validatorLivenessActivityRecords.asJava).toJava,
           ),
-          Optional.of(dsoRules.payload.dsoDelegate),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorLivenessActivityRecords.nonEmpty)
@@ -137,7 +140,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
-          Optional.of(dsoRules.payload.dsoDelegate),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.appCoupons.nonEmpty)
@@ -153,7 +156,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
-          Optional.of(dsoRules.payload.dsoDelegate),
+          Optional.of(controller),
         )
       )
     ).filter(_ => expiredRewardsTask.svRewardCoupons.nonEmpty)

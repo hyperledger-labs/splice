@@ -131,6 +131,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
         connection,
         PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
         epoch,
+        config.delegatelessAutomation,
       )
 
     (if (appLevelRetryProvider.isClosing) {

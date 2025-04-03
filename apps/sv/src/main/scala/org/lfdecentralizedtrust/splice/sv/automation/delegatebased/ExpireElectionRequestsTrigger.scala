@@ -56,14 +56,15 @@ class ExpireElectionRequestsTrigger(
       task: Contract[
         ElectionRequest.ContractId,
         ElectionRequest,
-      ]
+      ],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
     supportsSvController <- supportsSvController()
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ArchiveOutdatedElectionRequest(
         task.contractId,
-        Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
     )
     _ <- svTaskContext.connection

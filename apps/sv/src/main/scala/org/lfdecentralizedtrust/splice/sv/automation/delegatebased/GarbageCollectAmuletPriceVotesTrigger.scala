@@ -45,7 +45,8 @@ class GarbageCollectAmuletPriceVotesTrigger(
   val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      dsoRules: DsoRulesContract
+      dsoRules: DsoRulesContract,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       amuletPriceVotes <- store.listAllAmuletPriceVotes()
@@ -67,7 +68,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
             _.exerciseDsoRules_GarbageCollectAmuletPriceVotes(
               nonSvVoteCids.asJava,
               svDuplicatedVoteCids.asJava,
-              Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+              Option.when(supportsSvController)(controller).toJava,
             )
           )
           svTaskContext.connection

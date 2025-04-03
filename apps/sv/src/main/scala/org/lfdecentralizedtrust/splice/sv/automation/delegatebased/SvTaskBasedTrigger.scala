@@ -41,11 +41,18 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
     for {
       dsoRules <- store.getDsoRules()
       sameEpoch = dsoRules.payload.epoch == svTaskContext.epoch
-      isLeader = dsoRules.payload.dsoDelegate == store.key.svParty.toProtoPrimitive
+      dsoDelegate = dsoRules.payload.dsoDelegate
+      svParty = store.key.svParty.toProtoPrimitive
+      isLeader = dsoDelegate == svParty
+      supportsSvController <- supportsSvController()
       result <-
         if (sameEpoch) {
+          // TODO(#17956): remove delegate-based automation
           if (isLeader) {
-            completeTaskAsDsoDelegate(task)
+            completeTaskAsDsoDelegate(task, dsoDelegate)
+            // need to specify supportsSvController in order to not execute old DAML as non-delegate
+          } else if (svTaskContext.delegatelessAutomation && supportsSvController) {
+            completeTaskAsDsoDelegate(task, svParty)
           } else {
             monitorTaskAsFollower(task)
           }
@@ -120,7 +127,8 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
   }
 
   protected def completeTaskAsDsoDelegate(
-      task: T
+      task: T,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome]
 
   final protected def monitorTaskAsFollower(
@@ -200,5 +208,6 @@ object SvTaskBasedTrigger {
       connection: SpliceLedgerConnection,
       dsoDelegate: PartyId,
       epoch: Long,
+      delegatelessAutomation: Boolean,
   )
 }

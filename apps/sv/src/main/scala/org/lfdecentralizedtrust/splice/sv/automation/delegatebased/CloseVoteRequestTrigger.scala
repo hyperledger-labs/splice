@@ -41,7 +41,8 @@ class CloseVoteRequestTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      task: Task
+      task: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val voteRequestCid = task.work.contractId
     for {
@@ -60,7 +61,7 @@ class CloseVoteRequestTrigger(
                   voteRequestCid,
                   java.util.Optional.of(amuletRulesId),
                   Option
-                    .when(supportsSvController)(dsoRules.payload.dsoDelegate)
+                    .when(supportsSvController)(controller)
                     .toJava,
                 )
               )

@@ -33,7 +33,9 @@ class ExpiredAmuletTrigger(
     with SvTaskBasedTrigger[Task] {
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsDsoDelegate(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
+  override def completeTaskAsDsoDelegate(co: Task, controller: String)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] =
     for {
       latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
       dsoRules <- store.getDsoRules()
@@ -44,7 +46,7 @@ class ExpiredAmuletTrigger(
           new splice.amulet.Amulet_Expire(
             latestOpenMiningRound.contractId
           ),
-          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       _ <- svTaskContext.connection

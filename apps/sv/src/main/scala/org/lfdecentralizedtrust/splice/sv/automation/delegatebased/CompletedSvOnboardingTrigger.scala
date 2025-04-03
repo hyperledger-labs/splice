@@ -41,7 +41,8 @@ class CompletedSvOnboardingTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      dsoRules: DsoRulesContract
+      dsoRules: DsoRulesContract,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svOnboardings <- store.listSvOnboardingRequestsBySvs(dsoRules)
@@ -50,7 +51,7 @@ class CompletedSvOnboardingTrigger(
         dsoRules.exercise(
           _.exerciseDsoRules_ArchiveSvOnboardingRequest(
             co.contractId,
-            Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+            Option.when(supportsSvController)(controller).toJava,
           )
         )
       )

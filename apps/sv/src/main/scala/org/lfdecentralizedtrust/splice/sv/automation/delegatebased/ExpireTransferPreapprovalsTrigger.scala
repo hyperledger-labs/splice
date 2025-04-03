@@ -41,14 +41,16 @@ class ExpireTransferPreapprovalsTrigger(
 
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsDsoDelegate(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
+  override def completeTaskAsDsoDelegate(co: Task, controller: String)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
       supportsSvController <- supportsSvController()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireTransferPreapproval(
           co.work.contractId,
-          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       _ <- svTaskContext.connection

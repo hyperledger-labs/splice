@@ -24,6 +24,10 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
+  pauseAllDsoDelegateTriggers,
+  resumeAllDsoDelegateTriggers,
+}
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -844,10 +848,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Pausing vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation
-              .trigger[CloseVoteRequestTrigger]
-              .pause()
-              .futureValue
+            pauseAllDsoDelegateTriggers[CloseVoteRequestTrigger]
           }
 
           actAndCheck(
@@ -878,7 +879,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Resuming vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
+            resumeAllDsoDelegateTriggers[CloseVoteRequestTrigger]
           }
 
           clue("Voting to reject the other vote request") {

@@ -41,7 +41,8 @@ class ExpireStaleConfirmationsTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      task: Task
+      task: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
@@ -49,7 +50,7 @@ class ExpireStaleConfirmationsTrigger(
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireStaleConfirmation(
           task.work.contractId,
-          Option.when(supportsSvController)(dsoRules.payload.dsoDelegate).toJava,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       _ <- svTaskContext.connection
