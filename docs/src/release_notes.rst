@@ -8,6 +8,11 @@
 Release Notes
 =============
 
+0.3.19
+------
+
+* Stability improvements
+
 0.3.18
 ------
 
