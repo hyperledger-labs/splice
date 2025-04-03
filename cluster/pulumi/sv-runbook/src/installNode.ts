@@ -376,7 +376,9 @@ async function installSvAndValidator(
       enable: true,
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
-    validatorWalletUsers: [validatorWalletUserName].concat(svUserIds(auth0Config)),
+    validatorWalletUsers: svUserIds(auth0Config).apply(ids =>
+      ids.concat([validatorWalletUserName])
+    ),
     ...spliceInstanceNames,
   };
 

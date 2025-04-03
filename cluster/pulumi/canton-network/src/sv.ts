@@ -323,10 +323,9 @@ async function installValidator(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
-    validatorWalletUsers: (svConfig.validatorWalletUser
-      ? [svConfig.validatorWalletUser]
-      : []
-    ).concat(svUserIds(validatorSecrets.auth0Client.getCfg())),
+    validatorWalletUsers: svUserIds(validatorSecrets.auth0Client.getCfg()).apply(ids =>
+      ids.concat(svConfig.validatorWalletUser ? [svConfig.validatorWalletUser] : [])
+    ),
     dependencies: sv.participant.asDependencies,
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,

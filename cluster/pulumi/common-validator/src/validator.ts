@@ -54,7 +54,7 @@ export type ValidatorSecrets = {
 type BasicValidatorConfig = {
   xns: ExactNamespace;
   topupConfig?: ValidatorTopupConfig;
-  validatorWalletUsers: string[];
+  validatorWalletUsers: Output<string[]>;
   disableAllocateLedgerApiUserParty?: boolean;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: CnInput<pulumi.Resource>[];

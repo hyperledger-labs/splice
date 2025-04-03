@@ -11,12 +11,15 @@ set -eou pipefail
 # avoid accidentally changing the sub.
 # See https://trufflesecurity.com/blog/millions-at-risk-due-to-google-s-oauth-flaw
 
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 tenants=(canton-network-dev.us.auth0.com canton-network-sv-test.us.auth0.com canton-network-mainnet.us.auth0.com)
-users="$(yq < cluster/user-configs/sv-users.yaml .user_emails -o json)"
+users="$(yq < "${SCRIPT_DIR}/sv-users.yaml" .user_emails -o json)"
 for tenant in "${tenants[@]}"
 do
   all_auth0_users="$(auth0 users search -s email:1 -n 1000 --query digitalasset.com --tenant "$tenant" --json | jq 'map({user_id,email,created_at})')"
   jq -n --argjson auth0_users "$all_auth0_users" --argjson approved_users "$users" \
      '$auth0_users | map(select(. as $user | $approved_users | index($user.email)))' > \
-    "$SPLICE_ROOT/cluster/user-configs/$tenant.json"
+    "${SCRIPT_DIR}/$tenant.json"
+
 done

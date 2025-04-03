@@ -156,7 +156,7 @@ export async function installSplitwell(
       auth0Client: auth0Client,
       auth0AppName: 'splitwell_validator',
     },
-    validatorWalletUsers: [validatorWalletUser],
+    validatorWalletUsers: pulumi.output([validatorWalletUser]),
     validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
   });

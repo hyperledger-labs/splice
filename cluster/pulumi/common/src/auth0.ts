@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenResponse } from 'auth0';
 
@@ -14,13 +15,7 @@ import type {
   Auth0ClusterConfig,
 } from './auth0types';
 import { config, isMainNet } from './config';
-import {
-  CLUSTER_BASENAME,
-  ExactNamespace,
-  fixedTokens,
-  loadJsonFromFile,
-  SPLICE_ROOT,
-} from './utils';
+import { CLUSTER_BASENAME, ExactNamespace, fixedTokens } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
@@ -454,11 +449,21 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
   }
 }
 
-export const svUserIds = (auth0Cfg: Auth0Config): string[] => {
+export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {
   console.error(auth0Cfg);
-  const json = loadJsonFromFile(`${SPLICE_ROOT}/cluster/user-configs/${auth0Cfg.auth0Domain}.json`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return json.map((user: any) => user.user_id);
+  const temp = getSecretVersionOutput({
+    secret: `user-configs-${auth0Cfg.auth0Domain.replace('.us.auth0.com', '')}`,
+  });
+  return temp.apply(config => {
+    const secretData = config.secretData;
+    const json = JSON.parse(secretData);
+    const ret: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    json.forEach((user: any) => {
+      ret.push(user.user_id);
+    });
+    return ret;
+  });
 };
 
 export const ansDomainPrefix = 'cns';
