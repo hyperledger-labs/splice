@@ -444,7 +444,7 @@
       "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-1",
+      "name": "participant-2",
       "namespace": "splitwell",
       "timeout": 600,
       "values": {
@@ -482,7 +482,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 1
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -493,7 +493,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -508,7 +508,7 @@
       },
       "version": "0.3.17"
     },
-    "name": "splitwell-participant-1",
+    "name": "splitwell-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -615,9 +615,9 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
-        "participantHost": "participant-1",
+        "participantHost": "participant-2",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -844,7 +844,8 @@
           "enable": true
         },
         "migration": {
-          "id": 1,
+          "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "splitwell",
@@ -855,7 +856,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

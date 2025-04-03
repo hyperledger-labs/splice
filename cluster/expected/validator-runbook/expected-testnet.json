@@ -329,7 +329,7 @@
       "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-1",
+      "name": "participant-2",
       "namespace": "validator",
       "timeout": 600,
       "values": {
@@ -367,7 +367,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 1
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -378,7 +378,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -394,7 +394,7 @@
       },
       "version": "0.3.17"
     },
-    "name": "validator-participant-1",
+    "name": "validator-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -531,10 +531,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "1"
+          "id": "2"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
