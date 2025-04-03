@@ -452,7 +452,7 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
 export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {
   console.error(auth0Cfg);
   const temp = getSecretVersionOutput({
-    secret: `user-configs-${auth0Cfg.auth0Domain.replace('.us.auth0.com', '')}`,
+    secret: `pulumi-user-configs-${auth0Cfg.auth0Domain.replace('.us.auth0.com', '')}`,
   });
   return temp.apply(config => {
     const secretData = config.secretData;

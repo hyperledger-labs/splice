@@ -216,7 +216,7 @@ export async function initDumpConfig(): Promise<void> {
                 ...args.inputs,
                 secretData,
               };
-            } else if (args.inputs.secret.startsWith('user-configs-')) {
+            } else if (args.inputs.secret.startsWith('pulumi-user-configs-')) {
               const secretData = JSON.stringify([
                 {
                   user_id: 'google-oauth2|1234567890',
