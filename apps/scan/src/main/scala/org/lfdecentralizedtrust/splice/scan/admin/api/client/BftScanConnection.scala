@@ -68,6 +68,10 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
 import org.slf4j.event.Level
 
 import java.util.concurrent.ConcurrentHashMap
@@ -309,6 +313,48 @@ class BftScanConnection(
       tc: TraceContext,
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
     bftCall(_.lookupTransferPreapprovalByParty(receiver))
+
+  override def listDsoRulesVoteRequests()(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    bftCall(_.listDsoRulesVoteRequests())
+
+  override def listVoteRequestsByTrackingCid(
+      voteRequestCids: Seq[VoteRequest.ContractId]
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+  ] = bftCall(_.listVoteRequestsByTrackingCid(voteRequestCids))
+
+  def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    bftCall(_.lookupVoteRequest(contractId))
+
+  override def listVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Int,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]] = bftCall(
+    _.listVoteRequestResults(
+      actionName,
+      accepted,
+      requester,
+      effectiveFrom,
+      effectiveTo,
+      limit,
+    )
+  )
 
   override def getUpdatesBefore(
       migrationId: Long,
