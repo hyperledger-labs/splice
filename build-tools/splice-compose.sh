@@ -234,7 +234,7 @@ function subcmd_start {
   fi
 
   if [ $da_repo -eq 1 ]; then
-    export IMAGE_REPO="${DEV_DOCKER_REGISTRY}/"
+    export IMAGE_REPO="${CACHE_DEV_DOCKER_REGISTRY}/"
   else
     # Locally built images (the default when using this script)
     export IMAGE_REPO=""

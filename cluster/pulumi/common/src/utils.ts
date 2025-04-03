@@ -18,8 +18,8 @@ export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const PUBLIC_CONFIGS_PATH = config.optionalEnv('PUBLIC_CONFIGS_PATH');
 export const PRIVATE_CONFIGS_PATH = config.requireEnv('PRIVATE_CONFIGS_PATH');
 
-export const HELM_REPO = spliceEnvConfig.requireEnv('OCI_DEV_HELM_REGISTRY');
-export const DOCKER_REPO = spliceEnvConfig.requireEnv('DEV_DOCKER_REGISTRY');
+export const HELM_REPO = spliceEnvConfig.requireEnv('CACHE_OCI_DEV_HELM_REGISTRY');
+export const DOCKER_REPO = spliceEnvConfig.requireEnv('CACHE_DEV_DOCKER_REGISTRY');
 
 export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
   const daUrlScheme = 'global.canton.network.digitalasset.com';
