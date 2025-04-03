@@ -63,6 +63,7 @@ parameters:
         purge-unused-dbs-cidaily,
         bump-configs,
         update-serverless-workflows,
+        update-gcp-projects
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -4065,6 +4066,27 @@ jobs:
             echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
             ./cluster/serverless/deploy.sh
 
+  update_gcp_project:
+    executor: self_hosted
+    parameters:
+      <<: *cluster-parameter
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Update GCP projects
+          gce_authenticate: true
+          cluster: << parameters.cluster >>
+          cmd: |
+            cncluster pulumi gcp-project up --skip-preview --yes
+
   deploy_operator:
     executor: self_hosted
     environment:
@@ -5892,6 +5914,41 @@ workflows:
           context:
             - slack-context
             - canton-network-vpn
+
+  update_gcp_projects:
+    when:
+      equal: [ update-gcp-projects, << pipeline.parameters.run-job >> ]
+    jobs:
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-scratchnets
+          cluster: scratchneta
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-ci
+          cluster: cimain
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-ci-2
+          cluster: cidaily
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-devnet
+          cluster: devnet
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-mainnet
+          cluster: mainnet
+          context:
+            - artifactory
 
   deploy_hdm_operator:
     when:

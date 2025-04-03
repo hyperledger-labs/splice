@@ -1,0 +1,29 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "[\"35.194.81.56/32\",\"35.198.147.95/32\",\"35.189.40.124/32\",\"34.132.91.75/32\",\"18.210.210.130/32\",\"146.4.45.122/32\"]"
+      }
+    },
+    "name": "internal-whitelist-version",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:gcp::provider-stack::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "pulumi-internal-whitelists"
+    },
+    "name": "internal-whitelist",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:gcp::provider-stack::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+    "type": "gcp:secretmanager/secret:Secret"
+  }
+]

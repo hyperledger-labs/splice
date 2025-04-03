@@ -58,6 +58,7 @@ parameters:
         purge-unused-dbs-cidaily,
         bump-configs,
         update-serverless-workflows,
+        update-gcp-projects
       ]
     default: build
   # Whether the cluster should be reset before deploying.
