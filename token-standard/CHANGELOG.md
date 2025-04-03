@@ -9,6 +9,10 @@ Major changes:
 - Populate this information in the `LockedAmulet` implementation and allow using amulet `Holding`s
   with expired locks as inputs to transfers and allocations. Thereby enabling a combined unlock and
   use of amulet tokens in a single transaction.
+- Removed the `RegistryAppInstall` interface from the token metadata API, as it turned out to be
+  difficult to standardize in a uniform way. We expect to reintroduce a separate standard to
+  aid wallets in navigating to registry specific UIs running locally against an investor's
+  Canton node in the future.
 
 Polishing changes
 
