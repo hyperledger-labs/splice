@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.api.v2.commands.Command.Command.Create
 import com.daml.ledger.api.v2.commands.{Command, CreateCommand}
+import com.daml.ledger.api.v2.event_query_service
 import com.daml.ledger.api.v2.state_service.GetActiveContractsRequest
 import com.daml.ledger.api.v2.update_service.GetUpdatesRequest
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
@@ -20,11 +21,13 @@ import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent
 import com.digitalasset.canton.http.json.v2.{
   JsContractEntry,
+  JsEventServiceCodecs,
   JsGetUpdatesResponse,
   JsStateServiceCodecs,
   JsUpdate,
   JsUpdateServiceCodecs,
 }
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.google.protobuf
 import com.google.protobuf.ByteString
@@ -48,6 +51,7 @@ import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
 import java.nio.file.{Files, Paths}
+import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
@@ -86,6 +90,13 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )
   }
 
+  private val interfaces =
+    Seq(
+      transferinstructionv1.TransferFactory.TEMPLATE_ID,
+      holdingv1.Holding.TEMPLATE_ID,
+      holdingv1.BurnMintFactory.TEMPLATE_ID,
+    )
+
   def replaceOrFail[R](targetPath: String, normalizedContent: R, encoder: Encoder[R]): Unit = {
     val path = Paths.get(targetPath)
     val prettyNormalizedContent = encoder(normalizedContent).spaces2SortKeys
@@ -108,7 +119,20 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       aliceWalletClient.createTransferPreapproval()
       aliceValidatorWalletClient.createTransferPreapproval()
 
-      val (_, (activeContractsResponse, getUpdatesResponse)) = actAndCheck(
+      logger.info(
+        s"Generating CLI data for" +
+          s" alice: ${alice.toProtoPrimitive}" +
+          s" validator: ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"
+      )
+
+      val (
+        _,
+        (
+          activeContractsResponse,
+          getUpdatesResponse,
+          (amuletBeforeFirstTransferCid, amuletBeforeSecondTransferCid),
+        ),
+      ) = actAndCheck(
         "Create some holdings", {
           // Amulet holdings: one transferred via token standard, one tapped (minted)
           executeTransferViaTokenStandard(
@@ -117,8 +141,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             alice,
             BigDecimal("200.0"),
           )
-          eventually() {
+          val amuletBeforeFirstTransferCid = eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("200"))
+            aliceWalletClient.list().amulets.loneElement.contract.contractId.contractId
           }
           // send some back so there's a TransferFactory_Transfer node in the other direction
           executeTransferViaTokenStandard(
@@ -127,8 +152,18 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             aliceValidatorBackend.getValidatorPartyId(),
             BigDecimal("100.0"),
           )
-          eventually() {
+          val amuletBeforeSecondTransferCid = eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("87")) // fees!
+            aliceWalletClient.list().amulets.loneElement.contract.contractId.contractId
+          }
+          // Deliberately using a non-token-standard transfer so that this shows up as a BurnMint
+          aliceWalletClient.transferPreapprovalSend(
+            aliceValidatorBackend.getValidatorPartyId(),
+            BigDecimal("10.0"),
+            UUID.randomUUID().toString,
+          )
+          eventually() {
+            aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("64.9")) // fees!
           }
           aliceWalletClient.tap(BigDecimal("100.0"))
 
@@ -161,48 +196,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 ),
               )
           }
+
+          (amuletBeforeFirstTransferCid, amuletBeforeSecondTransferCid)
         },
       )(
         "holdings and transactions are returned",
-        _ => {
-          val interfaces =
-            Seq(
-              transferinstructionv1.TransferFactory.TEMPLATE_ID,
-              holdingv1.Holding.TEMPLATE_ID,
-              holdingv1.BurnMintFactory.TEMPLATE_ID,
-            )
-          def filtersByParty(includeWildcard: Boolean) = Map(
-            alice.toProtoPrimitive -> Filters(
-              interfaces.map(interface =>
-                CumulativeFilter(
-                  IdentifierFilter.InterfaceFilter(
-                    InterfaceFilter(
-                      Some(
-                        TemplateId
-                          .fromJavaIdentifier(interface)
-                          .toIdentifier
-                      ),
-                      includeCreatedEventBlob = true,
-                      includeInterfaceView = true,
-                    )
-                  )
-                )
-              ) ++ (if (includeWildcard)
-                      Seq(
-                        CumulativeFilter(
-                          IdentifierFilter.WildcardFilter(
-                            WildcardFilter(true)
-                          )
-                        )
-                      )
-                    else Seq.empty)
-            )
-          )
-
+        amuletsBeforeTransfersCid => {
           val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
             GetActiveContractsRequest(
               filter = Some(
-                TransactionFilter(filtersByParty(false))
+                TransactionFilter(filtersByParty(alice, includeWildcard = false))
               ),
               activeAtOffset =
                 aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end(),
@@ -225,7 +228,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   Some(
                     TransactionFormat(
                       transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
-                      eventFormat = Some(EventFormat(filtersByParty(true))),
+                      eventFormat = Some(EventFormat(filtersByParty(alice, includeWildcard = true))),
                     )
                   )
                 )
@@ -239,7 +242,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             io.circe.Decoder.decodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
           )
 
-          (activeContractsResponse, getUpdatesResponse)
+          (activeContractsResponse, getUpdatesResponse, amuletsBeforeTransfersCid)
         },
       )
 
@@ -306,6 +309,44 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           .valueOrFail("expected valid json after normalization")
       }
 
+      def normalizeCreatedEvent(
+          created: JsEvent.CreatedEvent,
+          offset: Long,
+          createdAt: protobuf.timestamp.Timestamp,
+      ) = {
+        created.copy(
+          offset = offset,
+          contractId = replaceContractIdWithStableString(created.contractId).toString,
+          templateId = stableTemplateId(created.templateId),
+          createArgument = created.createArgument.map(replaceStringsInJson),
+          createdEventBlob = ByteString.empty(),
+          interfaceViews = created.interfaceViews.map(view =>
+            view.copy(
+              viewValue = Some(
+                replaceStringsInJson(
+                  view.viewValue.valueOrFail("Expected view value to be available.")
+                )
+              ),
+              interfaceId = stableTemplateId(view.interfaceId),
+            )
+          ),
+          witnessParties = created.witnessParties.map(expectedParties),
+          signatories = created.signatories.map(expectedParties),
+          observers = created.observers.map(expectedParties),
+          createdAt = createdAt,
+        )
+      }
+
+      def normalizeArchivedEvent(archived: JsEvent.ArchivedEvent, offset: Long) = {
+        archived.copy(
+          offset = offset,
+          contractId = replaceContractIdWithStableString(archived.contractId).toString,
+          templateId = stableTemplateId(archived.templateId),
+          witnessParties = archived.witnessParties.map(expectedParties),
+          implementedInterfaces = archived.implementedInterfaces.map(stableTemplateId),
+        )
+      }
+
       val normalizedHoldings = activeContractsResponse.map(entry =>
         entry.copy(contractEntry = entry.contractEntry match {
           case active: JsContractEntry.JsActiveContract =>
@@ -368,35 +409,13 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               recordTime = protobuf.timestamp.Timestamp.of(idx.toLong, 0),
               events = transaction.value.events.zipWithIndex.map {
                 case (created: JsEvent.CreatedEvent, eventIdx) =>
-                  created.copy(
-                    offset = idx.toLong,
-                    contractId = replaceContractIdWithStableString(created.contractId).toString,
-                    templateId = stableTemplateId(created.templateId),
-                    createArgument = created.createArgument.map(replaceStringsInJson),
-                    createdEventBlob = ByteString.empty(),
-                    interfaceViews = created.interfaceViews.map(view =>
-                      view.copy(
-                        viewValue = Some(
-                          replaceStringsInJson(
-                            view.viewValue.valueOrFail("Expected view value to be available.")
-                          )
-                        ),
-                        interfaceId = stableTemplateId(view.interfaceId),
-                      )
-                    ),
-                    witnessParties = created.witnessParties.map(expectedParties),
-                    signatories = created.signatories.map(expectedParties),
-                    observers = created.observers.map(expectedParties),
-                    createdAt = protobuf.timestamp.Timestamp.of(idx.toLong, eventIdx),
+                  normalizeCreatedEvent(
+                    created,
+                    idx.toLong,
+                    protobuf.timestamp.Timestamp.of(idx.toLong, eventIdx),
                   )
                 case (archived: JsEvent.ArchivedEvent, _) =>
-                  archived.copy(
-                    offset = idx.toLong,
-                    contractId = replaceContractIdWithStableString(archived.contractId).toString,
-                    templateId = stableTemplateId(archived.templateId),
-                    witnessParties = archived.witnessParties.map(expectedParties),
-                    implementedInterfaces = archived.implementedInterfaces.map(stableTemplateId),
-                  )
+                  normalizeArchivedEvent(archived, idx.toLong)
                 case (exercised: JsEvent.ExercisedEvent, _) =>
                   exercised.copy(
                     offset = idx.toLong,
@@ -420,6 +439,43 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         normalizedUpdates.map(JsGetUpdatesResponse(_)),
         io.circe.Encoder.encodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
       )
+
+      Seq(amuletBeforeFirstTransferCid, amuletBeforeSecondTransferCid).zipWithIndex.foreach {
+        case (amuletBeforeTransferCid, idx) =>
+          val getEventsByContractIdResponse = makeJsonApiV2Request(
+            "/v2/events/events-by-contract-id",
+            JsEventServiceCodecs.jsGetEventsByContractIdRequestRW(
+              event_query_service.GetEventsByContractIdRequest(
+                amuletBeforeTransferCid,
+                Seq.empty,
+                Some(EventFormat(filtersByParty(alice, includeWildcard = true))),
+              )
+            ),
+            JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,
+          )
+          replaceOrFail(
+            s"token-standard/cli/__tests__/mocks/data/eventsByContractIdResponse-$idx.json",
+            getEventsByContractIdResponse.copy(
+              created = getEventsByContractIdResponse.created.map(created =>
+                created.copy(
+                  createdEvent = normalizeCreatedEvent(
+                    created.createdEvent,
+                    42L,
+                    protobuf.timestamp.Timestamp.of(42L, 42),
+                  ),
+                  synchronizerId = "sync::normalized",
+                )
+              ),
+              archived = getEventsByContractIdResponse.archived.map(archived =>
+                archived.copy(
+                  archivedEvent = normalizeArchivedEvent(archived.archivedEvent, 42L),
+                  synchronizerId = "sync::normalized",
+                )
+              ),
+            ),
+            JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,
+          )
+      }
     }
 
   }
@@ -444,11 +500,43 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )
       .futureValue
     val rawResponse = Unmarshal(response).to[String].futureValue
-    io.circe.parser
-      .parse(rawResponse)
-      .valueOrFail("failed to parse json")
-      .as[R](decode)
-      .valueOrFail(s"Failed to decode $rawResponse")
+    if (response.status.isFailure()) {
+      throw new RuntimeException(s"Failed to execute request to $subPath: $rawResponse")
+    } else {
+      io.circe.parser
+        .parse(rawResponse)
+        .valueOrFail("failed to parse json")
+        .as[R](decode)
+        .valueOrFail(s"Failed to decode $rawResponse")
+    }
   }
+
+  private def filtersByParty(party: PartyId, includeWildcard: Boolean) = Map(
+    party.toProtoPrimitive -> Filters(
+      interfaces.map(interface =>
+        CumulativeFilter(
+          IdentifierFilter.InterfaceFilter(
+            InterfaceFilter(
+              Some(
+                TemplateId
+                  .fromJavaIdentifier(interface)
+                  .toIdentifier
+              ),
+              includeCreatedEventBlob = true,
+              includeInterfaceView = true,
+            )
+          )
+        )
+      ) ++ (if (includeWildcard)
+              Seq(
+                CumulativeFilter(
+                  IdentifierFilter.WildcardFilter(
+                    WildcardFilter(true)
+                  )
+                )
+              )
+            else Seq.empty)
+    )
+  )
 
 }

@@ -32,7 +32,7 @@ export class LedgerClient {
     } else {
       const txt = await response.text();
       throw new Error(
-        `Obtained non-OK response from ${fullUrl}: ${response.statusText}.\n${txt}`
+        `Obtained non-OK response from ${fullUrl}: ${response.status} ${response.statusText}.\n${txt}`
       );
     }
   }
@@ -155,6 +155,22 @@ export class LedgerClient {
       deduplicationPeriod: { Empty: {} },
     };
     return this.doFetch("/v2/interactive-submission/execute", "POST", payload);
+  }
+
+  async getEventsByContractId(
+    contractId: string,
+    party: string,
+    interfaceNames: string[]
+  ): Promise<any> {
+    const payload = {
+      contractId,
+      eventFormat: {
+        filtersByParty: this.filtersByParty(party, interfaceNames, true),
+        verbose: false,
+      },
+      requestingParties: [], // this field will be removed according to openapi docs, but it's mandatory
+    };
+    return this.doFetch("/v2/events/events-by-contract-id", "POST", payload);
   }
 }
 

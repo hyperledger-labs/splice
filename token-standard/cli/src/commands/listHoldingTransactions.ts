@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { LedgerClient } from "../apis/ledger-client";
 import { CommandOptions } from "../cli";
-import { TokenStandardTransactionInterfaces } from "../constants";
+import {
+  HoldingInterface,
+  TokenStandardTransactionInterfaces,
+} from "../constants";
 
 // TODO (#18634): support verbose flag
 export async function listHoldingTransactions(
@@ -29,7 +32,12 @@ export async function listHoldingTransactions(
     ).map((c) => c.contractEntry.JsActiveContract.createdEvent.contractId);
     console.log(
       JSON.stringify(
-        toPrettyTransactions(updates, partyId, new Set(acs)),
+        await toPrettyTransactions(
+          updates,
+          partyId,
+          new Set(acs),
+          ledgerClient
+        ),
         null,
         2
       )
@@ -39,40 +47,43 @@ export async function listHoldingTransactions(
   }
 }
 
-function toPrettyTransactions(
+async function toPrettyTransactions(
   updates: any[],
   partyId: string,
-  mutatingHoldingsAcs: Set<string>
-): PrettyTransactions {
+  mutatingHoldingsAcs: Set<string>,
+  ledgerClient: LedgerClient
+): Promise<PrettyTransactions> {
   const offsetCheckpoints: number[] = updates
     .filter((update) => update.update.OffsetCheckpoint)
     .map((update) => update.update.OffsetCheckpoint.value.offset);
   const latestCheckpointOffset = Math.max(...offsetCheckpoints);
 
-  const transactions: PrettyTransaction[] = updates
-    // exclude OffsetCheckpoint, Reassignment, TopologyTransaction
-    .filter((update) => !!update.update?.Transaction?.value)
-    .map((update) => {
-      const tx = update.update.Transaction.value;
-      const rawEvents: any[] = tx.events;
+  const transactions: PrettyTransaction[] = await Promise.all(
+    updates
+      // exclude OffsetCheckpoint, Reassignment, TopologyTransaction
+      .filter((update) => !!update.update?.Transaction?.value)
+      .map(async (update) => {
+        const tx = update.update.Transaction.value;
+        const rawEvents: any[] = tx.events;
 
-      const events: Event[] = toPrettyEvents(
-        rawEvents.reverse(),
-        [],
-        partyId,
-        mutatingHoldingsAcs,
-        [],
-        -1
-      );
-
-      return {
-        updateId: tx.updateId,
-        offset: tx.offset,
-        recordTime: tx.recordTime,
-        synchronizerId: tx.synchronizerId,
-        events,
-      };
-    });
+        const events = await toPrettyEvents(
+          rawEvents.reverse(),
+          [],
+          partyId,
+          mutatingHoldingsAcs,
+          [],
+          -1,
+          ledgerClient
+        );
+        return {
+          updateId: tx.updateId,
+          offset: tx.offset,
+          recordTime: tx.recordTime,
+          synchronizerId: tx.synchronizerId,
+          events,
+        };
+      })
+  );
 
   return {
     // OffsetCheckpoint can be anywhere... or not at all, maybe
@@ -84,14 +95,15 @@ function toPrettyTransactions(
   };
 }
 
-function toPrettyEvents(
+async function toPrettyEvents(
   pendingEventsMutatingStack: any[],
   mutatingResult: Event[],
   partyId: string,
   mutatingHoldingAcs: Set<string>,
   parentChoiceNames: string[],
-  continueAfterNodeId: number
-): Event[] {
+  continueAfterNodeId: number,
+  ledgerClient: LedgerClient
+): Promise<Event[]> {
   if (pendingEventsMutatingStack.length === 0) return mutatingResult;
   else {
     const currentEvent = pendingEventsMutatingStack.pop();
@@ -107,69 +119,69 @@ function toPrettyEvents(
         partyId,
         mutatingHoldingAcs,
         parentChoiceNames,
-        continueAfterNodeId
+        continueAfterNodeId,
+        ledgerClient
       );
     } else if (exercisedEvent) {
-      // ledger API's TRANSACTION_SHAPE_LEDGER_EFFECTS does not include ArchivedEvent, instead has the choice as Archive
-      if (exercisedEvent.choice === "Archive") {
-        const prettyArchive = toPrettyArchiveEvent(
-          exercisedEvent,
-          mutatingHoldingAcs,
-          parentChoice
-        );
-        prettyArchive && mutatingResult.push(prettyArchive);
-        return toPrettyEvents(
-          pendingEventsMutatingStack,
-          mutatingResult,
-          partyId,
-          mutatingHoldingAcs,
-          parentChoiceNames,
-          exercisedEvent.nodeId
-        );
-      } else {
-        switch (exercisedEvent.choice) {
-          case "TransferFactory_Transfer":
-            const transfer = toPrettyTransfer(exercisedEvent);
-            mutatingResult.push(transfer);
-            return toPrettyEvents(
+      switch (exercisedEvent.choice) {
+        case "TransferFactory_Transfer":
+          const transfer = await tokenStandardChoiceExercised(
+            toPrettyTransfer(exercisedEvent),
+            exercisedEvent,
+            pendingEventsMutatingStack,
+            partyId,
+            mutatingHoldingAcs,
+            ledgerClient
+          );
+          mutatingResult.push(transfer);
+          return toPrettyEvents(
+            pendingEventsMutatingStack,
+            mutatingResult,
+            partyId,
+            mutatingHoldingAcs,
+            parentChoiceNames,
+            exercisedEvent.lastDescendantNodeId, // Children already parsed
+            ledgerClient
+          );
+        case "BurnMintFactory_BurnMint":
+          const pretty = toPrettyBurnMint(exercisedEvent, partyId);
+          if (pretty) {
+            const burnMint = await tokenStandardChoiceExercised(
+              pretty,
+              exercisedEvent,
               pendingEventsMutatingStack,
-              mutatingResult,
               partyId,
               mutatingHoldingAcs,
-              parentChoiceNames,
-              exercisedEvent.lastDescendantNodeId // We don't care about a transfer's children
+              ledgerClient
             );
-          case "BurnMintFactory_BurnMint":
-            const burnMint = toPrettyBurnMint(exercisedEvent, partyId);
-            if (burnMint) {
-              mutatingResult.push(burnMint);
-            }
-            return toPrettyEvents(
-              pendingEventsMutatingStack,
-              mutatingResult,
-              partyId,
-              mutatingHoldingAcs,
-              parentChoiceNames,
-              exercisedEvent.lastDescendantNodeId // We don't care about burnmint's children
-            );
-          default:
-            parentChoiceNames.push(exercisedEvent.choice);
-            const result = toPrettyEvents(
-              pendingEventsMutatingStack,
-              mutatingResult,
-              partyId,
-              mutatingHoldingAcs,
-              parentChoiceNames,
-              // we want to parse the children too
-              exercisedEvent.nodeId
-            );
-            parentChoiceNames.pop();
-            return result;
-        }
+            mutatingResult.push(burnMint);
+          }
+          return toPrettyEvents(
+            pendingEventsMutatingStack,
+            mutatingResult,
+            partyId,
+            mutatingHoldingAcs,
+            parentChoiceNames,
+            exercisedEvent.lastDescendantNodeId, // Children already parsed
+            ledgerClient
+          );
+        default:
+          parentChoiceNames.push(exercisedEvent.choice);
+          const result = toPrettyEvents(
+            pendingEventsMutatingStack,
+            mutatingResult,
+            partyId,
+            mutatingHoldingAcs,
+            parentChoiceNames,
+            // we want to parse the children too
+            exercisedEvent.nodeId,
+            ledgerClient
+          );
+          parentChoiceNames.pop();
+          return result;
       }
     } else if (createdEvent) {
-      const holdingView = createdEvent.interfaceViews[0];
-      if (!holdingView || holdingView.viewValue.owner !== partyId) {
+      if (shouldIgnoreCreateEvent(createdEvent, partyId)) {
         // Not a holding, or the party doesn't care about what happens there
         return toPrettyEvents(
           pendingEventsMutatingStack,
@@ -177,9 +189,11 @@ function toPrettyEvents(
           partyId,
           mutatingHoldingAcs,
           parentChoiceNames,
-          createdEvent.nodeId
+          createdEvent.nodeId,
+          ledgerClient
         );
       } else {
+        const holdingView = createdEvent.interfaceViews[0];
         const payload = {
           ...holdingView,
           viewStatus:
@@ -205,7 +219,8 @@ function toPrettyEvents(
           partyId,
           mutatingHoldingAcs,
           parentChoiceNames,
-          createdEvent.nodeId
+          createdEvent.nodeId,
+          ledgerClient
         );
       }
     } else if (archivedEvent) {
@@ -221,7 +236,8 @@ function toPrettyEvents(
         partyId,
         mutatingHoldingAcs,
         parentChoiceNames,
-        archivedEvent.nodeId
+        archivedEvent.nodeId,
+        ledgerClient
       );
     } else {
       throw new Error(`Unknown event: ${JSON.stringify(currentEvent)}`);
@@ -234,13 +250,8 @@ function toPrettyArchiveEvent(
   mutatingHoldingAcs: Set<string>,
   parentChoice: string
 ): RawArchivedEvent | null {
-  const interfaceId: string | undefined = event.implementedInterfaces[0];
-  const shouldIgnoreArchiveEvent =
-    !interfaceId ||
-    (interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding") &&
-      !mutatingHoldingAcs.has(event.contractId));
   // contract is unknown to the sender or not a holding
-  if (shouldIgnoreArchiveEvent) {
+  if (shouldIgnoreArchiveEvent(event, mutatingHoldingAcs)) {
     return null;
   } else {
     mutatingHoldingAcs.delete(event.contractId);
@@ -254,6 +265,16 @@ function toPrettyArchiveEvent(
       actingParties: event.actingParties || [],
     };
   }
+}
+
+function shouldIgnoreCreateEvent(createdEvent: any, partyId: string): boolean {
+  const holdingView = createdEvent.interfaceViews[0];
+  return !holdingView || holdingView.viewValue.owner !== partyId;
+}
+
+function shouldIgnoreArchiveEvent(event: any, acs: Set<string>): boolean {
+  const interfaceId: string | undefined = event.implementedInterfaces[0];
+  return !interfaceId || !acs.has(event.contractId);
 }
 
 function toPrettyTransfer(exercisedEvent: any): PrettyTransfer {
@@ -297,7 +318,6 @@ function toPrettyBurnMint(
     return null;
   }
 
-  // TODO(#18607) Resolve cid through event query service
   const inputHoldings = choiceArgument.inputHoldingCids;
   const outputHoldings = choiceArgument.outputs.map(
     (output: any, idx: number) => {
@@ -332,12 +352,20 @@ interface NodeIdAndEvent {
   createdEvent?: any;
 }
 function getNodeIdAndEvent(event: any): NodeIdAndEvent {
-  if (event.ExercisedEvent)
-    return {
-      nodeId: event.ExercisedEvent.nodeId,
-      exercisedEvent: event.ExercisedEvent,
-    };
-  else if (event.CreatedEvent)
+  if (event.ExercisedEvent) {
+    // ledger API's TRANSACTION_SHAPE_LEDGER_EFFECTS does not include ArchivedEvent, instead has the choice as Archive
+    if (event.ExercisedEvent.choice === "Archive") {
+      return {
+        nodeId: event.ExercisedEvent.nodeId,
+        archivedEvent: event.ExercisedEvent,
+      };
+    } else {
+      return {
+        nodeId: event.ExercisedEvent.nodeId,
+        exercisedEvent: event.ExercisedEvent,
+      };
+    }
+  } else if (event.CreatedEvent)
     return {
       nodeId: event.CreatedEvent.nodeId,
       createdEvent: event.CreatedEvent,
@@ -362,7 +390,8 @@ interface PrettyTransaction {
   events: Event[];
 }
 type Event = RawCreatedEvent | RawArchivedEvent | ExercisedEvent;
-type ExercisedEvent = PrettyTransfer | PrettyBurnMint;
+type ExercisedEvent = TokenStandardChoiceExercised & CreateArchiveChildren;
+type TokenStandardChoiceExercised = PrettyTransfer | PrettyBurnMint;
 interface RawArchivedEvent {
   type: "Archived";
   parentChoice: string;
@@ -420,4 +449,89 @@ interface PrettyBurnMint {
       };
     };
   };
+}
+
+type Holding = {
+  contractId: string;
+  amount: string;
+  owner: string;
+  instrumentId: { admin: string; id: string };
+};
+
+async function tokenStandardChoiceExercised(
+  pretty: TokenStandardChoiceExercised,
+  exercisedEvent: any,
+  pendingEventsMutatingStack: any[],
+  partyId: string,
+  mutatingHoldingAcs: Set<string>,
+  ledgerClient: LedgerClient
+): Promise<ExercisedEvent> {
+  const createsAndArchives = await findCreatesAndArchives(
+    pendingEventsMutatingStack
+      .reverse()
+      .filter(
+        (evt) =>
+          getNodeIdAndEvent(evt).nodeId <= exercisedEvent.lastDescendantNodeId
+      ),
+    partyId,
+    mutatingHoldingAcs,
+    ledgerClient
+  );
+  return { ...pretty, ...createsAndArchives };
+}
+
+interface CreateArchiveChildren {
+  creates: Holding[];
+  archives: Holding[];
+}
+async function findCreatesAndArchives(
+  mutatingEventsSlice: any[],
+  partyId: string,
+  mutatingAcs: Set<string>,
+  ledgerClient: LedgerClient,
+  mutatingResult: CreateArchiveChildren = { creates: [], archives: [] }
+): Promise<CreateArchiveChildren> {
+  const child = mutatingEventsSlice.pop();
+  if (!child) {
+    return mutatingResult;
+  }
+
+  const { createdEvent, archivedEvent } = getNodeIdAndEvent(child);
+
+  if (createdEvent && !shouldIgnoreCreateEvent(createdEvent, partyId)) {
+    mutatingAcs.add(createdEvent.contractId);
+    const holdingView = createdEvent.interfaceViews[0].viewValue;
+    mutatingResult.creates.push({
+      amount: holdingView.amount,
+      instrumentId: holdingView.instrumentId,
+      contractId: createdEvent.contractId,
+      owner: holdingView.owner,
+    });
+  } else if (
+    archivedEvent &&
+    !shouldIgnoreArchiveEvent(archivedEvent, mutatingAcs)
+  ) {
+    mutatingAcs.delete(archivedEvent.contractId);
+    const contractEvents = await ledgerClient.getEventsByContractId(
+      archivedEvent.contractId,
+      partyId,
+      [HoldingInterface]
+    );
+    const holdingView =
+      contractEvents.created.createdEvent.interfaceViews[0].viewValue;
+    mutatingResult.archives.push({
+      amount: holdingView.amount,
+      instrumentId: holdingView.instrumentId,
+      contractId: archivedEvent.contractId,
+      owner: holdingView.owner,
+    });
+  }
+
+  return findCreatesAndArchives(
+    mutatingEventsSlice,
+    partyId,
+    mutatingAcs,
+    ledgerClient,
+    mutatingResult
+  );
 }
