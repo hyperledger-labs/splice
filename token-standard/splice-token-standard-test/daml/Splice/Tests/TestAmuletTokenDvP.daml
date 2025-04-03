@@ -92,7 +92,7 @@ testDvP = script do
   aliceAlloc.transferLeg.amount === 100.0
 
   -- alice accepts allocation request directly via her wallet
-  inputHoldings <- WalletClient.listHoldingCids alice amuletId
+  inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
   holdings <- WalletClient.listHoldings alice amuletId
   debug holdings
 
@@ -100,18 +100,18 @@ testDvP = script do
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = alice
     allocation = aliceAlloc
-    inputHoldings
+    inputHoldingCids
     extraArgs = emptyExtraArgs
   submitWithDisclosuresMustFail' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- alice accepts allocation request directly via her wallet
   -- TODO(#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
-  debug inputHoldings
+  debug inputHoldingCids
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc
-    inputHoldings
+    inputHoldingCids
     extraArgs = emptyExtraArgs
   submitWithDisclosures' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
@@ -130,11 +130,11 @@ testDvP = script do
   bobAlloc.transferLeg.amount === 20.0
 
   -- bob accepts allocation request directly via her wallet
-  inputHoldings <- WalletClient.listHoldingCids bob amuletId
+  inputHoldingCids <- WalletClient.listHoldingCids bob amuletId
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = bobAlloc
-    inputHoldings
+    inputHoldingCids
     extraArgs = emptyExtraArgs
   submitWithDisclosures' bob enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg

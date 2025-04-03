@@ -107,7 +107,7 @@ setupTest = do
       instrumentId = registry.instrumentId
       requestedAt = now
       executeBefore = now `addRelTime` days 1
-      holdingCids = bobHoldingCids
+      inputHoldingCids = bobHoldingCids
       meta = Metadata with
         values = Map.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
 
@@ -129,7 +129,7 @@ setupTwoStepTransfer = do
   let transfer = defaultTransfer with
         sender = alice
         receiver = bob  -- turn this around so that the transfer is a two-step one
-        holdingCids = map fst aliceHoldingCids
+        inputHoldingCids = map fst aliceHoldingCids
 
   enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
     expectedAdmin = registry.dso
@@ -246,7 +246,7 @@ test_two_step_success = do
   -- bob queries the pending transfer through their wallet
   aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
   [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
-  bobInstrView.transfer.holdingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
   bobInstrCid === aliceInstrCid
 
   -- bob accepts the transfer
@@ -278,7 +278,7 @@ test_two_step_withdraw = do
   -- alice queries the pending transfer through their wallet
   [ lockedHolding ] <- WalletClient.listLockedHoldings alice registry.instrumentId
   [(aliceInstrCid, aliceInstrView)] <- WalletClient.listTransferOffers alice registry.instrumentId
-  aliceInstrView.transfer.holdingCids === [ lockedHolding._1 ]
+  aliceInstrView.transfer.inputHoldingCids === [ lockedHolding._1 ]
   aliceInstrCid0 === aliceInstrCid
 
   -- alice rejects the transfer
@@ -308,11 +308,11 @@ test_two_step_withdraw_locked_amulet_gone  = do
   -- alice queries the pending transfer through their wallet
   [ lockedHolding ] <- WalletClient.listLockedHoldings alice registry.instrumentId
   [(aliceInstrCid, aliceInstrView)] <- WalletClient.listTransferOffers alice registry.instrumentId
-  aliceInstrView.transfer.holdingCids === [ lockedHolding._1 ]
+  aliceInstrView.transfer.inputHoldingCids === [ lockedHolding._1 ]
   aliceInstrCid0 === aliceInstrCid
 
   -- pass time and unlock the amulet as the alice
-  let [lockedCid] = aliceInstrView.transfer.holdingCids
+  let [lockedCid] = aliceInstrView.transfer.inputHoldingCids
   setTime (aliceInstrView.transfer.executeBefore `addRelTime` days 1)
   AmuletRegistry.expireLockAsOwner registry lockedCid
 
@@ -358,7 +358,7 @@ test_two_step_reject = do
   -- bob queries the pending transfer through their wallet
   aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
   [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
-  bobInstrView.transfer.holdingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
   bobInstrCid === aliceInstrCid
 
   -- bob rejects the transfer
@@ -388,11 +388,11 @@ test_two_step_reject_locked_amulet_gone  = do
   -- bob queries the pending transfer through their wallet
   aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
   [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
-  bobInstrView.transfer.holdingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
   bobInstrCid === aliceInstrCid
 
   -- pass time and unlock the amulet as the owner
-  let [lockedCid] = bobInstrView.transfer.holdingCids
+  let [lockedCid] = bobInstrView.transfer.inputHoldingCids
   setTime (bobInstrView.transfer.executeBefore `addRelTime` days 1)
   AmuletRegistry.expireLockAsOwner registry lockedCid
 
@@ -424,7 +424,7 @@ test_no_holdings = script do
 
   -- check that the default transfer can be executed
   let transfer = defaultTransfer with
-        holdingCids = []
+        inputHoldingCids = []
 
   enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
     expectedAdmin = registry.dso

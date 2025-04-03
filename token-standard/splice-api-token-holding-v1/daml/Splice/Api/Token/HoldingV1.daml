@@ -71,7 +71,7 @@ interface BurnMintFactory where
   burnMintFactory_publicFetchImpl : ContractId BurnMintFactory -> BurnMintFactory_PublicFetch -> Update BurnMintFactoryView
 
   nonconsuming choice BurnMintFactory_BurnMint : BurnMintFactory_BurnMintResult
-    -- ^ Burn the holdings in holdingCids and create holdings with the owners and amounts specified in
+    -- ^ Burn the holdings in inputHoldingCids and create holdings with the owners and amounts specified in
     -- outputs. Implementations SHOULD use this over creating or archiving holdings directly so wallets can provide more details on transaction history.
     -- Implementations SHOULD use more specific choices like `TransferFactory_Transfer` where possible.
     --
@@ -89,11 +89,15 @@ interface BurnMintFactory where
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
       sender : Party
-        -- ^ The sender that owns the holdings in `holdingCids`. All holdings in `inputHoldingCids` must be owned by this party.
+        -- ^ The sender that owns the holdings in `inputHoldingCids`.
+        -- All holdings in `inputHoldingCids` must be owned by this party.
       instrumentId : InstrumentId
-        -- ^ The instrument id of the holdings. All holdings in `inputHoldingCids` as well as the resulting output holdings MUST have this instrument id.
+        -- ^ The instrument id of the holdings.
+        -- All holdings in `inputHoldingCids` as well as the resulting output holdings MUST
+        -- have this instrument id.
       inputHoldingCids : [ContractId Holding]
-        -- ^ The holdings that should be burnt. All holdings in `inputHoldingCids` MUST be archived by this choice.
+        -- ^ The holdings that should be burnt.
+        -- All holdings in `inputHoldingCids` MUST be archived by this choice.
       outputs : [BurnMintOutput]
         -- ^ The holdings that should be created. The choice MUST create new holdings with the given amounts.
       extraActors : [Party]

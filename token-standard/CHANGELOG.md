@@ -16,6 +16,8 @@ Polishing changes
   `BurnMintFactory_BurnMintResult`. If you need that information, use
   the ledger API's `GetEventsByContractId` endpoint to lookup the
   holding by contract id.
+- Rename the `AllocationInstruction.inputHoldings` field and the
+  `Transfer.holdingCids` field to `inputHoldingCids` for uniformity
 
 ## 2025-03-31
 

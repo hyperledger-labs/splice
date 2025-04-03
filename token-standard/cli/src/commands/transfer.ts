@@ -56,7 +56,7 @@ export async function transfer(
   const holdings = senderHoldings.map(
     (h) => h["contractEntry"]["JsActiveContract"]
   );
-  const holdingCids = holdings.map((h) => h["createdEvent"]["contractId"]);
+  const inputHoldingCids = holdings.map((h) => h["createdEvent"]["contractId"]);
 
   const now = dayjs()
   const choiceArgs: any = {
@@ -69,7 +69,7 @@ export async function transfer(
       lock: null,
       requestedAt: now,
       executeBefore: now.add(24, "hour").toISOString(),
-      holdingCids,
+      inputHoldingCids,
       meta: { values: [] },
     },
     extraArgs: {

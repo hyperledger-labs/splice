@@ -265,8 +265,8 @@ amulet_transferFactory_transferImpl this _self arg = do
   assertDeadlineExceeded "Transfer.requestedAt" transfer.requestedAt
   -- executeBefore:
   assertWithinDeadline "Transfer.executeBefore" transfer.executeBefore
-  -- holdingCids: note that their detailed validation is done in the transfer itself
-  require "At least one holding must be provided" (not $ null transfer.holdingCids)
+  -- inputHoldingCids: note that their detailed validation is done in the transfer itself
+  require "At least one holding must be provided" (not $ null transfer.inputHoldingCids)
 
   -- execute the right kind of transfer
   case optPreapprovalCid of
@@ -274,7 +274,7 @@ amulet_transferFactory_transferImpl this _self arg = do
       | transfer.receiver == transfer.sender -> do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.holdingCids
+          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
           result <- exercisePaymentTransfer paymentContext Transfer with
             sender = transfer.sender
             provider = transfer.sender
@@ -298,11 +298,11 @@ amulet_transferFactory_transferImpl this _self arg = do
           -- prepare a two-step transfer
           let twoStepTransfer = standardTransferToTwoStepTransfer arg.transfer.requestedAt arg.transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          lockedAmulet <- prepareTwoStepTransfer twoStepTransfer arg.transfer.holdingCids paymentContext
+          lockedAmulet <- prepareTwoStepTransfer twoStepTransfer arg.transfer.inputHoldingCids paymentContext
           -- create the transfer instruction tracking this locked amulet
           transferInstructionCid <- toInterfaceContractId <$> create AmuletTransferInstruction with
             transfer = arg.transfer with
-              holdingCids = [toInterfaceContractId lockedAmulet] -- report the locked holding backing the transfer
+              inputHoldingCids = [toInterfaceContractId lockedAmulet] -- report the locked holding backing the transfer
             lockedAmulet
           -- return result
           pure Api.Token.TransferInstructionV1.TransferInstructionResult with
@@ -315,7 +315,7 @@ amulet_transferFactory_transferImpl this _self arg = do
       -- use a payment context with featuring so the preapproval provider can be featured
       paymentContext <- paymentFromChoiceContext dso extraArgs.context
       -- execute a direct transfer
-      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.holdingCids
+      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
       result <- exercise preapprovalCid TransferPreapproval_Send
         with
           sender = transfer.sender
@@ -344,7 +344,7 @@ amulet_allocationFactory_allocateImpl
   -> Update AllocationFactory_AllocateResult
 amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   let dso = externalAmuletRules.dso
-  let AllocationFactory_Allocate {allocation, inputHoldings, extraArgs} = arg
+  let AllocationFactory_Allocate {allocation, inputHoldingCids, extraArgs} = arg
   -- validate call to factory and retrieve context
   requireExpectedAdminMatch arg.expectedAdmin dso
 
@@ -379,12 +379,12 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
   require "Instrument-id must match the factory" (transferLeg.instrumentId == amuletInstrumentId dso)
   -- transferLeg.meta: no check
 
-  -- inputHoldings:
-  require "At least one input holding must be provided" (not $ null inputHoldings)
+  -- inputHoldingCids:
+  require "At least one input holding must be provided" (not $ null inputHoldingCids)
 
   -- lock the funds
   let twoStepTransfer = allocationToTwoStepTransfer arg.allocation
-  lockedAmulet <- prepareTwoStepTransfer twoStepTransfer inputHoldings paymentContext
+  lockedAmulet <- prepareTwoStepTransfer twoStepTransfer inputHoldingCids paymentContext
   -- create the amulet allocation
   allocCid <- toInterfaceContractId <$> create AmuletAllocation with
     allocation = arg.allocation

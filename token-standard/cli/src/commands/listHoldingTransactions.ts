@@ -270,7 +270,7 @@ function toPrettyTransfer(exercisedEvent: any): PrettyTransfer {
       receiver: choiceArgument.transfer.receiver,
       amount: choiceArgument.transfer.amount,
       instrumentId: choiceArgument.transfer.instrumentId,
-      senderHoldings: choiceArgument.transfer.holdingCids,
+      senderHoldings: choiceArgument.transfer.inputHoldingCids,
       meta: choiceArgument.transfer.meta,
       extraArgs: choiceArgument.extraArgs,
     },
