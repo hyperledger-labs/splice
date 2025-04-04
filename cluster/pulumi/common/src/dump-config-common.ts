@@ -216,6 +216,11 @@ export async function initDumpConfig(): Promise<void> {
                 ...args.inputs,
                 secretData,
               };
+            } else if (args.inputs.secret == 'pulumi-internal-whitelists') {
+              return {
+                ...args.inputs,
+                secretData: '["<internal IPs>"]',
+              };
             } else if (args.inputs.secret.startsWith('pulumi-user-configs-')) {
               const secretData = JSON.stringify([
                 {

@@ -4,8 +4,6 @@
 #    cometbft:
 #      snapshotName: "nicu-test-cometbft-cloning"
 infra:
-  ipWhitelisting:
-    extraWhitelistedIngress: [ ]
   prometheus:
     retentionDuration: "1y"
     retentionSize: "1500GB"
