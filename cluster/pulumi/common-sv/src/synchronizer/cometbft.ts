@@ -21,7 +21,7 @@ import {
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
-import { svsConfiguration } from '../clusterSvConfig';
+import { clusterSvsConfiguration } from '../clusterSvConfig';
 import { svConfig } from '../config';
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync } from './cometbftConfig';
@@ -92,8 +92,6 @@ export function installCometBftNode(
   const stateSyncEnabled = !isSv1 && enableStateSync && !isRunningMigration && isActiveDomain;
   const cometbftChartValues = _.mergeWith(cometBftValues, {
     sv1: nodeConfigs.sv1,
-    // TODO (#13845) remove when ciperiodic version >= 0.1.18
-    founder: nodeConfigs.sv1,
     istioVirtualService: {
       enabled: true,
       gateway: 'cluster-ingress/cn-apps-gateway',
@@ -145,7 +143,7 @@ export function installCometBftNode(
   });
   const svIdentifier = nodeConfigs.selfSvNodeName;
   const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;
-  const svConfiguration = svsConfiguration[svIdentifier];
+  const svConfiguration = clusterSvsConfiguration[svIdentifier];
   let volumeDependecies: Resource[] = [];
   if (svConfiguration?.cometbft) {
     const volumeSize = cometbftChartValues.db.volumeSize;

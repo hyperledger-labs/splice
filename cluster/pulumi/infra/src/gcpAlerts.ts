@@ -63,7 +63,7 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -- sequencer down
 -(resource.labels.namespace_name=~"validator|splitwell"
   AND resource.labels.container_name=~"participant"
-  AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
+  AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Sequencer shutting down|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
 -(resource.labels.container_name="postgres-exporter" AND jsonPayload.msg=~"Error loading config|Excluded databases")
 -jsonPayload.message=~"UnknownHostException"
 -(resource.labels.container_name=~"participant|mediator" AND jsonPayload.message=~"Late processing \\(or clock skew\\) of batch")
@@ -86,16 +86,14 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name="sv-app" AND jsonPayload.stack_trace=~"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node")
 -- TODO(#15716): Don't just ignore this - investigate!
 -(resource.labels.container_name="splitwell-app" AND jsonPayload.message=~"Waiting for domain Domain 'global' to be connected has not completed after")
--- TODO(#15720): Don't just ignore this - investigate!
--(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
--- TODO(#15720): Don't just ignore this - investigate!
--(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"Request to.*/accept resulted in a timeout")
 -- TODO(#17636): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher
 -(jsonPayload.message=~"signalWhenIngested.* has not completed after .* milliseconds")
 ${conditionalString(
   isDevNet,
-  '-- TODO(#18511) Remove this once the node is fixed\n' +
-    '-(jsonPayload.message=~"ACS_COMMITMENT_MISMATCH.*" AND jsonPayload.remote=~".*sender = PAR::validator-texturecapital-dev::1220982ed049....*")'
+  "-- TODO(#17637): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3\n" +
+    '-(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")\n' +
+    '-- TODO(#8300): Can happen due to random disconnects/reconnects but also in other contexts\n' +
+    '-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")'
 )}
 ${conditionalString(
   !isMainNet,
@@ -181,7 +179,7 @@ ${conditionalString(
 }
 
 // https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-upgrades#control_plane_upgrade_logs
-export function installMaintenanceUpdateAlerts(
+export function installClusterMaintenanceUpdateAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel
 ): void {
   const logGkeClusterUpdate = new gcp.logging.Metric('log_gke_cluster_update', {
@@ -207,7 +205,7 @@ jsonPayload.state=~"STARTED"`,
   });
 
   const displayName = `Cluster ${CLUSTER_BASENAME} is being updated`;
-  new gcp.monitoring.AlertPolicy('updateAlert', {
+  new gcp.monitoring.AlertPolicy('updateClusterAlert', {
     alertStrategy: {
       autoClose: '3600s',
       notificationChannelStrategies: [
@@ -234,6 +232,56 @@ jsonPayload.state=~"STARTED"`,
           //retest period
           duration: '60s',
           filter: pulumi.interpolate`resource.type="global" AND metric.type = "logging.googleapis.com/user/${logGkeClusterUpdate.name}"`,
+          trigger: {
+            count: 1,
+          },
+        },
+        displayName: displayName,
+      },
+    ],
+    displayName: displayName,
+    notificationChannels: [notificationChannel.name],
+  });
+}
+
+export function installCloudSQLMaintenanceUpdateAlerts(
+  notificationChannel: gcp.monitoring.NotificationChannel
+): void {
+  const logGkeCloudSQLUpdate = new gcp.logging.Metric('log_gke_cloudsql_update', {
+    name: `log_gke_cloudsql_update_${CLUSTER_BASENAME}`,
+    description: 'Logs with cloudsql databases events',
+    filter: `
+resource.type="cloudsql_database"
+"terminating connection due to administrator command" OR "the database system is shutting down"`,
+  });
+
+  const displayName = `Possible CloudSQL maintenance going on in ${CLUSTER_BASENAME}`;
+  new gcp.monitoring.AlertPolicy('updateCloudSQLAlert', {
+    alertStrategy: {
+      autoClose: '3600s',
+      notificationChannelStrategies: [
+        {
+          notificationChannelNames: [notificationChannel.name],
+          renotifyInterval: `${4 * 60 * 60}s`, // 4 hours
+        },
+      ],
+    },
+    combiner: 'OR',
+    conditions: [
+      {
+        conditionThreshold: {
+          aggregations: [
+            {
+              //query period
+              alignmentPeriod: '600s',
+              crossSeriesReducer: 'REDUCE_SUM',
+              perSeriesAligner: 'ALIGN_SUM',
+            },
+          ],
+          comparison: 'COMPARISON_GT',
+          //retest period
+          duration: '60s',
+          filter: pulumi.interpolate`resource.type="cloudsql_database" AND metric.type = "logging.googleapis.com/user/${logGkeCloudSQLUpdate.name}"`,
           trigger: {
             count: 1,
           },

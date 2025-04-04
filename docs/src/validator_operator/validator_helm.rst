@@ -428,6 +428,13 @@ Services               Port         Routes
 * ``https://cns.validator.<YOUR_HOSTNAME>`` should be routed to service ``ans-web-ui`` in the ``validator`` namespace
 * ``https://cns.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
 
+.. warning::
+
+  To keep the attack surface on your validator deployment small,
+  please disallow ingress connections to all other services in your validator deployment.
+  It should be assumed that opening up *any* additional port or service represents a security risk that needs to be carefully evaluated on a case-by-case basis.
+  In addition, it is recommended to restrict access to above services to a limited number of explicitly trusted IP address ranges.
+
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of a Validator node ingress, we have
 provided a Helm chart that configures ingress according to the routes above using Istio, as detailed in the sections below.

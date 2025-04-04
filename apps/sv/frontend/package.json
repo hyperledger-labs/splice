@@ -1,5 +1,5 @@
 {
-  "name": "sv-frontend",
+  "name": "@lfdecentralizedtrust/splice-sv-frontend",
   "version": "0.1.0",
   "browserslist": {
     "production": [
@@ -45,9 +45,9 @@
     "@types/react-dom": "18.0.11",
     "@types/uuid": "8.3.4",
     "@vitejs/plugin-react": "^4.0.4",
-    "common-test-handlers": "^0.1.0",
-    "common-test-utils": "^0.1.0",
-    "common-test-vite-utils": "^0.1.0",
+    "@lfdecentralizedtrust/splice-common-test-handlers": "^0.1.0",
+    "@lfdecentralizedtrust/splice-common-test-utils": "^0.1.0",
+    "@lfdecentralizedtrust/splice-common-test-vite-utils": "^0.1.0",
     "happy-dom": "^11.0.0",
     "prettier": "2.8.4",
     "typescript": "4.9.5",

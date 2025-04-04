@@ -1,5 +1,5 @@
 {
-  "name": "common-test-vite-utils",
+  "name": "@lfdecentralizedtrust/splice-common-test-vite-utils",
   "version": "0.1.0",
   "private": true,
   "types": "./lib/types/index.d.ts",

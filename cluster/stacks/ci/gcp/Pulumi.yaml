@@ -1,0 +1,5 @@
+---
+name: gcp
+description: 'Provision a Google Cloud Platform project'
+runtime: nodejs
+main: "../../../pulumi/gcp/src/index.ts"

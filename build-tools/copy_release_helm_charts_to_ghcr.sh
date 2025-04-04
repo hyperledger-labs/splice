@@ -7,9 +7,10 @@
 set -eou pipefail
 
 VERSION=""
+VERSIONS_FILE=""
 APP_CHARTS_FILE=""
 
-while getopts "v:f:" opt; do
+while getopts "v:f:-:" opt; do
   case $opt in
     v)
       VERSION=$OPTARG
@@ -17,16 +18,33 @@ while getopts "v:f:" opt; do
     f)
       APP_CHARTS_FILE=$OPTARG
       ;;
+    -)
+      case "${OPTARG}" in
+        versions)
+          VERSIONS_FILE="${!OPTIND}"; OPTIND=$((OPTIND + 1))
+          ;;
+        *)
+          echo "Usage: $0 -v <version> | --versions <versions_file> [-f <app_charts_file>]"
+          exit 1
+          ;;
+      esac
+      ;;
     *)
-      echo "Usage: $0 -v <version> [-f <app_charts_file>]"
+      echo "Usage: $0 -v <version> | --versions <versions_file> [-f <app_charts_file>]"
       exit 1
       ;;
   esac
 done
 
-if [ -z "$VERSION" ]; then
-  echo "Error: Version is required."
-  echo "Usage: $0 -v <version> [-f <app_charts_file>]"
+if [ -z "$VERSION" ] && [ -z "$VERSIONS_FILE" ]; then
+  echo "Error: Either -v <version> or --versions <versions_file> must be provided."
+  echo "Usage: $0 -v <version> | --versions <versions_file> [-f <app_charts_file>]"
+  exit 1
+fi
+
+if [ -n "$VERSION" ] && [ -n "$VERSIONS_FILE" ]; then
+  echo "Error: Only one of -v <version> or --versions <versions_file> can be provided."
+  echo "Usage: $0 -v <version> | --versions <versions_file> [-f <app_charts_file>]"
   exit 1
 fi
 
@@ -34,24 +52,17 @@ if [ -z "${APP_CHARTS_FILE:-}" ]; then
   APP_CHARTS_FILE="/dev/stdin"
 fi
 
-if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${GITHUB_USER:-}" ]; then
-  echo "Error: you need to set GITHUB_TOKEN and GITHUB_USER."
+if [ -z "${GH_TOKEN:-}" ] || [ -z "${GH_USER:-}" ]; then
+  echo "Error: you need to set GH_TOKEN and GH_USER."
   exit 1
 fi
 
-echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
 
 APP_CHARTS=$(<"$APP_CHARTS_FILE")
 
-ARTIFACTORY_REGISTRY="https://digitalasset.jfrog.io/artifactory/canton-network-helm"
-GITHUB_REGISTRY="ghcr.io/digital-asset/decentralized-canton-sync/helm"
-
-helm repo add artifactory-helm \
-  "$ARTIFACTORY_REGISTRY" \
-  --username "$ARTIFACTORY_USER" \
-  --password "$ARTIFACTORY_PASSWORD"
-
-helm repo update
+SRC_REGISTRY="${DEV_HELM_REGISTRY}"
+DEST_REGISTRY="${RELEASE_HELM_REGISTRY}"
 
 TMP_DIR=$(mktemp -d)
 
@@ -60,20 +71,28 @@ if [ ! -d "$TMP_DIR" ]; then
   exit 1
 fi
 
-# Iterate through the APP_CHARTS, use make cluster/helm/write-app-charts to generate this list
-for CHART_NAME in $APP_CHARTS; do
-  for i in {1..10}; do
-    if helm pull artifactory-helm/"$CHART_NAME" --version "$VERSION" --destination "$TMP_DIR" && \
-       helm push "$TMP_DIR/$CHART_NAME-$VERSION.tgz" oci://"$GITHUB_REGISTRY"; then
-      echo "Successfully copied $CHART_NAME:$VERSION"
-      break
-    else
-      echo "Failed to copy $CHART_NAME:$VERSION (attempt $i)"
-      if [ "$i" -eq 10 ]; then
-        echo "Max retries reached. Exiting."
-        exit 1
+if [ -n "$VERSIONS_FILE" ]; then
+  VERSIONS=$(<"$VERSIONS_FILE")
+else
+  VERSIONS="$VERSION"
+fi
+
+for VERSION in $VERSIONS; do
+  # Iterate through the APP_CHARTS, use make cluster/helm/write-app-charts to generate this list
+  for CHART_NAME in $APP_CHARTS; do
+    for i in {1..10}; do
+      if helm pull oci://"$SRC_REGISTRY"/"$CHART_NAME" --version "$VERSION" --destination "$TMP_DIR" && \
+         helm push "$TMP_DIR/$CHART_NAME-$VERSION.tgz" oci://"$DEST_REGISTRY"; then
+        echo "Successfully copied $CHART_NAME:$VERSION"
+        break
+      else
+        echo "Failed to copy $CHART_NAME:$VERSION (attempt $i)"
+        if [ "$i" -eq 10 ]; then
+          echo "Max retries reached. Exiting."
+          exit 1
+        fi
+        sleep 5
       fi
-      sleep 5
-    fi
+    done
   done
 done

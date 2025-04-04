@@ -6,8 +6,9 @@ import { configureAuth0 } from './auth0';
 import { clusterBaseDomain, clusterBasename } from './config';
 import {
   getNotificationChannel,
+  installCloudSQLMaintenanceUpdateAlerts,
   installGcpLoggingAlerts,
-  installMaintenanceUpdateAlerts,
+  installClusterMaintenanceUpdateAlerts,
 } from './gcpAlerts';
 import { configureIstio } from './istio';
 import { configureNetwork } from './network';
@@ -28,7 +29,8 @@ configureObservability(observabilityDependsOn);
 if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();
   installGcpLoggingAlerts(notificationChannel);
-  installMaintenanceUpdateAlerts(notificationChannel);
+  installClusterMaintenanceUpdateAlerts(notificationChannel);
+  installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
 }
 
 configureStorage();

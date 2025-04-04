@@ -1,10 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
 // TODO(#7675) - do we need this model?
-import { SvVote } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
-import { useScanClient } from 'common-frontend/scan-api';
+import { SvVote } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { useScanClient } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
+import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import * as damlTypes from '@daml/types';
 import { Vote, VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';

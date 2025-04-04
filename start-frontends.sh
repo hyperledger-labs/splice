@@ -165,12 +165,12 @@ function wait_for_workspace_build() {
 }
 
 # listen & auto-rebuild all these frontend workspaces' code when its src changes
-wait_for_workspace_build "common-frontend-utils" "common/frontend/utils/lib/index.js"
-wait_for_workspace_build "common-test-vite-utils" "common/frontend-test-vite-utils/lib/cjs/package.json"
-wait_for_workspace_build "common-test-utils" "common/frontend-test-utils/lib/index.js"
-wait_for_workspace_build "common-test-handlers" "common/frontend-test-handlers/lib/index.js"
+wait_for_workspace_build "@lfdecentralizedtrust/splice-common-frontend-utils" "common/frontend/utils/lib/index.js"
+wait_for_workspace_build "@lfdecentralizedtrust/splice-common-test-vite-utils" "common/frontend-test-vite-utils/lib/cjs/package.json"
+wait_for_workspace_build "@lfdecentralizedtrust/splice-common-test-utils" "common/frontend-test-utils/lib/index.js"
+wait_for_workspace_build "@lfdecentralizedtrust/splice-common-test-handlers" "common/frontend-test-handlers/lib/index.js"
 # order matters, common-frontend depends on all the above
-wait_for_workspace_build "common-frontend" "common/frontend/lib/index.js"
+wait_for_workspace_build "@lfdecentralizedtrust/splice-common-frontend" "common/frontend/lib/index.js"
 
 # The set of frontends we want to start as part of typical integration testing
 function start_local_frontends() {

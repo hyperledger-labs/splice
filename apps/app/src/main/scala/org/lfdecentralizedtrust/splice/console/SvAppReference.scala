@@ -216,7 +216,6 @@ abstract class SvAppReference(
     }
   }
 
-  @Help.Summary("List vote results")
   def listVoteRequestResults(
       actionName: Option[String],
       accepted: Option[Boolean],
@@ -234,7 +233,7 @@ abstract class SvAppReference(
           effectiveFrom,
           effectiveTo,
           limit,
-        )()
+        )
       )
     }
   }

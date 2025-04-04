@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, RetryProvider}
@@ -42,6 +43,7 @@ import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -281,6 +283,14 @@ trait ScanStore
   )(implicit
       tc: TraceContext
   ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]]
+
+  def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+      companion: C,
+      recordTime: CantonTimestamp = CantonTimestamp.MinValue,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Option[Contract[TCId, T]]]
 }
 
 object ScanStore {
@@ -439,6 +449,12 @@ object ScanStore {
             ScanAcsStoreRowData(
               contract,
               svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+            )
+        },
+        mkFilter(splice.dso.amuletprice.AmuletPriceVote.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract
             )
         },
         mkFilter(splice.dsorules.VoteRequest.COMPANION)(co => co.payload.dso == dso) { contract =>

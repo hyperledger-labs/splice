@@ -14,8 +14,8 @@ function git-backport() {
         exit 0
     fi
 
-    if [ -z "$GITHUB_TOKEN" ]; then
-        _error "GITHUB_TOKEN is missing, add a personal access token with repo scope."
+    if [ -z "$GH_TOKEN" ]; then
+        _error "GH_TOKEN is missing, add a personal access token with repo scope."
     fi
 
     if [ -n "$(git status --porcelain)" ]; then

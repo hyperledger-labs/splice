@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { CopyableTypography, DateDisplay } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+import { CopyableTypography, DateDisplay } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import React from 'react';
 
 import { Chip } from '@mui/material';

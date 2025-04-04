@@ -8,13 +8,14 @@ main:
     - init:
         assign:
         - projectId: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+        - projectNumber: ${sys.get_env("GOOGLE_CLOUD_PROJECT_NUMBER")}
         - location: ${sys.get_env("GOOGLE_CLOUD_LOCATION")}
         # We find the latest backup from the cn-apps DB, which is migration-agnostic,
         # so that we have one less thing to update in HDMs.
         - sourceInstanceForFindingLatestBackup: sv-1-cn-apps-pg-8f8c7e7
         - sourceProject: da-cn-mainnet
         - sourceClusterLocation: europe-west6-a
-        - bucketName: cn-mainnet-backups
+        - bucketName: da-cn-mainnet-backups
         - sourceCluster: mainzrh
         - migrationId: ${args.migrationId}
     # If a backup run ID is provided, use it.
@@ -32,7 +33,7 @@ main:
               - findBackupBeforeDate:
                   call: http.get
                   args:
-                    url: https://find-backup-before-125482597181.us-central1.run.app
+                    url: ${"https://find-backup-before-" + projectNumber + ".us-central1.run.app"}
                     query:
                         before: ${beforeDate}
                         instance: ${sourceInstanceForFindingLatestBackup}
@@ -46,7 +47,7 @@ main:
     - findAllBackups:
         call: http.get
         args:
-          url: https://find-cloudsql-backups-125482597181.us-central1.run.app
+          url: ${"https://find-cloudsql-backups-" + projectNumber + ".us-central1.run.app"}
           query:
             cluster: ${sourceCluster}
             namespace: sv-1
@@ -401,7 +402,7 @@ tryCopyCloudSqlBackup:
         try:
           call: http.get
           args:
-            url: https://sa-bucket-permissions-125482597181.us-central1.run.app
+            url: ${"https://sa-bucket-permissions-" + sys.get_env("GOOGLE_CLOUD_PROJECT_NUMBER") + ".us-central1.run.app"}
             query:
               bucket: ${bucketName}
               serviceAccount: ${restoreInstance.serviceAccountEmailAddress}
@@ -518,7 +519,7 @@ cleanCloudSqlBackup:
               try:
                 call: http.get
                 args:
-                  url: https://sa-bucket-permissions-125482597181.us-central1.run.app
+                  url: ${"https://sa-bucket-permissions-" + sys.get_env("GOOGLE_CLOUD_PROJECT_NUMBER") + ".us-central1.run.app"}
                   query:
                     bucket: ${bucketName}
                     serviceAccount: ${restoreInstance.serviceAccountEmailAddress}

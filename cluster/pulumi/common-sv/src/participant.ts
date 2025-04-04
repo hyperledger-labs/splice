@@ -6,6 +6,7 @@ import {
   DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
+  getParticipantKmsHelmResources,
   InstalledHelmChart,
   installSpliceHelmChart,
   jmxOptions,
@@ -15,6 +16,8 @@ import {
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
+
+import { clusterSvsConfiguration } from './clusterSvConfig';
 
 export interface SvParticipant {
   readonly asDependencies: pulumi.Resource[];
@@ -45,6 +48,12 @@ export function installSvParticipant(
     ),
   };
 
+  const clusterConfiguration = clusterSvsConfiguration[xns.logicalName]?.participant;
+
+  const { kmsValues, gkeCredentialsSecret } = clusterConfiguration?.kms
+    ? getParticipantKmsHelmResources(xns, clusterConfiguration.kms)
+    : { kmsValues: {}, gkeCredentialsSecret: [] };
+
   const participantValuesWithOverwrites: ChartValues = {
     ...participantValues,
     ...{
@@ -60,6 +69,7 @@ export function installSvParticipant(
       targetAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
       jwksUrl: `https://${auth0Config.auth0Domain}/.well-known/jwks.json`,
     },
+    ...kmsValues,
   };
 
   return installSpliceHelmChart(
@@ -83,9 +93,7 @@ export function installSvParticipant(
     version,
     {
       ...(customOptions || {}),
-      dependsOn: (customOptions?.dependsOn || []).concat([db]),
-      // TODO(#14507) - remove alias once latest release is 0.2.0
-      aliases: [{ name: `participant-${migrationId}` }],
+      dependsOn: (customOptions?.dependsOn || []).concat([db]).concat(gkeCredentialsSecret),
     }
   );
 }

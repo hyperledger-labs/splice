@@ -1,12 +1,21 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import {
+  AmuletPriceVote,
+  DsoInfo,
+  SvVote,
+  VotesHooks,
+  VotesHooksContext,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { theme } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import {
+  dsoInfo,
+  getExpectedAmuletRulesConfigDiffsHTML,
+} from '@lfdecentralizedtrust/splice-common-test-handlers';
+import { checkAmuletRulesExpectedConfigDiffsHTML } from '@lfdecentralizedtrust/splice-common-test-utils';
 import { QueryClient, UseQueryResult, useQuery, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
-import { theme } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
-import { dsoInfo, getExpectedAmuletRulesConfigDiffsHTML } from 'common-test-handlers';
-import { checkAmuletRulesExpectedConfigDiffsHTML } from 'common-test-utils';
 import React from 'react';
 import { test, expect, describe } from 'vitest';
 
@@ -93,6 +102,14 @@ const provider: VotesHooks = {
             ? []
             : [constants.myVote(cid, cid === constants.rejectedVoteResult.request.trackingCid)];
         });
+      },
+    });
+  },
+  useAmuletPriceVotes(): UseQueryResult<AmuletPriceVote[]> {
+    return useQuery({
+      queryKey: ['useAmuletPriceVotes', constants.amuletPriceVotes],
+      queryFn: async () => {
+        return constants.amuletPriceVotes;
       },
     });
   },

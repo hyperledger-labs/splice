@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Loading, SvVote } from 'common-frontend';
-import { useVotesHooks } from 'common-frontend';
+import { Loading, SvVote } from '@lfdecentralizedtrust/splice-common-frontend';
+import { useVotesHooks } from '@lfdecentralizedtrust/splice-common-frontend';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useEffect, useMemo, useState } from 'react';

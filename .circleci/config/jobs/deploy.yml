@@ -211,7 +211,7 @@ jobs:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
@@ -268,7 +268,7 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Update deployment branch and tag for the cluster
                 cluster: << parameters.cluster >>
-                additional_nix_args: "--keep GITHUB_TOKEN"
+                additional_nix_args: "--keep GH_TOKEN"
                 cmd: |
                   # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
                   if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]]; then
@@ -321,7 +321,7 @@ jobs:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
@@ -394,7 +394,7 @@ jobs:
           cmd_name: Apply the pulumi infra stack
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID

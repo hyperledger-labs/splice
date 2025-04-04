@@ -16,10 +16,9 @@ import {
   sanitizedForPostgres,
   SpliceCustomResourceOptions,
   KmsConfig,
+  getParticipantKmsHelmResources,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
-
-import { getParticipantKmsHelmResources } from './participantKms';
 
 export function installParticipant(
   migrationId: DomainMigrationIndex,

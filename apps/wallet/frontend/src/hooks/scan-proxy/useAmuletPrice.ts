@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { useAmuletPriceFromOpenRounds } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import { UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { Contract } from 'common-frontend-utils';
-import { useAmuletPriceFromOpenRounds } from 'common-frontend/scan-api';
 
 import { OpenMiningRound } from '@daml.js/splice-amulet/lib/Splice/Round';
 
