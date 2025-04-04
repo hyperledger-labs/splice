@@ -42,4 +42,14 @@ class TriggerMetrics(
       qualification = Traffic,
     )
   )(MetricsContext.Empty)
+
+  val attempted: Meter = metricsFactory.meter(
+    MetricInfo(
+      name = prefix :+ "attempted",
+      summary = "Number of trigger tasks that were attempted",
+      description =
+        "This metric measures the total number of tasks attempted by the trigger, labeled with statusCode, errorCodeId and isDsoDelegateTrigger.",
+      qualification = Traffic,
+    )
+  )(MetricsContext.Empty)
 }
