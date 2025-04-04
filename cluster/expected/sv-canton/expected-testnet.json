@@ -155,7 +155,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cometbft",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
@@ -189,7 +189,7 @@
           "chainId": "test-1",
           "chainIdSuffix": "4"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -255,7 +255,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cometbft",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
       "name": "cometbft-global-domain-2",
@@ -289,7 +289,7 @@
           "chainId": "test-2",
           "chainIdSuffix": "4"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -423,7 +423,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-global-domain",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
       "name": "global-domain-1",
@@ -454,7 +454,7 @@
           "name": "cn-testzrhnet"
         },
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -510,7 +510,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-global-domain",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
       "name": "global-domain-2",
@@ -541,7 +541,7 @@
           "name": "cn-testzrhnet"
         },
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -784,7 +784,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-1",
@@ -820,7 +820,7 @@
         },
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
@@ -926,7 +926,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-2",
@@ -962,7 +962,7 @@
         },
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,

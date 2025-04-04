@@ -478,7 +478,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-istio-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-istio-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-gateway",
@@ -514,7 +514,7 @@
           "domains": 3
         },
         "enableGcsProxy": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",

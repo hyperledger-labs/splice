@@ -284,7 +284,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-validator1",
@@ -314,7 +314,7 @@
           "name": "cn-devnet",
           "svNamespace": "validator1"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "activeMigrationId": "1"
@@ -405,7 +405,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -437,7 +437,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -456,7 +456,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-1",
@@ -513,7 +513,7 @@
             }
           }
         ],
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "kms": {
           "keyRingId": "validator1_dev",
           "locationId": "us-central1",
@@ -622,7 +622,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-splitwell-web-ui",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-splitwell-web-ui",
       "compat": "true",
       "maxHistory": 10,
       "name": "splitwell-web-ui",
@@ -655,7 +655,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -746,7 +746,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-validator1",
@@ -806,7 +806,7 @@
         "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
