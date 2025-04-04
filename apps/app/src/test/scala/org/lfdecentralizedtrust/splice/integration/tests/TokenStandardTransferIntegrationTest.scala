@@ -19,9 +19,6 @@ class TokenStandardTransferIntegrationTest
     with TriggerTestUtil
     with ExternallySignedPartyTestUtil {
 
-  // TODO (#17384): support token standard choices in the script
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)

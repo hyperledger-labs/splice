@@ -42,9 +42,6 @@ class TokenStandardAllocationIntegrationTest
     with TriggerTestUtil
     with ExternallySignedPartyTestUtil {
 
-  // TODO (#17384): support token standard choices in the script
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   private val darPath =
     "token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar"
 

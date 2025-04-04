@@ -16,9 +16,6 @@ class TokenStandardCliIntegrationTest
     with ExternallySignedPartyTestUtil
     with HasTempDirectory {
 
-  // TODO (#17384): support token standard choices in the script
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   "Token Standard CLI" should {
 
     "execute transfers between external parties" in { implicit env =>

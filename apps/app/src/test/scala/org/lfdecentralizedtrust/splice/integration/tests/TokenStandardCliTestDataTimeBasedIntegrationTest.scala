@@ -71,9 +71,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
 
   private val isCI = sys.env.contains("CI")
 
-  // TODO (#17384): support token standard choices in the script
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       // Needs to be simtime for amounts to be consistent: `computeTransferPreapprovalFee` depends on current time
