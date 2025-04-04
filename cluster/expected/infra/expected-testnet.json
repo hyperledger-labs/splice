@@ -1076,7 +1076,7 @@
       },
       "spec": {
         "acme": {
-          "email": "team-canton-network@digitalasset.com",
+          "email": "email-for-letsencrypt@test.com",
           "preferredChain": "",
           "privateKeySecretRef": {
             "name": "letsencrypt-production-acme-account"

@@ -220,12 +220,17 @@ export async function initDumpConfig(): Promise<void> {
               const secretData = JSON.stringify([
                 {
                   user_id: 'google-oauth2|1234567890',
-                  email: 'someone@digitalasset.com',
+                  email: 'someone@test.com',
                 },
               ]);
               return {
                 ...args.inputs,
                 secretData,
+              };
+            } else if (args.inputs.secret == 'pulumi-lets-encrypt-email') {
+              return {
+                ...args.inputs,
+                secretData: 'email-for-letsencrypt@test.com',
               };
             } else {
               console.error(
