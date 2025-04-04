@@ -68,16 +68,7 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
       metadata: {
         name: 'chaos-mesh-role-binding',
       },
-      // TODO(#9932) Replace this by a google group.
       subjects: [
-        {
-          kind: 'User',
-          name: 'alex.matson@digitalasset.com',
-        },
-        {
-          kind: 'User',
-          name: 'chunlok.ling@digitalasset.com',
-        },
         {
           kind: 'User',
           name: 'fayimora.femibalogun@digitalasset.com',
@@ -105,10 +96,6 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
         {
           kind: 'User',
           name: 'oriol.munoz@digitalasset.com',
-        },
-        {
-          kind: 'User',
-          name: 'parth.joshi@digitalasset.com',
         },
         {
           kind: 'User',
