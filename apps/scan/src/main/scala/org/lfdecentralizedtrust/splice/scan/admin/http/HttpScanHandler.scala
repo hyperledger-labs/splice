@@ -82,9 +82,7 @@ import org.lfdecentralizedtrust.splice.store.{
   VotesStore,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.util.ErrorUtil
 
 class HttpScanHandler(
     svParty: PartyId,
@@ -1658,42 +1656,11 @@ class HttpScanHandler(
       .map(ScanResource.ListDsoRulesVoteRequestsResponse.OK)
   }
 
-  override def listVoteRequestResults(
-      respond: ScanResource.ListVoteRequestResultsResponse.type
-  )(
+  override def listVoteRequestResults(respond: ScanResource.ListVoteRequestResultsResponse.type)(
       body: ListVoteResultsRequest
   )(extracted: TraceContext): Future[ScanResource.ListVoteRequestResultsResponse] = {
     implicit val tc: TraceContext = extracted
-    withSpan(s"$workflowId.listDsoRulesVoteResults") { _ => _ =>
-      for {
-        voteResults <- votesStore.listVoteRequestResults(
-          body.actionName,
-          body.accepted,
-          body.requester,
-          body.effectiveFrom,
-          body.effectiveTo,
-          PageLimit.tryCreate(body.limit.intValue),
-        )
-      } yield {
-        ScanResource.ListVoteRequestResultsResponse.OK(
-          definitions.ListDsoRulesVoteResultsResponse(
-            voteResults
-              .map(voteResult => {
-                io.circe.parser
-                  .parse(
-                    ApiCodecCompressed
-                      .apiValueToJsValue(Contract.javaValueToLfValue(voteResult.toValue))
-                      .compactPrint
-                  )
-                  .valueOr(err =>
-                    ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")
-                  )
-              })
-              .toVector
-          )
-        )
-      }
-    }
+    this.listVoteRequestResults(body).map(ScanResource.ListVoteRequestResultsResponse.OK)
   }
 
   override def listVoteRequestsByTrackingCid(
