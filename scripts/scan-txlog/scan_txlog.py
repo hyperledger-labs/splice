@@ -3745,18 +3745,44 @@ class AppState:
 
     def _save_to_cache(self, args):
         if args.cache_file_path:
+            backup = None
             try:
+                if os.path.exists(args.cache_file_path):
+                    backup = _rename_to_backup(args.cache_file_path)
                 with open(args.cache_file_path, "w") as file:
                     data = self.to_json()
                     json.dump(data, file)
                     LOG.debug(f"Saved app state to {args.cache_file_path}")
             except Exception as e:
                 LOG.error(f"Could not save app state to {args.cache_file_path}: {e}")
+                os.replace(backup, args.cache_file_path) # overwrite if present
+                backup = None
+            if backup:
+                os.remove(backup)
 
     def finalize_batch(self, args):
         self._save_to_cache(args)
         self.state.flush_report()
 
+def _rename_to_backup(filename):
+    """Rename FILENAME to a unique name in the same folder with leading and
+    trailing `#`.
+
+    We do this instead of using a tempfile for output and then renaming after
+    because if tempfiles are on a different filesystem, the copy can fail in
+    progress, which would destroy the old file if it was still in place."""
+    target = os.path.join(os.path.dirname(filename), f"#{os.path.basename(filename)}")
+    while True:
+        target = f"{target}#"
+        if not os.path.lexists(target):
+            try:
+                os.rename(filename, target)
+                return target
+            # lexists is 99%; deal with race conditions
+            except FileExistsError:
+                pass
+            except IsADirectoryError:
+                pass
 
 def _parse_cli_args():
     # Parse command line arguments

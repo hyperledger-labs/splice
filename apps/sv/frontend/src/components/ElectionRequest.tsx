@@ -1,14 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useMutation } from '@tanstack/react-query';
 import {
   Alerting,
   AlertState,
   DisableConditionally,
   Loading,
   SvClientProvider,
-} from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { useMutation } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { Button, Stack, Table, TableBody, Typography } from '@mui/material';

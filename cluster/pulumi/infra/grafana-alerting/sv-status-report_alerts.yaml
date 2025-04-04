@@ -88,7 +88,7 @@ groups:
         dashboardUid: cdlm6c7fn7vuod
         panelId: 18
         noDataState: $NODATA
-        execErrState: Error
+        execErrState: Alerting
         for: 5m
         annotations:
           __dashboardUid__: cdlm6c7fn7vuod

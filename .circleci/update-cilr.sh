@@ -7,7 +7,7 @@ set -eoux pipefail
 if [ -n "${CI:-}" ]; then
   git config user.email "splice-maintainers@digitalasset.com"
   git config user.name "DA Automation"
-  git remote set-url origin "https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git"
+  git remote set-url origin "https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git"
 fi
 BRANCH_NAME="deploy-cilr"
 git branch -f "$BRANCH_NAME" HEAD

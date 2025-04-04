@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { AssignedContract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { QueryClient, UseQueryResult, useQuery } from '@tanstack/react-query';
-import { AssignedContract } from 'common-frontend-utils';
 
 import { Group } from '@daml.js/splitwell/lib/Splice/Splitwell';
 

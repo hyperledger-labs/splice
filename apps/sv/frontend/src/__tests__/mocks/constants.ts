@@ -5,8 +5,8 @@ import {
   getDsoSetConfigAction,
   getAmuletRulesAddFutureScheduleAction,
   getAmuletRulesSetConfigAction,
-} from 'common-test-handlers';
-import { dsoInfo } from 'common-test-handlers';
+} from '@lfdecentralizedtrust/splice-common-test-handlers';
+import { dsoInfo } from '@lfdecentralizedtrust/splice-common-test-handlers';
 import {
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,

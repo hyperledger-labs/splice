@@ -22,25 +22,25 @@ function _uses_pulumi_stack() {
     pulumi_project=$1
     pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
 
-    if [ ! -f "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.$pulumi_stack.yaml" ]; then
+    if [ ! -f "${SPLICE_ROOT}/${PULUMI_STACKS_DIR}/${pulumi_project}/Pulumi.$pulumi_stack.yaml" ]; then
         _pulumi --stack "organization/${pulumi_project}/$pulumi_stack" \
-                --cwd "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}" \
+                --cwd "${SPLICE_ROOT}/${PULUMI_STACKS_DIR}/${pulumi_project}" \
                 stack init \
                 --secrets-provider="gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}" \
                 2> /dev/null || true
 
         # Even though we do not use pulumi configs, pulumi insists on creating a local settings file, and on having a secrets-provider for it. We therefore create it here if it doesn't exist.
-        _info "Creating Pulumi stack for ${pulumi_project} project (file ${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.$pulumi_stack.yaml does not exist)"
+        _info "Creating Pulumi stack for ${pulumi_project} project (file ${SPLICE_ROOT}/${PULUMI_STACKS_DIR}/${pulumi_project}/Pulumi.$pulumi_stack.yaml does not exist)"
         local -x PULUMI_CONFIG_PASSPHRASE=''
         _pulumi --stack "organization/${pulumi_project}/$pulumi_stack" \
-                --cwd "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}" \
+                --cwd "${SPLICE_ROOT}/${PULUMI_STACKS_DIR}/${pulumi_project}" \
                 stack change-secrets-provider "gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}"
     fi
 }
 
 function _resolve_pulumi_stack() {
     pulumi_project=$1
-    if [[ $pulumi_project == "gcp" ]]; then
+    if [[ $pulumi_project == "gcp" ]] || [[ $pulumi_project == "gcp-project" ]]; then
         pulumi_stack="$CLOUDSDK_CORE_PROJECT"
     elif [[ $pulumi_project == "sv-canton" ]]; then
         pulumi_stack="$pulumi_project.${SPLICE_SV}-migration-${SPLICE_MIGRATION_ID}.$GCP_CLUSTER_BASENAME"

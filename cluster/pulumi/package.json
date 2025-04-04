@@ -32,6 +32,7 @@
         "common-validator",
         "canton-network",
         "gcp",
+        "gcp-project",
         "infra",
         "sv-runbook",
         "observability",

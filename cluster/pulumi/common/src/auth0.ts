@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenResponse } from 'auth0';
 
@@ -14,8 +15,7 @@ import type {
   Auth0ClusterConfig,
 } from './auth0types';
 import { config, isMainNet } from './config';
-import { infraStack } from './stackReferences';
-import { ExactNamespace, fixedTokens, loadJsonFromFile, SPLICE_ROOT } from './utils';
+import { CLUSTER_BASENAME, ExactNamespace, fixedTokens } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
@@ -312,27 +312,20 @@ async function auth0Secret(
   }
 }
 
-// TODO(#14778) Remove this type and the duplicated secrets
-// after mainnet upgrades to 0.2.0.
-export type SecretPrefix = 'cn' | 'splice';
-
 export async function installAuth0Secret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
-  clientName: string,
-  prefix: SecretPrefix
+  clientName: string
 ): Promise<k8s.core.v1.Secret> {
   const secrets = await auth0Client.getSecrets();
   const secret = await auth0Secret(auth0Client, secrets, clientName);
 
-  const pulumiNamePrefix = prefix == 'splice' ? `${prefix}-` : '';
-
   return new k8s.core.v1.Secret(
-    `${pulumiNamePrefix}auth0-secret-${xns.logicalName}-${clientName}`,
+    `splice-auth0-secret-${xns.logicalName}-${clientName}`,
     {
       metadata: {
-        name: `${prefix}-app-${secretNameApp}-ledger-api-auth`,
+        name: `splice-app-${secretNameApp}-ledger-api-auth`,
         namespace: xns.ns.metadata.name,
       },
       stringData: secret,
@@ -356,15 +349,7 @@ export async function installAuth0UISecret(
   }
   const id = lookupClientSecrets(secrets, namespaceClientIds, secretNameApp).client_id;
 
-  installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id, 'cn');
-  return installAuth0UiSecretWithClientId(
-    auth0Client,
-    xns,
-    secretNameApp,
-    clientName,
-    id,
-    'splice'
-  );
+  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id);
 }
 
 export function installAuth0UiSecretWithClientId(
@@ -372,16 +357,13 @@ export function installAuth0UiSecretWithClientId(
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string,
-  clientId: string | Promise<string>,
-  prefix: SecretPrefix
+  clientId: string | Promise<string>
 ): k8s.core.v1.Secret {
-  const pulumiNamePrefix = prefix == 'splice' ? `${prefix}-` : '';
-
   return new k8s.core.v1.Secret(
-    `${pulumiNamePrefix}auth0-ui-secret-${xns.logicalName}-${clientName}`,
+    `splice-auth0-ui-secret-${xns.logicalName}-${clientName}`,
     {
       metadata: {
-        name: `${prefix}-app-${secretNameApp}-ui-auth`,
+        name: `splice-app-${secretNameApp}-ui-auth`,
         namespace: xns.ns.metadata.name,
       },
       stringData: {
@@ -426,6 +408,7 @@ export enum Auth0ClientType {
 }
 
 export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> {
+  const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
   const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
   switch (clientType) {
     case Auth0ClientType.RUNBOOK:
@@ -466,11 +449,21 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
   }
 }
 
-export const svUserIds = (auth0Cfg: Auth0Config): string[] => {
+export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {
   console.error(auth0Cfg);
-  const json = loadJsonFromFile(`${SPLICE_ROOT}/cluster/user-configs/${auth0Cfg.auth0Domain}.json`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return json.map((user: any) => user.user_id);
+  const temp = getSecretVersionOutput({
+    secret: `pulumi-user-configs-${auth0Cfg.auth0Domain.replace('.us.auth0.com', '')}`,
+  });
+  return temp.apply(config => {
+    const secretData = config.secretData;
+    const json = JSON.parse(secretData);
+    const ret: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    json.forEach((user: any) => {
+      ret.push(user.user_id);
+    });
+    return ret;
+  });
 };
 
 export const ansDomainPrefix = 'cns';

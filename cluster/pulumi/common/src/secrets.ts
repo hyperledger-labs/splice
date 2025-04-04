@@ -6,7 +6,6 @@ import { Output } from '@pulumi/pulumi';
 import { ArtifactoryCreds } from './artifactory';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
-import { spliceConfig } from './config/config';
 import { artifactories } from './config/consts';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
@@ -20,6 +19,11 @@ export type SvCometBftKeys = {
   nodePrivateKey: string;
   validatorPrivateKey: string;
   validatorPublicKey: string;
+};
+
+export type SvCometBftGovernanceKey = {
+  publicKey: string;
+  privateKey: string;
 };
 
 export type GrafanaKeys = {
@@ -52,6 +56,20 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
   });
 }
 
+export function svCometBftGovernanceKeyFromSecret(
+  sv: string
+): pulumi.Output<SvCometBftGovernanceKey> {
+  const keyJson = getSecretVersionOutput({ secret: `${sv}-cometbft-governance-key` });
+  return keyJson.apply(k => {
+    const secretData = k.secretData;
+    const parsed = JSON.parse(secretData);
+    return {
+      publicKey: String(parsed.public),
+      privateKey: String(parsed.private),
+    };
+  });
+}
+
 export function imagePullSecretByNamespaceName(
   ns: string,
   dependsOn: pulumi.Resource[] = []
@@ -69,15 +87,12 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
     enableServerSideApply: true,
   });
 
-  const allowedArtifactories = spliceConfig.pulumiProjectConfig.allowedArtifactories;
-
   type DockerConfig = { [key: string]: { auth: string; username: string; password: string } };
 
   const dockerConfigJson = pulumi.output(keys).apply(creds => {
     const auths: DockerConfig = {};
 
-    allowedArtifactories.forEach(artName => {
-      const art = artifactories[artName];
+    artifactories.forEach(art => {
       auths[art] = {
         auth: btoa(creds.username + ':' + creds.password),
         username: creds.username,
@@ -176,8 +191,7 @@ export function uiSecret(
   appName: string,
   clientId: string
 ): k8s.core.v1.Secret {
-  installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId, 'cn');
-  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId, 'splice');
+  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId);
 }
 
 export type AppAndUiSecrets = {
@@ -190,9 +204,8 @@ export async function validatorSecrets(
   auth0Client: Auth0Client,
   clientId: string
 ): Promise<AppAndUiSecrets> {
-  await installAuth0Secret(auth0Client, ns, 'validator', 'validator', 'cn');
   return {
-    appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator', 'splice'),
+    appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
     uiSecret: uiSecret(auth0Client, ns, 'wallet', clientId),
   };
 }
@@ -226,6 +239,33 @@ export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.cor
     },
     {
       dependsOn: [ns.ns],
+    }
+  );
+}
+
+export function svCometBftGovernanceKeySecret(
+  xns: ExactNamespace,
+  keys: CnInput<SvCometBftGovernanceKey>
+): k8s.core.v1.Secret {
+  const secretName = 'splice-app-sv-cometbft-governance-key';
+  const data = pulumi.output(keys).apply(ks => {
+    return {
+      public: btoa(ks.publicKey),
+      private: btoa(ks.privateKey),
+    };
+  });
+  return new k8s.core.v1.Secret(
+    `splice-app-${xns.logicalName}-cometbft-governance-key`,
+    {
+      metadata: {
+        name: secretName,
+        namespace: xns.logicalName,
+      },
+      type: 'Opaque',
+      data: data,
+    },
+    {
+      dependsOn: [xns.ns],
     }
   );
 }

@@ -1,4 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
+import * as path from 'path';
 import * as sinon from 'sinon';
 import { setMocks } from '@pulumi/pulumi/runtime/mocks';
 
@@ -120,6 +121,8 @@ export async function initDumpConfig(): Promise<void> {
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
+  // the project name in setMocks seems to be ignored and we need to load the proper config, so we override it here to ensure we  always use the same config as in prod
+  process.env.CONFIG_PROJECT_NAME = path.basename(process.cwd());
   // StackReferences cannot be mocked in tests currently
   // (see https://github.com/pulumi/pulumi/issues/9212)
   sinon
@@ -209,6 +212,17 @@ export async function initDumpConfig(): Promise<void> {
                 username: 'art_user',
                 password: 's3cr3t',
               });
+              return {
+                ...args.inputs,
+                secretData,
+              };
+            } else if (args.inputs.secret.startsWith('pulumi-user-configs-')) {
+              const secretData = JSON.stringify([
+                {
+                  user_id: 'google-oauth2|1234567890',
+                  email: 'someone@digitalasset.com',
+                },
+              ]);
               return {
                 ...args.inputs,
                 secretData,

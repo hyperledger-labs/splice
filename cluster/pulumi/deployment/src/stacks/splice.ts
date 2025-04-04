@@ -1,10 +1,32 @@
-import { config, DeploySvRunbook } from 'splice-pulumi-common';
+import { CLUSTER_BASENAME, config, DeploySvRunbook } from 'splice-pulumi-common';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
 } from 'splice-pulumi-common-validator/src/validators';
-import { GitFluxRef } from 'splice-pulumi-common/src/operator/flux-source';
+import { GitFluxRef, StackFromRef } from 'splice-pulumi-common/src/operator/flux-source';
 import { createStackCR, EnvRefs } from 'splice-pulumi-common/src/operator/stack';
+
+export function getSpliceStacksFromMainReference(): StackFromRef[] {
+  const ret: StackFromRef[] = [];
+  if (DeploySvRunbook) {
+    ret.push({ project: 'sv-runbook', stack: CLUSTER_BASENAME });
+  }
+  if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
+    ret.push({ project: 'multi-validator', stack: CLUSTER_BASENAME });
+  }
+  if (config.envFlag('SPLICE_DEPLOY_VALIDATOR_RUNBOOK', false)) {
+    ret.push({ project: 'validator-runbook', stack: CLUSTER_BASENAME });
+  }
+  if (mustInstallValidator1) {
+    ret.push({ project: 'validator1', stack: CLUSTER_BASENAME });
+  }
+  if (mustInstallSplitwell) {
+    ret.push({ project: 'splitwell', stack: CLUSTER_BASENAME });
+  }
+  ret.push({ project: 'infra', stack: CLUSTER_BASENAME });
+  ret.push({ project: 'canton-network', stack: CLUSTER_BASENAME });
+  return ret;
+}
 
 export function installSpliceStacks(reference: GitFluxRef, envRefs: EnvRefs): void {
   if (DeploySvRunbook) {

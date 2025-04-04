@@ -26,6 +26,18 @@ import scala.jdk.OptionConverters.RichOptional
 
 trait VotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
 
+  def listAmuletPriceVotes(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[
+    splice.dso.amuletprice.AmuletPriceVote.ContractId,
+    splice.dso.amuletprice.AmuletPriceVote,
+  ]]] =
+    multiDomainAcsStore
+      .listContracts(splice.dso.amuletprice.AmuletPriceVote.COMPANION, limit)
+      .map(_ map (_.contract))
+
   def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
     Seq[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]]
   ] =

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend-utils';
 import { LookupFeaturedAppRightResponse } from 'scan-openapi';
 
 import { FeaturedAppRight } from '@daml.js/splice-amulet/lib/Splice/Amulet/';

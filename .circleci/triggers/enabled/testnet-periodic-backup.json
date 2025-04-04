@@ -3,7 +3,7 @@
   "description": "Periodic backup of TestNet",
   "attribution-actor": "system",
   "parameters": {
-    "branch": "release-line-0.3.15",
+    "branch": "TESTNET_RELEASE_BRANCH",
     "run-job": "backup-testnet"
   },
   "timetable": {

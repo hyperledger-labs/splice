@@ -5,16 +5,21 @@ import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { config, isDevNet, isMainNet } from './config';
+import { spliceEnvConfig } from './config/envConfig';
 
 /// Environment variables
-export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 300;
+export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
 export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY_SIZE')) || 0; // 0 => no limit
 
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');
+export const PULUMI_STACKS_DIR = config.requireEnv('PULUMI_STACKS_DIR');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
-export const PUBLIC_CONFIGS_PATH = config.requireEnv('PUBLIC_CONFIGS_PATH');
+export const PUBLIC_CONFIGS_PATH = config.optionalEnv('PUBLIC_CONFIGS_PATH');
 export const PRIVATE_CONFIGS_PATH = config.requireEnv('PRIVATE_CONFIGS_PATH');
+
+export const HELM_REPO = spliceEnvConfig.requireEnv('CACHE_OCI_DEV_HELM_REGISTRY');
+export const DOCKER_REPO = spliceEnvConfig.requireEnv('CACHE_DEV_DOCKER_REGISTRY');
 
 export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
   const daUrlScheme = 'global.canton.network.digitalasset.com';
@@ -49,19 +54,6 @@ export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   : 0;
 
 export type LogLevel = 'INFO' | 'DEBUG';
-
-export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
-
-export const daSupportApprovedIdentities: ApprovedSvIdentity[] = approveDaSupportSvNode
-  ? [
-      {
-        name: 'Digital-Asset-Support-SV',
-        publicKey:
-          'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAED20NyAmxCu7clk65HyRQlqXO0GrPeDqVhNWPNyPvOjLwnwwyVXiwBB5yVJTldOi6AJKZM8bowIcLSwoccIiPKA==',
-        rewardWeightBps: 10000, // dummy weight
-      },
-    ]
-  : [];
 
 export type ApprovedSvIdentity = {
   name: string;
@@ -183,14 +175,16 @@ export function fixedTokens(): boolean {
   return _fixedTokens;
 }
 
-const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
-
-export const svPublicConfigsClusterDirectory = `${PUBLIC_CONFIGS_PATH}/configs/${clusterDirectory}`;
-export const svPrivateConfigsClusterDirectory = `${PRIVATE_CONFIGS_PATH}/configs/${clusterDirectory}`;
+export const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
-    .approvedSvIdentities;
+  if (PUBLIC_CONFIGS_PATH) {
+    const svPublicConfigsClusterDirectory = `${PUBLIC_CONFIGS_PATH}/configs/${clusterDirectory}`;
+    return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
+      .approvedSvIdentities;
+  } else {
+    return [];
+  }
 }
 
 // Typically used for overriding chart values.
@@ -216,3 +210,8 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
+
+export const splitwellDarPaths = fs
+  .readdirSync(`${SPLICE_ROOT}/daml/dars`)
+  .filter(file => file.match(/splitwell.*\.dar/))
+  .map(file => `splice-node/dars/${file}`);

@@ -47,8 +47,7 @@ We provide minimal Helm configuration examples for Google Cloud (GCP) KMS and Am
 
 .. warning::
 
-   The GCP and AWS KMS drivers are available only for users of Canton Enterprise.
-   Splice will default to packaging Canton Open Source in the future.
+   The GCP and AWS KMS drivers are available only for licensed users of Canton Enterprise.
 
 Whatever KMS provider you choose, please note:
 

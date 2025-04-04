@@ -1,10 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import {
+  AmuletPriceVote,
+  DsoInfo,
+  SvVote,
+  theme,
+  VotesHooks,
+  VotesHooksContext,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import {
+  dsoInfo,
+  getDsoSvOffboardingAction,
+} from '@lfdecentralizedtrust/splice-common-test-handlers';
 import { QueryClient, QueryClientProvider, useQuery, UseQueryResult } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { DsoInfo, SvVote, theme, VotesHooks, VotesHooksContext } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
-import { dsoInfo, getDsoSvOffboardingAction } from 'common-test-handlers';
 import dayjs from 'dayjs';
 import React from 'react';
 import { describe, expect, test } from 'vitest';
@@ -95,6 +105,14 @@ const provider: VotesHooks = {
             ? []
             : [constants.myVote(cid, cid === constants.rejectedVoteResult.request.trackingCid)];
         });
+      },
+    });
+  },
+  useAmuletPriceVotes(): UseQueryResult<AmuletPriceVote[]> {
+    return useQuery({
+      queryKey: ['useAmuletPriceVotes', constants.amuletPriceVotes],
+      queryFn: async () => {
+        return constants.amuletPriceVotes;
       },
     });
   },

@@ -43,7 +43,6 @@ workflow:
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
-          run_upgrade_workarounds: true
           requires:
             - reset_cluster
             - autoscaler_prevent_scaledown
@@ -67,7 +66,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
-          run_upgrade_workarounds: true
           requires:
             - deploy_cluster_for_upgrade
       - preflight_sv_check:
@@ -88,7 +86,6 @@ workflow:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          run_upgrade_workarounds: true
           requires:
             - deploy_cluster_for_upgrade
       - preflight_validator_check:
@@ -271,6 +268,7 @@ workflow:
           context:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
+          silence_deployment_alerts: true
           requires:
             - wait_for_daml_upgrade
             - preflight_sv_check_after_sv_upgrade
@@ -302,6 +300,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
+          silence_deployment_alerts: true
           requires:
             - reset_validator_runbook_after_upgrade
       - preflight_sv_check:

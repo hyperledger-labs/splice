@@ -4,10 +4,10 @@ import {
   isDevNet,
   nonDevNetNonSvValidatorTopupConfig,
   nonSvValidatorTopupConfig,
-  SplitPostgresInstances,
 } from 'splice-pulumi-common';
 import { readBackupConfig } from 'splice-pulumi-common-validator/src/backup';
 import { splitwellOnboarding } from 'splice-pulumi-common-validator/src/validators';
+import { SplitPostgresInstances } from 'splice-pulumi-common/src/config/configs';
 
 import { installSplitwell } from './splitwell';
 

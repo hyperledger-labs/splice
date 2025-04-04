@@ -146,7 +146,7 @@ commands:
       - run_bash_command_in_nix:
           when: always
           cmd: ./scripts/check-todos.sh
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
       - store_artifacts:
           name: Store To-dos as artifacts
           when: always
@@ -261,6 +261,10 @@ commands:
             sudo systemctl restart docker
 
   docker_build:
+    parameters:
+      is_public:
+        type: boolean
+        default: false
     steps:
       - run_bash_command_in_nix:
          cmd_name: Build docker images
@@ -274,7 +278,8 @@ commands:
                               --keep CIRCLE_SHA1"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
-         cmd: make docker-build -j
+         cmd: |
+           make docker-build -j
   docker_login_artifactory:
     steps:
       - run:
@@ -343,7 +348,7 @@ commands:
           cmd_name: Running << parameters.project >> preview on cluster << parameters.cluster >>
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep SLACK_ACCESS_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
@@ -385,7 +390,7 @@ commands:
           name: Setting TARGET_BRANCH env var
           command: |
             PR_NUMBER=$(echo $CIRCLE_PULL_REQUEST | sed 's|.*/pull/\([0-9]*\)|\1|')
-            TARGET_BRANCH=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
+            TARGET_BRANCH=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
             echo "PR target branch: $TARGET_BRANCH"
             echo export "TARGET_BRANCH=\"$TARGET_BRANCH\"" >> "$BASH_ENV"
 
@@ -489,7 +494,7 @@ commands:
           cmd_name: Apply the deployment stack
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep SLACK_ACCESS_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID

@@ -3,7 +3,7 @@
     "description": "Periodic backup of MainNet",
     "attribution-actor": "system",
     "parameters": {
-      "branch": "release-line-0.3.13",
+      "branch": "MAINNET_RELEASE_BRANCH",
       "run-job": "backup-mainnet"
     },
     "timetable": {

@@ -1,5 +1,5 @@
 {
-  "name": "common-frontend",
+  "name": "@lfdecentralizedtrust/splice-common-frontend",
   "version": "0.1.0",
   "browserslist": {
     "production": [
@@ -18,7 +18,7 @@
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
     "@js-temporal/polyfill": "^0.4.4",
     "@tanstack/react-query": "4.29.5",
-    "common-frontend-utils": "0.1.0",
+    "@lfdecentralizedtrust/splice-common-frontend-utils": "0.1.0",
     "common-typeface-termina": "1.0.0",
     "date-fns": "2.29.3",
     "decimal.js-light": "2.5.1",
@@ -44,8 +44,8 @@
     "@types/node": "18.11.0",
     "@types/react": "18.0.28",
     "@types/react-dom": "18.0.11",
-    "common-test-handlers": "^0.1.0",
-    "common-test-utils": "^0.1.0",
+    "@lfdecentralizedtrust/splice-common-test-handlers": "^0.1.0",
+    "@lfdecentralizedtrust/splice-common-test-utils": "^0.1.0",
     "eslint": "8.34.0",
     "eslint-config-react-app": "7.0.1",
     "prettier": "2.8.4",

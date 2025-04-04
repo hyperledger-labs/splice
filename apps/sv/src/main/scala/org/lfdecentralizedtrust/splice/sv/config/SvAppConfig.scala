@@ -225,7 +225,7 @@ case class SvAppBackendConfig(
     svPartyHint: Option[String] = None,
     onboarding: Option[SvOnboardingConfig] = None,
     initialAmuletPriceVote: Option[BigDecimal] = None,
-    cometBftConfig: Option[CometBftConfig] = None,
+    cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
     // This is for the Poc from #13301
     synchronizerNodes: Map[String, SvSynchronizerNodeConfig] = Map.empty,
@@ -289,10 +289,25 @@ object SvAppBackendConfig {
   )
 }
 
-case class CometBftConfig(
+case class SvCometBftConfig(
     enabled: Boolean = false,
     connectionUri: String = "",
+    // `None` means that we will be abusing the SV participant for generating and storing that key
+    // (which doesn't work if the participant uses an external KMS).
+    governanceKey: Option[CometBftGovernanceKey] = None,
 )
+
+case class CometBftGovernanceKey(
+    // both base64 encoded
+    publicKey: String,
+    privateKey: String,
+)
+object CometBftGovernanceKey {
+  def hideConfidential(config: CometBftGovernanceKey): CometBftGovernanceKey = {
+    val hidden = "****"
+    config.copy(privateKey = hidden)
+  }
+}
 
 // Removes unnecessary data from the Sequencer that is earlier than the configured retention period
 final case class SequencerPruningConfig(

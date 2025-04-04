@@ -6,9 +6,9 @@ package org.lfdecentralizedtrust.splice.automation
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{
+  RetryProvider,
   SpliceLedgerConnection,
   SpliceLedgerSubscription,
-  RetryProvider,
 }
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
@@ -16,6 +16,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -48,9 +49,17 @@ class UpdateIngestionService(
       traceContext: TraceContext
   ): Future[SpliceLedgerSubscription[?]] =
     for {
-      lastIngestedOffset <- ingestionSink.initialize()
-      subscribeFrom <- lastIngestedOffset match {
-        case None =>
+      ingestionStart <- ingestionSink.initialize()
+      subscribeFrom <- ingestionStart match {
+        case IngestionStart.ResumeAtOffset(offset) =>
+          logger.debug(s"Resuming ingestion from offset $offset")
+          Future.successful(offset)
+        case IngestionStart.InitializeAcsAtOffset(offset) =>
+          logger.debug(s"Initializing ACS and starting ingestion from offset $offset")
+          for {
+            _ <- ingestAcsAndInFlight(offset)
+          } yield offset
+        case IngestionStart.InitializeAcsAtLatestOffset =>
           for {
             offset <-
               if (ingestFromParticipantBegin) {
@@ -70,13 +79,10 @@ class UpdateIngestionService(
               } else
                 for {
                   acsOffset <- connection.ledgerEnd()
-                  _ = logger.debug(s"Starting ingestion from ledger end: $acsOffset")
+                  _ = logger.debug(s"Starting ingestion from ledger end at $acsOffset")
                   _ <- ingestAcsAndInFlight(acsOffset)
                 } yield acsOffset
           } yield offset
-        case Some(offset) =>
-          logger.debug(s"Resuming ingestion from offset: $offset")
-          Future.successful(offset)
       }
     } yield new SpliceLedgerSubscription(
       source = connection.updates(subscribeFrom, filter),
