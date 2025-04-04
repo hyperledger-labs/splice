@@ -8,6 +8,8 @@ import DA.Assert
 import Daml.Script
 
 import Splice.Amulet
+import Splice.AmuletConfig (AmuletConfig(..))
+import qualified Splice.AmuletConfig as Unit
 import Splice.AmuletRules
 import Splice.Fees
 import Splice.Expiry
@@ -20,6 +22,16 @@ import Splice.Scripts.Util
 
 import DA.Foldable (forA_)
 import DA.Time
+
+scaleAmuletConfig : Decimal -> AmuletConfig Unit.USD -> AmuletConfig Amulet
+scaleAmuletConfig amuletPrice config = AmuletConfig with
+  transferConfig = scaleFees (1.0 / amuletPrice) config.transferConfig
+  decentralizedSynchronizer = config.decentralizedSynchronizer
+  issuanceCurve = config.issuanceCurve
+  tickDuration = config.tickDuration
+  packageConfig = config.packageConfig
+  transferPreapprovalFee = fmap (/ amuletPrice) config.transferPreapprovalFee
+  featuredAppActivityMarkerAmount = fmap (/ amuletPrice) config.featuredAppActivityMarkerAmount
 
 test : Script ()
 test = script do

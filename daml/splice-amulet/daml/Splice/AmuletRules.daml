@@ -634,16 +634,6 @@ transferControllers t =
     addOutputController s (TransferOutput with receiver; lock; ..) =
       Set.insert receiver $ optional s (foldl (flip Set.insert) s) (holders <$> lock)
 
-scaleAmuletConfig : Decimal -> AmuletConfig Unit.USD -> AmuletConfig Amulet
-scaleAmuletConfig amuletPrice config = AmuletConfig with
-  transferConfig = scaleFees (1.0 / amuletPrice) config.transferConfig
-  decentralizedSynchronizer = config.decentralizedSynchronizer
-  issuanceCurve = config.issuanceCurve
-  tickDuration = config.tickDuration
-  packageConfig = config.packageConfig
-  transferPreapprovalFee = config.transferPreapprovalFee
-  featuredAppActivityMarkerAmount = fmap (/amuletPrice) config.featuredAppActivityMarkerAmount
-
 computeFees : Party -> TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
 computeFees dso context sender outputs = do
   openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
