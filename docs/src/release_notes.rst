@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Frontends
+
+  - Relax config validation on audience to not require that it is a URL as this causes issues with some IAMs.
+
 0.3.19
 ------
 
