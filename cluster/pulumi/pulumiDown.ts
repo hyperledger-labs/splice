@@ -34,7 +34,8 @@ async function runStacksDown() {
   await awaitAllOrThrowAllExceptions(operations);
   // Deleting the operator in parallel with the deployment seems to race,
   // so we do it after the deployment
-  await stack('operator', 'operator', true, {});
+  const operatorStack = await stack('operator', 'operator', true, {})
+  await downOperation(operatorStack, abortController);
 }
 
 runStacksDown().catch(e => {
