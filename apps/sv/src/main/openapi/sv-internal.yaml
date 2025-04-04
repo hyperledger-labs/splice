@@ -414,7 +414,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListAmuletPriceVotesResponse"
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListAmuletPriceVotesResponse"
   /v0/admin/sv/open-mining-rounds:
     get:
       tags: [sv]
@@ -833,16 +833,6 @@ components:
           type: string
         reason_description:
           type: string
-
-    ListAmuletPriceVotesResponse:
-      type: object
-      required:
-        - amulet_price_votes
-      properties:
-        amulet_price_votes:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     ListOpenMiningRoundsResponse:
       type: object

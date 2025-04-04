@@ -54,7 +54,7 @@ export type ValidatorSecrets = {
 type BasicValidatorConfig = {
   xns: ExactNamespace;
   topupConfig?: ValidatorTopupConfig;
-  validatorWalletUsers: string[];
+  validatorWalletUsers: Output<string[]>;
   disableAllocateLedgerApiUserParty?: boolean;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: CnInput<pulumi.Resource>[];
@@ -257,14 +257,12 @@ type ValidatorSecretsConfig = {
 export async function installValidatorSecrets(
   config: ValidatorSecretsConfig
 ): Promise<ValidatorSecrets> {
-  await installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName, 'cn');
   return {
     validatorSecret: await installAuth0Secret(
       config.auth0Client,
       config.xns,
       'validator',
-      config.auth0AppName,
-      'splice'
+      config.auth0AppName
     ),
     wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
     cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),

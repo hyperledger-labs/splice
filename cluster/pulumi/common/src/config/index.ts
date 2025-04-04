@@ -6,8 +6,6 @@ export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';
 
 export const DeploySvRunbook = spliceEnvConfig.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);
 
-export const artifactsRepository = spliceEnvConfig.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
-
 export const clusterProdLike = spliceEnvConfig.envFlag('GCP_CLUSTER_PROD_LIKE');
 
 // During development we often overwrite the same tag so we use imagePullPolicy: Always.

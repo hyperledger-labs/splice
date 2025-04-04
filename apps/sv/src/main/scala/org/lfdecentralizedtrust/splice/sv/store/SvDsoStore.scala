@@ -60,7 +60,7 @@ trait SvDsoStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore
-    with VotesStore {
+    with ActiveVotesStore {
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
 
@@ -747,18 +747,6 @@ trait SvDsoStore
   def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
       tc: TraceContext
   ): Future[Long]
-
-  def listAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[Contract[
-      splice.dso.amuletprice.AmuletPriceVote.ContractId,
-      splice.dso.amuletprice.AmuletPriceVote,
-    ]]
-  ] =
-    multiDomainAcsStore
-      .listContracts(splice.dso.amuletprice.AmuletPriceVote.COMPANION, limit)
-      .map(_ map (_.contract))
 
   def lookupVoteByThisSvAndVoteRequestWithOffset(
       voteRequestCid: splice.dsorules.VoteRequest.ContractId

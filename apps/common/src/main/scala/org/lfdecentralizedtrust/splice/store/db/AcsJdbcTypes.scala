@@ -21,6 +21,8 @@ import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, 
 
 import java.sql.{JDBCType, PreparedStatement, ResultSet}
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 import java.io.StringWriter
 
@@ -38,6 +40,32 @@ trait AcsJdbcTypes {
       setParameterByteArray: SetParameter[Array[Byte]]
   ): SetParameter[ByteString] =
     (bs: ByteString, pp: PositionedParameters) => setParameterByteArray.apply(bs.toByteArray, pp)
+
+  protected implicit lazy val acsStoreIdJdbcType: JdbcType[AcsStoreId] =
+    AcsStoreId.subst(implicitly[BaseColumnType[Int]])
+
+  protected implicit lazy val acsStoreIdGetResult: GetResult[AcsStoreId] =
+    GetResult.GetInt.andThen(AcsStoreId.apply(_))
+
+  protected implicit lazy val acsStoreIdGetResultOption: GetResult[Option[AcsStoreId]] =
+    GetResult.GetIntOption.andThen(_.map(AcsStoreId.apply(_)))
+
+  protected implicit lazy val acsStoreIdSetParameter: SetParameter[AcsStoreId] =
+    (id: AcsStoreId, pp: PositionedParameters) =>
+      SetParameter.SetInt.apply(AcsStoreId.unwrap(id), pp)
+
+  protected implicit lazy val txLogStoreIdJdbcType: JdbcType[TxLogStoreId] =
+    TxLogStoreId.subst(implicitly[BaseColumnType[Int]])
+
+  protected implicit lazy val txLogStoreIdGetResult: GetResult[TxLogStoreId] =
+    GetResult.GetInt.andThen(TxLogStoreId.apply(_))
+
+  protected implicit lazy val txLogStoreIdGetResultOption: GetResult[Option[TxLogStoreId]] =
+    GetResult.GetIntOption.andThen(_.map(TxLogStoreId.apply(_)))
+
+  protected implicit lazy val txLogStoreIdSetParameter: SetParameter[TxLogStoreId] =
+    (id: TxLogStoreId, pp: PositionedParameters) =>
+      SetParameter.SetInt.apply(TxLogStoreId.unwrap(id), pp)
 
   protected implicit lazy val timestampJdbcType: JdbcType[Timestamp] =
     MappedColumnType.base[Timestamp, Long](_.micros, Timestamp.assertFromLong)

@@ -1,8 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import {
+  AmuletPriceVote,
+  DsoInfo,
+  SvVote,
+  VotesHooks,
+  VotesHooksContext,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { UseQueryResult } from '@tanstack/react-query';
-import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
 import React from 'react';
 
 import {
@@ -44,6 +50,9 @@ export const SvAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ chi
     },
     useListVotes(contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> {
       return svHooks.useListVotes(contractIds);
+    },
+    useAmuletPriceVotes(): UseQueryResult<AmuletPriceVote[]> {
+      return svHooks.useAmuletPriceVotes();
     },
     useVoteRequest(contractId: ContractId<VoteRequest>): UseQueryResult<Contract<VoteRequest>> {
       return svHooks.useVoteRequest(contractId);

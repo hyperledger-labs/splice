@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { ValidatorLicensesPage } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { useScanClient } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import { UseInfiniteQueryResult, useInfiniteQuery } from '@tanstack/react-query';
-import { ValidatorLicensesPage } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
-import { useScanClient } from 'common-frontend/scan-api';
 
 import { ValidatorLicense } from '@daml.js/splice-amulet/lib/Splice/ValidatorLicense/module';
 

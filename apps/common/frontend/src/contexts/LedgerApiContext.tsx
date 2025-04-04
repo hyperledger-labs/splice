@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useUserState } from 'common-frontend';
-import { callWithLogging } from 'common-frontend-utils';
+import { useUserState } from '@lfdecentralizedtrust/splice-common-frontend';
+import { callWithLogging } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 

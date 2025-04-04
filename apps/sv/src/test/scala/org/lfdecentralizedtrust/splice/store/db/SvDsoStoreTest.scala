@@ -4,7 +4,6 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  AmuletRules,
   AmuletRules_MiningRound_Archive,
   AppTransferContext,
 }
@@ -51,7 +50,6 @@ import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{Limit, MiningRoundsStore, PageLimit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{
   IdleAnsSubscription,
@@ -1532,117 +1530,6 @@ class DbSvDsoStoreTest
     } yield store
   }
 
-  "listVoteRequestResults" should {
-
-    "list all past VoteRequestResult" in {
-      for {
-        store <- mkStore()
-        voteRequestContract1 = voteRequest(
-          requester = userParty(1),
-          votes = (1 to 4)
-            .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
-        )
-        _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
-        result1 = mkVoteRequestResult(
-          voteRequestContract1
-        )
-        _ <- dummyDomain.exercise(
-          contract = dsoRules(),
-          interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-          choiceName = DsoRulesCloseVoteRequest.choice.name,
-          mkCloseVoteRequest(
-            voteRequestContract1.contractId
-          ),
-          result1.toValue,
-        )(
-          store.multiDomainAcsStore
-        )
-        voteRequestContract2 = voteRequest(
-          requester = userParty(2),
-          votes = (1 to 4)
-            .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
-        )
-        _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
-        result2 = mkVoteRequestResult(
-          voteRequestContract2,
-          effectiveAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS),
-        )
-        _ <- dummyDomain.exercise(
-          contract = dsoRules(),
-          interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-          choiceName = DsoRulesCloseVoteRequest.choice.name,
-          mkCloseVoteRequest(
-            voteRequestContract2.contractId
-          ),
-          result2.toValue,
-        )(
-          store.multiDomainAcsStore
-        )
-      } yield {
-        store
-          .listVoteRequestResults(
-            Some("AddSv"),
-            Some(true),
-            None,
-            None,
-            None,
-            PageLimit.tryCreate(1),
-          )
-          .futureValue
-          .toList
-          .loneElement shouldBe result2
-        store
-          .listVoteRequestResults(
-            Some("SRARC_AddSv"),
-            Some(false),
-            None,
-            None,
-            None,
-            PageLimit.tryCreate(1),
-          )
-          .futureValue
-          .toList
-          .size shouldBe (0)
-        store
-          .listVoteRequestResults(
-            None,
-            None,
-            None,
-            None,
-            None,
-            PageLimit.tryCreate(1),
-          )
-          .futureValue
-          .toList
-          .size shouldBe (1)
-        store
-          .listVoteRequestResults(
-            None,
-            None,
-            None,
-            Some(Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600).toString),
-            None,
-            PageLimit.tryCreate(1),
-          )
-          .futureValue
-          .toList
-          .size shouldBe (0)
-        store
-          .listVoteRequestResults(
-            None,
-            None,
-            None,
-            Some(Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(3600).toString),
-            None,
-            PageLimit.tryCreate(1),
-          )
-          .futureValue
-          .toList
-          .size shouldBe (1)
-      }
-    }
-  }
-
   "listExpiredVoteRequests" should {
 
     "return all vote requests that are expired as of now" in {
@@ -1759,91 +1646,6 @@ class DbSvDsoStoreTest
         result <- store.lookupVoteByThisSvAndVoteRequestWithOffset(goodRequest.contractId)
       } yield {
         result.value should be(Some(goodVote))
-      }
-    }
-  }
-
-  "lookupContractByDateTime" should {
-
-    "find the DsoRules contract at a given time" in {
-      val now = CantonTimestamp.now()
-      val firstDsoRules = dsoRules(epoch = 1)
-      val secondDsoRules = dsoRules(epoch = 2)
-      val thirdDsoRules = dsoRules(epoch = 3)
-      val recordTimeFirst = now.plusSeconds(1).toInstant
-      val recordTimeSecond = now.plusSeconds(5).toInstant
-      val recordTimeThird = now.plusSeconds(9).toInstant
-      for {
-        store <- mkStore()
-        _ <- store.updateHistory.ingestionSink.initialize()
-        first <- dummyDomain.create(
-          firstDsoRules,
-          recordTime = recordTimeFirst,
-          packageName = "splice-dso-governance",
-        )(
-          store.updateHistory
-        )
-        firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
-        _ <- dummyDomain.create(
-          secondDsoRules,
-          recordTime = recordTimeSecond,
-          packageName = "splice-dso-governance",
-        )(store.updateHistory)
-        _ <- dummyDomain.create(
-          thirdDsoRules,
-          recordTime = recordTimeThird,
-          packageName = "splice-dso-governance",
-        )(store.updateHistory)
-        result <- store.lookupContractByRecordTime(
-          DsoRules.COMPANION,
-          firstRecordTime.plusSeconds(1),
-        )
-      } yield {
-        result.value should not be firstDsoRules
-        result.value shouldBe secondDsoRules
-        result.value should not be thirdDsoRules
-      }
-    }
-
-    "find the AmuletRules contract at a given time" in {
-      val now = CantonTimestamp.now()
-      val firstAmuletRules = amuletRules(10)
-      val secondAmuletRules = amuletRules(20)
-      val thirdAmuletRules = amuletRules(30)
-      val recordTimeFirst = now.plusSeconds(1).toInstant
-      val recordTimeSecond = now.plusSeconds(5).toInstant
-      val recordTimeThird = now.plusSeconds(9).toInstant
-      for {
-        store <- mkStore()
-        _ <- store.updateHistory.ingestionSink.initialize()
-        first <- dummyDomain.create(
-          firstAmuletRules,
-          recordTime = recordTimeFirst,
-          packageName = "splice-amulet",
-        )(
-          store.updateHistory
-        )
-        firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
-        _ <- dummyDomain.create(
-          secondAmuletRules,
-          recordTime = recordTimeSecond,
-          packageName = "splice-amulet",
-        )(
-          store.updateHistory
-        )
-        _ <- dummyDomain.create(
-          thirdAmuletRules,
-          recordTime = recordTimeThird,
-          packageName = "splice-amulet",
-        )(store.updateHistory)
-        result <- store.lookupContractByRecordTime(
-          AmuletRules.COMPANION,
-          firstRecordTime.plusSeconds(1),
-        )
-      } yield {
-        result.value should not be firstAmuletRules
-        result.value shouldBe secondAmuletRules
-        result.value should not be thirdAmuletRules
       }
     }
   }

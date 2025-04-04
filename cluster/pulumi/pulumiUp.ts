@@ -18,6 +18,8 @@ async function runAllStacksUp() {
     name: 'canton-network',
     promise: mainStackUp,
   });
+  // TODO(#18683): We really shouldn't deploy that here (semantically), but if we don't things currently break.
+  // Once we resolve this we can think about redoing #18615 again.
   if (DeploySvRunbook) {
     const svRunbook = await stack('sv-runbook', 'sv-runbook', true, {});
     const svRunbookUp = upOperation(svRunbook, abortController);

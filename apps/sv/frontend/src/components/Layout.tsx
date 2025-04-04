@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { Header, useUserState, useVotesHooks } from 'common-frontend';
+import { Header, useUserState, useVotesHooks } from '@lfdecentralizedtrust/splice-common-frontend';
 
 import { Logout } from '@mui/icons-material';
 import { Box, Button, Divider, Stack, Typography } from '@mui/material';

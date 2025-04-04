@@ -12,7 +12,7 @@ const AmuletPrice: React.FC = () => {
   return (
     <Box>
       <MedianAmuletPrice />
-      <DesiredAmuletPrice />
+      <DesiredAmuletPrice canEditVote />
       <OpenMiningRounds />
     </Box>
   );

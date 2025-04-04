@@ -1,10 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
+import {
+  AuthProvider,
+  ErrorRouterPage,
+  theme,
+  UserProvider,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider, ErrorRouterPage, theme, UserProvider } from 'common-frontend';
-import { replaceEqualDeep } from 'common-frontend-utils';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,

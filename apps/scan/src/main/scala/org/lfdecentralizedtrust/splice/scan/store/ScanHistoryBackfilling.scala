@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.daml.ledger.javaapi.data as javaApi
-import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
 import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, TreeUpdateWithMigrationId}
@@ -31,7 +30,6 @@ class ScanHistoryBackfilling(
     currentMigrationId: Long,
     batchSize: Int = 100,
     override val loggerFactory: NamedLoggerFactory,
-    metricsFactory: LabeledMetricsFactory,
 )(implicit
     ec: ExecutionContextExecutor
 ) extends NamedLogging {
@@ -61,7 +59,6 @@ class ScanHistoryBackfilling(
       currentMigrationId = currentMigrationId,
       batchSize = batchSize,
       loggerFactory,
-      metricsFactory,
     )
 
   def backfill()(implicit tc: TraceContext): Future[Outcome] = {

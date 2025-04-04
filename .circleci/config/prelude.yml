@@ -45,6 +45,7 @@ parameters:
         backup-devnet,
         backup-testnet,
         backup-mainnet,
+        copy-mainnet-backup,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
@@ -57,6 +58,7 @@ parameters:
         purge-unused-dbs-cidaily,
         bump-configs,
         update-serverless-workflows,
+        update-gcp-projects
       ]
     default: build
   # Whether the cluster should be reset before deploying.

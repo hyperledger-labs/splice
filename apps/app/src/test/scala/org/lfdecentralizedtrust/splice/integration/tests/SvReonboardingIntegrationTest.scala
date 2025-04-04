@@ -390,8 +390,8 @@ class SvReonboardingIntegrationTest
           "EXTRA_PARTICIPANT_DB" -> s"participant_reonboard_new",
         ),
       )() {
-        // Canton is slooooooooooooooooooooooooooow
-        eventuallySucceeds(timeUntilSuccess = 60.seconds) {
+        // Canton is sloooooooooooooooooooooooooooooooow
+        eventuallySucceeds(timeUntilSuccess = 120.seconds) {
           sv4ReonboardBackend.participantClientWithAdminToken.health.status should be(
             NodeStatus.NotInitialized(true, Some(WaitingForId))
           )

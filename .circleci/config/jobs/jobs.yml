@@ -74,7 +74,7 @@ jobs:
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Bump configs
-          additional_nix_args: "--keep GITHUB_TOKEN"
+          additional_nix_args: "--keep GH_TOKEN"
           cmd: |
             .circleci/cn-scripts/bump-configs.sh
 
@@ -185,24 +185,23 @@ jobs:
            --keep NO_PROXY \
            --keep CIRCLE_BRANCH \
            --keep CIRCLE_REPOSITORY_URL \
-           --keep CIRCLE_SHA1"
+           --keep CIRCLE_SHA1 \
+           --keep GH_USER \
+           --keep GH_TOKEN"
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public docker repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
           additional_nix_args: "--keep ARTIFACTORY_USER \
             --keep ARTIFACTORY_PASSWORD \
-            --keep CIRCLE_BRANCH"
+            --keep CIRCLE_BRANCH \
+            --keep OCI_DEV_HELM_REGISTRY \
+            --keep GH_USER \
+            --keep GH_TOKEN"
           cmd_name: Push Helm Artifacts
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public helm repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
@@ -243,18 +242,22 @@ jobs:
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Copy artifacts to Github Container Registry
-                additional_nix_args: "--keep GITHUB_TOKEN \
+                additional_nix_args: "--keep GH_TOKEN \
+                  --keep GH_USER \
+                  --keep DEV_HELM_REGISTRY \
+                  --keep DEV_DOCKER_REGISTRY \
+                  --keep RELEASE_HELM_REGISTRY \
+                  --keep RELEASE_DOCKER_REGISTRY \
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD"
                 cmd: |
-                  export GITHUB_USER="canton-network-da"
                   make cluster/helm/copy_release_to_ghcr
                   make cluster/docker/copy_release_to_ghcr
             - run_bash_command_in_nix:
                 cmd_name: tag git
-                additional_nix_args: "--keep GITHUB_TOKEN"
+                additional_nix_args: "--keep GH_TOKEN --keep GH_USER"
                 cmd: |
-                  git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
                   RELEASE_TAG=$(get-snapshot-version)
 
                   if [ $(git tag -l "${RELEASE_TAG}") ]; then
@@ -667,17 +670,17 @@ jobs:
       - clone_and_update_open_source
       - run_bash_command_in_nix:
           cmd_name: Push changes to DA OSS
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/oss
       - run_bash_command_in_nix:
           cmd_name: Push changes to Splice
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/splice
       - run_bash_command_in_nix:
           cmd_name: Create release in DA OSS
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
           working_dir: "/home/circleci/oss"
           cmd: |
             if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
@@ -696,7 +699,7 @@ jobs:
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Create branch to point CILR to and update tag
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             VERSION="$(get-snapshot-version)"
             .circleci/update-cilr.sh
@@ -739,11 +742,12 @@ jobs:
           additional_nix_args: >
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD
+            --keep GCP_DA_CN_SHARED_KEY
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            gcloud auth configure-docker us-central1-docker.pkg.dev
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:
@@ -764,3 +768,24 @@ jobs:
           cmd: |
             echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
             ./cluster/serverless/deploy.sh
+
+  update_gcp_project:
+    executor: self_hosted
+    parameters:
+      <<: *cluster-parameter
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Update GCP projects
+          gce_authenticate: true
+          cluster: << parameters.cluster >>
+          cmd: |
+            cncluster pulumi gcp-project up --skip-preview --yes

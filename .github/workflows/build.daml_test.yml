@@ -5,7 +5,7 @@ jobs:
   daml_test:
     runs-on: self-hosted-k8s-small
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12
+      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
 
     steps:
 
@@ -50,5 +50,5 @@ jobs:
         shell: bash
         env:
           SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+          GH_TOKEN: ${{ secrets.GH_ISSUES }}
         run: ./.circleci/notification-scripts/failure_notification.py

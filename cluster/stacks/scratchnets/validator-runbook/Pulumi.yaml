@@ -1,0 +1,4 @@
+name: validator-runbook
+runtime: nodejs
+description: Deploy a standalone validator per the instructions in the runbook
+main: "../../../pulumi/validator-runbook/src/index.ts"

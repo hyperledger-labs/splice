@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { SvClientProvider, DsoViewPrettyJSON } from 'common-frontend';
+import { SvClientProvider, DsoViewPrettyJSON } from '@lfdecentralizedtrust/splice-common-frontend';
 import React from 'react';
 import 'react-json-pretty/themes/monikai.css';
 

@@ -268,6 +268,7 @@ workflow:
           context:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
+          silence_deployment_alerts: true
           requires:
             - wait_for_daml_upgrade
             - preflight_sv_check_after_sv_upgrade
@@ -299,6 +300,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
+          silence_deployment_alerts: true
           requires:
             - reset_validator_runbook_after_upgrade
       - preflight_sv_check:

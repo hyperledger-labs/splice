@@ -1,5 +1,5 @@
 {
-  "name": "wallet-frontend",
+  "name": "@lfdecentralizedtrust/splice-wallet-frontend",
   "version": "0.1.0",
   "browserslist": {
     "production": [
@@ -20,8 +20,8 @@
     "@mui/material": "^5.14.10",
     "@tanstack/react-query": "4.29.5",
     "bignumber.js": "9.1.1",
-    "common-frontend": "0.1.0",
-    "common-frontend-utils": "0.1.0",
+    "@lfdecentralizedtrust/splice-common-frontend": "0.1.0",
+    "@lfdecentralizedtrust/splice-common-frontend-utils": "0.1.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-helmet-async": "^2.0.5",
@@ -40,8 +40,8 @@
     "@typescript-eslint/eslint-plugin": "5.52.0",
     "@typescript-eslint/parser": "5.52.0",
     "@vitejs/plugin-react": "^4.0.4",
-    "common-test-utils": "^0.1.0",
-    "common-test-vite-utils": "^0.1.0",
+    "@lfdecentralizedtrust/splice-common-test-utils": "^0.1.0",
+    "@lfdecentralizedtrust/splice-common-test-vite-utils": "^0.1.0",
     "eslint": "8.34.0",
     "eslint-config-prettier": "8.6.0",
     "eslint-plugin-import": "2.27.5",

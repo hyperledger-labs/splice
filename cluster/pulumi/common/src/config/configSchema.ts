@@ -4,10 +4,16 @@ import { defaultActiveMigration, SynchronizerMigrationSchema } from './migration
 
 const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
-  allowedArtifactories: z.array(z.enum(['public', 'private'])),
   isExternalCluster: z.boolean(),
   cloudSql: z.object({
     enabled: z.boolean(),
+    // Docs on cloudsql maintenance windows: https://cloud.google.com/sql/docs/postgres/set-maintenance-window
+    maintenanceWindow: z
+      .object({
+        day: z.number().min(1).max(7).default(2), // 1 (Monday) to 7 (Sunday)
+        hour: z.number().min(0).max(23).default(8), // 24-hour format UTC
+      })
+      .default({ day: 2, hour: 8 }),
     protected: z.boolean(),
     tier: z.string(),
   }),

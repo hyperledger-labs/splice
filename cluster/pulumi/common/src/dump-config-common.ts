@@ -216,6 +216,17 @@ export async function initDumpConfig(): Promise<void> {
                 ...args.inputs,
                 secretData,
               };
+            } else if (args.inputs.secret.startsWith('pulumi-user-configs-')) {
+              const secretData = JSON.stringify([
+                {
+                  user_id: 'google-oauth2|1234567890',
+                  email: 'someone@digitalasset.com',
+                },
+              ]);
+              return {
+                ...args.inputs,
+                secretData,
+              };
             } else {
               console.error(
                 `WARN gcp secret not supported for mocking in setMockOptions: ${args.inputs.secret}`

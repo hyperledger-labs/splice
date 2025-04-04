@@ -58,9 +58,9 @@ Participant console
 
 4. Run the docker command
 
-    .. code-block:: bash
+    .. parsed-literal::
 
-        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:|version_literal| --console
+        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
 
     .. important::
         If you run the participant using the docker compose setup the docker command must be run with the docker network used by the participant.
@@ -89,9 +89,9 @@ Participant console
 
         Running docker with the default network (`splice-validator`):
 
-        .. code-block::
+        .. parsed-literal::
 
-            docker run -it --rm --network splice-validator -v $(pwd)/console.conf:/app/app.conf ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:|version_literal| --console
+            docker run -it --rm --network splice-validator -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
 
 Sequencer console
 +++++++++++++++++
@@ -121,9 +121,9 @@ Sequencer console
 
 3. Run the docker command
 
-    .. code-block:: bash
+    .. parsed-literal::
 
-        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:|version_literal| --console
+        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
 
 Mediator console
 +++++++++++++++++
@@ -149,9 +149,9 @@ Mediator console
 
 3. Run the docker command
 
-    .. code-block:: bash
+    .. parsed-literal::
 
-        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:|version_literal| --console
+        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
 
 
 Access in a K8s cluster
