@@ -95,18 +95,7 @@ export async function transfer(
       },
     },
   ];
-  const disclosedContracts = holdings
-    .map((h) => {
-      return {
-        contractId: h["createdEvent"]["contractId"],
-        createdEventBlob: h["createdEvent"]["createdEventBlob"],
-        synchronizerId: h["synchronizerId"],
-        templateId: h["createdEvent"]["templateId"],
-      };
-    })
-    .concat(
-      transferFactory.choiceContext.disclosedContracts
-    );
+  const disclosedContracts = transferFactory.choiceContext.disclosedContracts;
 
   const synchronizerId =
     getSynchronizerIdFromDisclosedContracts(disclosedContracts);

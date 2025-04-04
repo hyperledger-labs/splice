@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.CommandsOuterClass
 import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
@@ -65,17 +64,6 @@ trait TokenStandardTest extends IntegrationTest {
           ),
           includeCreatedEventBlob = true,
         )
-      // canton requires passing these explicitly
-      val disclosedHoldings: Seq[CommandsOuterClass.DisclosedContract] =
-        senderHoldings.map(senderHolding =>
-          com.daml.ledger.api.v2.commands.DisclosedContract.toJavaProto(
-            com.daml.ledger.api.v2.commands.DisclosedContract(
-              templateId = Some(senderHolding.templateId.toIdentifier),
-              contractId = senderHolding.contractId,
-              createdEventBlob = senderHolding.event.createdEventBlob,
-            )
-          )
-        )
       val now = env.environment.clock.now.toInstant
       val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
         dsoParty.toProtoPrimitive,
@@ -99,7 +87,7 @@ trait TokenStandardTest extends IntegrationTest {
         ),
       )
       val factoryChoice = sv1ScanBackend.getTransferFactory(choiceArgs)
-      factoryChoice.copy(disclosedContracts = factoryChoice.disclosedContracts ++ disclosedHoldings)
+      factoryChoice.copy(disclosedContracts = factoryChoice.disclosedContracts)
     }
   }
 

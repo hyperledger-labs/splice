@@ -594,7 +594,7 @@ class HttpValidatorAdminHandler(
                   Seq(userParty),
                   Seq(userParty),
                   commands,
-                  storeWithIngestion.connection.disclosedContracts(externalPartySetupProposal),
+                  DisclosedContracts.Empty,
                   body.verboseHashing.getOrElse(false),
                 )
                 .flatMap { r =>
