@@ -15,10 +15,6 @@ LogReporter - Aborted test suite
 Trying to gather entropy from the underlying operating system to initialized the contract ID seeding, but the entropy pool seems empty.
 In CI environments environment consider using the "testing-weak" mode, that may produce insecure contract IDs but does not block on startup.
 
-# Ignore generic http 400/500 response errors as they are often benign.
-# TODO (#1734): consider implementing a more fine-granular ignore
-.*Http response at 400 or 500 level.*
-
 # We use self-signed ledger API tokens for tests
 HMAC256 JWT Validator is NOT recommended for production environments
 

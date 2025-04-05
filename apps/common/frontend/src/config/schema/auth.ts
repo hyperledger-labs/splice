@@ -8,7 +8,7 @@ enum Algorithm {
 }
 
 const tokenRequestSchema = z.object({
-  token_audience: z.string().url(), // Request an access token from IAM provider with this audience
+  token_audience: z.string(), // Request an access token from IAM provider with this audience
   token_scope: z.string().optional(), // Request an access token from IAM provider with this scope
 });
 

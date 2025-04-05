@@ -71,7 +71,7 @@ object Auth0TestUserCleaner {
   }
 
   // Super simple retrier
-  def retryAuth0Calls[T](f: => T, retryCount: Int = 10): T = {
+  def retryAuth0Calls[T](f: => T, retryCount: Int = 10)(implicit traceContext: TraceContext): T = {
     if (retryCount <= 0) {
       throw new Error("Auth0 retry count exhausted")
     }
@@ -101,7 +101,8 @@ object Auth0TestUserCleaner {
       clientSecret,
       loggerFactory,
       new Auth0Util.Auth0Retry {
-        override def retryAuth0CallsForTests[T](f: => T): T = retryAuth0Calls(f)
+        override def retryAuth0CallsForTests[T](f: => T)(implicit tc: TraceContext): T =
+          retryAuth0Calls(f)
       },
     )
 
