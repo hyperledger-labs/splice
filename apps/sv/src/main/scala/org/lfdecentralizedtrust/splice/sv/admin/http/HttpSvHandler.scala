@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, VotesStore}
+import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStoreWithIngestion}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
@@ -71,7 +71,7 @@ class HttpSvHandler(
   private val svParty = dsoStore.key.svParty
   private val dsoParty = dsoStore.key.dsoParty
 
-  override protected val votesStore: VotesStore = dsoStore
+  override protected val votesStore: ActiveVotesStore = dsoStore
   override protected val workflowId: String = this.getClass.getSimpleName
 
   private def decodeValidatorOnboardingSecret(secret: String): ValidatorOnboardingSecret =
