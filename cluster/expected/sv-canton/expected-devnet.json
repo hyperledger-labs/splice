@@ -333,6 +333,29 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
+          "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cometbft-keys-1",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cometbft-keys-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s-imgpull-sv-1-sv-canton-migration-1",
@@ -378,6 +401,111 @@
     "name": "k8s-imgpull-sv-sv-canton-migration-1",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-canton-migration-1-ledger-api-user",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "sv-1-client-id@clients"
+        }
+      }
+    },
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-1-sv-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-canton-migration-1-ledger-api-user",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "sv-2-client-id@clients"
+        }
+      }
+    },
+    "name": "splice-auth0-user-sv-2-sv-canton-migration-1-sv-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-canton-migration-1-ledger-api-user",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "sv-3-client-id@clients"
+        }
+      }
+    },
+    "name": "splice-auth0-user-sv-3-sv-canton-migration-1-sv-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-canton-migration-1-ledger-api-user",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "sv-4-client-id@clients"
+        }
+      }
+    },
+    "name": "splice-auth0-user-sv-4-sv-canton-migration-1-sv-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-canton-migration-1-ledger-api-user",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "sv-client-id@clients"
+        }
+      }
+    },
+    "name": "splice-auth0-user-sv-sv-canton-migration-1-sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,
@@ -777,7 +905,7 @@
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
-            "name": "splice-app-sv-ledger-api-auth",
+            "name": "splice-app-sv-canton-migration-1-ledger-api-user",
             "optional": false
           }
         },
@@ -1334,7 +1462,7 @@
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
-            "name": "splice-app-sv-ledger-api-auth",
+            "name": "splice-app-sv-canton-migration-1-ledger-api-user",
             "optional": false
           }
         },
@@ -1891,7 +2019,7 @@
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
-            "name": "splice-app-sv-ledger-api-auth",
+            "name": "splice-app-sv-canton-migration-1-ledger-api-user",
             "optional": false
           }
         },
@@ -2448,7 +2576,7 @@
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
-            "name": "splice-app-sv-ledger-api-auth",
+            "name": "splice-app-sv-canton-migration-1-ledger-api-user",
             "optional": false
           }
         },
@@ -2737,8 +2865,11 @@
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-1-cometbft",
           "istioPort": 26106,
-          "keysSecret": "cometbft-keys",
-          "retainBlocks": 5040000
+          "keysSecret": "cometbft-keys-1",
+          "retainBlocks": 5040000,
+          "validator": {
+            "keyAddress": "0647E4FF27908B8B874C2647536AC986C9EA0BAB"
+          }
         },
         "nodeName": "DA-Helm-Test-Node",
         "peers": [],
@@ -3065,7 +3196,7 @@
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
-            "name": "splice-app-sv-ledger-api-auth",
+            "name": "splice-app-sv-canton-migration-1-ledger-api-user",
             "optional": false
           }
         },
