@@ -38,7 +38,7 @@ class Auth0Util(
   private val auth = new AuthAPI(domain, managementApiClientId, managementApiClientSecret)
   val api = new ManagementAPI(domain, requestManagementAPIToken())
 
-  def createUser(): Auth0User = {
+  def createUser()(implicit tc: TraceContext): Auth0User = {
     val user = new User()
     val rand = new scala.util.Random
     val password = s"${rand.alphanumeric.take(20).mkString}${rand.nextInt()}"
@@ -48,11 +48,16 @@ class Auth0Util(
     user.setEmail(email)
     user.setVerifyEmail(false) // avoid auth0 trying to send mails
     user.setConnection("Username-Password-Authentication")
+    logger.debug(s"Creating user with username $username email $email and password $password")
     val id = executeManagementApiRequest(api.users().create(user)).getId
+    logger.debug(s"Created user ${email} with password ${password} (id: ${id})")
     new Auth0User(id, email, password, this)
   }
 
   def deleteUser(id: String): Unit = {
+    // Called from AutoCloseable.close, which doesn't propagate the trace context
+    implicit val traceContext: TraceContext = TraceContext.empty
+    logger.debug(s"Deleting user with id: ${id}")
     executeManagementApiRequest(api.users.delete(id))
   }
 
@@ -70,7 +75,9 @@ class Auth0Util(
     auth.requestToken(s"${domain}/api/v2/").execute().getAccessToken()
   }
 
-  private def executeManagementApiRequest[T](req: com.auth0.net.Request[T]) =
+  private def executeManagementApiRequest[T](
+      req: com.auth0.net.Request[T]
+  )(implicit traceContext: TraceContext) =
     retry.retryAuth0CallsForTests {
       // Auth0 management API calls are rate limited, with limits much lower than
       // the rate limits for the auth API calls.
@@ -85,7 +92,7 @@ class Auth0Util(
 object Auth0Util {
 
   trait Auth0Retry {
-    def retryAuth0CallsForTests[T](f: => T): T
+    def retryAuth0CallsForTests[T](f: => T)(implicit traceContext: TraceContext): T
   }
 
   trait WithAuth0Support {
@@ -115,19 +122,22 @@ object Auth0Util {
         clientSecret,
         loggerFactory,
         new Auth0Retry {
-          def handleExceptions(e: Throwable): Nothing = e match {
-            case auth0Exception: Auth0Exception => {
-              logger.debug("Auth0 exception raised, triggering retry...")
-              fail(auth0Exception)
+          def handleExceptions(e: Throwable)(implicit traceContext: TraceContext): Nothing =
+            e match {
+              case auth0Exception: Auth0Exception => {
+                logger.debug("Auth0 exception raised, triggering retry...", auth0Exception)
+                fail(auth0Exception)
+              }
+              case ioException: java.io.IOException => {
+                logger.debug("IOException raised, triggering retry...", ioException)
+                fail(ioException)
+              }
+              case ex: Throwable => throw ex // throw anything else
             }
-            case ioException: java.io.IOException => {
-              logger.debug("IOException raised, triggering retry...")
-              fail(ioException)
-            }
-            case ex: Throwable => throw ex // throw anything else
-          }
 
-          override def retryAuth0CallsForTests[T](f: => T): T = {
+          override def retryAuth0CallsForTests[T](
+              f: => T
+          )(implicit traceContext: TraceContext): T = {
             eventually() {
               try {
                 f
