@@ -56,7 +56,9 @@ standardTransferToTwoStepTransfer requestedAt transfer =
     amount = transfer.amount
     requestedAt
     transferBefore = transfer.executeBefore
+    transferBeforeDeadline = "Transfer.executeBefore"
     allowFeaturing = False -- unfeatured as the sender is serving as its own "app provider"
+    lockContext = "transfer to " <> show transfer.receiver
 
 executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 executeTransferInstr instr extraArgs = do

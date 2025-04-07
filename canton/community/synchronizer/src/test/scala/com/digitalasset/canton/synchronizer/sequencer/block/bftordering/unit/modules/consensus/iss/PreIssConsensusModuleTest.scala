@@ -11,22 +11,19 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.{BftOrderingMetrics, SequencerMetrics}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Segment
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModule.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.{
-  GenesisEpoch,
-  GenesisPreviousEpochMaxBftTime,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis.GenesisEpoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.retransmissions.RetransmissionsManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.{
   CryptoProvider,
   TopologyActivationTime,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochLength,
   EpochNumber,
@@ -88,7 +85,7 @@ class PreIssConsensusModuleTest
         (anEpoch.copy(lastBlockCommits = someLastBlockCommits), anEpoch, anEpoch.info),
       ).forEvery { (latestCompletedEpoch, latestEpoch, expectedEpochInfoInState) =>
         implicit val metricsContext: MetricsContext = MetricsContext.Empty
-        implicit val config: BftBlockOrderer.Config = BftBlockOrderer.Config()
+        implicit val config: BftBlockOrdererConfig = BftBlockOrdererConfig()
 
         val epochStore = mock[EpochStore[IgnoringUnitTestEnv]]
         when(epochStore.latestEpoch(includeInProgress = false)).thenReturn(() =>
@@ -121,7 +118,7 @@ class PreIssConsensusModuleTest
         epochState
           .segmentModuleRefFactory(
             new SegmentState(
-              Segment(selfId, NonEmpty(Seq, BlockNumber.First)), // fake
+              Segment(myId, NonEmpty(Seq, BlockNumber.First)), // fake
               epochState.epoch,
               clock,
               completedBlocks = Seq.empty,
@@ -175,18 +172,18 @@ class PreIssConsensusModuleTest
       epochStore: EpochStore[IgnoringUnitTestEnv]
   ): PreIssConsensusModule[IgnoringUnitTestEnv] = {
     implicit val metricsContext: MetricsContext = MetricsContext.Empty
-    implicit val config: BftBlockOrderer.Config = BftBlockOrderer.Config()
+    implicit val config: BftBlockOrdererConfig = BftBlockOrdererConfig()
 
-    val orderingTopology = OrderingTopology(Set(selfId))
+    val orderingTopology = OrderingTopology.forTesting(Set(myId))
     new PreIssConsensusModule[IgnoringUnitTestEnv](
       OrderingTopologyInfo(
-        selfId,
+        myId,
         orderingTopology,
-        fakeCryptoProvider,
-        Seq(selfId),
+        failingCryptoProvider,
+        Seq(myId),
         previousTopology = orderingTopology, // not relevant
-        fakeCryptoProvider,
-        Seq(selfId),
+        failingCryptoProvider,
+        Seq(myId),
       ),
       epochLength,
       epochStore,
@@ -220,7 +217,7 @@ class PreIssConsensusModuleTest
 object PreIssConsensusModuleTest {
 
   private val epochLength = DefaultEpochLength
-  private val selfId = fakeSequencerId("self")
+  private val myId = BftNodeId("self")
   private val aTimestamp =
     CantonTimestamp.assertFromInstant(Instant.parse("2024-03-08T12:00:00.000Z"))
   private val anEpoch =
@@ -230,7 +227,6 @@ object PreIssConsensusModuleTest {
         BlockNumber.First,
         EpochLength(0),
         TopologyActivationTime(aTimestamp),
-        GenesisPreviousEpochMaxBftTime,
       ),
       lastBlockCommits = Seq.empty,
     )
@@ -245,7 +241,7 @@ object PreIssConsensusModuleTest {
           HashAlgorithm.Sha256,
         ),
         CantonTimestamp.Epoch,
-        selfId,
+        myId,
       )
       .fakeSign
   )
@@ -271,10 +267,9 @@ object PreIssConsensusModuleTest {
               .create(
                 BlockMetadata.mk(epochNumber, BlockNumber(blockNumber.toLong)),
                 ViewNumber.First,
-                CantonTimestamp.Epoch,
                 OrderingBlock(Seq()),
                 CanonicalCommitSet.empty,
-                from = fakeSequencerId("self"),
+                from = BftNodeId("self"),
               )
               .fakeSign,
             Seq.empty,

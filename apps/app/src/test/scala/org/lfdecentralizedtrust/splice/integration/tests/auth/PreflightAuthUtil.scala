@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests.auth
 
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.SvAppClientReference
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
+import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
   TestCommon,
@@ -14,8 +14,7 @@ import com.digitalasset.canton.integration.BaseIntegrationTest
 trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
   this: BaseIntegrationTest[
     SpliceConfig,
-    EnvironmentImpl,
-    SpliceTestConsoleEnvironment,
+    SpliceEnvironment,
   ] & TestCommon =>
   val clientIds = Map(
     "sv1" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV1"),

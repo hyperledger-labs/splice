@@ -1,0 +1,85 @@
+{
+  "archived" : {
+    "archivedEvent" : {
+      "contractId" : "15",
+      "implementedInterfaces" : [
+        "#package-name:Splice.Api.Token.HoldingV1:Holding"
+      ],
+      "nodeId" : 13,
+      "offset" : 42,
+      "packageName" : "splice-amulet",
+      "templateId" : "#package-name:Splice.Amulet:Amulet",
+      "witnessParties" : [
+        "party::normalized"
+      ]
+    },
+    "synchronizerId" : "sync::normalized"
+  },
+  "created" : {
+    "createdEvent" : {
+      "contractId" : "15",
+      "contractKey" : null,
+      "createArgument" : {
+        "amount" : {
+          "createdAt" : {
+            "number" : "1"
+          },
+          "initialAmount" : "200.0000000000",
+          "ratePerRound" : {
+            "rate" : "0.0038051800"
+          }
+        },
+        "dso" : "dso::normalized",
+        "owner" : "party::normalized"
+      },
+      "createdAt" : "1970-01-01T00:00:42.000000042Z",
+      "createdEventBlob" : "",
+      "interfaceViews" : [
+        {
+          "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
+          "viewStatus" : {
+            "code" : 0,
+            "details" : [
+            ],
+            "message" : ""
+          },
+          "viewValue" : {
+            "amount" : "200.0000000000",
+            "instrumentId" : {
+              "admin" : "dso::normalized",
+              "id" : "Amulet"
+            },
+            "lock" : null,
+            "meta" : {
+              "values" : [
+                [
+                  "splice.lfdecentralizedtrust.org/created-in-round",
+                  "1"
+                ],
+                [
+                  "splice.lfdecentralizedtrust.org/rate-per-round",
+                  "0.00380518"
+                ]
+              ]
+            },
+            "owner" : "party::normalized"
+          }
+        }
+      ],
+      "nodeId" : 14,
+      "observers" : [
+      ],
+      "offset" : 42,
+      "packageName" : "splice-amulet",
+      "signatories" : [
+        "dso::normalized",
+        "party::normalized"
+      ],
+      "templateId" : "#package-name:Splice.Amulet:Amulet",
+      "witnessParties" : [
+        "party::normalized"
+      ]
+    },
+    "synchronizerId" : "sync::normalized"
+  }
+}

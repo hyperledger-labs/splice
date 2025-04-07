@@ -4,17 +4,12 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.crypto.{
-  Hash,
-  HashPurpose,
-  Signature,
-  SignatureCheckError,
-  SigningKeyUsage,
-  SyncCryptoError,
-  SynchronizerSnapshotSyncCryptoApi,
-}
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.CantonCryptoProvider.BftOrderingSigningKeyUsage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.{
   MessageFrom,
   SignedMessage,
@@ -23,7 +18,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PekkoEnv,
   PekkoFutureUnlessShutdown,
 }
-import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.ExecutionContext
@@ -31,18 +25,20 @@ import scala.concurrent.ExecutionContext
 class CantonCryptoProvider(cryptoApi: SynchronizerSnapshotSyncCryptoApi)(implicit
     ec: ExecutionContext
 ) extends CryptoProvider[PekkoEnv] {
-  override def sign(
-      hash: Hash,
-      usage: NonEmpty[Set[SigningKeyUsage]],
+
+  override def signHash(
+      hash: Hash
   )(implicit
       traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[Either[SyncCryptoError, Signature]] =
-    PekkoFutureUnlessShutdown("sign", () => cryptoApi.sign(hash, usage).value)
+    PekkoFutureUnlessShutdown(
+      "sign",
+      () => cryptoApi.sign(hash, BftOrderingSigningKeyUsage).value,
+    )
 
   override def signMessage[MessageT <: ProtocolVersionedMemoizedEvidence & MessageFrom](
       message: MessageT,
-      hashPurpose: HashPurpose,
-      usage: NonEmpty[Set[SigningKeyUsage]],
+      autnenticatedMessageType: CryptoProvider.AuthenticatedMessageType,
   )(implicit
       traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[Either[SyncCryptoError, SignedMessage[MessageT]]] =
@@ -52,8 +48,8 @@ class CantonCryptoProvider(cryptoApi: SynchronizerSnapshotSyncCryptoApi)(implici
         (
           for {
             signature <- cryptoApi.sign(
-              CryptoProvider.hashForMessage(message, message.from, hashPurpose),
-              usage,
+              CryptoProvider.hashForMessage(message, message.from, autnenticatedMessageType),
+              BftOrderingSigningKeyUsage,
             )
           } yield SignedMessage(message, signature)
         ).value,
@@ -61,13 +57,27 @@ class CantonCryptoProvider(cryptoApi: SynchronizerSnapshotSyncCryptoApi)(implici
 
   override def verifySignature(
       hash: Hash,
-      member: SequencerId,
+      node: BftNodeId,
       signature: Signature,
-      usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit
       traceContext: TraceContext
-  ): PekkoFutureUnlessShutdown[Either[SignatureCheckError, Unit]] = PekkoFutureUnlessShutdown(
-    "verifying signature",
-    () => cryptoApi.verifySignature(hash, member, signature, usage).value,
-  )
+  ): PekkoFutureUnlessShutdown[Either[SignatureCheckError, Unit]] =
+    PekkoFutureUnlessShutdown(
+      "verifying signature",
+      () =>
+        SequencerNodeId.fromBftNodeId(node) match {
+          case Left(error) =>
+            FutureUnlessShutdown.pure(Left(SignatureCheckError.SignerHasNoValidKeys(error.message)))
+          case Right(sequencerNodeId) =>
+            cryptoApi
+              .verifySignature(hash, sequencerNodeId, signature, BftOrderingSigningKeyUsage)
+              .value
+        },
+    )
+}
+
+object CantonCryptoProvider {
+
+  private[driver] val BftOrderingSigningKeyUsage: NonEmpty[Set[SigningKeyUsage]] =
+    SigningKeyUsage.ProtocolOnly
 }

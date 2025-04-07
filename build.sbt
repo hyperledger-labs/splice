@@ -35,6 +35,7 @@ lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
 lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
+lazy val `canton-scalatest-addon` = BuildCommon.`canton-scalatest-addon`
 lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
@@ -44,6 +45,7 @@ lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
 lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
 lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
 lazy val `canton-daml-tls` = BuildCommon.`canton-daml-tls`
+lazy val `canton-base-errors` = BuildCommon.`canton-base-errors`
 lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
 lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
@@ -135,6 +137,7 @@ lazy val root: Project = (project in file("."))
     tools,
     `splice-wartremover-extension`,
     docs,
+    `canton-json-api-v2-openapi-ts-client`,
     `token-standard-cli`,
   )
   .settings(
@@ -405,10 +408,37 @@ lazy val `splice-token-test-dummy-holding-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `canton-json-api-v2-openapi-ts-client` = project
+  .in(file("token-standard/dependencies/canton-json-api-v2"))
+  .settings(
+    Headers.NoHeaderSettings,
+    templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+    Compile / sourceGenerators +=
+      Def.taskDyn {
+        val openApiFile = baseDirectory.value / "openapi.yaml"
+
+        val npmName = "canton-json-api-v2"
+
+        BuildCommon.TS.generateOpenApiClient(
+          npmName = npmName,
+          npmModuleName = npmName,
+          npmProjectName = npmName,
+          openApiSpec = "openapi.yaml",
+          cacheFileDependencies = Set(openApiFile),
+          directory = "openapi-ts-client",
+          subPath = "openapi",
+        )
+      },
+    cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+  )
+
 lazy val `token-standard-cli` =
   project
     .in(file("token-standard/cli"))
-    .dependsOn(`splice-api-token-transfer-instruction-v1-daml`)
+    .dependsOn(
+      `splice-api-token-transfer-instruction-v1-daml`,
+      `canton-json-api-v2-openapi-ts-client`,
+    )
     .settings(
       Headers.TsHeaderSettings,
       npmInstallOpenApiDeps := Seq(
@@ -416,7 +446,12 @@ lazy val `token-standard-cli` =
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
           false,
-        )
+        ),
+        (
+          (`canton-json-api-v2-openapi-ts-client` / Compile / compile).value,
+          (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
+          false,
+        ),
       ),
       npmInstallDeps := Seq(baseDirectory.value / "package.json"),
       npmInstall := BuildCommon.npmInstallTask.value,
@@ -1012,31 +1047,31 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-frontend-utils",
+              "@lfdecentralizedtrust/splice-common-frontend-utils",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-test-utils",
+              "@lfdecentralizedtrust/splice-common-test-utils",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-test-handlers",
+              "@lfdecentralizedtrust/splice-common-test-handlers",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-test-vite-utils",
+              "@lfdecentralizedtrust/splice-common-test-vite-utils",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-frontend",
+              "@lfdecentralizedtrust/splice-common-frontend",
               log,
             )
             (baseDirectory.value / "lib" ** "*").get.toSet
@@ -1072,11 +1107,11 @@ lazy val `apps-common-frontend` = {
         npmInstall.value
         for (
           workspace <- Seq(
-            "common-test-vite-utils",
-            "common-frontend-utils",
-            "common-test-utils",
-            "common-test-handlers",
-            "common-frontend",
+            "@lfdecentralizedtrust/splice-common-test-vite-utils",
+            "@lfdecentralizedtrust/splice-common-frontend-utils",
+            "@lfdecentralizedtrust/splice-common-test-utils",
+            "@lfdecentralizedtrust/splice-common-test-handlers",
+            "@lfdecentralizedtrust/splice-common-frontend",
           )
         )
           BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", workspace, log)
@@ -1119,7 +1154,7 @@ lazy val `apps-wallet-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "wallet-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-wallet-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1130,7 +1165,7 @@ lazy val `apps-scan-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "scan-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-scan-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1152,7 +1187,7 @@ lazy val `apps-ans-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "ans-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-ans-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1163,7 +1198,7 @@ lazy val `apps-sv-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "sv-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-sv-frontend",
       sharedFrontendSettings,
     )
 }

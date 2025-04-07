@@ -20,7 +20,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.github.blemale.scaffeine.Scaffeine
-import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
@@ -61,7 +60,8 @@ import org.lfdecentralizedtrust.splice.store.db.{
   TxLogQueries,
 }
 import org.lfdecentralizedtrust.splice.store.{
-  DbVotesStoreQueryBuilder,
+  DbVotesAcsStoreQueryBuilder,
+  DbVotesTxLogStoreQueryBuilder,
   Limit,
   PageLimit,
   SortOrder,
@@ -70,10 +70,15 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
+  PackageQualifiedName,
   QualifiedName,
   TemplateJsonDecoder,
 }
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -102,8 +107,17 @@ class DbScanStore(
       ScanTables.txLogTableName,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
-      storeDescriptor = StoreDescriptor(
-        version = 1, // TODO (#13454): bump when it will backfill.
+      acsStoreDescriptor = StoreDescriptor(
+        version = 2, // TODO (#13454): bump when it will backfill.
+        name = "DbScanStore",
+        party = key.dsoParty,
+        participant = participantId,
+        key = Map(
+          "dsoParty" -> key.dsoParty.toProtoPrimitive
+        ),
+      ),
+      txLogStoreDescriptor = StoreDescriptor(
+        version = 1,
         name = "DbScanStore",
         party = key.dsoParty,
         participant = participantId,
@@ -120,9 +134,11 @@ class DbScanStore(
     with AcsTables
     with AcsQueries
     with TxLogQueries[TxLogEntry]
+    with UpdateHistoryQueries
     with FlagCloseableAsync
     with RetryProvider.Has
-    with DbVotesStoreQueryBuilder {
+    with DbVotesAcsStoreQueryBuilder
+    with DbVotesTxLogStoreQueryBuilder[TxLogEntry] {
 
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
   import multiDomainAcsStore.waitUntilAcsIngested
@@ -162,7 +178,8 @@ class DbScanStore(
     waitUntilAcsIngested().map(_ =>
       new ScanAggregator(
         storage,
-        storeId,
+        acsStoreId,
+        txLogStoreId,
         isFirstSv,
         createScanAggregatesReader(this),
         loggerFactory,
@@ -193,7 +210,11 @@ class DbScanStore(
     } yield backFilledRound
   }
 
-  def storeId: Int = multiDomainAcsStore.storeId
+  private[splice] def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
+  private[splice] def txLogStoreId: TxLogStoreId = multiDomainAcsStore.txLogStoreId
+  // Round totals are derived from TxLog entries, and are therefore linked to that store
+  private[splice] def roundTotalsStoreId: TxLogStoreId = txLogStoreId
+
   override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def lookupAmuletRules()(implicit
@@ -205,7 +226,7 @@ class DbScanStore(
           .querySingle(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -230,7 +251,7 @@ class DbScanStore(
           .querySingle(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   ExternalPartyAmuletRules.TEMPLATE_ID
@@ -259,7 +280,7 @@ class DbScanStore(
           .querySingle(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -290,7 +311,7 @@ class DbScanStore(
         .query(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
@@ -321,7 +342,7 @@ class DbScanStore(
         .querySingle(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
@@ -351,7 +372,7 @@ class DbScanStore(
         .querySingle(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
@@ -377,7 +398,7 @@ class DbScanStore(
         .querySingle(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
@@ -404,7 +425,7 @@ class DbScanStore(
         .querySingle(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
@@ -446,19 +467,19 @@ class DbScanStore(
           pageEndEventId.fold(
             selectFromTxLogTable(
               txLogTableName,
-              storeId,
+              txLogStoreId,
               where = entryTypeCondition,
               orderLimit = orderLimit,
             )
           )(pageEndEventId =>
             selectFromTxLogTable(
               txLogTableName,
-              storeId,
+              txLogStoreId,
               where = (entryTypeCondition ++ sql" and entry_number " ++ compareEntryNumber ++
                 sql"""(
                   select entry_number
                   from scan_txlog_store
-                  where store_id = $storeId
+                  where store_id = $txLogStoreId
                   and event_id = ${lengthLimited(pageEndEventId)}
                   and """ ++ entryTypeCondition ++ sql"""
               )""").toActionBuilder,
@@ -472,7 +493,7 @@ class DbScanStore(
 
     }
 
-  override def findFeaturedAppRight(
+  override def lookupFeaturedAppRight(
       providerPartyId: PartyId
   )(implicit
       tc: TraceContext
@@ -483,7 +504,7 @@ class DbScanStore(
           .querySingle(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
                   template_id_qualified_name = ${QualifiedName(
@@ -506,7 +527,7 @@ class DbScanStore(
         .querySingle(
           selectFromTxLogTable(
             txLogTableName,
-            storeId,
+            txLogStoreId,
             where = sql"""
                    entry_type = ${EntryType.OpenMiningRoundTxLogEntry} and
                    round = $round
@@ -535,7 +556,7 @@ class DbScanStore(
             select   closed_round,
                      closed_round_effective_at
             from     round_totals
-            where    store_id = $storeId
+            where    store_id = $roundTotalsStoreId
             order by closed_round desc
             limit    1;
             """.as[(Long, Long)].headOption,
@@ -588,14 +609,14 @@ class DbScanStore(
                 select   max(closed_round) as closed_round,
                          party
                 from     round_party_totals
-                where    store_id = $storeId
+                where    store_id = $roundTotalsStoreId
                 and      closed_round <= $asOfEndOfRound
                 group by party
               )
               select sum(greatest(0, rpt.cumulative_change_to_initial_amount_as_of_round_zero - rpt.cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)))
               from   round_party_totals rpt,
                      most_recent mr
-              where  rpt.store_id = $storeId
+              where  rpt.store_id = $roundTotalsStoreId
               and    rpt.party = mr.party
               and    rpt.closed_round = mr.closed_round;
               """.as[Option[BigDecimal]].headOption,
@@ -612,11 +633,11 @@ class DbScanStore(
           sql"""
           select coalesce(cumulative_app_rewards, 0) + coalesce(cumulative_validator_rewards, 0)
           from   round_totals
-          where  store_id = $storeId
+          where  store_id = $roundTotalsStoreId
           and    closed_round = (
                     select max(closed_round)
                     from round_totals
-                    where store_id = $storeId
+                    where store_id = $roundTotalsStoreId
                  );
           """.as[BigDecimal].headOption,
           "getTotalRewardsCollectedEver",
@@ -633,7 +654,7 @@ class DbScanStore(
           sql"""
             select coalesce(app_rewards, 0) + coalesce(validator_rewards, 0)
             from   round_totals
-            where  store_id = $storeId
+            where  store_id = $roundTotalsStoreId
             and    closed_round = $round;
             """.as[BigDecimal].headOption,
           "getRewardsCollectedInRound",
@@ -654,7 +675,7 @@ class DbScanStore(
           sql"""
              select   greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
              from     round_party_totals
-             where    store_id = $storeId
+             where    store_id = $roundTotalsStoreId
              and      closed_round <= $asOfEndOfRound
              and      party = $partyId
              order by closed_round desc
@@ -678,7 +699,7 @@ class DbScanStore(
                          max(cumulative_app_rewards) as cumulative_app_rewards,
                          rank() over (order by max(cumulative_app_rewards) desc) as rank_nr
                 from     round_party_totals
-                where    store_id = $storeId
+                where    store_id = $roundTotalsStoreId
                 and      closed_round <= $asOfEndOfRound
                 and      cumulative_app_rewards > 0
                 group by party
@@ -707,7 +728,7 @@ class DbScanStore(
                          max(cumulative_validator_rewards) as cumulative_validator_rewards,
                          rank() over (order by max(cumulative_validator_rewards) desc) as rank_nr
                 from     round_party_totals
-                where    store_id = $storeId
+                where    store_id = $roundTotalsStoreId
                 and      closed_round <= $asOfEndOfRound
                 and      cumulative_validator_rewards > 0
                 group by party
@@ -741,7 +762,7 @@ class DbScanStore(
                          max(cumulative_traffic_purchased_cc_spent) as cumulative_traffic_purchased_cc_spent,
                          rank() over (order by max(cumulative_traffic_purchased) desc) as rank_nr
                 from     round_party_totals
-                where    store_id = $storeId
+                where    store_id = $roundTotalsStoreId
                 and      closed_round <= $asOfEndOfRound
                 and      cumulative_traffic_purchased > 0
                 group by party
@@ -750,7 +771,7 @@ class DbScanStore(
                 select   party as validator,
                          max(closed_round) as last_purchased_in_round
                 from     round_party_totals
-                where    store_id = $storeId
+                where    store_id = $roundTotalsStoreId
                 and      closed_round <= $asOfEndOfRound
                 and      traffic_purchased > 0
                 group by party
@@ -780,7 +801,7 @@ class DbScanStore(
         .query(
           selectFromAcsTable(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -806,7 +827,7 @@ class DbScanStore(
         .query(
           selectFromAcsTable(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = (sql"""template_id_qualified_name = ${QualifiedName(
                 ValidatorLicense.TEMPLATE_ID
@@ -831,7 +852,7 @@ class DbScanStore(
           sql"""
                select sum(total_traffic_purchased)
                from #${ScanTables.acsTableName}
-               where store_id = $storeId
+               where store_id = $acsStoreId
                 and migration_id = $domainMigrationId
                 and template_id_qualified_name = ${QualifiedName(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -856,7 +877,7 @@ class DbScanStore(
             select min(closed_round) as min_round,
                    max(closed_round) as max_round
             from   round_totals
-            where  store_id = $storeId;
+            where  store_id = $roundTotalsStoreId;
           """.as[(Option[Long], Option[Long])].headOption,
             "getAggregatedRounds",
           )
@@ -877,7 +898,7 @@ class DbScanStore(
     val q = sql"""
     select   #${ScanAggregator.roundTotalsColumns}
     from     round_totals
-    where    store_id = $storeId
+    where    store_id = $roundTotalsStoreId
     and      closed_round >= $startRound
     and      closed_round <= $endRound
     order by closed_round
@@ -898,7 +919,7 @@ class DbScanStore(
     val q = sql"""
     select   #${ScanAggregator.roundPartyTotalsColumns}
     from     round_party_totals
-    where    store_id = $storeId
+    where    store_id = $roundTotalsStoreId
     and      closed_round >= $startRound
     and      closed_round <= $endRound
     order by closed_round, party
@@ -933,7 +954,7 @@ class DbScanStore(
           .querySingle(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
          template_id_qualified_name = ${QualifiedName(templateId)}
@@ -957,7 +978,7 @@ class DbScanStore(
   )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] = {
     val query = listVoteRequestResultsQuery(
       txLogTableName = ScanTables.txLogTableName,
-      storeId = storeId,
+      txLogStoreId = txLogStoreId,
       dbType = EntryType.VoteRequestTxLogEntry,
       actionNameColumnName = "vote_action_name",
       acceptedColumnName = "vote_accepted",
@@ -989,7 +1010,7 @@ class DbScanStore(
         .query(
           listVoteRequestsByTrackingCidQuery(
             acsTableName = ScanTables.acsTableName,
-            storeId = storeId,
+            acsStoreId = acsStoreId,
             domainMigrationId = domainMigrationId,
             trackingCidColumnName = "vote_request_tracking_cid",
             trackingCids = trackingCids,
@@ -1010,7 +1031,7 @@ class DbScanStore(
         .querySingle(
           lookupVoteRequestQuery(
             ScanTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             "vote_request_tracking_cid",
             voteRequestCid,
@@ -1035,7 +1056,7 @@ class DbScanStore(
               with ranked_rows as (
                 select #${TxLogQueries.SelectFromTxLogTableResult
                 .sqlColumnsCommaSeparated()}, rank() over (partition by transfer_command_contract_id order by entry_number desc) from #${ScanTables.txLogTableName}
-                where store_id = $storeId
+                where store_id = $txLogStoreId
                   and entry_type = ${TxLogEntry.EntryType.TransferCommandTxLogEntry}
                   and transfer_command_sender = ${sender}
                   and transfer_command_nonce = $nonce
@@ -1052,4 +1073,34 @@ class DbScanStore(
         .map(entry => new TransferCommand.ContractId(entry.contractId) -> entry)
         .toMap
     }
+
+  override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+      companion: C,
+      recordTime: CantonTimestamp,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Option[Contract[TCId, T]]] = {
+    val templateId = companionClass.typeId(companion)
+    val packageName = PackageQualifiedName(templateId).packageName
+    for {
+      row <- storage
+        .querySingle(
+          selectFromUpdateTableResult(
+            updateHistory.historyId,
+            where = sql"""t.template_id_module_name = ${lengthLimited(
+                templateId.getModuleName
+              )} and t.template_id_entity_name = ${lengthLimited(
+                templateId.getEntityName
+              )} and t.package_name = ${lengthLimited(packageName)}
+              and uht.record_time > $recordTime""",
+            orderLimit = sql"""order by t.row_id asc limit 1""",
+          ).headOption,
+          s"lookup[$templateId]",
+        )
+        .value
+    } yield {
+      row.map(contractFromEvent(companion)(_))
+    }
+  }
 }

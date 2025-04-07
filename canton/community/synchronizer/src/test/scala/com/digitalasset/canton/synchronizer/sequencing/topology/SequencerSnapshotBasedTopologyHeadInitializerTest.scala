@@ -40,6 +40,7 @@ class SequencerSnapshotBasedTopologyHeadInitializerTest
             aSnapshotLastTs,
             latestBlockHeight = 77L,
             Map.empty,
+            Map.empty,
             SequencerPruningStatus.Unimplemented,
             Map.empty,
             None,
@@ -50,7 +51,7 @@ class SequencerSnapshotBasedTopologyHeadInitializerTest
           topologyStoreMock,
         )
 
-        when(topologyStoreMock.maxTimestamp(CantonTimestamp.MaxValue, includeRejected = true))
+        when(topologyStoreMock.maxTimestamp(SequencedTime.MaxValue, includeRejected = true))
           .thenReturn(
             FutureUnlessShutdown.pure(
               maxTopologyStoreEffectiveTimeO.map(maxTopologyStoreEffectiveTime =>

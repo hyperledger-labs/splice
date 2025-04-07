@@ -1,14 +1,26 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as crypto from "crypto";
-import dayjs from "dayjs";
-import { readFileSync } from "node:fs";
 import {
-  createConfiguration, DefaultApi as TransferFactoryAPI, ServerConfiguration
-} from "transfer-instruction-openapi";
-import { DisclosedContract, LedgerClient } from "../apis/ledger-client";
+  createLedgerApiClient,
+  filtersByParty,
+} from "../apis/ledger-api-utils";
 import { CommandOptions } from "../cli";
 import { HoldingInterface } from "../constants";
+import {
+  Command,
+  DeduplicationPeriod2,
+  PartySignatures,
+} from "canton-json-api-v2-openapi";
+import * as crypto from "crypto";
+import dayjs from "dayjs";
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import {
+  createConfiguration,
+  DefaultApi as TransferFactoryAPI,
+  DisclosedContract,
+  ServerConfiguration,
+} from "transfer-instruction-openapi";
 
 interface TransferCommandOptions {
   sender: string;
@@ -20,6 +32,7 @@ interface TransferCommandOptions {
   instrumentAdmin: string; // TODO (#18611): replace with registry call
   instrumentId: string;
   transferFactoryRegistryUrl: string;
+  userId: string;
 }
 
 export async function transfer(
@@ -33,31 +46,31 @@ export async function transfer(
     publicKey,
     instrumentAdmin,
     instrumentId,
-    authToken,
-    ledgerUrl,
     transferFactoryRegistryUrl,
   } = opts;
-  const ledgerClient = new LedgerClient(ledgerUrl, authToken);
+  const ledgerClient = createLedgerApiClient(opts);
   const transferRegistryConfig = createConfiguration({
     baseServer: new ServerConfiguration(transferFactoryRegistryUrl, {}),
   });
   const transferRegistryClient = new TransferFactoryAPI(transferRegistryConfig);
 
-  const ledgerEndOffset = await ledgerClient.getLedgerEnd();
-  const senderHoldings = await ledgerClient.getActiveContractsOfParty(
-    sender,
-    ledgerEndOffset.offset,
-    [HoldingInterface]
-  );
+  const ledgerEndOffset = await ledgerClient.getV2StateLedgerEnd();
+  const senderHoldings = await ledgerClient.postV2StateActiveContracts({
+    filter: {
+      filtersByParty: filtersByParty(sender, [HoldingInterface], false),
+    },
+    verbose: false,
+    activeAtOffset: ledgerEndOffset.offset,
+  });
   if (senderHoldings.length === 0) {
     throw new Error("Sender has no holdings, so transfer can't be executed.");
   }
   const holdings = senderHoldings.map(
     (h) => h["contractEntry"]["JsActiveContract"]
   );
-  const holdingCids = holdings.map((h) => h["createdEvent"]["contractId"]);
+  const inputHoldingCids = holdings.map((h) => h["createdEvent"]["contractId"]);
 
-  const now = dayjs()
+  const now = dayjs();
   const choiceArgs: any = {
     expectedAdmin: instrumentAdmin,
     transfer: {
@@ -68,7 +81,7 @@ export async function transfer(
       lock: null,
       requestedAt: now,
       executeBefore: now.add(24, "hour").toISOString(),
-      holdingCids,
+      inputHoldingCids,
       meta: { values: [] },
     },
     extraArgs: {
@@ -83,65 +96,67 @@ export async function transfer(
   choiceArgs.extraArgs.context =
     transferFactory.choiceContext.choiceContextData;
 
-  const commands = [
-    {
-      ExerciseCommand: {
-        templateId:
-          "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferFactory",
-        contractId: transferFactory.factoryId,
-        choice: "TransferFactory_Transfer",
-        choiceArgument: choiceArgs,
-      },
-    },
-  ];
-  const disclosedContracts = holdings
-    .map((h) => {
-      return {
-        contractId: h["createdEvent"]["contractId"],
-        createdEventBlob: h["createdEvent"]["createdEventBlob"],
-        synchronizerId: h["synchronizerId"],
-        templateId: h["createdEvent"]["templateId"],
-      };
-    })
-    .concat(
-      transferFactory.choiceContext.disclosedContracts
-    );
+  const command = new Command();
+  command.ExerciseCommand = {
+    templateId:
+      "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferFactory",
+    contractId: transferFactory.factoryId,
+    choice: "TransferFactory_Transfer",
+    choiceArgument: choiceArgs,
+  };
+
+  const disclosedContracts = transferFactory.choiceContext.disclosedContracts;
 
   const synchronizerId =
     getSynchronizerIdFromDisclosedContracts(disclosedContracts);
 
-  const prepared = await ledgerClient.prepareSend(
-    sender,
-    commands,
+  const prepared = await ledgerClient.postV2InteractiveSubmissionPrepare({
+    actAs: [sender],
+    readAs: [sender],
+    userId: opts.userId,
+    commandId: `tscli-${randomUUID()}`,
     synchronizerId,
-    disclosedContracts
-  );
+    commands: [command],
+    disclosedContracts,
+    verboseHashing: true,
+    packageIdSelectionPreference: [],
+  });
 
   const signed = signTransaction(
     publicKey,
     privateKey,
     prepared.preparedTransactionHash
   );
-  const partySignatures = {
+  const partySignatures: PartySignatures = {
     signatures: [
       {
         party: sender,
         signatures: [
           {
-            format: { SIGNATURE_FORMAT_RAW: {} },
             signature: signed.signedHash,
             signedBy: signed.signedBy,
-            signingAlgorithmSpec: { SIGNING_ALGORITHM_SPEC_ED25519: {} },
+            // `unrecognizedValue`s are forced because of openapi generation, but it's not required (nor does it break anything)
+            format: { SIGNATURE_FORMAT_RAW: {}, unrecognizedValue: 0 },
+            signingAlgorithmSpec: {
+              SIGNING_ALGORITHM_SPEC_ED25519: {},
+              unrecognizedValue: 0,
+            },
           },
         ],
       },
     ],
   };
 
-  const result = await ledgerClient.executeInteractiveSubmission(
-    prepared,
-    partySignatures
-  );
+  const deduplicationPeriod = new DeduplicationPeriod2();
+  deduplicationPeriod.Empty = {};
+  const result = await ledgerClient.postV2InteractiveSubmissionExecute({
+    userId: opts.userId,
+    submissionId: "",
+    preparedTransaction: prepared.preparedTransaction,
+    hashingSchemeVersion: prepared.hashingSchemeVersion,
+    partySignatures,
+    deduplicationPeriod,
+  });
 
   // TODO (#18610): this is currently '{}'. It should include record_time and update_id, which require usage of completions API
   console.log(JSON.stringify(result, null, 2));

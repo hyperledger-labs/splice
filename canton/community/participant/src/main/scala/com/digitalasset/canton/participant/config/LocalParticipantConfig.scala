@@ -23,6 +23,7 @@ import com.digitalasset.canton.platform.config.{
   IndexServiceConfig as LedgerIndexServiceConfig,
   InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
+  TopologyAwarePackageSelectionConfig,
   UserManagementServiceConfig,
 }
 import com.digitalasset.canton.platform.indexer.IndexerConfig
@@ -232,6 +233,8 @@ final case class LedgerApiServerConfig(
       LedgerApiServerConfig.DefaultIdentityProviderManagementConfig,
     interactiveSubmissionService: InteractiveSubmissionServiceConfig =
       InteractiveSubmissionServiceConfig.Default,
+    topologyAwarePackageSelection: TopologyAwarePackageSelectionConfig =
+      TopologyAwarePackageSelectionConfig.Default,
 ) extends ServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
 
@@ -332,8 +335,6 @@ object TestingTimeServiceConfig {
   *   Disable the package upgrade verification on DAR upload
   * @param packageMetadataView
   *   Initialization parameters for the package metadata in-memory store.
-  * @param experimentalEnableTopologyEvents
-  *   If true, topology events are propagated to the Ledger API clients
   */
 final case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
@@ -366,7 +367,6 @@ final case class ParticipantNodeParameterConfig(
     packageMetadataView: PackageMetadataViewConfig = PackageMetadataViewConfig(),
     commandProgressTracker: CommandProgressTrackerConfig = CommandProgressTrackerConfig(),
     unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig] = None,
-    experimentalEnableTopologyEvents: Boolean = false,
 ) extends LocalNodeParametersConfig
     with UniformCantonConfigValidation
 

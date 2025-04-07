@@ -5,23 +5,23 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.unit.mo
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.BootstrapDetector
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModule.DefaultEpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Epoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.{
   EpochStore,
   Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.TopologyActivationTime
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochLength,
   EpochNumber,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.EpochInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.snapshot.{
-  PeerActiveAt,
+  NodeActiveAt,
   SequencerSnapshotAdditionalInfo,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
@@ -52,7 +52,7 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
         // Only 1 node
         (
           Some(aSequencerSnapshot),
-          Membership.forTesting(mySequencerId),
+          Membership.forTesting(myId),
           Genesis.GenesisEpoch,
           BootstrapKind.RegularStartup,
         ),
@@ -66,7 +66,6 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
               BlockNumber(70L),
               EpochLength(10L),
               Genesis.GenesisTopologyActivationTime,
-              Genesis.GenesisPreviousEpochMaxBftTime,
             ),
             lastBlockCommits = Seq.empty,
           ),
@@ -83,13 +82,13 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
               BlockNumber(15000L),
               DefaultEpochLength,
               topologyActivationTime = TopologyActivationTime(CantonTimestamp.MinValue),
-              Genesis.GenesisPreviousEpochMaxBftTime,
             )
           ),
         ),
       )
     ) { (snapshotAdditionalInfo, membership, latestCompletedEpoch, expectedShouldStateTransfer) =>
       BootstrapDetector.detect(
+        DefaultEpochLength,
         snapshotAdditionalInfo,
         membership,
         latestCompletedEpoch,
@@ -100,6 +99,7 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
   "fail on missing start epoch number" in {
     a[RuntimeException] shouldBe thrownBy(
       BootstrapDetector.detect(
+        DefaultEpochLength,
         Some(SequencerSnapshotAdditionalInfo(Map.empty /* boom! */ )),
         aMembershipWith2Nodes,
         Genesis.GenesisEpoch,
@@ -110,14 +110,14 @@ class BootstrapDetectorTest extends AnyWordSpec with BftSequencerBaseTest {
 
 object BootstrapDetectorTest {
 
-  private val mySequencerId = fakeSequencerId("self")
-  private val otherSequencerId = fakeSequencerId("other")
+  private val myId = BftNodeId("self")
+  private val otherId = BftNodeId("other")
   private val aMembershipWith2Nodes =
-    Membership.forTesting(mySequencerId, Set(otherSequencerId))
+    Membership.forTesting(myId, Set(otherId))
   private val aSequencerSnapshot = SequencerSnapshotAdditionalInfo(
     // Minimal data required for the test
     Map(
-      mySequencerId -> PeerActiveAt(
+      myId -> NodeActiveAt(
         TopologyActivationTime(CantonTimestamp.Epoch),
         Some(EpochNumber(1500L)),
         firstBlockNumberInEpoch = Some(BlockNumber(15000L)),

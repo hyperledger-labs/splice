@@ -123,6 +123,15 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
           .mapMaterializedValue(_ -> FutureUnlessShutdown.pure(Done))
       )
 
+    override def readInternalV2(member: Member, timestamp: Option[CantonTimestamp])(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.EventSource] =
+      EitherT.rightT[FutureUnlessShutdown, CreateSubscriptionError](
+        Source.empty
+          .viaMat(KillSwitches.single)(Keep.right)
+          .mapMaterializedValue(_ -> FutureUnlessShutdown.pure(Done))
+      )
+
     override protected def acknowledgeSignedInternal(
         signedAcknowledgeRequest: SignedContent[AcknowledgeRequest]
     )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = ???
@@ -145,6 +154,9 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, SequencerError, SequencerSnapshot] =
       ???
+    override def awaitSnapshot(timestamp: CantonTimestamp)(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, SequencerError, SequencerSnapshot] = ???
     override protected val localSequencerMember: Member = sequencerId
     override protected def disableMemberInternal(member: Member)(implicit
         traceContext: TraceContext
@@ -155,10 +167,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
       FutureUnlessShutdown.pure(SequencerHealthStatus(isActive = true))
 
     override def adminStatus: SequencerAdminStatus = ???
-    override private[sequencer] def firstSequencerCounterServeableForSequencer(implicit
-        traceContext: TraceContext
-    ): FutureUnlessShutdown[SequencerCounter] =
-      ???
+
     override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
         traceContext: TraceContext
     ): FutureUnlessShutdown[SequencerTrafficStatus] = ???
@@ -189,6 +198,14 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest with FailOnShutdown 
         traceContext: TraceContext
     ): FutureUnlessShutdown[Boolean] =
       FutureUnlessShutdown.pure(existingMembers.contains(member))
+
+    /** Return the last timestamp of the containing block of the provided timestamp. This is needed
+      * to determine the effective timestamp to observe in topology processing, required to produce
+      * a correct snapshot.
+      */
+    override def awaitContainingBlockLastTimestamp(timestamp: CantonTimestamp)(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, SequencerError, CantonTimestamp] = ???
   }
 
   "sendAsyncSigned" should {

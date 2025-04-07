@@ -1,5 +1,5 @@
 {
-  "name": "common-test-handlers",
+  "name": "@lfdecentralizedtrust/splice-common-test-handlers",
   "version": "0.1.0",
   "private": true,
   "types": ".lib/index.d.ts",

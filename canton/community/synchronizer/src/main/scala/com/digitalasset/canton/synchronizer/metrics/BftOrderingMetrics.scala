@@ -16,7 +16,7 @@ import com.digitalasset.canton.metrics.{
   DbStorageMetrics,
   DeclarativeApiMetrics,
 }
-import com.digitalasset.canton.topology.SequencerId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 
 import scala.collection.mutable
 import scala.concurrent.blocking
@@ -46,7 +46,7 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
   private[metrics] val global = new GlobalMetrics
 
   // Private constructor to avoid being instantiated multiple times by accident
-  private[metrics] final class IngressMatrics private[BftOrderingHistograms] {
+  private[metrics] final class IngressMetrics private[BftOrderingHistograms] {
     private[metrics] val prefix = BftOrderingHistograms.this.prefix :+ "ingress"
 
     private[metrics] val requestsSize: Item = Item(
@@ -56,7 +56,7 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
       qualification = MetricQualification.Traffic,
     )
   }
-  private[metrics] val ingress = new IngressMatrics
+  private[metrics] val ingress = new IngressMetrics
 
   // Private constructor to avoid being instantiated multiple times by accident
   private[metrics] final class ConsensusMetrics private[BftOrderingHistograms] {
@@ -96,6 +96,14 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
       description = "Records the size (in batches) of blocks ordered.",
       qualification = MetricQualification.Traffic,
     )
+
+    private[metrics] val blockDelay: Item = Item(
+      prefix :+ "block-delay",
+      summary = "Block delay",
+      description =
+        "Wall-clock time of the ordered block being provided to the sequencer minus BFT time of the block.",
+      qualification = MetricQualification.Latency,
+    )
   }
   private[metrics] val output = new OutputMetrics
 
@@ -113,11 +121,11 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
   private[metrics] val topology = new TopologyMetrics
 
   // Private constructor to avoid being instantiated multiple times by accident
-  private[metrics] final class P2pMetrics private[BftOrderingHistograms] {
+  private[metrics] final class P2PMetrics private[BftOrderingHistograms] {
     val p2pPrefix: MetricName = BftOrderingHistograms.this.prefix :+ "p2p"
 
     // Private constructor to avoid being instantiated multiple times by accident
-    private[metrics] class SendMetrics private[P2pMetrics] {
+    private[metrics] class SendMetrics private[P2PMetrics] {
       val prefix: MetricName = p2pPrefix :+ "send"
 
       private[metrics] val networkWriteLatency: Item = Item(
@@ -130,7 +138,7 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
     private[metrics] val send = new SendMetrics
 
     // Private constructor to avoid being instantiated multiple times by accident
-    private[metrics] final class ReceiveMetrics private[P2pMetrics] {
+    private[metrics] final class ReceiveMetrics private[P2PMetrics] {
       val prefix: MetricName = p2pPrefix :+ "receive"
 
       private[metrics] val processingLatency: Item = Item(
@@ -142,7 +150,7 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
     }
     private[metrics] val receive = new ReceiveMetrics
   }
-  private[metrics] val p2p = new P2pMetrics
+  private[metrics] val p2p = new P2PMetrics
 }
 
 class BftOrderingMetrics private[metrics] (
@@ -408,28 +416,28 @@ class BftOrderingMetrics private[metrics] (
         val VotingSequencer: String = "voting-sequencer"
       }
 
-      private val prepareGauges = mutable.Map[SequencerId, Gauge[Double]]()
-      private val commitGauges = mutable.Map[SequencerId, Gauge[Double]]()
+      private val prepareGauges = mutable.Map[BftNodeId, Gauge[Double]]()
+      private val commitGauges = mutable.Map[BftNodeId, Gauge[Double]]()
 
-      def prepareVotesPercent(sequencerId: SequencerId): Gauge[Double] =
+      def prepareVotesPercent(node: BftNodeId): Gauge[Double] =
         getOrElseUpdateGauge(
           prepareGauges,
-          sequencerId,
+          node,
           "prepare-votes-percent",
           "Block vote % during prepare",
           "Percentage of BFT sequencers that voted for a block in the PBFT prepare stage.",
         )
 
-      def commitVotesPercent(sequencerId: SequencerId): Gauge[Double] =
+      def commitVotesPercent(node: BftNodeId): Gauge[Double] =
         getOrElseUpdateGauge(
           commitGauges,
-          sequencerId,
+          node,
           "commit-votes-percent",
           "Block vote % during commit",
           "Percentage of BFT sequencers that voted for a block in the PBFT commit stage.",
         )
 
-      def cleanupVoteGauges(keepOnly: Set[SequencerId]): Unit =
+      def cleanupVoteGauges(keepOnly: Set[BftNodeId]): Unit =
         blocking {
           synchronized {
             keepOnlyGaugesFor(prepareGauges, keepOnly)
@@ -438,19 +446,19 @@ class BftOrderingMetrics private[metrics] (
         }
 
       private def getOrElseUpdateGauge(
-          gauges: mutable.Map[SequencerId, Gauge[Double]],
-          sequencerId: SequencerId,
+          gauges: mutable.Map[BftNodeId, Gauge[Double]],
+          node: BftNodeId,
           name: String,
           summary: String,
           description: String,
       ): Gauge[Double] = {
-        val mc1 = mc.withExtraLabels(labels.VotingSequencer -> sequencerId.toProtoPrimitive)
+        val mc1 = mc.withExtraLabels(labels.VotingSequencer -> node)
         blocking {
           synchronized {
             locally {
               implicit val mc: MetricsContext = mc1
               gauges.getOrElseUpdate(
-                sequencerId,
+                node,
                 openTelemetryMetricsFactory.gauge(
                   MetricInfo(
                     prefix :+ name,
@@ -467,8 +475,8 @@ class BftOrderingMetrics private[metrics] (
       }
 
       private def keepOnlyGaugesFor[T](
-          gaugesMap: mutable.Map[SequencerId, Gauge[T]],
-          keepOnly: Set[SequencerId],
+          gaugesMap: mutable.Map[BftNodeId, Gauge[T]],
+          keepOnly: Set[BftNodeId],
       ): Unit =
         gaugesMap.view.filterKeys(!keepOnly.contains(_)).foreach { case (id, gauge) =>
           gauge.close()
@@ -489,6 +497,9 @@ class BftOrderingMetrics private[metrics] (
 
     val blockSizeBatches: Histogram =
       openTelemetryMetricsFactory.histogram(histograms.output.blockSizeBatches.info)
+
+    val blockDelay: Timer =
+      openTelemetryMetricsFactory.timer(histograms.output.blockDelay.info)
   }
   val output = new OutputMetrics
 
@@ -512,11 +523,11 @@ class BftOrderingMetrics private[metrics] (
   val topology = new TopologyMetrics
 
   // Private constructor to avoid being instantiated multiple times by accident
-  final class P2pMetrics private[BftOrderingMetrics] {
+  final class P2PMetrics private[BftOrderingMetrics] {
     private val p2pPrefix = histograms.p2p.p2pPrefix
 
     // Private constructor to avoid being instantiated multiple times by accident
-    final class ConnectionsMetrics private[P2pMetrics] {
+    final class ConnectionsMetrics private[P2PMetrics] {
       private val prefix = p2pPrefix :+ "connections"
 
       val connected: Gauge[Int] = openTelemetryMetricsFactory.gauge(
@@ -542,7 +553,7 @@ class BftOrderingMetrics private[metrics] (
     val connections = new ConnectionsMetrics
 
     // Private constructor to avoid being instantiated multiple times by accident
-    final class SendMetrics private[P2pMetrics] {
+    final class SendMetrics private[P2PMetrics] {
       private val prefix = histograms.p2p.send.prefix
 
       object labels {
@@ -584,7 +595,7 @@ class BftOrderingMetrics private[metrics] (
     val send = new SendMetrics
 
     // Private constructor to avoid being instantiated multiple times by accident
-    final class ReceiveMetrics private[P2pMetrics] {
+    final class ReceiveMetrics private[P2PMetrics] {
       private val prefix = histograms.p2p.receive.prefix
 
       object labels {
@@ -596,11 +607,11 @@ class BftOrderingMetrics private[metrics] (
           object values {
             sealed trait SourceValue extends PrettyNameOnlyCase
             case object SourceParsingFailed extends SourceValue
-            case class Empty(from: SequencerId) extends SourceValue
-            case class Availability(from: SequencerId) extends SourceValue
-            case class Consensus(from: SequencerId) extends SourceValue
-            case class Retransmissions(from: SequencerId) extends SourceValue
-            case class StateTransfer(from: SequencerId) extends SourceValue
+            case class Empty(from: BftNodeId) extends SourceValue
+            case class Availability(from: BftNodeId) extends SourceValue
+            case class Consensus(from: BftNodeId) extends SourceValue
+            case class Retransmissions(from: BftNodeId) extends SourceValue
+            case class StateTransfer(from: BftNodeId) extends SourceValue
           }
         }
       }
@@ -628,7 +639,7 @@ class BftOrderingMetrics private[metrics] (
     }
     val receive = new ReceiveMetrics
   }
-  val p2p = new P2pMetrics
+  val p2p = new P2PMetrics
 }
 
 object BftOrderingMetrics {

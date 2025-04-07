@@ -386,6 +386,7 @@ lockTo1 app sender lockHolder amuletAmount lockDuration = do
               lock = Some TimeLock with
                 holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
+                optContext = None
               receiverFeeRatio = 0.0
           ]
         beneficiaries = None -- no beneficiaries for self-transfer

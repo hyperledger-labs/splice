@@ -3,9 +3,11 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.memory
 
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.AvailabilityStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Env
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochNumber
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.OrderingRequestBatch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.BatchId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.pekko.PekkoModuleSystem.{
@@ -15,11 +17,11 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 
-import scala.collection.mutable
-import scala.util.Try
+import scala.collection.concurrent.TrieMap
+import scala.util.{Success, Try}
 
 abstract class GenericInMemoryAvailabilityStore[E <: Env[E]](
-    allKnownBatchesById: mutable.Map[BatchId, OrderingRequestBatch] = mutable.Map.empty
+    allKnownBatchesById: TrieMap[BatchId, OrderingRequestBatch] = TrieMap.empty
 ) extends AvailabilityStore[E] {
 
   def createFuture[A](action: String)(x: () => Try[A]): E#FutureUnlessShutdownT[A]
@@ -29,10 +31,7 @@ abstract class GenericInMemoryAvailabilityStore[E <: Env[E]](
   ): E#FutureUnlessShutdownT[Unit] =
     createFuture(addBatchActionName(batchId)) { () =>
       Try {
-        val _ = allKnownBatchesById.updateWith(batchId) {
-          case Some(value) => Some(value)
-          case None => Some(batch)
-        }
+        val _ = allKnownBatchesById.putIfAbsent(batchId, batch)
       }
     }
 
@@ -68,10 +67,27 @@ abstract class GenericInMemoryAvailabilityStore[E <: Env[E]](
 
   @VisibleForTesting
   def keys: Iterable[BatchId] = allKnownBatchesById.keys
+
+  override def loadNumberOfRecords(implicit
+      traceContext: TraceContext
+  ): E#FutureUnlessShutdownT[AvailabilityStore.NumberOfRecords] =
+    createFuture(loadNumberOfRecordsName) { () =>
+      Success(AvailabilityStore.NumberOfRecords(allKnownBatchesById.size.toLong))
+    }
+
+  override def prune(epochNumberExclusive: EpochNumber)(implicit
+      traceContext: TraceContext
+  ): E#FutureUnlessShutdownT[AvailabilityStore.NumberOfRecords] =
+    createFuture(pruneName(epochNumberExclusive)) { () =>
+      val batchesToDelete = allKnownBatchesById.filter(_._2.epochNumber < epochNumberExclusive).keys
+      batchesToDelete.foreach(allKnownBatchesById.remove(_).discard)
+      Success(AvailabilityStore.NumberOfRecords(batchesToDelete.size.toLong))
+    }
+
 }
 
 final class InMemoryAvailabilityStore(
-    allKnownBatchesById: mutable.Map[BatchId, OrderingRequestBatch] = mutable.Map.empty
+    allKnownBatchesById: TrieMap[BatchId, OrderingRequestBatch] = TrieMap.empty
 ) extends GenericInMemoryAvailabilityStore[PekkoEnv](allKnownBatchesById) {
   override def createFuture[A](action: String)(x: () => Try[A]): PekkoFutureUnlessShutdown[A] =
     PekkoFutureUnlessShutdown(action, () => FutureUnlessShutdown.fromTry(x()))

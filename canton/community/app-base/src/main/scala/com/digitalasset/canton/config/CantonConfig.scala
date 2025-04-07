@@ -16,7 +16,7 @@ import com.daml.metrics.api.MetricQualification
 import com.daml.metrics.{HistogramDefinition, MetricsFilterConfig}
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
-import com.digitalasset.canton.auth.AccessLevel
+import com.digitalasset.canton.auth.{AccessLevel, AuthorizedUser}
 import com.digitalasset.canton.config.CantonRequireTypes.*
 import com.digitalasset.canton.config.ConfigErrors.{
   CannotParseFilesError,
@@ -58,7 +58,10 @@ import com.digitalasset.canton.platform.apiserver.configuration.{
   EngineLoggingConfig,
   RateLimitingConfig,
 }
-import com.digitalasset.canton.platform.config.InteractiveSubmissionServiceConfig
+import com.digitalasset.canton.platform.config.{
+  InteractiveSubmissionServiceConfig,
+  TopologyAwarePackageSelectionConfig,
+}
 import com.digitalasset.canton.pureconfigutils.SharedConfigReaders.catchConvertError
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -78,9 +81,8 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.{
   SequencerHighAvailabilityConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.DriverBlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PServerConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.{
-  BftBlockOrderer,
+  BftBlockOrdererConfig,
   BftSequencerFactory,
 }
 import com.digitalasset.canton.synchronizer.sequencer.config.{
@@ -439,8 +441,6 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
         disableUpgradeValidation = participantParameters.disableUpgradeValidation,
         commandProgressTracking = participantParameters.commandProgressTracker,
         unsafeOnlinePartyReplication = participantParameters.unsafeOnlinePartyReplication,
-        // TODO(i21341) Remove the flag before going to production
-        experimentalEnableTopologyEvents = participantParameters.experimentalEnableTopologyEvents,
       )
     }
 
@@ -894,6 +894,8 @@ object CantonConfig {
       deriveReader[JwtTimestampLeeway]
 
     lazy implicit final val authServiceConfigReader: ConfigReader[AuthServiceConfig] = {
+      implicit val authorizedUserReader: ConfigReader[AuthorizedUser] =
+        deriveReader[AuthorizedUser]
       implicit val authServiceAccessLevelReader: ConfigReader[AccessLevel] =
         deriveEnumerationReader[AccessLevel]
       implicit val authServiceConfigUnsafeJwtHmac256Reader
@@ -920,6 +922,11 @@ object CantonConfig {
       implicit val ledgerApiInteractiveSubmissionServiceConfigReader
           : ConfigReader[InteractiveSubmissionServiceConfig] =
         deriveReader[InteractiveSubmissionServiceConfig]
+
+      implicit val ledgerApiTopologyAwarePackageSelectionConfigReader
+          : ConfigReader[TopologyAwarePackageSelectionConfig] =
+        deriveReader[TopologyAwarePackageSelectionConfig]
+
       deriveReader[LedgerApiServerConfig]
     }
 
@@ -965,34 +972,41 @@ object CantonConfig {
         : ConfigReader[SequencerWriterConfig.LowLatency] =
       deriveReader[SequencerWriterConfig.LowLatency]
 
-    implicit val memoryReader: ConfigReader[StorageConfig.Memory] =
+    lazy implicit val memoryReader: ConfigReader[StorageConfig.Memory] =
       deriveReader[StorageConfig.Memory]
-    implicit val h2Reader: ConfigReader[DbConfig.H2] =
+    lazy implicit val h2Reader: ConfigReader[DbConfig.H2] =
       deriveReader[DbConfig.H2]
-    implicit val postgresReader: ConfigReader[DbConfig.Postgres] =
+    lazy implicit val postgresReader: ConfigReader[DbConfig.Postgres] =
       deriveReader[DbConfig.Postgres]
-    implicit val dbConfigReader: ConfigReader[DbConfig] =
+    lazy implicit val dbConfigReader: ConfigReader[DbConfig] =
       deriveReader[DbConfig]
-    implicit val storageConfigReader: ConfigReader[StorageConfig] =
+    lazy implicit val storageConfigReader: ConfigReader[StorageConfig] =
       deriveReader[StorageConfig]
-    implicit val dbLockConfigReader: ConfigReader[DbLockConfig] = deriveReader[DbLockConfig]
-    implicit val lockedConnectionConfigReader: ConfigReader[DbLockedConnectionConfig] =
+    lazy implicit val dbLockConfigReader: ConfigReader[DbLockConfig] = deriveReader[DbLockConfig]
+    lazy implicit val lockedConnectionConfigReader: ConfigReader[DbLockedConnectionConfig] =
       deriveReader[DbLockedConnectionConfig]
-    implicit val connectionPoolConfigReader: ConfigReader[DbLockedConnectionPoolConfig] =
+    lazy implicit val connectionPoolConfigReader: ConfigReader[DbLockedConnectionPoolConfig] =
       deriveReader[DbLockedConnectionPoolConfig]
 
-    implicit val bftBlockOrdererP2PServerConfigReader
-        : ConfigReader[BftBlockOrderer.P2PServerConfig] =
-      deriveReader[BftBlockOrderer.P2PServerConfig]
-    implicit val bftBlockOrdererP2PEndpointConfigReader
-        : ConfigReader[BftBlockOrderer.P2PEndpointConfig] =
-      deriveReader[BftBlockOrderer.P2PEndpointConfig]
-    implicit val bftBlockOrdererP2PNetworkConfigReader
-        : ConfigReader[BftBlockOrderer.P2PNetworkConfig] =
-      deriveReader[BftBlockOrderer.P2PNetworkConfig]
-    implicit val bftBlockOrdererConfigReader: ConfigReader[BftBlockOrderer.Config] =
-      deriveReader[BftBlockOrderer.Config]
-    implicit val sequencerConfigBftSequencerReader: ConfigReader[SequencerConfig.BftSequencer] =
+    lazy implicit val bftBlockOrdererP2PServerConfigReader
+        : ConfigReader[BftBlockOrdererConfig.P2PServerConfig] =
+      deriveReader[BftBlockOrdererConfig.P2PServerConfig]
+    lazy implicit val bftBlockOrdererP2PEndpointConfigReader
+        : ConfigReader[BftBlockOrdererConfig.P2PEndpointConfig] =
+      deriveReader[BftBlockOrdererConfig.P2PEndpointConfig]
+    lazy implicit val bftBlockOrdererP2PNetworkAuthenticationConfigReader
+        : ConfigReader[BftBlockOrdererConfig.P2PNetworkAuthenticationConfig] =
+      deriveReader[BftBlockOrdererConfig.P2PNetworkAuthenticationConfig]
+    lazy implicit val bftBlockOrdererP2PNetworkConfigReader
+        : ConfigReader[BftBlockOrdererConfig.P2PNetworkConfig] =
+      deriveReader[BftBlockOrdererConfig.P2PNetworkConfig]
+    lazy implicit val bftBlockOrdererPruningConfigReader
+        : ConfigReader[BftBlockOrdererConfig.PruningConfig] =
+      deriveReader[BftBlockOrdererConfig.PruningConfig]
+    lazy implicit val bftBlockOrdererConfigReader: ConfigReader[BftBlockOrdererConfig] =
+      deriveReader[BftBlockOrdererConfig]
+    lazy implicit val sequencerConfigBftSequencerReader
+        : ConfigReader[SequencerConfig.BftSequencer] =
       deriveReader[SequencerConfig.BftSequencer]
 
     lazy implicit final val sequencerPruningConfig
@@ -1208,11 +1222,10 @@ object CantonConfig {
       deriveReader[SynchronizerTimeTrackerConfig]
     }
 
-    lazy implicit final val sequencerClientConfigReader: ConfigReader[SequencerClientConfig] = {
-      implicit val authTokenManagerConfigReader: ConfigReader[AuthenticationTokenManagerConfig] =
-        deriveReader[AuthenticationTokenManagerConfig]
+    lazy implicit val authTokenManagerConfigReader: ConfigReader[AuthenticationTokenManagerConfig] =
+      deriveReader[AuthenticationTokenManagerConfig]
+    lazy implicit final val sequencerClientConfigReader: ConfigReader[SequencerClientConfig] =
       deriveReader[SequencerClientConfig]
-    }
 
     lazy implicit final val cantonParametersReader: ConfigReader[CantonParameters] = {
       implicit val ammoniteConfigReader: ConfigReader[AmmoniteConsoleConfig] =
@@ -1478,6 +1491,10 @@ object CantonConfig {
       deriveWriter[JwtTimestampLeeway]
 
     lazy implicit final val authServiceConfigWriter: ConfigWriter[AuthServiceConfig] = {
+      implicit val authorizedUserWriter: ConfigWriter[AuthorizedUser] =
+        confidentialWriter[AuthorizedUser](
+          _.copy(userId = "****")
+        )
       implicit val authServiceAccessLevelWriter: ConfigWriter[AccessLevel] =
         deriveEnumerationWriter[AccessLevel]
       implicit val authServiceConfigJwtEs256CrtWriter: ConfigWriter[AuthServiceConfig.JwtEs256Crt] =
@@ -1505,6 +1522,11 @@ object CantonConfig {
       implicit val ledgerApiInteractiveSubmissionServiceConfigWriter
           : ConfigWriter[InteractiveSubmissionServiceConfig] =
         deriveWriter[InteractiveSubmissionServiceConfig]
+
+      implicit val ledgerApiTopologyAwarePackageSelectionConfigWriter
+          : ConfigWriter[TopologyAwarePackageSelectionConfig] =
+        deriveWriter[TopologyAwarePackageSelectionConfig]
+
       deriveWriter[LedgerApiServerConfig]
     }
     lazy implicit final val sequencerTrafficConfigWriter: ConfigWriter[SequencerTrafficConfig] =
@@ -1553,39 +1575,47 @@ object CantonConfig {
         : ConfigWriter[SequencerWriterConfig.LowLatency] =
       deriveWriter[SequencerWriterConfig.LowLatency]
 
-    implicit val publicServerConfigWriter: ConfigWriter[PublicServerConfig] =
+    lazy implicit val publicServerConfigWriter: ConfigWriter[PublicServerConfig] =
       deriveWriter[PublicServerConfig]
 
-    implicit val memoryWriter: ConfigWriter[StorageConfig.Memory] =
+    lazy implicit val memoryWriter: ConfigWriter[StorageConfig.Memory] =
       deriveWriter[StorageConfig.Memory]
-    implicit val h2Writer: ConfigWriter[DbConfig.H2] =
+    lazy implicit val h2Writer: ConfigWriter[DbConfig.H2] =
       confidentialWriter[DbConfig.H2](x => x.copy(config = DbConfig.hideConfidential(x.config)))
-    implicit val postgresWriter: ConfigWriter[DbConfig.Postgres] =
+    lazy implicit val postgresWriter: ConfigWriter[DbConfig.Postgres] =
       confidentialWriter[DbConfig.Postgres](x =>
         x.copy(config = DbConfig.hideConfidential(x.config))
       )
-    implicit val storageConfigWriter: ConfigWriter[StorageConfig] =
+    lazy implicit val storageConfigWriter: ConfigWriter[StorageConfig] =
       deriveWriter[StorageConfig]
-    implicit val dbLockConfigWriter: ConfigWriter[DbLockConfig] = deriveWriter[DbLockConfig]
-    implicit val lockedConnectionConfigWriter: ConfigWriter[DbLockedConnectionConfig] =
+    lazy implicit val dbLockConfigWriter: ConfigWriter[DbLockConfig] = deriveWriter[DbLockConfig]
+    lazy implicit val lockedConnectionConfigWriter: ConfigWriter[DbLockedConnectionConfig] =
       deriveWriter[DbLockedConnectionConfig]
-    implicit val connectionPoolConfigWriter: ConfigWriter[DbLockedConnectionPoolConfig] =
+    lazy implicit val connectionPoolConfigWriter: ConfigWriter[DbLockedConnectionPoolConfig] =
       deriveWriter[DbLockedConnectionPoolConfig]
 
-    lazy implicit final val bftBlockOrdererBftP2PServerConfigWriter: ConfigWriter[P2PServerConfig] =
-      deriveWriter[P2PServerConfig]
-    implicit val bftBlockOrdererBftP2PEndpointConfigWriter
-        : ConfigWriter[BftBlockOrderer.P2PEndpointConfig] =
-      deriveWriter[BftBlockOrderer.P2PEndpointConfig]
-    implicit val bftBlockOrdererBftP2PNetworkConfigWriter
-        : ConfigWriter[BftBlockOrderer.P2PNetworkConfig] =
-      deriveWriter[BftBlockOrderer.P2PNetworkConfig]
-    implicit val bftBlockOrdererConfigWriter: ConfigWriter[BftBlockOrderer.Config] =
-      deriveWriter[BftBlockOrderer.Config]
+    lazy implicit final val bftBlockOrdererBftP2PServerConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.P2PServerConfig] =
+      deriveWriter[BftBlockOrdererConfig.P2PServerConfig]
+    lazy implicit val bftBlockOrdererBftP2PEndpointConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.P2PEndpointConfig] =
+      deriveWriter[BftBlockOrdererConfig.P2PEndpointConfig]
+    lazy implicit val bftBlockOrdererBftP2PNetworkAuthenticationConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.P2PNetworkAuthenticationConfig] =
+      deriveWriter[BftBlockOrdererConfig.P2PNetworkAuthenticationConfig]
+    lazy implicit val bftBlockOrdererBftP2PNetworkConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.P2PNetworkConfig] =
+      deriveWriter[BftBlockOrdererConfig.P2PNetworkConfig]
+    lazy implicit val bftBlockOrdererPruningConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.PruningConfig] =
+      deriveWriter[BftBlockOrdererConfig.PruningConfig]
+    lazy implicit val bftBlockOrdererConfigWriter: ConfigWriter[BftBlockOrdererConfig] =
+      deriveWriter[BftBlockOrdererConfig]
 
-    implicit val sequencerConfigBftSequencerWriter: ConfigWriter[SequencerConfig.BftSequencer] =
+    lazy implicit val sequencerConfigBftSequencerWriter
+        : ConfigWriter[SequencerConfig.BftSequencer] =
       deriveWriter[SequencerConfig.BftSequencer]
-    implicit val sequencerPruningConfigWriter
+    lazy implicit val sequencerPruningConfigWriter
         : ConfigWriter[DatabaseSequencerConfig.SequencerPruningConfig] =
       deriveWriter[DatabaseSequencerConfig.SequencerPruningConfig]
     lazy implicit final val sequencerNodeInitConfigWriter: ConfigWriter[SequencerNodeInitConfig] =
@@ -1780,11 +1810,10 @@ object CantonConfig {
       deriveWriter[SynchronizerTimeTrackerConfig]
     }
 
-    lazy implicit final val sequencerClientConfigWriter: ConfigWriter[SequencerClientConfig] = {
-      implicit val authTokenManagerConfigWriter: ConfigWriter[AuthenticationTokenManagerConfig] =
-        deriveWriter[AuthenticationTokenManagerConfig]
+    lazy implicit val authTokenManagerConfigWriter: ConfigWriter[AuthenticationTokenManagerConfig] =
+      deriveWriter[AuthenticationTokenManagerConfig]
+    lazy implicit final val sequencerClientConfigWriter: ConfigWriter[SequencerClientConfig] =
       deriveWriter[SequencerClientConfig]
-    }
 
     lazy implicit final val cantonParametersWriter: ConfigWriter[CantonParameters] = {
       implicit val ammoniteConfigWriter: ConfigWriter[AmmoniteConsoleConfig] =

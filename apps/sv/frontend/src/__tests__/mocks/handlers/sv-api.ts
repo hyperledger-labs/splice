@@ -1,6 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { validatorLicensesHandler, dsoInfoHandler } from 'common-test-handlers';
+import {
+  validatorLicensesHandler,
+  dsoInfoHandler,
+} from '@lfdecentralizedtrust/splice-common-test-handlers';
 import dayjs from 'dayjs';
 import { rest, RestHandler } from 'msw';
 import {

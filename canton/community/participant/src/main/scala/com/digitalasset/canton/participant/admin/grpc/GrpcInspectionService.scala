@@ -6,8 +6,8 @@ package com.digitalasset.canton.participant.admin.grpc
 import cats.data.EitherT
 import cats.implicits.{toBifunctorOps, toTraverseOps}
 import cats.syntax.either.*
-import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution, RpcError}
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.InspectionServiceErrorGroup
@@ -120,7 +120,7 @@ class GrpcInspectionService(
           ),
           err => InspectionServiceError.InternalServerError.Error(err.toString),
         )
-        .leftWiden[CantonError]
+        .leftWiden[RpcError]
     } yield v30.SetConfigForSlowCounterParticipantsResponse()
 
     CantonGrpcUtil.mapErrNewEUS(result)
@@ -211,7 +211,7 @@ class GrpcInspectionService(
             .getIntervalsBehindForParticipants(synchronizers, participants),
           err => InspectionServiceError.InternalServerError.Error(err.toString),
         )
-        .leftWiden[CantonError]
+        .leftWiden[RpcError]
 
       mapped = intervals
         .filter(interval =>
@@ -436,14 +436,14 @@ class GrpcInspectionService(
             InspectionServiceError.IllegalArgumentError
               .Error(s"Unknown synchronizer id $synchronizerId"),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         pv <- EitherTUtil
           .fromFuture(
             syncStateInspection.getProtocolVersion(synchronizerAlias),
             err => InspectionServiceError.InternalServerError.Error(err.toString),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         cantonTickTs <- CantonGrpcUtil.wrapErrUS(
           ProtoConverter.parseRequired(
@@ -482,7 +482,7 @@ class GrpcInspectionService(
             topologySnapshot.awaitSnapshot(cantonTickTs),
             err => InspectionServiceError.InternalServerError.Error(err.toString),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         // Check that the given timestamp is a valid tick. We cannot move this check up, because .get(cantonTickTs)
         // would wait if the timestamp is in the future. Here, we already validated that the timestamp is in the past
@@ -499,7 +499,7 @@ class GrpcInspectionService(
               .get(cantonTickTs, warnOnUsingDefaults = false),
             err => InspectionServiceError.InternalServerError.Error(err.toString),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         _ <- EitherT.fromEither[FutureUnlessShutdown](
           CantonTimestampSecond
@@ -511,7 +511,7 @@ class GrpcInspectionService(
                 "",
               )
             )
-            .leftMap[CantonError](_ =>
+            .leftMap[RpcError](_ =>
               InspectionServiceError.IllegalArgumentError.Error(
                 s"""The participant cannot open commitment ${request.commitment} for participant
                    | ${request.computedForCounterParticipantUid} on synchronizer ${request.synchronizerId} because the given
@@ -523,7 +523,7 @@ class GrpcInspectionService(
         requestCommitment <- EitherT.fromEither[FutureUnlessShutdown](
           AcsCommitment
             .hashedCommitmentTypeFromByteString(request.commitment)
-            .leftMap[CantonError](err =>
+            .leftMap[RpcError](err =>
               InspectionServiceError.IllegalArgumentError
                 .Error(s"Failed to parse commitment hash: $err")
             )
@@ -538,7 +538,7 @@ class GrpcInspectionService(
             s"""The participant cannot open commitment ${request.commitment} for participant
             ${request.computedForCounterParticipantUid} on synchronizer ${request.synchronizerId} and period end
             ${request.periodEndTick} because the participant has not computed such a commitment at the given tick timestamp for the given counter participant""".stripMargin
-          ): CantonError,
+          ): RpcError,
         )
 
         counterParticipantParties <- EitherTUtil
@@ -550,7 +550,7 @@ class GrpcInspectionService(
               ),
             err => InspectionServiceError.InternalServerError.Error(err.toString),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         contractsAndTransferCounter <- EitherTUtil
           .fromFuture(
@@ -561,7 +561,7 @@ class GrpcInspectionService(
             ),
             err => InspectionServiceError.InternalServerError.Error(err.toString),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         commitmentContractsMetadata = contractsAndTransferCounter.map {
           case (cid, transferCounter) =>
@@ -604,7 +604,7 @@ class GrpcInspectionService(
             InspectionServiceError.IllegalArgumentError
               .Error(s"Synchronizer alias not found for $expectedSynchronizerId"),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         cantonTs <- CantonGrpcUtil.wrapErrUS(
           ProtoConverter.parseRequired(
@@ -619,14 +619,14 @@ class GrpcInspectionService(
             syncStateInspection.getProtocolVersion(expectedSynchronizerAlias),
             err => InspectionServiceError.InternalServerError.Error(err.toString),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
         cids <-
           EitherT.fromEither[FutureUnlessShutdown](
             request.cids
               .traverse(cid => LfContractId.fromBytes(Bytes.fromByteString(cid)))
               .leftMap(InspectionServiceError.IllegalArgumentError.Error(_))
-              .leftWiden[CantonError]
+              .leftWiden[RpcError]
           )
 
         contractStates <- EitherTUtil
@@ -643,7 +643,7 @@ class GrpcInspectionService(
               ),
             err => InspectionServiceError.InternalServerError.Error(err.toString),
           )
-          .leftWiden[CantonError]
+          .leftWiden[RpcError]
 
       } yield {
         contractStates.foreach(c => c.writeDelimitedTo(out).foreach(_ => out.flush()))
@@ -681,6 +681,7 @@ class GrpcInspectionService(
       .asGrpcResponse
 
   }
+
 }
 
 object InspectionServiceError extends InspectionServiceErrorGroup {

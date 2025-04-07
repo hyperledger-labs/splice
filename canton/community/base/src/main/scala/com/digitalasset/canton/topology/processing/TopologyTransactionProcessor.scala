@@ -308,7 +308,7 @@ class TopologyTransactionProcessor(
         MonadUtil.sequentialTraverseMonoid(tracedBatch.value) {
           _.withTraceContext { implicit traceContext =>
             {
-              case Deliver(sc, ts, _, _, batch, topologyTimestampO, _) =>
+              case Deliver(sc, _, ts, _, _, batch, topologyTimestampO, _) =>
                 logger.debug(s"Processing sequenced event with counter $sc and timestamp $ts")
                 val sequencedTime = SequencedTime(ts)
                 val envelopesForRightSynchronizer = ProtocolMessage.filterSynchronizerEnvelopes(
@@ -404,7 +404,7 @@ class TopologyTransactionProcessor(
   private def maxTimestampFromStore()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
-    store.maxTimestamp(CantonTimestamp.MaxValue, includeRejected = true)
+    store.maxTimestamp(SequencedTime.MaxValue, includeRejected = true)
 
   /** @return
     *   A tuple with list of envelopes with invalid recipients and a list of topology broadcasts to

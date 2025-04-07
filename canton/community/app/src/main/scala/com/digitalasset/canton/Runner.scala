@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton
 
+import com.digitalasset.canton.config.SharedCantonConfig
 import com.digitalasset.canton.console.{HeadlessConsole, InteractiveConsole}
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.environment.Environment
@@ -16,18 +17,19 @@ import scala.util.control.NonFatal
 /** Result for exposing the process exit code. All logging is expected to take place inside of the
   * runner.
   */
-trait Runner[E <: Environment] extends NamedLogging {
+trait Runner[C <: SharedCantonConfig[C]] extends NamedLogging {
 
-  def run(environment: E): Unit
+  def run(environment: Environment[C]): Unit
 }
 
-class ServerRunner[E <: Environment](
+class ServerRunner[C <: SharedCantonConfig[C]](
     bootstrapScript: Option[CantonScript] = None,
     override val loggerFactory: NamedLoggerFactory,
-) extends Runner[E]
+    exitAfterBootstrap: Boolean = false,
+) extends Runner[C]
     with NoTracing {
 
-  def run(environment: E): Unit =
+  def run(environment: Environment[C]): Unit =
     try {
       def start(): Unit =
         environment
@@ -48,6 +50,7 @@ class ServerRunner[E <: Environment](
         }
 
       bootstrapScript.fold(start())(startWithBootstrap)
+      if (exitAfterBootstrap) sys.exit(0)
     } catch {
       case ex: Throwable =>
         logger.error(s"Unexpected error while running server: ${ex.getMessage}")
@@ -56,16 +59,17 @@ class ServerRunner[E <: Environment](
     }
 }
 
-class ConsoleInteractiveRunner[E <: Environment](
+class ConsoleInteractiveRunner[C <: SharedCantonConfig[C]](
     noTty: Boolean = false,
     bootstrapScript: Option[CantonScript],
+    postScriptCallback: => Unit,
     override val loggerFactory: NamedLoggerFactory,
-) extends Runner[E] {
-  def run(environment: E): Unit = {
+) extends Runner[C] {
+  def run(environment: Environment[C]): Unit = {
     val success =
       try {
         val consoleEnvironment = environment.createConsole()
-        InteractiveConsole(consoleEnvironment, noTty, bootstrapScript, logger)
+        InteractiveConsole(consoleEnvironment, noTty, bootstrapScript, logger, postScriptCallback)
       } catch {
         case NonFatal(e) =>
           logger.error(e.getMessage)(TraceContext.empty)
@@ -75,14 +79,14 @@ class ConsoleInteractiveRunner[E <: Environment](
   }
 }
 
-class ConsoleScriptRunner[E <: Environment](
+class ConsoleScriptRunner[C <: SharedCantonConfig[C]](
     scriptPath: CantonScript,
     override val loggerFactory: NamedLoggerFactory,
-) extends Runner[E] {
+) extends Runner[C] {
   private val Ok = 0
   private val Error = 1
 
-  override def run(environment: E): Unit = {
+  override def run(environment: Environment[C]): Unit = {
     val exitCode =
       ConsoleScriptRunner.run(environment, scriptPath, logger) match {
         case Right(_unit) =>
@@ -149,20 +153,21 @@ final case class CantonScriptFromFile(scriptPath: File) extends CantonScript {
 }
 
 object ConsoleScriptRunner extends NoTracing {
-  def apply[E <: Environment](
+  def apply[C <: SharedCantonConfig[C]](
       scriptPath: File,
       loggerFactory: NamedLoggerFactory,
-  ): ConsoleScriptRunner[E] =
-    new ConsoleScriptRunner[E](CantonScriptFromFile(scriptPath), loggerFactory)
-  def run[E <: Environment](
-      environment: E,
+  ): ConsoleScriptRunner[C] =
+    new ConsoleScriptRunner(CantonScriptFromFile(scriptPath), loggerFactory)
+
+  def run[C <: SharedCantonConfig[C]](
+      environment: Environment[C],
       scriptPath: File,
       logger: TracedLogger,
   ): Either[HeadlessConsole.HeadlessConsoleError, Unit] =
     run(environment, CantonScriptFromFile(scriptPath), logger)
 
-  def run[E <: Environment](
-      environment: E,
+  def run[C <: SharedCantonConfig[C]](
+      environment: Environment[C],
       cantonScript: CantonScript,
       logger: TracedLogger,
   ): Either[HeadlessConsole.HeadlessConsoleError, Unit] = {

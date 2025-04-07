@@ -18,7 +18,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
   PruningSchedule,
 }
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
+import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
@@ -294,9 +294,9 @@ class ParticipantAdminConnection(
     )
     val requestComplete = Promise[ByteString]()
     // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
-    val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsResponse](requestComplete)
+    val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsOldResponse](requestComplete)
     runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
+      ParticipantAdminCommands.ParticipantRepairManagement.ExportAcsOld(
         parties = parties,
         partiesOffboarding = false,
         filterSynchronizerId,
@@ -317,7 +317,7 @@ class ParticipantAdminConnection(
       "Imports the acs in the participantl",
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
-          .ImportAcs(
+          .ImportAcsOld(
             acsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             allowContractIdSuffixRecomputation = false,

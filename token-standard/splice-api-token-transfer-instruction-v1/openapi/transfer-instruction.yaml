@@ -51,7 +51,7 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
 
   schemas:
-    # TODO(#83): share with the other usages of factory requests, contexts, and disclosed contracts in the other standards.
+    # Note: intentionally not shared with the other APIs to keep the self-contained, and because not all OpenAPI codegens support such shared definitions.
     GetFactoryRequest:
       type: object
       properties:
@@ -145,7 +145,7 @@ components:
           "disclosedContracts",
         ]
 
-    # TODO(#83): share with the other usages of disclosed contracts in the other standards.
+    # Note: intentionally not shared with the other APIs to keep the self-contained, and because not all OpenAPI codegens support such shared definitions.
     DisclosedContract:
       type: object
       properties:

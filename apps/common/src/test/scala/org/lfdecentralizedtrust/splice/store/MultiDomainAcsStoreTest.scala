@@ -55,7 +55,8 @@ abstract class MultiDomainAcsStoreTest[
   }
 
   protected def mkStore(
-      id: Int = 0,
+      acsId: Int = 0,
+      txLogId: Option[Int] = Some(1),
       domainMigrationId: Long = 0,
       participantId: ParticipantId = ParticipantId("MultiDomainAcsStoreTest"),
       filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = defaultContractFilter,
@@ -192,14 +193,14 @@ abstract class MultiDomainAcsStoreTest[
     "initial store is empty" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
       } yield succeed
     }
     "single domain creates and archives" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -239,7 +240,7 @@ abstract class MultiDomainAcsStoreTest[
           }
       }
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- store.ingestionSink.initialize()
         _ <- MonadUtil.sequentialTraverse(contracts)(d1.create(_))
         paginatedResultsAsc <- paginate(None, Seq.empty, SortOrder.Ascending)
@@ -253,7 +254,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       recoverToSucceededIf[IllegalStateException] {
         for {
-          _ <- acs()
+          _ <- initWithAcs()
           _ <- assertList()
           _ <- d1.create(c(1), createdEventSignatories = Seq(userParty(1)))
         } yield succeed
@@ -262,7 +263,7 @@ abstract class MultiDomainAcsStoreTest[
     "ingestion can be restarted at any time" in {
       implicit val store = mkStore()
       for {
-        _ <- acs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq((c(1), d1, 0L)))
         _ <- store.ingestionSink.initialize()
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -272,7 +273,7 @@ abstract class MultiDomainAcsStoreTest[
     "respect the limit and log a warning for HardLimit" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- d1.create(c(1))
         _ <- d1.create(c(2))
         resultHard <- loggerFactory.assertLogs(
@@ -290,8 +291,8 @@ abstract class MultiDomainAcsStoreTest[
     "single domain acs" in {
       implicit val store = mkStore()
       for {
-        _ <- acs(
-          acs = Seq((c(1), d1, 0L))
+        _ <- initWithAcs(
+          activeContracts = Seq((c(1), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -304,7 +305,7 @@ abstract class MultiDomainAcsStoreTest[
     "filtering of acs" in {
       implicit val store = mkStore()
       for {
-        _ <- acs(
+        _ <- initWithAcs(
           Seq((c(1), d1, 0L), (cFeatured(2), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
@@ -315,7 +316,7 @@ abstract class MultiDomainAcsStoreTest[
     "filtering of create" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- d1.create(c(1))
         _ <- d1.create(cFeatured(2))
         _ <- assertList(c(1) -> Some(d1))
@@ -343,7 +344,7 @@ abstract class MultiDomainAcsStoreTest[
       )
 
       for {
-        _ <- acs(acsOffset = acsOffset)
+        _ <- initWithAcs(acsOffset = acsOffset)
         _ <- signal_010
         _ = notCompleted(signal_011, signal_012)
         _ <- d1.create(c(1), tx1Offset)
@@ -357,7 +358,7 @@ abstract class MultiDomainAcsStoreTest[
     "unassign before assign" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -378,7 +379,7 @@ abstract class MultiDomainAcsStoreTest[
     "assign before unassign" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -399,7 +400,7 @@ abstract class MultiDomainAcsStoreTest[
     "assign and archive before unassign" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -423,7 +424,7 @@ abstract class MultiDomainAcsStoreTest[
     "assign before create" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         tf0 = nextReassignmentId
         _ <- d2.assign(c(1) -> d1, tf0, 1)
@@ -441,7 +442,7 @@ abstract class MultiDomainAcsStoreTest[
     "multiple early transfer ins" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         tf0 = nextReassignmentId
         tf1 = nextReassignmentId
@@ -469,7 +470,7 @@ abstract class MultiDomainAcsStoreTest[
     "archive before create" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         tf0 = nextReassignmentId
         _ <- d2.assign(c(1) -> d1, tf0, 1)
@@ -487,7 +488,7 @@ abstract class MultiDomainAcsStoreTest[
     "archive before assign" in {
       implicit val store = mkStore()
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- assertList()
         tf0 = nextReassignmentId
         tf1 = nextReassignmentId
@@ -510,7 +511,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       val tf0 = nextReassignmentId
       for {
-        _ <- acs(
+        _ <- initWithAcs(
           incompleteOut = Seq(
             (c(1), d1, d2, tf0, 1L)
           )
@@ -527,7 +528,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       val tf0 = nextReassignmentId
       for {
-        _ <- acs(
+        _ <- initWithAcs(
           incompleteIn = Seq(
             (c(1), d1, d2, tf0, 1L)
           )
@@ -547,7 +548,7 @@ abstract class MultiDomainAcsStoreTest[
       val tf0 = nextReassignmentId
       val tf1 = nextReassignmentId
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- d1.assign(c(1) -> d2, tf0, 1)
         _ <- d1.assign(cFeatured(2) -> d2, tf1, 2)
         _ <- assertList(c(1) -> Some(d1))
@@ -562,7 +563,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       val tf0 = nextReassignmentId
       for {
-        _ <- acs()
+        _ <- initWithAcs()
         _ <- d1.create(cFeatured(1))
         _ <- d1.unassign(c(1) -> d2, tf0, 1)
         _ <- assertIncompleteReassignments()
@@ -572,7 +573,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       val tf0 = nextReassignmentId
       for {
-        _ <- acs(
+        _ <- initWithAcs(
           incompleteOut = Seq((cFeatured(1), d1, d2, tf0, 1L))
         )
         _ <- assertIncompleteReassignments()
@@ -589,7 +590,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- acs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq((c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
@@ -609,7 +610,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- acs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq((c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -636,7 +637,7 @@ abstract class MultiDomainAcsStoreTest[
       val cid = c(1).contractId
       for {
         // incomplete unassign
-        _ <- acs(
+        _ <- initWithAcs(
           incompleteOut = Seq(
             (c(1), d1, d2, tf0, 1L)
           )
@@ -679,8 +680,8 @@ abstract class MultiDomainAcsStoreTest[
         }
       }
       for {
-        _ <- acs(
-          acs = Seq((c(1), d1, 0L)),
+        _ <- initWithAcs(
+          activeContracts = Seq((c(1), d1, 0L)),
           incompleteOut = Seq((c(2), d1, d2, tf2, 3L)),
         )
         _ = assertSize("Initial", 1)
@@ -713,7 +714,7 @@ abstract class MultiDomainAcsStoreTest[
     "reads return contracts from all package versions" in {
       implicit val store = mkStore()
       for {
-        _ <- acs(Seq((c(1), d1, 0L), (cUpgraded(2), d1, 0L)))
+        _ <- initWithAcs(Seq((c(1), d1, 0L), (cUpgraded(2), d1, 0L)))
         _ <- d1.create(c(3))
         _ <- d1.create(cUpgraded(4))
         results <- store.listContracts(AppRewardCoupon.COMPANION)
@@ -763,9 +764,9 @@ abstract class MultiDomainAcsStoreTest[
           ),
         )
       }
-      implicit val store: Store = mkStore(0, 0L, sampleParticipantId, contractFilter)
+      implicit val store: Store = mkStore(0, Some(0), 0L, sampleParticipantId, contractFilter)
       for {
-        _ <- acs(coids.zipWithIndex.map { case (coid, ix) =>
+        _ <- initWithAcs(coids.zipWithIndex.map { case (coid, ix) =>
           (smallestContract(coid, ix), dummyDomain, 0L)
         })
         contracts <- store.listAssignedContractsNotOnDomainN(

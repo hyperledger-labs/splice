@@ -38,30 +38,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
-import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{
-  AcsQueries,
-  AcsTables,
-  DbTxLogAppStore,
-  TxLogQueries,
-}
+import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.{
-  DbVotesStoreQueryBuilder,
+  DbVotesAcsStoreQueryBuilder,
   IngestionSummary,
   Limit,
+  LimitHelpers,
   MultiDomainAcsStore,
-  TxLogStore,
 }
-import org.lfdecentralizedtrust.splice.sv.store.TxLogEntry.EntryType
-import org.lfdecentralizedtrust.splice.sv.store.{
-  AppRewardCouponsSum,
-  DsoTxLogParser,
-  SvDsoStore,
-  SvStore,
-  TxLogEntry,
-  VoteRequestTxLogEntry,
-}
+import org.lfdecentralizedtrust.splice.sv.store.{AppRewardCouponsSum, SvDsoStore, SvStore}
 import SvDsoStore.RoundCounterpartyBatch
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template
@@ -73,7 +60,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
@@ -93,13 +79,12 @@ class DbSvDsoStore(
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbTxLogAppStore[TxLogEntry](
+) extends DbAppStore(
       storage,
       DsoTables.acsTableName,
-      DsoTables.txLogTableName,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
-      storeDescriptor = StoreDescriptor(
+      acsStoreDescriptor = StoreDescriptor(
         version = 1,
         name = "DbSvDsoStore",
         party = key.dsoParty,
@@ -116,9 +101,8 @@ class DbSvDsoStore(
     with SvDsoStore
     with AcsTables
     with AcsQueries
-    with UpdateHistoryQueries
-    with TxLogQueries[TxLogEntry]
-    with DbVotesStoreQueryBuilder {
+    with DbVotesAcsStoreQueryBuilder
+    with LimitHelpers {
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   val dsoStoreMetrics = new DbSvDsoStoreMetrics(retryProvider.metricsFactory)
@@ -130,29 +114,12 @@ class DbSvDsoStore(
       }
     }
   }
-  override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
-    org.lfdecentralizedtrust.splice.sv.store.TxLogEntry
-  ] {
-    val parser: org.lfdecentralizedtrust.splice.sv.store.DsoTxLogParser;
-    def entryToRow
-        : org.lfdecentralizedtrust.splice.sv.store.TxLogEntry => org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoTxLogRowData
-  } = new TxLogStore.Config[TxLogEntry] {
-    override val parser: org.lfdecentralizedtrust.splice.sv.store.DsoTxLogParser =
-      new DsoTxLogParser(
-        loggerFactory
-      )
-    override def entryToRow
-        : org.lfdecentralizedtrust.splice.sv.store.TxLogEntry => org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoTxLogRowData =
-      DsoTables.DsoTxLogRowData.fromTxLogEntry
-    override def encodeEntry = TxLogEntry.encode
-    override def decodeEntry = TxLogEntry.decode
-  }
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
   override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
-  def storeId: Int = multiDomainAcsStore.storeId
+  private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
 
   override def listExpiredAnsSubscriptions(
       now: CantonTimestamp,
@@ -188,7 +155,7 @@ class DbSvDsoStore(
               on       idle.subscription_reference_contract_id = ctx.subscription_reference_contract_id
                 and      ctx.store_id = idle.store_id
                 and      ctx.migration_id = idle.migration_id
-              where    idle.store_id = $storeId
+              where    idle.store_id = $acsStoreId
                 and      idle.migration_id = $domainMigrationId
                 and      idle.template_id_qualified_name = ${QualifiedName(
               SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -219,7 +186,7 @@ class DbSvDsoStore(
           .query(
             selectFromAcsTable(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -241,7 +208,7 @@ class DbSvDsoStore(
           .querySingle(
             selectFromAcsTable(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -262,7 +229,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -290,7 +257,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -450,7 +417,7 @@ class DbSvDsoStore(
             (selectClause ++
               sql"""
                    from #${DsoTables.acsTableName}
-                   where store_id = $storeId
+                   where store_id = $acsStoreId
                      and migration_id = $domainMigrationId
                      and template_id_qualified_name = ${QualifiedName(templateId)}
                      and assigned_domain = $synchronizerId
@@ -540,7 +507,7 @@ class DbSvDsoStore(
             sql"""
                 select reward_party, reward_round, array_agg(contract_id)
                 from dso_acs_store
-                where store_id = $storeId
+                where store_id = $acsStoreId
                   and migration_id = $domainMigrationId
                   and template_id_qualified_name = ${QualifiedName(templateId)}
                   and assigned_domain = $domain
@@ -574,7 +541,7 @@ class DbSvDsoStore(
               .querySingle(
                 selectFromAcsTableWithState(
                   DsoTables.acsTableName,
-                  storeId,
+                  acsStoreId,
                   domainMigrationId,
                   where = sql"""template_id_qualified_name = ${QualifiedName(
                       ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -599,7 +566,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTableWithState(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 SummarizingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -622,7 +589,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                     template_id_qualified_name = ${QualifiedName(
@@ -656,7 +623,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(
@@ -693,7 +660,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(
@@ -730,7 +697,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(
@@ -760,7 +727,7 @@ class DbSvDsoStore(
           .query(
             selectFromAcsTable(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -769,7 +736,7 @@ class DbSvDsoStore(
                        and action_ans_entry_context_cid IN (
                          select contract_id
                          from #${DsoTables.acsTableName}
-                         where store_id = $storeId
+                         where store_id = $acsStoreId
                            and migration_id = $domainMigrationId
                            and template_id_qualified_name = ${QualifiedName(
                   AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -793,7 +760,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                       template_id_qualified_name = ${QualifiedName(
@@ -834,7 +801,7 @@ class DbSvDsoStore(
           .query(
             selectFromAcsTable(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = (sql"""template_id_qualified_name = ${QualifiedName(
                   SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -857,7 +824,7 @@ class DbSvDsoStore(
           rows <- storage.query(
             selectFromAcsTableWithState(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(companion.getTemplateIdWithPackageId)}
@@ -865,7 +832,7 @@ class DbSvDsoStore(
                 and acs.amulet_round_of_expiry <= (
                   select mining_round - 2
                   from dso_acs_store
-                  where store_id = $storeId
+                  where store_id = $acsStoreId
                     and migration_id = $domainMigrationId
                     and template_id_qualified_name = ${QualifiedName(
                   splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -892,7 +859,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -924,7 +891,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = (sql"""template_id_qualified_name = ${QualifiedName(
                 AmuletPriceVote.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -948,7 +915,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(
@@ -976,7 +943,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                           template_id_qualified_name = ${QualifiedName(
@@ -1002,7 +969,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1024,7 +991,7 @@ class DbSvDsoStore(
           sql"""
                select sum(total_traffic_purchased)
                from #${DsoTables.acsTableName}
-               where store_id = $storeId
+               where store_id = $acsStoreId
                 and migration_id = $domainMigrationId
                 and template_id_qualified_name = ${QualifiedName(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1048,7 +1015,7 @@ class DbSvDsoStore(
         .querySingle(
           lookupVoteRequestQuery(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             "vote_request_tracking_cid",
             voteRequestCid,
@@ -1070,7 +1037,7 @@ class DbSvDsoStore(
         .query(
           listVoteRequestsByTrackingCidQuery(
             acsTableName = DsoTables.acsTableName,
-            storeId = storeId,
+            acsStoreId = acsStoreId,
             domainMigrationId = domainMigrationId,
             trackingCidColumnName = "vote_request_tracking_cid",
             trackingCids = trackingCids,
@@ -1092,7 +1059,7 @@ class DbSvDsoStore(
           .querySingle(
             selectFromAcsTableWithOffset(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
                               template_id_qualified_name = ${QualifiedName(
@@ -1122,7 +1089,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                            template_id_qualified_name = ${QualifiedName(
@@ -1149,7 +1116,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 AmuletPriceVote.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1173,7 +1140,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                             template_id_qualified_name = ${QualifiedName(
@@ -1201,7 +1168,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                               template_id_qualified_name = ${QualifiedName(
@@ -1233,7 +1200,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = (sql"""template_id_qualified_name = ${QualifiedName(
                 ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1258,7 +1225,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""
                               template_id_qualified_name = ${QualifiedName(
@@ -1289,7 +1256,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1313,7 +1280,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1345,7 +1312,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 SubscriptionInitialPayment.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1376,7 +1343,7 @@ class DbSvDsoStore(
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1397,41 +1364,6 @@ class DbSvDsoStore(
     )
   }
 
-  override def listVoteRequestResults(
-      actionName: Option[String],
-      accepted: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[DsoRules_CloseVoteRequestResult]] = {
-    val query = listVoteRequestResultsQuery(
-      txLogTableName = DsoTables.txLogTableName,
-      storeId = storeId,
-      dbType = EntryType.VoteRequestTxLogEntry,
-      actionNameColumnName = "action_name",
-      acceptedColumnName = "accepted",
-      effectiveAtColumnName = "effective_at",
-      requesterNameColumnName = "requester_name",
-      actionName = actionName,
-      accepted = accepted,
-      requester = requester,
-      effectiveFrom = effectiveFrom,
-      effectiveTo = effectiveTo,
-      limit = limit,
-    )
-    for {
-      rows <- storage.query(query, "listVoteRequestResults")
-      recentVoteResults = applyLimit("listVoteRequestResults", limit, rows)
-        .map(
-          txLogEntryFromRow[VoteRequestTxLogEntry](txLogConfig)
-        )
-        .map(_.result.getOrElse(throw txMissingField()))
-    } yield recentVoteResults
-  }
-
   override def lookupAnsEntryContext(reference: SubscriptionRequest.ContractId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AnsEntryContext.ContractId, AnsEntryContext]]] =
@@ -1441,7 +1373,7 @@ class DbSvDsoStore(
           .querySingle(
             selectFromAcsTableWithState(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
                template_id_qualified_name = ${QualifiedName(
@@ -1473,7 +1405,7 @@ class DbSvDsoStore(
             .query(
               selectFromAcsTable(
                 DsoTables.acsTableName,
-                storeId,
+                acsStoreId,
                 domainMigrationId,
                 where = (sql"""template_id_qualified_name = ${QualifiedName(
                     ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1520,7 +1452,7 @@ class DbSvDsoStore(
         .query(
           selectFromAcsTable(
             DsoTables.acsTableName,
-            storeId,
+            acsStoreId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -1547,7 +1479,7 @@ class DbSvDsoStore(
           .querySingle(
             selectFromAcsTableWithState(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
          template_id_qualified_name = ${QualifiedName(templateId)}
@@ -1575,7 +1507,7 @@ class DbSvDsoStore(
           .querySingle(
             selectFromAcsTableWithState(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
          template_id_qualified_name = ${QualifiedName(templateId)}
@@ -1601,7 +1533,7 @@ class DbSvDsoStore(
           .querySingle(
             selectFromAcsTableWithStateAndOffset(
               DsoTables.acsTableName,
-              storeId,
+              acsStoreId,
               domainMigrationId,
               where = sql"""
                     template_id_qualified_name = ${QualifiedName(
@@ -1652,36 +1584,6 @@ class DbSvDsoStore(
       )
     )
     listConfirmationsByActionConfirmer(expectedAction, confirmer)
-  }
-
-  def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
-      companion: C,
-      recordTime: CantonTimestamp = CantonTimestamp.MinValue,
-  )(implicit
-      companionClass: ContractCompanion[C, TCId, T],
-      tc: TraceContext,
-  ): Future[Option[Contract[TCId, T]]] = {
-    val templateId = companionClass.typeId(companion)
-    val packageName = PackageQualifiedName(templateId).packageName
-    for {
-      row <- storage
-        .querySingle(
-          selectFromUpdateTableResult(
-            updateHistory.historyId,
-            where = sql"""t.template_id_module_name = ${lengthLimited(
-                templateId.getModuleName
-              )} and t.template_id_entity_name = ${lengthLimited(
-                templateId.getEntityName
-              )} and t.package_name = ${lengthLimited(packageName)}
-              and uht.record_time > $recordTime""",
-            orderLimit = sql"""order by t.row_id asc limit 1""",
-          ).headOption,
-          s"lookup[$templateId]",
-        )
-        .value
-    } yield {
-      row.map(contractFromEvent(companion)(_))
-    }
   }
 
   override def close(): Unit = {

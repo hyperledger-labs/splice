@@ -3,16 +3,24 @@
 
 package com.digitalasset.canton.topology
 
-import com.daml.error.*
-import com.daml.error.ErrorCategory.InvalidGivenCurrentSystemStateResourceExists
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.ErrorCategory.InvalidGivenCurrentSystemStateResourceExists
+import com.digitalasset.base.error.{
+  Alarm,
+  AlarmErrorCode,
+  ErrorCategory,
+  ErrorCode,
+  ErrorGroup,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreError
 import com.digitalasset.canton.error.CantonErrorGroups.TopologyManagementErrorGroup.TopologyManagerErrorGroup
-import com.digitalasset.canton.error.{Alarm, AlarmErrorCode, CantonError, ContextualizedCantonError}
+import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError}
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.protocol.OnboardingRestriction
+import com.digitalasset.canton.protocol.{OnboardingRestriction, ReassignmentId}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
@@ -179,6 +187,28 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = s"The given serial $actual did not match the expected serial $expected."
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    """This error is returned when a signature does not cover the expected transaction hash
+      |of the transaction."""
+  )
+  @Resolution(
+    """Either add a signature for the hash of this specific transaction only, or a signature
+      |that covers the this transaction as part of a multi transaction hash."""
+  )
+  object MultiTransactionHashMismatch
+      extends ErrorCode(
+        id = "TOPOLOGY_MULTI_TRANSACTION_HASH_MISMATCH",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Failure(expected: TxHash, actual: NonEmpty[Set[TxHash]])(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"The given transaction hash set $actual did not contain the expected hash $expected of the transaction."
         )
         with TopologyManagerError
   }
@@ -850,5 +880,93 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           )
           with TopologyManagerError
     }
+
+    @Explanation(
+      """This error indicates that a dangerous PartyToParticipant mapping was rejected.
+        |If the command is run, there will no longer be enough signatory-assigning participants
+        |(i.e., reassigning participants with confirmation permissions for assignments) to complete the ongoing reassignments, these reassignments
+        |will remain stuck.
+        | """
+    )
+    @Resolution(
+      "Set the ForceFlag.AllowInsufficientSignatoryAssigningParticipantsForParty if you really know what you are doing."
+    )
+    object InsufficientSignatoryAssigningParticipantsForParty
+        extends ErrorCode(
+          id = "TOPOLOGY_INSUFFICIENT_SIGNATORY_ASSIGNING_PARTICIPANTS",
+          ErrorCategory.InvalidGivenCurrentSystemStateOther,
+        ) {
+      final case class RejectRemovingParty(
+          partyId: PartyId,
+          synchronizerId: SynchronizerId,
+          reassignmentId: ReassignmentId,
+      )(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            cause =
+              s"Disable party $partyId failed because there are incomplete reassignments, such as $reassignmentId, on synchronizer $synchronizerId involving the party. " +
+                s"Set the ForceFlag.AllowInsufficientSignatoryAssigningParticipantsForParty if you really know what you are doing."
+          )
+          with TopologyManagerError
+
+      final case class RejectThresholdIncrease(
+          partyId: PartyId,
+          synchronizerId: SynchronizerId,
+          reassignmentId: ReassignmentId,
+          nextThreshold: PositiveInt,
+          signatoryAssigningParticipants: Set[ParticipantId],
+      )(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            cause =
+              s"Increasing the threshold to $nextThreshold for the party $partyId would result in insufficient signatory-assigning participants for reassignment $reassignmentId " +
+                s"on synchronizer $synchronizerId. The signatory assigning participants for this reassignment are: $signatoryAssigningParticipants. " +
+                s"Set the ForceFlag.AllowInsufficientSignatoryAssigningParticipantsForParty if you really know what you are doing."
+          )
+          with TopologyManagerError
+
+      final case class RejectNotEnoughSignatoryAssigningParticipants(
+          partyId: PartyId,
+          synchronizerId: SynchronizerId,
+          reassignmentId: ReassignmentId,
+          threshold: PositiveInt,
+          signatoryAssigningParticipants: Set[ParticipantId],
+      )(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            cause =
+              s"Changing the party to participant mapping for party $partyId would result in insufficient signatory-assigning participants for reassignment $reassignmentId " +
+                s"on synchronizer $synchronizerId. Completing the assignment requires $threshold signatory-assigning participants, but only $signatoryAssigningParticipants would be available. " +
+                s"Set the ForceFlag.AllowInsufficientSignatoryAssigningParticipantsForParty if you are certain about proceeding with this change."
+          )
+          with TopologyManagerError
+
+    }
+
+    @Explanation(
+      """This error indicates that a request to change a participant permission to observer was rejected.
+        |If the command is run and the party is still a signatory on active contracts,
+        |then this transition prevents it from using the contracts.
+        |"""
+    )
+    @Resolution(
+      "Set the ForceFlag.AllowInsufficientParticipantPermissionForSignatoryParty if you really know what you are doing."
+    )
+    object InsufficientParticipantPermissionForSignatoryParty
+        extends ErrorCode(
+          id = "TOPOLOGY_INSUFFICIENT_PERMISSION_FOR_SIGNATORY_PARTY",
+          ErrorCategory.InvalidGivenCurrentSystemStateOther,
+        ) {
+      final case class Reject(partyId: PartyId, synchronizerId: SynchronizerId)(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends CantonError.Impl(
+            cause =
+              s"Changing participant permission of $partyId to observer failed because it is still a signatory on active contracts on synchronizer $synchronizerId. " +
+                s"It may also be a signatory on contracts across other synchronizers. " +
+                s"Set the ForceFlag.AllowInsufficientParticipantPermissionForSignatoryParty if you really know what you are doing."
+          )
+          with TopologyManagerError
+    }
+
   }
 }

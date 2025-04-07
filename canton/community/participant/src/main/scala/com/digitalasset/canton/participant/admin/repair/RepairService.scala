@@ -15,7 +15,7 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{Salt, SyncCryptoApiParticipantProvider}
-import com.digitalasset.canton.data.{CantonTimestamp, RepairContract}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.util.LfEngineToApi
 import com.digitalasset.canton.ledger.api.validation.StricterValueValidator as LedgerApiValueValidator
@@ -35,18 +35,18 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageDependencyResolver
+import com.digitalasset.canton.participant.admin.data.RepairContract
 import com.digitalasset.canton.participant.admin.repair.RepairService.{
   ContractToAdd,
   SynchronizerLookup,
 }
 import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
-import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
+import com.digitalasset.canton.participant.protocol.ContractAuthenticator
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.synchronizer.SynchronizerAliasManager
 import com.digitalasset.canton.participant.topology.TopologyComponentFactory
-import com.digitalasset.canton.participant.util.DAMLe.ContractWithMetadata
-import com.digitalasset.canton.participant.util.{DAMLe, TimeOfChange}
+import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.protocol.{LfChoiceName, *}
 import com.digitalasset.canton.store.SequencedEventStore
@@ -92,7 +92,7 @@ final class RepairService(
     participantId: ParticipantId,
     syncCrypto: SyncCryptoApiParticipantProvider,
     packageDependencyResolver: PackageDependencyResolver,
-    damle: DAMLe,
+    contractAuthenticator: ContractAuthenticator,
     contractStore: Eval[ContractStore],
     ledgerApiIndexer: Eval[LedgerApiIndexer],
     aliasManager: SynchronizerAliasManager,
@@ -217,35 +217,15 @@ final class RepairService(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Option[ContractToAdd]] =
     for {
-      // Able to recompute contract signatories and stakeholders (and sanity check
-      // repairContract metadata otherwise ignored matches real metadata)
-      contractWithMetadata <- damle
-        .contractWithMetadata(
-          repairContract.contract.rawContractInstance.contractInstance,
-          repairContract.contract.metadata.signatories,
-          // There is currently no mechanism in place through which another service command can ask to abort the
-          // engine computation for a previously sent contract. When therefore tell then engine to always continue.
-          getEngineAbortStatus = () => EngineAbortStatus.notAborted,
+      _ <- EitherT
+        .fromEither[FutureUnlessShutdown](
+          contractAuthenticator.authenticateSerializable(repairContract.contract)
         )
         .leftMap(e =>
-          log(s"Failed to compute contract ${repairContract.contract.contractId} metadata: $e")
+          log(s"Failed to authenticate contract with id: ${repairContract.contract.contractId}: $e")
         )
-      _ = if (repairContract.contract.metadata.signatories != contractWithMetadata.signatories) {
-        logger.info(
-          s"Contract ${repairContract.contract.contractId} metadata signatories ${repairContract.contract.metadata.signatories} differ from actual signatories ${contractWithMetadata.signatories}"
-        )
-      }
-      _ = if (repairContract.contract.metadata.stakeholders != contractWithMetadata.stakeholders) {
-        logger.info(
-          s"Contract ${repairContract.contract.contractId} metadata stakeholders ${repairContract.contract.metadata.stakeholders} differ from actual stakeholders ${contractWithMetadata.stakeholders}"
-        )
-      }
-      computedContract <- useComputedContractAndMetadata(
-        repairContract.contract,
-        contractWithMetadata,
-      )
       contractToAdd <- contractToAdd(
-        repairContract.copy(contract = computedContract),
+        repairContract,
         ignoreAlreadyAdded = ignoreAlreadyAdded,
         acsState = acsState,
         storedContract = storedContract,
@@ -272,22 +252,13 @@ final class RepairService(
         .right(
           ledgerApiIndexer.value.ledgerApiStore.value.cleanSynchronizerIndex(synchronizerId)
         )
-      startingPoints <- EitherT
-        .right(
-          SyncEphemeralStateFactory.startingPoints(
-            persistentState.requestJournalStore,
-            persistentState.sequencedEventStore,
-            synchronizerIndex,
-          )
-        )
-
       topologyFactory <- synchronizerLookup
         .topologyFactoryFor(synchronizerId)
         .toRight(s"No topology factory for synchronizer $synchronizerAlias")
         .toEitherT[FutureUnlessShutdown]
 
       topologySnapshot = topologyFactory.createTopologySnapshot(
-        startingPoints.processing.currentRecordTime,
+        SyncEphemeralStateFactory.currentRecordTime(synchronizerIndex),
         packageDependencyResolver,
         preferCaching = true,
       )
@@ -299,7 +270,9 @@ final class RepairService(
       topologySnapshot,
       persistentState,
       synchronizerParameters,
-      startingPoints,
+      SyncEphemeralStateFactory.currentRecordTime(synchronizerIndex),
+      SyncEphemeralStateFactory.nextRepairCounter(synchronizerIndex),
+      synchronizerIndex,
     )
 
   /** Participant repair utility for manually adding contracts to a synchronizer in an offline
@@ -743,25 +716,6 @@ final class RepairService(
     )
   }
 
-  private def useComputedContractAndMetadata(
-      inputContract: SerializableContract,
-      computed: ContractWithMetadata,
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, SerializableContract] =
-    EitherT.fromEither[FutureUnlessShutdown](
-      for {
-        rawContractInstance <- SerializableRawContractInstance
-          .create(computed.instance)
-          .leftMap(err =>
-            log(s"Failed to serialize contract ${inputContract.contractId}: ${err.errorMessage}")
-          )
-      } yield inputContract.copy(
-        metadata = computed.metadataWithGlobalKey,
-        rawContractInstance = rawContractInstance,
-      )
-    )
-
   /** Checks that the contracts can be added (packages known, stakeholders hosted, ...)
     * @param allHostedStakeholders
     *   All parties that are a stakeholder of one of the contracts and are hosted locally
@@ -1113,51 +1067,37 @@ final class RepairService(
       synchronizerId: SynchronizerId,
       timestamp: CantonTimestamp,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
-    def check(
-        persistentState: SyncPersistentState
-    ): FutureUnlessShutdown[Either[String, Unit]] =
+    def check(): FutureUnlessShutdown[Either[String, Unit]] =
       ledgerApiIndexer.value.ledgerApiStore.value
         .cleanSynchronizerIndex(synchronizerId)
-        .flatMap(
-          SyncEphemeralStateFactory.startingPoints(
-            persistentState.requestJournalStore,
-            persistentState.sequencedEventStore,
-            _,
-          )
-        )
-        .map { startingPoints =>
-          if (startingPoints.processing.lastSequencerTimestamp >= timestamp) {
+        .map(SyncEphemeralStateFactory.lastSequencerTimestamp)
+        .map { lastSequencerTimestamp =>
+          if (lastSequencerTimestamp >= timestamp) {
             logger.debug(
-              s"Clean sequencer index reached ${startingPoints.processing.lastSequencerTimestamp}, clearing $timestamp"
+              s"Clean sequencer index reached $lastSequencerTimestamp, clearing $timestamp"
             )
             Either.unit
           } else {
             val errMsg =
-              s"Clean sequencer index is still at ${startingPoints.processing.lastSequencerTimestamp} which is not yet $timestamp"
+              s"Clean sequencer index is still at $lastSequencerTimestamp which is not yet $timestamp"
             logger.debug(errMsg)
             Left(errMsg)
           }
         }
-    EitherT
-      .fromEither[FutureUnlessShutdown](
-        lookUpSynchronizerPersistence(synchronizerId, s"synchronizer $synchronizerId")
-      )
-      .flatMap { persistentState =>
-        EitherT(
-          retry
-            .Pause(
-              logger,
-              this,
-              retry.Forever,
-              50.milliseconds,
-              s"awaiting clean-head for=$synchronizerId at ts=$timestamp",
-            )
-            .unlessShutdown(
-              check(persistentState),
-              AllExceptionRetryPolicy,
-            )
+    EitherT(
+      retry
+        .Pause(
+          logger,
+          this,
+          retry.Forever,
+          50.milliseconds,
+          s"awaiting clean-head for=$synchronizerId at ts=$timestamp",
         )
-      }
+        .unlessShutdown(
+          check(),
+          AllExceptionRetryPolicy,
+        )
+    )
   }
 
   private def repairCounterSequence(
@@ -1201,8 +1141,8 @@ final class RepairService(
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, RepairRequest] = {
     val rtRepair = RecordTime.fromTimeOfChange(
       TimeOfChange(
-        synchronizer.startingPoints.processing.currentRecordTime,
-        Some(synchronizer.startingPoints.processing.nextRepairCounter),
+        synchronizer.currentRecordTime,
+        Some(synchronizer.nextRepairCounter),
       )
     )
     logger
@@ -1213,7 +1153,7 @@ final class RepairService(
       _ <- EitherT
         .right(
           SyncEphemeralStateFactory
-            .cleanupPersistentState(synchronizer.persistentState, synchronizer.startingPoints)
+            .cleanupPersistentState(synchronizer.persistentState, synchronizer.synchronizerIndex)
         )
 
       incrementalAcsSnapshotWatermark <- EitherT.right(
@@ -1230,7 +1170,7 @@ final class RepairService(
       )
       repairCounters <- EitherT.fromEither[FutureUnlessShutdown](
         repairCounterSequence(
-          synchronizer.startingPoints.processing.nextRepairCounter,
+          synchronizer.nextRepairCounter,
           repairCountersToAllocate,
         )
       )

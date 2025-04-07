@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
+import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -46,6 +47,7 @@ import com.digitalasset.canton.topology.store.{
   ValidatedTopologyTransaction,
 }
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.ParticipantPermission.Observation
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.RequiredAuth
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.{
@@ -295,6 +297,29 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
     EitherT.rightT(())
   }
 
+  def checkInsufficientSignatoryAssigningParticipantsForParty(
+      @unused partyId: PartyId,
+      @unused currentThreshold: PositiveInt,
+      @unused nextThreshold: Option[PositiveInt],
+      @unused nextConfirmingParticipants: Seq[HostingParticipant],
+      @unused forceFlags: ForceFlags,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] = {
+    traceContext.discard
+    EitherT.rightT(())
+  }
+
+  def checkInsufficientParticipantPermissionForSignatoryParty(
+      @unused party: PartyId,
+      @unused forceFlags: ForceFlags,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] = {
+    traceContext.discard
+    EitherTUtil.unitUS
+  }
+
   /** Authorizes a new topology transaction by signing it and adding it to the topology state
     *
     * @param op
@@ -511,7 +536,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
         case _ => EitherT.rightT[FutureUnlessShutdown, TopologyManagerError](())
       }
       signed <- SignedTopologyTransaction
-        .create(
+        .signAndCreate(
           transaction,
           keysToUseForSigning,
           isProposal,
@@ -541,15 +566,14 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
         keys,
         forSigning = true,
       )
-      signatures <- keyWithUsage.forgetNE.toSeq
-        .parTraverse { case (key, usage) =>
-          crypto.privateCrypto
-            .sign(transaction.hash.hash, key, usage)
-            .leftMap(err =>
-              TopologyManagerError.InternalError.TopologySigningError(err): TopologyManagerError
-            )
-        }
-    } yield transaction.addSignatures(signatures)
+      signatures <- keyWithUsage.toList.toNEF.parTraverse { case (key, usage) =>
+        crypto.privateCrypto
+          .sign(transaction.hash.hash, key, usage)
+          .leftMap(err =>
+            TopologyManagerError.InternalError.TopologySigningError(err): TopologyManagerError
+          )
+      }
+    } yield transaction.addSingleSignatures(signatures.toSet)
 
   private def determineKeysToUse(
       transaction: GenericTopologyTransaction,
@@ -744,9 +768,10 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
         forceChanges,
         transaction.mapping.code,
       )
-    case PartyToParticipant(partyId, _, participants) =>
+    case PartyToParticipant(partyId, threshold, participants) =>
       checkPartyToParticipantIsNotDangerous(
         partyId,
+        threshold,
         participants,
         forceChanges,
         transaction.transaction.operation,
@@ -867,44 +892,81 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +PureCrypto <: Crypt
 
   private def checkPartyToParticipantIsNotDangerous(
       partyId: PartyId,
+      threshold: PositiveInt,
       nextParticipants: Seq[HostingParticipant],
       forceChanges: ForceFlags,
       operation: TopologyChangeOp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] = {
-    val removedParticipantIds = operation match {
-      case TopologyChangeOp.Replace =>
-        store
-          .findPositiveTransactions(
-            asOf = CantonTimestamp.MaxValue,
-            asOfInclusive = false,
-            isProposal = false,
-            types = Seq(PartyToParticipant.code),
-            filterUid = Some(Seq(partyId.uid)),
-            filterNamespace = None,
-          )
-          .map {
-            _.collectOfMapping[PartyToParticipant].collectLatestByUniqueKey.toTopologyState
-              .collectFirst { case PartyToParticipant(_, _, currentHostingParticipants) =>
-                currentHostingParticipants.map(_.participantId.uid).toSet -- nextParticipants.map(
-                  _.participantId.uid
-                )
-              }
-              .getOrElse(Set.empty)
-          }
-      case TopologyChangeOp.Remove =>
-        FutureUnlessShutdown.pure(
-          nextParticipants.map(_.participantId.uid).toSet
+    val currentThresholdAndHostingParticipants
+        : FutureUnlessShutdown[(Option[PositiveInt], Seq[HostingParticipant])] =
+      store
+        .findPositiveTransactions(
+          asOf = CantonTimestamp.MaxValue,
+          asOfInclusive = false,
+          isProposal = false,
+          types = Seq(PartyToParticipant.code),
+          filterUid = Some(Seq(partyId.uid)),
+          filterNamespace = None,
         )
-    }
+        .map {
+          _.collectOfMapping[PartyToParticipant].collectLatestByUniqueKey.toTopologyState
+            .collectFirst {
+              case PartyToParticipant(_, currentThreshold, currentHostingParticipants) =>
+                Some(currentThreshold) -> currentHostingParticipants
+            }
+            .getOrElse(None -> Nil)
+        }
 
     for {
-      removed <- EitherT.right(removedParticipantIds)
+      currentThresholdAndHostingParticipants <- EitherT.right(
+        currentThresholdAndHostingParticipants
+      )
+      currentThresholdO = currentThresholdAndHostingParticipants._1
+      currentHostingParticipants = currentThresholdAndHostingParticipants._2
+
+      removed = operation match {
+        case TopologyChangeOp.Replace =>
+          currentHostingParticipants.map(_.participantId.uid).toSet -- nextParticipants.map(
+            _.participantId.uid
+          )
+        case TopologyChangeOp.Remove => currentHostingParticipants.map(_.participantId.uid).toSet
+
+      }
+
+      isAlreadyPureObserver = currentHostingParticipants.forall(_.permission == Observation)
+      isBecomingPureObserver = nextParticipants.forall(_.permission == Observation)
+      isTransitionToPureObserver = !isAlreadyPureObserver && isBecomingPureObserver
+
       _ <-
         if (removed.contains(nodeId)) {
           checkCannotDisablePartyWithActiveContracts(partyId, forceChanges: ForceFlags)
         } else EitherT.rightT[FutureUnlessShutdown, TopologyManagerError](())
+
+      _ <-
+        if (
+          isTransitionToPureObserver && currentHostingParticipants.exists(
+            _.participantId.uid == nodeId
+          )
+        ) {
+          checkInsufficientParticipantPermissionForSignatoryParty(partyId, forceChanges: ForceFlags)
+        } else EitherT.rightT[FutureUnlessShutdown, TopologyManagerError](())
+
+      (nextThreshold, nexHostingParticipants) = operation match {
+        case TopologyChangeOp.Replace => Some(threshold) -> nextParticipants
+        case TopologyChangeOp.Remove => None -> Nil
+      }
+
+      _ <- currentThresholdO.traverse_(currentThreshold =>
+        checkInsufficientSignatoryAssigningParticipantsForParty(
+          partyId,
+          currentThreshold,
+          nextThreshold,
+          nexHostingParticipants,
+          forceChanges,
+        )
+      )
 
     } yield ()
   }

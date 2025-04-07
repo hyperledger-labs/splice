@@ -10,8 +10,9 @@ import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
+import io.grpc.MethodDescriptor.Marshaller
 import io.grpc.protobuf.StatusProto
-import io.grpc.{Metadata, ServerCall, Status}
+import io.grpc.{Metadata, MethodDescriptor, ServerCall, Status}
 import org.mockito.captor.ArgCaptor
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.Assertion
@@ -20,7 +21,6 @@ import org.scalatest.matchers.should.Matchers
 import org.slf4j.event.Level
 
 import scala.concurrent.{Future, Promise}
-import scala.util.Success
 
 class UserBasedAuthorizationInterceptorSpec
     extends AsyncFlatSpec
@@ -59,13 +59,23 @@ class UserBasedAuthorizationInterceptorSpec
     val identityProviderAwareAuthService = mock[AuthService]
     val userManagementService = mock[UserManagementStore]
     val serverCall = mock[ServerCall[Nothing, Nothing]]
+    val marshaller = mock[Marshaller[Nothing]]
+    val methodDescriptor = MethodDescriptor
+      .newBuilder[Nothing, Nothing](
+        marshaller,
+        marshaller,
+      )
+      .setFullMethodName("")
+      .setType(MethodDescriptor.MethodType.UNARY)
+      .build()
     val failedMetadataDecode =
       Future.failed[ClaimSet](new RuntimeException("some internal failure"))
 
     val promise = Promise[Unit]()
     // Using a promise to ensure the verify call below happens after the expected call to `serverCall.close`
+    when(serverCall.getMethodDescriptor).thenReturn(methodDescriptor)
     when(serverCall.close(any[Status], any[Metadata])).thenAnswer {
-      promise.complete(Success(()))
+      promise.success(())
       ()
     }
 
@@ -82,10 +92,10 @@ class UserBasedAuthorizationInterceptorSpec
     val metadataCaptor = ArgCaptor[Metadata]
 
     when(
-      identityProviderAwareAuthService.decodeMetadata(any[Metadata])(any[TraceContext])
+      identityProviderAwareAuthService.decodeMetadata(any[Metadata], any[String])(any[TraceContext])
     )
       .thenReturn(Future.successful(ClaimSet.Unauthenticated))
-    when(authService.decodeMetadata(any[Metadata])(anyTraceContext))
+    when(authService.decodeMetadata(any[Metadata], any[String])(anyTraceContext))
       .thenReturn(failedMetadataDecode)
     authorizationInterceptor.interceptCall[Nothing, Nothing](serverCall, new Metadata(), null)
 

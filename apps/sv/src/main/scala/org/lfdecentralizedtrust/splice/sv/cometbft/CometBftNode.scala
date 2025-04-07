@@ -7,7 +7,7 @@ import cats.Show.Shown
 import cats.implicits.toTraverseOps
 import org.lfdecentralizedtrust.splice.codegen.java.splice as daml
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider}
-import org.lfdecentralizedtrust.splice.sv.config.CometBftConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvCometBftConfig
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
@@ -38,7 +38,7 @@ import io.grpc.Status
 class CometBftNode(
     val cometBftClient: CometBftClient,
     val cometBftRequestSigner: CometBftRequestSigner,
-    val cometBftConfig: CometBftConfig,
+    val cometBftConfig: SvCometBftConfig,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
 )(implicit ec: ExecutionContext)
@@ -53,7 +53,7 @@ class CometBftNode(
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
       actualConfig <- cometBftClient.readNetworkConfig()
-      genesisSigner = CometBftRequestSigner.GenesisSigner
+      genesisSigner = CometBftRequestSigner.genesisSigner
       currentKeysSetToGenesisKeys <- areGenesisGovernanceKeysConfigured(
         owningSvNode,
         genesisSigner,
@@ -62,12 +62,12 @@ class CometBftNode(
       _ =
         if (currentKeysSetToGenesisKeys) {
           logger.info(
-            s"Rotating sv1 governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints) as they are set to the genesis keys."
+            s"Rotating sv1 governance keys from ${genesisSigner.fingerprint} to ${cometBftRequestSigner.fingerprint} (fingerprints) as they are set to the genesis keys."
           )
           val governanceKeysToKeep = actualConfig.svNodeConfigStates
             .get(owningSvNode)
             .flatMap(_.currentConfig.map(_.governanceKeys)) match {
-            case Some(govKeys) => govKeys.filterNot(_.pubKey == genesisSigner.PublicKeyBase64)
+            case Some(govKeys) => govKeys.filterNot(_.pubKey == genesisSigner.publicKeyBase64)
             case None => List.empty
           }
           val currentConfigRevision =
@@ -78,7 +78,7 @@ class CometBftNode(
           val request = NetworkConfigChangeRequest(
             chainId = actualConfig.chainId,
             submitterSvNodeId = owningSvNode,
-            submitterKeyId = genesisSigner.Fingerprint,
+            submitterKeyId = genesisSigner.fingerprint,
             submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
             kind = NodeConfigChangeRequest(
               SvNodeConfigChangeRequest.of(
@@ -90,8 +90,8 @@ class CometBftNode(
                       localConfig.copy(
                         governanceKeys = governanceKeysToKeep :+
                           GovernanceKey(
-                            cometBftRequestSigner.PublicKeyBase64,
-                            cometBftRequestSigner.Fingerprint,
+                            cometBftRequestSigner.publicKeyBase64,
+                            cometBftRequestSigner.fingerprint,
                           )
                       )
                     )
@@ -121,7 +121,7 @@ class CometBftNode(
     } yield {
       if (currentKeysSetToGenesisKeys) {
         logger.info(
-          s"Successfully rotated sv1 governance keys from ${genesisSigner.Fingerprint} to ${cometBftRequestSigner.Fingerprint} (fingerprints)"
+          s"Successfully rotated sv1 governance keys from ${genesisSigner.fingerprint} to ${cometBftRequestSigner.fingerprint} (fingerprints)"
         )
       } else {
         logger.info(
@@ -144,8 +144,8 @@ class CometBftNode(
 
     val ourGovernanceKey = {
       proto.cometbft.GovernanceKey(
-        cometBftRequestSigner.PublicKeyBase64,
-        cometBftRequestSigner.Fingerprint,
+        cometBftRequestSigner.publicKeyBase64,
+        cometBftRequestSigner.fingerprint,
       )
     }
     val synchronizerId = target.dsoRules.domain
@@ -172,7 +172,7 @@ class CometBftNode(
         actualConfig <- cometBftClient.readNetworkConfig()
         networkConfigChanges = diffNetworkConfig(
           owningSvNode,
-          cometBftRequestSigner.Fingerprint,
+          cometBftRequestSigner.fingerprint,
           targetNodeStates,
           actualConfig,
           synchronizerId,
@@ -206,7 +206,7 @@ class CometBftNode(
                     chainId = actualConfig.chainId,
                     submitterSvNodeId = owningSvNode,
                     submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
-                    submitterKeyId = cometBftRequestSigner.Fingerprint,
+                    submitterKeyId = cometBftRequestSigner.fingerprint,
                     kind = NetworkConfigChangeRequest.Kind.BootstrapConfigChangeRequest(
                       SvBootstrapConfigChangeRequest(
                         networkConfigChanges.requests.map(_.getNodeConfigChangeRequest)
@@ -245,7 +245,7 @@ class CometBftNode(
       .exists(state =>
         state.currentConfig.exists(config =>
           config.governanceKeys
-            .exists(_.pubKey == genesisSigner.PublicKeyBase64)
+            .exists(_.pubKey == genesisSigner.publicKeyBase64)
         )
       )
   }
@@ -288,8 +288,8 @@ class CometBftNode(
           ),
           governanceKeys = List(
             proto.cometbft.GovernanceKey(
-              cometBftRequestSigner.PublicKeyBase64,
-              cometBftRequestSigner.Fingerprint,
+              cometBftRequestSigner.publicKeyBase64,
+              cometBftRequestSigner.fingerprint,
             )
           ),
           // TODO(#5882): add support for sequencing keys

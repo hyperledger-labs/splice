@@ -244,7 +244,7 @@ create or replace view debug.med_response_aggregations as
   select
     debug.canton_timestamp(request_id) as request_id,
     mediator_confirmation_request,
-    version,
+    debug.canton_timestamp(finalization_time) as finalization_time,
     verdict,
     request_trace_context
   from med_response_aggregations;
@@ -293,8 +293,7 @@ create or replace view debug.par_reassignments as
     debug.canton_timestamp(unassignment_decision_time) as unassignment_decision_time,
     unassignment_result,
     contract,
-    debug.canton_timestamp(assignment_timestamp) as assignment_timestamp,
-    source_protocol_version
+    debug.canton_timestamp(assignment_timestamp) as assignment_timestamp
   from par_reassignments;
 
 create or replace view debug.par_journal_requests as
@@ -430,6 +429,7 @@ create or replace view debug.sequencer_members as
     member,
     id,
     debug.canton_timestamp(registered_ts) as registered_ts,
+    debug.canton_timestamp(pruned_previous_event_timestamp) as pruned_previous_event_timestamp,
     enabled
   from sequencer_members;
 
@@ -500,7 +500,6 @@ create or replace view debug.par_in_flight_submission as
     submission_synchronizer_id,
     message_id,
     debug.canton_timestamp(sequencing_timeout) as sequencing_timeout,
-    sequencer_counter,
     debug.canton_timestamp(sequencing_time) as sequencing_time,
     tracking_data,
     root_hash_hex,
@@ -519,7 +518,7 @@ create or replace view debug.par_settings as
 create or replace view debug.par_command_deduplication as
   select
     change_id_hash,
-    application_id,
+    user_id,
     command_id,
     act_as,
     offset_definite_answer,
@@ -628,14 +627,14 @@ create or replace view debug.ord_epochs as
     start_block_number,
     epoch_length,
     debug.canton_timestamp(topology_ts) as topology_ts,
-    debug.canton_timestamp(previous_epoch_max_ts) as previous_epoch_max_ts,
     in_progress
   from ord_epochs;
 
 create or replace view debug.ord_availability_batch as
   select
     id,
-    batch
+    batch,
+    epoch_number
   from ord_availability_batch;
 
 create or replace view debug.ord_pbft_messages_in_progress as
@@ -669,6 +668,13 @@ create or replace view debug.ord_metadata_output_epochs as
     epoch_number,
     could_alter_ordering_topology
   from ord_metadata_output_epochs;
+
+create or replace view debug.ord_output_lower_bound as
+  select
+    single_row_lock,
+    epoch_number,
+    block_number
+  from ord_output_lower_bound;
 
 create or replace view debug.common_static_strings as
   select

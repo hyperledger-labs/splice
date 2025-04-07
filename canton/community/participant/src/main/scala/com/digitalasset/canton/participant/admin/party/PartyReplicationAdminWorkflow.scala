@@ -80,14 +80,22 @@ class PartyReplicationAdminWorkflow(
       retrySubmitter
         .submitCommands(
           Commands(
-            applicationId = applicationId,
+            workflowId = "",
+            userId = userId,
             commandId = s"proposal-$partyReplicationIdS",
-            actAs = Seq(participantId.adminParty.toProtoPrimitive),
             commands = proposal.create.commands.asScala.toSeq
               .map(LedgerClientUtils.javaCodegenToScalaProto),
             deduplicationPeriod =
               DeduplicationDuration(syncService.maxDeduplicationDuration.toProtoPrimitive),
+            minLedgerTimeAbs = None,
+            minLedgerTimeRel = None,
+            actAs = Seq(participantId.adminParty.toProtoPrimitive),
+            readAs = Nil,
+            submissionId = "",
+            disclosedContracts = Nil,
             synchronizerId = synchronizerId.toProtoPrimitive,
+            packageIdSelectionPreference = Nil,
+            prefetchContractKeys = Nil,
           ),
           timeouts.default.asFiniteApproximation,
         )
@@ -154,13 +162,21 @@ class PartyReplicationAdminWorkflow(
         commandResult <- performUnlessClosingF(s"submit $commandId")(
           retrySubmitter.submitCommands(
             Commands(
-              applicationId = applicationId,
+              workflowId = "",
+              userId = userId,
               commandId = commandId,
-              actAs = Seq(participantId.adminParty.toProtoPrimitive),
               commands = exercise.asScala.toSeq.map(LedgerClientUtils.javaCodegenToScalaProto),
               deduplicationPeriod =
                 DeduplicationDuration(syncService.maxDeduplicationDuration.toProtoPrimitive),
+              minLedgerTimeAbs = None,
+              minLedgerTimeRel = None,
+              actAs = Seq(participantId.adminParty.toProtoPrimitive),
+              readAs = Nil,
+              submissionId = "",
+              disclosedContracts = Nil,
               synchronizerId = synchronizerId,
+              packageIdSelectionPreference = Nil,
+              prefetchContractKeys = Nil,
             ),
             timeouts.default.asFiniteApproximation,
           )
@@ -204,19 +220,23 @@ class PartyReplicationAdminWorkflow(
 
   override private[admin] def processReassignment(tx: Reassignment): Unit =
     if (
-      tx.event.assignedEvent.exists(
-        _.createdEvent
-          .exists(_.templateId.exists(isTemplatePartyReplicationRelated))
-      ) ||
-      tx.event.unassignedEvent.exists(
-        _.templateId.exists(isTemplatePartyReplicationRelated)
-      )
+      tx.events
+        .flatMap(_.event.assigned)
+        .exists(
+          _.createdEvent
+            .exists(_.templateId.exists(isTemplatePartyReplicationRelated))
+        ) ||
+      tx.events
+        .flatMap(_.event.unassigned)
+        .exists(
+          _.templateId.exists(isTemplatePartyReplicationRelated)
+        )
     ) {
       implicit val traceContext: TraceContext =
         LedgerClient.traceContextFromLedgerApi(tx.traceContext)
       // TODO(#20638): Should we archive unexpectedly reassigned party replication contracts or only warn?
       logger.warn(
-        s"Received unexpected reassignment of party replication related contract: ${tx.event}"
+        s"Received unexpected reassignment of party replication related contract: ${tx.events}"
       )
     }
 
@@ -292,7 +312,7 @@ object PartyReplicationAdminWorkflow {
       sourceParticipantIdO: Option[ParticipantId],
       serialO: Option[PositiveInt],
   )
-  private def applicationId = "PartyReplicationAdminWorkflow"
+  private def userId = "PartyReplicationAdminWorkflow"
 
   private def apiIdentifierFromJavaIdentifier(javaIdentifier: JavaIdentifier): Identifier =
     Identifier(

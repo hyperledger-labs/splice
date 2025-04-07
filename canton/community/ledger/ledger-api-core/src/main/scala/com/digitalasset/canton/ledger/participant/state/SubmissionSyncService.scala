@@ -3,12 +3,10 @@
 
 package com.digitalasset.canton.ledger.participant.state
 
-import com.digitalasset.canton.data.ProcessedDisclosedContract
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.LfKeyResolver
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
-import com.digitalasset.daml.lf.transaction.{GlobalKey, SubmittedTransaction}
-import com.digitalasset.daml.lf.value.Value
+import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction}
 
 import java.util.concurrent.CompletionStage
 
@@ -59,26 +57,29 @@ trait SubmissionSyncService {
     * [[com.digitalasset.canton.ledger.participant.state.SubmitterInfo.changeId]] within the
     * [[com.digitalasset.canton.ledger.participant.state.SubmitterInfo.deduplicationPeriod]].
     *
-    * @param submitterInfo
-    *   the information provided by the submitter for correlating this submission with its
-    *   acceptance or rejection on the associated
-    *   [[com.digitalasset.canton.ledger.participant.state.Update]].
-    * @param optSynchronizerId
-    *   the optional ID of the synchronizer on which the submitter wants the transaction to be
-    *   sequenced. if empty, the participant will automatically attempt to find a suitable
-    *   synchronizer based on the parties and contracts involved in the submission.
-    * @param transactionMeta
-    *   the meta-data accessible to all consumers of the transaction. See
-    *   [[com.digitalasset.canton.ledger.participant.state.TransactionMeta]] for more information.
     * @param transaction
     *   the submitted transaction. This transaction can contain local contract-ids that need
     *   suffixing. The participant state may have to suffix those contract-ids in order to
     *   guaranteed their global uniqueness. See the Contract Id specification for more detail
     *   daml-lf/spec/contract-id.rst.
-    * @param estimatedInterpretationCost
+    * @param synchronizerRank
+    *   The synchronizer rank based on which:
+    *   - the participant performs the required reassignments of the transaction's input contracts
+    *   - the participant routes the transaction to the synchronizer
+    * @param routingSynchronizerState
+    *   The synchronizer state used for synchronizer selection. This is subsequently used for
+    *   synchronizer routing.
+    * @param submitterInfo
+    *   the information provided by the submitter for correlating this submission with its
+    *   acceptance or rejection on the associated
+    *   [[com.digitalasset.canton.ledger.participant.state.Update]].
+    * @param transactionMeta
+    *   the meta-data accessible to all consumers of the transaction. See
+    *   [[com.digitalasset.canton.ledger.participant.state.TransactionMeta]] for more information.
+    * @param _estimatedInterpretationCost
     *   Estimated cost of interpretation that may be used for handling submitted transactions
     *   differently.
-    * @param globalKeyMapping
+    * @param keyResolver
     *   Input key mapping inferred by interpretation. The map should contain all contract keys that
     *   were used during interpretation. A value of None means no contract was found with this
     *   contract key.
@@ -86,13 +87,15 @@ trait SubmissionSyncService {
     *   Explicitly disclosed contracts used during interpretation.
     */
   def submitTransaction(
-      submitterInfo: SubmitterInfo,
-      optSynchronizerId: Option[SynchronizerId],
-      transactionMeta: TransactionMeta,
       transaction: SubmittedTransaction,
-      estimatedInterpretationCost: Long,
-      globalKeyMapping: Map[GlobalKey, Option[Value.ContractId]],
-      processedDisclosedContracts: ImmArray[ProcessedDisclosedContract],
+      synchronizerRank: SynchronizerRank,
+      routingSynchronizerState: RoutingSynchronizerState,
+      submitterInfo: SubmitterInfo,
+      transactionMeta: TransactionMeta,
+      // TODO(#23334): Consider removing since it's currently not used
+      _estimatedInterpretationCost: Long,
+      keyResolver: LfKeyResolver,
+      processedDisclosedContracts: ImmArray[FatContractInstance],
   )(implicit
       traceContext: TraceContext
   ): CompletionStage[SubmissionResult]
@@ -107,10 +110,9 @@ trait SubmissionSyncService {
     *
     * @param submitter
     *   The submitter of the reassignment.
-    * @param applicationId
-    *   An identifier for the Daml application that submitted the command. This is used for
-    *   monitoring, command deduplication, and to allow Daml applications subscribe to their own
-    *   submissions only.
+    * @param userId
+    *   An identifier for the user that submitted the command. This is used for monitoring, command
+    *   deduplication, and to allow Daml applications subscribe to their own submissions only.
     * @param commandId
     *   A submitter-provided identifier to identify an intended ledger change within all the
     *   submissions by the same parties and application.
@@ -120,16 +122,16 @@ trait SubmissionSyncService {
     * @param workflowId
     *   A submitter-provided identifier used for monitoring and to traffic-shape the work handled by
     *   Daml applications communicating over the ledger.
-    * @param reassignmentCommand
-    *   The command specifying this reassignment further.
+    * @param reassignmentCommands
+    *   The commands specifying this reassignment further.
     */
   def submitReassignment(
       submitter: Ref.Party,
-      applicationId: Ref.ApplicationId,
+      userId: Ref.UserId,
       commandId: Ref.CommandId,
       submissionId: Option[Ref.SubmissionId],
       workflowId: Option[Ref.WorkflowId],
-      reassignmentCommand: ReassignmentCommand,
+      reassignmentCommands: Seq[ReassignmentCommand],
   )(implicit
       traceContext: TraceContext
   ): CompletionStage[SubmissionResult]

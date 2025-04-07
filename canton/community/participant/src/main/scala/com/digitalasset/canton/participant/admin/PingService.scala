@@ -4,22 +4,23 @@
 package com.digitalasset.canton.participant.admin
 
 import cats.implicits.{toBifunctorOps, toFunctorFilterOps}
-import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.commands.Commands
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod.DeduplicationDuration
 import com.daml.ledger.api.v2.event.CreatedEvent as ScalaCreatedEvent
 import com.daml.ledger.api.v2.event.Event.Event
-import com.daml.ledger.api.v2.reassignment.Reassignment
+import com.daml.ledger.api.v2.reassignment.{Reassignment, ReassignmentEvent}
 import com.daml.ledger.api.v2.state_service.ActiveContract
 import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.api.v2.transaction_filter.TransactionFilter
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{Command, CreatedEvent as JavaCreatedEvent, Identifier}
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes.WorkflowId
 import com.digitalasset.canton.ledger.client.{LedgerClient, LedgerClientUtils}
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
@@ -41,7 +42,6 @@ import com.digitalasset.canton.participant.ledger.api.client.{
   CommandSubmitterWithRetry,
   LedgerConnection,
 }
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
@@ -110,7 +110,7 @@ class PingService(
     vacuumStaleContracts(synchronizerId)
   })
 
-  private def applicationId = "PingService"
+  private def userId = "PingService"
 
   override def onClosed(): Unit =
     // Note that we can not time out pings nicely here on shutdown as the admin
@@ -154,12 +154,19 @@ class PingService(
     retrySubmitter.submitCommands(
       Commands(
         workflowId = workflowId.map(Tag.unwrap).getOrElse(""),
-        applicationId = applicationId,
+        userId = userId,
         commandId = commandId,
-        actAs = Seq(adminPartyId.toProtoPrimitive),
         commands = cmds.map(LedgerClientUtils.javaCodegenToScalaProto),
         deduplicationPeriod = DeduplicationDuration(deduplicationDuration.toProtoPrimitive),
+        minLedgerTimeAbs = None,
+        minLedgerTimeRel = None,
+        actAs = Seq(adminPartyId.toProtoPrimitive),
+        readAs = Nil,
+        submissionId = "",
+        disclosedContracts = Nil,
         synchronizerId = synchronizerId.map(_.toProtoPrimitive).getOrElse(""),
+        packageIdSelectionPreference = Nil,
+        prefetchContractKeys = Nil,
       ),
       timeout.duration.toScala,
     )
@@ -421,10 +428,10 @@ object PingService {
     override private[admin] def processReassignment(tx: Reassignment): Unit = {
       implicit val traceContext: TraceContext =
         LedgerClient.traceContextFromLedgerApi(tx.traceContext)
-      tx.event match {
-        case Reassignment.Event.UnassignedEvent(value) =>
+      tx.events foreach {
+        case ReassignmentEvent(ReassignmentEvent.Event.Unassigned(value)) =>
         // we only look at assign events
-        case Reassignment.Event.AssignedEvent(event) =>
+        case ReassignmentEvent(ReassignmentEvent.Event.Assigned(event)) =>
           val process = for {
             target <- SynchronizerId.fromProtoPrimitive(event.target, "target")
             created <- ProtoConverter.required("createdEvent", event.createdEvent)
@@ -444,7 +451,7 @@ object PingService {
             logger.error(s"Failed to process reassignment: $err / $event")
           }
 
-        case Reassignment.Event.Empty =>
+        case ReassignmentEvent(ReassignmentEvent.Event.Empty) =>
       }
     }
 

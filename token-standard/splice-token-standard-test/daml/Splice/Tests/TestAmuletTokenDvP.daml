@@ -22,6 +22,7 @@ import DA.List (sortOn)
 import DA.Time
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
 import Splice.Api.Token.AllocationRequestV1
 import Splice.Api.Token.AllocationInstructionV1
@@ -33,6 +34,7 @@ import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
 import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
 
 -- | Test that a DvP settlement of an OTC trade works when using Amulet via the token standard.
 testDvP : Script ()
@@ -47,8 +49,8 @@ testDvP = script do
   AmuletRegistry.featureApp registry provider
 
   -- get some funds for alice and bob
-  AmuletRegistry.tapFaucet registry alice 1000.0
-  AmuletRegistry.tapFaucet registry bob 1000.0
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+  AmuletRegistry.tapLockedAndUnlockedFunds registry bob 1000.0
 
   let amuletId = registry.instrumentId
   let mkTransfer sender receiver amount = Api.Token.AllocationV1.TransferLeg with
@@ -76,10 +78,11 @@ testDvP = script do
 
   -- provider initiates settlement
   now <- getTime
+  let settleBefore = now `addRelTime` hours 2
   otcTradeCid <- submit provider $
     exerciseCmd proposalCid OTCTradeProposal_InitiateSettlement with
       prepareUntil = now `addRelTime` hours 1
-      settleBefore = now `addRelTime` hours 2
+      settleBefore
 
   -- check that the allocation request is present
   Some otcTrade <- queryContractId provider otcTradeCid
@@ -89,36 +92,49 @@ testDvP = script do
   aliceAlloc.transferLeg.amount === 100.0
 
   -- alice accepts allocation request directly via her wallet
-  inputHoldings <- WalletClient.listHoldingCids alice amuletId
+  inputHoldingCids <- WalletClient.listHoldingCids alice amuletId
+  holdings <- WalletClient.listHoldings alice amuletId
+  debug holdings
 
   -- test that using the wrong admin party fails
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = alice
     allocation = aliceAlloc
-    inputHoldings
+    inputHoldingCids
     extraArgs = emptyExtraArgs
   submitWithDisclosuresMustFail' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- alice accepts allocation request directly via her wallet
+  -- TODO(#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
+  debug inputHoldingCids
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = aliceAlloc
-    inputHoldings
+    inputHoldingCids
     extraArgs = emptyExtraArgs
   submitWithDisclosures' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  -- check lock context
+  [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
+  let expectedLock = Some $ Lock with
+        expiresAt = Some settleBefore
+        expiresAfter = None
+        holders = [registry.dso]
+        context = Some "allocation for transfer leg 0 to 'bob'"
+  lockedHolding.lock === expectedLock
 
   -- Bob sees the allocation request in his wallet as well
   [bobAlloc] <- WalletClient.listRequestedAllocations bob amuletId
   bobAlloc.transferLeg.amount === 20.0
 
   -- bob accepts allocation request directly via her wallet
-  inputHoldings <- WalletClient.listHoldingCids bob amuletId
+  inputHoldingCids <- WalletClient.listHoldingCids bob amuletId
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso
     allocation = bobAlloc
-    inputHoldings
+    inputHoldingCids
     extraArgs = emptyExtraArgs
   submitWithDisclosures' bob enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg

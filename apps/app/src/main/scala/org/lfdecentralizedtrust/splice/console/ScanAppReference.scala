@@ -50,7 +50,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
   transferinstructionv1,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAdminAppClient
 
+import scala.jdk.OptionConverters.*
 import java.time.Instant
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
@@ -518,6 +524,60 @@ abstract class ScanAppReference(
   ): ChoiceContextWithDisclosures = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetAllocationTransferContext(allocationId))
+    }
+  }
+
+  @Help.Summary("List vote requests")
+  def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListVoteRequests
+      )
+    }
+  }
+
+  @Help.Summary("Get the latest vote request trackingCid")
+  def getLatestVoteRequestTrackingCid(): VoteRequest.ContractId = {
+    val latestVoteRequest = this
+      .listVoteRequests()
+      .headOption
+      .getOrElse(
+        throw new RuntimeException("No latest vote request found")
+      )
+    latestVoteRequest.payload.trackingCid.toScala.getOrElse(latestVoteRequest.contractId)
+  }
+
+  @Help.Summary("Lookup vote request")
+  def lookupVoteRequest(
+      trackingCid: VoteRequest.ContractId
+  ): Contract[VoteRequest.ContractId, VoteRequest] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.LookupVoteRequest(trackingCid)()
+      )
+    }
+  }
+
+  @Help.Summary("List vote results")
+  def listVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: BigInt,
+  ): Seq[DsoRules_CloseVoteRequestResult] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListVoteRequestResults(
+          actionName,
+          accepted,
+          requester,
+          effectiveFrom,
+          effectiveTo,
+          limit,
+        )
+      )
     }
   }
 }

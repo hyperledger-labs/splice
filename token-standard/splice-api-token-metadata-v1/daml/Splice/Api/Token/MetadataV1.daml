@@ -93,27 +93,3 @@ data ChoiceExecutionMetadata = ChoiceExecutionMetadata with
     meta : Metadata
       -- ^ Additional metadata specific to the result of exercising the choice, used for extensibility.
   deriving (Show, Eq)
-
-
--- | Installation of a registry app by an app user organization, e.g., an
--- investor. Used to provide app-user specific metadata and URLs for off-ledger
--- API endpoints.
-interface RegistryAppInstall where viewtype RegistryAppInstallView
-
--- | View for `RegistryAppInstall`.
-data RegistryAppInstallView = RegistryAppInstallView
-  with
-    appUser : Party
-      -- ^ Party using the registry app.
-      --
-      -- For example, an investor using the registry app to manage their holdings
-      -- of financial instruments administered by the registry app.
-    instrumentAdmin : Party
-      -- ^ The party representing the registry app that administers the instrument.
-      --
-      -- There SHOULD be a `RegistryAppInstall` for every `admin` party referenced
-      -- in an `InstrumentId` of an app user's `Holding`.
-    meta : Metadata
-      -- ^ Registry app installation metadata that is specific to the app user.
-      -- Used in particular to provide the URL for the registry app's off-ledger API.
-  deriving (Eq, Show)

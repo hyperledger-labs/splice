@@ -423,7 +423,7 @@ object MultiDomainAcsStore {
 
     def toTransactionFilter: LapiTransactionFilter =
       LapiTransactionFilter(
-        Map(
+        filtersByParty = Map(
           primaryParty.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
             Seq(
               CumulativeFilter(
@@ -433,7 +433,8 @@ object MultiDomainAcsStore {
               )
             )
           )
-        )
+        ),
+        filtersForAnyParty = None,
       )
   }
 
@@ -582,11 +583,12 @@ object MultiDomainAcsStore {
   }
 
   trait IngestionSink {
+    import IngestionSink.*
 
     def ingestionFilter: IngestionFilter
 
-    /** Must be the first method called. Returns the last ingested offset, if any. */
-    def initialize()(implicit traceContext: TraceContext): Future[Option[Long]]
+    /** Must be the first method called. Returns information about where and how to start ingestion. */
+    def initialize()(implicit traceContext: TraceContext): Future[IngestionStart]
 
     def ingestAcs(
         offset: Long,
@@ -598,6 +600,32 @@ object MultiDomainAcsStore {
     def ingestUpdate(domain: SynchronizerId, transfer: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit]
+  }
+
+  object IngestionSink {
+    sealed trait IngestionStart
+
+    object IngestionStart {
+
+      /** Ingestion service should ingest the ACS at an offset chosen by the service,
+        * then resume ingesting updates from there
+        */
+      final case object InitializeAcsAtLatestOffset extends IngestionStart
+
+      /** Ingestion service should ingest the ACS at the specified offset,
+        * then resume ingesting updates from there
+        */
+      final case class InitializeAcsAtOffset(
+          offset: Long
+      ) extends IngestionStart
+
+      /** Ingestion service should resume ingesting updates from the specified offset
+        */
+      final case class ResumeAtOffset(
+          offset: Long
+      ) extends IngestionStart
+    }
+
   }
 
   // The state of a contract in the store. Note that, contrary to `ContractState`, this can

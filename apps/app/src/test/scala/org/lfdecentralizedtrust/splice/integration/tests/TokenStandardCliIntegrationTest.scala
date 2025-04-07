@@ -16,9 +16,6 @@ class TokenStandardCliIntegrationTest
     with ExternallySignedPartyTestUtil
     with HasTempDirectory {
 
-  // TODO (#17384): support token standard choices in the script
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   "Token Standard CLI" should {
 
     "execute transfers between external parties" in { implicit env =>
@@ -116,10 +113,14 @@ class TokenStandardCliIntegrationTest
             "http://localhost:6201", // not available in any config
             "-a",
             aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
+            "-u",
+            "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
           )
           val exitCode = Process(args, cwd).!(logProcessor)
           // TODO (#18610): check that recordtime and updateid are present
-          readLines.last should be("{}")
+          inside(readLines) { case _ :+ last =>
+            last should be("{}")
+          }
           if (exitCode != 0) {
             logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
             readLines.foreach(logger.error(_)(TraceContext.empty))

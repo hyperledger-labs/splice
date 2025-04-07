@@ -4,8 +4,8 @@
 package com.digitalasset.canton.logging.pretty
 
 import cats.Show.Shown
-import com.daml.error.utils.DecodedCantonError
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.config.RequireTypes.{Port, RefinedNumeric}
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.protocol.*
@@ -13,13 +13,7 @@ import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.HashLength
 import com.digitalasset.canton.util.{ErrorUtil, HexString}
-import com.digitalasset.canton.{
-  LedgerApplicationId,
-  LfPartyId,
-  LfTimestamp,
-  LfVersioned,
-  Uninhabited,
-}
+import com.digitalasset.canton.{LedgerUserId, LfPartyId, LfTimestamp, LfVersioned, Uninhabited}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
 import com.digitalasset.daml.lf.transaction.ContractStateMachine.ActiveLedgerState
@@ -151,7 +145,7 @@ trait PrettyInstances {
 
   implicit def prettyLfParticipantId: Pretty[Ref.ParticipantId] = prettyOfString(prettyUidString(_))
 
-  implicit def prettyLedgerApplicationId: Pretty[LedgerApplicationId] = prettyOfString(
+  implicit def prettyLedgerUserId: Pretty[LedgerUserId] = prettyOfString(
     prettyUidString(_)
   )
 

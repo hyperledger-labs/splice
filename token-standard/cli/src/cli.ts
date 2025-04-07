@@ -63,6 +63,10 @@ export function createProgram() {
         "-R --transfer-factory-registry-url <value>",
         "The URL to a transfer registry."
       )
+      .requiredOption(
+        "-u, --user-id <value>",
+        "The user id, must match the user in the token"
+      )
       .action(transfer)
   );
 

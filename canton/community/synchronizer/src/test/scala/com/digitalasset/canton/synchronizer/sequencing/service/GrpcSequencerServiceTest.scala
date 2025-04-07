@@ -26,6 +26,12 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerParameters
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
+import com.digitalasset.canton.synchronizer.service.{
+  RecordStreamObserverItems,
+  StreamComplete,
+  StreamError,
+  StreamNext,
+}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.{SynchronizerTopologyClient, TopologySnapshot}
@@ -47,7 +53,6 @@ import com.digitalasset.canton.{
   BaseTest,
   HasExecutionContext,
   ProtocolVersionChecksFixtureAsyncWordSpec,
-  SequencerCounter,
 }
 import com.google.protobuf.ByteString
 import io.grpc.Status.Code.*
@@ -59,7 +64,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.FixtureAsyncWordSpec
 import org.scalatest.{Assertion, FutureOutcome}
 
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 
@@ -243,15 +247,11 @@ class GrpcSequencerServiceTest
     ): SignedContent[BytestringWithCryptographicEvidence] =
       signedContent(request.toByteString)
 
-    def sendProto(
-        versionedSignedRequest: ByteString
-    )(implicit
-        env: Environment
-    ): Future[Unit] = {
+    def sendProto(signedRequest: ByteString)(implicit env: Environment): Future[Unit] = {
       import env.*
 
-      val requestP = v30.SendAsyncVersionedRequest(versionedSignedRequest)
-      val response = service.sendAsyncVersioned(requestP)
+      val requestP = v30.SendAsyncRequest(signedRequest)
+      val response = service.sendAsync(requestP)
 
       response.map(_ => ())
     }
@@ -565,10 +565,13 @@ class GrpcSequencerServiceTest
 
   "versionedSubscribe" should {
     "return error if called with observer not capable of observing server calls" in { env =>
-      val observer = new MockStreamObserver[v30.VersionedSubscriptionResponse]()
+      val observer = new MockStreamObserver[v30.SubscriptionResponse]()
       loggerFactory.suppressWarningsAndErrors {
-        env.service.subscribeVersioned(
-          v30.SubscriptionRequest(member = "", counter = 0L),
+        env.service.subscribeV2(
+          v30.SubscriptionRequestV2(
+            member = "",
+            timestamp = Some(CantonTimestamp.Epoch.toProtoPrimitive),
+          ),
           observer,
         )
       }
@@ -579,8 +582,14 @@ class GrpcSequencerServiceTest
     }
 
     "return error if request cannot be deserialized" in { env =>
-      val observer = new MockServerStreamObserver[v30.VersionedSubscriptionResponse]()
-      env.service.subscribeVersioned(v30.SubscriptionRequest(member = "", counter = 0L), observer)
+      val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
+      env.service.subscribeV2(
+        v30.SubscriptionRequestV2(
+          member = "",
+          timestamp = Some(CantonTimestamp.Epoch.toProtoPrimitive),
+        ),
+        observer,
+      )
 
       observer.items.toSeq should matchPattern {
         case Seq(StreamError(err: StatusException)) if err.getStatus.getCode == INVALID_ARGUMENT =>
@@ -588,11 +597,11 @@ class GrpcSequencerServiceTest
     }
 
     "return error if pool registration fails" in { env =>
-      val observer = new MockServerStreamObserver[v30.VersionedSubscriptionResponse]()
+      val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
       val requestP =
-        SubscriptionRequest(
+        SubscriptionRequestV2(
           participant,
-          SequencerCounter.Genesis,
+          timestamp = None,
           testedProtocolVersion,
         ).toProtoV30
 
@@ -605,7 +614,7 @@ class GrpcSequencerServiceTest
         )
         .thenReturn(Left(PoolClosed))
 
-      env.service.subscribeVersioned(requestP, observer)
+      env.service.subscribeV2(requestP, observer)
 
       inside(observer.items.loneElement) { case StreamError(ex: StatusException) =>
         ex.getStatus.getCode shouldBe UNAVAILABLE
@@ -614,16 +623,16 @@ class GrpcSequencerServiceTest
     }
 
     "return error if sending request with member that is not authenticated" in { env =>
-      val observer = new MockServerStreamObserver[v30.VersionedSubscriptionResponse]()
+      val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
       val requestP =
-        SubscriptionRequest(
+        SubscriptionRequestV2(
           ParticipantId("Wrong participant"),
-          SequencerCounter.Genesis,
+          timestamp = Some(CantonTimestamp.Epoch),
           testedProtocolVersion,
         ).toProtoV30
 
       loggerFactory.suppressWarningsAndErrors {
-        env.service.subscribeVersioned(requestP, observer)
+        env.service.subscribeV2(requestP, observer)
       }
 
       observer.items.toSeq should matchPattern {
@@ -679,12 +688,13 @@ class GrpcSequencerServiceTest
       }
       val parsed = observer.items.toSeq.map {
         case StreamNext(response: v30.DownloadTopologyStateForInitResponse) =>
-          StreamNext(
+          StreamNext[TopologyStateForInitResponse](
             TopologyStateForInitResponse
               .fromProtoV30(response)
               .getOrElse(sys.error("error converting response from protobuf"))
           )
-        case otherwise => otherwise
+        case StreamComplete => StreamComplete
+        case StreamError(t) => StreamError(t)
       }
       parsed should matchPattern {
         case Seq(
@@ -702,14 +712,6 @@ class GrpcSequencerServiceTest
 }
 
 private object GrpcSequencerServiceTest {
-  sealed trait StreamItem
-
-  final case class StreamNext[A](value: A) extends StreamItem
-
-  final case class StreamError(t: Throwable) extends StreamItem
-
-  object StreamComplete extends StreamItem
-
   class MockStreamObserver[T] extends StreamObserver[T] with RecordStreamObserverItems[T]
 
   class MockServerStreamObserver[T]
@@ -730,18 +732,6 @@ private object GrpcSequencerServiceTest {
     override def request(count: Int): Unit = ???
 
     override def setMessageCompression(enable: Boolean): Unit = ???
-  }
-
-  trait RecordStreamObserverItems[T] {
-    this: StreamObserver[T] =>
-
-    val items: mutable.Buffer[StreamItem] = mutable.Buffer[StreamItem]()
-
-    override def onNext(value: T): Unit = items += StreamNext(value)
-
-    override def onError(t: Throwable): Unit = items += StreamError(t)
-
-    override def onCompleted(): Unit = items += StreamComplete
   }
 
   class MockSubscription extends CloseNotification with AutoCloseable {

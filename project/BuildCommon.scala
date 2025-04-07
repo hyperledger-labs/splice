@@ -367,6 +367,27 @@ object BuildCommon {
       )
   }
 
+  lazy val `canton-base-errors` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-base-errors", file("canton/base/errors"))
+      .dependsOn(
+        `canton-google-common-protos-scala`,
+        `canton-wartremover-extension` % "compile->compile;test->test",
+      )
+      .settings(
+        sharedCantonSettings,
+        libraryDependencies ++= Seq(
+          slf4j_api,
+          grpc_api,
+          reflections,
+          scalatest % Test,
+          scalacheck % Test,
+          scalatestScalacheck % Test,
+        ),
+      )
+  }
+
   lazy val `canton-daml-tls` = {
     import CantonDependencies._
     sbt.Project
@@ -471,7 +492,7 @@ object BuildCommon {
     sbt.Project
       .apply("canton-util-logging", file("canton/community/util-logging"))
       .dependsOn(
-        `canton-daml-errors`,
+        `canton-base-errors` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
@@ -519,6 +540,7 @@ object BuildCommon {
         // commented out from Canton OS repo as settings don't apply to us
         //      sharedAppSettings,
         disableTests,
+        removeTestSources,
         libraryDependencies ++= Seq(
           scala_logging,
           jul_to_slf4j,
@@ -604,6 +626,7 @@ object BuildCommon {
         `canton-bindings-java`,
         `canton-community-admin-api`,
         `canton-kms-driver-api`,
+        `canton-scalatest-addon` % "compile->test",
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -730,6 +753,11 @@ object BuildCommon {
         // depend on incompatible versions of `scala-xml` -- not ideal but only causes possible
         // runtime errors while testing and none have been found so far, so this should be fine for now
         dependencyOverrides += "org.scala-lang.modules" %% "scala-xml" % "2.0.1",
+        libraryDependencies ++= Seq(
+          toxiproxy_java,
+          opentelemetry_proto,
+          daml_http_test_utils,
+        ),
 
         // This library contains a lot of testing helpers that previously existing in testing scope
         // As such, in order to minimize the diff when creating this library, the same rules that
@@ -1099,6 +1127,18 @@ object BuildCommon {
 
   }
 
+  lazy val `canton-scalatest-addon` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-scalatest-addon", file("canton/community/lib/scalatest"))
+      .settings(
+        sharedSettings,
+        libraryDependencies += scalatest,
+        // Exclude to apply our license header to any Scala files
+        headerSources / excludeFilter := "*.scala",
+      )
+  }
+
   lazy val `canton-daml-errors` = {
     import CantonDependencies._
     sbt.Project
@@ -1198,6 +1238,7 @@ object BuildCommon {
     sbt.Project
       .apply("canton-ledger-api-core", file("canton/community/ledger/ledger-api-core"))
       .dependsOn(
+        `canton-base-errors` % "test->test",
         `canton-ledger-common` % "compile->compile;test->test",
         `canton-community-common` % "compile->compile;test->test",
         `canton-daml-adjustable-clock` % "test->test",

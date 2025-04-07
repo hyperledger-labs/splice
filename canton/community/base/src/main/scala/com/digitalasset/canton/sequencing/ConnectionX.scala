@@ -4,7 +4,7 @@
 package com.digitalasset.canton.sequencing
 
 import com.digitalasset.canton.health.AtomicHealthElement
-import com.digitalasset.canton.lifecycle.{FlagCloseable, OnShutdownRunner}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, HasRunOnClosing}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
 import com.digitalasset.canton.networking.Endpoint
@@ -48,15 +48,15 @@ object ConnectionX {
     * then be handled in a round-robin load balancing way.
     *
     * @param name
-    *   an identifier for this connection
+    *   An identifier for this connection.
     * @param endpoint
-    *   connection endpoint (host and port)
+    *   Connection endpoint (host and port).
     * @param transportSecurity
-    *   whether the connection uses TLS
+    *   Whether the connection uses TLS.
     * @param customTrustCertificates
-    *   custom X.509 certificates in PEM format, defined if using TLS
+    *   Custom X.509 certificates in PEM format, defined if using TLS.
     * @param tracePropagation
-    *   trace propagation mode used for this connection
+    *   Trace propagation mode used for this connection.
     */
   final case class ConnectionXConfig(
       name: String,
@@ -68,7 +68,7 @@ object ConnectionX {
 
   class ConnectionXHealth(
       override val name: String,
-      override val associatedOnShutdownRunner: OnShutdownRunner,
+      override val associatedHasRunOnClosing: HasRunOnClosing,
       protected override val logger: TracedLogger,
   ) extends AtomicHealthElement {
     override type State = ConnectionXState

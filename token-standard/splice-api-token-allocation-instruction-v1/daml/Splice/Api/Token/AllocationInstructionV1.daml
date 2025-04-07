@@ -114,7 +114,7 @@ interface AllocationFactory where
         -- that check the expected admin party.
       allocation : AllocationView
         -- ^ The target allocation which should be instructed.
-      inputHoldings : [ContractId Holding]
+      inputHoldingCids : [ContractId Holding]
         -- ^ The holdings that SHOULD be used to fund the allocation.
         --
         -- MAY be empty for registries that do not represent their holdings on-ledger; or

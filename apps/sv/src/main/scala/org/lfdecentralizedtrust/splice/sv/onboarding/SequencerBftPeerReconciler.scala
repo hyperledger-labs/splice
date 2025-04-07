@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 import cats.implicits.*
 import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer.P2PEndpointConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.Uri

@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.daml.error.ContextualizedErrorLogger
-import com.daml.error.ErrorCode.LoggedApiException
 import com.daml.ledger.api.v2.command_submission_service.{
   CommandSubmissionServiceGrpc,
   SubmitReassignmentRequest,
@@ -16,6 +14,8 @@ import com.daml.ledger.api.v2.commands.Commands
 import com.daml.metrics.Timed
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.tracing.{SpanAttribute, Telemetry, TelemetryContext}
+import com.digitalasset.base.error.ContextualizedErrorLogger
+import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
 import com.digitalasset.canton.ledger.api.validation.{CommandsValidator, SubmitRequestValidator}
@@ -85,7 +85,7 @@ final class ApiCommandSubmissionService(
       .map {
         case allCommands @ Commands(
               workflowId,
-              applicationId,
+              userId,
               commandId,
               commands,
               deduplicationPeriod,
@@ -102,7 +102,7 @@ final class ApiCommandSubmissionService(
           tracker.registerCommand(
             commandId,
             Option.when(submissionId.nonEmpty)(submissionId),
-            applicationId,
+            userId,
             commands,
             actAs = allCommands.actAs.toSet,
           )(loggingContextWithTrace.traceContext)
@@ -140,9 +140,9 @@ final class ApiCommandSubmissionService(
     implicit val loggingContextWithTrace: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory, telemetry)
 
-    request.reassignmentCommand.foreach { command =>
+    request.reassignmentCommands.foreach { command =>
       telemetryContext
-        .setAttribute(SpanAttribute.ApplicationId, command.applicationId)
+        .setAttribute(SpanAttribute.UserId, command.userId)
         .setAttribute(SpanAttribute.CommandId, command.commandId)
         .setAttribute(SpanAttribute.Submitter, command.submitter)
         .setAttribute(SpanAttribute.WorkflowId, command.workflowId)
@@ -152,7 +152,7 @@ final class ApiCommandSubmissionService(
       ErrorLoggingContext.fromOption(
         logger,
         loggingContextWithTrace,
-        requestWithSubmissionId.reassignmentCommand.map(_.submissionId),
+        requestWithSubmissionId.reassignmentCommands.map(_.submissionId),
       )
     Timed
       .value(
@@ -166,11 +166,11 @@ final class ApiCommandSubmissionService(
           submissionSyncService
             .submitReassignment(
               submitter = request.submitter,
-              applicationId = request.applicationId,
+              userId = request.userId,
               commandId = request.commandId,
               submissionId = Some(request.submissionId),
               workflowId = request.workflowId,
-              reassignmentCommand = request.reassignmentCommand match {
+              reassignmentCommands = request.reassignmentCommands.map {
                 case Left(assignCommand) =>
                   ReassignmentCommand.Assign(
                     sourceSynchronizer = assignCommand.sourceSynchronizerId,
@@ -200,8 +200,8 @@ final class ApiCommandSubmissionService(
   private def generateSubmissionIdIfEmpty(
       request: SubmitReassignmentRequest
   ): SubmitReassignmentRequest =
-    if (request.reassignmentCommand.exists(_.submissionId.isEmpty))
-      request.update(_.reassignmentCommand.submissionId := submissionIdGenerator.generate())
+    if (request.reassignmentCommands.exists(_.submissionId.isEmpty))
+      request.update(_.reassignmentCommands.submissionId := submissionIdGenerator.generate())
     else
       request
 

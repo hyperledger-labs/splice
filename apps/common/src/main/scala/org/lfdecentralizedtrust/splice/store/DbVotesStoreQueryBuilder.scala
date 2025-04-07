@@ -8,6 +8,8 @@ import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, TxLogQueries}
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import slick.dbio.{Effect, NoStream}
@@ -16,11 +18,14 @@ import slick.sql.SqlStreamingAction
 
 /** All column names will be unsafely interpolated, as they're expected to be constant strings.
   */
-trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLogging {
+trait DbVotesTxLogStoreQueryBuilder[TXE]
+    extends TxLogQueries[TXE]
+    with LimitHelpers
+    with NamedLogging {
 
   def listVoteRequestResultsQuery(
       txLogTableName: String,
-      storeId: Int,
+      txLogStoreId: TxLogStoreId,
       dbType: String3,
       actionNameColumnName: String,
       acceptedColumnName: String,
@@ -77,17 +82,22 @@ trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLo
     )
     val whereClause = conditions.reduceLeft((a, b) => (a ++ sql""" and """ ++ b).toActionBuilder)
 
-    TxLogQueries.selectFromTxLogTable(
+    selectFromTxLogTable(
       txLogTableName,
-      storeId,
+      txLogStoreId,
       where = whereClause.toActionBuilder,
       orderLimit = sql"""order by #$effectiveAtColumnName desc limit ${sqlLimit(limit)}""",
     )
   }
+}
+
+/** All column names will be unsafely interpolated, as they're expected to be constant strings.
+  */
+trait DbVotesAcsStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLogging {
 
   def listVoteRequestsByTrackingCidQuery(
       acsTableName: String,
-      storeId: Int,
+      acsStoreId: AcsStoreId,
       domainMigrationId: Long,
       trackingCidColumnName: String,
       trackingCids: Seq[VoteRequest.ContractId],
@@ -98,7 +108,7 @@ trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLo
     val voteRequestTrackingCidsSql = inClause(trackingCids)
     selectFromAcsTable(
       acsTableName,
-      storeId,
+      acsStoreId,
       domainMigrationId,
       where = (sql""" template_id_qualified_name = ${QualifiedName(
           VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
@@ -110,7 +120,7 @@ trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLo
 
   def lookupVoteRequestQuery(
       acsTableName: String,
-      storeId: Int,
+      acsStoreId: AcsStoreId,
       domainMigrationId: Long,
       trackingCidColumnName: String,
       voteRequestCid: VoteRequest.ContractId,
@@ -121,7 +131,7 @@ trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLo
   ], NoStream, Effect.Read] = {
     selectFromAcsTable(
       acsTableName,
-      storeId,
+      acsStoreId,
       domainMigrationId,
       where = (sql""" template_id_qualified_name = ${QualifiedName(
           VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID

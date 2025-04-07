@@ -123,15 +123,19 @@ If the update fails, Flyway will revert the entire migration.
 ### Handling old data (store_descriptors version)
 
 If populating the new column with SQL is not possible, you can force the store to re-ingest the **entire** ACS and all transactions thereafter.
-To do so, you just need to increment the version of the `storeDescriptor` of the store you want to change:
+To do so, you just need to increment the version of the `acsStoreDescriptor` of the store you want to change:
 
 ```scala
 // DbXXXStore
-storeDescriptor = StoreDescriptor(
+acsStoreDescriptor = StoreDescriptor(
   version = 42, // assuming it was previously 41
   // Do not modify the values for the other fields
 )
 ```
+
+Modifying the `acsStoreDescriptor` will not affect existing TxLog entries.
+The TxLog uses a separate descriptor `txLogDescriptor` (which may also be identical to the ACS descriptor).
+Modifying the `txLogDescriptor` will force the store to discard **all** existing TxLog entries and start re-ingesting from the current offset.
 
 ## Modifying the contract filter of a store
 

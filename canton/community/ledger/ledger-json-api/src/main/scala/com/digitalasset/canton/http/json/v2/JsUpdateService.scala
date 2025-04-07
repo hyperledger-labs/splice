@@ -16,7 +16,6 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsTransaction,
   JsTransactionTree,
 }
-import com.digitalasset.canton.http.json.v2.Protocol.Protocol
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.*
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -99,6 +98,7 @@ class JsUpdateService(
         update_service.GetTransactionByOffsetRequest(
           offset = req.in._1,
           requestingParties = req.in._2,
+          transactionFormat = None,
         )
       )
       .flatMap(protocolConverters.GetTransactionTreeResponse.toJson(_))
@@ -145,6 +145,7 @@ class JsUpdateService(
           update_service.GetTransactionByIdRequest(
             updateId = req.in._1,
             requestingParties = req.in._2,
+            transactionFormat = None,
           )
         )
         .flatMap { tr =>
@@ -154,8 +155,7 @@ class JsUpdateService(
     }
 
   private def getFlats(
-      caller: CallerContext,
-      protocol: Protocol,
+      caller: CallerContext
   ): TracedInput[Unit] => Flow[update_service.GetUpdatesRequest, JsGetUpdatesResponse, NotUsed] =
     req => {
       implicit val token = caller.token()
@@ -163,14 +163,11 @@ class JsUpdateService(
       prepareSingleWsStream(
         updateServiceClient(caller.token())(TraceContext.empty).getUpdates,
         (r: update_service.GetUpdatesResponse) => protocolConverters.GetUpdatesResponse.toJson(r),
-        protocol = protocol,
-        withCloseDelay = true,
       )
     }
 
   private def getTrees(
-      caller: CallerContext,
-      protocol: Protocol,
+      caller: CallerContext
   ): TracedInput[Unit] => Flow[
     update_service.GetUpdatesRequest,
     JsGetUpdateTreesResponse,
@@ -183,8 +180,6 @@ class JsUpdateService(
         updateServiceClient(caller.token()).getUpdateTrees,
         (r: update_service.GetUpdateTreesResponse) =>
           protocolConverters.GetUpdateTreesResponse.toJson(r),
-        protocol = protocol,
-        withCloseDelay = true,
       )
     }
 
@@ -303,7 +298,7 @@ final case class JsReassignment(
     commandId: String,
     workflowId: String,
     offset: Long,
-    event: JsReassignmentEvent.JsReassignmentEvent,
+    events: Seq[JsReassignmentEvent.JsReassignmentEvent],
     traceContext: Option[com.daml.ledger.api.v2.trace_context.TraceContext],
     recordTime: com.google.protobuf.timestamp.Timestamp,
 )
@@ -329,7 +324,6 @@ object JsUpdateTree {
   final case class OffsetCheckpoint(value: offset_checkpoint.OffsetCheckpoint) extends Update
   final case class Reassignment(value: JsReassignment) extends Update
   final case class TransactionTree(value: JsTransactionTree) extends Update
-  final case class TopologyTransaction(value: JsTopologyTransaction) extends Update
 }
 
 final case class JsGetUpdateTreesResponse(
@@ -377,8 +371,6 @@ object JsUpdateServiceCodecs {
   implicit val jsUpdateTree: Codec[JsUpdateTree.Update] = deriveCodec
   implicit val jsUpdateTreeReassignment: Codec[JsUpdateTree.Reassignment] = deriveCodec
   implicit val jsUpdateTreeTransaction: Codec[JsUpdateTree.TransactionTree] = deriveCodec
-  implicit val jsUpdateTreeTopologyTransaction: Codec[JsUpdateTree.TopologyTransaction] =
-    deriveCodec
 
   // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))

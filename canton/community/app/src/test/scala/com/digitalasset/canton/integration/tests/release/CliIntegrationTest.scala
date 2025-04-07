@@ -42,8 +42,8 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
     "WARN  org.jline - Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)"
   private lazy val jsonTtyWarning =
     "\"message\":\"Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)\",\"logger_name\":\"org.jline\",\"thread_name\":\"main\",\"level\":\"WARN\""
-  private lazy val commitmentCatchUpWarning =
-    "\"message\":\"The participant has activated ACS catchup mode to combat computation problem\",\"logger_name\":\"c.d.c.p.p.AcsCommitmentProcessor\",\"level\":\"WARN\""
+  private lazy val regexpCommitmentCatchUpWarning =
+    "WARN  c\\.d\\.c\\.p\\.p\\.AcsCommitmentProcessor:(.)*ACS_COMMITMENT_DEGRADATION(.)*The participant has activated ACS catchup mode to combat computation problem.(.)*"
 
   // Message printed out by the bootstrap script if Canton is started successfully
   private lazy val successMsg = "The last emperor is always the worst."
@@ -56,7 +56,7 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
       s"$cantonBin --help" ! processLogger
       checkOutput(
         processLogger,
-        shouldContain = Seq("Usage: canton [daemon|run|generate] [options] <args>..."),
+        shouldContain = Seq("Usage: canton [daemon|run|generate|sandbox] [options] <args>..."),
       )
     }
 
@@ -64,7 +64,7 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
       s"$cantonBin" ! processLogger
       checkOutput(
         processLogger,
-        shouldContain = Seq("Usage: canton [daemon|run|generate] [options] <args>..."),
+        shouldContain = Seq("Usage: canton [daemon|run|generate|sandbox] [options] <args>..."),
         shouldSucceed = false,
       )
     }
@@ -86,6 +86,35 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
       processLogger =>
         s"$cantonBin --config $simpleConf -C canton.participants.participant1.parameters.admin-workflow.bong-test-max-level=9000 $cantonShouldStartFlags" ! processLogger
         checkOutput(processLogger, shouldContain = Seq(successMsg))
+    }
+
+    "successfully start canton sandbox" in { processLogger =>
+      s"$cantonBin sandbox --exit-after-bootstrap" ! processLogger
+      checkOutput(processLogger, shouldContain = Seq("Canton sandbox is ready"))
+    }
+
+    "successfully start canton sandbox on bespoke ports" in { processLogger =>
+      val portNames = List(
+        "ledger-api-port",
+        "admin-api-port",
+        "json-api-port",
+        "sequencer-public-port",
+        "sequencer-admin-port",
+        "mediator-admin-port",
+      )
+      val portNamesWithValues = portNames.zip(5500 until 5500 + portNames.length)
+      val portsArgString = portNamesWithValues.foldLeft("") { (acc, elem) =>
+        acc + s"--${elem._1} ${elem._2} "
+      }
+      val portsAsserts = portNamesWithValues.map(elem => s"port=\"${elem._2}\"")
+      val sandboxLogName = "log/new-sandbox.log"
+      Process(s"rm -f $sandboxLogName", Some(new java.io.File(cantonDir))) !;
+      s"$cantonBin sandbox --exit-after-bootstrap $portsArgString --log-file-name $sandboxLogName" ! processLogger
+      checkOutput(processLogger, Seq("Canton sandbox is ready"))
+      val logFile = File(sandboxLogName)
+      assert(logFile.exists)
+      val contents = logFile.contentAsString
+      portsAsserts.foreach(portLine => assert(contents.contains(portLine)))
     }
 
     "successfully start a Canton node when configured only using -C" in { processLogger =>
@@ -200,7 +229,7 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
 
       val expectedLine =
         // user-manual-entry-begin: LogNumThreads
-        "INFO  c.d.c.e.EnterpriseEnvironment - Deriving 12 as number of threads from '-Dscala.concurrent.context.numThreads'."
+        "INFO  c.d.canton.environment.Environment - Deriving 12 as number of threads from '-Dscala.concurrent.context.numThreads'."
       // user-manual-entry-end: LogNumThreads
 
       forAtLeast(1, logLines)(_ should endWith(expectedLine))
@@ -238,7 +267,9 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
         Some(new java.io.File(cantonDir)),
       ) ! processLogger
       logger.debug(s"The process has ended now with $exitCode")
-      val out = processLogger.output()
+      // slow participants might activate ACS commitment catch-up mode, and we want to filter out the resulting
+      // ACS commitment degradation warnings, otherwise the CI complains
+      val out = processLogger.output().replaceAll(regexpCommitmentCatchUpWarning, "")
       logger.debug("Stdout is\n" + out)
       exitCode shouldBe 0
       out should include(successMsg)
@@ -352,14 +383,15 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
       "last-errors",
       // slow ExecutionContextMonitor warnings
       "WARN  c.d.c.c.ExecutionContextMonitor - Execution context",
-      // slow participants might activate ACS commitment catch-up mode
-      commitmentCatchUpWarning,
     )
     val log = filters
       .foldLeft(logger.output()) { case (log, filter) =>
         log.replace(filter, "")
       }
       .toLowerCase
+      // slow participants might activate ACS commitment catch-up mode
+      .replaceAll(regexpCommitmentCatchUpWarning, "")
+
     shouldContain.foreach(str => assert(log.contains(str.toLowerCase())))
     shouldNotContain.foreach(str => assert(!log.contains(str.toLowerCase())))
     val undesirables = Seq("warn", "error", "exception")

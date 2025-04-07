@@ -6,21 +6,24 @@ package com.digitalasset.canton.participant.admin.grpc
 import cats.data.EitherT
 import cats.syntax.all.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.ProtoDeserializationError.TimestampConversionError
 import com.digitalasset.canton.admin.participant.v30.*
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.data.CantonTimestamp.fromProtoPrimitive
-import com.digitalasset.canton.data.{CantonTimestamp, RepairContract}
-import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.data
-import com.digitalasset.canton.participant.admin.data.ActiveContract.loadFromByteString
-import com.digitalasset.canton.participant.admin.grpc.GrpcParticipantRepairService.ValidExportAcsRequest
+import com.digitalasset.canton.participant.admin.data.ActiveContractOld.loadFromByteString
+import com.digitalasset.canton.participant.admin.data.{ContractIdImportMode, RepairContract}
+import com.digitalasset.canton.participant.admin.grpc.GrpcParticipantRepairService.ValidExportAcsOldRequest
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError.ImportAcsError
-import com.digitalasset.canton.participant.admin.repair.{EnsureValidContractIds, RepairServiceError}
+import com.digitalasset.canton.participant.admin.repair.{
+  ContractIdsImportProcessor,
+  RepairServiceError,
+}
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.LfContractId
@@ -89,31 +92,30 @@ final class GrpcParticipantRepairService(
     )
   }
 
-  /** originates from download above
-    */
-  override def exportAcs(
-      request: ExportAcsRequest,
-      responseObserver: StreamObserver[ExportAcsResponse],
+  // TODO(#24610) – Remove, replaced by exportAcs
+  override def exportAcsOld(
+      request: ExportAcsOldRequest,
+      responseObserver: StreamObserver[ExportAcsOldResponse],
   ): Unit = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
     GrpcStreamingUtils.streamToClient(
       (out: OutputStream) => createAcsSnapshotTemporaryFile(request, out),
       responseObserver,
-      byteString => ExportAcsResponse(byteString),
+      byteString => ExportAcsOldResponse(byteString),
       processingTimeout.unbounded.duration,
       chunkSizeO = None,
     )
   }
 
   private def createAcsSnapshotTemporaryFile(
-      request: ExportAcsRequest,
+      request: ExportAcsOldRequest,
       out: OutputStream,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val gzipOut = new GZIPOutputStream(out)
     val res = for {
       validRequest <- EitherT.fromEither[FutureUnlessShutdown](
-        ValidExportAcsRequest(request, sync.stateInspection.allProtocolVersions)
+        ValidExportAcsOldRequest(request, sync.stateInspection.allProtocolVersions)
       )
       timestampAsString = validRequest.timestamp.fold("head")(ts => s"at $ts")
       _ = logger.info(
@@ -135,26 +137,22 @@ final class GrpcParticipantRepairService(
         .leftMap(RepairServiceError.fromAcsInspectionError(_, logger))
     } yield ()
 
-    mapErrNewEUS(res.leftMap(_.toCantonError))
+    mapErrNewEUS(res.leftMap(_.toCantonRpcError))
   }
 
-  /** New endpoint to upload contracts for a party which uses the versioned ActiveContract
-    */
-  override def importAcs(
-      responseObserver: StreamObserver[ImportAcsResponse]
-  ): StreamObserver[ImportAcsRequest] = {
+  override def importAcsOld(
+      responseObserver: StreamObserver[ImportAcsOldResponse]
+  ): StreamObserver[ImportAcsOldRequest] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
-    // TODO(i12481): This buffer will contain the whole ACS snapshot.
     val outputStream = new ByteArrayOutputStream()
-    // (workflowIdPrefix, allowContractIdSuffixRecomputation)
     val args = new AtomicReference[Option[(String, Boolean)]](None)
     def tryArgs: (String, Boolean) =
       args
         .get()
         .getOrElse(throw new IllegalStateException("The import ACS request fields are not set"))
 
-    new StreamObserver[ImportAcsRequest] {
+    new StreamObserver[ImportAcsOldRequest] {
       def setOrCheck(
           workflowIdPrefix: String,
           allowContractIdSuffixRecomputation: Boolean,
@@ -177,7 +175,7 @@ final class GrpcParticipantRepairService(
           }
         }
 
-      override def onNext(request: ImportAcsRequest): Unit = {
+      override def onNext(request: ImportAcsOldRequest): Unit = {
         val processRequest =
           for {
             _ <- setOrCheck(request.workflowIdPrefix, request.allowContractIdSuffixRecomputation)
@@ -198,7 +196,6 @@ final class GrpcParticipantRepairService(
         outputStream.close()
       }
 
-      // TODO(i12481): implement a solution to prevent the client from sending infinite streams
       override def onCompleted(): Unit = {
         val (workflowIdPrefix, allowContractIdSuffixRecomputation) = tryArgs
 
@@ -206,6 +203,103 @@ final class GrpcParticipantRepairService(
           data = ByteString.copyFrom(outputStream.toByteArray),
           workflowIdPrefix = workflowIdPrefix,
           allowContractIdSuffixRecomputation = allowContractIdSuffixRecomputation,
+        )
+
+        Try(Await.result(res, processingTimeout.unbounded.duration)) match {
+          case Failure(exception) => responseObserver.onError(exception)
+          case Success(contractIdRemapping) =>
+            responseObserver.onNext(ImportAcsOldResponse(contractIdRemapping))
+            responseObserver.onCompleted()
+        }
+        outputStream.close()
+      }
+    }
+  }
+
+  private def importAcsSnapshot(
+      data: ByteString,
+      workflowIdPrefix: String,
+      allowContractIdSuffixRecomputation: Boolean,
+  )(implicit traceContext: TraceContext): Future[Map[String, String]] =
+    importAcsContracts(
+      loadFromByteString(data).map(contracts => contracts.map(_.toRepairContract)),
+      workflowIdPrefix,
+      if (allowContractIdSuffixRecomputation) ContractIdImportMode.Recomputation
+      else ContractIdImportMode.Validation,
+    )
+
+  override def importAcs(
+      responseObserver: StreamObserver[ImportAcsResponse]
+  ): StreamObserver[ImportAcsRequest] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    // TODO(#23818): This buffer will contain the whole ACS snapshot.
+    val outputStream = new ByteArrayOutputStream()
+    // (workflowIdPrefix, ContractIdImportMode)
+    val args = new AtomicReference[Option[(String, ContractIdImportMode)]](None)
+    def tryArgs: (String, ContractIdImportMode) =
+      args
+        .get()
+        .getOrElse(throw new IllegalStateException("The import ACS request fields are not set"))
+
+    new StreamObserver[ImportAcsRequest] {
+      def setOrCheck(
+          workflowIdPrefix: String,
+          contractIdImportMode: ContractIdImportMode,
+      ): Try[Unit] =
+        Try {
+          val newOrMatchingValue = Some((workflowIdPrefix, contractIdImportMode))
+          if (!args.compareAndSet(None, newOrMatchingValue)) {
+            val (oldWorkflowIdPrefix, oldContractIdImportMode) = tryArgs
+            if (workflowIdPrefix != oldWorkflowIdPrefix) {
+              throw new IllegalArgumentException(
+                s"Workflow ID prefix cannot be changed from $oldWorkflowIdPrefix to $workflowIdPrefix"
+              )
+            } else if (oldContractIdImportMode != contractIdImportMode) {
+              throw new IllegalArgumentException(
+                s"Contract ID import mode cannot be changed from $oldContractIdImportMode to $contractIdImportMode"
+              )
+            }
+          }
+        }
+
+      override def onNext(request: ImportAcsRequest): Unit = {
+
+        val processRequest =
+          for {
+            contractIdRecomputationMode <- ContractIdImportMode
+              .fromProtoV30(
+                request.contractIdSuffixRecomputationMode
+              )
+              .fold(
+                left => Failure(new IllegalArgumentException(left.message)),
+                right => Success(right),
+              )
+            _ <- setOrCheck(request.workflowIdPrefix, contractIdRecomputationMode)
+            _ <- Try(outputStream.write(request.acsSnapshot.toByteArray))
+          } yield ()
+
+        processRequest match {
+          case Failure(exception) =>
+            outputStream.close()
+            responseObserver.onError(exception)
+          case Success(_) =>
+            () // Nothing to do, just move on to the next request
+        }
+      }
+
+      override def onError(t: Throwable): Unit = {
+        responseObserver.onError(t)
+        outputStream.close()
+      }
+
+      override def onCompleted(): Unit = {
+        val (workflowIdPrefix, contractIdImportMode) = tryArgs
+
+        val res = importAcsNewSnapshot(
+          acsSnapshot = ByteString.copyFrom(outputStream.toByteArray),
+          workflowIdPrefix = workflowIdPrefix,
+          contractIdImportMode = contractIdImportMode,
         )
 
         Try(Await.result(res, processingTimeout.unbounded.duration)) match {
@@ -219,23 +313,35 @@ final class GrpcParticipantRepairService(
     }
   }
 
-  private def importAcsSnapshot(
-      data: ByteString,
+  private def importAcsNewSnapshot(
+      acsSnapshot: ByteString,
       workflowIdPrefix: String,
-      allowContractIdSuffixRecomputation: Boolean,
+      contractIdImportMode: ContractIdImportMode,
+  )(implicit traceContext: TraceContext): Future[Map[String, String]] =
+    importAcsContracts(
+      RepairContract.loadAcsSnapshot(acsSnapshot),
+      workflowIdPrefix,
+      contractIdImportMode,
+    )
+
+  private def importAcsContracts(
+      contracts: Either[String, List[RepairContract]],
+      workflowIdPrefix: String,
+      contractIdImportMode: ContractIdImportMode,
   )(implicit traceContext: TraceContext): Future[Map[String, String]] = {
     val resultET = for {
-      activeContracts <- EitherT.fromEither[Future](
-        loadFromByteString(data)
+      repairContracts <- EitherT.fromEither[Future](
+        contracts
       )
       workflowIdPrefixO = Option.when(workflowIdPrefix != "")(workflowIdPrefix)
 
       activeContractsWithRemapping <-
-        EnsureValidContractIds( // TODO(#22803) - Make this optional or 0 secs operation since it should be a no-op
+        ContractIdsImportProcessor(
           loggerFactory,
           sync.protocolVersionGetter,
-          Option.when(allowContractIdSuffixRecomputation)(sync.pureCryptoApi),
-        )(activeContracts)
+          sync.pureCryptoApi,
+          contractIdImportMode,
+        )(repairContracts)
       (activeContractsWithValidContractIds, contractIdRemapping) =
         activeContractsWithRemapping
 
@@ -244,7 +350,9 @@ final class GrpcParticipantRepairService(
           MonadUtil.batchedSequentialTraverse_(
             batching.parallelism,
             batching.maxAcsImportBatchSize,
-          )(contracts)(writeContractsBatch(workflowIdPrefixO)(synchronizerId, _))
+          )(contracts)(
+            writeContractsBatch(workflowIdPrefixO)(synchronizerId, _)
+          )
       }
 
     } yield contractIdRemapping
@@ -260,7 +368,7 @@ final class GrpcParticipantRepairService(
 
   private def writeContractsBatch(
       workflowIdPrefixO: Option[String]
-  )(synchronizerId: SynchronizerId, contracts: Seq[data.ActiveContract])(implicit
+  )(synchronizerId: SynchronizerId, contracts: Seq[RepairContract])(implicit
       traceContext: TraceContext
   ): EitherT[Future, String, Unit] =
     for {
@@ -273,7 +381,7 @@ final class GrpcParticipantRepairService(
       _ <- EitherT.fromEither[Future](
         sync.repairService.addContracts(
           alias,
-          contracts.map(c => RepairContract(c.contract, c.reassignmentCounter)),
+          contracts,
           ignoreAlreadyAdded = true,
           ignoreStakeholderCheck = true,
           workflowIdPrefix = workflowIdPrefixO,
@@ -415,7 +523,7 @@ final class GrpcParticipantRepairService(
           .leftMap(_.toString)
           .leftMap(RepairServiceError.InvalidArgument.Error(_))
       )
-      _ <- sync.purgeDeactivatedSynchronizer(synchronizerAlias).leftWiden[CantonError]
+      _ <- sync.purgeDeactivatedSynchronizer(synchronizerAlias).leftWiden[RpcError]
     } yield ()
 
     EitherTUtil
@@ -516,16 +624,17 @@ final class GrpcParticipantRepairService(
 
 object GrpcParticipantRepairService {
 
-  private object ValidExportAcsRequest {
+  // TODO(#24610) - remove, used by ExportAcsOldRequest only
+  private object ValidExportAcsOldRequest {
 
     private def validateContractSynchronizerRenames(
-        contractSynchronizerRenames: Map[String, ExportAcsRequest.TargetSynchronizer],
+        contractSynchronizerRenames: Map[String, ExportAcsOldRequest.TargetSynchronizer],
         allProtocolVersions: Map[SynchronizerId, ProtocolVersion],
     ): Either[String, List[(SynchronizerId, (SynchronizerId, ProtocolVersion))]] =
       contractSynchronizerRenames.toList.traverse {
         case (
               source,
-              ExportAcsRequest.TargetSynchronizer(targetSynchronizer, targetProtocolVersionRaw),
+              ExportAcsOldRequest.TargetSynchronizer(targetSynchronizer, targetProtocolVersionRaw),
             ) =>
           for {
             sourceId <- SynchronizerId
@@ -557,9 +666,9 @@ object GrpcParticipantRepairService {
       }
 
     private def validateRequest(
-        request: ExportAcsRequest,
+        request: ExportAcsOldRequest,
         allProtocolVersions: Map[SynchronizerId, ProtocolVersion],
-    ): Either[String, ValidExportAcsRequest] =
+    ): Either[String, ValidExportAcsOldRequest] =
       for {
         parties <- request.parties.traverse(party =>
           UniqueIdentifier.fromProtoPrimitive_(party).map(PartyId(_).toLf).leftMap(_.message)
@@ -571,7 +680,7 @@ object GrpcParticipantRepairService {
           request.contractSynchronizerRenames,
           allProtocolVersions,
         )
-      } yield ValidExportAcsRequest(
+      } yield ValidExportAcsOldRequest(
         parties.toSet,
         timestamp,
         contractSynchronizerRenames.toMap,
@@ -579,9 +688,12 @@ object GrpcParticipantRepairService {
         partiesOffboarding = request.partiesOffboarding,
       )
 
-    def apply(request: ExportAcsRequest, allProtocolVersions: Map[SynchronizerId, ProtocolVersion])(
-        implicit elc: ErrorLoggingContext
-    ): Either[RepairServiceError, ValidExportAcsRequest] =
+    def apply(
+        request: ExportAcsOldRequest,
+        allProtocolVersions: Map[SynchronizerId, ProtocolVersion],
+    )(implicit
+        elc: ErrorLoggingContext
+    ): Either[RepairServiceError, ValidExportAcsOldRequest] =
       for {
         validRequest <- validateRequest(request, allProtocolVersions).leftMap(
           RepairServiceError.InvalidArgument.Error(_)
@@ -590,7 +702,7 @@ object GrpcParticipantRepairService {
 
   }
 
-  private final case class ValidExportAcsRequest private (
+  private final case class ValidExportAcsOldRequest private (
       parties: Set[LfPartyId],
       timestamp: Option[CantonTimestamp],
       contractSynchronizerRenames: Map[SynchronizerId, (SynchronizerId, ProtocolVersion)],

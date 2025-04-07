@@ -292,33 +292,37 @@ class HttpValidatorAdminHandler(
   private def decodeSignedTopologyTx(
       publicKey: SigningPublicKey,
       topologyTx: definitions.SignedTopologyTx,
-  ): GenericSignedTopologyTransaction =
+  ): GenericSignedTopologyTransaction = {
+    val tx = TopologyTransaction
+      .fromTrustedByteString(
+        ByteString.copyFrom(Base64.getDecoder.decode(topologyTx.topologyTx))
+      )
+      .valueOr(error =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"failed to construct topology transaction: $error")
+          .asRuntimeException()
+      )
     SignedTopologyTransaction(
-      transaction = TopologyTransaction
-        .fromTrustedByteString(
-          ByteString.copyFrom(Base64.getDecoder.decode(topologyTx.topologyTx))
-        )
-        .valueOr(error =>
-          throw Status.INVALID_ARGUMENT
-            .withDescription(s"failed to construct topology transaction: $error")
-            .asRuntimeException()
-        ),
+      transaction = tx,
       signatures = NonEmpty.mk(
         Set,
-        Signature(
-          Raw,
-          HexString
-            .parseToByteString(topologyTx.signedHash)
-            .getOrElse(
-              throw Status.INVALID_ARGUMENT
-                .withDescription(
-                  s"Failed to decode hex-encoded tx signature: ${topologyTx.signedHash}"
-                )
-                .asRuntimeException
-            ),
-          signedBy = publicKey.fingerprint,
-          signingAlgorithmSpec = None,
-          signatureDelegation = None,
+        SingleTransactionSignature(
+          tx.hash,
+          Signature(
+            Raw,
+            HexString
+              .parseToByteString(topologyTx.signedHash)
+              .getOrElse(
+                throw Status.INVALID_ARGUMENT
+                  .withDescription(
+                    s"Failed to decode hex-encoded tx signature: ${topologyTx.signedHash}"
+                  )
+                  .asRuntimeException
+              ),
+            signedBy = publicKey.fingerprint,
+            signingAlgorithmSpec = None,
+            signatureDelegation = None,
+          ),
         ),
       ),
       isProposal = true,
@@ -326,6 +330,7 @@ class HttpValidatorAdminHandler(
       SignedTopologyTransaction.versioningTable
         .protocolVersionRepresentativeFor(ProtocolVersion.dev)
     )
+  }
 
   override def submitExternalPartyTopology(
       respond: v0.ValidatorAdminResource.SubmitExternalPartyTopologyResponse.type
@@ -589,7 +594,7 @@ class HttpValidatorAdminHandler(
                   Seq(userParty),
                   Seq(userParty),
                   commands,
-                  storeWithIngestion.connection.disclosedContracts(externalPartySetupProposal),
+                  DisclosedContracts.Empty,
                   body.verboseHashing.getOrElse(false),
                 )
                 .flatMap { r =>

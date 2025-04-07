@@ -16,7 +16,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Env
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BlockNumber,
   EpochNumber,
   ViewNumber,
@@ -42,6 +42,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   PekkoFutureUnlessShutdown,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.TryUtil
 
 import scala.collection.MapView
 import scala.collection.concurrent.TrieMap
@@ -95,7 +96,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
     store.putIfAbsent(key, value).discard
     // Re-insertion with a different commit set may happen when a block has already been completed,
     //  but then catch-up is started and the block is re-sent by state transfer.
-    Success(())
+    TryUtil.unit
   }
 
   override def startEpoch(
@@ -159,7 +160,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
       prepares: Seq[SignedMessage[Prepare]]
   )(implicit traceContext: TraceContext): E#FutureUnlessShutdownT[Unit] =
     createFuture(addPreparesActionName) { () =>
-      prepares.headOption.fold[Try[Unit]](Success(())) { head =>
+      prepares.headOption.fold(TryUtil.unit) { head =>
         preparesMap
           .putIfAbsent(
             head.message.blockMetadata.blockNumber,
@@ -330,6 +331,7 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
                           prePrepare.message.block.proofs,
                           prePrepare.message.canonicalCommitSet,
                         ),
+                        prePrepare.message.viewNumber,
                         prePrepare.from,
                         isBlockLastInEpoch,
                         OrderedBlockForOutput.Mode.FromConsensus,
@@ -360,15 +362,15 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
       )
     }
 
-  override def prune(epochNumberInclusive: EpochNumber)(implicit
+  override def prune(epochNumberExclusive: EpochNumber)(implicit
       traceContext: TraceContext
   ): E#FutureUnlessShutdownT[EpochStore.NumberOfRecords] =
-    createFuture(pruneName(epochNumberInclusive)) { () =>
-      val epochsToDelete = epochs.filter(_._1 <= epochNumberInclusive)
+    createFuture(pruneName(epochNumberExclusive)) { () =>
+      val epochsToDelete = epochs.filter(_._1 < epochNumberExclusive)
       val blocksToDelete =
-        blocks.filter(_._2.prePrepare.message.blockMetadata.epochNumber <= epochNumberInclusive)
-      epochs --= epochsToDelete.keys
-      blocks --= blocksToDelete.keys
+        blocks.filter(_._2.prePrepare.message.blockMetadata.epochNumber < epochNumberExclusive)
+      epochsToDelete.keys.foreach(epochs.remove(_).discard)
+      blocksToDelete.keys.foreach(blocks.remove(_).discard)
 
       val blockNumbersToDeleteInProgressMessages = epochsToDelete
         .maxByOption(_._1)
@@ -386,10 +388,12 @@ abstract class GenericInMemoryEpochStore[E <: Env[E]]
             newViewsMap.get(blockNumber).map(_.size).getOrElse(0)
         }.sum
 
-      prePreparesMap --= blockNumbersToDeleteInProgressMessages
-      preparesMap --= blockNumbersToDeleteInProgressMessages
-      viewChangesMap --= blockNumbersToDeleteInProgressMessages
-      newViewsMap --= blockNumbersToDeleteInProgressMessages
+      blockNumbersToDeleteInProgressMessages.foreach { blockNumber =>
+        prePreparesMap.remove(blockNumber).discard
+        preparesMap.remove(blockNumber).discard
+        viewChangesMap.remove(blockNumber).discard
+        newViewsMap.remove(blockNumber).discard
+      }
 
       Success(
         EpochStore.NumberOfRecords(

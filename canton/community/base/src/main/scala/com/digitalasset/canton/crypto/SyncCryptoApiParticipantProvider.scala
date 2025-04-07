@@ -371,6 +371,10 @@ class SynchronizerCryptoClient private (
   ): Option[FutureUnlessShutdown[Unit]] =
     ips.awaitTimestamp(timestamp)
 
+  override def awaitSequencedTimestamp(timestampInclusive: SequencedTime)(implicit
+      traceContext: TraceContext
+  ): Option[FutureUnlessShutdown[Unit]] = ips.awaitSequencedTimestamp(timestampInclusive)
+
   override def currentSnapshotApproximation(implicit
       traceContext: TraceContext
   ): SynchronizerSnapshotSyncCryptoApi =
@@ -383,7 +387,7 @@ class SynchronizerCryptoClient private (
   override def onClosed(): Unit =
     LifeCycle.close(ips)(logger)
 
-  override def awaitMaxTimestamp(sequencedTime: CantonTimestamp)(implicit
+  override def awaitMaxTimestamp(sequencedTime: SequencedTime)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
     ips.awaitMaxTimestamp(sequencedTime)
@@ -405,7 +409,7 @@ object SynchronizerCryptoClient {
   )(implicit
       executionContext: ExecutionContext
   ): SynchronizerCryptoClient = {
-    val syncCryptoSignerDefault = SyncCryptoSigner.create(
+    val syncCryptoSignerWithLongTermKeys = SyncCryptoSigner.createWithLongTermKeys(
       staticSynchronizerParameters,
       member,
       pureCrypto,
@@ -419,7 +423,7 @@ object SynchronizerCryptoClient {
       synchronizerId,
       ips,
       crypto,
-      syncCryptoSignerDefault,
+      syncCryptoSignerWithLongTermKeys,
       staticSynchronizerParameters,
       timeouts,
       futureSupervisor,
@@ -446,6 +450,7 @@ object SynchronizerCryptoClient {
       executionContext: ExecutionContext
   ): SynchronizerCryptoClient = {
     val syncCryptoSignerWithSessionKeys = SyncCryptoSigner.createWithOptionalSessionKeys(
+      synchronizerId,
       staticSynchronizerParameters,
       member,
       pureCrypto,

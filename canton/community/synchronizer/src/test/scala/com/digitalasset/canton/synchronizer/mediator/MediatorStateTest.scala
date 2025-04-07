@@ -25,19 +25,18 @@ import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{
-  ApplicationId,
   BaseTest,
   CommandId,
   FailOnShutdown,
   HasExecutionContext,
   LfPartyId,
+  UserId,
 }
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Duration
 import java.util.UUID
-import scala.concurrent.duration.*
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class MediatorStateTest
     extends AsyncWordSpec
@@ -75,7 +74,7 @@ class MediatorStateTest
       )
       val submitterMetadata = SubmitterMetadata(
         NonEmpty(Set, alice),
-        ApplicationId.assertFromString("kaese"),
+        UserId.assertFromString("kaese"),
         CommandId.assertFromString("wurst"),
         participantId,
         salt = s(6638),
@@ -131,7 +130,8 @@ class MediatorStateTest
         timeouts,
         loggerFactory,
       )
-      Await.result(sut.add(currentVersion), 1.second)
+      sut.initialize(CantonTimestamp.MinValue).futureValueUS
+      sut.add(currentVersion).futureValueUS
       sut
     }
 

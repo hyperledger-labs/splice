@@ -27,7 +27,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   Genesis,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.TopologyActivationTime
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochLength,
   EpochNumber,
@@ -52,7 +53,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.ConsensusMessage as ProtoConsensusMessage
-import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{ProtoDeserializationError, RichGeneratedMessage}
 import com.google.protobuf.ByteString
@@ -83,7 +83,6 @@ class DbEpochStore(
       BlockNumber(r.nextLong()),
       EpochLength(r.nextLong()),
       TopologyActivationTime(CantonTimestamp.assertFromLong(r.nextLong())),
-      CantonTimestamp.assertFromLong(r.nextLong()),
     )
   }
 
@@ -108,7 +107,7 @@ class DbEpochStore(
     PekkoFutureUnlessShutdown(actionName, () => storage.performUnlessClosingUSF(actionName)(future))
 
   private def parseSignedMessage[A <: PbftNetworkMessage](
-      parse: SequencerId => ProtoConsensusMessage => ByteString => ParsingResult[A]
+      parse: BftNodeId => ProtoConsensusMessage => ByteString => ParsingResult[A]
   )(
       r: PositionedResult
   ): SignedMessage[A] = {
@@ -117,7 +116,7 @@ class DbEpochStore(
     val messageOrError = for {
       signedMessageProto <- Try(v30.SignedMessage.parseFrom(messageBytes)).toEither
         .leftMap(x => ProtoDeserializationError.OtherError(x.toString))
-      message <- SignedMessage.fromProtoWithSequencerId(v30.ConsensusMessage)(parse)(
+      message <- SignedMessage.fromProtoWithNodeId(v30.ConsensusMessage)(parse)(
         signedMessageProto
       )
     } yield message
@@ -138,8 +137,8 @@ class DbEpochStore(
       storage.update_(
         profile match {
           case _: Postgres =>
-            sqlu"""insert into ord_epochs(epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts, in_progress)
-                   values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value}, ${epoch.previousEpochMaxBftTime}, true)
+            sqlu"""insert into ord_epochs(epoch_number, start_block_number, epoch_length, topology_ts, in_progress)
+                   values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value}, true)
                    on conflict (epoch_number) do nothing
                 """
           case _: H2 =>
@@ -148,8 +147,8 @@ class DbEpochStore(
                      ord_epochs.epoch_number = ${epoch.number}
                    )
                    when not matched then
-                     insert (epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts, in_progress)
-                     values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value}, ${epoch.previousEpochMaxBftTime}, true)
+                     insert (epoch_number, start_block_number, epoch_length, topology_ts, in_progress)
+                     values (${epoch.number}, ${epoch.startBlockNumber}, ${epoch.length}, ${epoch.topologyActivationTime.value},  true)
                 """
         },
         functionFullName,
@@ -180,14 +179,14 @@ class DbEpochStore(
         for {
           epochInfo <-
             if (!includeInProgress)
-              sql"""select epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts
+              sql"""select epoch_number, start_block_number, epoch_length, topology_ts
                     from ord_epochs
                     where in_progress = false
                     order by epoch_number desc
                     limit 1
                  """.as[EpochInfo]
             else
-              sql"""select epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts
+              sql"""select epoch_number, start_block_number, epoch_length, topology_ts
                     from ord_epochs
                     order by epoch_number desc
                     limit 1
@@ -267,7 +266,7 @@ class DbEpochStore(
     messages.headOption.fold(Seq.empty[DbAction.WriteOnly[Int]]) { head =>
       val discriminator = getDiscriminator(head.message)
       messages.map { msg =>
-        val sequencerId = msg.from.uid.toProtoPrimitive
+        val from = msg.from
         val blockNumber = msg.message.blockMetadata.blockNumber
         val epochNumber = msg.message.blockMetadata.epochNumber
         val viewNumber = msg.message.viewNumber
@@ -275,7 +274,7 @@ class DbEpochStore(
         profile match {
           case _: Postgres =>
             sqlu"""insert into ord_pbft_messages_in_progress(block_number, epoch_number, view_number, message, discriminator, from_sequencer_id)
-                   values ($blockNumber, $epochNumber, $viewNumber, $msg, $discriminator, $sequencerId)
+                   values ($blockNumber, $epochNumber, $viewNumber, $msg, $discriminator, $from)
                    on conflict (block_number, view_number, discriminator, from_sequencer_id) do nothing
                 """
           case _: H2 =>
@@ -284,11 +283,11 @@ class DbEpochStore(
                      and ord_pbft_messages_in_progress.epoch_number = $epochNumber
                      and ord_pbft_messages_in_progress.view_number = $viewNumber
                      and ord_pbft_messages_in_progress.discriminator = $discriminator
-                     and ord_pbft_messages_in_progress.from_sequencer_id = $sequencerId
+                     and ord_pbft_messages_in_progress.from_sequencer_id = $from
                    )
                    when not matched then
                      insert (block_number, epoch_number, view_number, message, discriminator, from_sequencer_id)
-                     values ($blockNumber, $epochNumber, $viewNumber, $msg, $discriminator, $sequencerId)
+                     values ($blockNumber, $epochNumber, $viewNumber, $msg, $discriminator, $from)
                 """
         }
       }
@@ -300,7 +299,7 @@ class DbEpochStore(
     messages.headOption.fold(Seq.empty[DbAction.WriteOnly[Int]]) { head =>
       val discriminator = getDiscriminator(head.message)
       messages.map { msg =>
-        val sequencerId = msg.from.uid.toProtoPrimitive
+        val sequencerId = msg.from
         val blockNumber = msg.message.blockMetadata.blockNumber
         val epochNumber = msg.message.blockMetadata.epochNumber
 
@@ -421,7 +420,7 @@ class DbEpochStore(
     createFuture(loadEpochInfoActionName(epochNumber)) {
       storage
         .query(
-          sql"""select epoch_number, start_block_number, epoch_length, topology_ts, previous_epoch_max_ts
+          sql"""select epoch_number, start_block_number, epoch_length, topology_ts
                 from ord_epochs
                 where epoch_number = $epochNumber
                 limit 1
@@ -438,7 +437,7 @@ class DbEpochStore(
         .query(
           sql"""select
                   completed_message.message,
-                  epoch.epoch_number, epoch.start_block_number, epoch.epoch_length, epoch.topology_ts, epoch.previous_epoch_max_ts
+                  epoch.epoch_number, epoch.start_block_number, epoch.epoch_length, epoch.topology_ts
                 from
                   ord_pbft_messages_completed completed_message
                   inner join ord_epochs epoch
@@ -459,6 +458,7 @@ class DbEpochStore(
                 prePrepare.block.proofs,
                 prePrepare.canonicalCommitSet,
               ),
+              prePrepare.viewNumber,
               prePrepare.from,
               epochInfo.lastBlockNumber == prePrepare.blockMetadata.blockNumber,
               OrderedBlockForOutput.Mode.FromConsensus,
@@ -486,21 +486,21 @@ class DbEpochStore(
       )
     }
 
-  override def prune(epochNumberInclusive: EpochNumber)(implicit
+  override def prune(epochNumberExclusive: EpochNumber)(implicit
       traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[EpochStore.NumberOfRecords] =
-    createFuture(pruneName(epochNumberInclusive)) {
+    createFuture(pruneName(epochNumberExclusive)) {
       for {
         epochsDeleted <- storage.update(
-          sqlu""" delete from ord_epochs where epoch_number <= $epochNumberInclusive """,
+          sqlu""" delete from ord_epochs where epoch_number < $epochNumberExclusive """,
           functionFullName,
         )
         pbftMessagesCompletedDeleted <- storage.update(
-          sqlu""" delete from ord_pbft_messages_completed where epoch_number <= $epochNumberInclusive """,
+          sqlu""" delete from ord_pbft_messages_completed where epoch_number < $epochNumberExclusive """,
           functionFullName,
         )
         pbftMessagesInProgressDeleted <- storage.update(
-          sqlu""" delete from ord_pbft_messages_in_progress where epoch_number <= $epochNumberInclusive """,
+          sqlu""" delete from ord_pbft_messages_in_progress where epoch_number < $epochNumberExclusive """,
           functionFullName,
         )
       } yield EpochStore.NumberOfRecords(

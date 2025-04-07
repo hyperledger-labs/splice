@@ -97,6 +97,7 @@ testTransferExceedsMaxLockHolders = do
               lock = Some TimeLock with
                 holders = bobParties
                 expiresAt = now `addRelTime` (minutes 1)
+                optContext = None
               receiverFeeRatio = 0.0
           ]
         beneficiaries = None

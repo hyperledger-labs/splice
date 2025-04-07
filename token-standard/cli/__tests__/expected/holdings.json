@@ -2,7 +2,7 @@
   {
     "contractId": "0",
     "payload": {
-      "amount": "87.0000000000",
+      "amount": "64.9000000000",
       "instrumentId": {
         "admin": "dso::normalized",
         "id": "Amulet"

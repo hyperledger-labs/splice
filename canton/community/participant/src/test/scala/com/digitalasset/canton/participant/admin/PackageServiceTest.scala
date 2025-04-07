@@ -5,14 +5,13 @@ package com.digitalasset.canton.participant.admin
 
 import better.files.*
 import cats.data.EitherT
-import com.daml.error.DamlError
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.BaseTest.getResourcePath
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.{PackageMetadataViewConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.ledger.error.PackageServiceErrors
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.participant.admin.PackageService.DarMainPackageId
@@ -374,7 +373,7 @@ class PackageServiceTest
 
   "The DAR referenced by the requested hash does not exist" when {
     def rejectOnMissingDar(
-        req: PackageService => EitherT[FutureUnlessShutdown, CantonError, Unit],
+        req: PackageService => EitherT[FutureUnlessShutdown, RpcError, Unit],
         mainPackageId: DarMainPackageId,
         op: String,
     ): Env => Future[Assertion] = { env =>
@@ -423,7 +422,7 @@ class PackageServiceTest
         upgradeIncompatibleDars.map { case (darName, archive) =>
           val payload = encodeDarArchive(archive)
           EitherT
-            .rightT[FutureUnlessShutdown, DamlError](())
+            .rightT[FutureUnlessShutdown, RpcError](())
             // Delegate the future within
             .flatMap(_ =>
               sut.upload(

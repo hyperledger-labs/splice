@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -32,15 +33,12 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
-import org.scalatest.Ignore
 import org.scalatest.time.{Minute, Span}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
-// TODO(#17544) Reenable once the DAR issues are fixed
-@Ignore
 class BootstrapPackageConfigIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil
@@ -86,6 +84,14 @@ class BootstrapPackageConfigIntegrationTest
         )(config)
       )
       .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllValidatorAppConfigs_(c =>
+          // Reduce the cache TTL. Otherwise alice validator takes forever to see the new amulet rules version
+          c.copy(scanClient =
+            c.scanClient.setAmuletRulesCacheTimeToLive(NonNegativeFiniteDuration.ofSeconds(1))
+          )
+        )(conf)
+      )
+      .addConfigTransform((_, conf) =>
         conf.copy(validatorApps =
           conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
             _.map { aliceValidatorConfig =>
@@ -109,7 +115,8 @@ class BootstrapPackageConfigIntegrationTest
         Some(sv4Backend),
       ),
       "boostrap-dso-with-specific-package-config",
-      extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
+      extraParticipantsConfigFileNames =
+        Seq("standalone-participant-extra.conf", "standalone-participant-extra-no-auth.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
         "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
@@ -154,14 +161,15 @@ class BootstrapPackageConfigIntegrationTest
       clue("alice taps amulet with initial package") {
         val tapContractId = aliceValidatorWalletClient.tap(10)
         aliceValidatorBackend.participantClient.ledger_api_extensions.acs
-          .filterJava(
-            Amulet.COMPANION
-          )(dsoParty, _.id == tapContractId)
+          .of_party(Amulet.COMPANION)(dsoParty)
+          .filter(_.contractId == tapContractId.contractId)
           .loneElement
-          .getContractTypeId
-          .getPackageId shouldBe DarResources.amulet.getPackageIdWithVersion(
-          initialPackageConfig.amuletVersion
-        )
+          .getTemplateId
+          .packageId shouldBe DarResources.amulet
+          .getPackageIdWithVersion(
+            initialPackageConfig.amuletVersion
+          )
+          .value
       }
 
       checkDarVersions(
@@ -255,36 +263,6 @@ class BootstrapPackageConfigIntegrationTest
           },
         )
 
-        clue("alice taps amulet with new package") {
-          val tapContractId = aliceValidatorWalletClient.tap(10)
-          aliceValidatorBackend.participantClient.ledger_api_extensions.acs
-            .filterJava(
-              Amulet.COMPANION
-            )(dsoParty, _.id == tapContractId)
-            .loneElement
-            .getContractTypeId
-            .getPackageId shouldBe DarResources.amulet.bootstrap.packageId
-        }
-
-        clue("vetting topology is updated to the new config") {
-          eventuallySucceeds() {
-            val vettingTopologyState = sv1Backend.participantClient.topology.vetted_packages.list(
-              store = Some(
-                TopologyStoreId.Synchronizer(
-                  decentralizedSynchronizerId
-                )
-              ),
-              filterParticipant = sv1Backend.participantClient.id.filterString,
-            )
-            val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
-              .find(_.packageId == DarResources.amulet.bootstrap.packageId)
-              .value
-            newAmuletVettedPackage.validFrom.value shouldBe CantonTimestamp.assertFromInstant(
-              scheduledTime
-            )
-          }
-        }
-
         // Ensure that the code below really uses the new version. Locally things can be sufficiently
         // fast that you otherwise still end up using the old version.
         env.environment.clock
@@ -294,6 +272,45 @@ class BootstrapPackageConfigIntegrationTest
           )
           .unwrap
           .futureValue
+
+        clue("vetting topology is updated to the new config") {
+          eventuallySucceeds() {
+            Seq(
+              sv1Backend.participantClient,
+              sv2Backend.participantClient,
+              sv3Backend.participantClient,
+              sv4Backend.participantClient,
+              aliceValidatorBackend.participantClient,
+            ).foreach { participantClient =>
+              clue(s"Vetting state for ${participantClient.id}") {
+                val vettingTopologyState = participantClient.topology.vetted_packages.list(
+                  store = Some(
+                    TopologyStoreId.Synchronizer(
+                      decentralizedSynchronizerId
+                    )
+                  ),
+                  filterParticipant = participantClient.id.filterString,
+                )
+                val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
+                  .find(_.packageId == DarResources.amulet.bootstrap.packageId)
+                  .value
+                newAmuletVettedPackage.validFrom.value shouldBe CantonTimestamp.assertFromInstant(
+                  scheduledTime
+                )
+              }
+            }
+          }
+        }
+      }
+
+      clue("alice taps amulet with new package") {
+        val tapContractId = aliceValidatorWalletClient.tap(10)
+        aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+          .of_party(Amulet.COMPANION)(dsoParty)
+          .filter(_.contractId == tapContractId.contractId)
+          .loneElement
+          .getTemplateId
+          .packageId shouldBe DarResources.amulet.bootstrap.packageId
       }
 
       clue("ExternalPartyAmuletRules gets created") {

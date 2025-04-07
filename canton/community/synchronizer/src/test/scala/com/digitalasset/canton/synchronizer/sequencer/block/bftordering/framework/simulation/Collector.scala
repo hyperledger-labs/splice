@@ -9,9 +9,9 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.net
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.ModuleControl
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleName
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.SimulationFuture
-import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.blocking
@@ -62,8 +62,8 @@ class NodeCollector extends Collector[NodeCollector.Event] {
     newTickId
   }
 
-  def addNetworkEvent(peer: SequencerId, msg: Any)(implicit traceContext: TraceContext): Unit =
-    add(NodeCollector.SendNetworkEvent(peer, msg, traceContext))
+  def addNetworkEvent(node: BftNodeId, msg: Any)(implicit traceContext: TraceContext): Unit =
+    add(NodeCollector.SendNetworkEvent(node, msg, traceContext))
 
   def addFuture[X, T](
       to: ModuleName,
@@ -73,9 +73,9 @@ class NodeCollector extends Collector[NodeCollector.Event] {
     add(NodeCollector.AddFuture(to, future, fun, traceContext))
 
   def addOpenConnection(
-      to: SequencerId,
+      to: BftNodeId,
       endpoint: PlainTextP2PEndpoint,
-      continuation: (P2PEndpoint.Id, SequencerId) => Unit,
+      continuation: (P2PEndpoint.Id, BftNodeId) => Unit,
   ): Unit =
     add(NodeCollector.OpenConnection(to, endpoint, continuation))
 
@@ -92,7 +92,7 @@ object NodeCollector {
       to: ModuleName,
       msg: ModuleControl[SimulationEnv, ?],
   ) extends Event
-  final case class SendNetworkEvent(to: SequencerId, msg: Any, traceContext: TraceContext)
+  final case class SendNetworkEvent(to: BftNodeId, msg: Any, traceContext: TraceContext)
       extends Event
   final case class AddFuture[X, T](
       to: ModuleName,
@@ -101,17 +101,17 @@ object NodeCollector {
       traceContext: TraceContext,
   ) extends Event
   final case class OpenConnection(
-      to: SequencerId,
+      to: BftNodeId,
       endpoint: PlainTextP2PEndpoint,
-      continuation: (P2PEndpoint.Id, SequencerId) => Unit,
+      continuation: (P2PEndpoint.Id, BftNodeId) => Unit,
   ) extends Event
   final case class CancelTick(tickId: Int) extends Event
 }
 
 class ClientCollector(to: ModuleName) extends Collector[ClientCollector.Event] {
-  def addTickEvent(duration: FiniteDuration, msg: Any): Int = {
+  def addTickEvent(duration: FiniteDuration, msg: Any)(implicit traceContext: TraceContext): Int = {
     val tickId = generateNewTickId()
-    add(ClientCollector.TickEvent(duration, tickId, msg))
+    add(ClientCollector.TickEvent(duration, tickId, msg, traceContext))
     tickId
   }
 
@@ -126,7 +126,12 @@ class ClientCollector(to: ModuleName) extends Collector[ClientCollector.Event] {
 object ClientCollector {
   sealed trait Event
 
-  final case class TickEvent(duration: FiniteDuration, tickId: Int, msg: Any) extends Event
+  final case class TickEvent(
+      duration: FiniteDuration,
+      tickId: Int,
+      msg: Any,
+      traceContext: TraceContext,
+  ) extends Event
 
   final case class ClientRequest(to: ModuleName, msg: Any, traceContext: TraceContext) extends Event
   final case class CancelTick(tickId: Int) extends Event

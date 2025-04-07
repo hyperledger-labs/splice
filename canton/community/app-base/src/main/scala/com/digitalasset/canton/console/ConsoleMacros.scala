@@ -21,7 +21,6 @@ import com.daml.ledger.api.v2.value.{
 }
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.ContractData
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.admin.api.client.data.{
   ListPartiesResult,
@@ -34,12 +33,12 @@ import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
+import com.digitalasset.canton.console.commands.PruningSchedulerAdministration
 import com.digitalasset.canton.crypto.{CryptoPureApi, Salt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NodeLoggingUtil}
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
-import com.digitalasset.canton.participant.admin.repair.RepairService
 import com.digitalasset.canton.participant.config.BaseParticipantConfig
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
@@ -62,7 +61,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.{
 }
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.BinaryFileUtil
-import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
@@ -258,76 +257,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )
     def auto_close(closeable: AutoCloseable)(implicit environment: ConsoleEnvironment): Unit =
       environment.environment.addUserCloseable(closeable)
-
-    @Help.Summary("Convert contract data to a contract instance.")
-    @Help.Description(
-      """The `utils.contract_data_to_instance` bridges the gap between `participant.ledger_api.acs` commands that
-        |return various pieces of "contract data" and the `participant.repair.add` command used to add "contract instances"
-        |as part of repair workflows. Such workflows (for example migrating contracts from other Daml ledgers to Canton
-        |participants) typically consist of extracting contract data using `participant.ledger_api.acs` commands,
-        |modifying the contract data, and then converting the `contractData` using this function before finally
-        |adding the resulting contract instances to Canton participants via `participant.repair.add`.
-        |Obtain the `contractData` by invoking `.toContractData` on the `WrappedCreatedEvent` returned by the
-        |corresponding `participant.ledger_api.acs.of_party` or `of_all` call. The `ledgerTime` parameter should be
-        |chosen to be a time meaningful to the synchronizer on which you plan to subsequently invoke `participant.repair.add`
-        |on and will be retained alongside the contract instance by the `participant.repair.add` invocation."""
-    )
-    def contract_data_to_instance(contractData: ContractData, ledgerTime: Instant)(implicit
-        env: ConsoleEnvironment
-    ): SerializableContract =
-      TraceContext.withNewTraceContext { implicit traceContext =>
-        env.runE(
-          RepairService.ContractConverter.contractDataToInstance(
-            contractData.templateId.toIdentifier,
-            contractData.packageName,
-            contractData.packageVersion,
-            contractData.createArguments,
-            contractData.signatories,
-            contractData.observers,
-            contractData.inheritedContractId,
-            contractData.ledgerCreateTime.map(_.toInstant).getOrElse(ledgerTime),
-            contractData.contractSalt,
-          )
-        )
-      }
-
-    @Help.Summary("Convert a contract instance to contract data.")
-    @Help.Description(
-      """The `utils.contract_instance_to_data` converts a Canton "contract instance" to "contract data", a format more
-        |amenable to inspection and modification as part of repair workflows. This function consumes the output of
-        |the `participant.testing` commands and can thus be employed in workflows geared at verifying the contents of
-        |contracts for diagnostic purposes and in environments in which the "features.enable-testing-commands"
-        |configuration can be (at least temporarily) enabled."""
-    )
-    def contract_instance_to_data(
-        contract: SerializableContract
-    )(implicit env: ConsoleEnvironment): ContractData =
-      env.runE(
-        RepairService.ContractConverter.contractInstanceToData(contract).map {
-          case (
-                templateId,
-                packageName,
-                packageVersion,
-                createArguments,
-                signatories,
-                observers,
-                contractId,
-                contractSaltO,
-                ledgerCreateTime,
-              ) =>
-            ContractData(
-              TemplateId.fromIdentifier(templateId),
-              packageName,
-              packageVersion,
-              createArguments,
-              signatories,
-              observers,
-              contractId,
-              contractSaltO,
-              Some(ledgerCreateTime.ts.underlying),
-            )
-        }
-      )
 
     @Help.Summary("Recompute authenticated contract ids.")
     @Help.Description(
@@ -528,7 +457,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         template: String,
         arguments: Map[String, Any],
     ): Command =
-      Command().withCreate(
+      Command.defaultInstance.withCreate(
         CreateCommand(
           // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
@@ -545,7 +474,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         arguments: Map[String, Any],
         contractId: String,
     ): Command =
-      Command().withExercise(
+      Command.defaultInstance.withExercise(
         ExerciseCommand(
           // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
@@ -700,7 +629,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         proposedOrExisting.reduceLeft[SignedTopologyTransaction[
           TopologyChangeOp,
           DecentralizedNamespaceDefinition,
-        ]]((txA, txB) => txA.addSignatures(txB.signatures.forgetNE.toSeq))
+        ]]((txA, txB) => txA.addSignaturesFromTransaction(txB))
 
       val ownerNSDs = owners.flatMap(_.topology.transactions.identity_transactions())
       val foundingTransactions = ownerNSDs :+ decentralizedNamespaceDefinition
@@ -861,7 +790,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         .map(
           // combine signatures of transactions with the same hash
           _.reduceLeft[PositiveSignedTopologyTransaction] { (a, b) =>
-            a.addSignatures(b.signatures.toSeq)
+            a.addSignaturesFromTransaction(b)
           }.updateIsProposal(isProposal = false)
         )
         .toSeq
@@ -1077,6 +1006,52 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
       // TODO(#9557) 9. Write user-readable data in the readable output file regarding mismatching contracts ids
     }
+  }
+
+  @Help.Summary("Repair utilities")
+  @Help.Group("Repair")
+  lazy val repair = new RepairMacros(loggerFactory)
+
+  @Help.Summary("Convenience functions to configure behavior of pruning on all nodes at once")
+  @Help.Group("Pruning")
+  object pruning extends Helpful {
+
+    @Help.Summary(
+      "Sets the pruning schedule on all participants, mediators, and database sequencers in the environment"
+    )
+    def set_schedule(
+        cron: String,
+        maxDuration: config.PositiveDurationSeconds,
+        retention: config.PositiveDurationSeconds,
+    )(implicit env: ConsoleEnvironment): Unit =
+      allPrunableNodes.foreach { case (name, prunable) =>
+        prunable.set_schedule(cron, maxDuration, retention)
+        logger.info(s"Enabled pruning of node $name at $cron")
+      }
+
+    @Help.Summary(
+      "Deactivates scheduled pruning on all participants, mediators, and database sequencers in the environment"
+    )
+    def clear_schedule()(implicit env: ConsoleEnvironment): Unit =
+      allPrunableNodes.foreach { case (name, prunable) =>
+        prunable.clear_schedule()
+        logger.info(s"Disabled pruning of node $name")
+      }
+
+    // Helper to find all HA-active nodes
+    private def allPrunableNodes(implicit
+        env: ConsoleEnvironment
+    ): Map[String, PruningSchedulerAdministration[_]] =
+      (env.participants.all.collect { case p if p.health.active => p.name -> p.pruning }
+        ++ env.sequencers.all.collect {
+          case s
+              if s.health.status.successOption.exists(_.admin.acceptsAdminChanges) &&
+                // TODO(#15987): Remove the Try when block sequencers support scheduled pruning
+                util.Try(s.pruning.get_schedule().discard).isSuccess =>
+            s.name -> s.pruning
+        }
+        ++ env.mediators.all.collect { case m if m.health.active => m.name -> m.pruning }).toMap
+
   }
 }
 

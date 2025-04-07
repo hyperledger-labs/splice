@@ -11,7 +11,6 @@ import com.daml.ledger.javaapi.data.codegen.{
   Contract as JavaGenContract,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
@@ -58,7 +57,6 @@ object ContractCompanions {
 
   // Unfortunately interfaces need to be declared explicitly, as there's no auto-generated list of decoders
   private val interfaces = Seq(
-    metadatav1.RegistryAppInstall.INTERFACE,
     holdingv1.BurnMintFactory.INTERFACE,
     holdingv1.Holding.INTERFACE,
     transferinstructionv1.TransferInstruction.INTERFACE,

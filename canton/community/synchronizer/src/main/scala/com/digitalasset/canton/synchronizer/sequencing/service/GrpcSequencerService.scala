@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.config.CantonRequireTypes.String73
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -47,7 +48,6 @@ import com.digitalasset.canton.tracing.{
 }
 import com.digitalasset.canton.util.{EitherTUtil, RateLimiter}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{ProtoDeserializationError, SequencerCounter}
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.Status
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
@@ -188,9 +188,9 @@ class GrpcSequencerService(
   def disconnectAllMembers()(implicit traceContext: TraceContext): Unit =
     subscriptionPool.closeAllSubscriptions()
 
-  override def sendAsyncVersioned(
-      requestP: v30.SendAsyncVersionedRequest
-  ): Future[v30.SendAsyncVersionedResponse] = {
+  override def sendAsync(
+      requestP: v30.SendAsyncRequest
+  ): Future[v30.SendAsyncResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
     // This has to run at the beginning, because it reads from a thread-local.
@@ -230,11 +230,11 @@ class GrpcSequencerService(
       )
       _ <- checkRate(request.content)
       _ <- sequencer.sendAsyncSigned(request)
-    } yield v30.SendAsyncVersionedResponse()
+    } yield v30.SendAsyncResponse()
 
     val resET = performUnlessClosingEitherUSF(functionFullName)(sendET.leftMap { err =>
       logger.info(s"Rejecting submission request by $senderFromMetadata with $err")
-      err.toCantonError
+      err.toCantonRpcError
     })
     CantonGrpcUtil.mapErrNewEUS(resET)
   }
@@ -411,35 +411,37 @@ class GrpcSequencerService(
   }
 
   private def toVersionSubscriptionResponseV0(event: OrdinarySerializedEvent) =
-    v30.VersionedSubscriptionResponse(
+    v30.SubscriptionResponse(
       signedSequencedEvent = event.signedEvent.toByteString,
       Some(SerializableTraceContext(event.traceContext).toProtoV30),
     )
 
-  override def subscribeVersioned(
-      request: v30.SubscriptionRequest,
-      responseObserver: StreamObserver[v30.VersionedSubscriptionResponse],
+  override def subscribeV2(
+      request: v30.SubscriptionRequestV2,
+      responseObserver: StreamObserver[v30.SubscriptionResponse],
   ): Unit =
-    subscribeInternal[v30.VersionedSubscriptionResponse](
+    subscribeInternalV2[v30.SubscriptionResponse](
       request,
       responseObserver,
       toVersionSubscriptionResponseV0,
     )
 
-  private def subscribeInternal[T](
-      request: v30.SubscriptionRequest,
+  private def subscribeInternalV2[T](
+      request: v30.SubscriptionRequestV2,
       responseObserver: StreamObserver[T],
       toSubscriptionResponse: OrdinarySerializedEvent => T,
   ): Unit = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     withServerCallStreamObserver(responseObserver) { observer =>
       val result = for {
-        subscriptionRequest <- SubscriptionRequest
+        subscriptionRequest <- SubscriptionRequestV2
           .fromProtoV30(request)
           .left
           .map(err => invalidRequest(err.toString))
-        SubscriptionRequest(member, offset) = subscriptionRequest
-        _ = logger.debug(s"Received subscription request from $member for offset $offset")
+        SubscriptionRequestV2(member, timestamp) = subscriptionRequest
+        _ = logger.debug(
+          s"Received subscription request from $member for timestamp (inclusive) $timestamp"
+        )
         _ <- Either.cond(
           !isClosing,
           (),
@@ -450,10 +452,10 @@ class GrpcSequencerService(
         _ <- subscriptionPool
           .create(
             () =>
-              createSubscription[T](
+              createSubscriptionV2[T](
                 member,
                 authenticationTokenO.map(_.expireAt),
-                offset,
+                timestamp,
                 observer,
                 toSubscriptionResponse,
               ),
@@ -517,17 +519,17 @@ class GrpcSequencerService(
     result.asGrpcResponse
   }
 
-  private def createSubscription[T](
+  private def createSubscriptionV2[T](
       member: Member,
       expireAt: Option[CantonTimestamp],
-      counter: SequencerCounter,
+      timestamp: Option[CantonTimestamp],
       observer: ServerCallStreamObserver[T],
       toSubscriptionResponse: OrdinarySerializedEvent => T,
   )(implicit traceContext: TraceContext): GrpcManagedSubscription[T] = {
 
-    logger.info(s"$member subscribes from counter=$counter")
+    logger.info(s"$member subscribes from timestamp=$timestamp")
     new GrpcManagedSubscription(
-      handler => directSequencerSubscriptionFactory.create(counter, member, handler),
+      handler => directSequencerSubscriptionFactory.createV2(timestamp, member, handler),
       observer,
       member,
       expireAt,

@@ -3,10 +3,16 @@
 
 package com.digitalasset.canton.console.commands
 
+import better.files.File
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
+import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction
 import com.digitalasset.canton.LedgerParticipantId
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
+  TopologyTransactionWrapper,
+  UpdateWrapper,
+}
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -16,8 +22,10 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListPartiesResult,
   PartyDetails,
 }
-import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.admin.participant.v30.ExportAcsResponse
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
+import com.digitalasset.canton.console.commands.TopologyTxFiltering.{ChangedFilter, RevokedFilter}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CantonInternalError,
@@ -32,12 +40,15 @@ import com.digitalasset.canton.console.{
   ParticipantReference,
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.grpc.FileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Context
 
 import java.time.Instant
 import scala.util.Try
@@ -98,6 +109,8 @@ class ParticipantPartiesAdministrationGroup(
 ) extends PartiesAdministrationGroup(reference, consoleEnvironment)
     with FeatureFlagFilter {
 
+  private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
+
   @Help.Summary("List parties hosted by this participant")
   @Help.Description("""Inspect the parties hosted by this participant as used for synchronisation.
       |The response is built from the timestamped topology transactions of each synchronizer, excluding the
@@ -153,8 +166,8 @@ class ParticipantPartiesAdministrationGroup(
       participants: Seq[ParticipantId] = Seq(participantId),
       threshold: PositiveInt = PositiveInt.one,
       // TODO(i10809) replace wait for synchronizer for a clean topology synchronisation using the dispatcher info
-      waitForSynchronizer: SynchronizerChoice = SynchronizerChoice.Only(Seq()),
-      synchronizeParticipants: Seq[ParticipantReference] = Seq(),
+      waitForSynchronizer: SynchronizerChoice = SynchronizerChoice.All,
+      synchronizeParticipants: Seq[ParticipantReference] = consoleEnvironment.participants.all,
       mustFullyAuthorize: Boolean = true,
       synchronize: Option[NonNegativeDuration] = Some(
         consoleEnvironment.commandTimeouts.unbounded
@@ -304,7 +317,8 @@ class ParticipantPartiesAdministrationGroup(
               )
             ),
           ),
-          signedBy = Seq(this.participantId.fingerprint),
+          // let the topology service determine the appropriate keys to use
+          signedBy = Seq.empty,
           serial = nextSerial,
           store = TopologyStoreId.Authorized,
           mustFullyAuthorize = mustFullyAuthorize,
@@ -316,12 +330,12 @@ class ParticipantPartiesAdministrationGroup(
   }
 
   @Help.Summary("Disable party on participant")
-  def disable(party: PartyId, force: ForceFlags = ForceFlags.none): Unit =
+  def disable(party: PartyId, forceFlags: ForceFlags = ForceFlags.none): Unit =
     reference.topology.party_to_participant_mappings
       .propose_delta(
         party,
         removes = List(this.participantId),
-        force = force,
+        forceFlags = forceFlags,
       )
       .discard
 
@@ -377,6 +391,222 @@ class ParticipantPartiesAdministrationGroup(
       reference.health.wait_for_initialized()
       TopologySynchronisation.awaitTopologyObserved(reference, partyAssignment, timeout)
     }
+
+  // TODO(#24827) - Revise filtering such that only transactions are used where a party is really added to a participant
+  @Help.Summary("Finds a party's highest activation offset.")
+  @Help.Description(
+    """This command locates the highest ledger offset where a party's activation matches
+      |specified criteria.
+      |
+      |It searches the ledger for topology transactions, sequenced by the given synchronizer
+      |(`synchronizerId`), that result in the party (`partyId`) being newly hosted on the
+      |participant (`participantId`). An optional `validFrom` timestamp filters the topology
+      |transactions for their effective time.
+      |
+      |The ledger search occurs within the specified offset range, targeting a specific number
+      |of topology transactions (`completeAfter`).
+      |
+      |The search begins at the ledger start if `beginOffsetExclusive` is default. If the
+      |participant was pruned and `beginOffsetExclusive` is below the pruning offset, a
+      |`NOT_FOUND` error occurs. Use an `beginOffsetExclusive` near, but before, the desired
+      |topology transactions.
+      |
+      |If `endOffsetInclusive` is not set (`None`), the search continues until `completeAfter`
+      |number of transactions are found or the `timeout` expires. Otherwise, the ledger search
+      |ends at the specified offset.
+      |
+      |This command is useful for creating ACS snapshots with `export_acs`, which requires the
+      |party activation ledger offset.
+      |
+      |
+      |The arguments are:
+      |- partyId: The party to find activations for.
+      |- participantId: The participant hosting the new party.
+      |- synchronizerId: The synchronizer sequencing the activations.
+      |- validFrom: The activation's effective time (default: None).
+      |- beginOffsetExclusive: Starting ledger offset (default: 0).
+      |- endOffsetInclusive: Ending ledger offset (default: None = trailing search).
+      |- completeAfter: Number of transactions to find (default: Maximum = no limit).
+      |- timeout: Search timeout (default: 1 minute).
+      |"""
+  )
+  def find_party_max_activation_offset(
+      partyId: PartyId,
+      participantId: ParticipantId,
+      synchronizerId: SynchronizerId,
+      validFrom: Option[Instant] = None,
+      beginOffsetExclusive: Long = 0L,
+      endOffsetInclusive: Option[Long] = None,
+      completeAfter: PositiveInt = PositiveInt.MaxValue,
+      timeout: NonNegativeDuration = timeouts.bounded,
+  ): NonNegativeLong = {
+    val filter = TopologyTxFiltering.getTopologyFilter(
+      partyId,
+      participantId,
+      synchronizerId,
+      validFrom,
+      ChangedFilter,
+    )(consoleEnvironment)
+
+    findTopologyOffset(
+      partyId,
+      beginOffsetExclusive,
+      endOffsetInclusive,
+      completeAfter,
+      timeout,
+      filter,
+    )
+  }
+
+  @Help.Summary("Finds a party's highest deactivation offset.")
+  @Help.Description(
+    """This command locates the highest ledger offset where a party's deactivation matches
+      |specified criteria.
+      |
+      |It searches the ledger for topology transactions, sequenced by the given synchronizer
+      |(`synchronizerId`), that result in the party (`partyId`) being revoked on the participant
+      |(`participantId`). An optional `validFrom` timestamp filters the topology transactions
+      |for their effective time.
+      |
+      |The ledger search occurs within the specified offset range, targeting a specific number
+      |of topology transactions (`completeAfter`).
+      |
+      |The search begins at the ledger start if `beginOffsetExclusive` is default. If the
+      |participant was pruned and `beginOffsetExclusive` is below the pruning offset, a
+      |`NOT_FOUND` error occurs. Use an `beginOffsetExclusive` near, but before, the desired
+      |topology transactions.
+      |
+      |If `endOffsetInclusive` is not set (`None`), the search continues until `completeAfter`
+      |number of transactions are found or the `timeout` expires. Otherwise, the ledger search
+      |ends at the specified offset.
+      |
+      |This command is useful for finding active contracts at the ledger offset where a party
+      |has been off-boarded from a participant.
+      |
+      |
+      |The arguments are:
+      |- partyId: The party to find deactivations for.
+      |- participantId: The participant hosting the new party.
+      |- synchronizerId: The synchronizer sequencing the deactivations.
+      |- validFrom: The deactivation's effective time (default: None).
+      |- beginOffsetExclusive: Starting ledger offset (default: 0).
+      |- endOffsetInclusive: Ending ledger offset (default: None = trailing search).
+      |- completeAfter: Number of transactions to find (default: Maximum = no limit).
+      |- timeout: Search timeout (default: 1 minute).
+      |"""
+  )
+  def find_party_max_deactivation_offset(
+      partyId: PartyId,
+      participantId: ParticipantId,
+      synchronizerId: SynchronizerId,
+      validFrom: Option[Instant] = None,
+      beginOffsetExclusive: Long = 0L,
+      endOffsetInclusive: Option[Long] = None,
+      completeAfter: PositiveInt = PositiveInt.MaxValue,
+      timeout: NonNegativeDuration = timeouts.bounded,
+  ): NonNegativeLong = {
+    val filter = TopologyTxFiltering.getTopologyFilter(
+      partyId,
+      participantId,
+      synchronizerId,
+      validFrom,
+      RevokedFilter,
+    )(consoleEnvironment)
+
+    findTopologyOffset(
+      partyId,
+      beginOffsetExclusive,
+      endOffsetInclusive,
+      completeAfter,
+      timeout,
+      filter,
+    )
+  }
+
+  private def findTopologyOffset(
+      party: PartyId,
+      beginOffsetExclusive: Long,
+      endOffsetInclusive: Option[Long],
+      completeAfter: PositiveInt,
+      timeout: NonNegativeDuration,
+      filter: UpdateWrapper => Boolean,
+  ): NonNegativeLong = {
+    val topologyTransactions: Seq[TopologyTransaction] = reference.ledger_api.updates
+      .topology_transactions(
+        partyIds = Seq(party),
+        completeAfter = completeAfter,
+        timeout = timeout,
+        beginOffsetExclusive = beginOffsetExclusive,
+        endOffsetInclusive = endOffsetInclusive,
+        resultFilter = filter,
+      )
+      .collect { case TopologyTransactionWrapper(topologyTransaction) => topologyTransaction }
+
+    topologyTransactions
+      .map(_.offset)
+      .map(NonNegativeLong.tryCreate)
+      .lastOption
+      .getOrElse(
+        consoleEnvironment.raiseError(
+          "Offset not found in topology data. Possible causes: " +
+            "1) No topology transaction exists (Solution: Initiate a new topology transaction). " +
+            "2) Existing topology transactions do not match the specified search criteria. (Solution: Adjust search criteria). " +
+            "3) The ledger has not yet processed the relevant topology transaction. (Solution: Retry after delay, ensuring the ledger (end) has advanced)."
+        )
+      )
+  }
+
+  @Help.Summary("Export active contracts for the given set of parties to a file.")
+  @Help.Description(
+    """This command exports the current Active Contract Set (ACS) of a given set of parties to a
+      |GZIP compressed ACS snapshot file. Afterwards, the `import_acs` repair command imports it
+      |into a participant's ACS again.
+      |
+      |Note that the `export_acs` command execution may take a long time to complete and may
+      |require significant memory (RAM) depending on the size of the ACS.
+      |
+      |The arguments are:
+      |- parties: Identifying contracts having at least one stakeholder from the given set.
+      |- exportFilePath: The path denoting the file where the ACS snapshot will be stored.
+      |- filterSynchronizerId: When defined, restricts the export to the given synchronizer.
+      |- ledgerOffset: The offset at which the ACS snapshot is exported.
+      |- contractSynchronizerRenames: Changes the associated synchronizer id of contracts from
+      |                               one synchronizer to another based on the mapping.
+      |- timeout: A timeout for this operation to complete.
+      |- templateFilter: Template IDs for the contracts to be exported.
+      """
+  )
+  def export_acs(
+      parties: Set[PartyId],
+      exportFilePath: String = "canton-acs-export.gz",
+      filterSynchronizerId: Option[SynchronizerId] = None,
+      ledgerOffset: NonNegativeLong,
+      contractSynchronizerRenames: Map[SynchronizerId, SynchronizerId] = Map.empty,
+      timeout: NonNegativeDuration = timeouts.unbounded,
+  ): Unit =
+    consoleEnvironment.run {
+      val file = File(exportFilePath)
+      val responseObserver = new FileStreamObserver[ExportAcsResponse](file, _.chunk)
+
+      def call: ConsoleCommandResult[Context.CancellableContext] =
+        reference.adminCommand(
+          ParticipantAdminCommands.PartyManagement.ExportAcs(
+            parties,
+            filterSynchronizerId,
+            ledgerOffset.unwrap,
+            responseObserver,
+            contractSynchronizerRenames,
+          )
+        )
+
+      processResult(
+        call,
+        responseObserver.result,
+        timeout,
+        request = "exporting acs",
+        cleanupOnError = () => file.delete(),
+      )
+    }
 }
 
 object TopologySynchronisation {
@@ -404,4 +634,53 @@ object TopologySynchronisation {
         }
       }
     }
+}
+
+private object TopologyTxFiltering {
+  sealed trait AuthorizationFilterKind
+  case object ChangedFilter extends AuthorizationFilterKind
+  case object RevokedFilter extends AuthorizationFilterKind
+
+  def getTopologyFilter(
+      partyId: PartyId,
+      participantId: ParticipantId,
+      synchronizerId: SynchronizerId,
+      validFrom: Option[Instant],
+      filterType: AuthorizationFilterKind,
+  )(consoleEnvironment: ConsoleEnvironment): UpdateWrapper => Boolean = {
+    def filterOnEffectiveTime(tx: TopologyTransaction, recordTime: Option[Instant]): Boolean =
+      recordTime.forall { instant =>
+        tx.recordTime match {
+          case Some(ts) =>
+            ProtoConverter.InstantConverter
+              .fromProtoPrimitive(ts)
+              .valueOr(err =>
+                consoleEnvironment.raiseError(
+                  s"Failed record time timestamp conversion for $ts: $err"
+                )
+              ) == instant
+          case None => false
+        }
+      }
+
+    def filter(wrapper: UpdateWrapper): Boolean =
+      wrapper match {
+        case TopologyTransactionWrapper(tx) =>
+          synchronizerId.toProtoPrimitive == wrapper.synchronizerId &&
+          tx.events.exists { tx =>
+            filterType match {
+              case ChangedFilter =>
+                val changed = tx.getParticipantAuthorizationChanged
+                changed.partyId == partyId.toLf && changed.participantId == participantId.toLf
+              case RevokedFilter =>
+                val revoked = tx.getParticipantAuthorizationRevoked
+                revoked.partyId == partyId.toLf && revoked.participantId == participantId.toLf
+            }
+          } &&
+          filterOnEffectiveTime(tx, validFrom)
+        case _ => false
+      }
+
+    filter
+  }
 }

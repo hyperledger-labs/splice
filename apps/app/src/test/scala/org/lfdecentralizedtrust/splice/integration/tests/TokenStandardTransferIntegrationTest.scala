@@ -4,6 +4,11 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.crypto.*
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
 import java.util.UUID
 
@@ -14,15 +19,21 @@ class TokenStandardTransferIntegrationTest
     with TriggerTestUtil
     with ExternallySignedPartyTestUtil {
 
-  // TODO (#17384): support token standard choices in the script
-  override protected def runUpdateHistorySanityCheck: Boolean = false
-
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Validator)(
+          _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
+      )
   }
 
   "Token Standard transfer between externally signed parties" in { implicit env =>
+    // Setup Alice's validator operator with featured app rights
+    onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    aliceValidatorWalletClient.selfGrantFeaturedAppRight()
+
     // Onboard and Create/Accept ExternalPartySetupProposal for Alice
     val onboardingAlice @ OnboardingResult(aliceParty, _, alicePrivateKey) =
       onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
@@ -42,6 +53,7 @@ class TokenStandardTransferIntegrationTest
     }
 
     // Transfer 2000.0 to Alice
+
     aliceValidatorBackend
       .getExternalPartyBalance(aliceParty)
       .totalUnlockedCoin shouldBe "0.0000000000"
@@ -55,11 +67,18 @@ class TokenStandardTransferIntegrationTest
         )
       },
     )(
-      "Alice (external party) has received the 2000.0 Amulet",
+      "Alice (external party) has received the 2000.0 Amulet and featured app activity was recorded for alice's validator",
       _ => {
         aliceValidatorBackend
           .getExternalPartyBalance(aliceParty)
           .totalUnlockedCoin shouldBe "2000.0000000000"
+        val coupons = aliceValidatorWalletClient.listAppRewardCoupons()
+        inside(coupons) { _ =>
+          // It is OK to assert on the size of the list, as this is the one and only
+          // test-case in this suite; and validator parties are not shared across test suites.
+          coupons.size shouldBe 1
+          coupons.head.payload.featured shouldBe true
+        }
       },
     )
 

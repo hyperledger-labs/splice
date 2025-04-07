@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.CommandsOuterClass
 import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.api.v2
 import com.daml.ledger.javaapi
@@ -42,9 +41,6 @@ class TokenStandardAllocationIntegrationTest
     with WalletTestUtil
     with TriggerTestUtil
     with ExternallySignedPartyTestUtil {
-
-  // TODO (#17384): support token standard choices in the script
-  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   private val darPath =
     "token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar"
@@ -144,21 +140,8 @@ class TokenStandardAllocationIntegrationTest
           new metadatav1.Metadata(java.util.Map.of()),
         ),
       )
-      // TODO(#18483): remove this once canton no longer requires passing these explicitly
-      val extraDisclosedHoldings: Seq[CommandsOuterClass.DisclosedContract] =
-        senderHoldings.map(senderHolding =>
-          com.daml.ledger.api.v2.commands.DisclosedContract.toJavaProto(
-            com.daml.ledger.api.v2.commands.DisclosedContract(
-              templateId = Some(senderHolding.templateId.toIdentifier),
-              contractId = senderHolding.contractId,
-              createdEventBlob = senderHolding.event.createdEventBlob,
-            )
-          )
-        )
       val factoryChoice0 = sv1ScanBackend.getAllocationFactory(choiceArgs)
-      factoryChoice0.copy(disclosedContracts =
-        factoryChoice0.disclosedContracts ++ extraDisclosedHoldings
-      )
+      factoryChoice0.copy(disclosedContracts = factoryChoice0.disclosedContracts)
     }
   }
 

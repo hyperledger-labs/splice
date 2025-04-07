@@ -4,23 +4,22 @@
 package com.digitalasset.canton.lifecycle
 
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.OnShutdownRunner.RunOnShutdownHandle
+import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.TryUtil.*
 import com.digitalasset.canton.util.TwoPhasePriorityAccumulator
-import com.google.common.annotations.VisibleForTesting
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.Try
 
-trait OnShutdownRunner { this: AutoCloseable =>
+trait OnShutdownRunner extends HasRunOnClosing { this: AutoCloseable =>
 
   private val status: AtomicReference[OnShutdownRunner.Status] = new AtomicReference(
     OnShutdownRunner.Status.Running
   )
-  private val onShutdownTasks: TwoPhasePriorityAccumulator[RunOnShutdown, Unit] =
-    new TwoPhasePriorityAccumulator[RunOnShutdown, Unit](Some(_.done))
+  private val onShutdownTasks: TwoPhasePriorityAccumulator[RunOnClosing, Unit] =
+    new TwoPhasePriorityAccumulator[RunOnClosing, Unit](Some(_.done))
 
   protected def logger: TracedLogger
 
@@ -28,48 +27,29 @@ trait OnShutdownRunner { this: AutoCloseable =>
     * flag to the retry lib or you really know what you're doing, prefer `performUnlessClosing` and
     * friends.
     */
-  def isClosing: Boolean = status.get() != OnShutdownRunner.Status.Running
+  override def isClosing: Boolean = status.get() != OnShutdownRunner.Status.Running
 
   def runOnShutdownWithPriority_(
-      task: RunOnShutdown
-  )(implicit traceContext: TraceContext): Unit = {
+      task: RunOnClosing
+  ): Unit = {
     runOnShutdownWithPriority(task, 0).discard
   }
 
-  /** Register a task to run when shutdown is initiated.
-    *
-    * You can use this for example to register tasks that cancel long-running computations, whose
-    * termination you can then wait for in "closeAsync".
-    */
-  def runOnShutdown_[T](
-      task: RunOnShutdown
-  )(implicit traceContext: TraceContext): Unit =
-    runOnShutdown(task).discard
-
-  /** Same as [[runOnShutdown_]] but returns a token that allows you to remove the task explicitly
-    * from being run using
-    * [[com.digitalasset.canton.lifecycle.OnShutdownRunner.RunOnShutdownHandle.cancel]]
-    */
-  def runOnShutdown[T](
-      task: RunOnShutdown
-  )(implicit traceContext: TraceContext): RunOnShutdownHandle = {
+  override def runOnClose(task: RunOnClosing): UnlessShutdown[LifeCycleRegistrationHandle] = {
     val priority = 10
     runOnShutdownWithPriority(task, priority)
   }
 
-  private def runOnShutdownWithPriority[T](task: RunOnShutdown, priority: Int)(implicit
-      traceContext: TraceContext
-  ) = {
+  private def runOnShutdownWithPriority[T](task: RunOnClosing, priority: Int) = {
     onShutdownTasks.accumulate(task, priority) match {
-      case Right(handle) =>
-        new RunOnShutdownHandle.ProxyItemHandle(handle)
-      case Left(_) =>
-        runTaskUnlessDone(task)
-        RunOnShutdownHandle.dummy
+      case Right(handle) => Outcome(new LifeCycleManager.LifeCycleRegistrationHandleImpl(handle))
+      case Left(_) => AbortedDueToShutdown
     }
   }
 
-  private def runTaskUnlessDone(task: RunOnShutdown)(implicit traceContext: TraceContext): Unit =
+  override protected[this] def runTaskUnlessDone(
+      task: RunOnClosing
+  )(implicit traceContext: TraceContext): Unit =
     Try {
       // TODO(#8594) Time limit the shutdown tasks similar to how we time limit the readers in FlagCloseable
       if (!task.done) task.run()
@@ -81,9 +61,6 @@ trait OnShutdownRunner { this: AutoCloseable =>
     onShutdownTasks.drain().foreach { case (task, _) => runTaskUnlessDone(task) }
   }
 
-  @VisibleForTesting
-  protected def runStateChanged(waitingState: Boolean = false): Unit = {} // used for unit testing
-
   protected def onFirstClose(): Unit
 
   /** Blocks until all earlier tasks have completed and then prevents further tasks from being run.
@@ -94,7 +71,6 @@ trait OnShutdownRunner { this: AutoCloseable =>
     logger.debug("Initiating shutdown.")(TraceContext.empty)
 
     val firstCallToClose = onShutdownTasks.stopAccumulating(()).isEmpty
-    runStateChanged()
     if (firstCallToClose) {
       // First run onShutdown tasks.
       // Important to run them in the beginning as they may be used to cancel long-running tasks.
@@ -118,26 +94,7 @@ trait OnShutdownRunner { this: AutoCloseable =>
 
 object OnShutdownRunner {
 
-  sealed trait RunOnShutdownHandle {
-    def cancel(): Unit
-    def isScheduled: Boolean
-  }
-  object RunOnShutdownHandle {
-    private[OnShutdownRunner] object dummy extends RunOnShutdownHandle {
-      override def cancel(): Unit = ()
-      override def isScheduled: Boolean = false
-    }
-
-    private[OnShutdownRunner] final class ProxyItemHandle(
-        handle: TwoPhasePriorityAccumulator.ItemHandle
-    ) extends RunOnShutdownHandle {
-      override def cancel(): Unit = handle.remove().discard[Boolean]
-
-      override def isScheduled: Boolean = handle.accumulated
-    }
-  }
-
-  /** A closeable container for managing [[RunOnShutdown]] tasks and nothing else. */
+  /** A closeable container for managing [[RunOnClosing]] tasks and nothing else. */
   class PureOnShutdownRunner(override protected val logger: TracedLogger)
       extends AutoCloseable
       with OnShutdownRunner {
@@ -151,17 +108,4 @@ object OnShutdownRunner {
     case object SetAsClosing extends Status
     case object Closing extends Status
   }
-}
-
-/** Trait that can be registered with a [FlagCloseable] to run on shutdown */
-trait RunOnShutdown {
-
-  /** the name, used for logging during shutdown */
-  def name: String
-
-  /** true if the task has already run (maybe elsewhere) */
-  def done: Boolean
-
-  /** invoked by [FlagCloseable] during shutdown */
-  def run(): Unit
 }

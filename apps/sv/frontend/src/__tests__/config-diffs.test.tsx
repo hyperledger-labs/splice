@@ -1,15 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { fireEvent, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import {
   getExpectedAmuletRulesConfigDiffsHTML,
   getExpectedDsoRulesConfigDiffsHTML,
-} from 'common-test-handlers';
+} from '@lfdecentralizedtrust/splice-common-test-handlers';
 import {
   checkAmuletRulesExpectedConfigDiffsHTML,
   checkDsoRulesExpectedConfigDiffsHTML,
-} from 'common-test-utils';
+} from '@lfdecentralizedtrust/splice-common-test-utils';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';

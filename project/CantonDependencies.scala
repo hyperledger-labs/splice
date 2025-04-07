@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250227.13636.0.vdeaa9235"
+  val version: String = "3.3.0-snapshot.20250331.13697.0.vef800592"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -224,6 +224,7 @@ object CantonDependencies {
     "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry-java17" % s"$opentelemetry_java_instrumentation_version-alpha"
   lazy val opentelemetry_instrumentation_hikari =
     "io.opentelemetry.instrumentation" % "opentelemetry-hikaricp-3.0" % s"$opentelemetry_java_instrumentation_version-alpha"
+  lazy val opentelemetry_proto = "io.opentelemetry" % "opentelemetry-proto" % "1.7.1-alpha"
 
   lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.9.2"
 

@@ -7,7 +7,13 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  Identifier,
+  TransactionTree,
+  TreeEvent,
+}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -48,6 +54,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import slick.jdbc.canton.SQLActionBuilder
 
 import java.util.concurrent.atomic.AtomicReference
@@ -163,7 +170,7 @@ class UpdateHistory(
 
       override def initialize()(implicit
           traceContext: TraceContext
-      ): Future[Option[Long]] = {
+      ): Future[IngestionStart] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         // Notes:
@@ -236,10 +243,13 @@ class UpdateHistory(
           lastIngestedOffset match {
             case Some(offset) =>
               logger.info(s"${description()} resumed at offset $offset")
+              IngestionStart.ResumeAtOffset(offset)
             case None =>
               logger.info(s"${description()} initialized")
+              // In case the latest offset is not the beginning of the network,
+              // missing updates will be later backfilled using `ScanHistoryBackfillingTrigger`.
+              IngestionStart.InitializeAcsAtLatestOffset
           }
-          lastIngestedOffset
         }
       }
 
@@ -1192,7 +1202,7 @@ class UpdateHistory(
         /*implementedInterfaces = */ java.util.Collections.emptyList(),
       )
     }.toMap
-    val eventsById = createEventsById ++ exerciseEventsById
+    val eventsById: Map[Integer, TreeEvent] = createEventsById ++ exerciseEventsById
 
     LedgerClient.GetTreeUpdatesResponse(
       update = TransactionTreeUpdate(

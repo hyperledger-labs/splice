@@ -85,8 +85,8 @@ import com.digitalasset.canton.{
   BaseTest,
   FailOnShutdown,
   HasExecutorService,
-  LedgerApplicationId,
   LedgerCommandId,
+  LedgerUserId,
   LfPackageId,
   LfPartyId,
   ReassignmentCounter,
@@ -141,7 +141,7 @@ final class UnassignmentProcessingStepsTest
       submittingParticipant,
       LedgerCommandId.assertFromString("unassignment-processing-steps-command-id"),
       submissionId = None,
-      LedgerApplicationId.assertFromString("tests"),
+      LedgerUserId.assertFromString("tests"),
       workflowId = None,
     )
 
@@ -193,12 +193,6 @@ final class UnassignmentProcessingStepsTest
       FutureSupervisor.Noop,
       clock,
     )
-
-  private lazy val damle = DAMLeTestInstance(
-    submittingParticipant,
-    signatories = Set(submitter),
-    stakeholders = Set(submitter, party1),
-  )(loggerFactory)
 
   private lazy val unassignmentRequest = UnassignmentRequest(
     submitterMetadata = submitterMetadata(party1),
@@ -287,7 +281,6 @@ final class UnassignmentProcessingStepsTest
     new UnassignmentProcessingSteps(
       sourceSynchronizer,
       submittingParticipant,
-      damle,
       reassignmentCoordination,
       seedGenerator,
       Source(defaultStaticSynchronizerParameters),
@@ -857,6 +850,7 @@ final class UnassignmentProcessingStepsTest
             Batch.of(testedProtocolVersion, (signedResult, Recipients.cc(submittingParticipant)))
           Deliver.create(
             SequencerCounter(0),
+            None,
             CantonTimestamp.Epoch,
             sourceSynchronizer.unwrap,
             Some(MessageId.tryCreate("msg-0")),

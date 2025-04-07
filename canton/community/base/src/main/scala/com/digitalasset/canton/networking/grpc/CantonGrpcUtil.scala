@@ -6,13 +6,20 @@ package com.digitalasset.canton.networking.grpc
 import cats.Functor
 import cats.data.EitherT
 import cats.implicits.*
-import com.daml.error.{ErrorCategory, ErrorCategoryRetry, ErrorCode, Explanation, Resolution}
 import com.daml.grpc.AuthCallCredentials
+import com.digitalasset.base.error.{
+  ErrorCategory,
+  ErrorCategoryRetry,
+  ErrorCode,
+  Explanation,
+  Resolution,
+  RpcError,
+}
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.connection.v30.{ApiInfoServiceGrpc, GetApiInfoRequest}
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.GrpcErrorGroup
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, OnShutdownRunner, UnlessShutdown}
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasRunOnClosing, UnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -34,21 +41,21 @@ object CantonGrpcUtil {
   def wrapErrUS[T](value: ParsingResult[T])(implicit
       loggingContext: ErrorLoggingContext,
       ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, CantonError, T] =
+  ): EitherT[FutureUnlessShutdown, RpcError, T] =
     wrapErrUS(EitherT.fromEither[FutureUnlessShutdown](value))
 
   def wrapErrUS[T](value: EitherT[FutureUnlessShutdown, ProtoDeserializationError, T])(implicit
       loggingContext: ErrorLoggingContext,
       ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, CantonError, T] =
-    value.leftMap(x => ProtoDeserializationError.ProtoDeserializationFailure.Wrap(x): CantonError)
+  ): EitherT[FutureUnlessShutdown, RpcError, T] =
+    value.leftMap(x => ProtoDeserializationError.ProtoDeserializationFailure.Wrap(x): RpcError)
 
-  def mapErrNew[T <: CantonError, C](value: Either[T, C])(implicit
+  def mapErrNew[T <: RpcError, C](value: Either[T, C])(implicit
       ec: ExecutionContext
   ): EitherT[Future, StatusRuntimeException, C] =
     EitherT.fromEither[Future](value).leftMap(_.asGrpcError)
 
-  def mapErrNewETUS[T <: CantonError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
+  def mapErrNewETUS[T <: RpcError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
       ec: ExecutionContext,
       errorLoggingContext: ErrorLoggingContext,
   ): EitherT[Future, StatusRuntimeException, C] =
@@ -65,12 +72,12 @@ object CantonGrpcUtil {
   ): EitherT[Future, A, B] =
     value.onShutdown(throw AbortedDueToShutdown.Error().asGrpcError)
 
-  def mapErrNew[T <: CantonError, C](value: EitherT[Future, T, C])(implicit
+  def mapErrNew[T <: RpcError, C](value: EitherT[Future, T, C])(implicit
       ec: ExecutionContext
   ): Future[C] =
     EitherTUtil.toFuture(value.leftMap(_.asGrpcError))
 
-  def mapErrNewEUS[T <: CantonError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
+  def mapErrNewEUS[T <: RpcError, C](value: EitherT[FutureUnlessShutdown, T, C])(implicit
       ec: ExecutionContext,
       errorLoggingContext: ErrorLoggingContext,
   ): Future[C] =
@@ -130,7 +137,7 @@ object CantonGrpcUtil {
     }
 
     def go(backoffMs: Long): FutureUnlessShutdown[Either[GrpcError, Res]] =
-      if (client.onShutdownRunner.isClosing) FutureUnlessShutdown.abortedDueToShutdown
+      if (client.hasRunOnClosing.isClosing) FutureUnlessShutdown.abortedDueToShutdown
       else {
         logger.debug(s"Sending request $requestDescription to $serverName.")
         val sendF = sendGrpcRequestUnsafe(clientWithDeadline)(send)
@@ -140,7 +147,7 @@ object CantonGrpcUtil {
             FutureUnlessShutdown.pure(Right(value)).unwrap
           case Failure(e: StatusRuntimeException) =>
             val error = GrpcError(requestDescription, serverName, e)
-            if (client.onShutdownRunner.isClosing) {
+            if (client.hasRunOnClosing.isClosing) {
               logger.info(s"Ignoring gRPC error due to shutdown. Ignored error: $error")
               FutureUnlessShutdown.abortedDueToShutdown.unwrap
             } else {
@@ -153,7 +160,7 @@ object CantonGrpcUtil {
                     .delayIfNotClosing(
                       s"Delay retrying request $requestDescription for $serverName",
                       FiniteDuration.apply(effectiveBackoff, TimeUnit.MILLISECONDS),
-                      client.onShutdownRunner,
+                      client.hasRunOnClosing,
                     )
                     .flatMap { _ =>
                       logger.info(s"Retrying request $requestDescription for $serverName...")
@@ -196,7 +203,7 @@ object CantonGrpcUtil {
       stubFactory: Channel => Svc,
       timeout: Duration,
       logger: TracedLogger,
-      onShutdownRunner: OnShutdownRunner,
+      hasRunOnClosing: HasRunOnClosing,
       logPolicy: GrpcLogPolicy = DefaultGrpcLogPolicy,
       retryPolicy: GrpcError => Boolean,
       token: Option[String],
@@ -212,7 +219,7 @@ object CantonGrpcUtil {
       stubFactory,
       timeout,
       logger,
-      onShutdownRunner,
+      hasRunOnClosing,
       logPolicy,
       retryPolicy,
       token,
@@ -228,7 +235,7 @@ object CantonGrpcUtil {
       stubFactory: Channel => Svc,
       timeout: Duration,
       logger: TracedLogger,
-      onShutdownRunner: OnShutdownRunner,
+      hasRunOnClosing: HasRunOnClosing,
       logPolicy: GrpcLogPolicy,
       retryPolicy: GrpcError => Boolean,
       token: Option[String],
@@ -238,7 +245,7 @@ object CantonGrpcUtil {
     val managedChannel = GrpcManagedChannel(
       "sendSingleGrpcRequest",
       channelBuilder.build(),
-      onShutdownRunner,
+      hasRunOnClosing,
       logger,
     )
     val client = GrpcClient.create(
@@ -282,7 +289,7 @@ object CantonGrpcUtil {
     */
   def serverStreamingRequest[Svc <: AbstractStub[Svc], HasObserver, Resp](
       client: GrpcClient[Svc],
-      observerFactory: (CancellableContext, OnShutdownRunner) => HasObserver,
+      observerFactory: (CancellableContext, HasRunOnClosing) => HasObserver,
   )(getObserver: HasObserver => StreamObserver[Resp])(
       send: (Svc, StreamObserver[Resp]) => Unit
   )(implicit traceContext: TraceContext): HasObserver = {
@@ -317,7 +324,7 @@ object CantonGrpcUtil {
   @GrpcServiceInvocationMethod
   def bidirectionalStreamingRequest[Svc <: AbstractStub[Svc], F[_], HasObserver, Req, Resp](
       client: GrpcClient[Svc],
-      observerFactory: (CancellableContext, OnShutdownRunner) => F[HasObserver],
+      observerFactory: (CancellableContext, HasRunOnClosing) => F[HasObserver],
   )(getObserver: HasObserver => StreamObserver[Resp])(
       send: (Svc, StreamObserver[Resp]) => StreamObserver[Req]
   )(implicit traceContext: TraceContext, F: Functor[F]): F[(HasObserver, StreamObserver[Req])] = {
@@ -420,7 +427,7 @@ object CantonGrpcUtil {
       channelBuilder: ManagedChannelBuilderProxy,
       logger: TracedLogger,
       timeout: config.NonNegativeDuration,
-      onShutdownRunner: OnShutdownRunner,
+      hasRunOnClosing: HasRunOnClosing,
       token: Option[String],
   )(implicit
       ec: ExecutionContext,
@@ -436,7 +443,7 @@ object CantonGrpcUtil {
         logger = logger,
         logPolicy = CantonGrpcUtil.SilentLogPolicy,
         retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
-        onShutdownRunner = onShutdownRunner,
+        hasRunOnClosing = hasRunOnClosing,
         token = token,
       )(_.getApiInfo(GetApiInfoRequest()))
     for {

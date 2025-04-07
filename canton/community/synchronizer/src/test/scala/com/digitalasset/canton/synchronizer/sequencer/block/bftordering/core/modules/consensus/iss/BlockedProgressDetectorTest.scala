@@ -5,18 +5,17 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrderer
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.{
   Epoch,
   Segment,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore.Block
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.fakeSequencerId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
   ViewNumber,
@@ -110,7 +109,7 @@ class BlockedProgressDetectorTest extends AnyWordSpec with BftSequencerBaseTest 
       completedBlocks: Seq[Block] = Seq.empty,
   ) = {
     implicit val metricsContext: MetricsContext = MetricsContext.Empty
-    implicit val config: BftBlockOrderer.Config = BftBlockOrderer.Config()
+    implicit val config: BftBlockOrdererConfig = BftBlockOrdererConfig()
     new SegmentState(
       segment,
       epoch,
@@ -125,8 +124,8 @@ class BlockedProgressDetectorTest extends AnyWordSpec with BftSequencerBaseTest 
 
 object BlockedProgressDetectorTest {
 
-  private val myId = fakeSequencerId("self")
-  private val otherId = fakeSequencerId("otherId")
+  private val myId = BftNodeId("self")
+  private val otherId = BftNodeId("otherId")
   private val membership = Membership.forTesting(myId, Set(otherId))
   private val epochNumber = EpochNumber.First
   private val epoch = Epoch(
@@ -144,7 +143,6 @@ object BlockedProgressDetectorTest {
           .create(
             BlockMetadata(epochNumber, blockNumber),
             ViewNumber.First,
-            CantonTimestamp.Epoch,
             OrderingBlock(Seq.empty),
             CanonicalCommitSet(Set.empty),
             myId,
