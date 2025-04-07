@@ -1,6 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import {
+  Alerting,
+  AlertState,
   DisableConditionally,
   Loading,
   SvClientProvider,
@@ -18,7 +20,6 @@ import { ElectionRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRu
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useElectionContext, useDsoInfos } from '../contexts/SvContext';
 import { useSvConfig } from '../utils';
-import { Alerting, AlertState } from '../utils/Alerting';
 import RankingForm, { User } from '../utils/RankingForm';
 
 interface ListRankingsProps {

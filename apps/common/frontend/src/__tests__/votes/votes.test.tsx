@@ -4,33 +4,34 @@ import {
   AmuletPriceVote,
   DsoInfo,
   SvVote,
+  theme,
   VotesHooks,
   VotesHooksContext,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { theme } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import {
   dsoInfo,
-  getExpectedAmuletRulesConfigDiffsHTML,
+  getDsoSvOffboardingAction,
 } from '@lfdecentralizedtrust/splice-common-test-handlers';
-import { checkAmuletRulesExpectedConfigDiffsHTML } from '@lfdecentralizedtrust/splice-common-test-utils';
-import { QueryClient, UseQueryResult, useQuery, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider, useQuery, UseQueryResult } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
+import dayjs from 'dayjs';
 import React from 'react';
-import { test, expect, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { ThemeProvider } from '@mui/material';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
-  VoteRequest,
   DsoRules_CloseVoteRequestResult,
+  VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { ContractId } from '@daml/types';
 
 import * as constants from '../mocks/constants';
 import { ListVoteRequests } from '../../components';
+import VoteModalContent from '../../components/votes/VoteModalContent';
 
 const queryClient = new QueryClient();
 // The linter wants me to add the constants.X in the queryKey,
@@ -56,7 +57,9 @@ const provider: VotesHooks = {
   useListDsoRulesVoteRequests(): UseQueryResult<Contract<VoteRequest>[]> {
     return useQuery({
       queryKey: ['useListDsoRulesVoteRequests', constants.votedRequest, constants.unvotedRequest],
-      queryFn: async () => [constants.votedRequest, constants.unvotedRequest],
+      queryFn: async () => {
+        return [constants.votedRequest, constants.unvotedRequest];
+      },
     });
   },
   useListVoteRequestResult(
@@ -129,7 +132,10 @@ const TestVotes: React.FC<{ showActionNeeded: boolean }> = ({ showActionNeeded }
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <VotesHooksContext.Provider value={provider}>
-          <ListVoteRequests showActionNeeded={showActionNeeded} />
+          <ListVoteRequests
+            supportsVoteEffectivityAndSetConfig
+            showActionNeeded={showActionNeeded}
+          />
         </VotesHooksContext.Provider>
       </QueryClientProvider>
     </ThemeProvider>
@@ -153,23 +159,6 @@ describe('Votes list should', () => {
     expect(screen.queryByText('Action Needed')).toBeNull();
   });
 
-  test('Show votes that are planned', async () => {
-    render(<TestVotes showActionNeeded />);
-
-    const planned = await screen.findByText('Planned');
-    expect(planned).toBeDefined();
-    fireEvent.click(planned);
-
-    const plannedRows = await screen.findAllByText('CRARC_AddFutureAmuletConfigSchedule');
-    expect(plannedRows).toHaveLength(1);
-
-    const action = plannedRows[0]; // Use the first element from the array
-    fireEvent.click(action);
-
-    const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '0.06');
-    await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
-  });
-
   test('Show votes that are executed', async () => {
     render(<TestVotes showActionNeeded />);
 
@@ -190,5 +179,58 @@ describe('Votes list should', () => {
 
     const plannedRows = await screen.findAllByText('SRARC_UpdateSvRewardWeight');
     expect(plannedRows).toHaveLength(1);
+  });
+});
+
+describe('Vote Modal', () => {
+  test('displays a valid expiry date when vote request expires in the future', async () => {
+    const expiryDate = dayjs().add(1, 'day');
+    const expected = `${expiryDate.format('YYYY-MM-DD HH:mm')} (in a day)`;
+
+    render(
+      <ThemeProvider theme={theme}>
+        <QueryClientProvider client={queryClient}>
+          <VotesHooksContext.Provider value={provider}>
+            <VoteModalContent
+              voteRequestContractId={'contractId' as ContractId<VoteRequest>}
+              actionReq={getDsoSvOffboardingAction('sv1')}
+              requester="sv1"
+              getMemberName={() => 'sv1'}
+              reason={{ body: 'reason', url: 'url' }}
+              voteBefore={expiryDate.toDate()}
+              rejectedVotes={[]}
+              acceptedVotes={[]}
+            />
+          </VotesHooksContext.Provider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    );
+
+    const expiryDateField = await screen.findByTestId('vote-request-modal-expires-at');
+    expect(expiryDateField.textContent).toEqual(expected);
+  });
+
+  test('displays Did not expire when vote request is past expiry date but threshold was reached', async () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <QueryClientProvider client={queryClient}>
+          <VotesHooksContext.Provider value={provider}>
+            <VoteModalContent
+              voteRequestContractId={'contractId' as ContractId<VoteRequest>}
+              actionReq={getDsoSvOffboardingAction('sv1')}
+              requester="sv1"
+              getMemberName={() => 'sv1'}
+              reason={{ body: 'reason', url: 'url' }}
+              voteBefore={dayjs().subtract(1, 'day').toDate()}
+              rejectedVotes={[]}
+              acceptedVotes={[]}
+            />
+          </VotesHooksContext.Provider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    );
+
+    const expiryDate = await screen.findByTestId('vote-request-modal-expires-at');
+    expect(expiryDate.textContent).toEqual('Did not expire');
   });
 });

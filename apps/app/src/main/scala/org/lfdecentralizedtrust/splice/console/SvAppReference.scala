@@ -171,6 +171,7 @@ abstract class SvAppReference(
       reasonUrl: String,
       reasonDescription: String,
       expiration: RelTime,
+      effectiveTime: Option[Instant],
   )(implicit tc: TraceContext): Unit = {
     consoleEnvironment.run {
       httpCommand(
@@ -180,6 +181,7 @@ abstract class SvAppReference(
           reasonUrl,
           reasonDescription,
           expiration,
+          effectiveTime,
         )
       )
     }
@@ -216,6 +218,7 @@ abstract class SvAppReference(
     }
   }
 
+  @Help.Summary("List vote results")
   def listVoteRequestResults(
       actionName: Option[String],
       accepted: Option[Boolean],
@@ -233,7 +236,7 @@ abstract class SvAppReference(
           effectiveFrom,
           effectiveTo,
           limit,
-        )
+        )()
       )
     }
   }

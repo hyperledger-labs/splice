@@ -22,6 +22,7 @@ import { ActionFromForm } from '../VoteRequest';
 
 dayjs.extend(utc);
 
+// TODO(#16139): Retire this file
 const AddFutureAmuletConfigSchedule: React.FC<{
   chooseAction: (action: ActionFromForm) => void;
 }> = ({ chooseAction }) => {

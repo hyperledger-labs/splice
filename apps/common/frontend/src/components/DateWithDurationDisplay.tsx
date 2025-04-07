@@ -5,6 +5,8 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import React from 'react';
 
+import { Box } from '@mui/system';
+
 dayjs.extend(relativeTime);
 
 interface DateWithDurationDisplayProps {
@@ -12,6 +14,7 @@ interface DateWithDurationDisplayProps {
   format?: string;
   enableDuration?: boolean;
   onlyDuration?: boolean;
+  id?: string;
 }
 
 const DateWithDurationDisplay: React.FC<DateWithDurationDisplayProps> = (
@@ -29,11 +32,11 @@ const DateWithDurationDisplay: React.FC<DateWithDurationDisplayProps> = (
   const expireDuration = props.enableDuration ? `(${dayjs(dateObj).fromNow()})` : '';
 
   return (
-    <>
+    <Box component="span" id={props.id} data-testid={props.id}>
       {props.enableDuration && props.onlyDuration
         ? expireDuration
         : `${format(dateObj, f)} ${expireDuration}`}
-    </>
+    </Box>
   );
 };
 

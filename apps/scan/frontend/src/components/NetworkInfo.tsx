@@ -6,6 +6,7 @@ import {
   ErrorDisplay,
   getAmuletConfigurationAsOfNow,
   Loading,
+  supportsVoteEffectivityAndSetConfig,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { microsecondsToMinutes } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import BigNumber from 'bignumber.js';
 import { formatDistanceToNow } from 'date-fns';
+import dayjs from 'dayjs';
 
 import {
   Card,
@@ -31,6 +33,7 @@ import {
 import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig/module';
 import { SteppedRate } from '@daml.js/splice-amulet/lib/Splice/Fees/module';
 
+import { useListDsoRulesVoteRequests } from '../hooks';
 import { useScanConfig } from '../utils';
 
 const NetworkInfo: React.FC = () => {
@@ -96,6 +99,9 @@ const NetworkInfo: React.FC = () => {
     case 'error':
       return <ErrorDisplay message="Failed to fetch amulet rules" />;
     case 'success':
+      const supportNewGovernanceFlow = supportsVoteEffectivityAndSetConfig(
+        getAmuletRulesQuery.data.contract.payload.configSchedule.initialValue
+      );
       return (
         <Card>
           <CardContent>
@@ -117,7 +123,7 @@ const NetworkInfo: React.FC = () => {
                   ).initialValue
                 }
               />
-              <NextConfigUpdate />
+              {supportNewGovernanceFlow ? <NextConfigUpdate2 /> : <NextConfigUpdate />}
             </Stack>
           </CardContent>
         </Card>
@@ -125,6 +131,7 @@ const NetworkInfo: React.FC = () => {
   }
 };
 
+// TODO(#16139): retire old nextconfigupdate
 const NextConfigUpdate: React.FC = () => {
   const { data: amuletRules } = useGetAmuletRules();
 
@@ -146,6 +153,67 @@ const NextConfigUpdate: React.FC = () => {
             Fees
           </Typography>
           <FeesTable amuletConfig={futureValues.at(0)!._2} />
+        </Stack>
+      ) : (
+        <Typography variant="caption" id="next-config-update-time">
+          No currently scheduled configuration changes
+        </Typography>
+      )}
+    </Stack>
+  );
+};
+
+// TODO(#16139): NextConfigUpdate2 is NextConfigUpgrade that supports the new governance logic (rename it once old
+// logic is retired.
+const NextConfigUpdate2: React.FC = () => {
+  const query = useListDsoRulesVoteRequests();
+  const voteRequests = query.data;
+
+  /** Display only vote requests for AmuletConfig changes that have an effective time set.
+      Show only those past the expiration time, as they are likely to take effect.
+      Display only the next request scheduled to take effect.
+      If a request is rejected before its targetEffectiveTime, it is closed and will not be displayed anymore
+      (this change is not immediate and might take a few seconds to take effect)
+   */
+  const configurationUpdate =
+    voteRequests &&
+    voteRequests
+      .filter(
+        e =>
+          e.payload.action.tag === 'ARC_AmuletRules' &&
+          e.payload.action.value.amuletRulesAction.tag === 'CRARC_SetConfig'
+      )
+      .filter(
+        e =>
+          e.payload.targetEffectiveAt !== undefined && dayjs(e.payload.voteBefore).isBefore(dayjs())
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.payload.targetEffectiveAt!).getTime() -
+          new Date(a.payload.targetEffectiveAt!).getTime()
+      )
+      .pop();
+
+  const nextAmuletConfiguration =
+    configurationUpdate &&
+    configurationUpdate.payload.action.tag === 'ARC_AmuletRules' &&
+    configurationUpdate.payload.action.value.amuletRulesAction.tag === 'CRARC_SetConfig' &&
+    configurationUpdate.payload.action.value.amuletRulesAction.value.newConfig;
+
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h3">Next Configuration Update</Typography>
+      {nextAmuletConfiguration ? (
+        <Stack spacing={4}>
+          <Typography variant="body1" id="next-config-update-time">
+            {formatDistanceToNow(new Date(configurationUpdate.payload.targetEffectiveAt!), {
+              includeSeconds: true,
+            })}
+          </Typography>
+          <Typography variant="h3" id="next-config-update">
+            Fees
+          </Typography>
+          <FeesTable amuletConfig={nextAmuletConfiguration} />
         </Stack>
       ) : (
         <Typography variant="caption" id="next-config-update-time">

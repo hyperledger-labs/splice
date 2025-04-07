@@ -99,6 +99,8 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
+import java.time.Instant
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -133,8 +135,8 @@ class SvApp(
   private val cometBftConfig = config.cometBftConfig
     .filter(_.enabled)
 
-  override def packages: Seq[DarResource] =
-    super.packages ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.amuletNameService.all
+  override def packagesForJsonDecoding: Seq[DarResource] =
+    super.packagesForJsonDecoding ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit tc: TraceContext): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
@@ -533,7 +535,6 @@ class SvApp(
       adminHandler = new HttpSvAdminHandler(
         config,
         config.domainMigrationDumpPath,
-        amuletAppParameters.upgradesConfig,
         svAutomation,
         dsoAutomation,
         cometBftClient,
@@ -555,7 +556,6 @@ class SvApp(
         ),
         clock,
         retryProvider,
-        timeouts,
         loggerFactory,
       )
 
@@ -642,7 +642,6 @@ class SvApp(
         dsoStore,
         svAutomation,
         dsoAutomation,
-        adminHandler,
         logger,
         timeouts,
         httpClient,
@@ -784,7 +783,6 @@ object SvApp {
       dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
       dsoAutomation: SvDsoAutomationService,
-      svAdminHandler: HttpSvAdminHandler,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       httpClient: HttpClient,
@@ -814,7 +812,6 @@ object SvApp {
         SyncCloseable("dso store", dsoStore.close()),
         SyncCloseable("domain time automation", domainTimeAutomationService.close()),
         SyncCloseable("domain params automation", domainParamsAutomationService.close()),
-        SyncCloseable("admin handler", svAdminHandler.close()),
         SyncCloseable("storage", storage.close()),
       )
   }
@@ -992,6 +989,7 @@ object SvApp {
       reasonUrl: String,
       reasonDescription: String,
       expiration: Json,
+      effectiveTime: Optional[Instant],
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
   )(implicit
       ec: ExecutionContext,
@@ -1026,6 +1024,7 @@ object SvApp {
               decodedAction,
               reason,
               java.util.Optional.of(decodedExpiration),
+              effectiveTime,
             )
             cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
             _ <- dsoStoreWithIngestion.connection

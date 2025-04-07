@@ -9,6 +9,7 @@ export interface ConfirmationDialogProps {
   title: string;
   attributePrefix: string;
   children: React.ReactNode;
+  disableProceed?: boolean;
 }
 
 export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -18,6 +19,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   title,
   attributePrefix,
   children,
+  disableProceed,
 }) => {
   return (
     <Dialog
@@ -34,7 +36,11 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         <Button autoFocus onClick={onClose}>
           Cancel
         </Button>
-        <Button id={`${attributePrefix}-confirmation-dialog-accept-button`} onClick={onAccept}>
+        <Button
+          id={`${attributePrefix}-confirmation-dialog-accept-button`}
+          onClick={onAccept}
+          disabled={disableProceed}
+        >
           Proceed
         </Button>
       </DialogActions>

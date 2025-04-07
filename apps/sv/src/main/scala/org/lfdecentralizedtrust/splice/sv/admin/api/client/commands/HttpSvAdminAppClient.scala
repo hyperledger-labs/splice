@@ -205,6 +205,7 @@ object HttpSvAdminAppClient {
       reasonUrl: String,
       reasonDescription: String,
       expiration: RelTime,
+      effectiveTime: Option[Instant],
   )(implicit elc: ErrorLoggingContext)
       extends BaseCommand[http.CreateVoteRequestResponse, Unit] {
 
@@ -231,6 +232,10 @@ object HttpSvAdminAppClient {
                 .compactPrint
             )
             .valueOr(error => throw new IllegalArgumentException(error)),
+          effectiveTime match {
+            case None => None
+            case Some(time) => Some(time.atOffset(java.time.ZoneOffset.UTC))
+          },
         ),
         headers = headers,
       )
@@ -295,7 +300,7 @@ object HttpSvAdminAppClient {
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
-  ) extends BaseCommand[http.ListVoteRequestResultsResponse, Seq[
+  )() extends BaseCommand[http.ListVoteRequestResultsResponse, Seq[
         DsoRules_CloseVoteRequestResult
       ]] {
 

@@ -4,27 +4,24 @@
 package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import cats.implicits.catsSyntaxApplicativeId
-import cats.syntax.either.*
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
+import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.tracing.TraceContext
+import io.circe.syntax.EncoderOps
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.{
-  MediatorAdminConnection,
-  ParticipantAdminConnection,
-  RetryProvider,
-  SequencerAdminConnection,
-  SpliceStatus,
-}
-import org.lfdecentralizedtrust.splice.http.{
-  HttpClient,
-  HttpValidatorLicensesHandler,
-  HttpVotesHandler,
-}
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_admin as v0}
+import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
-import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStore, AppStoreWithIngestion}
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_admin as v0}
+import org.lfdecentralizedtrust.splice.http.{HttpValidatorLicensesHandler, HttpVotesHandler}
+import org.lfdecentralizedtrust.splice.store.{AppStore, AppStoreWithIngestion, VotesStore}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.migration.{
@@ -35,38 +32,18 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
-import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.config.{
-  NonNegativeDuration,
-  NonNegativeFiniteDuration,
-  ProcessingTimeout,
-}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ErrorUtil
-import io.circe.syntax.EncoderOps
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
+import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, TemplateJsonDecoder}
 
 import java.nio.file.Path
 import java.time.Instant
-import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
+import java.util.Optional
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 
 class HttpSvAdminHandler(
     config: SvAppBackendConfig,
     optDomainMigrationDumpConfig: Option[Path],
-    upgradesConfig: UpgradesConfig,
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     cometBftClient: Option[CometBftClient],
@@ -75,16 +52,12 @@ class HttpSvAdminHandler(
     domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
     clock: Clock,
     retryProvider: RetryProvider,
-    override protected val timeouts: ProcessingTimeout,
-    override protected val loggerFactory: NamedLoggerFactory,
+    protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
     templateJsonDecoder: TemplateJsonDecoder,
-    mat: Materializer,
-    httpClient: HttpClient,
 ) extends v0.SvAdminHandler[TracedUser]
-    with FlagCloseableAsync
     with HttpVotesHandler
     with HttpValidatorLicensesHandler {
 
@@ -94,47 +67,8 @@ class HttpSvAdminHandler(
   override protected val workflowId: String = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
-  override protected val votesStore: ActiveVotesStore = dsoStore
+  override protected val votesStore: VotesStore = dsoStore
   override protected val validatorLicensesStore: AppStore = dsoStore
-
-  // Similar to PublishScanConfigTrigger, this class creates its own scan connection
-  // on demand, because scan might not be available at application startup.
-  private def createScanConnection(): Future[ScanConnection] =
-    config.scan match {
-      case None =>
-        Future.failed(
-          Status.UNAVAILABLE
-            .withDescription(
-              "This application is not configured to connect to a scan service. " +
-                " Check the application configuration or use the scan API to query votes information."
-            )
-            .asRuntimeException()
-        )
-      case Some(scanConfig) =>
-        implicit val tc: TraceContext = TraceContext.empty
-        ScanConnection
-          .singleUncached(
-            ScanAppClientConfig(NetworkAppClientConfig(scanConfig.internalUrl)),
-            upgradesConfig,
-            clock,
-            retryProvider,
-            loggerFactory,
-            retryConnectionOnInitialFailure = true,
-          )
-    }
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var scanConnectionV: Option[Future[ScanConnection]] = None
-  private def scanConnectionF: Future[ScanConnection] = blocking {
-    this.synchronized {
-      scanConnectionV match {
-        case Some(f) => f
-        case None =>
-          val f = createScanConnection()
-          scanConnectionV = Some(f)
-          f
-      }
-    }
-  }
 
   def listOngoingValidatorOnboardings(
       respond: v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse.type
@@ -314,6 +248,10 @@ class HttpSvAdminHandler(
           body.url,
           body.description,
           body.expiration,
+          body.effectiveTime match {
+            case Some(effectiveTime) => Optional.of(effectiveTime.toInstant)
+            case None => Optional.empty()
+          },
           dsoStoreWithIngestion,
         )
         .flatMap {
@@ -323,7 +261,7 @@ class HttpSvAdminHandler(
     }
   }
 
-  override def listDsoRulesVoteRequests(
+  def listDsoRulesVoteRequests(
       respond: v0.SvAdminResource.ListDsoRulesVoteRequestsResponse.type
   )()(tuser: TracedUser): Future[v0.SvAdminResource.ListDsoRulesVoteRequestsResponse] = {
     this
@@ -331,46 +269,16 @@ class HttpSvAdminHandler(
       .map(v0.SvAdminResource.ListDsoRulesVoteRequestsResponse.OK)
   }
 
-  override def listVoteRequestResults(
+  def listVoteRequestResults(
       respond: v0.SvAdminResource.ListVoteRequestResultsResponse.type
   )(
       body: definitions.ListVoteResultsRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestResultsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listDsoRulesVoteResults") { _ => _ =>
-      for {
-        scanConnection <- scanConnectionF
-        voteResults <- scanConnection.listVoteRequestResults(
-          body.actionName,
-          body.accepted,
-          body.requester,
-          body.effectiveFrom,
-          body.effectiveTo,
-          body.limit.intValue,
-        )
-      } yield {
-        v0.SvAdminResource.ListVoteRequestResultsResponse.OK(
-          definitions.ListDsoRulesVoteResultsResponse(
-            voteResults
-              .map(voteResult => {
-                io.circe.parser
-                  .parse(
-                    ApiCodecCompressed
-                      .apiValueToJsValue(Contract.javaValueToLfValue(voteResult.toValue))
-                      .compactPrint
-                  )
-                  .valueOr(err =>
-                    ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")
-                  )
-              })
-              .toVector
-          )
-        )
-      }
-    }
+    this.listVoteRequestResults(body).map(v0.SvAdminResource.ListVoteRequestResultsResponse.OK)
   }
 
-  override def lookupDsoRulesVoteRequest(
+  def lookupDsoRulesVoteRequest(
       respond: v0.SvAdminResource.LookupDsoRulesVoteRequestResponse.type
   )(
       voteRequestContractId: String
@@ -682,17 +590,5 @@ class HttpSvAdminHandler(
           )
       }
     }(extracted.traceContext, tracer)
-  }
-
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
-    this.synchronized {
-      Seq[AsyncOrSyncCloseable](
-        AsyncCloseable(
-          "scanConnection",
-          scanConnectionV.fold(Future.unit)(_.map(_.close())),
-          NonNegativeDuration.tryFromDuration(timeouts.shutdownNetwork.duration),
-        )
-      )
-    }
   }
 }

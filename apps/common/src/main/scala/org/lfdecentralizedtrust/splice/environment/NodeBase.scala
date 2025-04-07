@@ -106,10 +106,10 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   protected def isInitialized = isInitializedVar.get()
 
-  protected def packages = DarResources.amulet.all
+  protected def packagesForJsonDecoding = DarResources.amulet.all
 
   lazy private val packageSignatures = {
-    ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)
+    ResourceTemplateDecoder.loadPackageSignaturesFromResources(packagesForJsonDecoding)
   }
 
   lazy protected implicit val templateDecoder: TemplateJsonDecoder =

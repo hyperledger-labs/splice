@@ -4,33 +4,29 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FlagCloseableAsync
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{FeaturedAppRight, ValidatorRight}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  AmuletRules,
-  AppTransferContext,
-  PaymentTransferContext,
-  TransferContext,
-  TransferPreapproval,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommandCounter,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
-import org.lfdecentralizedtrust.splice.environment.{
-  HttpAppConnection,
-  PackageIdResolver,
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerClient,
-  SpliceLedgerConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   LookupTransferCommandStatusResponse,
@@ -40,26 +36,17 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import org.lfdecentralizedtrust.splice.util.*
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FlagCloseableAsync
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
-  DsoRules_CloseVoteRequestResult,
-  VoteRequest,
-}
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.MapHasAsJava
 import scala.jdk.OptionConverters.*
 
-trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseableAsync {
+trait ScanConnection
+    extends PackageIdResolver.HasAmuletRules
+    with PackageVetting.HasVoteRequests
+    with FlagCloseableAsync {
 
   protected val clock: Clock
   protected val retryProvider: RetryProvider
@@ -145,6 +132,16 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
         )
       )
   }
+
+  def listVoteRequests()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]]
+
+  def getVoteRequests()(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    listVoteRequests()
 
   def getAmuletRules()(implicit
       tc: TraceContext
@@ -260,36 +257,6 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       tc: TraceContext,
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
 
-  def listDsoRulesVoteRequests()(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]]
-
-  def listVoteRequestResults(
-      actionName: Option[String],
-      accepted: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: Int,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
-
-  def listVoteRequestsByTrackingCid(
-      voteRequestCids: Seq[VoteRequest.ContractId]
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[
-    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-  ]
-
-  def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
 }
 
 object ScanConnection {

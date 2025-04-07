@@ -68,7 +68,7 @@
     "start": "vite --force",
     "test": "PORT=0 vitest",
     "test:sbt": "PORT=0 vitest --run",
-    "dev": "vite --mode testing"
+    "dev": "vite --mode testing --force"
   },
   "msw": {
     "workerDirectory": "public"
