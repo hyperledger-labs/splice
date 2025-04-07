@@ -137,6 +137,7 @@ lazy val root: Project = (project in file("."))
     tools,
     `splice-wartremover-extension`,
     docs,
+    `canton-json-api-v2-openapi-ts-client`,
     `token-standard-cli`,
   )
   .settings(
@@ -407,10 +408,37 @@ lazy val `splice-token-test-dummy-holding-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `canton-json-api-v2-openapi-ts-client` = project
+  .in(file("token-standard/dependencies/canton-json-api-v2"))
+  .settings(
+    Headers.NoHeaderSettings,
+    templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+    Compile / sourceGenerators +=
+      Def.taskDyn {
+        val openApiFile = baseDirectory.value / "openapi.yaml"
+
+        val npmName = "canton-json-api-v2"
+
+        BuildCommon.TS.generateOpenApiClient(
+          npmName = npmName,
+          npmModuleName = npmName,
+          npmProjectName = npmName,
+          openApiSpec = "openapi.yaml",
+          cacheFileDependencies = Set(openApiFile),
+          directory = "openapi-ts-client",
+          subPath = "openapi",
+        )
+      },
+    cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+  )
+
 lazy val `token-standard-cli` =
   project
     .in(file("token-standard/cli"))
-    .dependsOn(`splice-api-token-transfer-instruction-v1-daml`)
+    .dependsOn(
+      `splice-api-token-transfer-instruction-v1-daml`,
+      `canton-json-api-v2-openapi-ts-client`,
+    )
     .settings(
       Headers.TsHeaderSettings,
       npmInstallOpenApiDeps := Seq(
@@ -418,7 +446,12 @@ lazy val `token-standard-cli` =
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
           false,
-        )
+        ),
+        (
+          (`canton-json-api-v2-openapi-ts-client` / Compile / compile).value,
+          (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
+          false,
+        ),
       ),
       npmInstallDeps := Seq(baseDirectory.value / "package.json"),
       npmInstall := BuildCommon.npmInstallTask.value,

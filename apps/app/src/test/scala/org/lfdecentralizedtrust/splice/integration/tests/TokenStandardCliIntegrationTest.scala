@@ -118,7 +118,9 @@ class TokenStandardCliIntegrationTest
           )
           val exitCode = Process(args, cwd).!(logProcessor)
           // TODO (#18610): check that recordtime and updateid are present
-          readLines.last should be("{}")
+          inside(readLines) { case _ :+ last =>
+            last should be("{}")
+          }
           if (exitCode != 0) {
             logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
             readLines.foreach(logger.error(_)(TraceContext.empty))
