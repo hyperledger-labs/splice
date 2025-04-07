@@ -448,62 +448,61 @@ class AcsSnapshotStoreTest
 
     "getHoldingsState" should {
 
-      // TODO (#17153): this test should pass once DarResources is back to normal
-      // "only include contracts where the parties provided are owners, not just stakeholders" in {
-      //   val wantedParty1 = providerParty(1)
-      //   val wantedParty2 = providerParty(2)
-      //   val ignoredParty = providerParty(3)
-      //   // We include amulets and locked amulets in an older version
-      //   // as a regression test for #14758
-      //   val amulet1 = amulet(wantedParty1, 10, 1L, 1.0, version = DarResources.amulet_0_1_4)
-      //   val amulet2 = amulet(wantedParty2, 20, 2L, 1.0)
-      //   val ignoredAmulet = amulet(ignoredParty, 666, 1L, 1.0)
-      //   val lockedAmulet1 =
-      //     lockedAmulet(wantedParty1, 30, 1L, 0.5, version = DarResources.amulet_0_1_4)
-      //   val lockedAmulet2 = lockedAmulet(wantedParty2, 40, 2L, 0.5)
-      //   val ignoredLocked = lockedAmulet(ignoredParty, 666, 1, 0.5)
-      //   for {
-      //     updateHistory <- mkUpdateHistory()
-      //     store = mkStore(updateHistory)
-      //     _ <- MonadUtil.sequentialTraverse(Seq(amulet1, amulet2, ignoredAmulet)) { amulet =>
-      //       ingestCreate(
-      //         updateHistory,
-      //         amulet,
-      //         timestamp1.minusSeconds(10L),
-      //         Seq(PartyId.tryFromProtoPrimitive(amulet.payload.owner), dsoParty),
-      //       )
-      //     }
-      //     _ <- MonadUtil.sequentialTraverse(Seq(lockedAmulet1, lockedAmulet2, ignoredLocked)) {
-      //       locked =>
-      //         ingestCreate(
-      //           updateHistory,
-      //           locked,
-      //           timestamp1.minusSeconds(10L),
-      //           Seq(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner), dsoParty),
-      //         )
-      //     }
-      //     _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
-      //     resultDso <- store.getHoldingsState(
-      //       DefaultMigrationId,
-      //       timestamp1,
-      //       None,
-      //       PageLimit.tryCreate(10),
-      //       Seq(dsoParty),
-      //     )
-      //     resultWanteds <- store.getHoldingsState(
-      //       DefaultMigrationId,
-      //       timestamp1,
-      //       None,
-      //       PageLimit.tryCreate(10),
-      //       Seq(wantedParty1, wantedParty2),
-      //     )
-      //   } yield {
-      //     resultDso.createdEventsInPage should be(empty)
-      //     resultWanteds.createdEventsInPage.map(_.event.getContractId).toSet should be(
-      //       Set(amulet1, amulet2, lockedAmulet1, lockedAmulet2).map(_.contractId.contractId)
-      //     )
-      //   }
-      // }
+      "only include contracts where the parties provided are owners, not just stakeholders" in {
+        val wantedParty1 = providerParty(1)
+        val wantedParty2 = providerParty(2)
+        val ignoredParty = providerParty(3)
+        // We include amulets and locked amulets in an older version
+        // as a regression test for #14758
+        val amulet1 = amulet(wantedParty1, 10, 1L, 1.0, version = DarResources.amulet_0_1_4)
+        val amulet2 = amulet(wantedParty2, 20, 2L, 1.0)
+        val ignoredAmulet = amulet(ignoredParty, 666, 1L, 1.0)
+        val lockedAmulet1 =
+          lockedAmulet(wantedParty1, 30, 1L, 0.5, version = DarResources.amulet_0_1_4)
+        val lockedAmulet2 = lockedAmulet(wantedParty2, 40, 2L, 0.5)
+        val ignoredLocked = lockedAmulet(ignoredParty, 666, 1, 0.5)
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          _ <- MonadUtil.sequentialTraverse(Seq(amulet1, amulet2, ignoredAmulet)) { amulet =>
+            ingestCreate(
+              updateHistory,
+              amulet,
+              timestamp1.minusSeconds(10L),
+              Seq(PartyId.tryFromProtoPrimitive(amulet.payload.owner), dsoParty),
+            )
+          }
+          _ <- MonadUtil.sequentialTraverse(Seq(lockedAmulet1, lockedAmulet2, ignoredLocked)) {
+            locked =>
+              ingestCreate(
+                updateHistory,
+                locked,
+                timestamp1.minusSeconds(10L),
+                Seq(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner), dsoParty),
+              )
+          }
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          resultDso <- store.getHoldingsState(
+            DefaultMigrationId,
+            timestamp1,
+            None,
+            PageLimit.tryCreate(10),
+            Seq(dsoParty),
+          )
+          resultWanteds <- store.getHoldingsState(
+            DefaultMigrationId,
+            timestamp1,
+            None,
+            PageLimit.tryCreate(10),
+            Seq(wantedParty1, wantedParty2),
+          )
+        } yield {
+          resultDso.createdEventsInPage should be(empty)
+          resultWanteds.createdEventsInPage.map(_.event.getContractId).toSet should be(
+            Set(amulet1, amulet2, lockedAmulet1, lockedAmulet2).map(_.contractId.contractId)
+          )
+        }
+      }
 
       "lock holders don't see locked coins where they're not the owner" in {
         val owner = providerParty(1)

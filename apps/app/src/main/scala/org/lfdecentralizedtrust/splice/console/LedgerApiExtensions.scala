@@ -291,6 +291,24 @@ trait LedgerApiExtensions {
             .filter({ case (c, _) => contractIds.contains(c) })
             .toMap
         }
+
+        def of_party[
+            TC <: javaapi.data.codegen.Contract[TCid, T],
+            TCid <: javaapi.data.codegen.ContractId[T],
+            T <: javaapi.data.Template,
+        ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
+            partyId: PartyId
+        ): Seq[CreatedEvent] = {
+          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
+          val templateId = TemplateId(
+            s"#${filterIdentifier.packageName}",
+            filterIdentifier.qualifiedName.moduleName,
+            filterIdentifier.qualifiedName.entityName,
+          )
+          ledgerApi.ledger_api.state.acs
+            .of_party(partyId, filterTemplates = Seq(templateId))
+            .map(_.event)
+        }
       }
     }
   }

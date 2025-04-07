@@ -12,8 +12,6 @@ import com.digitalasset.daml.lf.language.Ast
 import java.nio.file.Path
 import scala.util.Using
 
-// TODO (#17153): all the old packages have been commented out to avoid
-// "DAR_NOT_VALID_UPGRADE [...] cannot be an upgrade of existing package P [...] Reason: Implementation of interface X
 object DarResources {
   object TokenStandard {
     val tokenMetadata = PackageResource(
@@ -68,15 +66,15 @@ object DarResources {
   val amulet = PackageResource(
     amulet_current,
     Seq(
-//      amulet_0_1_0,
-//      amulet_0_1_1,
-//      amulet_0_1_2,
-//      amulet_0_1_3,
-//      amulet_0_1_4,
-//      amulet_0_1_5,
-//      amulet_0_1_6,
-//      amulet_0_1_7,
-      amulet_0_1_8
+      amulet_0_1_0,
+      amulet_0_1_1,
+      amulet_0_1_2,
+      amulet_0_1_3,
+      amulet_0_1_4,
+      amulet_0_1_5,
+      amulet_0_1_6,
+      amulet_0_1_7,
+      amulet_0_1_8,
     ),
   )
 
@@ -97,19 +95,19 @@ object DarResources {
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
     Seq(
-//      dsoGovernance_0_1_0,
-//      dsoGovernance_0_1_1,
-//      dsoGovernance_0_1_2,
-//      dsoGovernance_0_1_3,
-//      dsoGovernance_0_1_4,
-//      dsoGovernance_0_1_5,
-//      dsoGovernance_0_1_6,
-//      dsoGovernance_0_1_7,
-//      dsoGovernance_0_1_8,
-//      dsoGovernance_0_1_9,
-//      dsoGovernance_0_1_10,
-//      dsoGovernance_0_1_11
-      dsoGovernance_0_1_12
+      dsoGovernance_0_1_0,
+      dsoGovernance_0_1_1,
+      dsoGovernance_0_1_2,
+      dsoGovernance_0_1_3,
+      dsoGovernance_0_1_4,
+      dsoGovernance_0_1_5,
+      dsoGovernance_0_1_6,
+      dsoGovernance_0_1_7,
+      dsoGovernance_0_1_8,
+      dsoGovernance_0_1_9,
+      dsoGovernance_0_1_10,
+      dsoGovernance_0_1_11,
+      dsoGovernance_0_1_12,
     ),
   )
 
@@ -126,15 +124,15 @@ object DarResources {
   val amuletNameService = PackageResource(
     amuletNameService_current,
     Seq(
-//      amuletNameService_0_1_0,
-//      amuletNameService_0_1_1,
-//      amuletNameService_0_1_2,
-//      amuletNameService_0_1_3,
-//      amuletNameService_0_1_4,
-//      amuletNameService_0_1_5,
-//      amuletNameService_0_1_6,
-//      amuletNameService_0_1_7,
-      amuletNameService_0_1_8
+      amuletNameService_0_1_0,
+      amuletNameService_0_1_1,
+      amuletNameService_0_1_2,
+      amuletNameService_0_1_3,
+      amuletNameService_0_1_4,
+      amuletNameService_0_1_5,
+      amuletNameService_0_1_6,
+      amuletNameService_0_1_7,
+      amuletNameService_0_1_8,
     ),
   )
 
@@ -151,15 +149,15 @@ object DarResources {
   val splitwell = PackageResource(
     splitwell_current,
     Seq(
-//      splitwell_0_1_0,
-//      splitwell_0_1_1,
-//      splitwell_0_1_2,
-//      splitwell_0_1_3,
-//      splitwell_0_1_4,
-//      splitwell_0_1_5,
-//      splitwell_0_1_6,
-//      splitwell_0_1_7,
-      splitwell_0_1_8
+      splitwell_0_1_0,
+      splitwell_0_1_1,
+      splitwell_0_1_2,
+      splitwell_0_1_3,
+      splitwell_0_1_4,
+      splitwell_0_1_5,
+      splitwell_0_1_6,
+      splitwell_0_1_7,
+      splitwell_0_1_8,
     ),
   )
 
@@ -176,15 +174,15 @@ object DarResources {
   val wallet = PackageResource(
     wallet_current,
     Seq(
-//      wallet_0_1_0,
-//      wallet_0_1_1,
-//      wallet_0_1_2,
-//      wallet_0_1_3,
-//      wallet_0_1_4,
-//      wallet_0_1_5,
-//      wallet_0_1_6,
-//      wallet_0_1_7,
-      wallet_0_1_8
+      wallet_0_1_0,
+      wallet_0_1_1,
+      wallet_0_1_2,
+      wallet_0_1_3,
+      wallet_0_1_4,
+      wallet_0_1_5,
+      wallet_0_1_6,
+      wallet_0_1_7,
+      wallet_0_1_8,
     ),
   )
 
@@ -201,15 +199,15 @@ object DarResources {
   val walletPayments = PackageResource(
     walletPayments_current,
     Seq(
-//      walletPayments_0_1_0,
-//      walletPayments_0_1_1,
-//      walletPayments_0_1_2,
-//      walletPayments_0_1_3,
-//      walletPayments_0_1_4,
-//      walletPayments_0_1_5,
-//      walletPayments_0_1_6,
-//      walletPayments_0_1_7,
-      walletPayments_0_1_8
+      walletPayments_0_1_0,
+      walletPayments_0_1_1,
+      walletPayments_0_1_2,
+      walletPayments_0_1_3,
+      walletPayments_0_1_4,
+      walletPayments_0_1_5,
+      walletPayments_0_1_6,
+      walletPayments_0_1_7,
+      walletPayments_0_1_8,
     ),
   )
 

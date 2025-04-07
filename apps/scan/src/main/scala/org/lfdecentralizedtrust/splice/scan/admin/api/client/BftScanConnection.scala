@@ -953,21 +953,28 @@ object BftScanConnection {
           retryConnectionOnInitialFailure = false,
         )
 
-  sealed trait BftScanClientConfig
+  sealed trait BftScanClientConfig {
+    def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): BftScanClientConfig
+  }
   object BftScanClientConfig {
     case class TrustSingle(
         url: Uri,
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
-    ) extends BftScanClientConfig
+    ) extends BftScanClientConfig {
+      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): TrustSingle =
+        copy(amuletRulesCacheTimeToLive = ttl)
+    }
     case class Bft(
         seedUrls: NonEmptyList[Uri],
         scansRefreshInterval: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultScansRefreshInterval,
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
-    ) extends BftScanClientConfig
-
+    ) extends BftScanClientConfig {
+      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): Bft =
+        copy(amuletRulesCacheTimeToLive = ttl)
+    }
   }
 
   private sealed trait ScanResponse[+T]
