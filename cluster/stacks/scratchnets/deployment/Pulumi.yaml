@@ -1,0 +1,5 @@
+name: deployment
+runtime:
+  name: nodejs
+description: Pulumi k8s operator
+main: "../../../pulumi/deployment/src/index.ts"

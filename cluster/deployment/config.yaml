@@ -4,8 +4,6 @@
 #    cometbft:
 #      snapshotName: "nicu-test-cometbft-cloning"
 infra:
-  ipWhitelisting:
-    extraWhitelistedIngress: [ ]
   prometheus:
     retentionDuration: "1y"
     retentionSize: "1500GB"
@@ -17,10 +15,6 @@ pulumiProjectConfig:
     # skip helm installs and create only non helm resources.
     # this for example lets you create the cloud sql instances without having deployments using them, and restoring them from other sources
     installDataOnly: false
-    # artifactories that resources deployed by this stack should be allowed to pull from
-    # (supported values: public, private)
-    allowedArtifactories:
-      - "public"
     isExternalCluster: false
     hasPublicDocs: false
     cloudSql:

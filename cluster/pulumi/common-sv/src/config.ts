@@ -44,9 +44,6 @@ export interface StaticSvConfig {
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
-  // Currently this only triggers managing the CometBFT governance key externally
-  // TODO(#16783): Make this actually deploy the SV participant with KMS enabled
-  participantKms?: boolean;
 }
 
 export type SequencerPruningConfig = {

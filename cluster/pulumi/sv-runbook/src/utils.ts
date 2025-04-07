@@ -40,15 +40,8 @@ export async function svAppSecrets(
   auth0Client: Auth0Client,
   clientId: string
 ): Promise<AppAndUiSecrets> {
-  await installAuth0Secret(auth0Client, ns, 'sv', 'sv', 'cn');
   return {
-    appSecret: await installAuth0Secret(
-      auth0Client,
-      ns,
-      'sv',
-      svRunbookConfig.auth0SvAppName,
-      'splice'
-    ),
+    appSecret: await installAuth0Secret(auth0Client, ns, 'sv', svRunbookConfig.auth0SvAppName),
     uiSecret: uiSecret(auth0Client, ns, 'sv', clientId),
   };
 }

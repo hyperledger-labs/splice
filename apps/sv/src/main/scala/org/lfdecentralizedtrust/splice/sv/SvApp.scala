@@ -560,6 +560,7 @@ class SvApp(
       adminHandler = new HttpSvAdminHandler(
         config,
         config.domainMigrationDumpPath,
+        amuletAppParameters.upgradesConfig,
         svAutomation,
         dsoAutomation,
         cometBftClient,
@@ -581,6 +582,7 @@ class SvApp(
         ),
         clock,
         retryProvider,
+        timeouts,
         loggerFactory,
       )
 
@@ -668,6 +670,7 @@ class SvApp(
         dsoStore,
         svAutomation,
         dsoAutomation,
+        adminHandler,
         logger,
         timeouts,
         httpClient,
@@ -809,6 +812,7 @@ object SvApp {
       dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
       dsoAutomation: SvDsoAutomationService,
+      svAdminHandler: HttpSvAdminHandler,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       httpClient: HttpClient,
@@ -838,6 +842,7 @@ object SvApp {
         SyncCloseable("dso store", dsoStore.close()),
         SyncCloseable("domain time automation", domainTimeAutomationService.close()),
         SyncCloseable("domain params automation", domainParamsAutomationService.close()),
+        SyncCloseable("admin handler", svAdminHandler.close()),
         SyncCloseable("storage", storage.close()),
       )
   }

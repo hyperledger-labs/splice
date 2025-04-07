@@ -20,7 +20,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.github.blemale.scaffeine.Scaffeine
-import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
@@ -61,7 +60,8 @@ import org.lfdecentralizedtrust.splice.store.db.{
   TxLogQueries,
 }
 import org.lfdecentralizedtrust.splice.store.{
-  DbVotesStoreQueryBuilder,
+  DbVotesAcsStoreQueryBuilder,
+  DbVotesTxLogStoreQueryBuilder,
   Limit,
   PageLimit,
   SortOrder,
@@ -70,10 +70,13 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
+  PackageQualifiedName,
   QualifiedName,
   TemplateJsonDecoder,
 }
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
@@ -131,9 +134,11 @@ class DbScanStore(
     with AcsTables
     with AcsQueries
     with TxLogQueries[TxLogEntry]
+    with UpdateHistoryQueries
     with FlagCloseableAsync
     with RetryProvider.Has
-    with DbVotesStoreQueryBuilder[TxLogEntry] {
+    with DbVotesAcsStoreQueryBuilder
+    with DbVotesTxLogStoreQueryBuilder[TxLogEntry] {
 
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
   import multiDomainAcsStore.waitUntilAcsIngested
@@ -1068,4 +1073,34 @@ class DbScanStore(
         .map(entry => new TransferCommand.ContractId(entry.contractId) -> entry)
         .toMap
     }
+
+  override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+      companion: C,
+      recordTime: CantonTimestamp,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Option[Contract[TCId, T]]] = {
+    val templateId = companionClass.typeId(companion)
+    val packageName = PackageQualifiedName(templateId).packageName
+    for {
+      row <- storage
+        .querySingle(
+          selectFromUpdateTableResult(
+            updateHistory.historyId,
+            where = sql"""t.template_id_module_name = ${lengthLimited(
+                templateId.getModuleName
+              )} and t.template_id_entity_name = ${lengthLimited(
+                templateId.getEntityName
+              )} and t.package_name = ${lengthLimited(packageName)}
+              and uht.record_time > $recordTime""",
+            orderLimit = sql"""order by t.row_id asc limit 1""",
+          ).headOption,
+          s"lookup[$templateId]",
+        )
+        .value
+    } yield {
+      row.map(contractFromEvent(companion)(_))
+    }
+  }
 }

@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as semver from 'semver';
 import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Resource } from '@pulumi/pulumi';
 import {
@@ -12,7 +11,6 @@ import {
   ChartValues,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
-  CnChartVersion,
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
@@ -137,14 +135,7 @@ export async function installSvNode(
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
-    await installAuth0Secret(
-      baseConfig.auth0Client,
-      xns,
-      'sv',
-      baseConfig.auth0SvAppName,
-      'splice'
-    ),
-    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.auth0SvAppName, 'cn'),
+    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.auth0SvAppName),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
@@ -334,10 +325,9 @@ async function installValidator(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
-    validatorWalletUsers: (svConfig.validatorWalletUser
-      ? [svConfig.validatorWalletUser]
-      : []
-    ).concat(svUserIds(validatorSecrets.auth0Client.getCfg())),
+    validatorWalletUsers: svUserIds(validatorSecrets.auth0Client.getCfg()).apply(ids =>
+      ids.concat(svConfig.validatorWalletUser ? [svConfig.validatorWalletUser] : [])
+    ),
     dependencies: sv.participant.asDependencies,
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,
@@ -365,11 +355,6 @@ async function installValidator(
 function internalScanUrl(config: SvConfig): pulumi.Output<string> {
   return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
 }
-
-const withoutFounderDecentralizedSynchronizerUrl = (version: CnChartVersion) =>
-  version.type == 'local' ||
-  version.version.startsWith('0.3.6') ||
-  semver.gt(version.version, '0.3.6');
 
 function installSvApp(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
@@ -408,8 +393,7 @@ function installSvApp(
           },
         }),
     decentralizedSynchronizerUrl:
-      config.onboarding.type == 'found-dso' &&
-      withoutFounderDecentralizedSynchronizerUrl(activeVersion)
+      config.onboarding.type == 'found-dso'
         ? undefined
         : decentralizedSynchronizer.sv1InternalSequencerAddress,
     domain:
@@ -503,13 +487,12 @@ function installScan(
   postgres: Postgres
 ) {
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
-  // const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const scanValues = {
     ...spliceInstanceNames,
     metrics: {
       enable: true,
     },
-    [supportsRenamedFounder ? 'isFirstSv' : 'isFounder']: isFirstSv,
+    isFirstSv: isFirstSv,
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
@@ -519,17 +502,9 @@ function installScan(
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
     enablePostgresMetrics: true,
-    // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
-    clusterUrl: CLUSTER_HOSTNAME,
   };
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
     dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
   });
   return scan;
 }
-
-// TODO (#13845) remove when ciperiodic version >= 0.1.18
-const supportsRenamedFounder =
-  activeVersion.type == 'local' ||
-  activeVersion.version.startsWith('0.1.18') ||
-  semver.gt(activeVersion.version, '0.1.18');

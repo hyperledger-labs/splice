@@ -1,7 +1,4 @@
 infra:
-  ipWhitelisting:
-    extraWhitelistedIngress:
-      - "35.225.102.103/32" # CI GKE cluster for CCI
   prometheus:
     retentionDuration: "30d"
     retentionSize: "200GB"
@@ -10,9 +7,6 @@ pulumiProjectConfig:
   default:
     cloudSql:
       protected: false
-    allowedArtifactories:
-      - "public"
-      - "private"
     isExternalCluster: true # TODO(#18023): remove it once cluster is reset
 validator1:
   participantPruningSchedule:
@@ -23,4 +17,4 @@ validator1:
 synchronizerMigration:
   active:
     id: 0
-    version: "0.3.18-snapshot.20250321.8640.0.v05582b27"
+    version: "0.3.18-snapshot.20250402.8645.0.v8f3e3dfc"

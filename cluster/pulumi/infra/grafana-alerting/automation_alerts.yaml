@@ -98,7 +98,7 @@ groups:
         dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
         panelId: 14
         noDataState: $NODATA
-        execErrState: Error
+        execErrState: Alerting
         for: 5m
         annotations:
           __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
@@ -162,7 +162,7 @@ groups:
               refId: too_long
               type: threshold
         noDataState: OK
-        execErrState: Error
+        execErrState: Alerting
         for: 5m
         annotations:
           description: ""
@@ -320,7 +320,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by(namespace)(splice_history_backfilling_completed + rate(splice_history_backfilling_transaction_count[5m]))
+              expr: max by(namespace)(rate(splice_history_backfilling_transaction_count[5m]) > 0 or splice_history_backfilling_completed)
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -355,13 +355,13 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        noDataState: OK
-        execErrState: Error
+        noDataState: $NODATA
+        execErrState: Alerting
         for: 5m
         annotations:
           description: ""
           runbook_url: ""
-          summary: History backfill is not making any progress in {{ index $labels "namespace" }}
+          summary: History backfilling is not making any progress in {{ index $labels "namespace" }}
         labels:
           "": ""
         isPaused: false

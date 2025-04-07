@@ -63,6 +63,7 @@ parameters:
         purge-unused-dbs-cidaily,
         bump-configs,
         update-serverless-workflows,
+        update-gcp-projects
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -340,7 +341,7 @@ commands:
       - run_bash_command_in_nix:
           when: always
           cmd: ./scripts/check-todos.sh
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
       - store_artifacts:
           name: Store To-dos as artifacts
           when: always
@@ -473,10 +474,6 @@ commands:
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: |
-           if [[ << parameters.is_public >> == true ]]; then
-             echo "Publishing to public docker repo"
-             export PUBLISH_PUBLIC_ARTIFACTS=true
-           fi
            make docker-build -j
   docker_login_artifactory:
     steps:
@@ -546,7 +543,7 @@ commands:
           cmd_name: Running << parameters.project >> preview on cluster << parameters.cluster >>
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep SLACK_ACCESS_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
@@ -588,7 +585,7 @@ commands:
           name: Setting TARGET_BRANCH env var
           command: |
             PR_NUMBER=$(echo $CIRCLE_PULL_REQUEST | sed 's|.*/pull/\([0-9]*\)|\1|')
-            TARGET_BRANCH=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
+            TARGET_BRANCH=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/DACH-NY/canton-network-node/pulls/$PR_NUMBER | jq -r '.base.ref')
             echo "PR target branch: $TARGET_BRANCH"
             echo export "TARGET_BRANCH=\"$TARGET_BRANCH\"" >> "$BASH_ENV"
 
@@ -692,7 +689,7 @@ commands:
           cmd_name: Apply the deployment stack
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep SLACK_ACCESS_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
@@ -2330,7 +2327,7 @@ jobs:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
@@ -2387,7 +2384,7 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: Update deployment branch and tag for the cluster
                 cluster: << parameters.cluster >>
-                additional_nix_args: "--keep GITHUB_TOKEN"
+                additional_nix_args: "--keep GH_TOKEN"
                 cmd: |
                   # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
                   if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]]; then
@@ -2440,7 +2437,7 @@ jobs:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
@@ -2513,7 +2510,7 @@ jobs:
           cmd_name: Apply the pulumi infra stack
           cluster: << parameters.cluster >>
           additional_nix_args: >
-            --keep GITHUB_TOKEN
+            --keep GH_TOKEN
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
@@ -2881,11 +2878,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID --keep BASH_ENV"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # The operator itself should use images from the branch on which this job is running.
             OPERATOR_IMAGE_VERSION=$(build-tools/get-snapshot-version)
@@ -2932,14 +2929,6 @@ jobs:
             echo "export OVERRIDE_VERSION=$BASE_VERSION" >> "$file"
 
             cat "$file" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
-
-            # if the base version is a release version ensure we use the public repository
-            # we write this to the .envrc.vars file directly and not to the patch that we also
-            # apply later to the upgrade version, because the upgrade version typiclaly is not public
-            # in these tests
-            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
-            fi
 
             git add "$file"
             git add **/.envrc.vars
@@ -3023,11 +3012,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -3116,11 +3105,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
 
@@ -3190,11 +3179,11 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             # Update the upgrade branch to archive the base version
 
@@ -3255,7 +3244,7 @@ jobs:
           cmd_name: Reset SV runbook
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
 
@@ -3271,12 +3260,12 @@ jobs:
           cmd_name: Push new branch with migration config changes
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
             UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
@@ -3386,7 +3375,7 @@ jobs:
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Bump configs
-          additional_nix_args: "--keep GITHUB_TOKEN"
+          additional_nix_args: "--keep GH_TOKEN"
           cmd: |
             .circleci/cn-scripts/bump-configs.sh
 
@@ -3497,24 +3486,23 @@ jobs:
            --keep NO_PROXY \
            --keep CIRCLE_BRANCH \
            --keep CIRCLE_REPOSITORY_URL \
-           --keep CIRCLE_SHA1"
+           --keep CIRCLE_SHA1 \
+           --keep GH_USER \
+           --keep GH_TOKEN"
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public docker repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
           additional_nix_args: "--keep ARTIFACTORY_USER \
             --keep ARTIFACTORY_PASSWORD \
-            --keep CIRCLE_BRANCH"
+            --keep CIRCLE_BRANCH \
+            --keep OCI_DEV_HELM_REGISTRY \
+            --keep GH_USER \
+            --keep GH_TOKEN"
           cmd_name: Push Helm Artifacts
           cmd: |
-            if [[ << parameters.is_public >> == true ]]; then
-              echo "Publishing to public helm repo"
-              export PUBLISH_PUBLIC_ARTIFACTS=true
-            fi
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
@@ -3555,18 +3543,22 @@ jobs:
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Copy artifacts to Github Container Registry
-                additional_nix_args: "--keep GITHUB_TOKEN \
+                additional_nix_args: "--keep GH_TOKEN \
+                  --keep GH_USER \
+                  --keep DEV_HELM_REGISTRY \
+                  --keep DEV_DOCKER_REGISTRY \
+                  --keep RELEASE_HELM_REGISTRY \
+                  --keep RELEASE_DOCKER_REGISTRY \
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD"
                 cmd: |
-                  export GITHUB_USER="canton-network-da"
                   make cluster/helm/copy_release_to_ghcr
                   make cluster/docker/copy_release_to_ghcr
             - run_bash_command_in_nix:
                 cmd_name: tag git
-                additional_nix_args: "--keep GITHUB_TOKEN"
+                additional_nix_args: "--keep GH_TOKEN --keep GH_USER"
                 cmd: |
-                  git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
                   RELEASE_TAG=$(get-snapshot-version)
 
                   if [ $(git tag -l "${RELEASE_TAG}") ]; then
@@ -3979,17 +3971,17 @@ jobs:
       - clone_and_update_open_source
       - run_bash_command_in_nix:
           cmd_name: Push changes to DA OSS
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/oss
       - run_bash_command_in_nix:
           cmd_name: Push changes to Splice
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/splice
       - run_bash_command_in_nix:
           cmd_name: Create release in DA OSS
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
           working_dir: "/home/circleci/oss"
           cmd: |
             if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
@@ -4008,7 +4000,7 @@ jobs:
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Create branch to point CILR to and update tag
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          additional_nix_args: "--keep GH_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             VERSION="$(get-snapshot-version)"
             .circleci/update-cilr.sh
@@ -4054,8 +4046,6 @@ jobs:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:
@@ -4076,6 +4066,27 @@ jobs:
           cmd: |
             echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
             ./cluster/serverless/deploy.sh
+
+  update_gcp_project:
+    executor: self_hosted
+    parameters:
+      <<: *cluster-parameter
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Update GCP projects
+          gce_authenticate: true
+          cluster: << parameters.cluster >>
+          cmd: |
+            cncluster pulumi gcp-project up --skip-preview --yes
 
   deploy_operator:
     executor: self_hosted
@@ -5904,6 +5915,41 @@ workflows:
           context:
             - slack-context
             - canton-network-vpn
+
+  update_gcp_projects:
+    when:
+      equal: [ update-gcp-projects, << pipeline.parameters.run-job >> ]
+    jobs:
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-scratchnets
+          cluster: scratchneta
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-ci
+          cluster: cimain
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-ci-2
+          cluster: cidaily
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-devnet
+          cluster: devnet
+          context:
+            - artifactory
+      - update_gcp_project:
+          <<: *main-branch-only
+          name: Update da-cn-mainnet
+          cluster: mainnet
+          context:
+            - artifactory
 
   deploy_hdm_operator:
     when:

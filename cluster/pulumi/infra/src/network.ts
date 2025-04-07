@@ -132,6 +132,10 @@ function clusterCertificate(
     issuerServer = 'https://acme-v02.api.letsencrypt.org/directory';
   }
 
+  const email = gcp.secretmanager
+    .getSecretVersionOutput({ secret: 'pulumi-lets-encrypt-email' })
+    .apply(s => s.secretData);
+
   const issuer = new k8s.apiextensions.CustomResource(
     'issuer',
     {
@@ -143,7 +147,7 @@ function clusterCertificate(
       },
       spec: {
         acme: {
-          email: 'team-canton-network@digitalasset.com',
+          email,
           preferredChain: '',
           privateKeySecretRef: {
             name: `${issuerName}-acme-account`,

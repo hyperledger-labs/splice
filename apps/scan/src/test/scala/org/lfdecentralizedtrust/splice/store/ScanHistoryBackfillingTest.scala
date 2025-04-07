@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
@@ -207,12 +206,11 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       currentMigrationId = destination.domainMigrationInfo.currentMigrationId,
       batchSize = 1,
       loggerFactory = loggerFactory,
-      metricsFactory = NoOpMetricsFactory,
     )
     def go(i: Int): Future[Boolean] = {
       logger.debug(s"backfill() iteration $i")
       backfiller.backfill().flatMap {
-        case HistoryBackfilling.Outcome.MoreWorkAvailableNow => go(i + 1)
+        case HistoryBackfilling.Outcome.MoreWorkAvailableNow(_) => go(i + 1)
         case HistoryBackfilling.Outcome.MoreWorkAvailableLater => Future.successful(false)
         case HistoryBackfilling.Outcome.BackfillingIsComplete => Future.successful(true)
       }
