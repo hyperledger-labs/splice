@@ -67,7 +67,6 @@ jobs:
             --keep VPN_HOST_IP
             --keep VPN_USER
             --keep VPN_PASSWORD
-            --keep GCP_DA_CN_SHARED_KEY
           cmd: |
             if [ -n "<< parameters.base_version >>" ]; then
               base_version="<< parameters.base_version >>"
@@ -76,8 +75,7 @@ jobs:
               base_version=$(build-tools/get-snapshot-version)
               BASE_VERSION=$base_version
             fi
-            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-            gcloud auth configure-docker us-central1-docker.pkg.dev
+
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1" -t "$BASE_VERSION"
           # retry on vpn disconnects.
           # Note that this might break the assumption that the validator spinup is fast enough for the
@@ -162,12 +160,7 @@ jobs:
           at: workspace
       - run_bash_command_in_nix:
           cmd_name: Restore the migration dump into a docker volume
-          additional_nix_args: >
-            --keep GCP_DA_CN_SHARED_KEY
-          cmd: |
-            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-            gcloud auth configure-docker us-central1-docker.pkg.dev
-            build-tools/splice-compose.sh restore_volume splice-validator_domain-upgrade-dump workspace/domain-upgrade-dump.tar
+          cmd: build-tools/splice-compose.sh restore_volume splice-validator_domain-upgrade-dump workspace/domain-upgrade-dump.tar
       - docker_login_artifactory
       - run_bash_command_in_nix:
           cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn

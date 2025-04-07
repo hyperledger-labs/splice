@@ -320,7 +320,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by(namespace)(splice_history_backfilling_completed + rate(splice_history_backfilling_transaction_count[5m]))
+              expr: max by(namespace)(rate(splice_history_backfilling_transaction_count[5m]) > 0 or splice_history_backfilling_completed)
               instant: true
               intervalMs: 1000
               legendFormat: __auto

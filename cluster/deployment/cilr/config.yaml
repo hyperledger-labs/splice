@@ -2,16 +2,12 @@ pulumiProjectConfig:
   default:
     cloudSql:
       enabled: true
-      protected: false
+      protected: true
       tier: "db-custom-4-7680"
   sv-runbook:
     cloudSql:
       enabled: true
 
-infra:
-  ipWhitelisting:
-    extraWhitelistedIngress:
-      - "35.225.102.103/32" # CI GKE cluster for CCI
 svs:
   sv-13:
     participant:

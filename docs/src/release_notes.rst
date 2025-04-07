@@ -15,6 +15,11 @@ Upcoming
 
   - Relax config validation on audience to not require that it is a URL as this causes issues with some IAMs.
 
+- API
+
+  - interdependencies in the Open API specs are now inlined in every yaml file,
+    so that the files can be used independently of each other (and no longer incorrectly reference the common.yaml file in the bundle).
+
 0.3.19
 ------
 

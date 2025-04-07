@@ -3,7 +3,7 @@ on: workflow_call
 
 jobs:
   docs:
-    runs-on: self-hosted-k8s-x-small
+    runs-on: self-hosted-k8s-small
     container:
       image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
 

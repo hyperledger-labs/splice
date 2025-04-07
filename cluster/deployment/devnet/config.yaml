@@ -1,7 +1,3 @@
-infra:
-  ipWhitelisting:
-    extraWhitelistedIngress:
-      - "35.225.102.103/32" # CI GKE cluster for CCI (for preflights)
 validator1:
   kms:
     type: gcp
@@ -30,6 +26,8 @@ monitoring:
         # we expect more frequent timeouts on devnet and therefore sequencer request amplification so we allow a higher threshold"
         kilobytes: 10
         overMinutes: 30
+      cloudSql:
+        maintenance: true
       cometbft:
         expectedMaxBlocksPerSecond: 5
       loadTester:

@@ -1,7 +1,9 @@
+import * as pulumi from '@pulumi/pulumi';
 import { config } from 'splice-pulumi-common';
 
-import { gcpProjectId } from './consts';
-import { installAll } from './gcp-project';
+import { GcpProject } from './gcp-project';
+
+const gcpProjectId = pulumi.getStack();
 
 const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 if (!GCP_PROJECT) {
@@ -14,7 +16,7 @@ if (gcpProjectId !== GCP_PROJECT) {
 }
 
 function main() {
-  return installAll();
+  return new GcpProject(gcpProjectId);
 }
 
 main();

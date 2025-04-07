@@ -69,8 +69,8 @@ export class CometBftNodeConfigs {
   } {
     return {
       nodeId: this.sv1NodeConfig.id,
-      publicKey: this.sv1NodeConfig.validator?.publicKey,
-      keyAddress: this.sv1NodeConfig.validator?.keyAddress,
+      publicKey: this.sv1NodeConfig.validator.publicKey,
+      keyAddress: this.sv1NodeConfig.validator.keyAddress,
       externalAddress: this.p2pExternalAddress(this._nodeConfigs.sv1.nodeIndex),
     };
   }
