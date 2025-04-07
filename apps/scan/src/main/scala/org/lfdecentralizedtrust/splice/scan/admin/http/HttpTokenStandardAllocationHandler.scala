@@ -86,23 +86,21 @@ class HttpTokenStandardAllocationHandler(
             .activeSynchronizer
         v1.Resource.GetAllocationTransferContextResponseOK(
           definitions.ChoiceContext(
-            choiceContextData = Some(
-              io.circe.parser
-                .parse(
-                  new metadatav1.ChoiceContext(
-                    Map(
-                      // TODO(#18575): also retrieve and serve featured app right
-                      "amulet-rules" -> amuletRules.contractId.contractId,
-                      "open-round" -> newestOpenRound.contractId.contractId,
-                    ).map[String, metadatav1.AnyValue] { case (k, v) =>
-                      k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
-                    }.asJava
-                  ).toJson
-                )
-                .getOrElse(
-                  throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
-                )
-            ),
+            choiceContextData = io.circe.parser
+              .parse(
+                new metadatav1.ChoiceContext(
+                  Map(
+                    // TODO(#18575): also retrieve and serve featured app right
+                    "amulet-rules" -> amuletRules.contractId.contractId,
+                    "open-round" -> newestOpenRound.contractId.contractId,
+                  ).map[String, metadatav1.AnyValue] { case (k, v) =>
+                    k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
+                  }.asJava
+                ).toJson
+              )
+              .getOrElse(
+                throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
+              ),
             disclosedContracts = Vector(
               toTokenStandardDisclosedContract(lockedAmulet.contract, activeSynchronizerId),
               toTokenStandardDisclosedContract(amuletRules, activeSynchronizerId),

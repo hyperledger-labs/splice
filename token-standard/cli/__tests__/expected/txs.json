@@ -1,18 +1,18 @@
 {
-  "nextOffset": 9,
+  "nextOffset": 17,
   "transactions": [
     {
       "updateId": "update-4",
       "offset": 4,
-      "recordTime": "1970-01-01T00:00:04Z",
+      "recordTime": "1971-01-01T00:00:04Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
           "type": "BurnMint",
           "input": {
-            "sender": "validator::normalized",
+            "sender": "aliceValidator::normalized",
             "inputHoldings": [
-              "14"
+              "15"
             ],
             "instrumentId": {
               "admin": "dso::normalized",
@@ -25,7 +25,7 @@
                     "open-round",
                     {
                       "tag": "AV_ContractId",
-                      "value": "8"
+                      "value": "9"
                     }
                   ]
                 ]
@@ -43,21 +43,21 @@
           "output": {
             "outputHoldings": [
               {
-                "15": {
+                "16": {
                   "amount": "200.0000000000",
                   "context": {
                     "values": []
                   },
-                  "owner": "party::normalized"
+                  "owner": "alice::normalized"
                 }
               },
               {
-                "16": {
+                "17": {
                   "amount": "199663.3600000000",
                   "context": {
                     "values": []
                   },
-                  "owner": "validator::normalized"
+                  "owner": "aliceValidator::normalized"
                 }
               }
             ]
@@ -69,8 +69,8 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "15",
-              "owner": "party::normalized"
+              "contractId": "16",
+              "owner": "alice::normalized"
             }
           ],
           "archives": []
@@ -80,22 +80,22 @@
     {
       "updateId": "update-5",
       "offset": 5,
-      "recordTime": "1970-01-01T00:00:05Z",
+      "recordTime": "1971-01-01T00:00:05Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
           "type": "Transfer",
           "status": "Completed",
           "input": {
-            "sender": "party::normalized",
-            "receiver": "validator::normalized",
+            "sender": "alice::normalized",
+            "receiver": "aliceValidator::normalized",
             "amount": "100.0000000000",
             "instrumentId": {
               "admin": "dso::normalized",
               "id": "Amulet"
             },
             "senderHoldings": [
-              "15"
+              "16"
             ],
             "meta": {
               "values": []
@@ -114,14 +114,14 @@
                     "open-round",
                     {
                       "tag": "AV_ContractId",
-                      "value": "8"
+                      "value": "9"
                     }
                   ],
                   [
                     "transfer-preapproval",
                     {
                       "tag": "AV_ContractId",
-                      "value": "20"
+                      "value": "21"
                     }
                   ]
                 ]
@@ -136,7 +136,7 @@
               "22"
             ],
             "senderHoldingCids": [
-              "21"
+              "23"
             ],
             "meta": {
               "values": []
@@ -149,8 +149,8 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "22",
-              "owner": "party::normalized"
+              "contractId": "23",
+              "owner": "alice::normalized"
             }
           ],
           "archives": [
@@ -160,8 +160,8 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "15",
-              "owner": "party::normalized"
+              "contractId": "16",
+              "owner": "alice::normalized"
             }
           ]
         }
@@ -170,15 +170,15 @@
     {
       "updateId": "update-6",
       "offset": 6,
-      "recordTime": "1970-01-01T00:00:06Z",
+      "recordTime": "1971-01-01T00:00:06Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
           "type": "BurnMint",
           "input": {
-            "sender": "party::normalized",
+            "sender": "alice::normalized",
             "inputHoldings": [
-              "22"
+              "23"
             ],
             "instrumentId": {
               "admin": "dso::normalized",
@@ -191,7 +191,7 @@
                     "open-round",
                     {
                       "tag": "AV_ContractId",
-                      "value": "8"
+                      "value": "9"
                     }
                   ]
                 ]
@@ -209,21 +209,21 @@
           "output": {
             "outputHoldings": [
               {
-                "25": {
+                "27": {
                   "amount": "10.0000000000",
                   "context": {
                     "values": []
                   },
-                  "owner": "validator::normalized"
+                  "owner": "aliceValidator::normalized"
                 }
               },
               {
-                "0": {
+                "26": {
                   "amount": "64.9000000000",
                   "context": {
                     "values": []
                   },
-                  "owner": "party::normalized"
+                  "owner": "alice::normalized"
                 }
               }
             ]
@@ -235,8 +235,8 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "0",
-              "owner": "party::normalized"
+              "contractId": "26",
+              "owner": "alice::normalized"
             }
           ],
           "archives": [
@@ -246,8 +246,8 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "22",
-              "owner": "party::normalized"
+              "contractId": "23",
+              "owner": "alice::normalized"
             }
           ]
         }
@@ -256,13 +256,13 @@
     {
       "updateId": "update-7",
       "offset": 7,
-      "recordTime": "1970-01-01T00:00:07Z",
+      "recordTime": "1971-01-01T00:00:07Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
           "type": "BurnMint",
           "input": {
-            "sender": "party::normalized",
+            "sender": "alice::normalized",
             "inputHoldings": [],
             "instrumentId": {
               "admin": "dso::normalized",
@@ -275,7 +275,7 @@
                     "open-round",
                     {
                       "tag": "AV_ContractId",
-                      "value": "8"
+                      "value": "9"
                     }
                   ]
                 ]
@@ -293,25 +293,25 @@
           "output": {
             "outputHoldings": [
               {
-                "2": {
-                  "amount": "20000.0000000000",
+                "30": {
+                  "amount": "5000.0000000000",
                   "context": {
                     "values": []
                   },
-                  "owner": "party::normalized"
+                  "owner": "alice::normalized"
                 }
               }
             ]
           },
           "creates": [
             {
-              "amount": "20000.0000000000",
+              "amount": "5000.0000000000",
               "instrumentId": {
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "2",
-              "owner": "party::normalized"
+              "contractId": "30",
+              "owner": "alice::normalized"
             }
           ],
           "archives": []
@@ -321,43 +321,689 @@
     {
       "updateId": "update-8",
       "offset": 8,
-      "recordTime": "1970-01-01T00:00:08Z",
+      "recordTime": "1971-01-01T00:00:08Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
-          "type": "Created",
-          "parentChoice": "raw API",
-          "contractId": "3",
-          "payload": {
-            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
-            "viewValue": {
-              "amount": "30.0000000000",
-              "instrumentId": {
-                "admin": "party::normalized",
-                "id": "DummyHolding"
-              },
-              "lock": null,
-              "meta": {
+          "type": "Transfer",
+          "status": "Pending",
+          "input": {
+            "sender": "alice::normalized",
+            "receiver": "bob::normalized",
+            "amount": "1000.0000000000",
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "senderHoldings": [
+              "26",
+              "30"
+            ],
+            "meta": {
+              "values": []
+            },
+            "extraArgs": {
+              "context": {
                 "values": [
                   [
-                    "test",
-                    "test"
+                    "amulet-rules",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "1"
+                    }
+                  ],
+                  [
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "9"
+                    }
                   ]
                 ]
               },
-              "owner": "party::normalized"
+              "meta": {
+                "values": []
+              }
             }
           },
-          "offset": 8,
-          "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
-          "packageName": "splice-api-token-sample-holding"
+          "output": {
+            "receiverHoldingCids": [],
+            "senderHoldingCids": [],
+            "meta": {
+              "values": []
+            }
+          },
+          "creates": [
+            {
+              "amount": "3987.8847792800",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "33",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "32",
+              "owner": "alice::normalized"
+            }
+          ],
+          "archives": [
+            {
+              "amount": "5000.0000000000",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "30",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "64.9000000000",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "26",
+              "owner": "alice::normalized"
+            }
+          ]
         }
       ]
     },
     {
       "updateId": "update-9",
       "offset": 9,
-      "recordTime": "1970-01-01T00:00:09Z",
+      "recordTime": "1971-01-01T00:00:09Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Transfer",
+          "status": "Pending",
+          "input": {
+            "sender": "alice::normalized",
+            "receiver": "bob::normalized",
+            "amount": "1000.0000000000",
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "senderHoldings": [
+              "33"
+            ],
+            "meta": {
+              "values": []
+            },
+            "extraArgs": {
+              "context": {
+                "values": [
+                  [
+                    "amulet-rules",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "1"
+                    }
+                  ],
+                  [
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "9"
+                    }
+                  ]
+                ]
+              },
+              "meta": {
+                "values": []
+              }
+            }
+          },
+          "output": {
+            "receiverHoldingCids": [],
+            "senderHoldingCids": [],
+            "meta": {
+              "values": []
+            }
+          },
+          "creates": [
+            {
+              "amount": "2910.8695585600",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "38",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "37",
+              "owner": "alice::normalized"
+            }
+          ],
+          "archives": [
+            {
+              "amount": "3987.8847792800",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "33",
+              "owner": "alice::normalized"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "updateId": "update-10",
+      "offset": 10,
+      "recordTime": "1971-01-01T00:00:10Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Transfer",
+          "status": "Pending",
+          "input": {
+            "sender": "alice::normalized",
+            "receiver": "bob::normalized",
+            "amount": "1000.0000000000",
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "senderHoldings": [
+              "38"
+            ],
+            "meta": {
+              "values": []
+            },
+            "extraArgs": {
+              "context": {
+                "values": [
+                  [
+                    "amulet-rules",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "1"
+                    }
+                  ],
+                  [
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "9"
+                    }
+                  ]
+                ]
+              },
+              "meta": {
+                "values": []
+              }
+            }
+          },
+          "output": {
+            "receiverHoldingCids": [],
+            "senderHoldingCids": [],
+            "meta": {
+              "values": []
+            }
+          },
+          "creates": [
+            {
+              "amount": "1833.8543378400",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "43",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "42",
+              "owner": "alice::normalized"
+            }
+          ],
+          "archives": [
+            {
+              "amount": "2910.8695585600",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "38",
+              "owner": "alice::normalized"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "updateId": "update-11",
+      "offset": 11,
+      "recordTime": "1971-01-01T00:00:11Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Transfer",
+          "status": "Pending",
+          "input": {
+            "sender": "alice::normalized",
+            "receiver": "bob::normalized",
+            "amount": "1000.0000000000",
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "senderHoldings": [
+              "43"
+            ],
+            "meta": {
+              "values": []
+            },
+            "extraArgs": {
+              "context": {
+                "values": [
+                  [
+                    "amulet-rules",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "1"
+                    }
+                  ],
+                  [
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "9"
+                    }
+                  ]
+                ]
+              },
+              "meta": {
+                "values": []
+              }
+            }
+          },
+          "output": {
+            "receiverHoldingCids": [],
+            "senderHoldingCids": [],
+            "meta": {
+              "values": []
+            }
+          },
+          "creates": [
+            {
+              "amount": "756.8391171200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "47",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "0",
+              "owner": "alice::normalized"
+            }
+          ],
+          "archives": [
+            {
+              "amount": "1833.8543378400",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "43",
+              "owner": "alice::normalized"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "updateId": "update-12",
+      "offset": 12,
+      "recordTime": "1971-01-01T00:00:12Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "LockedAmulet_Unlock",
+          "contractId": "52",
+          "payload": {
+            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/created-in-round",
+                    "1"
+                  ],
+                  [
+                    "splice.lfdecentralizedtrust.org/rate-per-round",
+                    "0.00380518"
+                  ]
+                ]
+              },
+              "owner": "alice::normalized"
+            }
+          },
+          "offset": 12,
+          "templateId": "#package-name:Splice.Amulet:Amulet",
+          "packageName": "splice-amulet"
+        },
+        {
+          "type": "BurnMint",
+          "input": {
+            "sender": "alice::normalized",
+            "inputHoldings": [
+              "52"
+            ],
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "extraArgs": {
+              "context": {
+                "values": [
+                  [
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "9"
+                    }
+                  ]
+                ]
+              },
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/reason",
+                    "transfer"
+                  ]
+                ]
+              }
+            }
+          },
+          "output": {
+            "outputHoldings": [
+              {
+                "50": {
+                  "amount": "1000.0000000000",
+                  "context": {
+                    "values": []
+                  },
+                  "owner": "bob::normalized"
+                }
+              },
+              {
+                "51": {
+                  "amount": "42.0152207200",
+                  "context": {
+                    "values": []
+                  },
+                  "owner": "alice::normalized"
+                }
+              }
+            ]
+          },
+          "creates": [
+            {
+              "amount": "42.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "51",
+              "owner": "alice::normalized"
+            }
+          ],
+          "archives": [
+            {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "52",
+              "owner": "alice::normalized"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "updateId": "update-13",
+      "offset": 13,
+      "recordTime": "1971-01-01T00:00:13Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "LockedAmulet_Unlock",
+          "contractId": "55",
+          "payload": {
+            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/created-in-round",
+                    "1"
+                  ],
+                  [
+                    "splice.lfdecentralizedtrust.org/rate-per-round",
+                    "0.00380518"
+                  ]
+                ]
+              },
+              "owner": "alice::normalized"
+            }
+          },
+          "offset": 13,
+          "templateId": "#package-name:Splice.Amulet:Amulet",
+          "packageName": "splice-amulet"
+        }
+      ]
+    },
+    {
+      "updateId": "update-14",
+      "offset": 14,
+      "recordTime": "1971-01-01T00:00:14Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "LockedAmulet_Unlock",
+          "contractId": "56",
+          "payload": {
+            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/created-in-round",
+                    "1"
+                  ],
+                  [
+                    "splice.lfdecentralizedtrust.org/rate-per-round",
+                    "0.00380518"
+                  ]
+                ]
+              },
+              "owner": "alice::normalized"
+            }
+          },
+          "offset": 14,
+          "templateId": "#package-name:Splice.Amulet:Amulet",
+          "packageName": "splice-amulet"
+        }
+      ]
+    },
+    {
+      "updateId": "update-15",
+      "offset": 15,
+      "recordTime": "1971-01-01T00:00:15Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Transfer",
+          "status": "Completed",
+          "input": {
+            "sender": "alice::normalized",
+            "receiver": "alice::normalized",
+            "amount": "1.0000000000",
+            "instrumentId": {
+              "admin": "dso::normalized",
+              "id": "Amulet"
+            },
+            "senderHoldings": [
+              "47",
+              "51",
+              "55",
+              "56"
+            ],
+            "meta": {
+              "values": []
+            },
+            "extraArgs": {
+              "context": {
+                "values": [
+                  [
+                    "amulet-rules",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "1"
+                    }
+                  ],
+                  [
+                    "open-round",
+                    {
+                      "tag": "AV_ContractId",
+                      "value": "9"
+                    }
+                  ]
+                ]
+              },
+              "meta": {
+                "values": []
+              }
+            }
+          },
+          "output": {
+            "receiverHoldingCids": [
+              "2"
+            ],
+            "senderHoldingCids": [
+              "3"
+            ],
+            "meta": {
+              "values": []
+            }
+          },
+          "creates": [
+            {
+              "amount": "2913.8847792800",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "3",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "1.0000000000",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "2",
+              "owner": "alice::normalized"
+            }
+          ],
+          "archives": [
+            {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "56",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "1064.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "55",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "42.0152207200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "51",
+              "owner": "alice::normalized"
+            },
+            {
+              "amount": "756.8391171200",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "47",
+              "owner": "alice::normalized"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "updateId": "update-16",
+      "offset": 16,
+      "recordTime": "1971-01-01T00:00:16Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
@@ -367,9 +1013,9 @@
           "payload": {
             "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
             "viewValue": {
-              "amount": "40.0000000000",
+              "amount": "30.0000000000",
               "instrumentId": {
-                "admin": "party::normalized",
+                "admin": "alice::normalized",
                 "id": "DummyHolding"
               },
               "lock": null,
@@ -381,10 +1027,46 @@
                   ]
                 ]
               },
-              "owner": "party::normalized"
+              "owner": "alice::normalized"
             }
           },
-          "offset": 9,
+          "offset": 16,
+          "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
+          "packageName": "splice-api-token-sample-holding"
+        }
+      ]
+    },
+    {
+      "updateId": "update-17",
+      "offset": 17,
+      "recordTime": "1971-01-01T00:00:17Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "raw API",
+          "contractId": "5",
+          "payload": {
+            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "40.0000000000",
+              "instrumentId": {
+                "admin": "alice::normalized",
+                "id": "DummyHolding"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "test",
+                    "test"
+                  ]
+                ]
+              },
+              "owner": "alice::normalized"
+            }
+          },
+          "offset": 17,
           "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }

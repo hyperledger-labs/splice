@@ -1405,7 +1405,10 @@ object HttpScanAppClient {
   case class GetTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)
       extends TokenStandardTransferInstructionBaseCommand[
         transferinstruction.v1.GetTransferFactoryResponse,
-        FactoryChoiceWithDisclosures,
+        (
+            FactoryChoiceWithDisclosures,
+            transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+        ),
       ] {
     override def submitRequest(
         client: Client,
@@ -1429,14 +1432,16 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ): PartialFunction[
       transferinstruction.v1.GetTransferFactoryResponse,
-      Either[String, FactoryChoiceWithDisclosures],
+      Either[
+        String,
+        (
+            FactoryChoiceWithDisclosures,
+            transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+        ),
+      ],
     ] = { case transferinstruction.v1.GetTransferFactoryResponse.OK(factory) =>
       for {
-        data <- Either.fromOption(
-          factory.choiceContext.choiceContextData,
-          "Choice context data not set",
-        )
-        choiceContext <- parseAsChoiceContext(data)
+        choiceContext <- parseAsChoiceContext(factory.choiceContext.choiceContextData)
       } yield {
         val disclosedContracts =
           factory.choiceContext.disclosedContracts.map(
@@ -1456,8 +1461,98 @@ object HttpScanAppClient {
           .commands()
           .asScala
           .toSeq
-        FactoryChoiceWithDisclosures(commands, disclosedContracts)
+        (FactoryChoiceWithDisclosures(commands, disclosedContracts), factory.transferKind)
       }
+    }
+  }
+
+  case class GetTransferInstructionAcceptContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ) extends TokenStandardTransferInstructionBaseCommand[
+        transferinstruction.v1.GetTransferInstructionAcceptContextResponse,
+        ChoiceContextWithDisclosures,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], transferinstruction.v1.GetTransferInstructionAcceptContextResponse] = {
+      client.getTransferInstructionAcceptContext(transferInstructionId.contractId, headers)
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      transferinstruction.v1.GetTransferInstructionAcceptContextResponse,
+      Either[String, ChoiceContextWithDisclosures],
+    ] = { case transferinstruction.v1.GetTransferInstructionAcceptContextResponse.OK(context) =>
+      val disclosedContracts =
+        context.disclosedContracts.map(fromTransferInstructionHttpDisclosedContract)
+      for {
+        choiceContext <- parseAsChoiceContext(context.choiceContextData)
+      } yield ChoiceContextWithDisclosures(disclosedContracts, choiceContext)
+    }
+  }
+
+  case class GetTransferInstructionRejectContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ) extends TokenStandardTransferInstructionBaseCommand[
+        transferinstruction.v1.GetTransferInstructionRejectContextResponse,
+        ChoiceContextWithDisclosures,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], transferinstruction.v1.GetTransferInstructionRejectContextResponse] = {
+      client.getTransferInstructionRejectContext(transferInstructionId.contractId, headers)
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      transferinstruction.v1.GetTransferInstructionRejectContextResponse,
+      Either[String, ChoiceContextWithDisclosures],
+    ] = { case transferinstruction.v1.GetTransferInstructionRejectContextResponse.OK(context) =>
+      val disclosedContracts =
+        context.disclosedContracts.map(fromTransferInstructionHttpDisclosedContract)
+      for {
+        choiceContext <- parseAsChoiceContext(context.choiceContextData)
+      } yield ChoiceContextWithDisclosures(disclosedContracts, choiceContext)
+    }
+  }
+
+  case class GetTransferInstructionWithdrawContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ) extends TokenStandardTransferInstructionBaseCommand[
+        transferinstruction.v1.GetTransferInstructionWithdrawContextResponse,
+        ChoiceContextWithDisclosures,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], transferinstruction.v1.GetTransferInstructionWithdrawContextResponse] = {
+      client.getTransferInstructionWithdrawContext(transferInstructionId.contractId, headers)
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      transferinstruction.v1.GetTransferInstructionWithdrawContextResponse,
+      Either[String, ChoiceContextWithDisclosures],
+    ] = { case transferinstruction.v1.GetTransferInstructionWithdrawContextResponse.OK(context) =>
+      val disclosedContracts =
+        context.disclosedContracts.map(fromTransferInstructionHttpDisclosedContract)
+      for {
+        choiceContext <- parseAsChoiceContext(context.choiceContextData)
+      } yield ChoiceContextWithDisclosures(disclosedContracts, choiceContext)
     }
   }
 
@@ -1491,11 +1586,7 @@ object HttpScanAppClient {
       Either[String, FactoryChoiceWithDisclosures],
     ] = { case allocationinstruction.v1.GetAllocationFactoryResponse.OK(factory) =>
       for {
-        data <- Either.fromOption(
-          factory.choiceContext.choiceContextData,
-          "Choice context data not set",
-        )
-        choiceContext <- parseAsChoiceContext(data)
+        choiceContext <- parseAsChoiceContext(factory.choiceContext.choiceContextData)
       } yield {
         val disclosedContracts =
           factory.choiceContext.disclosedContracts.map(
@@ -1546,8 +1637,7 @@ object HttpScanAppClient {
       val disclosedContracts =
         context.disclosedContracts.map(fromAllocationHttpDisclosedContract)
       for {
-        data <- Either.fromOption(context.choiceContextData, "Choice context data not set")
-        choiceContext <- parseAsChoiceContext(data)
+        choiceContext <- parseAsChoiceContext(context.choiceContextData)
       } yield ChoiceContextWithDisclosures(disclosedContracts, choiceContext)
     }
   }

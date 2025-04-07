@@ -30,6 +30,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
         "404":
           $ref: "#/components/responses/404"
 
@@ -52,6 +54,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
         "404":
           $ref: "#/components/responses/404"
 
@@ -74,11 +78,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
         "404":
           $ref: "#/components/responses/404"
 
 components:
   responses:
+    "400":
+      description: "bad request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     "404":
       description: "not found"
       content:
@@ -105,7 +117,7 @@ components:
             $ref: "#/components/schemas/DisclosedContract"
       required:
         [
-          "transferExecutionChoiceContext",
+          "choiceContextData",
           "disclosedContracts",
         ]
 

@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import eventsByContractIdResponses0 from "./data/eventsByContractIdResponse-0.json";
-import eventsByContractIdResponses1 from "./data/eventsByContractIdResponse-1.json";
+import eventsByContractIdResponses from "./data/eventsByContractIdResponses.json";
 import holdings from "./data/holdings.json";
 import txs from "./data/txs.json";
 import { HttpHandler, http, HttpResponse } from "msw";
@@ -25,7 +24,7 @@ export const buildLedgerApiMock = (ledgerUrl: string): HttpHandler[] => [
   }),
   http.post(`${ledgerUrl}/v2/events/events-by-contract-id`, async (req) => {
     const payload: any = await req.request.json();
-    const mocks = [eventsByContractIdResponses0, eventsByContractIdResponses1];
+    const mocks = eventsByContractIdResponses
     const response = mocks.find(
       (mock) => mock.created.createdEvent.contractId === payload.contractId
     );

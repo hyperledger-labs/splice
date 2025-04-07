@@ -16,4 +16,19 @@ case class ChoiceContextWithDisclosures(
     // many parsing steps. We just want to pass this context through.
     disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     choiceContext: metadatav1.ChoiceContext,
-)
+) {
+  import org.lfdecentralizedtrust.splice.util.ChoiceContextWithDisclosures.*
+
+  def toExtraArgs(meta: metadatav1.Metadata = emptyMetadata): metadatav1.ExtraArgs =
+    new metadatav1.ExtraArgs(choiceContext, meta)
+}
+
+object ChoiceContextWithDisclosures {
+  val emptyMetadata: metadatav1.Metadata = new metadatav1.Metadata(java.util.Map.of())
+  val emptyExtraArgs: metadatav1.ExtraArgs = new metadatav1.ExtraArgs(
+    new metadatav1.ChoiceContext(
+      java.util.Map.of()
+    ),
+    emptyMetadata,
+  )
+}

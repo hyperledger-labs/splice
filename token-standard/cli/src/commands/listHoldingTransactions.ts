@@ -8,7 +8,7 @@ import {
 import { CommandOptions } from "../cli";
 import {
   HoldingInterface,
-  TokenStandardTransactionInterfaces,
+  TokenStandardTransactionInterfaces
 } from "../constants";
 import {
   DefaultApi as LedgerJsonApi,
@@ -322,12 +322,11 @@ function toPrettyTransfer(
 ): PrettyTransfer {
   const choiceArgument = exercisedEvent.choiceArgument;
   const exerciseResult = exercisedEvent.exerciseResult;
+  const completed =
+    exerciseResult.output.tag === "TransferInstructionResult_Completed";
   return {
     type: "Transfer",
-    status:
-      exerciseResult.output.tag === "TransferInstructionResult_Completed"
-        ? "Completed"
-        : "Pending",
+    status: completed ? "Completed" : "Pending",
     input: {
       sender: choiceArgument.transfer.sender,
       receiver: choiceArgument.transfer.receiver,
@@ -337,13 +336,20 @@ function toPrettyTransfer(
       meta: choiceArgument.transfer.meta,
       extraArgs: choiceArgument.extraArgs,
     },
-    output: {
-      receiverHoldingCids:
-        exerciseResult.output.value.holdings.senderHoldingCids,
-      senderHoldingCids:
-        exerciseResult.output.value.holdings.receiverHoldingCids,
-      meta: exerciseResult.meta,
-    },
+    output: completed
+      ? {
+          receiverHoldingCids:
+            exerciseResult.output.value.holdings.receiverHoldingCids,
+          senderHoldingCids:
+            exerciseResult.output.value.holdings.senderHoldingCids,
+          meta: exerciseResult.meta,
+        }
+      : {
+          // TODO(#18819): consider using a better type as part of supporting pending transfers
+          receiverHoldingCids: [],
+          senderHoldingCids: [],
+          meta: exerciseResult.meta,
+        },
   };
 }
 
@@ -465,8 +471,8 @@ interface PrettyTransfer {
     extraArgs: any;
   };
   output: {
-    senderHoldingCids: string[];
-    receiverHoldingCids: string[];
+    senderHoldingCids: null | string[];
+    receiverHoldingCids: null | string[];
     meta: any;
   };
 }
@@ -498,6 +504,7 @@ type Holding = {
   amount: string;
   owner: string;
   instrumentId: { admin: string; id: string };
+  // TODO (#18819): support locked holdings, as they are now used in two-step transfers -- perhaps best to just reuse the Daml HoldingView interface
 };
 
 async function tokenStandardChoiceExercised(

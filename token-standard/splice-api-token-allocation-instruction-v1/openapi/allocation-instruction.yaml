@@ -125,7 +125,7 @@ components:
             $ref: "#/components/schemas/DisclosedContract"
       required:
         [
-          "transferExecutionChoiceContext",
+          "choiceContextData",
           "disclosedContracts",
         ]
 

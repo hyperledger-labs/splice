@@ -33,7 +33,78 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-# TODO(#18643): add endpoints for withdraw, reject, accept
+
+  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/accept:
+    get:
+      operationId: "getTransferInstructionAcceptContext"
+      description: |
+        Get the choice context to accept a transfer instruction.
+      parameters:
+        - name: transferInstructionId
+          description: "The contract ID of the transfer instruction to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/reject:
+    get:
+      operationId: "getTransferInstructionRejectContext"
+      description: |
+        Get the choice context to reject a transfer instruction.
+      parameters:
+        - name: transferInstructionId
+          description: "The contract ID of the transfer instruction to reject."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/withdraw:
+    get:
+      operationId: "getTransferInstructionWithdrawContext"
+      description: |
+        Get the choice context to withdraw a transfer instruction.
+      parameters:
+        - name: transferInstructionId
+          description: "The contract ID of the transfer instruction to withdraw."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
 
 components:
   responses:
@@ -141,7 +212,7 @@ components:
             $ref: "#/components/schemas/DisclosedContract"
       required:
         [
-          "transferExecutionChoiceContext",
+          "choiceContextData",
           "disclosedContracts",
         ]
 

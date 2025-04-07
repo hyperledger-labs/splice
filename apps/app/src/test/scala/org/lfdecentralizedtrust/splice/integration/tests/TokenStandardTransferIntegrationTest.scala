@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.util.UUID
 
@@ -64,6 +65,7 @@ class TokenStandardTransferIntegrationTest
           aliceValidatorBackend.getValidatorPartyId(),
           aliceParty,
           BigDecimal(2000.0),
+          transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
         )
       },
     )(
@@ -106,6 +108,7 @@ class TokenStandardTransferIntegrationTest
       aliceParty,
       bobParty,
       BigDecimal(1000.0),
+      transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
     )
     val prepareSend =
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api.interactive_submission

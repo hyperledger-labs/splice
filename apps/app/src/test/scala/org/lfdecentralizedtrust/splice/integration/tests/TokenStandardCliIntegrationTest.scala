@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.crypto.SigningPrivateKey
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.io.FileOutputStream
 import scala.collection.mutable
@@ -64,6 +65,7 @@ class TokenStandardCliIntegrationTest
             aliceValidatorBackend.getValidatorPartyId(),
             aliceParty,
             BigDecimal(2000.0),
+            transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
           )
         },
       )(
