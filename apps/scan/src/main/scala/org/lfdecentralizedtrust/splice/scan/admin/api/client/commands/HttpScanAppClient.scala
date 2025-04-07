@@ -1607,9 +1607,10 @@ object HttpScanAppClient {
         metadata.v1.definitions.Instrument
       ]] {
 
-    override def submitRequest(client: Client, headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse,
-    ], metadata.v1.ListInstrumentsResponse] =
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], metadata.v1.ListInstrumentsResponse] =
       client.listInstruments(pageSize, pageToken, headers)
 
     override protected def handleOk()(implicit

@@ -74,12 +74,7 @@ import org.lfdecentralizedtrust.splice.http.{
   UrlValidator,
 }
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{
-  AppStore,
-  PageLimit,
-  SortOrder,
-  VotesStore,
-}
+import org.lfdecentralizedtrust.splice.store.{AppStore, PageLimit, SortOrder, VotesStore}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
