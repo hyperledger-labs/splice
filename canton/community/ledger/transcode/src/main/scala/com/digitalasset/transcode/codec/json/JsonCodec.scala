@@ -22,8 +22,6 @@ import scala.collection.mutable.ArrayBuffer
   *   querying and mathematical operations, but can loose precision, as numbers in some json
   *   implementations are backed by Double
   */
-
-//TODO (i20144) remove or convert to scala2
 class JsonCodec(
     encodeNumericAsString: Boolean = true,
     encodeInt64AsString: Boolean = true,
@@ -39,6 +37,7 @@ class JsonCodec(
 
     override def toDynamicValue(v: Value): DynamicValue = {
       val valueMap = v.obj.value
+
       val unexpectedFields = valueMap.keySet.toSet -- fields.map(_._1)
 
       val result = DynamicValue.Record(fields map { case (name, c) =>

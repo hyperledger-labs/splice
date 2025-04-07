@@ -13,7 +13,7 @@ import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
   LifeCycle,
-  RunOnShutdown,
+  RunOnClosing,
 }
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
@@ -74,6 +74,7 @@ trait SynchronizerOutboxDispatchHelper extends NamedLogging {
 trait StoreBasedSynchronizerOutboxDispatchHelper extends SynchronizerOutboxDispatchHelper {
 
   def authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore]
+
   override protected def convertTransactions(
       transactions: Seq[GenericSignedTopologyTransaction]
   )(implicit
@@ -137,10 +138,10 @@ trait SynchronizerOutboxDispatch extends NamedLogging with FlagCloseable {
 
   // register handle close task
   // this will ensure that the handle is closed before the outbox, aborting any retries
-  runOnShutdown_(new RunOnShutdown {
+  runOnOrAfterClose_(new RunOnClosing {
     override def name: String = "close-handle"
     override def done: Boolean = handle.isClosing
-    override def run(): Unit = LifeCycle.close(handle)(logger)
+    override def run()(implicit traceContext: TraceContext): Unit = LifeCycle.close(handle)(logger)
   })(TraceContext.empty)
 
   protected def notAlreadyPresent(

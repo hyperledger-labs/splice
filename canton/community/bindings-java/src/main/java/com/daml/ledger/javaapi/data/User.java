@@ -25,14 +25,12 @@ public final class User {
 
   public UserManagementServiceOuterClass.User toProto() {
     if (primaryParty == null || primaryParty.isEmpty()) {
-      return UserManagementServiceOuterClass.User.newBuilder()
-        .setId(id)
-        .build();
+      return UserManagementServiceOuterClass.User.newBuilder().setId(id).build();
     } else {
       return UserManagementServiceOuterClass.User.newBuilder()
-        .setId(id)
-        .setPrimaryParty(primaryParty.get())
-        .build();
+          .setId(id)
+          .setPrimaryParty(primaryParty.get())
+          .build();
     }
   }
 

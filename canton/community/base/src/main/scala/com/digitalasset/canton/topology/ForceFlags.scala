@@ -50,6 +50,16 @@ object ForceFlag {
   case object DisablePartyWithActiveContracts
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_DISABLE_PARTY_WITH_ACTIVE_CONTRACTS)
 
+  case object AllowInsufficientParticipantPermissionForSignatoryParty
+      extends ForceFlag(
+        v30.ForceFlag.FORCE_FLAG_ALLOW_INSUFFICIENT_PARTICIPANT_PERMISSION_FOR_SIGNATORY_PARTY
+      )
+
+  case object AllowInsufficientSignatoryAssigningParticipantsForParty
+      extends ForceFlag(
+        v30.ForceFlag.FORCE_FLAG_ALLOW_INSUFFICIENT_SIGNATORY_ASSIGNING_PARTICIPANTS_FOR_PARTY
+      )
+
   case object AllowUnvalidatedSigningKeys
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVALIDATED_SIGNING_KEYS)
 
@@ -72,6 +82,8 @@ object ForceFlag {
       AllowUnvalidatedSigningKeys,
       AllowUnvetPackageWithActiveContracts,
       SubmissionTimeRecordTimeToleranceIncrease,
+      AllowInsufficientParticipantPermissionForSignatoryParty,
+      AllowInsufficientSignatoryAssigningParticipantsForParty,
     )
       .map(ff => ff.toProtoV30 -> ff)
       .toMap

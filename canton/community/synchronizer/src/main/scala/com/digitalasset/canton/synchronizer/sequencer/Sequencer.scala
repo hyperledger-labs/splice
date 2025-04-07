@@ -106,6 +106,18 @@ trait Sequencer
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.EventSource]
 
+  def readV2(member: Member, timestampInclusive: Option[CantonTimestamp])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.EventSource]
+
+  /** Return the last timestamp of the containing block of the provided timestamp. This is needed to
+    * determine the effective timestamp to observe in topology processing, required to produce a
+    * correct snapshot.
+    */
+  def awaitContainingBlockLastTimestamp(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SequencerError, CantonTimestamp]
+
   /** Return a snapshot state that other newly onboarded sequencers can use as an initial state from
     * which to support serving events. This state depends on the provided timestamp and will contain
     * registered members, counters per member, latest timestamp (which will be greater than or equal
@@ -118,6 +130,12 @@ trait Sequencer
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerError, SequencerSnapshot]
 
+  /** Wait for and return the sequencer snapshot that contains the provided timestamp.
+    */
+  def awaitSnapshot(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SequencerError, SequencerSnapshot]
+
   /** Disable the provided member. Should prevent them from reading or writing in the future
     * (although they can still be addressed). Their unread data can also be pruned. Effectively
     * disables all instances of this member.
@@ -125,19 +143,6 @@ trait Sequencer
   def disableMember(member: Member)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerAdministrationError, Unit]
-
-  /** The first [[com.digitalasset.canton.SequencerCounter]] that this sequencer can serve for its
-    * sequencer client when the sequencer topology processor's
-    * [[com.digitalasset.canton.store.SequencedEventStore]] is empty. For a sequencer bootstrapped
-    * from a [[SequencerSnapshot]], this should be at least the
-    * [[sequencer.SequencerSnapshot.heads]] for the
-    * [[com.digitalasset.canton.topology.SequencerId]]. For a non-bootstrapped sequencer, this can
-    * be [[com.digitalasset.canton.GenesisSequencerCounter]]. This is sound as pruning ensures that
-    * we never
-    */
-  private[sequencer] def firstSequencerCounterServeableForSequencer(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[SequencerCounter]
 
   /** Return the latest known status of the specified members, either at wall clock time of this
     * sequencer or latest known sequenced event, whichever is the most recent. This method should be

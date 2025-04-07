@@ -38,27 +38,28 @@ cli_handler.setFormatter(
         },
     )
 )
-file_handler = logging.FileHandler("log/scan_txlog.log")
-file_handler.setFormatter(
-    logging.Formatter("%(levelname)s:%(name)s:%(asctime)s:%(message)s")
-)
 
 # Set precision and rounding mode
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
 
-def _default_logger(name, loglevel):
+def _setup_logger(name, loglevel, file_path):
+    # Ensure the log directory exists
+    log_directory = os.path.dirname(file_path)
+    if log_directory and not os.path.exists(log_directory):
+        os.makedirs(log_directory)
+
+    file_handler = logging.FileHandler(file_path)
+    file_handler.setFormatter(
+        logging.Formatter("%(levelname)s:%(name)s:%(asctime)s:%(message)s")
+    )
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
     logger.addHandler(file_handler)
     logger.setLevel(loglevel)
 
     return logger
-
-
-# Global logger, always accessible
-LOG = _default_logger("global", "INFO")
 
 
 def _party_enabled(args, p):
@@ -1029,6 +1030,10 @@ class LfValue:
     # data AmuletRules_ConvertFeaturedAppActivityMarkers -> openRoundCid
     def get_amuletrules_convertfeaturedappactivitymarkers_openroundcid(self):
         return self.__get_record_field("openMiningRoundCid").get_contract_id()
+
+    # data TransferInstructionResult -> output
+    def get_transferinstructionresult_output(self):
+        return self.__get_record_field("output").__get_variant()
 
     # data SteppedRate
     def __get_stepped_rate(self):
@@ -3485,13 +3490,6 @@ class State:
         return HandleTransactionResult.empty()
 
     def handle_convert_featured_app_activity_markers(self, transaction, event):
-        # print(event)
-        # print(
-        #     event.exercise_argument.get_dsorules_amuletrules_convertfeaturedappactivitymarkers_openroundcid()
-        # )
-        # open_round = self.active_contracts[
-        #     event.exercise_argument.__get_record_field("openMiningRoundCid")
-        # ]
         assert len(event.child_event_ids) == 1
         event = transaction.events_by_id[event.child_event_ids[0]]
         assert event.choice_name == "AmuletRules_ConvertFeaturedAppActivityMarkers"
@@ -3508,6 +3506,63 @@ class State:
             ):
                 self.active_contracts[child_event.contract_id] = child_event
         return HandleTransactionResult.for_open_round(round_number)
+
+    def handle_transfer_factory_transfer(self, transaction, event):
+        output = event.exercise_result.get_transferinstructionresult_output()
+        if output["tag"] == "TransferInstructionResult_Completed":
+            # direct transfer
+            for event_id in event.child_event_ids:
+                child_event = transaction.events_by_id[event_id]
+                if (
+                    isinstance(child_event, ExercisedEvent)
+                    and child_event.choice_name == "TransferPreapproval_Send"
+                ):
+                    return self.handle_transfer_preapproval_send(
+                        transaction, child_event
+                    )
+            raise Exception(
+                f"Could not find TransferPreapproval_Send child event for TransferFactory_Transfer: {transaction}"
+            )
+        else:
+            # TODO(#18643) Support two-step transfers
+            raise Exception(
+                f"Unexpected output tag for TransferFactory_Transfer: {output.tag}"
+            )
+
+    def handle_allocation_factory_allocate(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction, child_event, description="Allocation"
+                )
+        raise Exception(
+            f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
+        )
+
+    def handle_allocation_execute_transfer(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Allocation unlock"
+                )
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction, child_event, description="Allocation execution"
+                )
+        raise Exception(
+            f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
+        )
 
     def handle_root_exercised_event(self, transaction, event):
         LOG.debug(f"Root exercise: {event.choice_name}")
@@ -3659,6 +3714,12 @@ class State:
                 return self.handle_convert_featured_app_activity_markers(
                     transaction, event
                 )
+            case "TransferFactory_Transfer":
+                return self.handle_transfer_factory_transfer(transaction, event)
+            case "AllocationFactory_Allocate":
+                return self.handle_allocation_factory_allocate(transaction, event)
+            case "Allocation_ExecuteTransfer":
+                return self.handle_allocation_execute_transfer(transaction, event)
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"
 
@@ -3782,17 +3843,45 @@ class AppState:
 
     def _save_to_cache(self, args):
         if args.cache_file_path:
+            backup = None
             try:
+                if os.path.exists(args.cache_file_path):
+                    backup = _rename_to_backup(args.cache_file_path)
                 with open(args.cache_file_path, "w") as file:
                     data = self.to_json()
                     json.dump(data, file)
                     LOG.debug(f"Saved app state to {args.cache_file_path}")
             except Exception as e:
                 LOG.error(f"Could not save app state to {args.cache_file_path}: {e}")
+                os.replace(backup, args.cache_file_path)  # overwrite if present
+                backup = None
+            if backup:
+                os.remove(backup)
 
     def finalize_batch(self, args):
         self._save_to_cache(args)
         self.state.flush_report()
+
+
+def _rename_to_backup(filename):
+    """Rename FILENAME to a unique name in the same folder with leading and
+    trailing `#`.
+
+    We do this instead of using a tempfile for output and then renaming after
+    because if tempfiles are on a different filesystem, the copy can fail in
+    progress, which would destroy the old file if it was still in place."""
+    target = os.path.join(os.path.dirname(filename), f"#{os.path.basename(filename)}")
+    while True:
+        target = f"{target}#"
+        if not os.path.lexists(target):
+            try:
+                os.rename(filename, target)
+                return target
+            # lexists is 99%; deal with race conditions
+            except FileExistsError:
+                pass
+            except IsADirectoryError:
+                pass
 
 
 def _parse_cli_args():
@@ -3985,11 +4074,7 @@ async def main():
     global file_handler, LOG
     args = _parse_cli_args()
 
-    # Set up logging
-    file_handler = logging.FileHandler(args.log_file_path)
-    file_handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
-    LOG = _default_logger("global", "INFO")
-    LOG.setLevel(args.loglevel.upper())
+    LOG = _setup_logger("global", args.loglevel.upper(), args.log_file_path)
     _log_uncaught_exceptions()
 
     LOG.debug(f"Starting scan_txlog with arguments: {args}")

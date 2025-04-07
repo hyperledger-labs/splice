@@ -4,7 +4,6 @@
 package com.digitalasset.canton.ledger.api.validation
 
 import cats.syntax.traverse.*
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.commands.Command.Command.{
   Create as ProtoCreate,
   CreateAndExercise as ProtoCreateAndExercise,
@@ -17,6 +16,7 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionRequest,
   PrepareSubmissionRequest,
 }
+import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.data.{DeduplicationPeriod, Offset}
 import com.digitalasset.canton.ledger.api.util.{DurationConversion, TimestampConversion}
 import com.digitalasset.canton.ledger.api.validation.CommandsValidator.{
@@ -42,6 +42,7 @@ import scala.collection.immutable
 final class CommandsValidator(
     validateDisclosedContracts: ValidateDisclosedContracts,
     validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions,
+    topologyAwarePackageSelectionEnabled: Boolean = false,
 ) {
 
   import FieldValidator.*
@@ -57,12 +58,12 @@ final class CommandsValidator(
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, Commands] =
     for {
-      appId <- requireApplicationId(prepareRequest.applicationId, "application_id")
+      userId <- requireUserId(prepareRequest.userId, "user_id")
       commandId <- requireLedgerString(prepareRequest.commandId, "command_id").map(
         CommandId(_)
       )
       submitters <- validateSubmitters(effectiveSubmitters(prepareRequest))
-      synchronizerId <- requireSynchronizerId(prepareRequest.synchronizerId, "synchronizer_id")
+      synchronizerIdO <- optionalSynchronizerId(prepareRequest.synchronizerId, "synchronizer_id")
       commandz <- requireNonEmpty(prepareRequest.commands, "commands")
       validatedCommands <- validateInnerCommands(commandz)
       ledgerEffectiveTime <- validateLedgerTime(
@@ -88,7 +89,7 @@ final class CommandsValidator(
     } yield Commands(
       // Not used for external submissions
       workflowId = None,
-      applicationId = appId,
+      userId = userId,
       commandId = commandId,
       // Will be provided in "execute"
       submissionId = None,
@@ -103,9 +104,14 @@ final class CommandsValidator(
         commandsReference = "",
       ),
       disclosedContracts = validatedDisclosedContracts,
-      synchronizerId = Some(synchronizerId),
+      synchronizerId = synchronizerIdO,
       packageMap = packageResolutions.packageMap,
-      packagePreferenceSet = packageResolutions.packagePreferenceSet,
+      packagePreferenceSet =
+        if (topologyAwarePackageSelectionEnabled) {
+          // TODO(#23334): move the decision point into the TopologyAwareCommandExecutor
+          prepareRequest.packageIdSelectionPreference.map(Ref.PackageId.assertFromString).toSet
+        } else
+          packageResolutions.packagePreferenceSet,
       prefetchKeys = prefetchKeys,
     )
 
@@ -119,7 +125,7 @@ final class CommandsValidator(
   ): Either[StatusRuntimeException, Commands] =
     for {
       workflowId <- validateWorkflowId(commands.workflowId)
-      appId <- requireApplicationId(commands.applicationId, "application_id")
+      userId <- requireUserId(commands.userId, "user_id")
       commandId <- requireLedgerString(commands.commandId, "command_id").map(CommandId(_))
       submissionId <- validateSubmissionId(commands.submissionId)
       submitters <- validateSubmitters(effectiveSubmitters(commands))
@@ -152,7 +158,7 @@ final class CommandsValidator(
       prefetchKeys <- validatePrefetchContractKeys(commands.prefetchContractKeys)
     } yield Commands(
       workflowId = workflowId,
-      applicationId = appId,
+      userId = userId,
       commandId = commandId,
       submissionId = submissionId,
       actAs = submitters.actAs,
@@ -167,7 +173,12 @@ final class CommandsValidator(
       disclosedContracts = validatedDisclosedContracts,
       synchronizerId = synchronizerId,
       packageMap = packageResolutions.packageMap,
-      packagePreferenceSet = packageResolutions.packagePreferenceSet,
+      packagePreferenceSet =
+        if (topologyAwarePackageSelectionEnabled) {
+          // TODO(#23334): move the decision point into the TopologyAwareCommandExecutor
+          commands.packageIdSelectionPreference.map(Ref.PackageId.assertFromString).toSet
+        } else
+          packageResolutions.packagePreferenceSet,
       prefetchKeys = prefetchKeys,
     )
 

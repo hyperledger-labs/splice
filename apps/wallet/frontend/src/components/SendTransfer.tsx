@@ -1,8 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { DisableConditionally } from 'common-frontend';
 import addHours from 'date-fns/addHours';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

@@ -6,9 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 import cats.data.OptionT
 import cats.syntax.either.*
 import cats.syntax.traverseFilter.*
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -38,21 +36,9 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
-  DevnetTap,
-  Mint,
-  Transfer,
-}
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
-import org.lfdecentralizedtrust.splice.http.{
-  HttpValidatorLicensesHandler,
-  HttpVotesHandler,
-  UrlValidator,
-}
-import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
-import org.lfdecentralizedtrust.splice.store.{AppStore, PageLimit, SortOrder, VotesStore}
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -62,7 +48,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.ActiveContract
+import com.digitalasset.canton.participant.admin.data.{ActiveContractOld as ActiveContract}
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -70,13 +56,29 @@ import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.{Instant, OffsetDateTime, ZoneOffset}
-import java.util.Base64
-import java.util.zip.GZIPOutputStream
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Try, Using}
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  DevnetTap,
+  Mint,
+  Transfer,
+}
+import org.lfdecentralizedtrust.splice.http.{
+  HttpValidatorLicensesHandler,
+  HttpVotesHandler,
+  UrlValidator,
+}
+import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
+import org.lfdecentralizedtrust.splice.store.{AppStore, PageLimit, SortOrder, VotesStore}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.util.ErrorUtil
 
 class HttpScanHandler(
     svParty: PartyId,
@@ -362,7 +364,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupFeaturedAppRight") { _ => _ =>
       for {
-        right <- store.findFeaturedAppRight(
+        right <- store.lookupFeaturedAppRight(
           PartyId.tryFromProtoPrimitive(providerPartyId)
         )
       } yield {
@@ -1618,6 +1620,21 @@ class HttpScanHandler(
     }
   }
 
+  override def listAmuletPriceVotes(
+      respond: ScanResource.ListAmuletPriceVotesResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.ListAmuletPriceVotesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listAmuletPriceVotes") { _ => _ =>
+      for {
+        amuletPriceVotes <- votesStore.listAmuletPriceVotes()
+      } yield ScanResource.ListAmuletPriceVotesResponse.OK(
+        definitions.ListAmuletPriceVotesResponse(
+          amuletPriceVotes.map(_.toHttp).toVector
+        )
+      )
+    }
+  }
+
   override def listDsoRulesVoteRequests(
       respond: ScanResource.ListDsoRulesVoteRequestsResponse.type
   )()(extracted: TraceContext): Future[ScanResource.ListDsoRulesVoteRequestsResponse] = {
@@ -1626,11 +1643,42 @@ class HttpScanHandler(
       .map(ScanResource.ListDsoRulesVoteRequestsResponse.OK)
   }
 
-  override def listVoteRequestResults(respond: ScanResource.ListVoteRequestResultsResponse.type)(
+  override def listVoteRequestResults(
+      respond: ScanResource.ListVoteRequestResultsResponse.type
+  )(
       body: ListVoteResultsRequest
   )(extracted: TraceContext): Future[ScanResource.ListVoteRequestResultsResponse] = {
     implicit val tc: TraceContext = extracted
-    this.listVoteRequestResults(body).map(ScanResource.ListVoteRequestResultsResponse.OK)
+    withSpan(s"$workflowId.listDsoRulesVoteResults") { _ => _ =>
+      for {
+        voteResults <- votesStore.listVoteRequestResults(
+          body.actionName,
+          body.accepted,
+          body.requester,
+          body.effectiveFrom,
+          body.effectiveTo,
+          PageLimit.tryCreate(body.limit.intValue),
+        )
+      } yield {
+        ScanResource.ListVoteRequestResultsResponse.OK(
+          definitions.ListDsoRulesVoteResultsResponse(
+            voteResults
+              .map(voteResult => {
+                io.circe.parser
+                  .parse(
+                    ApiCodecCompressed
+                      .apiValueToJsValue(Contract.javaValueToLfValue(voteResult.toValue))
+                      .compactPrint
+                  )
+                  .valueOr(err =>
+                    ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")
+                  )
+              })
+              .toVector
+          )
+        )
+      }
+    }
   }
 
   override def listVoteRequestsByTrackingCid(

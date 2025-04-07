@@ -79,6 +79,7 @@ class SequencedEventStoreBasedTopologyHeadInitializerTest
                     SignedContent(
                       Deliver.create(
                         SequencerCounter(0),
+                        None,
                         timestamp,
                         SynchronizerId.tryFromString("namespace::id"),
                         None,
@@ -104,7 +105,7 @@ class SequencedEventStoreBasedTopologyHeadInitializerTest
             topologyStoreMock,
           )
 
-          when(topologyStoreMock.maxTimestamp(CantonTimestamp.MaxValue, includeRejected = true))
+          when(topologyStoreMock.maxTimestamp(SequencedTime.MaxValue, includeRejected = true))
             .thenReturn(
               FutureUnlessShutdown.pure(
                 maxTopologyStoreTimestampsO.map { case (sequencedTime, effectiveTime) =>

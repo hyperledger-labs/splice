@@ -1,7 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DateWithDurationDisplay, Loading } from 'common-frontend';
-import { getUTCWithOffset, JsonEditor, JSONValue } from 'common-frontend-utils';
+import { DateWithDurationDisplay, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  getUTCWithOffset,
+  JsonEditor,
+  JSONValue,
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';

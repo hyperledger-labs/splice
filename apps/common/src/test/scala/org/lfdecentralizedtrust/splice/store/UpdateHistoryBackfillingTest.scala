@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 
@@ -178,7 +177,6 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
       latestMigrationId,
       batchSize = 10,
       loggerFactory = loggerFactory,
-      metricsFactory = NoOpMetricsFactory,
     )
 
   private def backfillAll(
@@ -188,7 +186,7 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
       logger.debug(s"backfill() iteration $i")
       i should be < 100
       backfiller.backfill().flatMap {
-        case HistoryBackfilling.Outcome.MoreWorkAvailableNow => go(i + 1)
+        case HistoryBackfilling.Outcome.MoreWorkAvailableNow(_) => go(i + 1)
         case HistoryBackfilling.Outcome.MoreWorkAvailableLater => go(i + 1)
         case HistoryBackfilling.Outcome.BackfillingIsComplete => Future.unit
       }

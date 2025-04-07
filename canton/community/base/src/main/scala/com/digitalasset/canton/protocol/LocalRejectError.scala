@@ -3,9 +3,19 @@
 
 package com.digitalasset.canton.protocol
 
-import com.daml.error.*
+import com.digitalasset.base.error.{
+  AlarmErrorCode,
+  BaseAlarm,
+  ErrorCategory,
+  ErrorClass,
+  ErrorCode,
+  ErrorGroup,
+  ErrorResource,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.LocalRejectionGroup
-import com.digitalasset.canton.error.{AlarmErrorCode, BaseAlarm, TransactionError}
+import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.{LocalReject, TransactionRejection}
 import com.digitalasset.canton.version.ProtocolVersion

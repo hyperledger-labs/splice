@@ -9,10 +9,18 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.validated.*
-import com.daml.error.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.base.error.{
+  Alarm,
+  AlarmErrorCode,
+  ErrorCategory,
+  ErrorCode,
+  ErrorGroup,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.admin.participant.v30.{ReceivedCommitmentState, SentCommitmentState}
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.RequireTypes.{
@@ -25,7 +33,7 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.AcsCommitmentErrorGroup
-import com.digitalasset.canton.error.{Alarm, AlarmErrorCode, CantonError, ContextualizedCantonError}
+import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError}
 import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
@@ -248,7 +256,7 @@ class AcsCommitmentProcessor private (
     * commitments. It's accessed only through chained futures, such that all accesses are
     * synchronized
     */
-  @volatile private[this] var endOfLastProcessedPeriod: Option[CantonTimestampSecond] =
+  @volatile private[pruning] var endOfLastProcessedPeriod: Option[CantonTimestampSecond] =
     endLastProcessedPeriod
 
   /** In contrast to `endOfLastProcessedPeriod`, during catch-up, a period is considered processed
@@ -256,7 +264,8 @@ class AcsCommitmentProcessor private (
     * `endOfLastProcessedPeriodDuringCatchUp`. Used in `processCompletedPeriod` to compute the
     * correct reconciliation interval to be processed.
     */
-  @volatile private[this] var endOfLastProcessedPeriodDuringCatchUp: Option[CantonTimestampSecond] =
+  @volatile private[pruning] var endOfLastProcessedPeriodDuringCatchUp
+      : Option[CantonTimestampSecond] =
     None
 
   /** During a coarse-grained catch-up interval, [[runningCmtSnapshotsForCatchUp]] stores in memory
@@ -1804,7 +1813,7 @@ class AcsCommitmentProcessor private (
 
   private[canton] class AcsCommitmentProcessorHealth(
       override val name: String,
-      override protected val associatedOnShutdownRunner: OnShutdownRunner,
+      override protected val associatedHasRunOnClosing: HasRunOnClosing,
       override protected val logger: TracedLogger,
   ) extends AtomicHealthComponent {
     override protected def initialHealthState: ComponentHealthState = ComponentHealthState.Ok()

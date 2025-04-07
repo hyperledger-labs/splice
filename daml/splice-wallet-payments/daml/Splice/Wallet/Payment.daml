@@ -136,6 +136,7 @@ template AppPaymentRequest
                     lock = Some TimeLock with
                       holders = dedupSort $ provider :: map (.receiver) receiverAmounts
                       expiresAt = expiresAt
+                      optContext = Some $ "amulet-payment-request: " <> description
                     receiverFeeRatio = 0.0
                 ]
               beneficiaries = None -- no beneficiaries for the locking step

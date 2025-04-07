@@ -7,7 +7,6 @@ import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 
 import DA.Action (void)
 import DA.Exception
-import DA.Map qualified as Map (fromList)
 import DA.Time
 import DA.Foldable (forA_)
 import DA.Optional (isSome)
@@ -397,29 +396,6 @@ template WalletAppInstall
     endUserParty : Party -- The primary party of the end-user
   where
     signatory endUserParty, validatorParty
-
-    -- Metadata Map Text Text
-    -- Choice context Map Text AnyValue --> can be parsed from Daml, keep qualified
-
-    -- 1. map user-specific endpoints for context
-    interface instance Api.Token.MetadataV1.RegistryAppInstall for WalletAppInstall where
-      view = Api.Token.MetadataV1.RegistryAppInstallView with
-        appUser = endUserParty
-        instrumentAdmin = dsoParty
-        meta = Api.Token.MetadataV1.Metadata with
-          values = Map.fromList [
-            -- For Amulet the registry URL needs to point to their local validator, so that the proper BFT reads are done.
-            -- TODO (#17541): store that URL as part of the `WalletAppInstall` contract, so that it can be updated.
-            ("tokenmetadatav1.org.lfdecentralizedtrust.splice/registryUrl", "https://user-validator-host/api/amulet-registry/")
-            ]
-
-    -- 2. fall back to enpdoints disclosed via ANS (if no user-specific one is available)
-    -- not in alpha
-
-    -- 3. retrieve off-ledger context (currently relying on WalletAppInstall cid for auth)
-    -- not required for Amulet
-    -- probably required for disclosure of Credentials
-
 
     -- Takes a batch of commands manipulating amulets, and tries to execute them sequentially in one large Daml transaction.
     nonconsuming choice WalletAppInstall_ExecuteBatch: WalletAppInstall_ExecuteBatchResult

@@ -6,11 +6,11 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewo
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.CompleteBlockData
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.NumberIdentifiers.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BlockNumber,
   EpochNumber,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.CompleteBlockData
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.OrderedBlockForOutput
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.snapshot.SequencerSnapshotAdditionalInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
@@ -43,7 +43,6 @@ object Output {
   final case class TopologyFetched[E <: Env[E]](
       lastBlockFromPreviousEpochMode: OrderedBlockForOutput.Mode,
       newEpochNumber: EpochNumber,
-      previousEpochMaxBftTime: CantonTimestamp,
       orderingTopology: OrderingTopology,
       cryptoProvider: CryptoProvider[E],
   ) extends Message[E]
@@ -51,7 +50,6 @@ object Output {
   final case class MetadataStoredForNewEpoch[E <: Env[E]](
       lastBlockFromPreviousEpochMode: OrderedBlockForOutput.Mode,
       newEpochNumber: EpochNumber,
-      previousEpochMaxBftTime: CantonTimestamp,
       orderingTopology: OrderingTopology,
       cryptoProvider: CryptoProvider[E],
   ) extends Message[E]

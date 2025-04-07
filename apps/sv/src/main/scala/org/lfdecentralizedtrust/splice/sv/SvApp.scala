@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import cats.data.OptionT
-import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple7Semigroupal}
+import cats.implicits.catsSyntaxTuple7Semigroupal
 import cats.instances.future.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -50,7 +50,6 @@ import org.lfdecentralizedtrust.splice.sv.cometbft.{
   CometBftConnectionConfig,
   CometBftHttpRpcClient,
   CometBftNode,
-  CometBftRequestSigner,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvAppBackendConfig,
@@ -67,13 +66,17 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
+import org.lfdecentralizedtrust.splice.sv.util.{
+  SvOnboardingToken,
+  SvUtil,
+  ValidatorOnboardingSecret,
+}
 import org.lfdecentralizedtrust.splice.util.{
   BackupDump,
   Contract,
   HasHealth,
-  TemplateJsonDecoder,
   UploadablePackage,
+  TemplateJsonDecoder,
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
@@ -340,19 +343,13 @@ class SvApp(
       config.onboarding match {
         case Some(sv1Config: SvOnboardingConfig.FoundDso) =>
           for {
-            signer <- CometBftRequestSigner.getOrGenerateSigner(
-              "cometbft-governance-keys",
+            cometBftNode <- SvUtil.mapToCometBftNode(
+              cometBftClient,
+              cometBftConfig,
               participantAdminConnection,
               logger,
-            )
-            cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-              new CometBftNode(
-                client,
-                signer,
-                config,
-                loggerFactory,
-                retryProvider,
-              )
+              loggerFactory,
+              retryProvider,
             )
             res <- appInitStep("SV1Initializer bootstrapping Dso") {
               val initializer = new SV1Initializer(
@@ -391,13 +388,13 @@ class SvApp(
                 logger,
               )
             }
-            signer <- CometBftRequestSigner.getOrGenerateSigner(
-              "cometbft-governance-keys",
+            cometBftNode <- SvUtil.mapToCometBftNode(
+              cometBftClient,
+              cometBftConfig,
               participantAdminConnection,
               logger,
-            )
-            cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-              new CometBftNode(client, signer, config, loggerFactory, retryProvider)
+              loggerFactory,
+              retryProvider,
             )
             res <- appInitStep("JoiningNodeInitializer joining Dso with key") {
               val initializer = newJoiningNodeInitializer(Some(joiningConfig), cometBftNode)
@@ -432,13 +429,13 @@ class SvApp(
           }
         case None =>
           for {
-            signer <- CometBftRequestSigner.getOrGenerateSigner(
-              "cometbft-governance-keys",
+            cometBftNode <- SvUtil.mapToCometBftNode(
+              cometBftClient,
+              cometBftConfig,
               participantAdminConnection,
               logger,
-            )
-            cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-              new CometBftNode(client, signer, config, loggerFactory, retryProvider)
+              loggerFactory,
+              retryProvider,
             )
             res <- {
               val initializer = newJoiningNodeInitializer(None, cometBftNode)
@@ -563,6 +560,7 @@ class SvApp(
       adminHandler = new HttpSvAdminHandler(
         config,
         config.domainMigrationDumpPath,
+        amuletAppParameters.upgradesConfig,
         svAutomation,
         dsoAutomation,
         cometBftClient,
@@ -584,6 +582,7 @@ class SvApp(
         ),
         clock,
         retryProvider,
+        timeouts,
         loggerFactory,
       )
 
@@ -671,6 +670,7 @@ class SvApp(
         dsoStore,
         svAutomation,
         dsoAutomation,
+        adminHandler,
         logger,
         timeouts,
         httpClient,
@@ -812,6 +812,7 @@ object SvApp {
       dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
       dsoAutomation: SvDsoAutomationService,
+      svAdminHandler: HttpSvAdminHandler,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       httpClient: HttpClient,
@@ -841,6 +842,7 @@ object SvApp {
         SyncCloseable("dso store", dsoStore.close()),
         SyncCloseable("domain time automation", domainTimeAutomationService.close()),
         SyncCloseable("domain params automation", domainParamsAutomationService.close()),
+        SyncCloseable("admin handler", svAdminHandler.close()),
         SyncCloseable("storage", storage.close()),
       )
   }

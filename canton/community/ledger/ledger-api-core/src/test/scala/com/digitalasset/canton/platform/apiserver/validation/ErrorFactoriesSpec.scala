@@ -3,8 +3,14 @@
 
 package com.digitalasset.canton.platform.apiserver.validation
 
-import com.daml.error.*
-import com.daml.error.utils.ErrorDetails
+import com.digitalasset.base.error.utils.ErrorDetails
+import com.digitalasset.base.error.{
+  BaseError,
+  ContextualizedErrorLogger,
+  ErrorCode,
+  ErrorsAssertions,
+  RpcError,
+}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.auth.AuthorizationChecksErrors
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidDeduplicationPeriodField.ValidMaxDeduplicationFieldKey
@@ -679,7 +685,7 @@ class ErrorFactoriesSpec
   }
 
   private def assertError(
-      error: => DamlError
+      error: => RpcError
   )(
       code: Code,
       message: String,

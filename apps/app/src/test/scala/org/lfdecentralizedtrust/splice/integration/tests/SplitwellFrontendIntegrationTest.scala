@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.LocalAuth0Test
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{
   AnsEntryTestUtil,
@@ -369,10 +368,6 @@ class SplitwellFrontendIntegrationTest
           )
         }
       }
-    }
-
-    "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      withAuth0LoginCheck("aliceSplitwell", aliceSplitwellUIPort)((_, _, _) => ())
     }
   }
 }

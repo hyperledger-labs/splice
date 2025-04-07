@@ -32,7 +32,7 @@ class DbExternalPartyWalletStore(
 ) extends DbAppStore(
       storage = storage,
       acsTableName = WalletTables.externalPartyAcsTableName,
-      storeDescriptor = StoreDescriptor(
+      acsStoreDescriptor = StoreDescriptor(
         version = 1,
         name = "DbExternalPartyWalletStore",
         party = key.externalParty,
@@ -51,8 +51,6 @@ class DbExternalPartyWalletStore(
     with AcsTables
     with AcsQueries
     with LimitHelpers {
-
-  def storeId: Int = multiDomainAcsStore.storeId
 
   override def toString: String =
     show"DbExternalPartyWalletStore(externalParty=${key.externalParty})"

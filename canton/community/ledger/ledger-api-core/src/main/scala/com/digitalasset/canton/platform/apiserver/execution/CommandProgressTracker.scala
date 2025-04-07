@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.execution
 
-import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.admin.command_inspection_service.{
   CommandState,
   CommandStatus as ApiCommandStatus,
@@ -12,6 +11,7 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
 }
 import com.daml.ledger.api.v2.commands.Command
 import com.daml.ledger.api.v2.completion.Completion
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -181,14 +181,14 @@ trait CommandProgressTracker {
   def registerCommand(
       commandId: String,
       submissionId: Option[String],
-      applicationId: String,
+      userId: String,
       commands: Seq[Command],
       actAs: Set[String],
   )(implicit traceContext: TraceContext): CommandResultHandle
 
   def findHandle(
       commandId: String,
-      applicationId: String,
+      userId: String,
       actAs: Seq[String],
       submissionId: Option[String],
   ): CommandResultHandle
@@ -208,14 +208,14 @@ object CommandProgressTracker {
     override def registerCommand(
         commandId: String,
         submissionId: Option[String],
-        applicationId: String,
+        userId: String,
         commands: Seq[Command],
         actAs: Set[String],
     )(implicit traceContext: TraceContext): CommandResultHandle = CommandResultHandle.NoOp
 
     override def findHandle(
         commandId: String,
-        applicationId: String,
+        userId: String,
         actAs: Seq[String],
         submissionId: Option[String],
     ): CommandResultHandle =

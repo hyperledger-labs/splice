@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { JSONValue, JsonEditor } from 'common-frontend-utils';
+import { JSONValue, JsonEditor } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useState } from 'react';

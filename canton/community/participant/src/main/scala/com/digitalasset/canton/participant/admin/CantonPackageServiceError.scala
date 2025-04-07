@@ -3,7 +3,14 @@
 
 package com.digitalasset.canton.participant.admin
 
-import com.daml.error.*
+import com.digitalasset.base.error.{
+  ContextualizedDamlError,
+  ErrorCategory,
+  ErrorCode,
+  ErrorGroup,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.PackageServiceErrorGroup
 import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError, ParentCantonError}
 import com.digitalasset.canton.ledger.error.PackageServiceErrors
@@ -21,7 +28,6 @@ object CantonPackageServiceError extends PackageServiceErrorGroup {
       val loggingContext: ErrorLoggingContext,
       override val code: ErrorCode,
   ) extends ContextualizedDamlError(parent.cause)
-      with ContextualizedCantonError
       with ParentCantonError[ParticipantTopologyManagerError] {
 
     override val cause: String = parent.cause
@@ -33,6 +39,11 @@ object CantonPackageServiceError extends PackageServiceErrorGroup {
     override def asGrpcStatus: com.google.rpc.Status = ErrorCode.asGrpcStatus(this)(loggingContext)
 
     override def mixinContext: Map[String, String] = Map("action" -> "package-vetting")
+
+    override def correlationId: Option[String] = loggingContext.correlationId
+
+    override def traceId: Option[String] = loggingContext.traceId
+
   }
 
   @Explanation("Package fetching errors")

@@ -4,8 +4,8 @@
 package com.digitalasset.canton.crypto.store
 
 import cats.data.EitherT
-import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.error.{CantonBaseError, CantonErrorGroups}
@@ -64,7 +64,7 @@ trait CryptoPrivateStore extends AutoCloseable {
     * @return
     */
   def filterSigningKeys(
-      signingKeyIds: Seq[Fingerprint],
+      signingKeyIds: NonEmpty[Seq[Fingerprint]],
       filterUsage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit
       traceContext: TraceContext

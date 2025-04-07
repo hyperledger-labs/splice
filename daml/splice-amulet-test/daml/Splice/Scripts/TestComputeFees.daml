@@ -47,6 +47,7 @@ test = script do
               lock = Some TimeLock with
                 expiresAt = addRelTime now (days 1)
                 holders = [bob.primaryParty, bob.primaryParty, provider1.primaryParty]
+                optContext = None
           , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
@@ -64,6 +65,7 @@ test = script do
               lock = Some TimeLock with
                 expiresAt = addRelTime now (days 1)
                 holders = [bob.primaryParty, bob.primaryParty, provider1.primaryParty]
+                optContext = None
           , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0

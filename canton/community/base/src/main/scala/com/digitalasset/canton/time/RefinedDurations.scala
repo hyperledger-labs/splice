@@ -291,6 +291,7 @@ final case class PositiveSeconds private (duration: Duration)
     val newDuration = duration.plus(i.duration)
     checked(PositiveSeconds(newDuration))
   }
+
 }
 
 object PositiveSeconds extends RefinedDurationCompanion[PositiveSeconds] {

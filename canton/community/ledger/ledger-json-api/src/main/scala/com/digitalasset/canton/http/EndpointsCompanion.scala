@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.http
 
-import com.daml.error.utils.ErrorDetails
-import com.daml.error.utils.ErrorDetails.ErrorDetail
 import com.daml.jwt.{
   AuthServiceJWTCodec,
   AuthServiceJWTPayload,
@@ -13,6 +11,8 @@ import com.daml.jwt.{
   StandardJWTPayload,
 }
 import com.daml.logging.LoggingContextOf
+import com.digitalasset.base.error.utils.ErrorDetails
+import com.digitalasset.base.error.utils.ErrorDetails.ErrorDetail
 import com.digitalasset.canton.http.json.SprayJson
 import com.digitalasset.canton.http.util.Logging.{
   InstanceUUID,
@@ -153,7 +153,7 @@ object EndpointsCompanion extends NoTracing {
                 )
               else \/-(NonEmptyList(actAs.head: String, actAs.tail*))
           } yield JwtWritePayload(
-            lar.ApplicationId(userId),
+            lar.UserId(userId),
             lar.Party.subst(actAsNonEmpty),
             lar.Party.subst(readAs),
           )
@@ -168,7 +168,7 @@ object EndpointsCompanion extends NoTracing {
       ) =>
         transformUserTokenTo(jwt, listUserRights)((userId, actAs, readAs) =>
           \/ fromEither JwtPayload(
-            lar.ApplicationId(userId),
+            lar.UserId(userId),
             actAs = lar.Party.subst(actAs),
             readAs = lar.Party.subst(readAs),
           ).toRight(Unauthorized("Unable to convert user token into a set of claims"))

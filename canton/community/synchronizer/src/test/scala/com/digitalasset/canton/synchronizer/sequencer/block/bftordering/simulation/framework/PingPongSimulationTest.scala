@@ -22,7 +22,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationInitializer
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.onboarding.EmptyOnboardingDataProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.onboarding.EmptyOnboardingManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   Env,
   Module,
@@ -64,7 +64,7 @@ final case class PingHelper[E <: Env[E]](
 }
 
 final case class Ping[E <: Env[E]](
-    otherPeer: P2PNetworkRef[String],
+    otherNode: P2PNetworkRef[String],
     recorder: Recorder,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
@@ -72,7 +72,7 @@ final case class Ping[E <: Env[E]](
 ) extends Module[E, String] {
 
   override def ready(self: ModuleRef[String]): Unit =
-    ifCompleteNotifyPeers(self)(TraceContext.empty)
+    ifCompleteNotifyNodes(self)(TraceContext.empty)
 
   override def receiveInternal(message: String)(implicit
       context: E#ActorContextT[String],
@@ -81,7 +81,7 @@ final case class Ping[E <: Env[E]](
     message match {
       case "init" =>
         context.delayedEvent(5.seconds, "tick")
-        otherPeer.asyncP2PSend("ping")(())
+        otherNode.asyncP2PSend("ping")(())
       case "tick" =>
         val helperRef = context.newModuleRef[String](ModuleName("ping-helper"))
         val helper = PingHelper[E](context.self, recorder, loggerFactory, timeouts)
@@ -89,7 +89,7 @@ final case class Ping[E <: Env[E]](
         helper.ready(helperRef)
         helperRef.asyncSend("tick")
       case "tick-ack" =>
-        otherPeer.asyncP2PSend("ping-tick")(())
+        otherNode.asyncP2PSend("ping-tick")(())
       case "pong" =>
         recorder.pingActorReceivedClientPing = true
         context.become(copy[E](state = state.copy(clientPing = true)))
@@ -102,17 +102,17 @@ final case class Ping[E <: Env[E]](
       case _ => sys.error(s"Unexpected message: $message")
     }
 
-  private def ifCompleteNotifyPeers(
+  private def ifCompleteNotifyNodes(
       self: ModuleRef[String]
   )(implicit traceContext: TraceContext): Unit =
     if (state.clientPing && state.clockPing) {
-      otherPeer.asyncP2PSend("complete")(())
+      otherNode.asyncP2PSend("complete")(())
       self.asyncSend("complete")
     }
 }
 
 final case class Pong[E <: Env[E]](
-    otherPeer: P2PNetworkRef[String],
+    otherNode: P2PNetworkRef[String],
     recorder: Recorder,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
@@ -124,9 +124,9 @@ final case class Pong[E <: Env[E]](
   ): Unit =
     message match {
       case "ping" =>
-        otherPeer.asyncP2PSend("pong")(())
+        otherNode.asyncP2PSend("pong")(())
       case "ping-tick" =>
-        otherPeer.asyncP2PSend("pong-tick")(())
+        otherNode.asyncP2PSend("pong-tick")(())
       case "complete" =>
         recorder.pongActorStopped = true
         context.stop()
@@ -232,8 +232,8 @@ class PingPongSimulationTest extends AnyFlatSpec with BaseTest {
     )
 
     val fakePort = Port.tryCreate(0)
-    val pingerEndpoint = PlainTextP2PEndpoint("pinger", fakePort)
-    val pongerEndpoint = PlainTextP2PEndpoint("ponger", fakePort)
+    val pingerEndpoint = PlainTextP2PEndpoint("pinger", fakePort).asInstanceOf[P2PEndpoint]
+    val pongerEndpoint = PlainTextP2PEndpoint("ponger", fakePort).asInstanceOf[P2PEndpoint]
     val recorder = new Recorder
 
     val topologyInit = Map(
@@ -252,7 +252,7 @@ class PingPongSimulationTest extends AnyFlatSpec with BaseTest {
     val simulation =
       SimulationModuleSystem(
         topologyInit,
-        EmptyOnboardingDataProvider,
+        EmptyOnboardingManager,
         simSettings,
         new SimClock(loggerFactory = loggerFactory),
         timeouts,

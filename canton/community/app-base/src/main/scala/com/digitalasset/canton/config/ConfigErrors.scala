@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.config
 
-import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.error.CantonErrorGroups.ConfigErrorGroup
 import com.digitalasset.canton.error.ContextualizedCantonError
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -49,9 +49,8 @@ object ConfigErrors extends ConfigErrorGroup {
 
     def exceptions: Seq[ConfigException]
 
-    override def log(): Unit = {
-      super.log()
-
+    override def logError(): Unit = {
+      super.logError()
       exceptions.foreach { e =>
         loggingContext.logger.debug(
           code.toMsg(

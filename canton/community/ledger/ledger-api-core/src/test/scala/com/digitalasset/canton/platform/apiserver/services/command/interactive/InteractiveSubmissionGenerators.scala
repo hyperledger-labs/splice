@@ -7,17 +7,18 @@ import com.digitalasset.canton.GeneratorsLf.*
 import com.digitalasset.canton.config.GeneratorsConfig.*
 import com.digitalasset.canton.config.PositiveFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveLong
-import com.digitalasset.canton.data.{DeduplicationPeriod, Offset, ProcessedDisclosedContract}
+import com.digitalasset.canton.data.{DeduplicationPeriod, Offset}
+import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.TransactionData
 import com.digitalasset.canton.ledger.participant.state.{SubmitterInfo, TransactionMeta}
-import com.digitalasset.canton.platform.apiserver.execution.CommandExecutionResult
 import com.digitalasset.canton.topology.GeneratorsTopology.*
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.{LfApplicationId, LfPackageId, LfPartyId}
+import com.digitalasset.canton.{LedgerUserId, LfPackageId, LfPartyId}
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Time}
 import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.{
+  FatContractInstance,
   GlobalKey,
   Node,
   NodeId,
@@ -131,14 +132,14 @@ object InteractiveSubmissionGenerators {
   private implicit val submitterInfoGen: Gen[SubmitterInfo] = for {
     actAs <- Arbitrary.arbitrary[List[LfPartyId]]
     readAs <- Arbitrary.arbitrary[List[LfPartyId]]
-    applicationId <- Arbitrary.arbitrary[LfApplicationId]
+    userId <- Arbitrary.arbitrary[LedgerUserId]
     commandId <- lfCommandIdArb.arbitrary
     deduplicationPeriod <- genDeduplicationPeriodArb.arbitrary
     submissionIdO <- Gen.option(lfSubmissionIdArb.arbitrary)
   } yield SubmitterInfo(
     actAs,
     readAs,
-    applicationId,
+    userId,
     commandId,
     deduplicationPeriod,
     submissionIdO,
@@ -173,35 +174,34 @@ object InteractiveSubmissionGenerators {
   private val globalKeyMappingGen: Gen[Map[GlobalKey, Option[Value.ContractId]]] =
     Gen.mapOf(globalKeyMappingEntryGen)
 
-  private val processedDisclosedContractGen: Gen[ProcessedDisclosedContract] = for {
+  private val inputContractsGen: Gen[FatContractInstance] = for {
     create <- ValueGenerators
       .malformedCreateNodeGenWithVersion(LanguageVersion.v2_1)
       .map(normalizeNodeForV1)
     createdAt <- Arbitrary.arbitrary[Time.Timestamp]
     driverMetadata <- Arbitrary.arbitrary[Array[Byte]].map(Bytes.fromByteArray)
-  } yield ProcessedDisclosedContract(create, createdAt, driverMetadata)
+  } yield FatContractInstance.fromCreateNode(create, createdAt, driverMetadata)
 
-  private val commandExecutionResultGen: Gen[CommandExecutionResult] = for {
+  private val preparedTransactionDataGen: Gen[TransactionData] = for {
     submitterInfo <- submitterInfoGen
-    domainIdO <- Gen.option(Arbitrary.arbitrary[SynchronizerId])
+    synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
     transaction <- versionedTransactionGenerator.map(SubmittedTransaction(_))
     transactionMeta <- transactionMetaGen(transaction)
     dependsOnLedgerTime <- Arbitrary.arbBool.arbitrary
     interpretationTimeNanos <- Gen.long
     globalKeyMapping <- globalKeyMappingGen
-    processedDisclosedContracts <- Gen.listOfN(1, processedDisclosedContractGen).map(ImmArray.from)
-  } yield CommandExecutionResult(
+    inputContracts <- Gen.listOfN(1, inputContractsGen).map(ImmArray.from)
+  } yield TransactionData(
     submitterInfo,
-    domainIdO,
     transactionMeta,
     transaction,
     dependsOnLedgerTime,
-    interpretationTimeNanos,
     globalKeyMapping,
-    processedDisclosedContracts,
+    inputContracts.map(fci => fci.contractId -> fci).toSeq.toMap,
+    synchronizerId,
   )
 
-  implicit val commandExecutionResultArb: Arbitrary[CommandExecutionResult] = Arbitrary(
-    commandExecutionResultGen
+  implicit val preparedTransactionDataArb: Arbitrary[TransactionData] = Arbitrary(
+    preparedTransactionDataGen
   )
 }

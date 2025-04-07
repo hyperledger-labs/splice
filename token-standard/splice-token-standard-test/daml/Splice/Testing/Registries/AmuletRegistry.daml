@@ -16,7 +16,12 @@ module Splice.Testing.Registries.AmuletRegistry
   , tapFaucet
   , featureApp
   , createTransferPreapproval
+
+  -- ** Locking
+  , TimeLock(..)
+  , createLockedAmulet
   , expireLockAsOwner
+  , tapLockedAndUnlockedFunds
 
   ) where
 
@@ -38,7 +43,9 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.Expiry
 import Splice.ExternalPartyAmuletRules
+import Splice.Fees
 import Splice.Round
 
 import Splice.Testing.Utils
@@ -121,6 +128,22 @@ tapFaucet registry user amount = do
     openRound
   return $ toInterfaceContractId result.amuletSum.amulet
 
+
+-- | Direct-create locked amulet -- used for testing purposes only.
+createLockedAmulet : AmuletRegistry -> Party -> Decimal -> TimeLock -> Script (ContractId Holding)
+createLockedAmulet registry user amount lock = do
+  (_, openRound) <- getLatestOpenRound registry
+  let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
+  lockedAmuletCid <- submitMulti [user, registry.dso] [] $ createCmd LockedAmulet with
+    lock
+    amulet = Amulet with
+      dso = registry.dso
+      owner = user
+      amount = ExpiringAmount with
+        initialAmount = amount
+        createdAt = openRound.round
+        ratePerRound = transferConfigAmulet.holdingFee
+  pure (toInterfaceContractId lockedAmuletCid)
 
 -- | Simulate that a validator operator created a transfer pre-approval for a party
 -- for the purpose of that party being able to receive Amulet from any other party.
@@ -323,3 +346,18 @@ expireLockAsOwner  registry lockedHoldingCid = do
   result <- submitWithDisclosures' lockedAmulet.amulet.owner openRoundD $ exerciseCmd lockedAmuletCid
     LockedAmulet_OwnerExpireLock with openRoundCid
   pure (toInterfaceContractId result.amuletSum.amulet)
+
+-- | Get funds in equal splits as locked and unlocked holdings to test using
+-- expired locked holdings as transfer inputs.
+tapLockedAndUnlockedFunds : AmuletRegistry -> Party -> Decimal -> Script [ContractId Holding]
+tapLockedAndUnlockedFunds registry user amount = do
+  let lockedAmount = amount / 2.0
+  let unlockedAmount = amount - lockedAmount
+  unlockedCid <- tapFaucet registry user (unlockedAmount + lockedAmount)
+  -- TODO(#18760) Reenable the locked amulet
+  -- now <- getTime
+  -- lockedCid <- createLockedAmulet registry user lockedAmount TimeLock with
+  --  holders = [registry.dso]
+  --  expiresAt = now -- we want these funds to already be expired
+   --  optContext = Some "test expired lock"
+  pure [unlockedCid] -- , lockedCid]

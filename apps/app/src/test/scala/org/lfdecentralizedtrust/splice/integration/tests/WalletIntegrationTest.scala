@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.validator.automation.AcceptTransferPreapprovalProposalTrigger
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
@@ -177,7 +178,11 @@ class WalletIntegrationTest
         // Wait until 2 transactions have been received
         val txs =
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.transactions
-            .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+            .treesJava(
+              Set(alice),
+              completeAfter = PositiveInt.tryCreate(2),
+              beginOffset = offsetBefore,
+            )
         val createdAmuletsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
         val createdLockedAmuletsInTx =
@@ -230,7 +235,11 @@ class WalletIntegrationTest
         // tx 3: single transfer that was not picked due to the batch size limit
         val txs =
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.transactions
-            .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
+            .treesJava(
+              Set(alice),
+              completeAfter = PositiveInt.tryCreate(3),
+              beginOffset = offsetBefore,
+            )
         val createdAmuletsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
         val createdLockedAmuletsInTx =

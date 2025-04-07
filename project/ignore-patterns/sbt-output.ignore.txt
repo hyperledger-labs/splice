@@ -69,6 +69,7 @@ npm error
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/.*Error.*.ts
 .*o.o.codegen.TemplateManager - writing file .*/token-standard/.*/openapi-ts-client/models/ErrorResponse.ts
 .*o.o.codegen.TemplateManager - writing file .*/token-standard/.*/openapi-ts-client/apis/exception.ts
+.*o.o.codegen.TemplateManager - writing file .*JsCantonError.ts
 
 # Output by guardrail if the yaml file changes because we cache the previous generated code
 ^.\[31mWarning:.\[0m$
@@ -123,5 +124,9 @@ Generating daml-prim-DA-Exception-AssertionFailed
 Generating daml-prim-DA-Exception-PreconditionFailed
 Generating daml-prim-DA-Exception-ArithmeticError
 Generating daml-prim-DA-Exception-GeneralError
+
+Retried waiting for GCLocker too often allocating
+
+canton/base/errors
 
 # Make sure to have a trailing newline

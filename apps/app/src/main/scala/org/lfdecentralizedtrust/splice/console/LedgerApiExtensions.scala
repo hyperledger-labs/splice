@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.util.{Contract, JavaDecodeUtil, PackageQu
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleMacros,
@@ -67,7 +68,7 @@ trait LedgerApiExtensions {
             submissionId: String = "",
             minLedgerTimeAbs: Option[Instant] = None,
             readAs: Seq[PartyId] = Seq.empty,
-            applicationId: String = LedgerApiCommands.defaultApplicationId,
+            userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): JavaTransactionTree = {
           val cmds = commands.map(cmd =>
@@ -92,7 +93,7 @@ trait LedgerApiExtensions {
                   .distinctBy(_.getContractId)
                   .map(DisclosedContract.fromJavaProto),
                 synchronizerId = synchronizerId,
-                applicationId = applicationId,
+                userId = userId,
                 packageIdSelectionPreference = Seq.empty,
               )
             )
@@ -121,7 +122,7 @@ trait LedgerApiExtensions {
             synchronizerId = synchronizerId,
             commandId.getOrElse(""),
             readAs = readAs,
-            applicationId = userId,
+            userId = userId,
             disclosedContracts = disclosedContracts,
           )
           SpliceLedgerConnection.decodeExerciseResult(
@@ -149,7 +150,7 @@ trait LedgerApiExtensions {
             synchronizerId = synchronizerId,
             commandId.getOrElse(""),
             readAs = readAs,
-            applicationId = userId,
+            userId = userId,
             disclosedContracts = disclosedContracts,
           )
           val cid = SpliceLedgerConnection
@@ -196,7 +197,7 @@ trait LedgerApiExtensions {
         )
         def treesJava(
             partyIds: Set[PartyId],
-            completeAfter: Int,
+            completeAfter: PositiveInt,
             beginOffset: Long,
             endOffset: Option[Long] = None,
             verbose: Boolean = true,
@@ -289,6 +290,24 @@ trait LedgerApiExtensions {
             )
             .filter({ case (c, _) => contractIds.contains(c) })
             .toMap
+        }
+
+        def of_party[
+            TC <: javaapi.data.codegen.Contract[TCid, T],
+            TCid <: javaapi.data.codegen.ContractId[T],
+            T <: javaapi.data.Template,
+        ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
+            partyId: PartyId
+        ): Seq[CreatedEvent] = {
+          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
+          val templateId = TemplateId(
+            s"#${filterIdentifier.packageName}",
+            filterIdentifier.qualifiedName.moduleName,
+            filterIdentifier.qualifiedName.entityName,
+          )
+          ledgerApi.ledger_api.state.acs
+            .of_party(partyId, filterTemplates = Seq(templateId))
+            .map(_.event)
         }
       }
     }

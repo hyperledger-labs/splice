@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvSynchronizerNodeConfig}
+import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSynchronizerNodeConfig}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 
 import java.time.Duration
@@ -51,7 +51,7 @@ final class ExtraSynchronizerNode(
 object ExtraSynchronizerNode {
   def fromConfig(
       conf: SvSynchronizerNodeConfig,
-      cometbftConfig: Option[CometBftConfig],
+      cometbftConfig: Option[SvCometBftConfig],
       loggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
       grpcClientMetrics: GrpcClientMetrics,

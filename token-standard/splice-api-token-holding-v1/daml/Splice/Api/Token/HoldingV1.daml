@@ -4,6 +4,8 @@
 -- | Types and interfaces for retrieving an investor's holdings.
 module Splice.Api.Token.HoldingV1 where
 
+import DA.Time (RelTime)
+
 import Splice.Api.Token.MetadataV1
 
 -- | A globally unique identifier for instruments.
@@ -21,9 +23,23 @@ data InstrumentId = InstrumentId
 data Lock = Lock
   with
     holders : [Party]
-      -- ^ Parties which are locking the contract.
-      -- This should  be a `Set` rather than a `List`, but the latter is easier to represent
-      -- in the JSON encoding. Should be deduplicated in the implementing template.
+      -- ^ Unique list of parties which are locking the contract.
+      -- (Represented as a list, as that has the better JSON encoding.)
+    expiresAt : Optional Time
+      -- ^ Absolute, inclusive deadline as of which the lock expires.
+    expiresAfter : Optional RelTime
+      -- ^ Duration after which the created lock expires. Measured relative
+      -- to the ledger time that the locked holding contract was created.
+      --
+      -- If both `expiresAt` and `expiresAfter` are set, the lock expires at
+      -- the earlier of the two times.
+    context : Optional Text
+      -- ^ Short, human-readable description of the context of the lock.
+      -- Used by wallets to enable users to understand the reason for the lock.
+      --
+      -- Note that the visibility of the content in this field might be wider
+      -- than the visibility of the contracts in the context. You should thus
+      -- carefully decide what information is safe to put in the lock context.
   deriving (Eq, Ord, Show)
 
 -- | Holding interface.
@@ -40,6 +56,9 @@ data HoldingView = HoldingView
       -- ^ Size of the holding.
     lock : Optional Lock
       -- ^ Lock on the holding.
+      --
+      -- Registries SHOULD allow holdings with expired locks as inputs to
+      -- transfers to enable a combined unlocking + use choice.
     meta : Metadata
       -- ^ Metadata.
   deriving (Eq, Show)
@@ -52,7 +71,7 @@ interface BurnMintFactory where
   burnMintFactory_publicFetchImpl : ContractId BurnMintFactory -> BurnMintFactory_PublicFetch -> Update BurnMintFactoryView
 
   nonconsuming choice BurnMintFactory_BurnMint : BurnMintFactory_BurnMintResult
-    -- ^ Burn the holdings in holdingCids and create holdings with the owners and amounts specified in
+    -- ^ Burn the holdings in inputHoldingCids and create holdings with the owners and amounts specified in
     -- outputs. Implementations SHOULD use this over creating or archiving holdings directly so wallets can provide more details on transaction history.
     -- Implementations SHOULD use more specific choices like `TransferFactory_Transfer` where possible.
     --
@@ -70,11 +89,15 @@ interface BurnMintFactory where
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
       sender : Party
-        -- ^ The sender that owns the holdings in `holdingCids`. All holdings in `inputHoldingCids` must be owned by this party.
+        -- ^ The sender that owns the holdings in `inputHoldingCids`.
+        -- All holdings in `inputHoldingCids` must be owned by this party.
       instrumentId : InstrumentId
-        -- ^ The instrument id of the holdings. All holdings in `inputHoldingCids` as well as the resulting output holdings MUST have this instrument id.
+        -- ^ The instrument id of the holdings.
+        -- All holdings in `inputHoldingCids` as well as the resulting output holdings MUST
+        -- have this instrument id.
       inputHoldingCids : [ContractId Holding]
-        -- ^ The holdings that should be burnt. All holdings in `inputHoldingCids` MUST be archived by this choice.
+        -- ^ The holdings that should be burnt.
+        -- All holdings in `inputHoldingCids` MUST be archived by this choice.
       outputs : [BurnMintOutput]
         -- ^ The holdings that should be created. The choice MUST create new holdings with the given amounts.
       extraActors : [Party]
@@ -112,9 +135,6 @@ data BurnMintFactory_BurnMintResult = BurnMintFactory_BurnMintResult
   with
     outputCids : [ContractId Holding]
       -- ^ The holdings created by the choice. Must contain exactly the outputs specified in the choice argument in the same order.
-    inputHoldingAmounts : [Decimal]
-      -- ^ The amounts of the input holdings that got consumed. MUST be identical to fetching the contracts in inputHoldingCids,
-      --  and querying the amount on HoldingView and reported in the same order.
   deriving (Show, Eq)
 
 data BurnMintFactoryView = BurnMintFactoryView

@@ -59,6 +59,7 @@ testUsageFees = do
                     lock = Some TimeLock with
                       expiresAt = addRelTime now (days 2)
                       holders = []
+                      optContext = None
                 -- normal receiver amulet
                 , TransferOutput with
                     receiver = bob.primaryParty
@@ -73,6 +74,7 @@ testUsageFees = do
                     lock = Some TimeLock with
                       expiresAt = addRelTime now (days 2)
                       holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
+                      optContext = None
 
                 ]
       beneficiaries = None

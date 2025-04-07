@@ -8,13 +8,16 @@ import org.lfdecentralizedtrust.splice.console.{
 }
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   LedgerClient,
   Reassignment,
   ReassignmentUpdate,
   TransactionTreeUpdate,
+  TreeUpdate,
 }
+import com.daml.ledger.javaapi.data.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.{
   CompactJson,
@@ -37,9 +40,12 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
   UnassignedWrapper,
 }
 import com.digitalasset.canton.console.LocalInstanceReference
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.scalatest.Assertion
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 trait UpdateHistoryTestUtil extends TestCommon {
 
@@ -53,7 +59,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     participant.ledger_api.updates
       .trees(
         partyIds = Set(partyId),
-        completeAfter = Int.MaxValue,
+        completeAfter = PositiveInt.MaxValue,
         beginOffsetExclusive = beginExclusive,
         endOffsetInclusive = Some(ledgerEnd),
         verbose = false,
@@ -192,6 +198,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       )
       .map(CompactJsonScanHttpEncodings.httpToLapiUpdate)
       .map(_.update)
+      .map(dropTrailingNones)
 
     updatesFromScanApi should have length updatesFromHistory.size.toLong
 
@@ -263,5 +270,108 @@ trait UpdateHistoryTestUtil extends TestCommon {
   }
   def shortDebugDescription(u: Seq[definitions.UpdateHistoryItem]): String = {
     u.map(shortDebugDescription).mkString("[\n", ",\n", "\n]")
+  }
+
+  def dropTrailingNones(u: GetTreeUpdatesResponse): GetTreeUpdatesResponse =
+    u.copy(update = dropTrailingNones(u.update))
+
+  def dropTrailingNones(u: TreeUpdate): TreeUpdate =
+    u match {
+      case TransactionTreeUpdate(t) => TransactionTreeUpdate(dropTrailingNones(t))
+      case ReassignmentUpdate(r) => ReassignmentUpdate(dropTrailingNones(r))
+    }
+
+  def dropTrailingNones(t: TransactionTree): TransactionTree =
+    new TransactionTree(
+      t.getUpdateId,
+      t.getCommandId,
+      t.getWorkflowId,
+      t.getEffectiveAt,
+      t.getOffset,
+      t.getEventsById.asScala.view.mapValues(dropTrailingNones).toMap.asJava,
+      t.getSynchronizerId,
+      t.getTraceContext,
+      t.getRecordTime,
+    )
+
+  def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =
+    r.copy(
+      event = dropTrailingNones(r.event)
+    )
+
+  def dropTrailingNones(e: ReassignmentEvent): ReassignmentEvent =
+    e match {
+      case unassign: ReassignmentEvent.Unassign => unassign
+      case assign: ReassignmentEvent.Assign =>
+        assign.copy(createdEvent = dropTrailingNones(assign.createdEvent))
+    }
+
+  def dropTrailingNones(e: TreeEvent): TreeEvent = e match {
+    case e: CreatedEvent => dropTrailingNones(e)
+    case e: ExercisedEvent => dropTrailingNones(e)
+    case _ => fail(s"Unexpected event: $e")
+  }
+
+  def dropTrailingNones(e: CreatedEvent): CreatedEvent = new CreatedEvent(
+    e.getWitnessParties,
+    e.getOffset,
+    e.getNodeId,
+    e.getTemplateId,
+    e.getPackageName,
+    e.getContractId,
+    dropTrailingNones(e.getArguments),
+    e.getCreatedEventBlob,
+    e.getInterfaceViews.asScala.view.mapValues(dropTrailingNones(_)).toMap.asJava,
+    e.getFailedInterfaceViews,
+    e.getContractKey.toScala.map(dropTrailingNones(_)).toJava,
+    e.getSignatories,
+    e.getObservers,
+    e.createdAt,
+  )
+  def dropTrailingNones(e: ExercisedEvent): ExercisedEvent = new ExercisedEvent(
+    e.getWitnessParties,
+    e.getOffset,
+    e.getNodeId,
+    e.getTemplateId,
+    e.getPackageName,
+    e.getInterfaceId,
+    e.getContractId,
+    e.getChoice,
+    dropTrailingNones(e.getChoiceArgument),
+    e.getActingParties,
+    e.isConsuming,
+    e.getLastDescendantNodeId,
+    dropTrailingNones(e.getExerciseResult),
+    e.getImplementedInterfaces,
+  )
+
+  def dropTrailingNones(v: Value): Value = v match {
+    case r: DamlRecord => dropTrailingNones(r)
+    case v: Variant => {
+      val value = dropTrailingNones(v.getValue())
+      v.getVariantId.toScala.fold(new Variant(v.getConstructor, value))(
+        new Variant(_, v.getConstructor, value)
+      )
+    }
+    case l: DamlList => DamlList.of(l.toList(dropTrailingNones(_)))
+    case o: DamlOptional => DamlOptional.of(o.getValue.toScala.map(dropTrailingNones(_)).toJava)
+    case m: DamlGenMap => DamlGenMap.of(m.toMap(identity, dropTrailingNones(_)))
+    case m: DamlTextMap => DamlTextMap.of(m.toMap(identity, dropTrailingNones(_)))
+    case _ => v
+  }
+
+  def dropTrailingNones(r: DamlRecord): DamlRecord = {
+    val fields =
+      r.getFields()
+        .asScala
+        .reverse
+        .dropWhile(f => f.getValue() == DamlOptional.EMPTY)
+        .reverse
+        .map { f =>
+          val value = dropTrailingNones(f.getValue())
+          f.getLabel().toScala.fold(new DamlRecord.Field(value))(new DamlRecord.Field(_, value))
+        }
+        .asJava
+    r.getRecordId.toScala.fold(new DamlRecord(fields))(new DamlRecord(_, fields))
   }
 }

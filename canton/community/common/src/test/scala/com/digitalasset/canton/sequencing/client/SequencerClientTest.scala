@@ -117,25 +117,28 @@ class SequencerClientTest
     SequencerTestUtils.mockDeliver(
       firstSequencerCounter.unwrap,
       CantonTimestamp.Epoch,
-      DefaultTestIdentities.synchronizerId,
+      synchronizerId = DefaultTestIdentities.synchronizerId,
     )
   private lazy val signedDeliver: OrdinarySerializedEvent =
     OrdinarySequencedEvent(SequencerTestUtils.sign(deliver))(traceContext)
 
   private lazy val nextDeliver: Deliver[Nothing] = SequencerTestUtils.mockDeliver(
-    43,
-    CantonTimestamp.ofEpochSecond(1),
-    DefaultTestIdentities.synchronizerId,
+    sc = 43,
+    timestamp = CantonTimestamp.ofEpochSecond(1),
+    previousTimestamp = Some(CantonTimestamp.Epoch),
+    synchronizerId = DefaultTestIdentities.synchronizerId,
   )
   private lazy val deliver44: Deliver[Nothing] = SequencerTestUtils.mockDeliver(
-    44,
-    CantonTimestamp.ofEpochSecond(2),
-    DefaultTestIdentities.synchronizerId,
+    sc = 44,
+    timestamp = CantonTimestamp.ofEpochSecond(2),
+    previousTimestamp = Some(CantonTimestamp.ofEpochSecond(1)),
+    synchronizerId = DefaultTestIdentities.synchronizerId,
   )
   private lazy val deliver45: Deliver[Nothing] = SequencerTestUtils.mockDeliver(
-    45,
-    CantonTimestamp.ofEpochSecond(3),
-    DefaultTestIdentities.synchronizerId,
+    sc = 45,
+    timestamp = CantonTimestamp.ofEpochSecond(3),
+    previousTimestamp = Some(CantonTimestamp.ofEpochSecond(2)),
+    synchronizerId = DefaultTestIdentities.synchronizerId,
   )
 
   private var actorSystem: ActorSystem = _
@@ -165,8 +168,9 @@ class SequencerClientTest
   }
 
   def deliver(i: Long): Deliver[Nothing] = SequencerTestUtils.mockDeliver(
-    i,
-    CantonTimestamp.Epoch.plusSeconds(i),
+    sc = i,
+    timestamp = CantonTimestamp.Epoch.plusSeconds(i),
+    previousTimestamp = if (i > 1) Some(CantonTimestamp.Epoch.plusSeconds(i - 1)) else None,
     DefaultTestIdentities.synchronizerId,
   )
 
@@ -194,19 +198,18 @@ class SequencerClientTest
         env.client.close()
       }
 
-      "start from the specified sequencer counter if there is no recorded event" in {
-        val env = factory.create(initialSequencerCounter = SequencerCounter(5))
+      "with no recorded events subscription should begin from None" in {
+        val env = factory.create()
         env.subscribeAfter().futureValueUS
-        val counter = env.transport.subscriber.value.request.counter
-        counter shouldBe SequencerCounter(5)
-        env.client.close()
+        val requestedTimestamp = env.transport.subscriber.value.request.timestamp
+        requestedTimestamp shouldBe None
       }
 
       "starts subscription at last stored event (for fork verification)" in {
         val env = factory.create(storedEvents = Seq(deliver))
         env.subscribeAfter().futureValueUS
-        val counter = env.transport.subscriber.value.request.counter
-        counter shouldBe deliver.counter
+        val startTimestamp = env.transport.subscriber.value.request.timestamp
+        startTimestamp shouldBe Some(deliver.timestamp)
         env.client.close()
       }
 
@@ -265,7 +268,7 @@ class SequencerClientTest
               alwaysSuccessfulHandler(events)
             },
           )
-          _ = transport.subscriber.value.request.counter shouldBe deliver.counter
+          _ = transport.subscriber.value.request.timestamp shouldBe Some(deliver.timestamp)
           _ <- transport.subscriber.value.sendToHandler(signedDeliver)
         } yield {
           eventually() {
@@ -347,11 +350,11 @@ class SequencerClientTest
         val maxSeenCounter = new AtomicInteger(0)
         val maxSequencerCounter = new AtomicLong(0L)
         val env = factory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(0)),
           options = SequencerClientConfig(
             eventInboxSize = PositiveInt.tryCreate(1),
             maximumInFlightEventBatches = PositiveInt.tryCreate(5),
           ),
-          initialSequencerCounter = SequencerCounter(1L),
         )
 
         env
@@ -450,7 +453,9 @@ class SequencerClientTest
   def richSequencerClient(): Unit = {
     "subscribe" should {
       "stores the event in the SequencedEventStore" in {
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val storedEventF = for {
           _ <- env.subscribeAfter()
@@ -464,7 +469,9 @@ class SequencerClientTest
       }
 
       "stores the event even if the handler fails" in {
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val storedEventF = for {
           _ <- env.subscribeAfter(eventHandler = alwaysFailingHandler)
@@ -521,7 +528,9 @@ class SequencerClientTest
             FutureUnlessShutdown.failed[AsyncResult[Unit]](error)
           )
 
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val closeReasonF = for {
           _ <- env.subscribeAfter(CantonTimestamp.MinValue, handler)
@@ -559,7 +568,9 @@ class SequencerClientTest
         val handler: PossiblyIgnoredApplicationHandler[ClosedEnvelope] =
           ApplicationHandler.create("shutdown")(_ => FutureUnlessShutdown.abortedDueToShutdown)
 
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val closeReasonF = for {
           _ <- env.subscribeAfter(eventHandler = handler)
@@ -585,7 +596,9 @@ class SequencerClientTest
         val asyncFailure = HandlerResult.asynchronous(FutureUnlessShutdown.failed(error))
         val asyncException = ApplicationHandlerException(error, deliver.counter, deliver.counter)
 
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val closeReasonF = for {
           _ <- env.subscribeAfter(
@@ -628,7 +641,9 @@ class SequencerClientTest
       "completes the sequencer client if asynchronous event processing shuts down" in {
         val asyncShutdown = HandlerResult.asynchronous(FutureUnlessShutdown.abortedDueToShutdown)
 
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val closeReasonF = for {
           _ <- env.subscribeAfter(
@@ -656,7 +671,9 @@ class SequencerClientTest
 
     "subscribeTracking" should {
       "updates sequencer counter prehead" in {
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val preHeadF = for {
           _ <- client.subscribeTracking(
@@ -734,7 +751,9 @@ class SequencerClientTest
       }
 
       "does not update the prehead if the application handler fails" in {
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         import env.*
         val preHeadF = for {
           _ <- client.subscribeTracking(
@@ -777,7 +796,8 @@ class SequencerClientTest
           }
 
         val env = RichEnvFactory.create(
-          options = SequencerClientConfig(eventInboxSize = PositiveInt.tryCreate(1))
+          initializeCounterAllocatorTo = Some(SequencerCounter(41)),
+          options = SequencerClientConfig(eventInboxSize = PositiveInt.tryCreate(1)),
         )
         import env.*
         val testF = for {
@@ -814,8 +834,7 @@ class SequencerClientTest
     "submissionCost" should {
       "compute submission cost and update traffic state when receiving the receipt" in {
         val env = RichEnvFactory.create(
-          initialSequencerCounter = SequencerCounter.Genesis,
-          topologyO = Some(topologyWithTrafficControl),
+          topologyO = Some(topologyWithTrafficControl)
         )
         val messageId = MessageId.tryCreate("mock-deliver")
         val trafficReceipt = TrafficReceipt(
@@ -840,7 +859,7 @@ class SequencerClientTest
                 SequencerTestUtils.mockDeliver(
                   0L,
                   CantonTimestamp.MinValue.immediateSuccessor,
-                  DefaultTestIdentities.synchronizerId,
+                  synchronizerId = DefaultTestIdentities.synchronizerId,
                   messageId = Some(messageId),
                   trafficReceipt = Some(trafficReceipt),
                 )
@@ -864,8 +883,7 @@ class SequencerClientTest
 
       "consume traffic from deliver errors" in {
         val env = RichEnvFactory.create(
-          initialSequencerCounter = SequencerCounter.Genesis,
-          topologyO = Some(topologyWithTrafficControl),
+          topologyO = Some(topologyWithTrafficControl)
         )
         val messageId = MessageId.tryCreate("mock-deliver")
         val trafficReceipt = TrafficReceipt(
@@ -916,18 +934,18 @@ class SequencerClientTest
     "changeTransport" should {
       "create second subscription from the same counter as the previous one when there are no events" in {
         val secondTransport = MockTransport()
-        val env = RichEnvFactory.create(initialSequencerCounter = SequencerCounter.Genesis)
+        val env = RichEnvFactory.create()
         val testF = for {
           _ <- env.subscribeAfter()
           _ <- env.changeTransport(secondTransport)
         } yield {
           val originalSubscriber = env.transport.subscriber.value
-          originalSubscriber.request.counter shouldBe SequencerCounter.Genesis
+          originalSubscriber.request.timestamp shouldBe None
           originalSubscriber.subscription.isClosing shouldBe true // old subscription gets closed
           env.transport.isClosing shouldBe true
 
           val newSubscriber = secondTransport.subscriber.value
-          newSubscriber.request.counter shouldBe SequencerCounter.Genesis
+          newSubscriber.request.timestamp shouldBe None
           newSubscriber.subscription.isClosing shouldBe false
           secondTransport.isClosing shouldBe false
 
@@ -941,7 +959,9 @@ class SequencerClientTest
       "create second subscription from the same counter as the previous one when there are events" in {
         val secondTransport = MockTransport()
 
-        val env = RichEnvFactory.create()
+        val env = RichEnvFactory.create(
+          initializeCounterAllocatorTo = Some(SequencerCounter(41))
+        )
         val testF = for {
           _ <- env.subscribeAfter()
 
@@ -952,10 +972,10 @@ class SequencerClientTest
           _ <- env.changeTransport(secondTransport)
         } yield {
           val originalSubscriber = env.transport.subscriber.value
-          originalSubscriber.request.counter shouldBe firstSequencerCounter
+          originalSubscriber.request.timestamp shouldBe None
 
           val newSubscriber = secondTransport.subscriber.value
-          newSubscriber.request.counter shouldBe nextDeliver.counter
+          newSubscriber.request.timestamp shouldBe Some(nextDeliver.timestamp)
 
           env.client.completion.isCompleted shouldBe false
         }
@@ -1080,7 +1100,7 @@ class SequencerClientTest
   }
 
   private sealed trait Subscriber[E] {
-    def request: SubscriptionRequest
+    def request: SubscriptionRequestV2
     def subscription: MockSubscription[E]
     def sendToHandler(event: OrdinarySerializedEvent): FutureUnlessShutdown[Unit]
 
@@ -1089,7 +1109,7 @@ class SequencerClientTest
   }
 
   private case class OldStyleSubscriber[E](
-      override val request: SubscriptionRequest,
+      override val request: SubscriptionRequestV2,
       private val handler: SerializedEventHandler[E],
       override val subscription: MockSubscription[E],
   ) extends Subscriber[E] {
@@ -1108,7 +1128,7 @@ class SequencerClientTest
   }
 
   private case class SubscriberPekko[E](
-      override val request: SubscriptionRequest,
+      override val request: SubscriptionRequestV2,
       private val queue: BoundedSourceQueue[OrdinarySerializedEvent],
       override val subscription: MockSubscription[E],
   ) extends Subscriber[E] {
@@ -1274,7 +1294,7 @@ class SequencerClientTest
     ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit] =
       sendAsync(request.content).mapK(FutureUnlessShutdown.outcomeK)
 
-    override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
+    override def subscribe[E](request: SubscriptionRequestV2, handler: SerializedEventHandler[E])(
         implicit traceContext: TraceContext
     ): SequencerSubscription[E] = {
       val subscription = new MockSubscription[E]
@@ -1300,7 +1320,7 @@ class SequencerClientTest
 
     override type SubscriptionError = Uninhabited
 
-    override def subscribe(request: SubscriptionRequest)(implicit
+    override def subscribe(request: SubscriptionRequestV2)(implicit
         traceContext: TraceContext
     ): SequencerSubscriptionPekko[SubscriptionError] = {
       // Choose a sufficiently large queue size so that we can test throttling
@@ -1351,8 +1371,8 @@ class SequencerClientTest
         cleanPrehead: Option[SequencerCounterCursorPrehead] = None,
         eventValidator: SequencedEventValidator = eventAlwaysValid,
         options: SequencerClientConfig = SequencerClientConfig(),
-        initialSequencerCounter: SequencerCounter = firstSequencerCounter,
         topologyO: Option[SynchronizerCryptoClient] = None,
+        initializeCounterAllocatorTo: Option[SequencerCounter] = None,
     )(implicit closeContext: CloseContext): Env[Client]
 
     protected def preloadStores(
@@ -1360,9 +1380,20 @@ class SequencerClientTest
         cleanPrehead: Option[SequencerCounterCursorPrehead],
         sequencedEventStore: SequencedEventStore,
         sequencerCounterTrackerStore: SequencerCounterTrackerStore,
+        initializeCounterAllocatorTo: Option[SequencerCounter],
     ): Unit = {
       val signedEvents = storedEvents.map(SequencerTestUtils.sign)
+      val firstCounterO = signedEvents
+        .map(_.content.counter)
+        .minOption
+        .map(_ - 1) // internal state has to be just before the counter of the first event
+        .orElse(
+          initializeCounterAllocatorTo
+        )
       val preloadStores = for {
+        _ <- firstCounterO.traverse_(counter =>
+          sequencedEventStore.reinitializeFromDbOrSetLowerBound(counter)
+        )
         _ <- sequencedEventStore.store(
           signedEvents.map(OrdinarySequencedEvent(_)(TraceContext.empty))
         )
@@ -1447,14 +1478,14 @@ class SequencerClientTest
         cleanPrehead: Option[SequencerCounterCursorPrehead],
         eventValidator: SequencedEventValidator,
         options: SequencerClientConfig,
-        initialSequencerCounter: SequencerCounter,
         topologyO: Option[SynchronizerCryptoClient] = None,
+        initializeCounterAllocatorTo: Option[SequencerCounter] = None,
     )(implicit closeContext: CloseContext): Env[RichSequencerClient] = {
       val clock = new SimClock(loggerFactory = loggerFactory)
       val timeouts = DefaultProcessingTimeouts.testing
       val transport = MockTransport()
       val sendTrackerStore = new InMemorySendTrackerStore()
-      val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory)
+      val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory, timeouts)
       val sequencerCounterTrackerStore =
         new InMemorySequencerCounterTrackerStore(loggerFactory, timeouts)
       val timeTracker = new SynchronizerTimeTracker(
@@ -1515,10 +1546,15 @@ class SequencerClientTest
         exitOnTimeout = false,
         loggerFactory,
         futureSupervisor,
-        initialSequencerCounter,
       )(parallelExecutionContext, tracer)
 
-      preloadStores(storedEvents, cleanPrehead, sequencedEventStore, sequencerCounterTrackerStore)
+      preloadStores(
+        storedEvents,
+        cleanPrehead,
+        sequencedEventStore,
+        sequencerCounterTrackerStore,
+        initializeCounterAllocatorTo,
+      )
 
       Env(
         client,
@@ -1538,14 +1574,14 @@ class SequencerClientTest
         cleanPrehead: Option[SequencerCounterCursorPrehead],
         eventValidator: SequencedEventValidator,
         options: SequencerClientConfig,
-        initialSequencerCounter: SequencerCounter,
         topologyO: Option[SynchronizerCryptoClient] = None,
+        initializeCounterAllocatorTo: Option[SequencerCounter] = None,
     )(implicit closeContext: CloseContext): Env[SequencerClient] = {
       val clock = new SimClock(loggerFactory = loggerFactory)
       val timeouts = DefaultProcessingTimeouts.testing
       val transport = MockTransport()
       val sendTrackerStore = new InMemorySendTrackerStore()
-      val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory)
+      val sequencedEventStore = new InMemorySequencedEventStore(loggerFactory, timeouts)
       val sequencerCounterTrackerStore =
         new InMemorySequencerCounterTrackerStore(loggerFactory, timeouts)
       val timeTracker = new SynchronizerTimeTracker(
@@ -1602,10 +1638,15 @@ class SequencerClientTest
         exitOnTimeout = false,
         loggerFactory,
         futureSupervisor,
-        initialSequencerCounter,
       )(PrettyInstances.prettyUninhabited, parallelExecutionContext, tracer, materializer)
 
-      preloadStores(storedEvents, cleanPrehead, sequencedEventStore, sequencerCounterTrackerStore)
+      preloadStores(
+        storedEvents,
+        cleanPrehead,
+        sequencedEventStore,
+        sequencerCounterTrackerStore,
+        initializeCounterAllocatorTo,
+      )
 
       Env(
         client,

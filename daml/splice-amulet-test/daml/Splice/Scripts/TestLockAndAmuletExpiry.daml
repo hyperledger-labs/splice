@@ -8,6 +8,8 @@ import DA.Assert
 import Daml.Script
 
 import Splice.Amulet
+import Splice.AmuletConfig (AmuletConfig(..))
+import qualified Splice.AmuletConfig as Unit
 import Splice.AmuletRules
 import Splice.Fees
 import Splice.Expiry
@@ -20,6 +22,16 @@ import Splice.Scripts.Util
 
 import DA.Foldable (forA_)
 import DA.Time
+
+scaleAmuletConfig : Decimal -> AmuletConfig Unit.USD -> AmuletConfig Amulet
+scaleAmuletConfig amuletPrice config = AmuletConfig with
+  transferConfig = scaleFees (1.0 / amuletPrice) config.transferConfig
+  decentralizedSynchronizer = config.decentralizedSynchronizer
+  issuanceCurve = config.issuanceCurve
+  tickDuration = config.tickDuration
+  packageConfig = config.packageConfig
+  transferPreapprovalFee = fmap (/ amuletPrice) config.transferPreapprovalFee
+  featuredAppActivityMarkerAmount = fmap (/ amuletPrice) config.featuredAppActivityMarkerAmount
 
 test : Script ()
 test = script do
@@ -48,11 +60,11 @@ test = script do
       openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
   -- Lock expires at T00:12:30
-  let lockExpiresAt12_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30
+  let lockExpiresAt12_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30; optContext = None
   -- Lock expires at T00:15:00
-  let lockExpiresAt15_00 = TimeLock with holders = [alice.primaryParty]; expiresAt = t15_00
+  let lockExpiresAt15_00 = TimeLock with holders = [alice.primaryParty]; expiresAt = t15_00; optContext = None
   -- Lock expires at T00:17:30
-  let lockExpiresAt17_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t17_30
+  let lockExpiresAt17_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t17_30; optContext = None
 
   -- This amulet is estimated to expire at round 5.
   -- we exploit that there are exactly three open rounds active at any point in time.
@@ -258,6 +270,7 @@ getLockedAmuletCmd app owner lockHolder amount lockDuration = do
               lock = Some TimeLock with
                 holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
+                optContext = None
               receiverFeeRatio = 0.0
           ]
         beneficiaries = None -- test code, don't set beneficiaries

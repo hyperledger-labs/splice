@@ -11,6 +11,9 @@ module Splice.Amulet.TwoStepTransfer (
   executeTwoStepTransfer,
   abortTwoStepTransfer,
 
+  -- * Shared support code
+  holdingToTransferInputs,
+
   -- * Test-only
   holdingFeesForDuration,
 ) where
@@ -36,8 +39,12 @@ data TwoStepTransfer = TwoStepTransfer with
     sender : Party
     receiver : Party
     amount : Decimal
+    lockContext : Text
+      -- ^ Context description of the lock. This is used to display the reason for
+      -- the lock in wallets.
     requestedAt : Time
     transferBefore : Time
+    transferBeforeDeadline : Text -- ^ Name of the deadline for the transfer
     provider : Party
       -- ^ Provider that should be marked as the app provider on the second step.
     allowFeaturing : Bool
@@ -47,6 +54,23 @@ data TwoStepTransfer = TwoStepTransfer with
 -- the time of locking the amulet and the time of executing the actual transfer.
 feeReserveMultiplier : Decimal
 feeReserveMultiplier = 4.0
+
+-- | Converting a set of holding inputs to inputs for an amulet transfer,
+-- unlocking any expired LockedAmulet holdings on the fly.
+holdingToTransferInputs : ForOwner -> PaymentTransferContext -> [ContractId Holding] -> Update [TransferInput]
+holdingToTransferInputs _forOwner _paymentContext inputHoldingCids =
+  forA inputHoldingCids $ \holdingCid -> do
+    -- TODO(#18760) Support locked amulet through fetchCheckedInterface
+    -- holding <- fetchCheckedInterface @Holding forOwner holdingCid
+    -- case fromInterface holding of
+    --   Some (LockedAmulet {}) -> do
+    --     let lockedAmuletCid : ContractId LockedAmulet = fromInterfaceContractId holdingCid
+    --     -- We assume the lock is expired, and if not then we rely `LockedAmulet_OwnerExpireLock` to fail
+    --     result <- exercise lockedAmuletCid LockedAmulet_OwnerExpireLock with
+    --       openRoundCid = paymentContext.context.openMiningRound
+    --     pure $ InputAmulet result.amuletSum.amulet
+    --  None ->
+    pure $ InputAmulet $ coerceContractId holdingCid
 
 -- | Prepare a two-step transfer of amulet by locking the funds.
 prepareTwoStepTransfer : TwoStepTransfer -> [ContractId Holding] -> PaymentTransferContext -> Update (ContractId LockedAmulet)
@@ -65,7 +89,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} inputHoldingCids paymentContext = do
   let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
 
   -- lock the amulet
-  let transferInputs = [ InputAmulet (coerceContractId holding) | holding <- inputHoldingCids ]
+  transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) paymentContext inputHoldingCids
   let transfer = Splice.AmuletRules.Transfer with
         sender
         provider = sender -- the sender is serving as its own "app provider"
@@ -77,6 +101,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} inputHoldingCids paymentContext = do
               lock = Some TimeLock with
                 expiresAt = transferBefore
                 holders = [dso]
+                optContext = Some lockContext
           ]
         inputs = transferInputs
         beneficiaries = None
@@ -87,8 +112,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} inputHoldingCids paymentContext = do
 
 executeTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update ([ContractId Holding], [ContractId Holding])
 executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
-  now <- getTime
-  require "Before deadline transferBefore" (now < transferBefore)
+  assertWithinDeadline transferBeforeDeadline transferBefore
   paymentContext <-
     if allowFeaturing
       then paymentFromChoiceContext dso extraArgs.context
@@ -114,18 +138,17 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
 
 abortTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update [ContractId Holding]
 abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
-  expireLockedAmulet <- getContextBool extraArgs.context expireLockKey
+  expireLockedAmulet <- getFromContextU @Bool extraArgs.context expireLockKey
   if expireLockedAmulet
     then do
-      openRoundCid <- getContextContractId @OpenMiningRound extraArgs.context openRoundContextKey
+      openRoundCid <- getFromContextU @(ContractId OpenMiningRound) extraArgs.context openRoundContextKey
       -- prudent engineering: check the DSO party
       _ <- fetchChecked (ForDso with dso) openRoundCid
       result <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
       pure [toInterfaceContractId result.amuletSum.amulet]
     else do
       -- scan is telling us to not expire the lock, this is OK if the transfer expired
-      now <- getTime
-      require "After transferBefore" (now >= transferBefore)
+      assertDeadlineExceeded transferBeforeDeadline transferBefore
       pure []
 
 holdingFeesForDuration : RelTime -> OpenMiningRound -> Decimal

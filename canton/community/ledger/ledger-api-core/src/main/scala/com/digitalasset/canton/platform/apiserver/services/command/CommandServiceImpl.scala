@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.services.command
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.command_service.*
 import com.daml.ledger.api.v2.command_submission_service.{SubmitRequest, SubmitResponse}
 import com.daml.ledger.api.v2.commands.Commands
@@ -15,6 +14,7 @@ import com.daml.ledger.api.v2.update_service.{
   GetTransactionTreeResponse,
 }
 import com.daml.tracing.Telemetry
+import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.config
 import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
@@ -87,6 +87,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
         val updateId = resp.completion.updateId
         val txRequest = GetTransactionByIdRequest(
           updateId = updateId,
+          requestingParties = Nil,
           transactionFormat = request.transactionFormat,
         )
         transactionServices
@@ -115,7 +116,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
                     .update(
                       _.transactionFormat.transactionShape := TRANSACTION_SHAPE_LEDGER_EFFECTS,
                       _.transactionFormat.eventFormat.modify(_.clearFiltersForAnyParty),
-                      _.transactionFormat.eventFormat.filtersForAnyParty := Filters(),
+                      _.transactionFormat.eventFormat.filtersForAnyParty := Filters(Nil),
                     )
                     .clearRequestingParties
                 )
@@ -139,6 +140,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
         val txRequest = GetTransactionByIdRequest(
           updateId = resp.completion.updateId,
           requestingParties = effectiveActAs.toList,
+          transactionFormat = None,
         )
         transactionServices
           .getTransactionTreeById(txRequest)
@@ -172,7 +174,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
         submissionKey = SubmissionKey(
           commandId = commands.commandId,
           submissionId = commands.submissionId,
-          applicationId = commands.applicationId,
+          userId = commands.userId,
           parties = commands.actAs.toSet,
         ),
         timeout = nonNegativeTimeout,

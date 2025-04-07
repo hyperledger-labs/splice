@@ -3,13 +3,13 @@
 
 package com.digitalasset.canton.http.json.v2
 
-import com.daml.error.*
-import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.admin.object_meta.ObjectMeta
 import com.daml.ledger.api.v2.trace_context.TraceContext
 import com.daml.ledger.api.v2.{offset_checkpoint, reassignment, transaction_filter}
+import com.digitalasset.base.error.utils.DecodedCantonError
+import com.digitalasset.base.error.{DamlErrorWithDefiniteAnswer, RpcError}
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
-import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent.CreatedEvent
+import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent.{CreatedEvent, ExercisedEvent}
 import com.google.protobuf
 import com.google.protobuf.field_mask.FieldMask
 import com.google.protobuf.struct.Struct
@@ -167,24 +167,9 @@ object JsSchema {
   object JsTreeEvent {
     sealed trait TreeEvent
 
-    final case class ExercisedTreeEvent(
-        offset: Long,
-        nodeId: Int,
-        contractId: String,
-        templateId: String,
-        interfaceId: Option[String],
-        choice: String,
-        choiceArgument: Json,
-        actingParties: Seq[String],
-        consuming: Boolean,
-        witnessParties: Seq[String],
-        exerciseResult: Json,
-        packageName: String,
-        lastDescendantNodeId: Int,
-    ) extends TreeEvent
-
     final case class CreatedTreeEvent(value: CreatedEvent) extends TreeEvent
 
+    final case class ExercisedTreeEvent(value: ExercisedEvent) extends TreeEvent
   }
 
   final case class JsCantonError(
@@ -204,11 +189,11 @@ object JsSchema {
     import DirectScalaPbRwImplicits.*
     implicit val rw: Codec[JsCantonError] = deriveCodec
 
-    def fromErrorCode(damlError: DamlError): JsCantonError = JsCantonError(
+    def fromErrorCode(damlError: RpcError): JsCantonError = JsCantonError(
       code = damlError.code.id,
       cause = damlError.cause,
-      correlationId = damlError.errorContext.correlationId,
-      traceId = damlError.errorContext.traceId,
+      correlationId = damlError.correlationId,
+      traceId = damlError.traceId,
       context = damlError.context,
       resources = damlError.resources.map { case (k, v) => (k.asString, v) },
       errorCategory = damlError.code.category.asInt,

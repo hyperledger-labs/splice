@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.admin.object_meta.ObjectMeta as ProtoObjectMeta
 import com.daml.ledger.api.v2.admin.party_management_service.PartyManagementServiceGrpc.PartyManagementService
 import com.daml.ledger.api.v2.admin.party_management_service.{
@@ -26,6 +25,7 @@ import com.daml.logging.LoggingContext
 import com.daml.platform.v1.page_tokens.ListPartiesPageTokenPayload
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.tracing.Telemetry
+import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.auth.AuthorizationChecksErrors
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
@@ -233,7 +233,12 @@ private[apiserver] final class ApiPartyManagementService private (
           partyIdHintO <- optionalString(
             request.partyIdHint
           )(requireParty)
-          metadata = request.localMetadata.getOrElse(ProtoObjectMeta())
+          metadata = request.localMetadata.getOrElse(
+            ProtoObjectMeta(
+              resourceVersion = "",
+              annotations = Map.empty,
+            )
+          )
           _ <- requireEmptyString(
             metadata.resourceVersion,
             "party_details.local_metadata.resource_version",
@@ -337,7 +342,12 @@ private[apiserver] final class ApiPartyManagementService private (
             "party_details",
           )
           party <- requireParty(partyDetails.party)
-          metadata = partyDetails.localMetadata.getOrElse(ProtoObjectMeta())
+          metadata = partyDetails.localMetadata.getOrElse(
+            ProtoObjectMeta(
+              resourceVersion = "",
+              annotations = Map.empty,
+            )
+          )
           resourceVersionNumberO <- optionalString(metadata.resourceVersion)(
             requireResourceVersion(
               _,

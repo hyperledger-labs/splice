@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftConnectionConfig, CometBftHttpRpcClient}
-import org.lfdecentralizedtrust.splice.sv.config.CometBftConfig
+import org.lfdecentralizedtrust.splice.sv.config.{CometBftGovernanceKey, SvCometBftConfig}
 import org.lfdecentralizedtrust.splice.util.SvTestUtil
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -29,36 +29,43 @@ import monocle.Monocle.toAppliedFocusOps
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment with SvTestUtil {
 
   import ExecutionContext.Implicits.global
+
+  // generated with `scripts/generate-cometbft-governance-keys.sh`
+  val sv3CometBftGovernanceKey = CometBftGovernanceKey(
+    "vTrMu0ocEHttI2YaoLeqLZPdHkBpjf8syW1o2rneeVk=",
+    "feEYBquDbB7YYNBUOTOSlxWAJ2m23RD05Fp0PTtR0gM=",
+  )
+  val sv4CometBftGovernanceKey = CometBftGovernanceKey(
+    "tYd7aUPmSBqdqMP1Ogs3SvBpu6kR8+pH381D8wZQDhE=",
+    "wDhQgIS+ZrHfxNk0YxbUXSWsUBlzUt8p2C+xO1BTHmg=",
+  )
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
-          ConfigTransforms.updateAllSvAppConfigs_ { config =>
-            config
-              .focus(_.cometBftConfig)
-              .replace(
-                Some(
-                  CometBftConfig(
-                    enabled = true
-                  )
-                )
-              )
-              .focus(_.automation.enableCometbftReconciliation)
-              .replace(true)
-          }(config),
-        (_, config) =>
           ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
             {
               val svIdx = name.replace("sv", "")
               config
                 .focus(_.cometBftConfig)
-                .modify(_.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:266${svIdx}7")))
+                .replace(
+                  Some(
+                    SvCometBftConfig(
+                      enabled = true,
+                      connectionUri = s"http://127.0.0.1:266${svIdx}7",
+                      governanceKey = if (name == "sv4") Some(sv4CometBftGovernanceKey) else None,
+                    )
+                  )
+                )
+                .focus(_.automation.enableCometbftReconciliation)
+                .replace(true)
             }
           }(config),
         (_, config) =>
@@ -69,6 +76,12 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
                   .svApps(InstanceName.tryCreate("sv2"))
                   .focus(_.cometBftConfig)
                   .modify(_.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:26657")))
+              }) +
+              (InstanceName.tryCreate("sv3Local") -> {
+                config
+                  .svApps(InstanceName.tryCreate("sv3"))
+                  .focus(_.cometBftConfig)
+                  .modify(_.map(_.focus(_.governanceKey).replace(Some(sv3CometBftGovernanceKey))))
               })
           ),
       )
@@ -84,6 +97,19 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
           cometBFTnodeIsUpToDateValidator(sv)
         }
       }
+    }
+  }
+
+  "sv4 uses a governance key from config" in { implicit env =>
+    getCurrentGovernanceKey(sv4Backend) should be(sv4CometBftGovernanceKey.publicKey)
+  }
+
+  "sv3 can switch to a new governance key set in its config" in { implicit env =>
+    getCurrentGovernanceKey(sv3Backend) should not be sv3CometBftGovernanceKey.publicKey
+    sv3Backend.stop()
+    sv3LocalBackend.startSync()
+    eventually() {
+      getCurrentGovernanceKey(sv3Backend) should be(sv3CometBftGovernanceKey.publicKey)
     }
   }
 
@@ -192,9 +218,6 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
     // validate dump
     sv.cometBftNodeDump().abciInfo.isObject shouldBe true
     sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
-    sv.appState.participantAdminConnection
-      .listMyKeys("cometbft-governance-keys")
-      .futureValue should not be empty
   }
 
   private def cometbftClientForSvApp(sv: SvAppBackendReference) = {
@@ -218,4 +241,14 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
     responseKeys.foreach(key => response.result.findAllByKey(key) should not be empty)
   }
 
+  private def getCurrentGovernanceKey(sv: SvAppBackendReference) = {
+    val dsoInfo = sv.getDsoInfo()
+    val svParty = dsoInfo.svParty
+    val keys = dsoInfo.svNodeStates(svParty).payload.state.synchronizerNodes.asScala.flatMap {
+      case (_, node) =>
+        node.cometBft.governanceKeys.asScala.map(_.pubKey)
+    }
+    keys should have size 1
+    keys.head
+  }
 }

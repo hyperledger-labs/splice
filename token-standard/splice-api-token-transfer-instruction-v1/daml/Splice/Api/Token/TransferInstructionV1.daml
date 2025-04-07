@@ -32,7 +32,7 @@ data Transfer = Transfer with
       --
       -- Registries SHOULD NOT execute the transfer instruction after this time,
       -- so that senders can retry creating a new transfer instruction after this time.
-    holdingCids : [ContractId Holding]
+    inputHoldingCids : [ContractId Holding]
       -- ^ The holding contracts that should be used to fund the transfer.
       --
       -- MAY be empty if the registry supports automatic selection of holdings for transfers

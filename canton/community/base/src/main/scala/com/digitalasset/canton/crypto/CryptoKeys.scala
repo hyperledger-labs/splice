@@ -12,6 +12,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.{
   String300,
   String68,
 }
+import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -26,6 +27,7 @@ import com.digitalasset.canton.version.{
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import io.circe.Encoder
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import slick.jdbc.{GetResult, SetParameter}
 
 import scala.annotation.nowarn
@@ -218,6 +220,12 @@ trait PublicKey extends CryptoKeyPairKey {
 }
 
 object PublicKey {
+
+  /** Return the latest key from a sequence of keys */
+  def getLatestKey[A <: PublicKey](availableKeys: Seq[A]): Option[A] =
+    // use lastOption to retrieve latest key (newer keys are at the end) */
+    availableKeys.lastOption
+
   def fromProtoPublicKeyV30(publicKeyP: v30.PublicKey): ParsingResult[PublicKey] =
     publicKeyP.key match {
       case v30.PublicKey.Key.Empty => Left(ProtoDeserializationError.FieldNotSet("key"))
@@ -343,6 +351,17 @@ object CryptoKeyFormat {
     override def toProtoEnum: v30.CryptoKeyFormat =
       v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_DER_X509_SUBJECT_PUBLIC_KEY_INFO
   }
+
+  // Parses a DER-encoded X.509 SubjectPublicKeyInfo structure and extracts the public key bytes.
+  def extractPublicKeyFromX509Spki(
+      publicKey: ByteString
+  ): Either[KeyParseAndValidateError, Array[Byte]] =
+    Either
+      .catchOnly[IllegalArgumentException] {
+        val subjectPublicKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.toByteArray)
+        subjectPublicKeyInfo.getPublicKeyData.getBytes
+      }
+      .leftMap(err => KeyParseAndValidateError(s"Failed to parse public key: $err"))
 
   /** ASN.1 + DER-encoding of PKCS #8 PrivateKeyInfo structure:
     * [[https://datatracker.ietf.org/doc/html/rfc5208#section-5 RFC 5208]]

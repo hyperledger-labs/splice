@@ -102,12 +102,15 @@ template Amulet
         instrumentId = amuletInstrumentId dso
         amount = amount.initialAmount
         lock = None
-        meta = Api.Token.MetadataV1.Metadata
-          with
-            values = Map.fromList [
-              (createdInRoundMetaKey, show amount.createdAt.number),
-              (ratePerRoundMetaKey, show amount.ratePerRound.rate)
-              ]
+        meta = amuletMetadata this
+
+amuletMetadata : Amulet -> Api.Token.MetadataV1.Metadata
+amuletMetadata Amulet{..} =
+  Api.Token.MetadataV1.Metadata with
+    values = Map.fromList [
+      (createdInRoundMetaKey, show amount.createdAt.number),
+      (ratePerRoundMetaKey, show amount.ratePerRound.rate)
+      ]
 
 template LockedAmulet
   with
@@ -123,13 +126,10 @@ template LockedAmulet
         amount = amulet.amount.initialAmount
         lock = Some Api.Token.HoldingV1.Lock with
           holders = lock.holders
-        meta = Api.Token.MetadataV1.Metadata
-          with
-            values = Map.fromList [
-              (createdInRoundMetaKey, show amulet.amount.createdAt),
-              (ratePerRoundMetaKey, show amulet.amount.ratePerRound)
-              ]
-
+          expiresAt = Some lock.expiresAt
+          expiresAfter = None
+          context = lock.optContext
+        meta = amuletMetadata amulet
 
     choice LockedAmulet_Unlock : LockedAmulet_UnlockResult
       with
@@ -148,8 +148,7 @@ template LockedAmulet
         openRoundCid : ContractId OpenMiningRound
       controller amulet.owner
       do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
-         t <- getTime
-         require "Lock is expired" (lock.expiresAt < t)
+         assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
          amuletCid <- create amulet
          let amuletSum = AmuletCreateSummary with
                amulet = amuletCid
@@ -161,8 +160,8 @@ template LockedAmulet
       with
         roundCid : ContractId OpenMiningRound
       controller amulet.dso
-      do t <- getTime
-         require "Lock is expired" (lock.expiresAt < t)
+      do
+         assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
          requireAmuletExpiredForAllOpenRounds roundCid amulet
          let expireSum = AmuletExpireSummary with
                owner = amulet.owner

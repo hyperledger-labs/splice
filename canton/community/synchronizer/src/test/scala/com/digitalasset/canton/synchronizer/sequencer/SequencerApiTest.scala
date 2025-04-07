@@ -57,7 +57,7 @@ abstract class SequencerApiTest
 
     lazy val sequencer: CantonSequencer = {
       val sequencer = SequencerApiTest.this.createSequencer(
-        topologyFactory.forOwnerAndSynchronizer(owner = mediatorId, synchronizerId)
+        topologyFactory.forOwnerAndSynchronizer(owner = sequencerId, synchronizerId)
       )
       registerAllTopologyMembers(topologyFactory.topologySnapshot(), sequencer)
       sequencer
@@ -174,7 +174,6 @@ abstract class SequencerApiTest
 
       "not fail when a block is empty due to suppressed events" in { env =>
         import env.*
-
         val suppressedMessageContent = "suppressed message"
         // TODO(i10412): The sequencer implementations for tests currently do not all behave in the same way.
         // Until this is fixed, we are currently sidestepping the issue by using a different set of recipients
@@ -217,7 +216,8 @@ abstract class SequencerApiTest
                   "to avoid starvation"
                 )) or
                 include("Started gathering segment status") or
-                include("Broadcasting epoch status"))
+                include("Broadcasting epoch status") or
+                include("Scheduling pruning in 1 hour"))
             },
           )
         } yield {
@@ -995,7 +995,12 @@ trait SequencerApiTestUtils
     members
       .parTraverseFilter { member =>
         for {
-          source <- valueOrFail(sequencer.read(member, firstSequencerCounter))(
+          source <- valueOrFail(
+            if (firstSequencerCounter == SequencerCounter.Genesis)
+              sequencer.readV2(member, None)
+            else
+              sequencer.read(member, firstSequencerCounter)
+          )(
             s"Read for $member"
           )
           events <- FutureUnlessShutdown.outcomeF(
@@ -1074,7 +1079,7 @@ trait SequencerApiTestUtils
       val event = message.signedEvent.content
 
       event match {
-        case Deliver(_, _, _, messageIdO, batch, _, trafficReceipt) =>
+        case Deliver(_, _, _, _, messageIdO, batch, _, trafficReceipt) =>
           withClue(s"Received the wrong number of envelopes for recipient $member") {
             batch.envelopes.length shouldBe expectedMessage.envs.length
           }
@@ -1111,6 +1116,7 @@ trait SequencerApiTestUtils
         event.signedEvent.content match {
           case DeliverError(
                 _counter,
+                _previousTimestamp,
                 _timestamp,
                 _synchronizerId,
                 messageId,

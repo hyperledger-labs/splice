@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.ledger.error.groups
 
-import com.daml.error.{
+import com.digitalasset.base.error.{
   ContextualizedErrorLogger,
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
@@ -14,12 +14,13 @@ import com.daml.error.{
   Explanation,
   Resolution,
 }
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.CommandExecutionErrorGroup
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageId}
 import com.digitalasset.daml.lf.engine.Error as LfError
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
-import com.digitalasset.daml.lf.language.{Ast, LanguageVersion}
+import com.digitalasset.daml.lf.language.{Ast, LanguageVersion, Reference}
 import com.digitalasset.daml.lf.transaction.{GlobalKey, TransactionVersion}
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.digitalasset.daml.lf.value.{Value, ValueCoder}
@@ -313,18 +314,29 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
 
+      object Reject {
+        def apply(cause: String, err: LfInterpretationError.ContractNotActive)(implicit
+            loggingContext: ContextualizedErrorLogger
+        ): Reject = Reject(
+          cause,
+          err.coid,
+          Some(err.templateId.toString()),
+        )
+      }
+
       final case class Reject(
           override val cause: String,
-          err: LfInterpretationError.ContractNotActive,
+          coid: ContractId,
+          templateIdO: Option[String],
       )(implicit
           loggingContext: ContextualizedErrorLogger
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
         override def resources: Seq[(ErrorResource, String)] = Seq(
-          (ErrorResource.TemplateId, err.templateId.toString),
-          (ErrorResource.ContractId, err.coid.coid),
-        )
+          templateIdO.map(templateId => (ErrorResource.TemplateId, templateId)),
+          Some((ErrorResource.ContractId, coid.coid)),
+        ).flatten
       }
 
     }
@@ -736,6 +748,49 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       ) extends DamlErrorWithDefiniteAnswer(cause = cause) {}
     }
 
+    @Explanation(
+      "This error is thrown by use of `failWithStatus` in daml code. The Daml code determines the canton error category, and thus the grpc status code."
+    )
+    @Resolution(
+      "Ensure that you are using the contract correctly, and that the choice implementation does not have a bug."
+    )
+    object FailureStatus
+        extends ErrorCode(
+          id = "DAML_FAILURE",
+          ErrorCategory.OverrideDocStringErrorCategory("<determined by daml code>"),
+        ) {
+
+      // Building conveyance string from OverrideDocStringErrorCategory will fail, and would be wrong
+      override def errorConveyanceDocString: Option[String] = Some(
+        "Conveyance is determined by the category, which is selected in daml code. Refer to the documentation of the actual error category encoded in the raised error for details."
+      )
+
+      def Reject(
+          cause: String,
+          err: LfInterpretationError.FailureStatus,
+      )(implicit
+          loggingContext: ContextualizedErrorLogger
+      ) = ErrorCategory.fromInt(err.failureCategory) match {
+        case Some(errorCategory) =>
+          new DamlErrorWithDefiniteAnswer(
+            cause = cause
+          )(
+            code = new ErrorCode(id = FailureStatus.id, errorCategory)(FailureStatus.parent) {},
+            loggingContext = loggingContext,
+          ) {
+            override def context: Map[String, String] =
+              // ++ on maps takes last key, we don't want users to override `error_id`, so we add this last
+              // SerializableErrorCodeComponents also puts `context` first, so fields added by canton cannot be overwritten
+              super.context ++ err.metadata ++ List(("error_id", err.errorId))
+          }
+        case None =>
+          LedgerApiErrors.InternalError.Generic(
+            s"Error category ordinal ${err.failureCategory} is not a valid error category. "
+              + s"This is likely a programming bug. Please report this error. Original raised error cause: $cause"
+          )
+      }
+    }
+
     @Explanation("Errors that occur when trying to upgrade a contract")
     object UpgradeError extends ErrorGroup {
       @Explanation("Validation fails when trying to upgrade the contract")
@@ -802,34 +857,6 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         }
       }
 
-      @Explanation("View mismatch when trying to upgrade the contract")
-      @Resolution(
-        "Verify that the interface views of the contract have not changed"
-      )
-      object ViewMismatch
-          extends ErrorCode(
-            id = "INTERPRETATION_UPGRADE_ERROR_VIEW_MISMATCH",
-            ErrorCategory.InvalidGivenCurrentSystemStateOther,
-          ) {
-        final case class Reject(
-            override val cause: String,
-            err: LfInterpretationError.Upgrade.ViewMismatch,
-        )(implicit
-            loggingContext: ContextualizedErrorLogger
-        ) extends DamlErrorWithDefiniteAnswer(
-              cause = cause
-            ) {
-
-          override def resources: Seq[(ErrorResource, String)] =
-            Seq(
-              (ErrorResource.ContractId, err.coid.coid),
-              (ErrorResource.InterfaceId, err.iterfaceId.toString),
-              (ErrorResource.TemplateId, err.srcTemplateId.toString),
-              (ErrorResource.TemplateId, err.dstTemplateId.toString),
-            )
-        }
-      }
-
       @Explanation(
         "An optional contract field with a value of Some may not be dropped during downgrading"
       )
@@ -884,5 +911,51 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           )
       }
     }
+  }
+
+  // TODO(#23334): Consider moving in dedicated error group
+  @Explanation(
+    """This error is a catch-all for errors thrown by topology-aware package selection in command processing."""
+  )
+  @Resolution(
+    "Inspect the error message and adjust the topology state to ensure successful submissions"
+  )
+  object PackageSelectionFailed
+      extends ErrorCode(
+        id = "PACKAGE_SELECTION_FAILED",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+
+    final case class Reject(
+        override val cause: String
+    )(implicit
+        loggingContext: ContextualizedErrorLogger
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause = cause
+        ) {}
+  }
+
+  @Explanation(
+    "A package-name required in command interpretation was discarded in topology-aware package selection."
+  )
+  @Resolution(
+    "Revisit the command submission and ensure it conforms with the vetted topology state of the submitters and informees."
+  )
+  object PackageNameDiscarded
+      extends ErrorCode(
+        id = "PACKAGE_NAME_DISCARDED",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+      ) {
+
+    final case class Reject(
+        pkgName: Ref.PackageName,
+        reference: Reference,
+    )(implicit
+        loggingContext: ContextualizedErrorLogger
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause =
+            // TODO(#23334): Improve error reporting for package-name discarded errors
+            s"Command interpretation failed due to the required $pkgName being discarded in package selection: $reference."
+        )
   }
 }

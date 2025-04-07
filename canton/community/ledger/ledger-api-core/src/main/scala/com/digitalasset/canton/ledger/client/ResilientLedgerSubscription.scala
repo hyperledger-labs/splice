@@ -3,15 +3,15 @@
 
 package com.digitalasset.canton.ledger.client
 
-import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse.Update
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.{NoTracing, Spanning}
+import com.digitalasset.canton.tracing.{NoTracing, Spanning, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.util.TryUtil.ForFailedOps
 import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
@@ -64,14 +64,14 @@ class ResilientLedgerSubscription[S, T](
     )
     .apply(resilientSubscription(), AllExceptionRetryPolicy)
 
-  runOnShutdown_(new RunOnShutdown {
+  runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"$subscriptionName-shutdown"
 
     override def done: Boolean =
       // Use isClosing to avoid task eviction at the beginning (see runOnShutdown)
       isClosing && ledgerSubscriptionRef.get().forall(_.completed.isCompleted)
 
-    override def run(): Unit =
+    override def run()(implicit traceContext: TraceContext): Unit =
       ledgerSubscriptionRef.getAndSet(None).foreach(LifeCycle.close(_)(logger))
   })
 

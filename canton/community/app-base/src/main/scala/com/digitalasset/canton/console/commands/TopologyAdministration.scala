@@ -7,18 +7,19 @@ import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.topology.*
 import com.digitalasset.canton.admin.api.client.data.{
-  TopologyQueueStatus,
   DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters,
+  TopologyQueueStatus,
 }
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration, RequireTypes}
-import com.digitalasset.canton.console.CommandErrors.{GenericCommandError}
+import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
@@ -1455,7 +1456,7 @@ class TopologyAdministrationGroup(
     @Help.Description("""Change the association of a party to hosting participants.
       party: The unique identifier of the party whose set of participants or permission to modify.
       adds: The unique identifiers of the participants to host the party each specifying the participant's permissions
-            (submission, confirmation, observation). If the party already hosts the specified participant, update the
+            (submission, confirmation, observation). If the participant already hosts the specified party, update the
             participant's permissions.
       removes: The unique identifiers of the participants that should no longer host the party.
       signedBy: Refers to the optional fingerprint of the authorizing key which in turn refers to a specific, locally existing certificate.
@@ -1481,7 +1482,7 @@ class TopologyAdministrationGroup(
         ),
         mustFullyAuthorize: Boolean = false,
         store: TopologyStoreId = TopologyStoreId.Authorized,
-        force: ForceFlags = ForceFlags.none,
+        forceFlags: ForceFlags = ForceFlags.none,
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant] = {
 
       val currentO = findCurrent(party, store)
@@ -1527,7 +1528,7 @@ class TopologyAdministrationGroup(
           synchronize = synchronize,
           mustFullyAuthorize = mustFullyAuthorize,
           store = store,
-          forceFlags = force,
+          forceFlags = forceFlags,
         )
       } else {
         // we would remove the last participant, therefore we issue a REMOVE
@@ -1542,7 +1543,7 @@ class TopologyAdministrationGroup(
           synchronize = synchronize,
           mustFullyAuthorize = mustFullyAuthorize,
           store = store,
-          forceFlags = force,
+          forceFlags = forceFlags,
         )
 
       }
@@ -2865,7 +2866,7 @@ class TopologyAdministrationGroup(
       if (
         oldSynchronizerParameters.mediatorDeduplicationTimeout < minMediatorDeduplicationTimeout
       ) {
-        val err: CantonError = TopologyManagerError.IncreaseOfSubmissionTimeRecordTimeTolerance
+        val err: RpcError = TopologyManagerError.IncreaseOfSubmissionTimeRecordTimeTolerance
           .PermanentlyInsecure(
             newSubmissionTimeRecordTimeTolerance.toInternal,
             oldSynchronizerParameters.mediatorDeduplicationTimeout.toInternal,

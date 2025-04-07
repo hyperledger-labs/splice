@@ -10,6 +10,7 @@ import ch.qos.logback.core.status.{ErrorStatus, Status, StatusListener, WarnStat
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.CantonAppDriver.installGCLogging
 import com.digitalasset.canton.buildinfo.BuildInfo
+import com.digitalasset.canton.cli.Command.Sandbox
 import com.digitalasset.canton.cli.{Cli, Command, LogFileAppender}
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.{
@@ -23,6 +24,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.util.JarResourceUtils
 import com.sun.management.GarbageCollectionNotificationInfo
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
@@ -38,9 +40,10 @@ import scala.util.control.NonFatal
   *
   * Starts a set of synchronizers and participant nodes.
   */
-abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging with NoTracing {
+abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
 
   type Config <: SharedCantonConfig[Config]
+  type E <: Environment[Config]
 
   protected def environmentFactory: EnvironmentFactory[Config, E]
 
@@ -135,9 +138,18 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
     }
   }))
   logger.debug("Registered shutdown-hook.")
+  val sandboxConfig = JarResourceUtils.extractFileFromJar("sandbox/sandbox.conf")
+  val sandboxBotstrap = JarResourceUtils.extractFileFromJar("sandbox/bootstrap.canton")
+  val configFiles = cliOptions.command
+    .collect { case Sandbox => sandboxConfig }
+    .toList
+    .concat(cliOptions.configFiles)
+  val bootstrapFile = cliOptions.command
+    .collect { case Sandbox => sandboxBotstrap }
+    .orElse(cliOptions.bootstrapScriptPath)
 
   val cantonConfig: Config = {
-    val mergedUserConfigsE = NonEmpty.from(cliOptions.configFiles) match {
+    val mergedUserConfigsE = NonEmpty.from(configFiles) match {
       case None if cliOptions.configMap.isEmpty =>
         Left(ConfigErrors.NoConfigFiles.Error())
       case None => Right(ConfigFactory.empty())
@@ -156,7 +168,7 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
 
     val loadedConfig = loadConfig(finalConfig) match {
       case Left(_) =>
-        if (cliOptions.configFiles.sizeCompare(1) > 0)
+        if (configFiles.sizeCompare(1) > 0)
           writeConfigToTmpFile(mergedUserConfigs)
         sys.exit(1)
       case Right(loaded) =>
@@ -198,7 +210,7 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
   }
 
   // verify that run script and bootstrap script aren't mixed
-  if (cliOptions.bootstrapScriptPath.isDefined) {
+  if (bootstrapFile.isDefined) {
     cliOptions.command match {
       case Some(Command.RunScript(_)) =>
         logger.error("--bootstrap script and run script are mutually exclusive")
@@ -211,32 +223,38 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
   }
 
   private lazy val bootstrapScript: Option[CantonScript] =
-    cliOptions.bootstrapScriptPath.map(CantonScriptFromFile.apply)
+    bootstrapFile.map(CantonScriptFromFile.apply)
 
-  val runner: Runner[E] = cliOptions.command match {
+  val environment = environmentFactory.create(cantonConfig, loggerFactory)
+  val runner: Runner[Config] = cliOptions.command match {
+    case Some(Command.Sandbox) =>
+      new ServerRunner(bootstrapScript, loggerFactory, cliOptions.exitAfterBootstrap)
     case Some(Command.Daemon) => new ServerRunner(bootstrapScript, loggerFactory)
     case Some(Command.RunScript(script)) => ConsoleScriptRunner(script, loggerFactory)
     case Some(Command.Generate(target)) =>
       Generate.process(target, cantonConfig)
       sys.exit(0)
     case _ =>
-      new ConsoleInteractiveRunner(cliOptions.noTty, bootstrapScript, loggerFactory)
+      new ConsoleInteractiveRunner(
+        cliOptions.noTty,
+        bootstrapScript,
+        environment.writePortsFile(),
+        loggerFactory,
+      )
   }
 
-  val environment = environmentFactory.create(cantonConfig, loggerFactory)
   environmentRef.set(Some(environment)) // registering for graceful shutdown
-  environment.startAndReconnect() match {
+  environment.startAndReconnect(runner.run(environment)) match {
     case Right(()) =>
     case Left(_) => sys.exit(1)
   }
-
-  runner.run(environment)
 
   def loadConfig(config: com.typesafe.config.Config): Either[CantonConfigError, Config]
 
 }
 
 object CantonAppDriver {
+
   @SuppressWarnings(Array("org.wartremover.warts.Null", "org.wartremover.warts.AsInstanceOf"))
   private def installGCLogging(loggerFactory: NamedLoggerFactory, config: GCLoggingConfig): Unit =
     if (config.enabled) {

@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.ledger.api.validation
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamRequest as GrpcCompletionStreamRequest
+import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.messages.command.completion.CompletionStreamRequest
 import io.grpc.StatusRuntimeException
@@ -19,14 +19,14 @@ object CompletionServiceRequestValidator {
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, CompletionStreamRequest] =
     for {
-      appId <- requireApplicationId(request.applicationId, "application_id")
+      userId <- requireUserId(request.userId, "user_id")
       parties <- requireParties(request.parties.toSet)
       offsetO <- ParticipantOffsetValidator.validateNonNegative(
         request.beginExclusive,
         "begin_exclusive",
       )
     } yield CompletionStreamRequest(
-      appId,
+      userId,
       parties,
       offsetO,
     )

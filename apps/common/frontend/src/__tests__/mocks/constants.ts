@@ -8,7 +8,7 @@ import {
 import { ContractId, emptyMap } from '@daml/types';
 
 import { Contract } from '../../../utils';
-import { SvVote } from '../../models';
+import { AmuletPriceVote, SvVote } from '../../models';
 
 export function myVote(requestCid: ContractId<VoteRequest>, accept: boolean): SvVote {
   return {
@@ -22,6 +22,19 @@ export function myVote(requestCid: ContractId<VoteRequest>, accept: boolean): Sv
     accept,
   };
 }
+
+export const amuletPriceVotes: AmuletPriceVote[] = [
+  {
+    sv: 'digital-asset-2::122073b343bd7a751da8471636096c87df6eb5de9279803c5ea272977def23a9d088',
+    amuletPrice: '1.11',
+    lastUpdatedAt: new Date('2025-02-12T13:50:54.176913Z'),
+  },
+  {
+    sv: 'digital-asset-eng-2::1220a487994f51a4ea99be5d7c94662b91c2154214a312ade0d55367b884b6fd8dfc',
+    amuletPrice: '1.11',
+    lastUpdatedAt: new Date('2025-02-12T10:50:54.176913Z'),
+  },
+];
 
 export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
   request: {

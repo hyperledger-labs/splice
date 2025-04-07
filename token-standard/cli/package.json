@@ -15,7 +15,8 @@
   "dependencies": {
     "commander": "^13.1.0",
     "dayjs": "^1.11.13",
-    "transfer-instruction-openapi": "file:../splice-api-token-transfer-instruction-v1/openapi-ts-client"
+    "transfer-instruction-openapi": "file:../splice-api-token-transfer-instruction-v1/openapi-ts-client",
+    "canton-json-api-v2-openapi": "file:../dependencies/canton-json-api-v2/openapi-ts-client"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",

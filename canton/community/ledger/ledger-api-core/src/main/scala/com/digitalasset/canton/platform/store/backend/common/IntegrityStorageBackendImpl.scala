@@ -82,9 +82,9 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
        |UNION ALL
        |SELECT event_offset, node_id FROM lapi_events_non_consuming_exercise
        |UNION ALL
-       |SELECT event_offset, 0 FROM lapi_events_unassign
+       |SELECT event_offset, node_id FROM lapi_events_unassign
        |UNION ALL
-       |SELECT event_offset, 0 FROM lapi_events_assign
+       |SELECT event_offset, node_id FROM lapi_events_assign
        |""".stripMargin
 
   private val SqlDuplicateOffsets = SQL"""
@@ -237,35 +237,35 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
     val completions = SQL"""
           SELECT
             completion_offset,
-            application_id,
+            user_id,
             submitters,
             command_id,
             update_id,
             submission_id,
             message_uuid,
-            request_sequencer_counter,
+            record_time,
             synchronizer_id
           FROM lapi_command_completions
       """
       .asVectorOf(
         offset("completion_offset") ~
-          str("application_id") ~
+          str("user_id") ~
           array[Int]("submitters") ~
           str("command_id") ~
           str("update_id").? ~
           str("submission_id").? ~
           str("message_uuid").? ~
-          long("request_sequencer_counter").? ~
+          long("record_time") ~
           long("synchronizer_id") map {
-            case offset ~ applicationId ~ submitters ~ commandId ~ updateId ~ submissionId ~ messageUuid ~ requestSequencerCounter ~ synchronizerId =>
+            case offset ~ userId ~ submitters ~ commandId ~ updateId ~ submissionId ~ messageUuid ~ recordTimeLong ~ synchronizerId =>
               CompletionEntry(
-                applicationId,
+                userId,
                 submitters.toList,
                 commandId,
                 updateId,
                 submissionId,
                 messageUuid,
-                requestSequencerCounter,
+                recordTimeLong,
                 synchronizerId,
               ) -> offset
           }
@@ -344,13 +344,13 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
   }
 
   private final case class CompletionEntry(
-      applicationId: String,
+      userId: String,
       submitters: List[Int],
       commandId: String,
       updateId: Option[String],
       submissionId: Option[String],
       messageUuid: Option[String],
-      requestSequencerCounter: Option[Long],
+      recordTimeLong: Long,
       synchronizerId: Long,
   )
 }
