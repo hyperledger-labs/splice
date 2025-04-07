@@ -83,7 +83,6 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
   )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): A = {
     val auth0 = auth0UtilFromEnvVars("test")
     Using.resource(auth0.createUser()) { user =>
-      logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
       if (!onboardThroughWalletUI) {
         aliceValidatorBackend.onboardUser(user.id)
       }
