@@ -36,6 +36,8 @@ monitoring:
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
+      cloudSql:
+        maintenance: false
       cometbft:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:

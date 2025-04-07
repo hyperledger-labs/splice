@@ -26,6 +26,8 @@ monitoring:
         # we expect more frequent timeouts on devnet and therefore sequencer request amplification so we allow a higher threshold"
         kilobytes: 10
         overMinutes: 30
+      cloudSql:
+        maintenance: true
       cometbft:
         expectedMaxBlocksPerSecond: 5
       loadTester:

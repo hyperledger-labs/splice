@@ -23,5 +23,8 @@ pulumiProjectConfig:
 monitoring:
   alerting:
     enableNoDataAlerts: true
+    alerts:
+      cloudSql:
+        maintenance: true
 operatorDeployment:
   reference: refs/heads/main
