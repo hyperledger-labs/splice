@@ -93,9 +93,6 @@ class HttpTokenStandardTransferInstructionHandler(
               )
               .disclose(externalPartyAmuletRules.contract)
               .build(),
-            validUntil = newestOpenRound.targetClosesAt.atOffset(
-              ZoneOffset.UTC
-            ),
           )
         )
       }

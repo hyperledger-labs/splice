@@ -83,9 +83,6 @@ class HttpTokenStandardAllocationInstructionHandler(
                 toTokenStandardDisclosedContract(newestOpenRound.contract, activeSynchronizerId),
               ),
             ),
-            validUntil = newestOpenRound.payload.targetClosesAt.atOffset(
-              ZoneOffset.UTC
-            ),
           )
         )
       }

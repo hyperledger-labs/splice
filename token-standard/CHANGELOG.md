@@ -22,6 +22,9 @@ Polishing changes
   holding by contract id.
 - Rename the `AllocationInstruction.inputHoldings` field and the
   `Transfer.holdingCids` field to `inputHoldingCids` for uniformity
+- Removed the `validUntil` field from choice contexts returned by off-ledger APIs,
+  as that is a left-over from a design stage where we did not require registries to support
+  a 24h prepare-submission delay time by default.
 
 ## 2025-03-31
 
