@@ -1,0 +1,4 @@
+name: infra
+runtime: nodejs
+description: Infrastructure on GCP
+main: "../../../pulumi/infra/src/index.ts"

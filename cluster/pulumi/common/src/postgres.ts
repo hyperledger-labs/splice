@@ -6,14 +6,14 @@ import { Resource } from '@pulumi/pulumi';
 
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, config } from './config';
+import { spliceConfig } from './config/config';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
 
-const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
-const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
-// default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
-const cloudSqlDbInstance = config.optionalEnv('CLOUDSQL_DB_INSTANCE') || 'db-custom-2-7680';
+const enableCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.enabled;
+const protectCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.protected;
+const cloudSqlDbInstance = spliceConfig.pulumiProjectConfig.cloudSql.tier;
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -105,6 +105,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
             // it's fairly critical for performance that the sql instance is in the same zone as the GKE nodes
             zone: GCP_ZONE || config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE'),
           },
+          maintenanceWindow: spliceConfig.pulumiProjectConfig.cloudSql.maintenanceWindow,
         },
       },
       { ...baseOpts, parent: this }
@@ -188,11 +189,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     );
     const password = generatePassword(`${logicalName}-passwd`, {
       parent: this,
-      aliases: [
-        { name: `${logicalNameAlias}-passwd` },
-        // allow for refactoring where the secret was created outside of the resources, can be removed once base version > 0.2.1
-        { name: `${logicalName}-passwd`, parent: undefined },
-      ],
+      aliases: [{ name: `${logicalNameAlias}-passwd` }],
     }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
     this.secretName = passwordSecret.metadata.name;
@@ -215,11 +212,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
       }),
       version,
       {
-        aliases: [
-          { name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' },
-          // can be removed once version is > 0.2.1
-          { name: alias, type: 'kubernetes:helm.sh/v3:Release' },
-        ],
+        aliases: [{ name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' }],
         dependsOn: [passwordSecret],
       }
     );

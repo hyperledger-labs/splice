@@ -29,6 +29,7 @@ RUN whoami && \
 	git config --global --add safe.directory '*'
 
 ENV COURSIER_CACHE=/cache/coursier
+ENV CI=true
 
 COPY target/LICENSE .
 COPY target/gha-runner-rpc.py .

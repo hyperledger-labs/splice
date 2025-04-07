@@ -1,4 +1,4 @@
-import { Contract } from 'common-frontend-utils';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 import * as damlTypes from '@daml/types';
 import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';

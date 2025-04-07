@@ -34,13 +34,9 @@ import {
   slackToken,
   supportTeamEmail,
 } from './alertings';
-import { monitoringConfig } from './config';
+import { infraConfig, monitoringConfig } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
-
-export const prometheusRetentionDuration = config.optionalEnv('PROMETHEUS_RETENTION_TIME') || '1y';
-export const prometheusRetentionSize = config.optionalEnv('PROMETHEUS_RETENTION_SIZE') || '1500GB';
-export const prometheusStorageSize = config.optionalEnv('PROMETHEUS_STORAGE_SIZE') || '2Ti';
 
 function istioVirtualService(
   ns: k8s.core.v1.Namespace,
@@ -274,8 +270,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
               'promql-experimental-functions',
             ],
             enableRemoteWriteReceiver: true,
-            retention: prometheusRetentionDuration,
-            retentionSize: prometheusRetentionSize,
+            retention: infraConfig.prometheus.retentionDuration,
+            retentionSize: infraConfig.prometheus.retentionSize,
             resources: {
               requests: {
                 memory: clusterProdLike ? (!clusterIsResetPeriodically ? '24Gi' : '6Gi') : '4Gi',
@@ -293,7 +289,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
                   accessModes: ['ReadWriteOnce'],
                   resources: {
                     requests: {
-                      storage: prometheusStorageSize,
+                      storage: infraConfig.prometheus.storageSize,
                     },
                   },
                 },

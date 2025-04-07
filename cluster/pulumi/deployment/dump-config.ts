@@ -9,7 +9,7 @@ async function main() {
   // eslint-disable-next-line no-process-env
   process.env.SLACK_ACCESS_TOKEN = 's3cr3t';
   // eslint-disable-next-line no-process-env
-  process.env.GITHUB_TOKEN = 's3cr3t';
+  process.env.GH_TOKEN = 's3cr3t';
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deployment: typeof import('./src/index') = await import('./src/index');
 }

@@ -1,16 +1,19 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import BigNumber from 'bignumber.js';
 import {
   DateDisplay,
   ErrorDisplay,
   getAmuletConfigurationAsOfNow,
   Loading,
   supportsVoteEffectivityAndSetConfig,
-} from 'common-frontend';
-import { microsecondsToMinutes } from 'common-frontend-utils';
-import { useGetAmuletRules, useOpenRounds } from 'common-frontend/scan-api';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { microsecondsToMinutes } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import {
+  useGetAmuletRules,
+  useOpenRounds,
+} from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
+import BigNumber from 'bignumber.js';
 import { formatDistanceToNow } from 'date-fns';
 import dayjs from 'dayjs';
 

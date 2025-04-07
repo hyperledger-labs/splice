@@ -1,5 +1,4 @@
-pulumiProjectConfig:
-  default:
-    allowedArtifactories:
-      - "public"
-      - "private"
+prometheus:
+  retentionDuration: "30d"
+  retentionSize: "200GB"
+  storageSize: "600Gi"

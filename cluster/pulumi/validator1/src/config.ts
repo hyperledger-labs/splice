@@ -1,17 +1,11 @@
+import { KmsConfigSchema } from 'splice-pulumi-common';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const Validator1ConfigSchema = z.object({
   validator1: z
     .object({
-      kms: z
-        .object({
-          type: z.string(),
-          locationId: z.string(),
-          projectId: z.string(),
-          keyRingId: z.string(),
-        })
-        .optional(),
+      kms: KmsConfigSchema.optional(),
       participantPruningSchedule: z
         .object({
           cron: z.string(),

@@ -1309,37 +1309,7 @@ function subcmd_debug_shell() {
   _cluster_must_exist
 
   VERSION_NUMBER=$(get-snapshot-version)
-  repo="digitalasset-canton-network-docker.jfrog.io"
-
-  if [[ "$VERSION_NUMBER" == *-dirty ]]; then
-    repo="digitalasset-canton-network-docker-dev.jfrog.io"
-  else
-    if [ -n "${CIRCLE_BRANCH:-}" ]; then
-      if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
-        repo="digitalasset-canton-network-docker.jfrog.io"
-      else
-        repo="digitalasset-canton-network-docker-dev.jfrog.io"
-      fi
-    else
-      current_branch=$(git rev-parse --abbrev-ref HEAD)
-      if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
-        repo="digitalasset-canton-network-docker.jfrog.io"
-      else
-        repo="digitalasset-canton-network-docker-dev.jfrog.io"
-      fi
-    fi
-  fi
-
-  if ! kubectl get secret docker-reg-cred -n default > /dev/null 2>&1; then
-    kubectl create secret docker-registry docker-reg-cred \
-        --docker-server=$repo \
-        --docker-username="${ARTIFACTORY_USER}" \
-        --docker-password="${ARTIFACTORY_PASSWORD}" \
-        -n default
-
-    kubectl patch serviceaccount default -n default \
-        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
-  fi
+  repo="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker"
 
   _info "Deploying debug pod"
   kubectl apply --wait -f - <<EOF
@@ -1352,7 +1322,7 @@ metadata:
 spec:
   containers:
   - name: splice-debug
-    image: $repo/digitalasset/splice-debug:${VERSION_NUMBER}
+    image: $repo/splice-debug:${VERSION_NUMBER}
     command: ["/bin/sleep", "2h"]
     imagePullPolicy: Always
   restartPolicy: Never
@@ -1793,10 +1763,6 @@ function subcmd_unprotect_dbs() {
   fi
 
   namespaces=("$@")
-
-  if [[ "${ENABLE_CLOUD_SQL:-}" != "true" ]]; then
-    _error "This script is only supported with CloudSQL"
-  fi
 
   _info "The following namespaces' DBs will be unprotected: ${namespaces[*]}"
   _prompt_to_confirm

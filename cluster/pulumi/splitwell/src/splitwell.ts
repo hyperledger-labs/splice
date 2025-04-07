@@ -12,8 +12,7 @@ import {
   installAuth0Secret,
   installSpliceHelmChart,
   ValidatorTopupConfig,
-  config,
-  splitwellDarPath,
+  splitwellDarPaths,
   imagePullSecret,
   CnInput,
   activeVersion,
@@ -114,9 +113,9 @@ export async function installSplitwell(
     postgres.installPostgres(xns, 'validator-pg', 'validator-pg', activeVersion, true);
   const validatorDbName = 'val_splitwell';
 
-  const extraDependsOn = imagePullDeps
-    .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'splice'))
-    .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'cn'));
+  const extraDependsOn = imagePullDeps.concat(
+    await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell')
+  );
 
   const validator = await installValidatorApp({
     xns,
@@ -131,8 +130,8 @@ export async function installSplitwell(
       'canton.validator-apps.validator_backend.app-instances.splitwell = {',
       '  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
       '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
-      // We vet both versions to easily test upgrades.
-      `  dars = ["${splitwellDarPath}"]`,
+      // We vet all versions to easily test upgrades.
+      `  dars = ["${splitwellDarPaths.join('", "')}"]`,
       '}',
     ].join('\n'),
     onboardingSecret,
@@ -157,11 +156,8 @@ export async function installSplitwell(
       auth0Client: auth0Client,
       auth0AppName: 'splitwell_validator',
     },
-    validatorWalletUsers: [validatorWalletUser],
-    // TODO(#14199) Remove this with the next reset
-    validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
-      ? config.requireEnv('CN_SPLITWELL_VALIDATOR_LEGACY_PARTY_HINT')
-      : 'digitalasset-splitwell-1',
+    validatorWalletUsers: pulumi.output([validatorWalletUser]),
+    validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
   });
 

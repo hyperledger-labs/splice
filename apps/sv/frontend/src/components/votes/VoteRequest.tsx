@@ -1,7 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
-import { useMutation } from '@tanstack/react-query';
 import {
   ActionView,
   Alerting,
@@ -9,8 +7,10 @@ import {
   DateWithDurationDisplay,
   DisableConditionally,
   SvClientProvider,
-} from 'common-frontend';
-import { getUTCWithOffset } from 'common-frontend-utils';
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { getUTCWithOffset } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
+import { useMutation } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useCallback, useEffect, useState } from 'react';

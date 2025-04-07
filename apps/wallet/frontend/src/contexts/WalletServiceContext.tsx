@@ -1,14 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as external from 'wallet-external-openapi';
-import BigNumber from 'bignumber.js';
-import { useUserState } from 'common-frontend';
+import { useUserState } from '@lfdecentralizedtrust/splice-common-frontend';
 import {
   BaseApiMiddleware,
   Contract,
   ContractWithState,
   OpenAPILoggingMiddleware,
-} from 'common-frontend-utils';
+} from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import BigNumber from 'bignumber.js';
 import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,

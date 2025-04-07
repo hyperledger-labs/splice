@@ -45,8 +45,6 @@ function configureIstioBase(
       values: {
         global: {
           istioNamespace: istioDNamespace.metadata.name,
-          // uncomment when the version is > 1.24.2
-          // platform: 'gke',
         },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,

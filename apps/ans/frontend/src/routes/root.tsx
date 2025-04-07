@@ -1,6 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ErrorBoundary, Header, Loading, PartyId, useUserState } from 'common-frontend';
+import {
+  ErrorBoundary,
+  Header,
+  Loading,
+  PartyId,
+  useUserState,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import { Outlet } from 'react-router-dom';
 
 import { Box, Button, Stack } from '@mui/material';

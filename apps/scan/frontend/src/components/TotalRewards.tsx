@@ -1,8 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { ErrorDisplay, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  useAmuletPrice,
+  useTotalRewards,
+} from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import BigNumber from 'bignumber.js';
-import { ErrorDisplay, Loading } from 'common-frontend';
-import { useAmuletPrice, useTotalRewards } from 'common-frontend/scan-api';
 
 import AmountSummary from './AmountSummary';
 

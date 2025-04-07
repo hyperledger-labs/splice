@@ -1,3 +1,6 @@
+infra:
+  prometheus:
+    retentionDuration: "10y"
 synchronizerMigration:
   archived:
     - id: 1
@@ -6,11 +9,13 @@ synchronizerMigration:
   active:
     id: 2
     provider: external
-    version: 0.3.13
-    releaseReference: "refs/heads/release-line-0.3.13"
+    version: 0.3.15
+    releaseReference: "refs/heads/release-line-0.3.15"
 pulumiProjectConfig:
   default:
     isExternalCluster: true
+    cloudSql:
+      enabled: true
 monitoring:
   alerting:
     enableNoDataAlerts: true

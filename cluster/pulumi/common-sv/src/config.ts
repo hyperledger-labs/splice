@@ -8,6 +8,7 @@ import {
   CnInput,
   ExpectedValidatorOnboarding,
   SvIdKey,
+  SvCometBftGovernanceKey,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
 import { SweepConfig } from 'splice-pulumi-common-validator';
@@ -37,7 +38,7 @@ export interface StaticSvConfig {
   nodeName: string;
   ingressName: string;
   onboardingName: string;
-  validatorWalletUser: string;
+  validatorWalletUser?: string;
   auth0ValidatorAppName: string;
   auth0SvAppName: string;
   cometBft: StaticCometBftConfig;
@@ -70,6 +71,7 @@ export interface SvConfig extends StaticSvConfig {
   splitPostgresInstances: boolean;
   disableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
+  cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
 }
 
 export const SvConfigSchema = z.object({

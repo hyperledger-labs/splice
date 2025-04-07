@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { SvClientProvider, SvVote } from 'common-frontend';
-import { ListVoteRequests } from 'common-frontend';
+import { SvClientProvider, SvVote } from '@lfdecentralizedtrust/splice-common-frontend';
+import { ListVoteRequests } from '@lfdecentralizedtrust/splice-common-frontend';
 import React from 'react';
 
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';

@@ -7,7 +7,6 @@ import {
   ExpectedValidatorOnboarding,
   isDevNet,
   sequencerPruningConfig,
-  SplitPostgresInstances,
   svOnboardingPollingInterval,
   svValidatorTopupConfig,
 } from 'splice-pulumi-common';
@@ -20,6 +19,7 @@ import {
   standaloneValidatorOnboarding,
   validator1Onboarding,
 } from 'splice-pulumi-common-validator/src/validators';
+import { SplitPostgresInstances } from 'splice-pulumi-common/src/config/configs';
 
 import { activeVersion } from '../../common';
 import { installChaosMesh } from './chaosMesh';
@@ -60,7 +60,7 @@ export async function installCluster(
   console.error(
     activeVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${activeVersion.version}`
+      : `Using charts from the container registry by default, version ${activeVersion.version}`
   );
 
   const backupConfig = await readBackupConfig();

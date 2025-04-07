@@ -1,7 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DisableConditionally, ErrorDisplay, Loading } from 'common-frontend';
-import { AssignedContract, Contract } from 'common-frontend-utils';
+import {
+  DisableConditionally,
+  ErrorDisplay,
+  Loading,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { AssignedContract, Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';

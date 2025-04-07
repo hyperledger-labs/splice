@@ -16,7 +16,7 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
     disableOnboardingParticipantPromotionDelay: DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY,
   };
   const validatorAppConfig = {
-    walletUserName: svRunbookConfig.validatorWalletUser,
+    walletUserName: svRunbookConfig.validatorWalletUser!,
   };
 
   const resolveValidator1PartyId = SV_BENEFICIARY_VALIDATOR1 ? getValidator1PartyId : undefined;
