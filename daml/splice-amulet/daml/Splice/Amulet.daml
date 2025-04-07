@@ -230,8 +230,9 @@ template FeaturedAppRight with
 validateAppRewardBeneficiaries : [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary] -> Update ()
 validateAppRewardBeneficiaries beneficiaries = do
   -- Note: we limit the minimal weight to limit the management overhead of the SVs
-  require "Beneficiary weights are between 0.05 and 1.0" (all (\beneficiary -> 0.05 <= beneficiary.weight && beneficiary.weight <= 1.0) beneficiaries)
+  require "Beneficiary weights are between 0.0 and 1.0" (all (\beneficiary -> 0.0 < beneficiary.weight && beneficiary.weight <= 1.0) beneficiaries)
   require "Beneficiary weights add up to 1.0" (sum (map (.weight) beneficiaries) == 1.0)
+  require "There are at most 20 beneficiaries" (length beneficiaries <= 20)
 
 -- | A marker created by a featured application for activity generated from that app. This is used
 -- to record activity other than amulet transfers where regular AppRewardCoupons are not created directly.

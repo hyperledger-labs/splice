@@ -21,7 +21,7 @@ interface FeaturedAppRight where
         -- between the beneficiary parties.
         --
         -- Implementations SHOULD check that the weights are positive and add up to 1.0.
-        -- Implementations MAY also require weights to be larger than a minimum value.
+        -- Implementations MAY also impose a limit on the maximum number of beneficiaries.
     controller (view this).provider
     do featuredAppRight_CreateActivityMarkerImpl this self arg
 

@@ -417,12 +417,13 @@ testAppRewardBeneficiaries = do
       beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2]
     context = context.context
 
-  -- Beneficiary weight < 0.05
+  -- length beneficiaries > 20
+
   _ <- submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
-      inputs = map (\c -> InputAmulet c)[amulet]
+      inputs = map (\c -> InputAmulet c) [amulet]
       outputs = [
                   TransferOutput with
                     receiver = bob.primaryParty
@@ -430,7 +431,7 @@ testAppRewardBeneficiaries = do
                     amount = 10.0
                     lock = None
                 ]
-      beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.04, AppRewardBeneficiary alice.primaryParty 0.96]
+      beneficiaries = Some (AppRewardBeneficiary alice.primaryParty 0.8 :: replicate 20 (AppRewardBeneficiary alice.primaryParty 0.01))
     context = context.context
 
   forA_ [False, True] $ \featured -> do
