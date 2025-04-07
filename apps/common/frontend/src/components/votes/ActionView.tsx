@@ -466,6 +466,7 @@ const AddFutureConfigValueTable: React.FC<{
     },
   ];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
     title: <DateWithDurationDisplay datetime={vr[0]} />,
     content: (
@@ -478,12 +479,8 @@ const AddFutureConfigValueTable: React.FC<{
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        children: (
-          <AccordionList
-            unfoldedAccordions={unfoldedAccordions}
-            foldedAccordions={foldedAccordions}
-          />
-        ),
+        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
 
@@ -502,7 +499,8 @@ const AddFutureConfigValueTable: React.FC<{
         }}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          foldedAccordions: foldedAccordions,
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
         }}
       />
       {confirmationDialogPropsWithDiffs &&
@@ -636,6 +634,19 @@ const UpdateFutureConfigValueTable: React.FC<{
         .filter(v => v[0] !== amuletRulesAction.value.scheduleItem._1)
     : [];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const foldedAccordions = inflightVoteRequests.map(vr => ({
+    title: <DateWithDurationDisplay datetime={vr[0]} />,
+    content: (
+      <PrettyJsonDiff
+        changes={{
+          newConfig: amuletRulesAction.value.scheduleItem._2,
+          actualConfig: vr[1],
+        }}
+      />
+    ),
+  }));
+
   return (
     <>
       <ActionValueTable
@@ -663,17 +674,8 @@ const UpdateFutureConfigValueTable: React.FC<{
               ),
             },
           ],
-          foldedAccordions: inflightVoteRequests.map(vr => ({
-            title: <DateWithDurationDisplay datetime={vr[0]} />,
-            content: (
-              <PrettyJsonDiff
-                changes={{
-                  newConfig: amuletRulesAction.value.scheduleItem._2,
-                  actualConfig: vr[1],
-                }}
-              />
-            ),
-          })),
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
         }}
       />
       {getConfirmationDialog(confirmationDialogProps!, expirationInDays!)}
@@ -752,6 +754,7 @@ const SetAmuletConfigValueTable: React.FC<{
     },
   ];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
     title: <DateWithDurationDisplay datetime={vr[0]} />,
     content: (
@@ -768,12 +771,8 @@ const SetAmuletConfigValueTable: React.FC<{
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        children: (
-          <AccordionList
-            unfoldedAccordions={unfoldedAccordions}
-            foldedAccordions={foldedAccordions}
-          />
-        ),
+        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
 
@@ -784,7 +783,8 @@ const SetAmuletConfigValueTable: React.FC<{
         actionName={amuletAction.tag}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          foldedAccordions: foldedAccordions,
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
         }}
       />
       {confirmationDialogPropsWithDiffs &&
@@ -864,6 +864,7 @@ const SetDsoConfigValueTable: React.FC<{
     },
   ];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
     title: <DateWithDurationDisplay datetime={vr[0]} />,
     content: (
@@ -880,12 +881,8 @@ const SetDsoConfigValueTable: React.FC<{
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        children: (
-          <AccordionList
-            unfoldedAccordions={unfoldedAccordions}
-            foldedAccordions={foldedAccordions}
-          />
-        ),
+        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
 
@@ -896,7 +893,8 @@ const SetDsoConfigValueTable: React.FC<{
         actionName={dsoAction.tag}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          foldedAccordions: foldedAccordions,
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
         }}
       />
       {confirmationDialogPropsWithDiffs &&

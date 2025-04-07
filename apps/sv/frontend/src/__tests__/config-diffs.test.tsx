@@ -66,7 +66,7 @@ describe('SV can see AmuletRules config diffs', () => {
     expect(await screen.findByText('Config diffs')).toBeDefined();
 
     // current comparison
-    checkNumberNumberOfDiffs(2);
+    checkNumberNumberOfDiffs(1);
   });
 
   test('in the action needed section.', async () => {
@@ -134,7 +134,7 @@ describe('SV can see DsoRules config diffs', () => {
     expect(await screen.findByText('Config diffs')).toBeDefined();
 
     // current comparison
-    checkNumberNumberOfDiffs(3);
+    checkNumberNumberOfDiffs(1);
   });
 
   test('in the action needed section.', async () => {
@@ -146,7 +146,7 @@ describe('SV can see DsoRules config diffs', () => {
     await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
 
     // current comparison
-    checkNumberNumberOfDiffs(2);
+    checkNumberNumberOfDiffs(1);
   });
 
   test('of a SetConfig vote result in the executed section.', async () => {
