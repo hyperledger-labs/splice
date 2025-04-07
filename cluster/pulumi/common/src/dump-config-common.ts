@@ -216,6 +216,27 @@ export async function initDumpConfig(): Promise<void> {
                 ...args.inputs,
                 secretData,
               };
+            } else if (args.inputs.secret == 'pulumi-internal-whitelists') {
+              return {
+                ...args.inputs,
+                secretData: '["<internal IPs>"]',
+              };
+            } else if (args.inputs.secret.startsWith('pulumi-user-configs-')) {
+              const secretData = JSON.stringify([
+                {
+                  user_id: 'google-oauth2|1234567890',
+                  email: 'someone@test.com',
+                },
+              ]);
+              return {
+                ...args.inputs,
+                secretData,
+              };
+            } else if (args.inputs.secret == 'pulumi-lets-encrypt-email') {
+              return {
+                ...args.inputs,
+                secretData: 'email-for-letsencrypt@test.com',
+              };
             } else {
               console.error(
                 `WARN gcp secret not supported for mocking in setMockOptions: ${args.inputs.secret}`

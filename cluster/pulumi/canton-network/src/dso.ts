@@ -14,16 +14,16 @@ import {
   svCometBftGovernanceKeyFromSecret,
   DecentralizedSynchronizerMigrationConfig,
   ApprovedSvIdentity,
-  daSupportApprovedIdentities,
   config,
   approvedSvIdentities,
 } from 'splice-pulumi-common';
 import { StaticCometBftConfigWithNodeName, svConfigs } from 'splice-pulumi-common-sv';
 import {
+  clusterSvsConfiguration,
   SequencerPruningConfig,
   StaticSvConfig,
   SvOnboarding,
-} from 'splice-pulumi-common-sv/src/config';
+} from 'splice-pulumi-common-sv';
 
 import { InstalledSv, installSvNode } from './sv';
 
@@ -126,7 +126,7 @@ export class Dso extends pulumi.ComponentResource {
     }, {});
 
     const cometBftGovernanceKeys = relevantSvConfs
-      .filter(conf => conf.participantKms)
+      .filter(conf => clusterSvsConfiguration[conf.nodeName]?.participant?.kms)
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
         return {
           ...acc,
@@ -134,13 +134,13 @@ export class Dso extends pulumi.ComponentResource {
         };
       }, {});
 
-    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(svIdKeys)
-      .map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
-        name: onboardingName,
-        publicKey: keys.publicKey,
-        rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
-      }))
-      .concat(daSupportApprovedIdentities);
+    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(
+      svIdKeys
+    ).map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
+      name: onboardingName,
+      publicKey: keys.publicKey,
+      rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
+    }));
 
     const sv1CometBftConf = {
       ...sv1Conf.cometBft,

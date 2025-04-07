@@ -1,0 +1,5 @@
+name: gha
+runtime:
+  name: nodejs
+description: Pulumi GitHub Actions self hosted runner
+main: "../../../pulumi/gha/src/index.ts"

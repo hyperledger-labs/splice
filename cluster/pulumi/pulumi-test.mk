@@ -58,24 +58,24 @@ $(dir)/lint:
 	&& npm run lint:check
 
 .PHONY: $(dir)/test-config-devnet
-$(dir)/test-config-devnet: $(dir)/test-devnet.json $(dir)/expected-devnet.json
-	diff -u $(@D)/expected-devnet.json $(@D)/test-devnet.json; \
+$(dir)/test-config-devnet: $(dir)/test-devnet.json $(EXPECTED_FILES_DIR)/$(notdir $(dir))/expected-devnet.json
+	diff -u $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-devnet.json $(@D)/test-devnet.json; \
 	EXIT=$$?; \
-	cp $(@D)/test-devnet.json $(@D)/expected-devnet.json; \
+	cp $(@D)/test-devnet.json $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-devnet.json; \
 	exit $$EXIT
 
 .PHONY: $(dir)/test-config-testnet
-$(dir)/test-config-testnet: $(dir)/test-testnet.json $(dir)/expected-testnet.json
-	diff -u $(@D)/expected-testnet.json $(@D)/test-testnet.json; \
+$(dir)/test-config-testnet: $(dir)/test-testnet.json $(EXPECTED_FILES_DIR)/$(notdir $(dir))/expected-testnet.json
+	diff -u $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-testnet.json $(@D)/test-testnet.json; \
 	EXIT=$$?; \
-	cp $(@D)/test-testnet.json $(@D)/expected-testnet.json; \
+	cp $(@D)/test-testnet.json $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-testnet.json; \
 	exit $$EXIT
 
 .PHONY: $(dir)/test-config-mainnet
-$(dir)/test-config-mainnet: $(dir)/test-mainnet.json $(dir)/expected-mainnet.json
-	diff -u $(@D)/expected-mainnet.json $(@D)/test-mainnet.json; \
+$(dir)/test-config-mainnet: $(dir)/test-mainnet.json $(EXPECTED_FILES_DIR)/$(notdir $(dir))/expected-mainnet.json
+	diff -u $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-mainnet.json $(@D)/test-mainnet.json; \
 	EXIT=$$?; \
-	cp $(@D)/test-mainnet.json $(@D)/expected-mainnet.json; \
+	cp $(@D)/test-mainnet.json $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-mainnet.json; \
 	exit $$EXIT
 
 
@@ -84,12 +84,12 @@ $(dir)/update-expected: $(dir)/update-expected-devnet $(dir)/update-expected-tes
 
 .PHONY: $(dir)/update-expected-devnet
 $(dir)/update-expected-devnet: $(dir)/test-devnet.json
-	@cp -v $^ $(@D)/expected-devnet.json
+	@cp -v $^ $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-devnet.json
 
 .PHONY: $(dir)/update-expected-testnet
 $(dir)/update-expected-testnet: $(dir)/test-testnet.json
-	@cp -v $^ $(@D)/expected-testnet.json
+	@cp -v $^ $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-testnet.json
 
 .PHONY: $(dir)/update-expected-mainnet
 $(dir)/update-expected-mainnet: $(dir)/test-mainnet.json
-	@cp -v $^ $(@D)/expected-mainnet.json
+	@cp -v $^ $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected-mainnet.json

@@ -279,7 +279,14 @@ function configurePublicGatewayService(
       ),
     },
   });
-  return configureGatewayService(ingressNs, ingressIp, ['0.0.0.0/0'], [], istiod, '-public');
+  return configureGatewayService(
+    ingressNs,
+    ingressIp,
+    pulumi.output(['0.0.0.0/0']),
+    [],
+    istiod,
+    '-public'
+  );
 }
 
 // Note that despite the helm chart name being "gateway", this does not actually
@@ -288,7 +295,7 @@ function configurePublicGatewayService(
 function configureGatewayService(
   ingressNs: k8s.core.v1.Namespace,
   ingressIp: pulumi.Output<string>,
-  externalIPRanges: string[],
+  externalIPRanges: pulumi.Output<string[]>,
   ingressPorts: IngressPort[],
   istiod: k8s.helm.v3.Release,
   suffix: string

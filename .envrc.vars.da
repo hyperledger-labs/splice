@@ -120,8 +120,17 @@ export MULTIVALIDATOR_SIZE=0
 # unnecessary slowness when running helm commands.
 export HELM_MAX_HISTORY_SIZE=10
 
-# default repository for cluster deployments, scratchnet deployments override this
-export SPLICE_ARTIFACTS_REPOSITORY=public
-
 export PRIVATE_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs-private
 export PUBLIC_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs
+export EXPECTED_FILES_DIR=${SPLICE_ROOT}/cluster/expected
+export CONFIGS_DIR=${SPLICE_ROOT}/cluster/configs-internal
+
+export GHCR=ghcr.io
+export DEV_REGISTRY=$GHCR/digital-asset/decentralized-canton-sync-dev
+export DEV_HELM_REGISTRY=$DEV_REGISTRY/helm
+export OCI_DEV_HELM_REGISTRY=oci://$DEV_HELM_REGISTRY
+export DEV_DOCKER_REGISTRY=$DEV_REGISTRY/docker
+export RELEASE_REGISTRY=$GHCR/digital-asset/decentralized-canton-sync
+export RELEASE_HELM_REGISTRY=$RELEASE_REGISTRY/helm
+export OCI_RELEASE_HELM_REGISTRY=oci://$RELEASE_HELM_REGISTRY
+export RELEASE_DOCKER_REGISTRY=$RELEASE_REGISTRY/docker

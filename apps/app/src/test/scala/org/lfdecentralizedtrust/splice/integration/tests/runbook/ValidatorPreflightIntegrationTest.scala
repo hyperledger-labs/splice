@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 
 import java.net.URI
@@ -15,6 +16,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.RichOptional
+import scala.util.control.NonFatal
 
 /** Base for preflight tests running against a deployed validator
   */
@@ -56,22 +58,29 @@ abstract class ValidatorPreflightIntegrationTestBase
   override def beforeEach() = {
     super.beforeEach();
 
-    def addUser(name: String) = {
+    def addUser(name: String)(implicit traceContext: TraceContext) = {
       val user = auth0.createUser()
-      logger.debug(
-        s"Created user $name: email ${user.email}, password ${user.password}, id: ${user.id}"
-      )
       auth0Users += (name -> user)
     }
 
-    addUser("alice-validator")
-    addUser("bob-validator")
-    addUser("charlie-validator")
+    TraceContext.withNewTraceContext(implicit traceContext => {
+      try {
+        addUser("alice-validator")
+        addUser("bob-validator")
+        addUser("charlie-validator")
+      } catch {
+        case NonFatal(e) =>
+          // Logging the error, as an exception in this method will abort the test suite with no log output.
+          logger.error("addUser {alice,bob,charlie}-validator beforeEach failed", e)
+          throw e
+      }
+    })
   }
 
   override def afterEach() = {
     try super.afterEach()
-    finally auth0Users.values.map(user => user.close)
+    finally
+      auth0Users.values.foreach(user => user.close())
   }
 
   override def beforeAll() = {
@@ -97,7 +106,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   protected def limitValidatorUsers() = {
-    val users = validatorClient.listUsers()
+    val users = eventuallySucceeds()(validatorClient.listUsers())
 
     val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
     val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
@@ -111,7 +120,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         .foreach { user =>
           {
             logger.debug(s"Offboarding user: ${user}")
-            validatorClient.offboardUser(user)
+            eventuallySucceeds()(validatorClient.offboardUser(user))
           }
         }
     } else {

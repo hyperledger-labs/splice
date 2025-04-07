@@ -224,7 +224,7 @@ jobs:
     - docs
     runs-on: self-hosted-docker-tiny
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12
+      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

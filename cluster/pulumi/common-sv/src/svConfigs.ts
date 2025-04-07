@@ -310,7 +310,6 @@ export const svConfigs: StaticSvConfig[] = isMainNet
             publicKey: '6ltWNxHRrwPj9qPYB3HQWL4hpeFTCjHSW2m+7rCYWAw=',
           },
         },
-        participantKms: true,
       },
       {
         nodeName: 'sv-14',

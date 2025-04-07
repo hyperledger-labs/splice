@@ -16,6 +16,8 @@ START_TIME = datetime.now()
 MAX_TIMEOUT = timedelta(hours=8)
 SELF_WORKFLOW_ID = os.environ.get('CIRCLE_WORKFLOW_ID')
 CURRENT_BRANCH = os.environ.get('CIRCLE_BRANCH')
+IGNORE_PIPELINES = os.environ.get('CIRCLECI_IGNORE_PIPELINES', '')
+IGNORE_PIPELINES_LIST = IGNORE_PIPELINES.split(',')
 
 
 @dataclass
@@ -182,6 +184,9 @@ def main(args):
         pipeline_id = pipeline.id
         ago = datetime.now(timezone.utc) - pipeline.created_at
         print(f"Pipeline {pipeline_number}, id {pipeline_id}, created at {pipeline.created_at} ({ago.total_seconds()} seconds ago)")
+        if pipeline_id in IGNORE_PIPELINES_LIST:
+            print(f"Skipping pipeline {pipeline_id} as it is in the ignore list.")
+            continue
 
         workflows = fetch_workflows(pipeline_id)
 

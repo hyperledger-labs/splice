@@ -54,6 +54,10 @@ import org.apache.pekko.stream.Materializer
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the DSO party id.
@@ -492,6 +496,58 @@ class SingleScanConnection private[client] (
         count,
       ),
     )
+
+  override def listDsoRulesVoteRequests()(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] = ???
+
+  override def listVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Int,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]] = runHttpCmd(
+    config.adminApi.url,
+    HttpScanAppClient.ListVoteRequestResults(
+      actionName,
+      accepted,
+      requester,
+      effectiveFrom,
+      effectiveTo,
+      limit,
+    ),
+  )
+
+  override def listVoteRequestsByTrackingCid(
+      voteRequestCids: Seq[VoteRequest.ContractId]
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+  ] = runHttpCmd(
+    config.adminApi.url,
+    HttpScanAppClient.ListVoteRequestsByTrackingCid(
+      voteRequestCids
+    ),
+  )
+
+  override def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] = runHttpCmd(
+    config.adminApi.url,
+    HttpScanAppClient.LookupVoteRequest(
+      contractId
+    ),
+  )
+
 }
 
 object SingleScanConnection {

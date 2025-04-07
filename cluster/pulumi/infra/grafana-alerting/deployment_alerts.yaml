@@ -93,7 +93,7 @@ groups:
           dashboardUid: QP_wDqDnz
           panelId: 27
           noDataState: OK
-          execErrState: Error
+          execErrState: Alerting
           for: 5m
           annotations:
             __dashboardUid__: QP_wDqDnz

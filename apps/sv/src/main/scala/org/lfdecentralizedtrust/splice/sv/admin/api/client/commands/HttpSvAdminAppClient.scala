@@ -295,7 +295,7 @@ object HttpSvAdminAppClient {
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
-  )() extends BaseCommand[http.ListVoteRequestResultsResponse, Seq[
+  ) extends BaseCommand[http.ListVoteRequestResultsResponse, Seq[
         DsoRules_CloseVoteRequestResult
       ]] {
 

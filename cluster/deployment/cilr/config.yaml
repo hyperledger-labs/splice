@@ -8,10 +8,12 @@ pulumiProjectConfig:
     cloudSql:
       enabled: true
 
-infra:
-  ipWhitelisting:
-    extraWhitelistedIngress:
-      - "35.225.102.103/32" # CI GKE cluster for CCI
+svs:
+  sv-13:
+    participant:
+      kms:
+        keyRingId: sv-13_participant_cilr
+        locationId: us-central1
 validator1:
   kms:
     type: gcp
@@ -30,7 +32,7 @@ synchronizerMigration:
   active:
     id: 4
     provider: external
-    version: 0.3.15-snapshot.20250307.8495.0.v7f69e805
+    version: 0.3.19
     releaseReference: "refs/tags/cilr"
 persistentSequencerHeapDumps: true
 monitoring:

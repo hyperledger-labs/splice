@@ -14,7 +14,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
 ) {
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "history"
 
-  object Backfilling {
+  object UpdateHistoryBackfilling {
     private val historyBackfillingPrefix: MetricName = prefix :+ "backfilling"
 
     type CantonTimestampMicros =

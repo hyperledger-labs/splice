@@ -60,7 +60,7 @@ export async function installCluster(
   console.error(
     activeVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${activeVersion.version}`
+      : `Using charts from the container registry by default, version ${activeVersion.version}`
   );
 
   const backupConfig = await readBackupConfig();

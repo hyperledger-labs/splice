@@ -119,11 +119,19 @@ clusters.)
       ```
    1. For access to the canton enterprise docker repo and for sbt to download internal dependencies
       To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` must be configured.
-      Best would be to add the to the `.envrc.private` file like so:
+      Best would be to add the environment variables to the `.envrc.private` file like so:
       ```
       export ARTIFACTORY_USER="yourartifactoryusername"
       export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
       ```
+1. Configure Github Container Registry (GHCR) credentials
+   The build pushes images to GHCR. You need to create a personal access token if you want to push images from your local machine.
+   From your profile on github, go to Settings, Developer Settings, Personal Access Tokens, Tokens (classic), and create a new token with the `write:packages` scope.
+   Best would be to add the environment variables to the `.envrc.private` file like the following:
+   ```
+   export GH_USER="yourgithubusername"
+   export GH_TOKEN="yourgithubtoken"
+   ```
 1. After switching to the CC repo you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-amulet/.envrc is blocked. Run `direnv allow` to approve its content
@@ -219,6 +227,9 @@ A list of expected environment definitions is as follows:
 * Artifactory credentials
    * `ARTIFACTORY_USER`: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
    * `ARTIFACTORY_PASSWORD`: Your identity token at digitalasset.jfrog.io (can be obtained by generating an identity token in your user profile)
+* Github credentials
+   * `GH_USER`: your Github username
+   * `GH_TOKEN`: your Github personal access token
 
 Be aware: The Auth0 tokens allow the requester to perform any
 administrative action against the Auth0 tenant! Use caution and keep
@@ -476,7 +487,7 @@ For **support** duty, also during off hours, see [CN L3 Support](https://docs.go
 
 #### Technical helpers: tracking recent activity
 
-We have a script `./scripts/monitor-flaky-tests.sh` that can be helpful for keeping track of new activity (e.g. team members reporting new occurrences of flakes on individual PRs) on flaky issues you may not be subscribed to on GitHub. A good way to use this is with the watch command for live updates, like `watch -n 120 ./scripts/monitor-flaky-tests.sh`. The `gh` command requires you to authenticate to GitHub. You can run `gh auth login` once, or add a repo-scoped personal access token in a var (`export GITHUB_TOKEN=...`) in `.envrc.private`.
+We have a script `./scripts/monitor-flaky-tests.sh` that can be helpful for keeping track of new activity (e.g. team members reporting new occurrences of flakes on individual PRs) on flaky issues you may not be subscribed to on GitHub. A good way to use this is with the watch command for live updates, like `watch -n 120 ./scripts/monitor-flaky-tests.sh`. The `gh` command requires you to authenticate to GitHub. You can run `gh auth login` once, or add a repo-scoped personal access token in a var (`export GH_TOKEN=...`) in `.envrc.private`.
 
 By default, the script returns the top 5 most recent issues. Use the `-l <int>` argument to fetch more issues.
 
@@ -1385,7 +1396,7 @@ cncluster pulumi infra config
 
 ### Github Tokens
 
-The `GITHUB_TOKEN` is used by the [TODO checker](.circleci/todo/src/checkTodos.sc) to access the issue and PR list
+The `GH_TOKEN` is used by the [TODO checker](.circleci/todo/src/checkTodos.sc) to access the issue and PR list
 of the https://github.com/DACH-NY/canton-network-node repo.
 
 1. Go to https://github.com/settings/tokens, which you can reach by navigating
@@ -1406,7 +1417,7 @@ of the https://github.com/DACH-NY/canton-network-node repo.
    clicking on the "Configure SSO" button. The result should look as follows:
    ![Screenshot of SSO settings](readme/images/github-token-sso-setup.png)
 
-5. Create or replace the `GITHUB_TOKEN` environment variable in CircleCI
+5. Create or replace the `GH_TOKEN` environment variable in CircleCI
    and set its value to the copied token as-is.
 
 ### VPN Secrets

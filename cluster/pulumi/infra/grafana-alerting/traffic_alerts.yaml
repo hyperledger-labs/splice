@@ -54,7 +54,7 @@ groups:
         dashboardUid: fdnphvrryfq4gf
         panelId: 6
         noDataState: OK
-        execErrState: Error
+        execErrState: Alerting
         for: 1m
         annotations:
           __dashboardUid__: fdnphvrryfq4gf
