@@ -20,6 +20,12 @@ Upcoming
   - interdependencies in the Open API specs are now inlined in every yaml file,
     so that the files can be used independently of each other (and no longer incorrectly reference the common.yaml file in the bundle).
 
+- Deployment
+
+  - The ``splice-util-lib``` helm chart is no longer published.
+    The library has always been packaged with every helm chart that uses it,
+    there is no need to pull it separately from the ghcr.io container registry.
+
 0.3.19
 ------
 
