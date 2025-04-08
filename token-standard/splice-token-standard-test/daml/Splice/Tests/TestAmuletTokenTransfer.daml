@@ -68,28 +68,27 @@ setupTest = do
         [ HoldingView with
             owner = bob
             instrumentId = InstrumentId with id = "Amulet", admin = registry.dso
-            amount = 50.0
+            amount = 25.0
             lock = None
             meta = Metadata with
               values = Map.fromList
                 [ ("splice.lfdecentralizedtrust.org/created-in-round", "1")
                 , ("splice.lfdecentralizedtrust.org/rate-per-round", "0.00004")
                 ]
-        -- TODO(#18760) Add this back once Canton is fixed
-        -- , HoldingView with
-        --     owner = bob
-        --     instrumentId = InstrumentId with id = "Amulet", admin = registry.dso
-        --     amount = 25.0
-        --     lock = Some $ Lock with
-        --       expiresAt = Some now
-        --       expiresAfter = None
-        --       holders = [registry.dso]
-        --       context = Some "test expired lock"
-        --     meta = Metadata with
-        --       values = Map.fromList
-        --         [ ("splice.lfdecentralizedtrust.org/created-in-round", "1")
-        --         , ("splice.lfdecentralizedtrust.org/rate-per-round", "0.00004")
-        --         ]
+        , HoldingView with
+            owner = bob
+            instrumentId = InstrumentId with id = "Amulet", admin = registry.dso
+            amount = 25.0
+            lock = Some $ Lock with
+              expiresAt = Some now
+              expiresAfter = None
+              holders = [registry.dso]
+              context = Some "test expired lock"
+            meta = Metadata with
+              values = Map.fromList
+                [ ("splice.lfdecentralizedtrust.org/created-in-round", "1")
+                , ("splice.lfdecentralizedtrust.org/rate-per-round", "0.00004")
+                ]
         ]
   expectedBobHoldingViews === actualBobHoldingViews
 

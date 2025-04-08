@@ -147,7 +147,7 @@ final class PreparedTransactionEncoder(
       .withFieldConst(_.lfVersion, languageVersion.transformInto[String])
       .buildTransformer
 
-    private implicit def exerciseTransformer(implicit
+    private[interactive] implicit def exerciseTransformer(implicit
         languageVersion: LanguageVersion
     ): PartialTransformer[lf.transaction.Node.Exercise, isdv1.Exercise] = Transformer
       .definePartial[lf.transaction.Node.Exercise, isdv1.Exercise]
@@ -159,7 +159,7 @@ final class PreparedTransactionEncoder(
       .withFieldConst(_.lfVersion, languageVersion.transformInto[String])
       .buildTransformer
 
-    private implicit def fetchTransformer(implicit
+    private[interactive] implicit def fetchTransformer(implicit
         languageVersion: LanguageVersion
     ): PartialTransformer[lf.transaction.Node.Fetch, isdv1.Fetch] = Transformer
       .definePartial[lf.transaction.Node.Fetch, isdv1.Fetch]

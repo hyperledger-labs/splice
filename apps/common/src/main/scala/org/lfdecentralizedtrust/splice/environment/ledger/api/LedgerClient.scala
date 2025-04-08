@@ -314,7 +314,7 @@ private[environment] class LedgerClient(
           userId = userId,
           submissionId = submissionId,
           hashingSchemeVersion =
-            lapi.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V1,
+            lapi.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2,
         )
       )
     } yield result

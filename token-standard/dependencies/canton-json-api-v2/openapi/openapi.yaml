@@ -3178,11 +3178,11 @@ components:
       properties:
         HASHING_SCHEME_VERSION_UNSPECIFIED:
           type: object
-    HASHING_SCHEME_VERSION_V1:
-      title: HASHING_SCHEME_VERSION_V1
+    HASHING_SCHEME_VERSION_V2:
+      title: HASHING_SCHEME_VERSION_V2
       type: object
       properties:
-        HASHING_SCHEME_VERSION_V1:
+        HASHING_SCHEME_VERSION_V2:
           type: object
     HashingSchemeVersion:
       title: HashingSchemeVersion
@@ -3195,10 +3195,10 @@ components:
               $ref: '#/components/schemas/HASHING_SCHEME_VERSION_UNSPECIFIED'
         - type: object
           required:
-            - HASHING_SCHEME_VERSION_V1
+            - HASHING_SCHEME_VERSION_V2
           properties:
-            HASHING_SCHEME_VERSION_V1:
-              $ref: '#/components/schemas/HASHING_SCHEME_VERSION_V1'
+            HASHING_SCHEME_VERSION_V2:
+              $ref: '#/components/schemas/HASHING_SCHEME_VERSION_V2'
         - type: object
           required:
             - Recognized
@@ -4889,7 +4889,7 @@ components:
       title: Recognized
       oneOf:
         - $ref: '#/components/schemas/HASHING_SCHEME_VERSION_UNSPECIFIED'
-        - $ref: '#/components/schemas/HASHING_SCHEME_VERSION_V1'
+        - $ref: '#/components/schemas/HASHING_SCHEME_VERSION_V2'
     RevokeUserRightsRequest:
       title: RevokeUserRightsRequest
       description: |-
@@ -5845,4 +5845,3 @@ components:
       type: http
       description: Ledger API standard JWT token
       scheme: bearer
-

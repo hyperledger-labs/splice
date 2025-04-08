@@ -68,7 +68,7 @@
             }
           }
         ],
-        "nodeId" : 15,
+        "nodeId" : 16,
         "observers" : [
         ],
         "offset" : 42,
@@ -138,7 +138,7 @@
             }
           }
         ],
-        "nodeId" : 20,
+        "nodeId" : 24,
         "observers" : [
         ],
         "offset" : 42,
@@ -208,7 +208,7 @@
             }
           }
         ],
-        "nodeId" : 21,
+        "nodeId" : 25,
         "observers" : [
         ],
         "offset" : 42,
@@ -492,7 +492,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 13,
+        "nodeId" : 14,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -553,7 +553,7 @@
             }
           }
         ],
-        "nodeId" : 14,
+        "nodeId" : 15,
         "observers" : [
         ],
         "offset" : 42,
@@ -638,7 +638,7 @@
             }
           }
         ],
-        "nodeId" : 15,
+        "nodeId" : 16,
         "observers" : [
         ],
         "offset" : 42,
@@ -673,7 +673,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 8,
+        "nodeId" : 9,
         "observers" : [
           "alice::normalized"
         ],
@@ -697,7 +697,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 15,
+        "nodeId" : 17,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -817,7 +817,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 17,
+        "nodeId" : 19,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -940,7 +940,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 20,
+        "nodeId" : 22,
         "observers" : [
           "bob::normalized"
         ],
@@ -1042,7 +1042,7 @@
             }
           }
         ],
-        "nodeId" : 18,
+        "nodeId" : 20,
         "observers" : [
         ],
         "offset" : 42,
@@ -1066,7 +1066,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 14,
+        "nodeId" : 15,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -1127,7 +1127,7 @@
             }
           }
         ],
-        "nodeId" : 19,
+        "nodeId" : 21,
         "observers" : [
         ],
         "offset" : 42,
@@ -1162,7 +1162,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 10,
+        "nodeId" : 12,
         "observers" : [
           "alice::normalized"
         ],
@@ -1199,7 +1199,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 11,
+        "nodeId" : 13,
         "observers" : [
           "alice::normalized"
         ],
@@ -1261,7 +1261,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 17,
+        "nodeId" : 18,
         "observers" : [
           "bob::normalized"
         ],
@@ -1363,7 +1363,7 @@
             }
           }
         ],
-        "nodeId" : 15,
+        "nodeId" : 16,
         "observers" : [
         ],
         "offset" : 42,
@@ -1387,7 +1387,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 14,
+        "nodeId" : 15,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -1448,7 +1448,7 @@
             }
           }
         ],
-        "nodeId" : 16,
+        "nodeId" : 17,
         "observers" : [
         ],
         "offset" : 42,
@@ -1483,7 +1483,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 9,
+        "nodeId" : 10,
         "observers" : [
           "alice::normalized"
         ],
@@ -1520,7 +1520,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 10,
+        "nodeId" : 11,
         "observers" : [
           "alice::normalized"
         ],
@@ -1582,7 +1582,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 17,
+        "nodeId" : 18,
         "observers" : [
           "bob::normalized"
         ],
@@ -1684,7 +1684,7 @@
             }
           }
         ],
-        "nodeId" : 15,
+        "nodeId" : 16,
         "observers" : [
         ],
         "offset" : 42,
@@ -1708,7 +1708,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 14,
+        "nodeId" : 15,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -1769,7 +1769,7 @@
             }
           }
         ],
-        "nodeId" : 16,
+        "nodeId" : 17,
         "observers" : [
         ],
         "offset" : 42,
@@ -1804,7 +1804,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 9,
+        "nodeId" : 10,
         "observers" : [
           "alice::normalized"
         ],
@@ -1841,7 +1841,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 10,
+        "nodeId" : 11,
         "observers" : [
           "alice::normalized"
         ],
@@ -1889,7 +1889,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 17,
+        "nodeId" : 18,
         "observers" : [
           "bob::normalized"
         ],
@@ -1914,7 +1914,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 13,
+        "nodeId" : 17,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -1975,7 +1975,7 @@
             }
           }
         ],
-        "nodeId" : 16,
+        "nodeId" : 17,
         "observers" : [
         ],
         "offset" : 42,
@@ -2010,7 +2010,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 9,
+        "nodeId" : 10,
         "observers" : [
           "alice::normalized"
         ],
@@ -2047,7 +2047,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 10,
+        "nodeId" : 11,
         "observers" : [
           "alice::normalized"
         ],
@@ -2071,7 +2071,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 15,
+        "nodeId" : 19,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -2313,7 +2313,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 17,
+        "nodeId" : 21,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -2398,7 +2398,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 19,
+        "nodeId" : 23,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -2494,7 +2494,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 8,
+        "nodeId" : 12,
         "observers" : [
           "alice::normalized"
         ],
@@ -2531,7 +2531,7 @@
         "createdEventBlob" : "",
         "interfaceViews" : [
         ],
-        "nodeId" : 9,
+        "nodeId" : 13,
         "observers" : [
           "alice::normalized"
         ],

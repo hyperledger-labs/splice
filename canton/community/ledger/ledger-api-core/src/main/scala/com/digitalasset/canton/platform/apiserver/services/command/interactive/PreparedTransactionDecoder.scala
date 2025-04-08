@@ -227,7 +227,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
       .withFieldConst(_.packageVersion, None)
       .buildTransformer
 
-    private implicit def fetchTransformer(implicit
+    private[interactive] implicit def fetchTransformer(implicit
         contextualizedErrorLogger: ContextualizedErrorLogger
     ): PartialTransformer[isdv1.Fetch, lf.transaction.Node.Fetch] = Transformer
       .definePartial[isdv1.Fetch, lf.transaction.Node.Fetch]
@@ -236,10 +236,9 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
       // Not supported in V1
       .withFieldConst(_.keyOpt, None)
       .withFieldConst(_.byKey, false)
-      .withFieldConst(_.interfaceId, None)
       .buildTransformer
 
-    private implicit def exerciseTransformer(implicit
+    private[interactive] implicit def exerciseTransformer(implicit
         contextualizedErrorLogger: ContextualizedErrorLogger
     ): PartialTransformer[isdv1.Exercise, lf.transaction.Node.Exercise] =
       Transformer
