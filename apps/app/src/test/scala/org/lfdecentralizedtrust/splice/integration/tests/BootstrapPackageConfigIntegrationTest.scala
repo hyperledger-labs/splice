@@ -190,8 +190,9 @@ class BootstrapPackageConfigIntegrationTest
       )
 
       clue("Change AmuletConfig to latest packages") {
-        // 12s picked empirically to be far enough in the future that the voting can go through before that date.
-        val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
+        // 20s picked empirically to be far enough in the future that the voting can go through before that date.
+        // it must also leave enough time for the dars to be uploaded and vetting to happen to prevent command failures
+        val scheduledTime = Instant.now().plus(20, ChronoUnit.SECONDS)
         val amuletRules = sv2ScanBackend.getAmuletRules()
         val amuletConfig = amuletRules.payload.configSchedule.initialValue
         val newAmuletConfig = new AmuletConfig(
@@ -329,6 +330,14 @@ class BootstrapPackageConfigIntegrationTest
     eventually() {
       val vettedPackages: Seq[VettedPackage] =
         participantAdminConnection.getVettingState(domainId).futureValue.mapping.packages
+      val uploadedPackages =
+        participantAdminConnection
+          .listDars()
+          .futureValue
+          .map(dar => dar.name -> PackageVersion.assertFromString(dar.version))
+          .filter { case (name, _) =>
+            DarResources.packageResources.map(_.bootstrap.metadata.name).contains(name)
+          }
       val uploadedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
         vettedPackages
           .flatMap { darDesc =>
@@ -336,6 +345,7 @@ class BootstrapPackageConfigIntegrationTest
           }
           .map(dar => dar.metadata.name -> dar.metadata.version)
       }
+      uploadedPackages should contain theSameElementsAs uploadedDarNameAndVersions
       darsToCheck.foreach { case (packageResource, upToVersion) =>
         withClue(
           s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"

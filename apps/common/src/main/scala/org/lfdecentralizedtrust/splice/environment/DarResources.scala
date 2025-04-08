@@ -224,7 +224,7 @@ object DarResources {
     Seq(DarResource("splice-api-featured-app-v1-1.0.0.dar")),
   )
 
-  private val packageResources: Seq[PackageResource] =
+  val packageResources: Seq[PackageResource] =
     TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,
       DarResources.amuletNameService,

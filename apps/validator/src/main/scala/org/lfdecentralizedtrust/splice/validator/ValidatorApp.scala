@@ -49,7 +49,6 @@ import org.lfdecentralizedtrust.splice.util.{
   BackupDump,
   HasHealth,
   PackageVetting,
-  UploadablePackage,
 }
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
 import org.lfdecentralizedtrust.splice.validator.automation.{
@@ -269,13 +268,6 @@ class ValidatorApp(
             }
             _ <- appInitStep("Ensuring extra domains registered") {
               domainConnector.ensureExtraDomainsRegistered()
-            }
-            _ <- appInitStep("Upload dars") {
-              val darFiles = ValidatorPackageVettingTrigger.packages
-                .flatMap(pkg => DarResources.lookupAllPackageVersions(pkg.packageName))
-                .map(dar => UploadablePackage.fromResource(dar))
-                .toSeq
-              participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
             }
             // Prevet early to make sure we have the required packages even
             // before the automation kicks in.

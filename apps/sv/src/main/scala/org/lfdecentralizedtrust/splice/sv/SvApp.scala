@@ -71,13 +71,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{
   SvUtil,
   ValidatorOnboardingSecret,
 }
-import org.lfdecentralizedtrust.splice.util.{
-  BackupDump,
-  Contract,
-  HasHealth,
-  UploadablePackage,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CryptoConfig,
@@ -102,7 +96,6 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 
 import java.nio.file.Paths
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
@@ -299,13 +292,6 @@ class SvApp(
         retryProvider,
         loggerFactory,
       )
-      _ <- appInitStep("Upload dars") {
-        val darFiles = SvPackageVettingTrigger.packages
-          .flatMap(pkg => DarResources.lookupAllPackageVersions(pkg.packageName))
-          .map(dar => UploadablePackage.fromResource(dar))
-          .toSeq
-        participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
-      }
       newJoiningNodeInitializer = (
           joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
           cometBftNode: Option[CometBftNode],
