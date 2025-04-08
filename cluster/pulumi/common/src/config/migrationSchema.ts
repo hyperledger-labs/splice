@@ -30,6 +30,16 @@ const migrationVersion = z
       return parsedVersion(version || CHARTS_VERSION);
     }
   });
+
+export const GitReferenceSchema = z.object({
+  repoUrl: z.string(),
+  gitReference: z.string(),
+  pulumiStacksDir: z.string(), // Relative to the root of the repo pointed to by repoUrl
+  pulumiBaseDir: z.string(), // Relative to the root of the repo pointed to by repoUrl
+  deploymentDir: z.string(), // Relative to the root of the repo pointed to by repoUrl
+  spliceRoot: z.string(), // Relative to the root of the repo pointed to by repoUrl (use "." if checking out splice directly)
+});
+
 export const MigrationInfoSchema = z
   .object({
     id: z
@@ -38,7 +48,7 @@ export const MigrationInfoSchema = z
       .gte(0),
     version: migrationVersion,
     provider: z.nativeEnum(MigrationProvider).default(MigrationProvider.EXTERNAL),
-    releaseReference: z.string().optional(),
+    releaseReference: GitReferenceSchema.optional(),
   })
   .strict();
 

@@ -545,9 +545,9 @@ subcommands. A few highlights include the following:
           * `export OPERATOR_IMAGE_VERSION=X.X.X`
           * `export GOOGLE_CREDENTIALS=$(cat "$HOME/.config/gcloud/application_default_credentials.json")`
           * `git checkout -b <some_temp_branch>`
-          * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
-          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch>`
-          * push `config.yaml` and `.envrc.vars` to the temporary branch
+          * `cncluster update_config active 0 <X.X.X> refs/heads/<some_temp_branch> canton-network-node`
+          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch> canton-network-node`
+          * push `config.yaml` to the temporary branch
           * `cncluster apply_operator`
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.

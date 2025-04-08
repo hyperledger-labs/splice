@@ -93,6 +93,10 @@ parameters:
   upgrade-version:
     type: string
     default: ""
+  git-repo:
+    type: enum
+    enum: [canton-network-internal, canton-network-node]
+    default: canton-network-node
   # branch_filter parameter of wait_for_previous_pipeline
   branch-filter:
     type: string
@@ -2870,6 +2874,9 @@ jobs:
       base_version:
         type: string
         default: ""
+      git_repo:
+        type: string
+        default: "canton-network-node"
       deploy_retry_count:
         type: integer
         default: 2
@@ -2916,8 +2923,7 @@ jobs:
             echo "Using BASE_VERSION: $BASE_VERSION"
 
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
-            #TODO(#15759) - remove the internal param after HDM base version is >= 0.3.12
-            cncluster update_config active 0 internal $BASE_VERSION $RELEASE_REF
+            cncluster update_config active 0 $BASE_VERSION $RELEASE_REF << parameters.git_repo >>
 
             # We write the changes to envrc.vars into a separate file first, so we can easily apply
             # the same changes to the update branch later. We do not rely on e.g. `git cherry-pick`
@@ -2949,7 +2955,7 @@ jobs:
             git branch -f  $DEPLOYMENT_BRANCH HEAD
             git checkout $DEPLOYMENT_BRANCH
             git push -f origin $DEPLOYMENT_BRANCH
-            cncluster set_operator_deployment_reference refs/heads/$DEPLOYMENT_BRANCH
+            cncluster set_operator_deployment_reference refs/heads/$DEPLOYMENT_BRANCH << parameters.git_repo >>
             echo "export OPERATOR_IMAGE_VERSION=$OPERATOR_IMAGE_VERSION" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             git add **/config.yaml
             git add **/.envrc.vars
@@ -2996,6 +3002,9 @@ jobs:
       upgrade_version:
         type: string
         default: ""
+      git_repo:
+        type: string
+        default: "canton-network-node"
       deploy_retry_count:
         type: integer
         default: 2
@@ -3057,9 +3066,9 @@ jobs:
 
             # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
             # (same as above, we do not cherry-pick the commit, to avoid conflicts that cannot be resolved automatically)
-            cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF
+            cncluster update_config active 0 $BASE_VERSION $BASE_RELEASE_REF << parameters.git_repo >>
             # Add the new entry for the staging nodes.
-            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF << parameters.git_repo >>
 
             git add **/.envrc.vars
             git add **/config.yaml
@@ -3070,7 +3079,7 @@ jobs:
             # This will trigger the deployment stack to spin up the components for migration ID 1.
             DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
             git checkout $DEPLOYMENT_BRANCH
-            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF << parameters.git_repo >>
 
             git add **/.envrc.vars
             git add **/config.yaml
@@ -6001,6 +6010,7 @@ workflows:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
+          git_repo: << pipeline.parameters.git-repo >>
           requires:
             - artifacts_push
             - autoscaler_prevent_scaledown
@@ -6030,6 +6040,7 @@ workflows:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
+          git_repo: << pipeline.parameters.git-repo >>
           requires:
             - deploy_cluster_for_migration
       - trigger_global_domain_migration:
