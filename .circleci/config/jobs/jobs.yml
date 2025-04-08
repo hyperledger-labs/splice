@@ -742,9 +742,12 @@ jobs:
           additional_nix_args: >
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD
+            --keep GCP_DA_CN_SHARED_KEY
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            gcloud auth configure-docker us-central1-docker.pkg.dev
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:
