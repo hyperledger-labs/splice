@@ -470,7 +470,7 @@
         ],
         "image": {
           "pullPolicy": "Always",
-          "registry": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "registry": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
           "repository": "pulumi-kubernetes-operator",
           "tag": "0.0.1-deadbeef"
         },

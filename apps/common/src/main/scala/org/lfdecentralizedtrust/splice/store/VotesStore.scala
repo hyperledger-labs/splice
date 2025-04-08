@@ -24,7 +24,8 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.RichOptional
 
-trait VotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
+/** Vote information that can be determined from active ledger contracts */
+trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
 
   def listAmuletPriceVotes(
       limit: Limit = Limit.DefaultLimit
@@ -110,17 +111,6 @@ trait VotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
 
     }
 
-  def listVoteRequestResults(
-      actionName: Option[String],
-      accepted: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
-
   def listVoteRequestsByTrackingCid(
       voteRequestCids: Seq[splice.dsorules.VoteRequest.ContractId],
       limit: Limit = Limit.DefaultLimit,
@@ -145,5 +135,20 @@ trait VotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
       )
     )
   }
+
+}
+
+trait VotesStore extends ActiveVotesStore {
+
+  def listVoteRequestResults(
+      actionName: Option[String],
+      accepted: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
 }

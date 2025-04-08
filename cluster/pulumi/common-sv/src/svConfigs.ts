@@ -386,6 +386,9 @@ export const svRunbookConfig: StaticSvConfig = {
     retainBlocks: cometbftRetainBlocks,
     id: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
     nodeIndex: 0,
+    validator: {
+      keyAddress: '0647E4FF27908B8B874C2647536AC986C9EA0BAB',
+    },
   },
 };
 

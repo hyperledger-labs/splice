@@ -9,8 +9,8 @@ synchronizerMigration:
   active:
     id: 2
     provider: external
-    version: 0.3.15
-    releaseReference: "refs/heads/release-line-0.3.15"
+    version: 0.3.17
+    releaseReference: "refs/heads/release-line-0.3.17"
 pulumiProjectConfig:
   default:
     isExternalCluster: true
@@ -19,5 +19,8 @@ pulumiProjectConfig:
 monitoring:
   alerting:
     enableNoDataAlerts: true
+    alerts:
+      cloudSql:
+        maintenance: true
 operatorDeployment:
   reference: refs/heads/main

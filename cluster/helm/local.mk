@@ -27,7 +27,8 @@ APP_CHARTS_FILE := cluster/helm/.app-charts
 # Makefile for each file in cluster/helm/target run `helm push $file`
 .PHONY: cluster/helm/push
 cluster/helm/push:
-	@for file in cluster/helm/target/*.tgz; do \
+	@set -e; \
+	for file in cluster/helm/target/*.tgz; do \
 	    publish_helm_chart.sh $$file;\
 	done
 

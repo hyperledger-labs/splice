@@ -1,11 +1,9 @@
 import * as pulumi from '@pulumi/pulumi';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
 import {
   config,
-  isDevNet,
-  isMainNet,
   loadJsonFromFile,
-  SPLICE_ROOT,
   PRIVATE_CONFIGS_PATH,
   clusterDirectory,
 } from 'splice-pulumi-common';
@@ -28,6 +26,9 @@ const MonitoringConfigSchema = z.object({
         kilobytes: z.number(),
         overMinutes: z.number(),
       }),
+      cloudSql: z.object({
+        maintenance: z.boolean(),
+      }),
       cometbft: z.object({
         expectedMaxBlocksPerSecond: z.number(),
       }),
@@ -39,9 +40,6 @@ const MonitoringConfigSchema = z.object({
 });
 export const InfraConfigSchema = z.object({
   infra: z.object({
-    ipWhitelisting: z.object({
-      extraWhitelistedIngress: z.array(z.string()).default([]),
-    }),
     prometheus: z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
@@ -67,8 +65,6 @@ console.error(
 export const infraConfig = fullConfig.infra;
 export const monitoringConfig = fullConfig.monitoring;
 
-const daSupportNodeIpRanges: string[] = [];
-
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 
 function extractIpRanges(x: IpRangesDict): string[] {
@@ -77,7 +73,7 @@ function extractIpRanges(x: IpRangesDict): string[] {
     : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
 }
 
-export function loadIPRanges(): string[] {
+export function loadIPRanges(): pulumi.Output<string[]> {
   if (spliceConfig.pulumiProjectConfig.isExternalCluster && !PRIVATE_CONFIGS_PATH) {
     throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
   }
@@ -89,22 +85,19 @@ export function loadIPRanges(): string[] {
         )
       )
     : [];
-  const internalIPRangesJson = loadJsonFromFile(
-    SPLICE_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
-  );
 
-  const extraWhitelistedIps =
-    infraConfig.ipWhitelisting.extraWhitelistedIngress.concat(daSupportNodeIpRanges);
+  const internalWhitelistedIps = getSecretVersionOutput({
+    secret: 'pulumi-internal-whitelists',
+  }).apply(whitelists => {
+    const secretData = whitelists.secretData;
+    const json = JSON.parse(secretData);
+    const ret: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    json.forEach((ip: any) => {
+      ret.push(ip);
+    });
+    return ret;
+  });
 
-  if (isDevNet) {
-    return externalIpRanges
-      .concat(extractIpRanges(internalIPRangesJson.devnet))
-      .concat(extraWhitelistedIps);
-  } else if (isMainNet) {
-    return externalIpRanges.concat(extractIpRanges(internalIPRangesJson.mainnet));
-  } else {
-    return externalIpRanges
-      .concat(extractIpRanges(internalIPRangesJson.testnet))
-      .concat(extraWhitelistedIps);
-  }
+  return internalWhitelistedIps.apply(whitelists => whitelists.concat(externalIpRanges));
 }

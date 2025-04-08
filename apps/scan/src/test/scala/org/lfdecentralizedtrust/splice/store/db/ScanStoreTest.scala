@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   LockedAmulet_ExpireAmuletResult,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
   AmuletRules_BuyMemberTrafficResult,
   AmuletRules_MintResult,
 }
@@ -1212,21 +1213,44 @@ abstract class ScanStoreTest
         "list all past VoteRequestResult" in {
           for {
             store <- mkStore()
-            voteRequestContract = voteRequest(
+            voteRequestContract1 = voteRequest(
               requester = userParty(1),
               votes = (1 to 4)
                 .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
             )
-            _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
-            result = mkVoteRequestResult(voteRequestContract)
+            _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
+            result1 = mkVoteRequestResult(
+              voteRequestContract1
+            )
             _ <- dummyDomain.exercise(
-              contract = dsoRules(party = dsoParty),
+              contract = dsoRules(dsoParty),
               interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
               choiceName = DsoRulesCloseVoteRequest.choice.name,
               mkCloseVoteRequest(
-                voteRequestContract.contractId
+                voteRequestContract1.contractId
               ),
-              result.toValue,
+              result1.toValue,
+            )(
+              store.multiDomainAcsStore
+            )
+            voteRequestContract2 = voteRequest(
+              requester = userParty(2),
+              votes = (1 to 4)
+                .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
+            )
+            _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
+            result2 = mkVoteRequestResult(
+              voteRequestContract2,
+              effectiveAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS),
+            )
+            _ <- dummyDomain.exercise(
+              contract = dsoRules(dsoParty),
+              interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
+              choiceName = DsoRulesCloseVoteRequest.choice.name,
+              mkCloseVoteRequest(
+                voteRequestContract2.contractId
+              ),
+              result2.toValue,
             )(
               store.multiDomainAcsStore
             )
@@ -1242,7 +1266,7 @@ abstract class ScanStoreTest
               )
               .futureValue
               .toList
-              .loneElement shouldBe result
+              .loneElement shouldBe result2
             store
               .listVoteRequestResults(
                 Some("SRARC_AddSv"),
@@ -1765,6 +1789,91 @@ abstract class ScanStoreTest
           result <- store.lookupLatestTransferCommandEvents(userParty(2), 0L, 10)
           _ = result shouldBe Map(transferCmd3.contractId -> transferCmd3Status)
         } yield succeed
+      }
+    }
+
+    "lookupContractByRecordTime" should {
+
+      "find the DsoRules contract at a given time" in {
+        val now = CantonTimestamp.now()
+        val firstDsoRules = dsoRules(dsoParty, epoch = 1)
+        val secondDsoRules = dsoRules(dsoParty, epoch = 2)
+        val thirdDsoRules = dsoRules(dsoParty, epoch = 3)
+        val recordTimeFirst = now.plusSeconds(1).toInstant
+        val recordTimeSecond = now.plusSeconds(5).toInstant
+        val recordTimeThird = now.plusSeconds(9).toInstant
+        for {
+          store <- mkStore()
+          _ <- store.updateHistory.ingestionSink.initialize()
+          first <- dummyDomain.create(
+            firstDsoRules,
+            recordTime = recordTimeFirst,
+            packageName = "splice-dso-governance",
+          )(
+            store.updateHistory
+          )
+          firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
+          _ <- dummyDomain.create(
+            secondDsoRules,
+            recordTime = recordTimeSecond,
+            packageName = "splice-dso-governance",
+          )(store.updateHistory)
+          _ <- dummyDomain.create(
+            thirdDsoRules,
+            recordTime = recordTimeThird,
+            packageName = "splice-dso-governance",
+          )(store.updateHistory)
+          result <- store.lookupContractByRecordTime(
+            DsoRules.COMPANION,
+            firstRecordTime.plusSeconds(1),
+          )
+        } yield {
+          result.value should not be firstDsoRules
+          result.value shouldBe secondDsoRules
+          result.value should not be thirdDsoRules
+        }
+      }
+
+      "find the AmuletRules contract at a given time" in {
+        val now = CantonTimestamp.now()
+        val firstAmuletRules = amuletRules(10)
+        val secondAmuletRules = amuletRules(20)
+        val thirdAmuletRules = amuletRules(30)
+        val recordTimeFirst = now.plusSeconds(1).toInstant
+        val recordTimeSecond = now.plusSeconds(5).toInstant
+        val recordTimeThird = now.plusSeconds(9).toInstant
+        for {
+          store <- mkStore()
+          _ <- store.updateHistory.ingestionSink.initialize()
+          first <- dummyDomain.create(
+            firstAmuletRules,
+            recordTime = recordTimeFirst,
+            packageName = "splice-amulet",
+          )(
+            store.updateHistory
+          )
+          firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
+          _ <- dummyDomain.create(
+            secondAmuletRules,
+            recordTime = recordTimeSecond,
+            packageName = "splice-amulet",
+          )(
+            store.updateHistory
+          )
+          _ <- dummyDomain.create(
+            thirdAmuletRules,
+            recordTime = recordTimeThird,
+            packageName = "splice-amulet",
+          )(store.updateHistory)
+          result <- store.lookupContractByRecordTime(
+            AmuletRules.COMPANION,
+            firstRecordTime.plusSeconds(1),
+          )
+        } yield {
+          result.value should not be firstAmuletRules
+          result.value shouldBe secondAmuletRules
+          result.value should not be thirdAmuletRules
+        }
       }
     }
   }

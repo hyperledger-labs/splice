@@ -428,9 +428,6 @@ All images and Helm charts are pushed to the **Development** Github Container Re
 ghcr.io/digital-asset/decentralized-canton-sync-dev/docker and ghcr.io/digital-asset/decentralized-canton-sync-dev/helm.
 This includes artifacts pushed manually, snapshots created in CCI, and release versions.
 
-The us-central1-docker.pkg.dev/da-cn-shared/ghcr Google Artifact Repository is setup as a `remote` repository to ghcr.io.
-This is used by cluster deployments and caches the ghcr repositories.
-
 Releases are copied to
 ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm
 when they are published using the `publish-public-artifacts` CCI workflow.
