@@ -147,7 +147,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "2913.8847792800",
+                "amount" : "3113.8847792800",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"

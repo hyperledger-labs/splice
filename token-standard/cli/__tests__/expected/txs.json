@@ -1,5 +1,5 @@
 {
-  "nextOffset": 17,
+  "nextOffset": 25,
   "transactions": [
     {
       "updateId": "update-4",
@@ -750,9 +750,49 @@
       ]
     },
     {
-      "updateId": "update-15",
-      "offset": 15,
-      "recordTime": "1971-01-01T00:00:15Z",
+      "updateId": "update-20",
+      "offset": 20,
+      "recordTime": "1971-01-01T00:00:20Z",
+      "synchronizerId": "sync::normalized",
+      "events": [
+        {
+          "type": "Created",
+          "parentChoice": "AmuletRules_Transfer",
+          "contractId": "65",
+          "payload": {
+            "interfaceId": "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewValue": {
+              "amount": "200.0000000000",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "lock": null,
+              "meta": {
+                "values": [
+                  [
+                    "splice.lfdecentralizedtrust.org/created-in-round",
+                    "1"
+                  ],
+                  [
+                    "splice.lfdecentralizedtrust.org/rate-per-round",
+                    "0.00380518"
+                  ]
+                ]
+              },
+              "owner": "alice::normalized"
+            }
+          },
+          "offset": 20,
+          "templateId": "#package-name:Splice.Amulet:Amulet",
+          "packageName": "splice-amulet"
+        }
+      ]
+    },
+    {
+      "updateId": "update-23",
+      "offset": 23,
+      "recordTime": "1971-01-01T00:00:23Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
@@ -770,7 +810,8 @@
               "47",
               "51",
               "55",
-              "56"
+              "56",
+              "65"
             ],
             "meta": {
               "values": []
@@ -812,7 +853,7 @@
           },
           "creates": [
             {
-              "amount": "2913.8847792800",
+              "amount": "3113.8847792800",
               "instrumentId": {
                 "admin": "dso::normalized",
                 "id": "Amulet"
@@ -831,6 +872,15 @@
             }
           ],
           "archives": [
+            {
+              "amount": "200.0000000000",
+              "instrumentId": {
+                "admin": "dso::normalized",
+                "id": "Amulet"
+              },
+              "contractId": "65",
+              "owner": "alice::normalized"
+            },
             {
               "amount": "1064.0152207200",
               "instrumentId": {
@@ -872,9 +922,9 @@
       ]
     },
     {
-      "updateId": "update-16",
-      "offset": 16,
-      "recordTime": "1971-01-01T00:00:16Z",
+      "updateId": "update-24",
+      "offset": 24,
+      "recordTime": "1971-01-01T00:00:24Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
@@ -901,16 +951,16 @@
               "owner": "alice::normalized"
             }
           },
-          "offset": 16,
+          "offset": 24,
           "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }
       ]
     },
     {
-      "updateId": "update-17",
-      "offset": 17,
-      "recordTime": "1971-01-01T00:00:17Z",
+      "updateId": "update-25",
+      "offset": 25,
+      "recordTime": "1971-01-01T00:00:25Z",
       "synchronizerId": "sync::normalized",
       "events": [
         {
@@ -937,7 +987,7 @@
               "owner": "alice::normalized"
             }
           },
-          "offset": 17,
+          "offset": 25,
           "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
           "packageName": "splice-api-token-sample-holding"
         }

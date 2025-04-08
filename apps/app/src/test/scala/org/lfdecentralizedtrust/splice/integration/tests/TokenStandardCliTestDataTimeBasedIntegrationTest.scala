@@ -120,18 +120,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       aliceWalletClient.createTransferPreapproval()
       aliceValidatorWalletClient.createTransferPreapproval()
 
-      // regularly called to populate the list of all of Alice's holding contracts
-      // Store contract-ids for normalization
-      // Only works under the assumption that they always appear in the same order
-      val aliceHoldingCidsTracker = mutable.ArrayBuffer[String]()
-      def captureAliceAmuletHoldingContractIds() = {
-        listHoldings(aliceValidatorBackend.participantClientWithAdminToken, alice).foreach {
-          case (holdingCid, _) =>
-            if (!aliceHoldingCidsTracker.contains(holdingCid.contractId))
-              aliceHoldingCidsTracker.addOne(holdingCid.contractId)
-        }
-      }
-
       logger.info(
         s"Generating CLI data for" +
           s" alice: ${alice.toProtoPrimitive}" +
@@ -150,7 +138,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           )
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("200"))
-            captureAliceAmuletHoldingContractIds()
           }
           // send some back so there's a TransferFactory_Transfer node in the other direction
           executeTransferViaTokenStandard(
@@ -162,7 +149,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           )
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("87")) // fees!
-            captureAliceAmuletHoldingContractIds()
           }
           // Deliberately using a non-token-standard transfer so that this shows up as a BurnMint
           aliceWalletClient.transferPreapprovalSend(
@@ -172,11 +158,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           )
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("64.9")) // fees!
-            captureAliceAmuletHoldingContractIds()
           }
           aliceWalletClient.tap(walletAmuletToUsd(5000.0))
-          captureAliceAmuletHoldingContractIds()
-          val (_, instructionCids) = actAndCheck(
+          val (_, bobInstructionCids) = actAndCheck(
             "Alice creates 4 transfers to Bob who has no pre-approval",
             for (_ <- 1 to 4) {
               executeTransferViaTokenStandard(
@@ -195,7 +179,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 bob,
               )
               instructions should have size 4
-              captureAliceAmuletHoldingContractIds()
               instructions.map(_._1)
             },
           )
@@ -204,7 +187,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             acceptTransferInstruction(
               bobValidatorBackend.participantClientWithAdminToken,
               bob,
-              instructionCids(0),
+              bobInstructionCids(0),
             ),
           )(
             "Bob sees the funds",
@@ -215,12 +198,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               rejectTransferInstruction(
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
-                instructionCids(1),
+                bobInstructionCids(1),
               )
               withdrawTransferInstruction(
                 aliceValidatorBackend.participantClientWithAdminToken,
                 alice,
-                instructionCids(2),
+                bobInstructionCids(2),
               )
             },
           )(
@@ -236,10 +219,79 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 aliceBalance.unlockedQty should beWithin(BigDecimal("2900.0"), BigDecimal("3100.0"))
                 aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
               }
-              captureAliceAmuletHoldingContractIds()
             },
           )
-          // TODO(#18820): create test data for tx history when receiving a two-step transfer
+          clue("Test receiving two-step transfers") {
+            actAndCheck(
+              "Alice validator cancels TransferPreapproval for alice",
+              aliceValidatorBackend.cancelTransferPreapprovalByParty(alice),
+            )(
+              "See that TransferPreapproval for alice has been cancelled",
+              _ => {
+                aliceValidatorBackend.lookupTransferPreapprovalByParty(alice) shouldBe None
+                sv1ScanBackend.lookupTransferPreapprovalByParty(alice) shouldBe None
+              },
+            )
+            val (_, aliceInstructionCids) = actAndCheck(
+              "Bob creates 4 transfers to Alice who has no longer a pre-approval",
+              for (_ <- 1 to 4) {
+                executeTransferViaTokenStandard(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob,
+                  alice,
+                  BigDecimal("200.0"),
+                  transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                )
+              },
+            )(
+              "Alice can see the transfer instructions",
+              _ => {
+                val instructions = listTransferInstructions(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice,
+                )
+                instructions should have size 5 // one outstanding from alice to bob, and four new ones form bob to alice
+                instructions.collect {
+                  case instr if instr._2.transfer.receiver == alice.toProtoPrimitive =>
+                    instr._1
+                }
+              },
+            )
+            actAndCheck(
+              "Alice accepts instruction #1 and rejects #2; and bob withdraws #3; while #4 is left as-is", {
+                clue("Accept instruction #1") {
+                  acceptTransferInstruction(
+                    aliceValidatorBackend.participantClientWithAdminToken,
+                    alice,
+                    aliceInstructionCids(0),
+                  )
+                }
+                clue("Reject instruction #2") {
+                  rejectTransferInstruction(
+                    aliceValidatorBackend.participantClientWithAdminToken,
+                    alice,
+                    aliceInstructionCids(1),
+                  )
+                }
+                clue("Withdraw instruction #3") {
+                  withdrawTransferInstruction(
+                    bobValidatorBackend.participantClientWithAdminToken,
+                    bob,
+                    aliceInstructionCids(2),
+                  )
+                }
+              },
+            )(
+              "There are only two open transfer instructions left",
+              _ => {
+                val instructions = listTransferInstructions(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice,
+                )
+                instructions should have size 2
+              },
+            )
+          }
           // TODO(#18825): test at least reject with expired locked amulet
 
           // Test self-transfer for party w/o pre-approval
@@ -249,20 +301,26 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               bobValidatorBackend.participantClientWithAdminToken,
               bob,
               bob,
-              BigDecimal("500.0"),
+              BigDecimal("250.0"),
               transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
             ),
           )(
-            "Bob's has two holdings and the balance remained the same (modulo fees)",
+            "Bob's has three holdings and the balance remained the same (modulo fees)",
             _ => {
               listHoldings(
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
-              ) should have size 2
-              bobWalletClient.balance().unlockedQty should beAround(
-                BigDecimal("988.0")
-              ) // self-transfer fees 12 CC; 6 for each output
-
+              ) should have size 3
+              inside(bobWalletClient.balance()) { balance =>
+                balance.unlockedQty should beWithin(
+                  BigDecimal("450.0"),
+                  BigDecimal("600.0"),
+                ) // received 1_000, transferred back 200, and 200 in-flight
+                balance.lockedQty should beWithin(
+                  BigDecimal("200.0"),
+                  BigDecimal("270.0"),
+                ) // locked amount + fee reserve
+              }
             },
           )
           // Test self-transfer for wallet history
@@ -276,17 +334,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
             ),
           )(
-            "Alice's has two holdings and the balance remained the same (modulo fees)",
+            "Alice's has three holdings and the balance remained the same (modulo fees)",
             _ => {
               listHoldings(
                 aliceValidatorBackend.participantClientWithAdminToken,
                 alice,
               ) should have size 3
               inside(aliceWalletClient.balance()) { aliceBalance =>
-                aliceBalance.unlockedQty should beWithin(BigDecimal("2900.0"), BigDecimal("3100.0"))
+                aliceBalance.unlockedQty should beWithin(BigDecimal("3100.0"), BigDecimal("3300.0"))
                 aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
               }
-              captureAliceAmuletHoldingContractIds()
             },
           )
 
