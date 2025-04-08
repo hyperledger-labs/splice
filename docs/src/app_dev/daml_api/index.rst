@@ -29,3 +29,4 @@ API docs for daml packages
    ../api/splice-api-token-allocation-request-v1/index
    ../api/splice-api-token-allocation-instruction-v1/index
    ../api/splice-api-token-allocation-v1/index
+   ../api/splice-api-token-burn-mint-v1/index

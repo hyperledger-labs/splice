@@ -13,6 +13,21 @@ Major changes:
   difficult to standardize in a uniform way. We expect to reintroduce a separate standard to
   aid wallets in navigating to registry specific UIs running locally against an investor's
   Canton node in the future.
+- Moved `BurnMintFactory` to a dedicated `splice-api-burn-mint-v1`
+  packages. `BurnMintFactory` is intended to decouple apps like
+  bridges that need to execute burns and mints from the underlying
+  token model which isn't a core part of holdings.
+- Added `splice.lfdecentralizedtrust.org/tx-kind` metadata key with the following semantics:
+      1. transfer: transfer from sender to one or more receivers
+      2. expire-dust: sweep a dust holding (e.g. an expired `Amulet`)
+      3. instruct-transfer: create or evolve transfer instruction
+      4. burn-mint: burn and/or mint multiple holdings of the same owner in a single transaction.
+         The precise amounts on the input and output holdings determine whether it is a mint (output amount > input amount),
+         burn (output amount < input amount), or a redistribution (output amount == input amount).
+  Token implementations SHOULD include a `meta` field containing a `splice.lfdecentralizedtrust.org/tx-kind` field in the choice result
+  type of all non-token standard choices that manipulate holdings, transfer instructions, allocation instructions or allocations.
+  This allows wallets to parse transaction history even for choices that do not go through the
+  token standard interfaces.
 
 Polishing changes
 

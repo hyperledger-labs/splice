@@ -95,7 +95,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     Seq(
       transferinstructionv1.TransferFactory.TEMPLATE_ID,
       holdingv1.Holding.TEMPLATE_ID,
-      holdingv1.BurnMintFactory.TEMPLATE_ID,
     )
 
   def replaceOrFail[R](targetPath: String, normalizedContent: R, encoder: Encoder[R]): Unit = {
