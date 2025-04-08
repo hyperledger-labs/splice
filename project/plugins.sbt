@@ -7,7 +7,7 @@ addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.10.0")
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.7")
 libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.14"
 
-addSbtPlugin("com.eed3si9n" %% "sbt-buildinfo" % "0.9.0")
+addSbtPlugin("com.eed3si9n" %% "sbt-buildinfo" % "0.13.1")
 
 // Our DamlPlugin needs to read and write values from daml.yaml files
 // This is a _very_ simple yaml library as we only need to look at two simple keys
