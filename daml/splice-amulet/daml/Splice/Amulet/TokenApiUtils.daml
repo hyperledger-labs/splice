@@ -34,17 +34,11 @@ ratePerRoundMetaKey = splicePrefix <> "rate-per-round"
 reasonMetaKey : Text
 reasonMetaKey = splicePrefix <> "reason"
 
-
-
-
 -- | Kind of transaction. SHOULD be one of the following:
--- 1. redistribute: multi-input-output self-transfers
--- 2. burn: give back to admin
--- 3. mint: receiver from admin
--- 4. transfer: transfer from sender to one or more receivers
--- 5. expire-dust: sweep some dust holding
--- 6. instruct-transfer: create or evolve transfer instruction
--- 7. burn-mint: burn and/or mint multiple holdings of the same owner in a single transaction.
+-- 1. transfer: transfer from sender to one or more receivers
+-- 2. expire-dust: sweep some dust holding
+-- 3. instruct-transfer: create or evolve transfer instruction
+-- 4. burn-mint: burn and/or mint multiple holdings of the same owner in a single transaction.
 --    The precise amounts on the input and output holdings determine whether it is a mint (output amount > input amount),
 --    burn (output amount < input amount), or a redistribution (output amount == input amount).
 txKindMetaKey : Text

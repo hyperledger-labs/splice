@@ -395,3 +395,5 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
     allocationOrInstruction = AOI_Allocation with allocation = allocCid
     meta = emptyMetadata
 
+requireExpectedAdminMatch : Party -> Party -> Update ()
+requireExpectedAdminMatch expected actual =   require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
