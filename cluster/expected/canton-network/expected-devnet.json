@@ -328,7 +328,7 @@
           "name": "cn-devnet"
         },
         "enableGcsProxy": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "networkName": "dev",
         "tolerations": [
           {
@@ -1145,7 +1145,7 @@
           "svIngressName": "sv-2",
           "svNamespace": "sv-1"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -1207,7 +1207,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1258,7 +1258,7 @@
         },
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
         "metrics": {
           "enable": true
@@ -1373,9 +1373,51 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              },
+              {
+                "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
+                "weight": "10000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 295000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -1383,14 +1425,9 @@
             "rewardWeightBps": 110000
           },
           {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -1405,6 +1442,11 @@
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
           }
         ],
@@ -1467,7 +1509,7 @@
           },
           "prefix": "dev/sv-1"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.6\",\"amuletNameServiceVersion\": \"0.1.6\",\"dsoGovernanceVersion\": \"0.1.9\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.6\",\"walletPaymentsVersion\": \"0.1.6\"}",
         "initialSynchronizerFeesConfig": {
@@ -1570,7 +1612,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -1796,7 +1838,7 @@
           "svIngressName": "sv-2-eng",
           "svNamespace": "sv-2"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -1858,7 +1900,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1909,7 +1951,7 @@
         },
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -2024,9 +2066,51 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              },
+              {
+                "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
+                "weight": "10000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 295000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2034,14 +2118,9 @@
             "rewardWeightBps": 110000
           },
           {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -2056,6 +2135,11 @@
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
           }
         ],
@@ -2098,7 +2182,7 @@
           },
           "prefix": "dev/sv-2"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -2194,7 +2278,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -2413,7 +2497,7 @@
           "svIngressName": "sv-3-eng",
           "svNamespace": "sv-3"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -2475,7 +2559,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2526,7 +2610,7 @@
         },
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -2641,9 +2725,51 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              },
+              {
+                "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
+                "weight": "10000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 295000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2651,14 +2777,9 @@
             "rewardWeightBps": 110000
           },
           {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -2673,6 +2794,11 @@
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
           }
         ],
@@ -2715,7 +2841,7 @@
           },
           "prefix": "dev/sv-3"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -2811,7 +2937,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -3030,7 +3156,7 @@
           "svIngressName": "sv-4-eng",
           "svNamespace": "sv-4"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -3092,7 +3218,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3143,7 +3269,7 @@
         },
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -3258,9 +3384,51 @@
             "rewardWeightBps": 150000
           },
           {
+            "extraBeneficiaries": [
+              {
+                "beneficiary": "GSF-validator-1::1220dc05147ec4b91b61ebc970af0e10f1daebd4bf6d8274c2e1a3bf9f7cb7988a81",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "Broadridge-validator-1::12207fe33e049ae3edfa6c4cb7fd79547732e4ec68393b81257e1a139f4c137f14d0",
+                "weight": "100000"
+              },
+              {
+                "beneficiary": "TheTie-validator-1::12202554d6a291a2e430608b61f7816075b7be8de24d9a1db5da712ffd40f012b911",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "DFNS-validator-1::1220b260c467f792172e74dbc797b1efcaf87cc803890ffdff432e2bb7535d119232",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "proofgroup-exploratory-1::122051c478dfdabd969d36c0109152434673834822f9a8f8535dc5680af6dc4744bf",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
+                "weight": "30000"
+              },
+              {
+                "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "Elliptic-validator-1::",
+                "weight": "5000"
+              },
+              {
+                "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
+                "weight": "10000"
+              }
+            ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 270000
+            "rewardWeightBps": 295000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -3268,14 +3436,9 @@
             "rewardWeightBps": 110000
           },
           {
-            "name": "Tradeweb-Markets",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
-            "rewardWeightBps": 100000
-          },
-          {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           },
           {
             "name": "Orb-1-LP-1",
@@ -3290,6 +3453,11 @@
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
           }
         ],
@@ -3332,7 +3500,7 @@
           },
           "prefix": "dev/sv-4"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -3428,7 +3596,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
