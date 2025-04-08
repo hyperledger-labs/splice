@@ -39,15 +39,19 @@ data AmuletCreateSummary amuletContractId = AmuletCreateSummary with
 
 data Amulet_ExpireResult = Amulet_ExpireResult with
   expireSum : AmuletExpireSummary
+  meta : Optional Api.Token.MetadataV1.Metadata
 
 data LockedAmulet_UnlockResult = LockedAmulet_UnlockResult with
   amuletSum : AmuletCreateSummary (ContractId Amulet)
+  meta : Optional Api.Token.MetadataV1.Metadata
 
 data LockedAmulet_OwnerExpireLockResult = LockedAmulet_OwnerExpireLockResult with
   amuletSum : AmuletCreateSummary (ContractId Amulet)
+  meta : Optional Api.Token.MetadataV1.Metadata
 
 data LockedAmulet_ExpireAmuletResult = LockedAmulet_ExpireAmuletResult with
   expireSum : AmuletExpireSummary
+  meta : Optional Api.Token.MetadataV1.Metadata
 
 data ValidatorRight_ArchiveAsValidatorResult = ValidatorRight_ArchiveAsValidatorResult
 
@@ -94,7 +98,7 @@ template Amulet
                 round = amount.createdAt
                 changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
                 changeToHoldingFeesRate = - (amount.ratePerRound.rate)
-          return Amulet_ExpireResult with ..
+          return Amulet_ExpireResult with meta = Some (holdingTxMeta "expire-dust" "dso expiry" None), ..
 
     interface instance Api.Token.HoldingV1.Holding for Amulet where
       view = Api.Token.HoldingV1.HoldingView with
@@ -141,7 +145,7 @@ template LockedAmulet
                amulet = amuletCid
                amuletPrice = openMiningRound.amuletPrice
                round = openMiningRound.round
-         return LockedAmulet_UnlockResult with ..
+         return LockedAmulet_UnlockResult with meta = Some (holdingTxMeta "unlock" "holders released lock" None), ..
 
     choice LockedAmulet_OwnerExpireLock : LockedAmulet_OwnerExpireLockResult
       with
@@ -154,7 +158,7 @@ template LockedAmulet
                amulet = amuletCid
                amuletPrice = openMiningRound.amuletPrice
                round = openMiningRound.round
-         return LockedAmulet_OwnerExpireLockResult with ..
+         return LockedAmulet_OwnerExpireLockResult with meta = Some (holdingTxMeta "unlock" "lock expired" None), ..
 
     choice LockedAmulet_ExpireAmulet : LockedAmulet_ExpireAmuletResult
       with
@@ -168,7 +172,7 @@ template LockedAmulet
                round = amulet.amount.createdAt
                changeToInitialAmountAsOfRoundZero = -(getValueAsOfRound0 amulet.amount)
                changeToHoldingFeesRate = - (amulet.amount.ratePerRound.rate)
-         return LockedAmulet_ExpireAmuletResult with ..
+         return LockedAmulet_ExpireAmuletResult with meta = Some (holdingTxMeta "expire-dust" "dso expiry" None), ..
 
 
 -- Contracts to implement reward issuance

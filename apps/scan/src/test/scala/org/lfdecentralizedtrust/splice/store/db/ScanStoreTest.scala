@@ -215,7 +215,8 @@ abstract class ScanStoreTest
                 new splice.types.Round(2),
                 changeToInitialAmountAsOfRoundZero.bigDecimal,
                 holdingFee.bigDecimal,
-              )
+              ),
+              Optional.empty(),
             ).toValue,
             nextOffset(),
           )(
@@ -2013,6 +2014,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       ),
       java.util.List.of(),
       Optional.empty(),
+      Optional.empty(),
     )
 
   def mkTransferResultRecord(
@@ -2055,6 +2057,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       ),
       new java.math.BigDecimal(inputAmuletAmount),
       memberTrafficCid,
+      Optional.empty(),
       Optional.empty(),
     ).toValue
 
@@ -2183,7 +2186,8 @@ trait AmuletTransferUtil { self: StoreTest =>
         new splice.types.Round(round),
         changeToInitialAmountAsOfRoundZero.bigDecimal,
         changeToHoldingFeesRate.bigDecimal,
-      )
+      ),
+      Optional.empty(),
     ).toValue
 
   def amuletTemplate(amount: Double, owner: PartyId) = {

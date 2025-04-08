@@ -97,7 +97,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
           /*amulet =*/ new amuletCodegen.Amulet.ContractId(validContractId(2)),
           /*amuletPrice =*/ BigDecimal(0.5).bigDecimal,
           /*round =*/ new typesCodegen.Round(31L),
-        )
+        ),
+        /*meta = */ Optional.of(someMetadata),
       ).toValue
       val event = exercisedEvent(
         contractId = validContractId(3),

@@ -181,6 +181,22 @@
                         "value" : "12"
                       }
                     ],
+                    "meta" : {
+                      "values" : [
+                        [
+                          "splice.lfdecentralizedtrust.org/reason",
+                          "transfer"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/sender",
+                          "'aliceValidator::normalized'"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/tx-kind",
+                          "transfer"
+                        ]
+                      ]
+                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -255,6 +271,18 @@
                 "contractId" : "1",
                 "exerciseResult" : {
                   "amuletPaid" : "49.3200000000",
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "create TransferPreapproval"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "burn-mint"
+                      ]
+                    ]
+                  },
                   "transferPreapprovalCid" : "11",
                   "transferResult" : {
                     "createdAmulets" : [
@@ -263,6 +291,22 @@
                         "value" : "12"
                       }
                     ],
+                    "meta" : {
+                      "values" : [
+                        [
+                          "splice.lfdecentralizedtrust.org/reason",
+                          "transfer"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/sender",
+                          "'aliceValidator::normalized'"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/tx-kind",
+                          "transfer"
+                        ]
+                      ]
+                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -837,6 +881,22 @@
                         "value" : "16"
                       }
                     ],
+                    "meta" : {
+                      "values" : [
+                        [
+                          "splice.lfdecentralizedtrust.org/reason",
+                          "transfer"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/sender",
+                          "'aliceValidator::normalized'"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/tx-kind",
+                          "transfer"
+                        ]
+                      ]
+                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -928,6 +988,22 @@
                       "value" : "16"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'aliceValidator::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -1430,6 +1506,22 @@
                         "value" : "22"
                       }
                     ],
+                    "meta" : {
+                      "values" : [
+                        [
+                          "splice.lfdecentralizedtrust.org/reason",
+                          "transfer"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/sender",
+                          "'alice::normalized'"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/tx-kind",
+                          "transfer"
+                        ]
+                      ]
+                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -1521,6 +1613,22 @@
                       "value" : "22"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -1990,6 +2098,22 @@
                         "value" : "27"
                       }
                     ],
+                    "meta" : {
+                      "values" : [
+                        [
+                          "splice.lfdecentralizedtrust.org/reason",
+                          "transfer"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/sender",
+                          "'alice::normalized'"
+                        ],
+                        [
+                          "splice.lfdecentralizedtrust.org/tx-kind",
+                          "transfer"
+                        ]
+                      ]
+                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -2081,6 +2205,22 @@
                       "value" : "27"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -2532,6 +2672,18 @@
                     "round" : {
                       "number" : "1"
                     }
+                  },
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "tapped faucet"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "mint"
+                      ]
+                    ]
                   }
                 },
                 "implementedInterfaces" : [
@@ -2913,6 +3065,22 @@
                       "value" : "32"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -3575,6 +3743,22 @@
                       "value" : "37"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -4207,6 +4391,22 @@
                       "value" : "42"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -4839,6 +5039,22 @@
                       "value" : "0"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -5393,6 +5609,18 @@
                     "round" : {
                       "number" : "1"
                     }
+                  },
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "holders released lock"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "unlock"
+                      ]
+                    ]
                   }
                 },
                 "implementedInterfaces" : [
@@ -5517,6 +5745,22 @@
                       "value" : "50"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
@@ -5982,6 +6226,18 @@
                     "round" : {
                       "number" : "1"
                     }
+                  },
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "holders released lock"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "unlock"
+                      ]
+                    ]
                   }
                 },
                 "implementedInterfaces" : [
@@ -6173,6 +6429,18 @@
                     "round" : {
                       "number" : "1"
                     }
+                  },
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "holders released lock"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "unlock"
+                      ]
+                    ]
                   }
                 },
                 "implementedInterfaces" : [
@@ -6414,6 +6682,22 @@
                       "value" : "2"
                     }
                   ],
+                  "meta" : {
+                    "values" : [
+                      [
+                        "splice.lfdecentralizedtrust.org/reason",
+                        "transfer"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/sender",
+                        "'alice::normalized'"
+                      ],
+                      [
+                        "splice.lfdecentralizedtrust.org/tx-kind",
+                        "transfer"
+                      ]
+                    ]
+                  },
                   "round" : {
                     "number" : "1"
                   },
