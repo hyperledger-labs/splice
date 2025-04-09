@@ -525,8 +525,12 @@ are stored in the deployment directory for the given cluster.
 `cncluster help` will provide a full list of supported cluster
 subcommands. A few highlights include the following:
 
-* `cncluster apply` - Apply the current working copy's `canton-network`
-  and `infra` Pulumi stacks to a cluster. The presence of all images referenced by that
+* `cncluster apply` - Apply the current working copy's
+  `canton-network`, `infra`, `validator1` and `splitwell` stacks to a cluster,
+  as well as all `sv-canton` stacks required by the SVs that will be deployed out of `canton-network`.
+  Useful flags include `--skip-infra` (to skip the infra stack)
+  and `--sv1-only` (to deploy only SV1 and no other SVs or validators).
+  The presence of all images referenced by that
   configuration is confirmed prior to application of the manifest.
 
   * The tag for the images to be deployed can be overridden with an
