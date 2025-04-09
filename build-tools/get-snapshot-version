@@ -6,6 +6,10 @@ if [ $# -eq 1 ]; then
     OVERRIDE_VERSION=$1
 fi
 
+# We always run from splice-root, to make sure we are using Splice commit hashes,
+# and not those of a repo that submodules Splice.
+cd "${SPLICE_ROOT}"
+
 sha=$(git rev-parse HEAD)
 
 # Always use the release version on release branches. This only matters for the ciupgrade tests.

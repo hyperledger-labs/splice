@@ -218,7 +218,7 @@ function _update_cluster_config() {
   if [ -z "${TARGET_CLUSTER-}" ]; then
     file="config.yaml"
   else
-    file="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
+    file="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
   fi
   tmp_file=$(mktemp)
   echo "$yaml_content" > "$tmp_file"
