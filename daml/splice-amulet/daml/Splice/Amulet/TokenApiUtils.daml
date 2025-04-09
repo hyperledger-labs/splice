@@ -16,6 +16,9 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 splicePrefix : Text
 splicePrefix = "splice.lfdecentralizedtrust.org/"
 
+amuletPrefix : Text
+amuletPrefix = "amulet." <> splicePrefix
+
 -- | Shared definition of the instrument-id used for amulets.
 amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
 amuletInstrumentId dso =
@@ -26,10 +29,10 @@ amuletInstrumentId dso =
 ----------------
 
 createdInRoundMetaKey : Text
-createdInRoundMetaKey = splicePrefix <> "created-in-round"
+createdInRoundMetaKey = amuletPrefix <> "created-in-round"
 
 ratePerRoundMetaKey : Text
-ratePerRoundMetaKey = splicePrefix <> "rate-per-round"
+ratePerRoundMetaKey = amuletPrefix <> "rate-per-round"
 
 reasonMetaKey : Text
 reasonMetaKey = splicePrefix <> "reason"

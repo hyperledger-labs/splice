@@ -34,11 +34,11 @@
                 "meta" : {
                   "values" : [
                     [
-                      "splice.lfdecentralizedtrust.org/created-in-round",
+                      "amulet.splice.lfdecentralizedtrust.org/created-in-round",
                       "1"
                     ],
                     [
-                      "splice.lfdecentralizedtrust.org/rate-per-round",
+                      "amulet.splice.lfdecentralizedtrust.org/rate-per-round",
                       "0.00380518"
                     ]
                   ]
@@ -95,11 +95,11 @@
                 "meta" : {
                   "values" : [
                     [
-                      "splice.lfdecentralizedtrust.org/created-in-round",
+                      "amulet.splice.lfdecentralizedtrust.org/created-in-round",
                       "1"
                     ],
                     [
-                      "splice.lfdecentralizedtrust.org/rate-per-round",
+                      "amulet.splice.lfdecentralizedtrust.org/rate-per-round",
                       "0.00380518"
                     ]
                   ]
@@ -156,11 +156,11 @@
                 "meta" : {
                   "values" : [
                     [
-                      "splice.lfdecentralizedtrust.org/created-in-round",
+                      "amulet.splice.lfdecentralizedtrust.org/created-in-round",
                       "1"
                     ],
                     [
-                      "splice.lfdecentralizedtrust.org/rate-per-round",
+                      "amulet.splice.lfdecentralizedtrust.org/rate-per-round",
                       "0.00380518"
                     ]
                   ]

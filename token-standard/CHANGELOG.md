@@ -46,6 +46,8 @@ Polishing changes
   of a transfer instruction; and allow both create and update steps for transfer instructions
   to return "change" to the sender. Thereby improving the sender's ability to batch multiple
   transfer instruction steps in a single Daml transaction for high throughput use-cases.
+- Move amulet specific metadata keys under `amulet.splice.lfdecentralizedtrust.org/`
+  to distinguish them from keys that are intended for all tokens implementing the token standard.
 
 ## 2025-03-31
 

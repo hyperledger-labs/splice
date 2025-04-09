@@ -19,6 +19,7 @@ import DA.Optional (isSome)
 import DA.Time
 
 import Splice.Amulet (AppRewardCoupon(..))
+import Splice.Amulet.TokenApiUtils (createdInRoundMetaKey, ratePerRoundMetaKey)
 
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
@@ -72,8 +73,8 @@ setupTest = do
             lock = None
             meta = Metadata with
               values = Map.fromList
-                [ ("splice.lfdecentralizedtrust.org/created-in-round", "1")
-                , ("splice.lfdecentralizedtrust.org/rate-per-round", "0.00004")
+                [ (createdInRoundMetaKey, "1")
+                , (ratePerRoundMetaKey, "0.00004")
                 ]
         , HoldingView with
             owner = bob
@@ -86,8 +87,8 @@ setupTest = do
               context = Some "test expired lock"
             meta = Metadata with
               values = Map.fromList
-                [ ("splice.lfdecentralizedtrust.org/created-in-round", "1")
-                , ("splice.lfdecentralizedtrust.org/rate-per-round", "0.00004")
+                [ (createdInRoundMetaKey, "1")
+                , (ratePerRoundMetaKey, "0.00004")
                 ]
         ]
   expectedBobHoldingViews === actualBobHoldingViews
