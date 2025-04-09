@@ -2,6 +2,8 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { CLUSTER_BASENAME, config, isMainNet } from 'splice-pulumi-common';
 
+import { GitFluxRef } from './flux-source';
+
 export type EnvRefs = { [key: string]: unknown };
 
 export function createEnvRefs(envSecretName: string, namespaceName: string = 'operator'): EnvRefs {
@@ -63,7 +65,7 @@ export function createStackCR(
   name: string,
   projectName: string,
   supportsResetOnSameCommit: boolean,
-  ref: k8s.apiextensions.CustomResource,
+  ref: GitFluxRef,
   envRefs: EnvRefs,
   extraEnvs: { [key: string]: string } = {},
   namespaceName: string = 'operator',
@@ -84,7 +86,13 @@ export function createStackCR(
             SPLICE_ROOT: {
               type: 'Literal',
               literal: {
-                value: `/tmp/pulumi-working/operator/${name}/workspace`,
+                value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.spliceRoot}`,
+              },
+            },
+            DEPLOYMENT_DIR: {
+              type: 'Literal',
+              literal: {
+                value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.deploymentDir}`,
               },
             },
             GCP_CLUSTER_BASENAME: {
@@ -107,11 +115,11 @@ export function createStackCR(
           },
           fluxSource: {
             sourceRef: {
-              apiVersion: ref.apiVersion,
-              kind: ref.kind,
-              name: ref.metadata.name,
+              apiVersion: ref.resource.apiVersion,
+              kind: ref.resource.kind,
+              name: ref.resource.metadata.name,
             },
-            dir: `cluster/pulumi/${projectName}`,
+            dir: `${ref.config.pulumiBaseDir}/${projectName}`,
           },
           // Do not resync the stack when the commit hash matches the last one
           continueResyncOnCommitMatch: false,

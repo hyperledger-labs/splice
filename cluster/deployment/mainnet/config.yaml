@@ -10,7 +10,13 @@ synchronizerMigration:
     id: 2
     provider: external
     version: 0.3.17
-    releaseReference: "refs/heads/release-line-0.3.17"
+    releaseReference:
+      gitReference: "refs/heads/release-line-0.3.17"
+      repoUrl: https://github.com/DACH-NY/canton-network-node
+      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiBaseDir: "cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "."
 pulumiProjectConfig:
   default:
     isExternalCluster: true
@@ -23,4 +29,10 @@ monitoring:
       cloudSql:
         maintenance: true
 operatorDeployment:
-  reference: refs/heads/main
+  reference:
+    gitReference: refs/heads/main
+    repoUrl: https://github.com/DACH-NY/canton-network-node
+    pulumiStacksDir: "cluster/stacks/prod"
+    pulumiBaseDir: "cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "."

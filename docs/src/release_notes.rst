@@ -11,6 +11,20 @@ Release Notes
 Upcoming
 --------
 
+.. important::
+
+    * This release includes a change to the database schema that will trigger a potentially long database migration
+      of the scan and validator app databases, resulting in increased downtime of SV nodes,
+      and to a much lesser extent the validator nodes.
+      This migration will also use a significant amount of temporary disk space (around 30% of current database size).
+      Please make sure your database has enough disk space available before upgrading, and make sure the
+      `temp_file_limit <https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-TEMP-FILE-LIMIT>`_
+      PostgreSQL parameter is set to a sufficiently high value.
+
+- Performance
+
+  - Improved the performance of ACS snapshot generation
+
 - Frontends
 
   - Relax config validation on audience to not require that it is a URL as this causes issues with some IAMs.
@@ -19,6 +33,12 @@ Upcoming
 
   - interdependencies in the Open API specs are now inlined in every yaml file,
     so that the files can be used independently of each other (and no longer incorrectly reference the common.yaml file in the bundle).
+
+- Deployment
+
+  - The ``splice-util-lib``` helm chart is no longer published.
+    The library has always been packaged with every helm chart that uses it,
+    there is no need to pull it separately from the ghcr.io container registry.
 
 0.3.19
 ------
