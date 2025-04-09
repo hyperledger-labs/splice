@@ -286,19 +286,16 @@ amulet_transferFactory_transferImpl this _self arg = do
               lock = None ]
             beneficiaries = None
           pure Api.Token.TransferInstructionV1.TransferInstructionResult with
-            output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
-              with
-                holdings = Api.Token.TransferInstructionV1.TransferInstructionResultHoldings
-                  with
-                    senderHoldingCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
-                    receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
+            senderChangeCids = toInterfaceContractId <$> optionalToList result.senderChangeAmulet
+            output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
+              receiverHoldingCids = createdAmuletToHolding <$> result.createdAmulets
             meta = emptyMetadata
 
       | otherwise -> do
           -- prepare a two-step transfer
           let twoStepTransfer = standardTransferToTwoStepTransfer arg.transfer.requestedAt arg.transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          lockedAmulet <- prepareTwoStepTransfer twoStepTransfer arg.transfer.inputHoldingCids paymentContext
+          (lockedAmulet, senderChangeCids) <- prepareTwoStepTransfer twoStepTransfer arg.transfer.inputHoldingCids paymentContext
           -- create the transfer instruction tracking this locked amulet
           transferInstructionCid <- toInterfaceContractId <$> create AmuletTransferInstruction with
             transfer = arg.transfer with
@@ -306,6 +303,7 @@ amulet_transferFactory_transferImpl this _self arg = do
             lockedAmulet
           -- return result
           pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+            senderChangeCids
             output = Api.Token.TransferInstructionV1.TransferInstructionResult_Pending
               with
                 transferInstructionCid
@@ -325,12 +323,9 @@ amulet_transferFactory_transferImpl this _self arg = do
 
       -- return result
       pure Api.Token.TransferInstructionV1.TransferInstructionResult with
-        output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
-          with
-            holdings = Api.Token.TransferInstructionV1.TransferInstructionResultHoldings
-              with
-                senderHoldingCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
-                receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
+        senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
+        output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
+          receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
         meta = emptyMetadata
 
 
@@ -384,7 +379,7 @@ amulet_allocationFactory_allocateImpl externalAmuletRules _self arg = do
 
   -- lock the funds
   let twoStepTransfer = allocationToTwoStepTransfer arg.allocation
-  lockedAmulet <- prepareTwoStepTransfer twoStepTransfer inputHoldingCids paymentContext
+  (lockedAmulet, _senderChangeCids) <- prepareTwoStepTransfer twoStepTransfer inputHoldingCids paymentContext
   -- create the amulet allocation
   allocCid <- toInterfaceContractId <$> create AmuletAllocation with
     allocation = arg.allocation

@@ -1,23 +1,23 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import {
+  ArchivedEvent as LedgerApiArchivedEvent,
+  CreatedEvent as LedgerApiCreatedEvent,
+  DefaultApi as LedgerJsonApi,
+  Event as LedgerApiEvent,
+  ExercisedEvent as LedgerApiExercisedEvent,
+  JsGetUpdatesResponse
+} from "canton-json-api-v2-openapi";
+import {
   createLedgerApiClient,
   ensureHoldingViewIsPresent,
-  filtersByParty,
+  filtersByParty
 } from "../apis/ledger-api-utils";
 import { CommandOptions } from "../cli";
 import {
   HoldingInterface,
   TokenStandardTransactionInterfaces
 } from "../constants";
-import {
-  DefaultApi as LedgerJsonApi,
-  JsGetUpdatesResponse,
-  Event as LedgerApiEvent,
-  ExercisedEvent as LedgerApiExercisedEvent,
-  CreatedEvent as LedgerApiCreatedEvent,
-  ArchivedEvent as LedgerApiArchivedEvent,
-} from "canton-json-api-v2-openapi";
 
 // TODO (#18773): change approach
 export async function listHoldingTransactions(
@@ -322,11 +322,34 @@ function toPrettyTransfer(
 ): PrettyTransfer {
   const choiceArgument = exercisedEvent.choiceArgument;
   const exerciseResult = exercisedEvent.exerciseResult;
-  const completed =
-    exerciseResult.output.tag === "TransferInstructionResult_Completed";
+  function computeOutput() {
+    // TODO(#18819): consider using a better type as part of supporting pending transfers
+    switch(exerciseResult.output.tag) {
+      case "TransferInstructionResult_Completed":
+        return {
+          receiverHoldingCids: exerciseResult.output.value.receiverHoldingCids,
+          senderHoldingCids: exerciseResult.senderChangeCids,
+          meta: exerciseResult.meta,
+        };
+      case "TransferInstructionResult_Pending":
+        return {
+          receiverHoldingCids: [],
+          senderHoldingCids: exerciseResult.senderChangeCids,
+          meta: exerciseResult.meta,
+        };
+      case "TransferInstructionResult_Failed":
+        return {
+          receiverHoldingCids: [],
+          senderHoldingCids: exerciseResult.senderChangeCids,
+          meta: exerciseResult.meta,
+        };
+      default:
+        throw new Error(`Unknown tag: ${exerciseResult.output.tag}`);
+    }
+  }
   return {
     type: "Transfer",
-    status: completed ? "Completed" : "Pending",
+    status: exerciseResult.output.tag.replace(/^TransferInstructionResult_/, ""),
     input: {
       sender: choiceArgument.transfer.sender,
       receiver: choiceArgument.transfer.receiver,
@@ -336,20 +359,7 @@ function toPrettyTransfer(
       meta: choiceArgument.transfer.meta,
       extraArgs: choiceArgument.extraArgs,
     },
-    output: completed
-      ? {
-          receiverHoldingCids:
-            exerciseResult.output.value.holdings.receiverHoldingCids,
-          senderHoldingCids:
-            exerciseResult.output.value.holdings.senderHoldingCids,
-          meta: exerciseResult.meta,
-        }
-      : {
-          // TODO(#18819): consider using a better type as part of supporting pending transfers
-          receiverHoldingCids: [],
-          senderHoldingCids: [],
-          meta: exerciseResult.meta,
-        },
+    output: computeOutput(),
   };
 }
 
@@ -471,8 +481,8 @@ interface PrettyTransfer {
     extraArgs: any;
   };
   output: {
-    senderHoldingCids: null | string[];
-    receiverHoldingCids: null | string[];
+    senderHoldingCids: string[];
+    receiverHoldingCids: string[];
     meta: any;
   };
 }

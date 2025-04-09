@@ -1218,16 +1218,14 @@
                   "output" : {
                     "tag" : "TransferInstructionResult_Completed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                          "22"
-                        ],
-                        "senderHoldingCids" : [
-                          "23"
-                        ]
-                      }
+                      "receiverHoldingCids" : [
+                        "22"
+                      ]
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "23"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -2489,7 +2487,10 @@
                     "value" : {
                       "transferInstructionCid" : "31"
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "32"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -2597,7 +2598,7 @@
                   "createdAmulets" : [
                     {
                       "tag" : "TransferResultLockedAmulet",
-                      "value" : "32"
+                      "value" : "33"
                     }
                   ],
                   "meta" : {
@@ -2619,7 +2620,7 @@
                   "round" : {
                     "number" : "1"
                   },
-                  "senderChangeAmulet" : "33",
+                  "senderChangeAmulet" : "32",
                   "summary" : {
                     "amuletPrice" : "0.0050000000",
                     "balanceChanges" : [
@@ -2781,7 +2782,7 @@
             },
             {
               "CreatedEvent" : {
-                "contractId" : "32",
+                "contractId" : "33",
                 "contractKey" : null,
                 "createArgument" : {
                   "amulet" : {
@@ -2863,7 +2864,7 @@
             },
             {
               "CreatedEvent" : {
-                "contractId" : "33",
+                "contractId" : "32",
                 "contractKey" : null,
                 "createArgument" : {
                   "amount" : {
@@ -2932,12 +2933,12 @@
                 "contractId" : "31",
                 "contractKey" : null,
                 "createArgument" : {
-                  "lockedAmulet" : "32",
+                  "lockedAmulet" : "33",
                   "transfer" : {
                     "amount" : "1000.0000000000",
                     "executeBefore" : "2025-06-18T00:00:00.000000Z",
                     "inputHoldingCids" : [
-                      "32"
+                      "33"
                     ],
                     "instrumentId" : {
                       "admin" : "dso::normalized",
@@ -3026,7 +3027,7 @@
                     "amount" : "1000.0000000000",
                     "executeBefore" : "2025-06-18T00:00:00.000000Z",
                     "inputHoldingCids" : [
-                      "33"
+                      "32"
                     ],
                     "instrumentId" : {
                       "admin" : "dso::normalized",
@@ -3053,7 +3054,10 @@
                     "value" : {
                       "transferInstructionCid" : "36"
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "37"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -3130,7 +3134,7 @@
                     "inputs" : [
                       {
                         "tag" : "InputAmulet",
-                        "value" : "33"
+                        "value" : "32"
                       }
                     ],
                     "outputs" : [
@@ -3157,7 +3161,7 @@
                   "createdAmulets" : [
                     {
                       "tag" : "TransferResultLockedAmulet",
-                      "value" : "37"
+                      "value" : "38"
                     }
                   ],
                   "meta" : {
@@ -3179,7 +3183,7 @@
                   "round" : {
                     "number" : "1"
                   },
-                  "senderChangeAmulet" : "38",
+                  "senderChangeAmulet" : "37",
                   "summary" : {
                     "amuletPrice" : "0.0050000000",
                     "balanceChanges" : [
@@ -3228,7 +3232,7 @@
                   
                 },
                 "consuming" : true,
-                "contractId" : "33",
+                "contractId" : "32",
                 "exerciseResult" : {
                   
                 },
@@ -3312,7 +3316,7 @@
             },
             {
               "CreatedEvent" : {
-                "contractId" : "37",
+                "contractId" : "38",
                 "contractKey" : null,
                 "createArgument" : {
                   "amulet" : {
@@ -3394,7 +3398,7 @@
             },
             {
               "CreatedEvent" : {
-                "contractId" : "38",
+                "contractId" : "37",
                 "contractKey" : null,
                 "createArgument" : {
                   "amount" : {
@@ -3463,12 +3467,12 @@
                 "contractId" : "36",
                 "contractKey" : null,
                 "createArgument" : {
-                  "lockedAmulet" : "37",
+                  "lockedAmulet" : "38",
                   "transfer" : {
                     "amount" : "1000.0000000000",
                     "executeBefore" : "2025-06-18T00:00:00.000000Z",
                     "inputHoldingCids" : [
-                      "37"
+                      "38"
                     ],
                     "instrumentId" : {
                       "admin" : "dso::normalized",
@@ -3557,7 +3561,7 @@
                     "amount" : "1000.0000000000",
                     "executeBefore" : "2025-06-18T00:00:00.000000Z",
                     "inputHoldingCids" : [
-                      "38"
+                      "37"
                     ],
                     "instrumentId" : {
                       "admin" : "dso::normalized",
@@ -3584,7 +3588,10 @@
                     "value" : {
                       "transferInstructionCid" : "41"
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "42"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -3661,7 +3668,7 @@
                     "inputs" : [
                       {
                         "tag" : "InputAmulet",
-                        "value" : "38"
+                        "value" : "37"
                       }
                     ],
                     "outputs" : [
@@ -3688,7 +3695,7 @@
                   "createdAmulets" : [
                     {
                       "tag" : "TransferResultLockedAmulet",
-                      "value" : "42"
+                      "value" : "43"
                     }
                   ],
                   "meta" : {
@@ -3710,7 +3717,7 @@
                   "round" : {
                     "number" : "1"
                   },
-                  "senderChangeAmulet" : "43",
+                  "senderChangeAmulet" : "42",
                   "summary" : {
                     "amuletPrice" : "0.0050000000",
                     "balanceChanges" : [
@@ -3759,7 +3766,7 @@
                   
                 },
                 "consuming" : true,
-                "contractId" : "38",
+                "contractId" : "37",
                 "exerciseResult" : {
                   
                 },
@@ -3843,7 +3850,7 @@
             },
             {
               "CreatedEvent" : {
-                "contractId" : "42",
+                "contractId" : "43",
                 "contractKey" : null,
                 "createArgument" : {
                   "amulet" : {
@@ -3925,7 +3932,7 @@
             },
             {
               "CreatedEvent" : {
-                "contractId" : "43",
+                "contractId" : "42",
                 "contractKey" : null,
                 "createArgument" : {
                   "amount" : {
@@ -3994,12 +4001,12 @@
                 "contractId" : "41",
                 "contractKey" : null,
                 "createArgument" : {
-                  "lockedAmulet" : "42",
+                  "lockedAmulet" : "43",
                   "transfer" : {
                     "amount" : "1000.0000000000",
                     "executeBefore" : "2025-06-18T00:00:00.000000Z",
                     "inputHoldingCids" : [
-                      "42"
+                      "43"
                     ],
                     "instrumentId" : {
                       "admin" : "dso::normalized",
@@ -4088,7 +4095,7 @@
                     "amount" : "1000.0000000000",
                     "executeBefore" : "2025-06-18T00:00:00.000000Z",
                     "inputHoldingCids" : [
-                      "43"
+                      "42"
                     ],
                     "instrumentId" : {
                       "admin" : "dso::normalized",
@@ -4115,7 +4122,10 @@
                     "value" : {
                       "transferInstructionCid" : "46"
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "47"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -4192,7 +4202,7 @@
                     "inputs" : [
                       {
                         "tag" : "InputAmulet",
-                        "value" : "43"
+                        "value" : "42"
                       }
                     ],
                     "outputs" : [
@@ -4290,7 +4300,7 @@
                   
                 },
                 "consuming" : true,
-                "contractId" : "43",
+                "contractId" : "42",
                 "exerciseResult" : {
                   
                 },
@@ -4632,16 +4642,14 @@
                   "output" : {
                     "tag" : "TransferInstructionResult_Completed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                          "50"
-                        ],
-                        "senderHoldingCids" : [
-                          "51"
-                        ]
-                      }
+                      "receiverHoldingCids" : [
+                        "50"
+                      ]
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "51"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -4667,7 +4675,7 @@
                   "openRoundCid" : "9"
                 },
                 "consuming" : true,
-                "contractId" : "32",
+                "contractId" : "33",
                 "exerciseResult" : {
                   "amuletSum" : {
                     "amulet" : "52",
@@ -5165,17 +5173,14 @@
                     ]
                   },
                   "output" : {
-                    "tag" : "TransferInstructionResult_Completed",
+                    "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                        ],
-                        "senderHoldingCids" : [
-                          "55"
-                        ]
-                      }
+                      
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "55"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -5201,7 +5206,7 @@
                   "openRoundCid" : "9"
                 },
                 "consuming" : true,
-                "contractId" : "37",
+                "contractId" : "38",
                 "exerciseResult" : {
                   "amuletSum" : {
                     "amulet" : "55",
@@ -5368,17 +5373,14 @@
                     ]
                   },
                   "output" : {
-                    "tag" : "TransferInstructionResult_Completed",
+                    "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                        ],
-                        "senderHoldingCids" : [
-                          "56"
-                        ]
-                      }
+                      
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "56"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -5404,7 +5406,7 @@
                   "openRoundCid" : "9"
                 },
                 "consuming" : true,
-                "contractId" : "42",
+                "contractId" : "43",
                 "exerciseResult" : {
                   "amuletSum" : {
                     "amulet" : "56",
@@ -5868,16 +5870,14 @@
                   "output" : {
                     "tag" : "TransferInstructionResult_Completed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                          "65"
-                        ],
-                        "senderHoldingCids" : [
-                          "66"
-                        ]
-                      }
+                      "receiverHoldingCids" : [
+                        "65"
+                      ]
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "66"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -6401,17 +6401,14 @@
                     ]
                   },
                   "output" : {
-                    "tag" : "TransferInstructionResult_Completed",
+                    "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                        ],
-                        "senderHoldingCids" : [
-                          "70"
-                        ]
-                      }
+                      
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "70"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -6604,17 +6601,14 @@
                     ]
                   },
                   "output" : {
-                    "tag" : "TransferInstructionResult_Completed",
+                    "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                        ],
-                        "senderHoldingCids" : [
-                          "71"
-                        ]
-                      }
+                      
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "71"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],
@@ -6825,16 +6819,14 @@
                   "output" : {
                     "tag" : "TransferInstructionResult_Completed",
                     "value" : {
-                      "holdings" : {
-                        "receiverHoldingCids" : [
-                          "2"
-                        ],
-                        "senderHoldingCids" : [
-                          "3"
-                        ]
-                      }
+                      "receiverHoldingCids" : [
+                        "2"
+                      ]
                     }
-                  }
+                  },
+                  "senderChangeCids" : [
+                    "3"
+                  ]
                 },
                 "implementedInterfaces" : [
                 ],

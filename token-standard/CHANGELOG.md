@@ -42,6 +42,10 @@ Polishing changes
   a 24h prepare-submission delay time by default.
 - Improve extensibility by allowing to pass the metadata intended to be used
   when exercising a choice into the off-ledger API for fetching the choice context.
+- Distinguish in the `TransferInstructionResult` betweeen successful and failed completions
+  of a transfer instruction; and allow both create and update steps for transfer instructions
+  to return "change" to the sender. Thereby improving the sender's ability to batch multiple
+  transfer instruction steps in a single Daml transaction for high throughput use-cases.
 
 ## 2025-03-31
 

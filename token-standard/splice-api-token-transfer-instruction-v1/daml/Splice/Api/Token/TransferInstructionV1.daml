@@ -50,27 +50,23 @@ data Transfer = Transfer with
 data TransferInstructionResult = TransferInstructionResult with
   output : TransferInstructionResult_Output
    -- ^ The output of the step.
+  senderChangeCids : [ContractId Holding]
+    -- ^ New holdings owned by the sender created to return "change". Can be used
+    -- by callers to batch creating or updating multiple transfer instructions
+    -- in a single Daml transaction.
   meta : Metadata
     -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
 
 -- | The output of instructing a transfer or advancing the state of a transfer instruction.
 data TransferInstructionResult_Output
-  = TransferInstructionResult_Completed with
-      holdings : TransferInstructionResultHoldings
-        -- ^ Updated sender and receiver holdings
-  | TransferInstructionResult_Pending with
+  = TransferInstructionResult_Pending with
       transferInstructionCid : ContractId TransferInstruction
          -- ^ Contract id of the transfer instruction that will be used to complete the transfer
-  deriving (Show, Eq)
-
--- | The holdings that were newly created as part of completing the transfer.
--- MAY be empty for registries that do not track the holdings on-ledger.
-data TransferInstructionResultHoldings = TransferInstructionResultHoldings
-  with
-    senderHoldingCids : [ContractId Holding]
-      -- ^ Newly created holdings owned by the sender. Often used to return "change".
-    receiverHoldingCids : [ContractId Holding]
-      -- ^ The newly created holdings owned by the receiver.
+  | TransferInstructionResult_Completed with
+      receiverHoldingCids : [ContractId Holding]
+        -- ^ The newly created holdings owned by the receiver as part of successfully
+        -- completing the transfer.
+  | TransferInstructionResult_Failed
   deriving (Show, Eq)
 
 
@@ -117,7 +113,7 @@ interface TransferInstruction where
   transferInstruction_acceptImpl : ContractId TransferInstruction -> TransferInstruction_Accept -> Update TransferInstructionResult
   transferInstruction_rejectImpl : ContractId TransferInstruction -> TransferInstruction_Reject -> Update TransferInstructionResult
   transferInstruction_withdrawImpl : ContractId TransferInstruction -> TransferInstruction_Withdraw -> Update TransferInstructionResult
-  transferInstruction_reportOutcomeImpl : ContractId TransferInstruction -> TransferInstruction_ReportOutcome -> Update TransferInstruction_ReportOutcomeResult
+  transferInstruction_reportOutcomeImpl : ContractId TransferInstruction -> TransferInstruction_ReportOutcome -> Update TransferInstructionResult
 
   choice TransferInstruction_Accept : TransferInstructionResult
     -- ^ Accept the transfer as the receiver.
@@ -150,7 +146,7 @@ interface TransferInstruction where
     controller (view this).transfer.sender
     do transferInstruction_withdrawImpl this self arg
 
-  choice TransferInstruction_ReportOutcome : TransferInstruction_ReportOutcomeResult
+  choice TransferInstruction_ReportOutcome : TransferInstructionResult
     -- ^ Report the outcome of the transfer instruction. Used by the registry
     -- to aid the wallet in parsing the transaction history.
     with
@@ -215,12 +211,4 @@ data TransferFactoryView = TransferFactoryView
       -- which this transfer factory can be used.
     meta : Metadata
       -- ^ Additional metadata specific to the transfer factory, used for extensibility.
-  deriving (Show, Eq)
-
-data TransferInstruction_ReportOutcomeResult = TransferInstruction_ReportOutcomeResult
-  with
-    holdings : TransferInstructionResultHoldings
-      -- ^ Newly created sender and receiver holdings
-    meta : Metadata
-      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
   deriving (Show, Eq)

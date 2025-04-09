@@ -167,6 +167,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
           new transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending(
             new transferinstructionv1.TransferInstruction.ContractId(validContractId(333))
           ),
+          /*senderChangeCids =*/ List.empty.asJava,
           someMetadata,
         ).toValue
 

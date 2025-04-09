@@ -66,10 +66,9 @@ executeTransferInstr instr extraArgs = do
   (senderHoldingCids, receiverHoldingCids) <-
     executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
+    senderChangeCids = senderHoldingCids
     output = TransferInstructionResult_Completed with
-      holdings = TransferInstructionResultHoldings with
-        senderHoldingCids
-        receiverHoldingCids
+      receiverHoldingCids
     meta = emptyMetadata
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
@@ -77,8 +76,6 @@ abortAmuletTransferInstruction instr extraArgs = do
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer.requestedAt instr.transfer
   senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
-    output = TransferInstructionResult_Completed with
-      holdings = TransferInstructionResultHoldings with
-        senderHoldingCids
-        receiverHoldingCids = []
+    senderChangeCids = senderHoldingCids
+    output = TransferInstructionResult_Failed
     meta = emptyMetadata

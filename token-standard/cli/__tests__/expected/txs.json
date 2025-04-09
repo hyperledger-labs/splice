@@ -273,7 +273,9 @@
           },
           "output": {
             "receiverHoldingCids": [],
-            "senderHoldingCids": [],
+            "senderHoldingCids": [
+              "32"
+            ],
             "meta": {
               "values": []
             }
@@ -285,7 +287,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "33",
+              "contractId": "32",
               "owner": "alice::normalized"
             },
             {
@@ -294,7 +296,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "32",
+              "contractId": "33",
               "owner": "alice::normalized"
             }
           ],
@@ -339,7 +341,7 @@
               "id": "Amulet"
             },
             "senderHoldings": [
-              "33"
+              "32"
             ],
             "meta": {
               "values": []
@@ -370,7 +372,9 @@
           },
           "output": {
             "receiverHoldingCids": [],
-            "senderHoldingCids": [],
+            "senderHoldingCids": [
+              "37"
+            ],
             "meta": {
               "values": []
             }
@@ -382,7 +386,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "38",
+              "contractId": "37",
               "owner": "alice::normalized"
             },
             {
@@ -391,7 +395,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "37",
+              "contractId": "38",
               "owner": "alice::normalized"
             }
           ],
@@ -402,7 +406,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "33",
+              "contractId": "32",
               "owner": "alice::normalized"
             }
           ]
@@ -427,7 +431,7 @@
               "id": "Amulet"
             },
             "senderHoldings": [
-              "38"
+              "37"
             ],
             "meta": {
               "values": []
@@ -458,7 +462,9 @@
           },
           "output": {
             "receiverHoldingCids": [],
-            "senderHoldingCids": [],
+            "senderHoldingCids": [
+              "42"
+            ],
             "meta": {
               "values": []
             }
@@ -470,7 +476,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "43",
+              "contractId": "42",
               "owner": "alice::normalized"
             },
             {
@@ -479,7 +485,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "42",
+              "contractId": "43",
               "owner": "alice::normalized"
             }
           ],
@@ -490,7 +496,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "38",
+              "contractId": "37",
               "owner": "alice::normalized"
             }
           ]
@@ -515,7 +521,7 @@
               "id": "Amulet"
             },
             "senderHoldings": [
-              "43"
+              "42"
             ],
             "meta": {
               "values": []
@@ -546,7 +552,9 @@
           },
           "output": {
             "receiverHoldingCids": [],
-            "senderHoldingCids": [],
+            "senderHoldingCids": [
+              "47"
+            ],
             "meta": {
               "values": []
             }
@@ -578,7 +586,7 @@
                 "admin": "dso::normalized",
                 "id": "Amulet"
               },
-              "contractId": "43",
+              "contractId": "42",
               "owner": "alice::normalized"
             }
           ]
