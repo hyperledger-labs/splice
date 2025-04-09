@@ -90,8 +90,9 @@ Upcoming
           wallet             0.1.8
           walletPayments     0.1.8
           ================== =======
+- CometBFT
 
-
+   - Updated CometBFT to `0.37.15 <https://github.com/cometbft/cometbft/blob/v0.37.15/CHANGELOG.md?rgh-link-date=2025-04-03T08%3A37%3A21.000Z#v03715>`_
 
 0.3.19
 ------
