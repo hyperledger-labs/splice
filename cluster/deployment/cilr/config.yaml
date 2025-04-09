@@ -51,9 +51,10 @@ monitoring:
       cometbft:
         expectedMaxBlocksPerSecond: 7
 operatorDeployment:
-  reference: refs/heads/main
-  repoUrl: https://github.com/DACH-NY/canton-network-node
-  pulumiStacksDir: "cluster/stacks/ci"
-  pulumiBaseDir: "cluster/pulumi"
-  deploymentDir: "cluster/deployment"
-  spliceRoot: "."
+  reference:
+    gitReference: refs/heads/main
+    repoUrl: https://github.com/DACH-NY/canton-network-node
+    pulumiStacksDir: "cluster/stacks/ci"
+    pulumiBaseDir: "cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "."
