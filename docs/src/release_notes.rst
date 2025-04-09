@@ -40,6 +40,10 @@ Upcoming
     The library has always been packaged with every helm chart that uses it,
     there is no need to pull it separately from the ghcr.io container registry.
 
+- CometBFT
+
+   - Updated CometBFT to `0.37.15 <https://github.com/cometbft/cometbft/blob/v0.37.15/CHANGELOG.md?rgh-link-date=2025-04-03T08%3A37%3A21.000Z#v03715>`_
+
 0.3.19
 ------
 
