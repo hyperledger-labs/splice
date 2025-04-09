@@ -35,7 +35,7 @@ paths:
 
 
   /registry/transfer-instruction/{transferInstructionId}/choice-contexts/accept:
-    get:
+    post:
       operationId: "getTransferInstructionAcceptContext"
       description: |
         Get the choice context to accept a transfer instruction.
@@ -46,6 +46,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
       responses:
         "200":
           description: ok
@@ -59,7 +65,7 @@ paths:
           $ref: "#/components/responses/404"
 
   /registry/transfer-instruction/{transferInstructionId}/choice-contexts/reject:
-    get:
+    post:
       operationId: "getTransferInstructionRejectContext"
       description: |
         Get the choice context to reject a transfer instruction.
@@ -70,6 +76,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
       responses:
         "200":
           description: ok
@@ -83,7 +95,7 @@ paths:
           $ref: "#/components/responses/404"
 
   /registry/transfer-instruction/{transferInstructionId}/choice-contexts/withdraw:
-    get:
+    post:
       operationId: "getTransferInstructionWithdrawContext"
       description: |
         Get the choice context to withdraw a transfer instruction.
@@ -94,6 +106,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
       responses:
         "200":
           description: ok
@@ -144,6 +162,19 @@ components:
         [
           "choiceArguments",
         ]
+
+    GetChoiceContextRequest:
+      description: |
+        A request to get the context for executing a choice on a contract.
+      type: object
+      properties:
+        meta:
+          description: |
+            Metadata that will be passed to the choice, and should be incorporated
+            into the choice context. Provided for extensibility.
+          type: object
+          additionalProperties:
+            type: string
 
     TransferFactoryWithChoiceContext:
       description: |

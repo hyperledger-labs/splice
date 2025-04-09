@@ -11,11 +11,10 @@ info:
 paths:
 
   /registry/allocations/{allocationId}/choice-contexts/execute-transfer:
-    get:
+    post:
       operationId: "getAllocationTransferContext"
       description: |
         Get the choice context to execute a transfer on an allocation.
-      # TODO(#18152): consider whether the OpenAPI endpoint should accept the metadata that would be passed to the choice; or even just take the full choice argument
       parameters:
         - name: allocationId
           description: "The contract ID of the allocation whose transfer the caller wants to execute."
@@ -23,6 +22,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
       responses:
         "200":
           description: ok
@@ -36,7 +41,7 @@ paths:
           $ref: "#/components/responses/404"
 
   /registry/allocations/{allocationId}/choice-contexts/withdraw:
-    get:
+    post:
       operationId: "getAllocationWithdrawContext"
       description: |
         Get the choice context to withdraw an allocation.
@@ -47,6 +52,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
       responses:
         "200":
           description: ok
@@ -60,7 +71,7 @@ paths:
           $ref: "#/components/responses/404"
 
   /registry/allocations/{allocationId}/choice-contexts/cancel:
-    get:
+    post:
       operationId: "getAllocationCancelContext"
       description: |
         Get the choice context to cancel an allocation.
@@ -71,6 +82,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
       responses:
         "200":
           description: ok
@@ -98,6 +115,19 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
   schemas:
+    GetChoiceContextRequest:
+      description: |
+        A request to get the context for executing a choice on a contract.
+      type: object
+      properties:
+        meta:
+          description: |
+            Metadata that will be passed to the choice, and should be incorporated
+            into the choice context. Provided for extensibility.
+          type: object
+          additionalProperties:
+            type: string
+
     ChoiceContext:
       description: |
         The context required to exercise a choice on a contract via an interface.

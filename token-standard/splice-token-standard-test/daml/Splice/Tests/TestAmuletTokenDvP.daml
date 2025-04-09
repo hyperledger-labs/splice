@@ -154,7 +154,7 @@ testDvP = script do
   length allocations === 2
 
   contexts <- forA allocations $ \(allocCid, _) ->
-     RegistryApi.getAllocationTransferContext registry allocCid
+     RegistryApi.getAllocationTransferContext registry allocCid emptyMetadata
   let disclosures = foldMap (.disclosures) contexts
   let extraArgss = do
         context <- contexts

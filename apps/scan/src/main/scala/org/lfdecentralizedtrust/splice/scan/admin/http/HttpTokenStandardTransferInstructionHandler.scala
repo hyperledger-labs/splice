@@ -101,7 +101,7 @@ class HttpTokenStandardTransferInstructionHandler(
 
   override def getTransferInstructionAcceptContext(
       respond: Resource.GetTransferInstructionAcceptContextResponse.type
-  )(transferInstructionId: String)(
+  )(transferInstructionId: String, body: definitions.GetChoiceContextRequest)(
       extracted: TraceContext
   ): Future[Resource.GetTransferInstructionAcceptContextResponse] = {
     implicit val tc: TraceContext = extracted
@@ -119,7 +119,7 @@ class HttpTokenStandardTransferInstructionHandler(
 
   override def getTransferInstructionRejectContext(
       respond: Resource.GetTransferInstructionRejectContextResponse.type
-  )(transferInstructionId: String)(
+  )(transferInstructionId: String, body: definitions.GetChoiceContextRequest)(
       extracted: TraceContext
   ): Future[Resource.GetTransferInstructionRejectContextResponse] = {
     implicit val tc: TraceContext = extracted
@@ -137,7 +137,7 @@ class HttpTokenStandardTransferInstructionHandler(
 
   override def getTransferInstructionWithdrawContext(
       respond: Resource.GetTransferInstructionWithdrawContextResponse.type
-  )(transferInstructionId: String)(
+  )(transferInstructionId: String, body: definitions.GetChoiceContextRequest)(
       extracted: TraceContext
   ): Future[Resource.GetTransferInstructionWithdrawContextResponse] = {
     implicit val tc: TraceContext = extracted

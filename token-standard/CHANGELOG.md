@@ -40,6 +40,8 @@ Polishing changes
 - Removed the `validUntil` field from choice contexts returned by off-ledger APIs,
   as that is a left-over from a design stage where we did not require registries to support
   a 24h prepare-submission delay time by default.
+- Improve extensibility by allowing to pass the metadata intended to be used
+  when exercising a choice into the off-ledger API for fetching the choice context.
 
 ## 2025-03-31
 

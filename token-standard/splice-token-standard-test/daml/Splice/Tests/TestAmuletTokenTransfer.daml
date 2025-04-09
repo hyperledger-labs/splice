@@ -249,7 +249,7 @@ test_two_step_success = do
   bobInstrCid === aliceInstrCid
 
   -- bob accepts the transfer
-  context <- RegistryApi.getTransferInstruction_AcceptContext registry bobInstrCid
+  context <- RegistryApi.getTransferInstruction_AcceptContext registry bobInstrCid emptyMetadata
   result <- submitWithDisclosures' bob context.disclosures $ exerciseCmd bobInstrCid TransferInstruction_Accept with
     extraArgs = ExtraArgs with
       context = context.choiceContext
@@ -281,7 +281,7 @@ test_two_step_withdraw = do
   aliceInstrCid0 === aliceInstrCid
 
   -- alice rejects the transfer
-  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid
+  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
   result <- submitWithDisclosures' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
     extraArgs = ExtraArgs with
       context = context.choiceContext
@@ -320,7 +320,7 @@ test_two_step_withdraw_locked_amulet_gone  = do
   lockedHoldings === []
 
   -- withdraw fails if the time is too early
-  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid
+  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
   setTime (aliceInstrView.transfer.executeBefore `addRelTime` negate (days 1))
   submitWithDisclosuresMustFail' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
     extraArgs = ExtraArgs with
@@ -331,7 +331,7 @@ test_two_step_withdraw_locked_amulet_gone  = do
   setTime (aliceInstrView.transfer.executeBefore `addRelTime` days 1)
 
   -- alice withdraws the transfer
-  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid
+  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
   result <- submitWithDisclosures' alice context.disclosures $ exerciseCmd aliceInstrCid TransferInstruction_Withdraw with
     extraArgs = ExtraArgs with
       context = context.choiceContext
@@ -361,7 +361,7 @@ test_two_step_reject = do
   bobInstrCid === aliceInstrCid
 
   -- bob rejects the transfer
-  context <- RegistryApi.getTransferInstruction_RejectContext registry bobInstrCid
+  context <- RegistryApi.getTransferInstruction_RejectContext registry bobInstrCid emptyMetadata
   result <- submitWithDisclosures' bob context.disclosures $ exerciseCmd bobInstrCid TransferInstruction_Reject with
     extraArgs = ExtraArgs with
       context = context.choiceContext
@@ -396,7 +396,7 @@ test_two_step_reject_locked_amulet_gone  = do
   AmuletRegistry.expireLockAsOwner registry lockedCid
 
   -- bob rejects the transfer
-  context <- RegistryApi.getTransferInstruction_RejectContext registry bobInstrCid
+  context <- RegistryApi.getTransferInstruction_RejectContext registry bobInstrCid emptyMetadata
   result <- submitWithDisclosures' bob context.disclosures $ exerciseCmd bobInstrCid TransferInstruction_Reject with
     extraArgs = ExtraArgs with
       context = context.choiceContext

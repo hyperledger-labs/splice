@@ -1479,7 +1479,11 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], transferinstruction.v1.GetTransferInstructionAcceptContextResponse] = {
-      client.getTransferInstructionAcceptContext(transferInstructionId.contractId, headers)
+      client.getTransferInstructionAcceptContext(
+        transferInstructionId.contractId,
+        body = transferinstruction.v1.definitions.GetChoiceContextRequest(meta = None),
+        headers = headers,
+      )
     }
 
     override protected def handleOk()(implicit
@@ -1509,7 +1513,11 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], transferinstruction.v1.GetTransferInstructionRejectContextResponse] = {
-      client.getTransferInstructionRejectContext(transferInstructionId.contractId, headers)
+      client.getTransferInstructionRejectContext(
+        transferInstructionId.contractId,
+        body = transferinstruction.v1.definitions.GetChoiceContextRequest(meta = None),
+        headers = headers,
+      )
     }
 
     override protected def handleOk()(implicit
@@ -1539,7 +1547,11 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], transferinstruction.v1.GetTransferInstructionWithdrawContextResponse] = {
-      client.getTransferInstructionWithdrawContext(transferInstructionId.contractId, headers)
+      client.getTransferInstructionWithdrawContext(
+        transferInstructionId.contractId,
+        body = transferinstruction.v1.definitions.GetChoiceContextRequest(meta = None),
+        headers = headers,
+      )
     }
 
     override protected def handleOk()(implicit
@@ -1625,7 +1637,11 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], allocation.v1.GetAllocationTransferContextResponse] = {
-      client.getAllocationTransferContext(allocationId.contractId, headers)
+      client.getAllocationTransferContext(
+        allocationId.contractId,
+        body = allocation.v1.definitions.GetChoiceContextRequest(None),
+        headers = headers,
+      )
     }
 
     override protected def handleOk()(implicit
