@@ -5,25 +5,6 @@ package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
-import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingRequest
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
-import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
-import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
-import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
-import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
-import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -31,13 +12,33 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.SequencerDomainState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import io.circe.parser.*
-import io.grpc.{Status, StatusRuntimeException}
-import io.grpc.Status.Code
-import io.opentelemetry.api.trace.Tracer
-import java.nio.charset.StandardCharsets
-
 import com.google.protobuf.ByteString
+import io.circe.parser.*
+import io.grpc.Status.Code
+import io.grpc.{Status, StatusRuntimeException}
+import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStoreWithIngestion}
+import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
+import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
+import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
+
+import java.nio.charset.StandardCharsets
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -59,15 +60,19 @@ class HttpSvHandler(
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
-    tracer: Tracer,
+    protected val tracer: Tracer,
 ) extends v0.SvHandler[TraceContext]
     with Spanning
-    with NamedLogging {
-  private val workflowId = this.getClass.getSimpleName
+    with NamedLogging
+    with HttpVotesHandler {
+
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
   private val svParty = dsoStore.key.svParty
   private val dsoParty = dsoStore.key.dsoParty
+
+  override protected val votesStore: ActiveVotesStore = dsoStore
+  override protected val workflowId: String = this.getClass.getSimpleName
 
   private def decodeValidatorOnboardingSecret(secret: String): ValidatorOnboardingSecret =
     // There are two ways to create secrets:

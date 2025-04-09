@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   ActionView,
+  Alerting,
+  AlertState,
   DateWithDurationDisplay,
   DisableConditionally,
   SvClientProvider,
@@ -9,8 +11,7 @@ import {
 import { getUTCWithOffset } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
 import { useMutation } from '@tanstack/react-query';
-import { Dayjs } from 'dayjs';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -19,6 +20,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   FormControl,
   NativeSelect,
   Stack,
@@ -32,13 +34,14 @@ import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useDsoInfos } from '../../contexts/SvContext';
-import { useListDsoRulesVoteRequests } from '../../hooks/useListVoteRequests';
+import { useListDsoRulesVoteRequests } from '../../hooks';
 import { useSvConfig } from '../../utils';
-import { Alerting, AlertState } from '../../utils/Alerting';
+import { hasConflictingFields } from '../../utils/configDiffs';
 import {
   isExpirationBeforeEffectiveDate,
   isScheduleDateTimeValid,
   isValidUrl,
+  isValidVoteRequestUrl,
   VoteRequestValidity,
 } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
@@ -47,6 +50,7 @@ import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardSv from './actions/OffboardSv';
 import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfigSchedule';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
+import SetAmuletRulesConfig from './actions/SetAmuletRulesConfig';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
 import UpdateFutureAmuletConfigSchedule from './actions/UpdateFutureAmuletConfigSchedule';
 import UpdateSvRewardWeight from './actions/UpdateSvRewardWeight';
@@ -61,13 +65,18 @@ export function actionFromFormIsError(
   return !!(action as { formError: DecoderError }).formError;
 }
 
-export const CreateVoteRequest: React.FC = () => {
+export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: boolean }> = ({
+  supportsVoteEffectivityAndSetConfig,
+}) => {
   // States related to vote requests
   const [actionName, setActionName] = useState('SRARC_OffboardSv');
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
+  const [isEffective, setIsEffective] = useState(true);
+  const [effectivity, setEffectivity] = useState<Dayjs>(dayjs());
   const [expiration, setExpiration] = useState<Dayjs>(dayjs());
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [disableProceed, setDisableProceed] = useState(false);
 
   // States related to constraints from vote requests
   const [
@@ -77,7 +86,7 @@ export const CreateVoteRequest: React.FC = () => {
   const [alertMessage, setAlertMessage] = useState<AlertState>({});
 
   const dsoInfosQuery = useDsoInfos();
-  const listVoteRequestsQuery = useListDsoRulesVoteRequests();
+  const voteRequestQuery = useListDsoRulesVoteRequests();
 
   const expirationFromVoteRequestTimeout = dayjs().add(
     Math.floor(
@@ -90,6 +99,7 @@ export const CreateVoteRequest: React.FC = () => {
 
   useEffect(() => {
     setExpiration(expirationFromVoteRequestTimeout);
+    setEffectivity(expirationFromVoteRequestTimeout.add(1, 'day'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dsoInfosQuery.isInitialLoading]);
 
@@ -97,14 +107,20 @@ export const CreateVoteRequest: React.FC = () => {
     setExpiration(newDate ?? dayjs());
   };
 
+  const handleEffectivityDateChange = (newDate: Dayjs | null) => {
+    setEffectivity(newDate ?? dayjs());
+  };
+
   const handleActionNameChange = (newActionName: string) => {
-    setMaxDateTimeIfAddFutureAmuletConfigSchedule(undefined);
+    setExpiration(expirationFromVoteRequestTimeout);
+    setIsEffective(true);
+    setEffectivity(expirationFromVoteRequestTimeout.add(1, 'day'));
     setUrl('');
     setSummary('');
     setActionName(newActionName);
   };
 
-  const actionNameOptions = [
+  const actionNameOptions1 = [
     { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
@@ -120,6 +136,19 @@ export const CreateVoteRequest: React.FC = () => {
     },
     { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
   ];
+
+  const actionNameOptions2 = [
+    { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
+    { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
+    { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
+    { name: 'Set Dso Rules Configuration', value: 'SRARC_SetConfig' },
+    { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
+    { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
+  ];
+
+  const actionNameOptions = supportsVoteEffectivityAndSetConfig
+    ? actionNameOptions2
+    : actionNameOptions1;
 
   const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
   const chooseAction = useCallback(
@@ -184,7 +213,7 @@ export const CreateVoteRequest: React.FC = () => {
     }
 
     const scheduleValidity: VoteRequestValidity = isScheduleDateTimeValid(
-      listVoteRequestsQuery.data!,
+      voteRequestQuery.data!,
       effectiveDate
     );
 
@@ -215,12 +244,20 @@ export const CreateVoteRequest: React.FC = () => {
         !actionFromFormIsError(action) &&
         validateAction(action)
       ) {
-        return await createVoteRequest(requester, action, url, summary, duration)
+        return await createVoteRequest(
+          requester,
+          action,
+          url,
+          summary,
+          duration,
+          supportsVoteEffectivityAndSetConfig && isEffective ? effectivity?.toDate() : undefined
+        )
           .then(() => setUrl(''))
           .then(() => setSummary(''))
           .then(() => setActionName('SRARC_OffboardSv'))
           .then(() => setAction(undefined))
-          .then(() => setMaxDateTimeIfAddFutureAmuletConfigSchedule(undefined))
+          .then(() => setExpiration(expirationFromVoteRequestTimeout))
+          .then(() => setEffectivity(effectivity))
           .then(() => setAlertMessage({}));
       }
     },
@@ -245,6 +282,51 @@ export const CreateVoteRequest: React.FC = () => {
     createVoteRequestMutation.mutate();
     setConfirmDialogOpen(false);
   };
+
+  const conflicts = hasConflictingFields(action, voteRequestQuery.data);
+
+  useEffect(() => {
+    if (conflicts.hasConflict) {
+      setDisableProceed(true);
+    } else {
+      setDisableProceed(false);
+    }
+  }, [conflicts]);
+
+  // @ts-ignore
+  const conditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
+    { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
+    {
+      disabled: !action || actionFromFormIsError(action),
+      reason: !action
+        ? 'No action'
+        : `Action is not valid: ${
+            actionFromFormIsError(action) && JSON.stringify(action.formError)
+          }`,
+    },
+    { disabled: summary === '', reason: 'No summary', severity: 'warning' },
+    { disabled: !isValidVoteRequestUrl(url), reason: 'Invalid URL', severity: 'warning' },
+    {
+      disabled: !isValidSynchronizerPauseTime,
+      reason: 'Synchronizer upgrade time is before the expiry/effective date',
+      severity: 'warning',
+    },
+  ].concat(
+    supportsVoteEffectivityAndSetConfig
+      ? [
+          {
+            disabled: isEffective && expiration.isAfter(effectivity),
+            reason: 'Expiration must be set before effectivity.',
+            severity: 'warning',
+          },
+          {
+            disabled: conflicts.hasConflict,
+            reason: `A Vote Request aiming to change similar fields already exists. You are therefore not allowed to modify the fields: ${conflicts.intersection}`,
+            severity: 'warning',
+          },
+        ]
+      : []
+  );
 
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
@@ -273,38 +355,119 @@ export const CreateVoteRequest: React.FC = () => {
               </NativeSelect>
             </FormControl>
           </Stack>
-          <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h6" mt={4}>
-              Vote Request Expires At
-            </Typography>
-            <DesktopDateTimePicker
-              label={`Enter time in local timezone (${getUTCWithOffset()})`}
-              value={expiration}
-              ampm={false}
-              format="YYYY-MM-DD HH:mm"
-              minDateTime={dayjs()}
-              maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
-              readOnly={false}
-              onChange={d => handleExpirationDateChange(d)}
-              slotProps={{
-                textField: {
-                  id: 'datetime-picker-vote-request-expiration',
-                  inputProps: {
-                    'data-testid': 'datetime-picker-vote-request-expiration',
+          {supportsVoteEffectivityAndSetConfig ? (
+            <Stack>
+              <Stack direction="column" mb={4} spacing={1}>
+                <Typography variant="h6" mt={4}>
+                  Vote Request Expires At
+                </Typography>
+                <DesktopDateTimePicker
+                  label={`Enter time in local timezone (${getUTCWithOffset()})`}
+                  value={expiration}
+                  ampm={false}
+                  format="YYYY-MM-DD HH:mm"
+                  minDateTime={dayjs()}
+                  maxDateTime={effectivity}
+                  readOnly={false}
+                  onChange={d => handleExpirationDateChange(d)}
+                  slotProps={{
+                    textField: {
+                      id: 'datetime-picker-vote-request-expiration',
+                      inputProps: {
+                        'data-testid': 'datetime-picker-vote-request-expiration',
+                      },
+                    },
+                  }}
+                  closeOnSelect
+                />
+                <Typography variant="body2" mt={1}>
+                  Expires{' '}
+                  <DateWithDurationDisplay
+                    datetime={expiration?.toDate()}
+                    enableDuration
+                    onlyDuration
+                  />
+                </Typography>
+              </Stack>
+
+              <Stack direction="row" mb={1}>
+                <Checkbox
+                  sx={{ pl: 0 }}
+                  checked={!isEffective}
+                  onChange={e => setIsEffective(!e.target.checked)}
+                  id={'checkbox-set-effective-at-threshold'}
+                  data-testid="checkbox-set-effective-at-threshold"
+                />
+                <Typography variant="h6" mt={1}>
+                  Effective at threshold
+                </Typography>
+              </Stack>
+
+              {isEffective && (
+                <Stack direction="column" mb={4} spacing={1}>
+                  <Typography variant="h6" mt={4}>
+                    Vote Request Effective At
+                  </Typography>
+                  <DesktopDateTimePicker
+                    label={`Enter time in local timezone (${getUTCWithOffset()})`}
+                    value={effectivity}
+                    minDateTime={dayjs()}
+                    ampm={false}
+                    format="YYYY-MM-DD HH:mm"
+                    readOnly={false}
+                    onChange={d => handleEffectivityDateChange(d)}
+                    slotProps={{
+                      textField: {
+                        id: 'datetime-picker-vote-request-effectivity',
+                        inputProps: {
+                          'data-testid': 'datetime-picker-vote-request-effectivity',
+                        },
+                      },
+                    }}
+                    closeOnSelect
+                  />
+                  <Typography variant="body2" mt={1}>
+                    Effective{' '}
+                    <DateWithDurationDisplay
+                      datetime={effectivity?.toDate()}
+                      enableDuration
+                      onlyDuration
+                    />
+                  </Typography>
+                </Stack>
+              )}
+            </Stack>
+          ) : (
+            <Stack direction="column" mb={4} spacing={1}>
+              <Typography variant="h6" mt={4}>
+                Vote Request Expires At
+              </Typography>
+              <DesktopDateTimePicker
+                label={`Enter time in local timezone (${getUTCWithOffset()})`}
+                value={expiration}
+                ampm={false}
+                format="YYYY-MM-DD HH:mm"
+                minDateTime={dayjs()}
+                maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
+                readOnly={false}
+                onChange={d => handleExpirationDateChange(d)}
+                slotProps={{
+                  textField: {
+                    id: 'datetime-picker-vote-request-expiration',
                   },
-                },
-              }}
-              closeOnSelect
-            />
-            <Typography variant="body2" mt={1}>
-              Expires{' '}
-              <DateWithDurationDisplay
-                datetime={expiration?.toDate()}
-                enableDuration
-                onlyDuration
+                }}
+                closeOnSelect
               />
-            </Typography>
-          </Stack>
+              <Typography variant="body2" mt={1}>
+                Expires{' '}
+                <DateWithDurationDisplay
+                  datetime={expiration?.toDate()}
+                  enableDuration
+                  onlyDuration
+                />
+              </Typography>
+            </Stack>
+          )}
           {actionName === 'SRARC_OffboardSv' && <OffboardSv chooseAction={chooseAction} />}
           {actionName === 'SRARC_GrantFeaturedAppRight' && (
             <GrantFeaturedAppRight chooseAction={chooseAction} />
@@ -314,11 +477,15 @@ export const CreateVoteRequest: React.FC = () => {
           )}
           {actionName === 'SRARC_SetConfig' && (
             <SetDsoRulesConfig
-              expiration={expiration}
+              supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
               chooseAction={chooseAction}
               setIsValidSynchronizerPauseTime={setIsValidSynchronizerPauseTime}
+              expiration={expiration}
+              effectivity={effectivity}
+              isEffective={isEffective}
             />
           )}
+          {actionName === 'CRARC_SetConfig' && <SetAmuletRulesConfig chooseAction={chooseAction} />}
           {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
             <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
           )}
@@ -339,6 +506,7 @@ export const CreateVoteRequest: React.FC = () => {
             <TextField
               error={!summary}
               id="create-reason-summary"
+              inputProps={{ 'data-testid': 'create-reason-summary' }}
               rows={2}
               multiline
               onChange={e => setSummary(e.target.value)}
@@ -354,6 +522,7 @@ export const CreateVoteRequest: React.FC = () => {
                   autoComplete="off"
                   error={!isValidUrl(url)}
                   id="create-reason-url"
+                  inputProps={{ 'data-testid': 'create-reason-url' }}
                   onChange={e => setUrl(e.target.value)}
                   value={url}
                 />
@@ -372,7 +541,11 @@ export const CreateVoteRequest: React.FC = () => {
                     action as ActionRequiringConfirmation
                   ) as ActionRequiringConfirmation
                 }
-                effectiveAt={expiresAt}
+                expiresAt={new Date(expiresAt!)}
+                effectiveAt={
+                  // TODO(#16139): get rid of logic to set expiration date for request that don't define effectivity
+                  supportsVoteEffectivityAndSetConfig ? effectivity?.toDate() : new Date(expiresAt!)
+                }
                 expirationInDays={expirationInDays}
                 confirmationDialogProps={{
                   showDialog: confirmDialogOpen,
@@ -381,6 +554,7 @@ export const CreateVoteRequest: React.FC = () => {
                   title: 'Confirm Your Vote Request',
                   attributePrefix: 'vote',
                   children: null,
+                  disableProceed: disableProceed,
                 }}
               />
             </Stack>
@@ -388,25 +562,7 @@ export const CreateVoteRequest: React.FC = () => {
           <Alerting alertState={alertMessage} />
 
           <Stack direction="column" mb={4} spacing={1}>
-            <DisableConditionally
-              conditions={[
-                { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
-                {
-                  disabled: !action || actionFromFormIsError(action),
-                  reason: !action
-                    ? 'No action'
-                    : `Action is not valid: ${
-                        actionFromFormIsError(action) && JSON.stringify(action.formError)
-                      }`,
-                },
-                { disabled: summary === '', reason: 'No summary' },
-                { disabled: !isValidUrl(url), reason: 'Invalid URL' },
-                {
-                  disabled: !isValidSynchronizerPauseTime,
-                  reason: 'Synchronizer upgrade time is before the expiry/effective date',
-                },
-              ]}
-            >
+            <DisableConditionally conditions={conditions}>
               <Button
                 id="create-voterequest-submit-button"
                 data-testid="create-voterequest-submit-button"
@@ -427,13 +583,19 @@ export const CreateVoteRequest: React.FC = () => {
   );
 };
 
-const VoteRequestWithContexts: React.FC = () => {
+const VoteRequestWithContexts: React.FC<{ supportsVoteEffectivityAndSetConfig: boolean }> = ({
+  supportsVoteEffectivityAndSetConfig,
+}) => {
   const config = useSvConfig();
 
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <CreateVoteRequest />
-      <SvListVoteRequests />
+      <CreateVoteRequest
+        supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
+      />
+      <SvListVoteRequests
+        supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
+      />
     </SvClientProvider>
   );
 };

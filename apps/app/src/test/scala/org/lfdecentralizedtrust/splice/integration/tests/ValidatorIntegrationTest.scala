@@ -6,7 +6,11 @@ import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, EnvironmentImpl}
+import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
+  DarResources,
+  EnvironmentImpl,
+}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -104,6 +108,14 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
     // the party is available via the scan proxy
     aliceValidatorBackend.scanProxy.getDsoParty() shouldBe dsoParty
+
+    // check that the dsoGovernance are not vetted
+    aliceValidatorBackend.participantClient.topology.vetted_packages
+      .list(filterParticipant = aliceValidatorBackend.participantClient.id.toProtoPrimitive)
+      .flatMap(_.item.packages)
+      .map(_.packageId) should contain noElementsOf (DarResources.dsoGovernance.all.map(
+      _.packageId
+    ))
 
     // the ans rules are available via the scan proxy
     aliceValidatorBackend.scanProxy

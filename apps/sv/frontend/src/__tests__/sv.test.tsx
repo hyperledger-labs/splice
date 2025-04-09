@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import dayjs from 'dayjs';
+import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
+import { ListDsoRulesVoteRequestsResponse } from 'sv-openapi';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
-import { svPartyId } from './mocks/constants';
+import { svPartyId, voteRequests } from './mocks/constants';
+import { server, svUrl } from './setup/setup';
 
 const AppWithConfig = () => {
   return (
@@ -50,83 +52,9 @@ describe('SV user can', () => {
 
     expect(await screen.findByText('Vote Requests')).toBeDefined();
   });
-
-  test('set next scheduled synchronizer upgrade', async () => {
-    const user = userEvent.setup();
-    render(<AppWithConfig />);
-
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
-
-    expect(await screen.findByText('Vote Requests')).toBeDefined();
-    expect(await screen.findByText('Governance')).toBeDefined();
-    const dropdown = screen.getByTestId('display-actions');
-    expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
-    expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
-    expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
-
-    const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
-    await user.click(checkBox);
-
-    expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
-  });
-
-  test('scheduled synchronizer upgrade time must be before effective date', async () => {
-    const user = userEvent.setup();
-    render(<AppWithConfig />);
-
-    expect(await screen.findByText('Log In')).toBeDefined();
-
-    const input = screen.getByRole('textbox');
-    await user.type(input, 'sv1');
-
-    await user.click(screen.getByText('Governance'));
-
-    const dropdown = screen.getByTestId('display-actions');
-    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
-    expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
-    expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
-
-    const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
-    await user.click(checkBox);
-
-    const format = 'YYYY-MM-DD HH:mm';
-    const expirationDate = screen
-      .getByTestId('datetime-picker-vote-request-expiration')
-      .getAttribute('value');
-    expect(expirationDate).toBeDefined();
-    console.log('expirationDate', expirationDate);
-
-    const expirationDateDayjs = dayjs(expirationDate);
-    const expirationDateMinus1Minute = expirationDateDayjs.subtract(1, 'minute').format(format);
-    const expirationDatePlus1Minute = expirationDateDayjs.add(1, 'minute').format(format);
-
-    const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
-      'nextScheduledSynchronizerUpgrade.time-value'
-    );
-
-    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-      target: { value: expirationDateMinus1Minute },
-    });
-
-    expect(
-      screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
-    ).toBeDefined();
-
-    fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-      target: { value: expirationDatePlus1Minute },
-    });
-
-    expect(screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')).toBe(
-      ''
-    );
-  });
 });
 
-describe('An AddFutureAmuletConfigSchedule request', () => {
+describe('An SetConfig request', () => {
   test('defaults to the current amulet configuration', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
@@ -139,12 +67,143 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
 
     const dropdown = screen.getByTestId('display-actions');
     expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: 'CRARC_AddFutureAmuletConfigSchedule' } });
+    fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
 
     expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
-    expect(await screen.findByDisplayValue('4815162342')).toBeDefined();
+    expect(await screen.findByDisplayValue('0.03')).toBeDefined();
+
+    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+
+    expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
+    expect(await screen.findByDisplayValue('10')).toBeDefined();
   });
 
+  test(
+    'displays a warning when an SV tries to modify a DsoRules field already changed by another request',
+    async () => {
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      const dropdown = screen.getByTestId('display-actions');
+      expect(dropdown).toBeDefined();
+      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+
+      const input = screen.getByTestId(
+        'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
+      );
+      await user.clear(input);
+      await user.type(input, '481516');
+      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+
+      const input2 = screen.getByTestId('create-reason-summary');
+      await user.type(input2, 'summaryABC');
+      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      const warning = screen.getByTestId('voterequest-creation-alert');
+      expect(warning).toBeDefined();
+      expect(warning.textContent).toContain(
+        'A Vote Request aiming to change similar fields already exists. ' +
+          'You are therefore not allowed to modify the fields: decentralizedSynchronizer.synchronizers.acsCommitmentReconciliationInterval'
+      );
+
+      const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+      expect(button.getAttribute('disabled')).toBeDefined();
+    },
+    { timeout: 10000 }
+  );
+
+  test(
+    'displays a warning when an SV tries to modify an AmuletRules field already changed by another request',
+    async () => {
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      const dropdown = screen.getByTestId('display-actions');
+      expect(dropdown).toBeDefined();
+      fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
+
+      const input = screen.getByTestId('transferConfig.createFee.fee-value');
+      await user.clear(input);
+      await user.type(input, '481516');
+      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+
+      const input2 = screen.getByTestId('create-reason-summary');
+      await user.type(input2, 'summaryABC');
+      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      const warning = screen.getByTestId('voterequest-creation-alert');
+      expect(warning).toBeDefined();
+      expect(warning.textContent).toContain(
+        'A Vote Request aiming to change similar fields already exists. ' +
+          'You are therefore not allowed to modify the fields: transferConfig.createFee.fee'
+      );
+
+      const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
+      expect(button.getAttribute('disabled')).toBeDefined();
+    },
+    { timeout: 10000 }
+  );
+
+  test(
+    'disables the Proceed button in the confirmation dialog if a conflict arises after request creation',
+    async () => {
+      server.use(
+        rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+          return res(ctx.json<ListDsoRulesVoteRequestsResponse>({ dso_rules_vote_requests: [] }));
+        })
+      );
+
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Vote Requests')).toBeDefined();
+      expect(await screen.findByText('Governance')).toBeDefined();
+
+      const dropdown = screen.getByTestId('display-actions');
+      expect(dropdown).toBeDefined();
+      fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
+
+      const input = screen.getByTestId('transferConfig.createFee.fee-value');
+      await user.clear(input);
+      await user.type(input, '481516');
+      expect(await screen.findByDisplayValue('481516')).toBeDefined();
+
+      const input2 = screen.getByTestId('create-reason-summary');
+      await user.type(input2, 'summaryABC');
+      expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      expect(await screen.findByText('Send Request to Super Validators')).toBeDefined();
+      await user.click(screen.getByText('Send Request to Super Validators'));
+
+      server.use(
+        rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+          return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
+        })
+      );
+
+      const button = screen.getByRole('button', { name: 'Proceed' });
+      expect(button.getAttribute('disabled')).toBeDefined();
+    },
+    { timeout: 10000 }
+  );
+});
+
+describe('An AddFutureAmuletConfigSchedule request', () => {
   test('is displayed in executed section when its effective date is in the past', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);

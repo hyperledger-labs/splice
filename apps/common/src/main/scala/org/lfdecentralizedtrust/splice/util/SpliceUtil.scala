@@ -10,8 +10,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.{
-  BaseRateTrafficLimits,
   AmuletDecentralizedSynchronizerConfig,
+  BaseRateTrafficLimits,
   SynchronizerFeesConfig,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
@@ -20,11 +20,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.codegen.java.da.set.types.Set as DamlSet
 import org.lfdecentralizedtrust.splice.environment.{
-  SpliceLedgerConnection,
   CommandPriority,
   DarResource,
   DarResources,
   RetryProvider,
+  SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -32,9 +32,18 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.CometBftConfigLimits
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
+  DsoDecentralizedSynchronizerConfig,
+  SynchronizerConfig,
+  SynchronizerNodeConfigLimits,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRulesConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso
 
 import java.math.RoundingMode
 import java.time.{Duration, Instant}
+import java.util.Optional
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -235,7 +244,7 @@ object SpliceUtil {
   private val dummyReadVsWriteScalingFactor = 4
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
-
+  // TODO(#16139) get rid of this method
   def defaultAmuletConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
@@ -271,6 +280,44 @@ object SpliceUtil {
   // Similar to holding fees, it compensates the SVs for the storage cost of the contract.
   // Roughly equal to $1/year expressed as a daily rate.
   lazy val defaultTransferPreapprovalFee = damlDecimal(0.00274)
+
+  def defaultDsoRulesConfig(
+      numUnclaimedRewardsThreshold: Int,
+      numMemberTrafficContractsThreshold: Int,
+      maxNumCometBftNodes: Int,
+      dummyDomain: DomainId,
+  ): DsoRulesConfig = new DsoRulesConfig(
+    numUnclaimedRewardsThreshold, // numUnclaimedRewardsThreshold
+    numMemberTrafficContractsThreshold, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
+    new RelTime(TimeUnit.HOURS.toMicros(1)), // actionConfirmationTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingRequestTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingConfirmedTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
+    new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout
+    new SynchronizerNodeConfigLimits(
+      new CometBftConfigLimits(
+        maxNumCometBftNodes, // maxNumCometBftNodes
+        2, // maxNumGovernanceKeys
+        2, // maxNumSequencingKeys
+        50, // maxNodeIdLength
+        256, // maxPubKeyLength
+      )
+    ),
+    1024, // maxTextLength
+    new DsoDecentralizedSynchronizerConfig(
+      // domains
+      Map(
+        dummyDomain.toProtoPrimitive -> new SynchronizerConfig(
+          dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
+          "TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
+          Optional.empty(),
+        )
+      ).asJava,
+      dummyDomain.toProtoPrimitive, // lastDomainId
+      dummyDomain.toProtoPrimitive, // activeSynchronizer
+    ), // decentralizedSynchronizerConfig
+    Optional.empty(), // nextScheduledHardDomainMigration
+  )
 
   def defaultAmuletConfig(
       initialTickDuration: NonNegativeFiniteDuration,
