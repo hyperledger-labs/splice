@@ -806,6 +806,9 @@ components:
           type: string
         expiration:
           type: object
+        effectiveTime:
+          type: string
+          format: date-time
 
     ListVotesResponse:
       type: object

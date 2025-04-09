@@ -1,29 +1,29 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{
   FrontendLoginUtil,
   SvFrontendTestUtil,
   SvTestUtil,
   WalletTestUtil,
 }
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.PartyId
-import org.openqa.selenium.support.ui.ExpectedConditions
-import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.By
+import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
+import java.nio.file.Path
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -34,373 +34,48 @@ class SvFrontendIntegrationTest
     with VotesFrontendTestUtil
     with ValidatorLicensesFrontendTestUtil {
 
+  // TODO(#16139): change tests to work with current version (by simply getting rid of this file in favor of SvFrontendIntegrationTest2)
+  private val initialPackageConfig = InitialPackageConfig(
+    amuletVersion = "0.1.7",
+    amuletNameServiceVersion = "0.1.7",
+    dsoGovernanceVersion = "0.1.10",
+    validatorLifecycleVersion = "0.1.1",
+    walletVersion = "0.1.7",
+    walletPaymentsVersion = "0.1.7",
+  )
+
+  private val splitwellDarPath = "daml/dars/splitwell-0.1.7.dar"
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
-
-  "SV UIs" should {
-    "have basic login functionality" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "login works with correct password", {
-            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "logged in in the sv ui",
-          _ => find(id("app-title")).value.text should matchText("SUPER VALIDATOR OPERATIONS"),
-        )
-      }
-    }
-
-    "warn if user fails to login" in { _ =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-          {
-            actAndCheck(
-              "login does not work with wrong user", {
-                login(sv1UIPort, "WrongUser")
-              },
-            )(
-              "login fails",
-              _ =>
-                find(id("loginFailed")).value.text should matchText(
-                  "User unauthorized to act as the SV Party."
-                ),
-            )
-          },
-          entries => {
-            forExactly(1, entries) {
-              _.warningMessage should include(
-                "Authorization Failed"
-              )
-            }
-            // Vite loads the generated daml code multiple times which triggers this warning.
-            // We also ignore that in our warning checker on CI.
-            forExactly(entries.length - 1, entries) {
-              _.warningMessage should include(
-                "Trying to re-register"
-              )
-            }
-          },
-        )
-      }
-    }
-
-    "have 5 information tabs" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "DSO and amulet infos are displayed in pretty json", {
-            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see the 5 tab panels",
-          _ => {
-            inside(find(id("information-tab-general"))) { case Some(e) =>
-              e.text shouldBe "General"
-            }
-            inside(find(id("information-tab-dso-info"))) { case Some(e) =>
-              e.text shouldBe "DSO Info"
-            }
-            inside(find(id("information-tab-amulet-info"))) { case Some(e) =>
-              e.text shouldBe s"$amuletName Info"
-            }
-            inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
-              e.text shouldBe "CometBFT Debug Info"
-            }
-            inside(find(id("information-tab-canton-domain-status"))) { case Some(e) =>
-              e.text shouldBe "Domain Node Status"
-            }
-          },
-        )
-        actAndCheck("Click on general information tab", click on "information-tab-general")(
-          "observe information on party information",
-          _ => {
-            val valueCells = findAll(className("general-dso-value-name")).toSeq
-            valueCells should have length 9
-            forExactly(1, valueCells)(cell =>
-              seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
-            )
-            forExactly(3, valueCells)(cell =>
-              seleniumText(cell) should matchText(
-                sv1Backend.getDsoInfo().svParty.toProtoPrimitive
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(initialPackageConfig = initialPackageConfig)
+        )(config)
+      )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
+          if (name == "splitwellValidator")
+            validatorConfig.copy(
+              appInstances = validatorConfig.appInstances.updated(
+                "splitwell",
+                validatorConfig
+                  .appInstances("splitwell")
+                  .copy(
+                    dars = validatorConfig.appInstances("splitwell").dars ++ Seq(
+                      Path.of(splitwellDarPath)
+                    )
+                  ),
               )
             )
-          },
-        )
-        actAndCheck(
-          "Click on domain status tab",
-          click on "information-tab-canton-domain-status",
-        )(
-          "Observe sequencer and mediator as active",
-          _ => {
-            val activeCells = findAll(className("active-value")).toSeq
-            activeCells should have length 2
-            forAll(activeCells)(_.text shouldBe "true")
-          },
-        )
-      }
-    }
+          else
+            validatorConfig
+        )(conf)
+      )
 
-    "can prepare an onboarding secret for new validator" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        val (_, rowSize) = actAndCheck(
-          "sv1 operator can login and browse to the validator onboarding tab", {
-            go to s"http://localhost:$sv1UIPort/validator-onboarding"
-            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see a button for creating onboarding secret",
-          _ => {
-            find(className("onboarding-secret-table")) should not be empty
-            val rows = findAll(className("onboarding-secret-table-row")).toSeq
-            find(id("create-validator-onboarding-secret")) should not be empty
-            rows.size
-          },
-        )
-
-        val (_, newSecret) = actAndCheck(
-          "click on the button to create an onboarding secret", {
-            click on "create-validator-onboarding-secret"
-          },
-        )(
-          "a new secret row is added",
-          _ => {
-            val secrets = findAll(
-              className("onboarding-secret-table-secret")
-            ).toSeq
-            secrets should have size (rowSize + 1L)
-            secrets.head.text
-          },
-        )
-
-        val licenseRows = getLicensesTableRows
-        val newValidatorParty = allocateRandomSvParty("validatorX")
-
-        actAndCheck(
-          "onboard new validator using the secret",
-          sv1Backend.onboardValidator(
-            newValidatorParty,
-            newSecret,
-            s"${newValidatorParty.uid.identifier}@example.com",
-          ),
-        )(
-          "a new validator row is added",
-          _ => {
-            checkLastValidatorLicenseRow(
-              licenseRows.size.toLong,
-              sv1Backend.getDsoInfo().svParty,
-              newValidatorParty,
-            )
-          },
-        )
-      }
-    }
-
-    "can see validator licenses in infinite scroll" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        val (_, rowSize) = actAndCheck(
-          "sv1 operator can login and browse to the validator onboarding tab", {
-            go to s"http://localhost:$sv1UIPort/validator-onboarding"
-            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see a button for creating onboarding secret",
-          _ => {
-            find(className("onboarding-secret-table")) should not be empty
-          },
-        )
-
-        // the frontend fetches 10 items per page, creating more to show infinte scroll works on first load
-        val validatorCount = 12
-        def getSecrets = findAll(
-          className("onboarding-secret-table-secret")
-        ).toSeq.map(_.text)
-
-        val secrets = clue("create onboarding secrets") {
-          (1 to validatorCount).foreach { _ =>
-            waitForCondition(id("create-validator-onboarding-secret")) {
-              ExpectedConditions.elementToBeClickable(_)
-            }
-            click on "create-validator-onboarding-secret"
-          }
-          val secrets = getSecrets
-
-          secrets
-        }
-
-        val parties = clue(s"allocate ${validatorCount} sv parties") {
-          (1 to validatorCount).map { i => allocateRandomSvParty(s"validatorX$i") }
-        }
-
-        actAndCheck(
-          "onboard all validators", {
-            parties.zip(secrets) foreach { case (party, secret) =>
-              sv1Backend.onboardValidator(
-                party,
-                secret,
-                s"${party.uid.identifier}@example.com",
-              )
-            }
-            // reloading to test that we auto-fetch the new data on new page load
-            webDriver.manage().window().setSize(new org.openqa.selenium.Dimension(1920, 2560))
-            webDriver.navigate().refresh()
-          },
-        )(
-          "the table shows more licenses than the page size",
-          _ => {
-            val rows = findAll(className("validator-licenses-table-row")).toSeq
-            rows.size should be > validatorCount
-          },
-        )
-      }
-    }
-
-    "can view median amulet price and update desired amulet price by each SV" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "sv1 operator can login and browse to the amulet price tab", {
-            go to s"http://localhost:$sv1UIPort/amulet-price"
-            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see a median amulet price, desired amulet price of SV1 and other SVs, open mining rounds",
-          _ => {
-            val shownAmuletPrice = s"${walletAmuletPrice.stripTrailingZeros.toPlainString} USD"
-            inside(find(id("median-amulet-price-usd"))) { case Some(e) =>
-              e.text shouldBe shownAmuletPrice
-            }
-            inside(find(id("cur-sv-amulet-price-usd"))) { case Some(e) =>
-              e.text shouldBe shownAmuletPrice
-            }
-            val rows = findAll(className("amulet-price-table-row")).toSeq
-            rows should have size 3
-            svAmuletPriceShouldMatch(rows, sv2Backend.getDsoInfo().svParty, shownAmuletPrice)
-            svAmuletPriceShouldMatch(rows, sv3Backend.getDsoInfo().svParty, "Not Set")
-            svAmuletPriceShouldMatch(rows, sv4Backend.getDsoInfo().svParty, "Not Set")
-
-            val roundRows = findAll(className("open-mining-round-row")).toSeq
-            roundRows should have size 3
-            forEvery(roundRows) {
-              _.childElement(className("amulet-price")).text shouldBe shownAmuletPrice
-            }
-          },
-        )
-
-        def showBigDecimal(v: BigDecimal) = v.bigDecimal.stripTrailingZeros.toPlainString
-
-        val testDesiredPriceChange = (desiredPrice: BigDecimal, otherValues: Seq[BigDecimal]) => {
-          inside(find(id("median-amulet-price-usd"))) { case Some(e) =>
-            e.text shouldBe s"${median(Seq(desiredPrice) ++ otherValues).map(showBigDecimal).getOrElse('0')} USD"
-          }
-          inside(find(id("cur-sv-amulet-price-usd"))) { case Some(e) =>
-            e.text shouldBe s"${showBigDecimal(desiredPrice)} USD"
-          }
-          val rows = findAll(className("amulet-price-table-row")).toSeq
-          rows should have size 3
-          forEvery(
-            Table(
-              ("backend", "other value row"),
-              (sv2Backend, 0),
-              (sv3Backend, 1),
-              (sv4Backend, 2),
-            )
-          ) { (backend, otherValueRow) =>
-            svAmuletPriceShouldMatch(
-              rows,
-              backend.getDsoInfo().svParty,
-              otherValues
-                .lift(otherValueRow)
-                .fold("Not Set")(v => s"${showBigDecimal(v)} USD"),
-            )
-          }
-        }
-
-        actAndCheck(
-          "sv1 operator can change the desired price", {
-            click on "edit-amulet-price-button"
-            click on "desired-amulet-price-field"
-            numberField("desired-amulet-price-field").underlying.clear()
-            numberField("desired-amulet-price-field").underlying.sendKeys("10.55")
-
-            click on "update-amulet-price-button"
-          },
-        )(
-          "median fractional amulet price changed and amulet price updated on the row for sv2",
-          _ => {
-            testDesiredPriceChange(10.55, Seq(walletAmuletPrice))
-          },
-        )
-
-        actAndCheck(
-          "sv1 operator can change the desired price", {
-            click on "edit-amulet-price-button"
-            click on "desired-amulet-price-field"
-            numberField("desired-amulet-price-field").underlying.clear()
-            numberField("desired-amulet-price-field").underlying.sendKeys("10")
-
-            click on "update-amulet-price-button"
-          },
-        )(
-          "median amulet price changed and amulet price updated on the row for sv2",
-          _ => {
-            testDesiredPriceChange(10, Seq(walletAmuletPrice))
-          },
-        )
-
-        actAndCheck(
-          "sv2 set the desired price", {
-            eventuallySucceeds() {
-              sv2Backend.updateAmuletPriceVote(BigDecimal(15.55))
-            }
-          },
-        )(
-          "median amulet price changed and amulet price updated on the row for sv2",
-          _ => {
-            testDesiredPriceChange(10, Seq(15.55))
-          },
-        )
-
-        actAndCheck(
-          "sv3 set the desired price", {
-            eventuallySucceeds() {
-              sv3Backend.updateAmuletPriceVote(BigDecimal(5))
-            }
-          },
-        )(
-          "median amulet price changed and amulet price updated on the row for sv2",
-          _ => {
-            testDesiredPriceChange(10, Seq(15.55, 5))
-          },
-        )
-
-        actAndCheck(
-          "sv4 set the desired price", {
-            eventuallySucceeds() {
-              sv4Backend.updateAmuletPriceVote(BigDecimal(9.0))
-            }
-          },
-        )(
-          "median amulet price changed and amulet price updated on the row for sv4",
-          _ => {
-            testDesiredPriceChange(10, Seq(15.55, 5, 9))
-          },
-        )
-
-        actAndCheck(
-          "sv1 update the desired price", {
-            eventuallySucceeds() {
-              sv1Backend.updateAmuletPriceVote(BigDecimal(1.0))
-            }
-          },
-        )(
-          "median amulet price changed",
-          _ => {
-            testDesiredPriceChange(1, Seq(15.55, 5, 9))
-          },
-        )
-      }
-    }
+  "Old SV UIs" should {
 
     def testCreateAndVoteDsoRulesAction(action: String)(
         fillUpForm: WebDriverType => Unit
@@ -1122,7 +797,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("Another vote request for a schedule adjustment")
                 }
               },
@@ -1170,7 +845,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("The expiration date must be before the effective date")
                 }
               },
@@ -1272,7 +947,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("Another vote request for a schedule adjustment")
                 }
               },
@@ -1370,7 +1045,7 @@ class SvFrontendIntegrationTest
             )(
               "sv1 can see the alerting message preventing him to continue",
               _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                inside(find(id("voterequest-creation-alert"))) { case Some(tb) =>
                   tb.text should include("Another vote request for a schedule adjustment")
                 }
               },
@@ -1410,54 +1085,6 @@ class SvFrontendIntegrationTest
             )
           }
       }
-
-    "can request DSO delegate election" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "sv1 operator can login and browse to the delegate election tab", {
-            go to s"http://localhost:$sv1UIPort/delegate"
-            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see a button for requesting a delegate election",
-          _ => {
-            find(id("submit-ranking-delegate-election")) should not be empty
-          },
-        )
-
-        val svs: Vector[String] =
-          sv3Backend.getDsoInfo().dsoRules.payload.svs.keySet().asScala.toVector
-
-        val newLeader = svs.head
-
-        sv2Backend.createElectionRequest(sv2Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
-        sv3Backend.createElectionRequest(sv3Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
-
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          actAndCheck(
-            "sv1 operator makes his own ranking for his delegate preference", {
-              click on "submit-ranking-delegate-election"
-            },
-          )(
-            "The epoch advances by one and the delegate name is changed.",
-            _ => {
-              find(id("delegate-election-epoch")).value.text should include(
-                sv1Backend.getDsoInfo().dsoRules.payload.epoch.toString
-              )
-              find(id("delegate-election-current-delegate")).value.text should include(newLeader)
-            },
-          ),
-          entries => {
-            forExactly(4, entries) { line =>
-              line.message should include(
-                "Noticed an DsoRules epoch change"
-              )
-            }
-          },
-        )
-
-      }
-    }
 
     "if two AddFutureAmuletConfigSchedule actions scheduled at the same time are created concurrently, then only one succeeds" in {
       implicit env =>
@@ -1616,18 +1243,6 @@ class SvFrontendIntegrationTest
     }
   }
 
-  def setExpirationDate(party: String, dateTime: String)(implicit
-      webDriver: WebDriverType
-  ) = {
-    setDateTime(party, "datetime-picker-vote-request-expiration", dateTime)
-  }
-
-  def setAmuletConfigDate(party: String, dateTime: String)(implicit
-      webDriver: WebDriverType
-  ) = {
-    setDateTime(party, "datetime-picker-amulet-configuration", dateTime)
-  }
-
   def getVoteRequestsInProgressSize()(implicit webDriver: WebDriverType) = {
     val tbodyInProgress = find(id("sv-voting-in-progress-table-body"))
     tbodyInProgress
@@ -1640,17 +1255,6 @@ class SvFrontendIntegrationTest
     tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
-  }
-
-  private def svAmuletPriceShouldMatch(
-      rows: Seq[Element],
-      svParty: PartyId,
-      amuletPrice: String,
-  ) = {
-    forExactly(1, rows) { row =>
-      seleniumText(row.childElement(className("sv-party"))) shouldBe svParty.toProtoPrimitive
-      row.childElement(className("amulet-price")).text shouldBe amuletPrice
-    }
   }
 
 }

@@ -126,6 +126,15 @@ class SingleScanConnection private[client] (
     )
   }
 
+  override def listVoteRequests()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListDsoRulesVoteRequests(),
+    )
+
   override def getExternalPartyAmuletRules()(implicit
       ec: ExecutionContext,
       tc: TraceContext,

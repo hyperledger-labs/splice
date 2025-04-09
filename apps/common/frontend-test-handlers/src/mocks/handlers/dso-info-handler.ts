@@ -1,7 +1,7 @@
 import { rest, RestHandler } from 'msw';
 
-import { getAmuletConfig } from '../helpers/amulet-config-helper';
-import { getDsoConfig } from '../helpers/dso-config-helper';
+import { getAmuletRulesConfig } from '../helpers/amulet-config-helper';
+import { getDsoRulesConfig } from '../helpers/dso-config-helper';
 
 // Obtained via `curl https://sv.sv-2.cimain.network.canton.global/api/sv/v0/dso`
 // ...and then npmFix made it look nice.
@@ -89,15 +89,15 @@ export const dsoInfo = {
       payload: {
         dso: 'DSO::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
         configSchedule: {
-          initialValue: getAmuletConfig('0.03'),
+          initialValue: getAmuletRulesConfig('0.03'),
           futureValues: [
             {
               _1: '2023-03-15T08:35:00Z',
-              _2: getAmuletConfig('0.003'),
+              _2: getAmuletRulesConfig('0.003'),
             },
             {
               _1: '2024-03-15T08:35:00Z',
-              _2: getAmuletConfig('4815162342'),
+              _2: getAmuletRulesConfig('4815162342'),
             },
           ],
         },
@@ -133,7 +133,7 @@ export const dsoInfo = {
           ],
         ],
         offboardedSvs: [],
-        config: getDsoConfig('1600'),
+        config: getDsoRulesConfig('5', '1600'),
         dsoDelegate:
           'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
         isDevNet: true,

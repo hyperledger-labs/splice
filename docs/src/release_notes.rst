@@ -40,6 +40,56 @@ Upcoming
     The library has always been packaged with every helm chart that uses it,
     there is no need to pull it separately from the ghcr.io container registry.
 
+- Implement `Canton Improvement Proposal cip-0051 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0051/cip-0051.md>`_
+
+    * Added the optional `targetEffectiveAt` field to the `VoteRequest` template, which allows specifying an effective date and time for the vote request.
+      Additionally, the `DsoRules_CloseVoteRequest` now enforces the new semantics for vote requests that include an effective date and time.
+
+    * These changes will take full effect once all SVs upgrade to the new DAML package version and corresponding frontend and backend updates.
+
+    * New Vote Request Semantics:
+
+        * Vote Requests with an Effective Date-Time (``targetEffectiveAt != None``):
+            * **Voting Period Starts (now < voteBefore):**
+                * Early closing occurs if a super-majority of SVs rejects the vote request.
+            * **Voting Period Ends (now ≥ voteBefore and now < targetEffectiveAt):**
+                * If a super-majority has voted, the vote request remains open and SVs can still change their votes.
+                * If not, the vote request is marked as expired.
+                * Early closing occurs upon a super-majority of rejections after expiration.
+            * **Effective Date-Time Reached (now ≥ targetEffectiveAt):**
+                * If a super-majority accepts the vote request, the change takes effect.
+                * Otherwise, the vote request is registered as rejected.
+        * Vote Requests Without an Effective Date-Time (``targetEffectiveAt = None``):
+            * **Voting Period Starts (now < voteBefore):**
+                * Early closing occurs when a super-majority rejects.
+                * Early acceptance occurs when a super-majority agrees.
+            * **Voting Period Ends (now ≥ voteBefore):**
+                * The vote request is marked as expired.
+
+    * The Daml changes in this release require a governance vote to upgrade the package configs to:
+
+    * Introducing `CRARC_SetConfig` choice in favor of `CRARC_AddFutureAmuletConfigSchedule`, `CRARC_AddUpdateAmuletConfigSchedule` and `CRARC_AddRemoveAmuletConfigSchedule`
+
+    * The new action `CRARC_SetConfig` allows the SV to set the configuration of AmuletRules configuration in the same way of `SRARC_SetConfig`. This action is only available when the new dars below are vetted.
+
+    * Handling parallel proposals
+
+        * Before: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) risked overwriting new changes with outdated values because the entire new configuration replaced the old one, regardless of the specific changes.
+
+        * Now: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) apply only to the fields that were intented to be changed. A copy of the current configuration is passed along the modified configuration at the creation of a proposal.
+
+    * Governance: new dars
+
+          ================== =======
+          name               version
+          ================== =======
+          amulet             0.1.8
+          amuletNameService  0.1.8
+          dsoGovernance      0.1.11
+          validatorLifecycle 0.1.2
+          wallet             0.1.8
+          walletPayments     0.1.8
+          ================== =======
 - CometBFT
 
    - Updated CometBFT to `0.37.15 <https://github.com/cometbft/cometbft/blob/v0.37.15/CHANGELOG.md?rgh-link-date=2025-04-03T08%3A37%3A21.000Z#v03715>`_

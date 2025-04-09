@@ -128,8 +128,11 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  override def packages =
-    super.packages ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
+  override def packagesForJsonDecoding =
+    super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
+
+  def packagesForUploading =
+    super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
@@ -419,7 +422,7 @@ class ValidatorApp(
   ): Future[Unit] = {
     // TODO(#11412): This potentially uploads versions that should not yet be uploaded. Consider using PackageVetting instead.
     logger.info(s"Uploading dars for ACS import.")
-    val darFiles = packages.map(UploadablePackage.fromResource)
+    val darFiles = packagesForUploading.map(UploadablePackage.fromResource)
     for {
       _ <- participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
     } yield {
@@ -686,7 +689,11 @@ class ValidatorApp(
             participantAdminConnection,
             loggerFactory,
           )
-          _ <- packageVetting.vetPackages(amuletRules)
+          voteRequests <- scanConnection.getVoteRequests()
+          _ <- packageVetting.vetPackages(
+            amuletRules,
+            AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+          )
         } yield ()
       }
 

@@ -5,6 +5,7 @@ module Splice.CometBft where
 
 import qualified DA.Map as Map
 import qualified DA.Text as T
+import Splice.Util
 
 {-
 
@@ -43,12 +44,12 @@ data CometBftNodeConfig = CometBftNodeConfig with
 -- | Config for a key used by the SvApp to create CometBFT network governance transactions.
 data GovernanceKeyConfig = GovernanceKeyConfig with
     pubKey : Text
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 -- | Config for a key used by the CometBFT Sequencer Driver to sequence messages via the CometBFT network.
 data SequencingKeyConfig = SequencingKeyConfig with
     pubKey : Text
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 -- | Config for all CometBFT nodes and keys under the control of a single SV node operator.
 data CometBftConfig = CometBftConfig with
@@ -103,3 +104,30 @@ validCometBftNodeConfig limits (nodeId, config) =
 
 totalVotingPower : CometBftConfig -> Int
 totalVotingPower config = sum $ map votingPower $ Map.values $ config.nodes
+
+instance Patchable CometBftConfigLimits where
+  patch new base current = CometBftConfigLimits with
+    maxNumCometBftNodes = patch new.maxNumCometBftNodes base.maxNumCometBftNodes current.maxNumCometBftNodes
+    maxNumGovernanceKeys = patch new.maxNumGovernanceKeys base.maxNumGovernanceKeys current.maxNumGovernanceKeys
+    maxNumSequencingKeys = patch new.maxNumSequencingKeys base.maxNumSequencingKeys current.maxNumSequencingKeys
+    maxNodeIdLength = patch new.maxNodeIdLength base.maxNodeIdLength current.maxNodeIdLength
+    maxPubKeyLength = patch new.maxPubKeyLength base.maxPubKeyLength current.maxPubKeyLength
+
+instance Patchable CometBftConfig where
+  patch new base current = CometBftConfig with
+    nodes = patch new.nodes base.nodes current.nodes
+    governanceKeys = patchListAsSet new.governanceKeys base.governanceKeys current.governanceKeys
+    sequencingKeys = patchListAsSet new.sequencingKeys base.sequencingKeys current.sequencingKeys
+
+instance Patchable CometBftNodeConfig where
+  patch new base current = CometBftNodeConfig with
+    validatorPubKey = patch new.validatorPubKey base.validatorPubKey current.validatorPubKey
+    votingPower = patch new.votingPower base.votingPower current.votingPower
+
+instance Patchable SequencingKeyConfig where
+  patch new base current = SequencingKeyConfig with
+    pubKey = patch new.pubKey base.pubKey current.pubKey
+
+instance Patchable GovernanceKeyConfig where
+  patch new base current = GovernanceKeyConfig with
+    pubKey = patch new.pubKey base.pubKey current.pubKey

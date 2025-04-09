@@ -9,8 +9,10 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.util.Contract
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class ValidatorPackageVettingTrigger(
     override protected val participantAdminConnection: ParticipantAdminConnection,
@@ -23,6 +25,11 @@ class ValidatorPackageVettingTrigger(
 ) extends PackageVettingTrigger(ValidatorPackageVettingTrigger.packages) {
   override def getAmuletRules()(implicit tc: TraceContext) =
     scanConnection.getAmuletRules()
+
+  override def getVoteRequests()(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    scanConnection.getVoteRequests()
 }
 
 object ValidatorPackageVettingTrigger {

@@ -1,14 +1,25 @@
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function getDsoConfig(acsCommitmentReconciliationInterval: string) {
+import {
+  ActionRequiringConfirmation,
+  DsoRulesConfig,
+  SynchronizerUpgradeSchedule,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
+
+export function getDsoRulesConfig(
+  numMemberTrafficContractsThreshold: string,
+  acsCommitmentReconciliationInterval: string,
+  nextScheduledSynchronizerUpgrade?: SynchronizerUpgradeSchedule
+): DsoRulesConfig {
   return {
-    numMemberTrafficContractsThreshold: '5',
+    numMemberTrafficContractsThreshold: numMemberTrafficContractsThreshold,
     dsoDelegateInactiveTimeout: {
       microseconds: '70000000',
     },
     svOnboardingRequestTimeout: {
       microseconds: '3600000000',
     },
-    nextScheduledSynchronizerUpgrade: null,
+    nextScheduledSynchronizerUpgrade: nextScheduledSynchronizerUpgrade
+      ? nextScheduledSynchronizerUpgrade
+      : null,
     actionConfirmationTimeout: {
       microseconds: '3600000000',
     },
@@ -27,7 +38,8 @@ export function getDsoConfig(acsCommitmentReconciliationInterval: string) {
             acsCommitmentReconciliationInterval: acsCommitmentReconciliationInterval,
           },
         ],
-      ],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any,
       lastSynchronizerId:
         'global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
       activeSynchronizerId:
@@ -49,15 +61,56 @@ export function getDsoConfig(acsCommitmentReconciliationInterval: string) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function getDsoAction(acsCommitmentReconciliationInterval: string) {
+export function getDsoSetConfigAction(
+  acsCommitmentReconciliationInterval: { new: string; base?: string },
+  numMemberTrafficContractsThreshold: { new: string; base?: string } = { new: '5', base: '5' }
+): ActionRequiringConfirmation {
   return {
     tag: 'ARC_DsoRules',
     value: {
       dsoAction: {
         tag: 'SRARC_SetConfig',
         value: {
-          newConfig: getDsoConfig(acsCommitmentReconciliationInterval),
+          newConfig: getDsoRulesConfig(
+            numMemberTrafficContractsThreshold.new,
+            acsCommitmentReconciliationInterval.new
+          ),
+          baseConfig:
+            acsCommitmentReconciliationInterval.base && numMemberTrafficContractsThreshold.base
+              ? getDsoRulesConfig(
+                  numMemberTrafficContractsThreshold.base,
+                  acsCommitmentReconciliationInterval.base
+                )
+              : null,
+        },
+      },
+    },
+  };
+}
+
+export function getDsoSvOffboardingAction(sv: string): ActionRequiringConfirmation {
+  return {
+    tag: 'ARC_DsoRules',
+    value: {
+      dsoAction: {
+        tag: 'SRARC_OffboardSv',
+        value: {
+          sv: sv,
+        },
+      },
+    },
+  };
+}
+
+export function getUpdateSvRewardWeightAction(sv: string): ActionRequiringConfirmation {
+  return {
+    tag: 'ARC_DsoRules',
+    value: {
+      dsoAction: {
+        tag: 'SRARC_UpdateSvRewardWeight',
+        value: {
+          svParty: sv,
+          newRewardWeight: '1000',
         },
       },
     },
