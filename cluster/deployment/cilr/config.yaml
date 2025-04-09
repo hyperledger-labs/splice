@@ -36,6 +36,10 @@ synchronizerMigration:
     releaseReference:
       gitReference: "refs/tags/cilr"
       repoUrl: https://github.com/DACH-NY/canton-network-node
+      pulumiStacksDir: "cluster/stacks/ci"
+      pulumiBaseDir: "cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "."
 persistentSequencerHeapDumps: true
 monitoring:
   alerting:
@@ -48,3 +52,8 @@ monitoring:
         expectedMaxBlocksPerSecond: 7
 operatorDeployment:
   reference: refs/heads/main
+  repoUrl: https://github.com/DACH-NY/canton-network-node
+  pulumiStacksDir: "cluster/stacks/ci"
+  pulumiBaseDir: "cluster/pulumi"
+  deploymentDir: "cluster/deployment"
+  spliceRoot: "."
