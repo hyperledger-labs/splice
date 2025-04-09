@@ -49,7 +49,7 @@ senderMetaKey = splicePrefix <> "sender"
 
 holdingTxMeta : Text -> Text -> Optional Party -> Metadata
 holdingTxMeta kind reason sender =
-  Metadata (Map.fromList ([(txKindMetaKey, kind), (reasonMetaKey, reason)] <> map (\s -> (senderMetaKey, show s)) (optionalToList sender)))
+  Metadata (Map.fromList ([(txKindMetaKey, kind), (reasonMetaKey, reason)] <> map (\s -> (senderMetaKey, partyToText s)) (optionalToList sender)))
 
 -- Choice context keys for splice
 ---------------------------------

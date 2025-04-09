@@ -189,7 +189,7 @@
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
-                          "'aliceValidator::normalized'"
+                          "aliceValidator::normalized"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/tx-kind",
@@ -299,7 +299,7 @@
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
-                          "'aliceValidator::normalized'"
+                          "aliceValidator::normalized"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/tx-kind",
@@ -744,7 +744,7 @@
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
-                          "'aliceValidator::normalized'"
+                          "aliceValidator::normalized"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/tx-kind",
@@ -851,7 +851,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'aliceValidator::normalized'"
+                        "aliceValidator::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -1286,7 +1286,7 @@
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
-                          "'alice::normalized'"
+                          "alice::normalized"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/tx-kind",
@@ -1393,7 +1393,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -1795,7 +1795,7 @@
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
-                          "'alice::normalized'"
+                          "alice::normalized"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/tx-kind",
@@ -1902,7 +1902,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -2608,7 +2608,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -3168,7 +3168,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -3699,7 +3699,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -4230,7 +4230,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -4819,7 +4819,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -6055,7 +6055,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'bob::normalized'"
+                        "bob::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
@@ -6914,7 +6914,7 @@
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
-                        "'alice::normalized'"
+                        "alice::normalized"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
