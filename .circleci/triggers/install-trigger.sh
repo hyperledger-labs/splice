@@ -52,7 +52,12 @@ case "$BRANCH_VALUE" in
 esac
 
 if [[ -n "$CONFIG_YAML" ]]; then
-    RELEASE_REFERENCE=$(yq eval '.synchronizerMigration.active.releaseReference' "$CONFIG_YAML")
+    RELEASE_REFERENCE=$(yq eval '.synchronizerMigration.active.releaseReference.gitReference' "$CONFIG_YAML")
+
+    if [[ "$RELEASE_REFERENCE" != refs* ]]; then
+        echo "Error: releaseReference does not appear to be a valid git reference: $RELEASE_REFERENCE"
+        exit 1
+    fi
 
     RELEASE_REFERENCE="${RELEASE_REFERENCE#refs/heads/}"
 

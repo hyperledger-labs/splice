@@ -5,7 +5,11 @@ import { expand } from 'dotenv-expand';
 import Dict = NodeJS.Dict;
 
 export class SpliceConfigContext {
-  readonly deploymentFolderPath = `${process.env.SPLICE_ROOT}/cluster/deployment`;
+  readonly deploymentFolderPath = requiredValue(
+    process.env.DEPLOYMENT_DIR,
+    'DEPLOYMENT_DIR',
+    'Deployment folder must be specified'
+  );
 
   extractGcpClusterFolderName(): string {
     const gcpclusterbasename = requiredValue(

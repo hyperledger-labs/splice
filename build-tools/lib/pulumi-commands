@@ -33,7 +33,7 @@ function subcmd_pulumi() {
             ;;
     esac
 
-    local args=(--cwd "${SPLICE_ROOT}/${PULUMI_STACKS_DIR}/${pulumi_project}")
+    local args=(--cwd "${PULUMI_STACKS_DIR}/${pulumi_project}")
 
     case "${pulumi_cmd}" in
         whoami|org)

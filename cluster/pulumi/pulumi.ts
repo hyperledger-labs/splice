@@ -72,7 +72,7 @@ export async function stack(
   // safe to use process.env as we check if we're in a CI env
   // eslint-disable-next-line no-process-env
   const stackMustAlreadyExist = process.env.CI !== undefined && requiresExistingStack;
-  const projectDirectory = `${SPLICE_ROOT}/${PULUMI_STACKS_DIR}/${project}`;
+  const projectDirectory = `${PULUMI_STACKS_DIR}/${project}`;
   const stackOpts: automation.LocalProgramArgs = {
     workDir: projectDirectory,
     stackName: fullStackName,

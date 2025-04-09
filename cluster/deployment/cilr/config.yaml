@@ -33,7 +33,9 @@ synchronizerMigration:
     id: 4
     provider: external
     version: 0.3.19
-    releaseReference: "refs/tags/cilr"
+    releaseReference:
+      gitReference: "refs/tags/cilr"
+      repoUrl: https://github.com/DACH-NY/canton-network-node
 persistentSequencerHeapDumps: true
 monitoring:
   alerting:

@@ -37,6 +37,7 @@ workflow:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
+          git_repo: << pipeline.parameters.git-repo >>
           requires:
             - artifacts_push
             - autoscaler_prevent_scaledown
@@ -66,6 +67,7 @@ workflow:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
+          git_repo: << pipeline.parameters.git-repo >>
           requires:
             - deploy_cluster_for_migration
       - trigger_global_domain_migration:

@@ -9,7 +9,13 @@ synchronizerMigration:
     id: 1
     provider: external
     version: 0.3.19
-    releaseReference: "refs/heads/release-line-0.3.19"
+    releaseReference:
+      gitReference: "refs/heads/release-line-0.3.19"
+      repoUrl: https://github.com/DACH-NY/canton-network-node
+      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiBaseDir: "cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "."
 pulumiProjectConfig:
   default:
     isExternalCluster: true
@@ -34,4 +40,10 @@ monitoring:
         # DevNet fluctuates a bit more than our internal clusters so we alert only when it drops below 0.9
         minRate: 0.9
 operatorDeployment:
-  reference: refs/heads/main
+  reference:
+    gitReference: refs/heads/main
+    repoUrl: https://github.com/DACH-NY/canton-network-node
+    pulumiStacksDir: "cluster/stacks/prod"
+    pulumiBaseDir: "cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "."

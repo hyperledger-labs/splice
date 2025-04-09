@@ -11,6 +11,20 @@ Release Notes
 Upcoming
 --------
 
+.. important::
+
+    * This release includes a change to the database schema that will trigger a potentially long database migration
+      of the scan and validator app databases, resulting in increased downtime of SV nodes,
+      and to a much lesser extent the validator nodes.
+      This migration will also use a significant amount of temporary disk space (around 30% of current database size).
+      Please make sure your database has enough disk space available before upgrading, and make sure the
+      `temp_file_limit <https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-TEMP-FILE-LIMIT>`_
+      PostgreSQL parameter is set to a sufficiently high value.
+
+- Performance
+
+  - Improved the performance of ACS snapshot generation
+
 - Frontends
 
   - Relax config validation on audience to not require that it is a URL as this causes issues with some IAMs.
@@ -20,8 +34,13 @@ Upcoming
   - interdependencies in the Open API specs are now inlined in every yaml file,
     so that the files can be used independently of each other (and no longer incorrectly reference the common.yaml file in the bundle).
 
+- Deployment
 
-- Governance: voting logic
+  - The ``splice-util-lib``` helm chart is no longer published.
+    The library has always been packaged with every helm chart that uses it,
+    there is no need to pull it separately from the ghcr.io container registry.
+
+- Implement `Canton Improvement Proposal cip-0051 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0051/cip-0051.md>`_
 
     * Added the optional `targetEffectiveAt` field to the `VoteRequest` template, which allows specifying an effective date and time for the vote request.
       Additionally, the `DsoRules_CloseVoteRequest` now enforces the new semantics for vote requests that include an effective date and time.
@@ -49,28 +68,29 @@ Upcoming
 
     * The Daml changes in this release require a governance vote to upgrade the package configs to:
 
-- Governance: introducing `CRARC_SetConfig` choice in favor of `CRARC_AddFutureAmuletConfigSchedule`, `CRARC_AddUpdateAmuletConfigSchedule` and `CRARC_AddRemoveAmuletConfigSchedule`
+    * Introducing `CRARC_SetConfig` choice in favor of `CRARC_AddFutureAmuletConfigSchedule`, `CRARC_AddUpdateAmuletConfigSchedule` and `CRARC_AddRemoveAmuletConfigSchedule`
 
     * The new action `CRARC_SetConfig` allows the SV to set the configuration of AmuletRules configuration in the same way of `SRARC_SetConfig`. This action is only available when the new dars below are vetted.
 
-- Governance: handling parallel proposals
+    * Handling parallel proposals
 
-    * Before: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) risked overwriting new changes with outdated values because the entire new configuration replaced the old one, regardless of the specific changes.
+        * Before: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) risked overwriting new changes with outdated values because the entire new configuration replaced the old one, regardless of the specific changes.
 
-    * Now: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) apply only to the fields that were intented to be changed. A copy of the current configuration is passed along the modified configuration at the creation of a proposal.
+        * Now: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) apply only to the fields that were intented to be changed. A copy of the current configuration is passed along the modified configuration at the creation of a proposal.
 
-- Governance: new dars
+    * Governance: new dars
 
-      ================== =======
-      name               version
-      ================== =======
-      amulet             0.1.8
-      amuletNameService  0.1.8
-      dsoGovernance      0.1.11
-      validatorLifecycle 0.1.2
-      wallet             0.1.8
-      walletPayments     0.1.8
-      ================== =======
+          ================== =======
+          name               version
+          ================== =======
+          amulet             0.1.8
+          amuletNameService  0.1.8
+          dsoGovernance      0.1.11
+          validatorLifecycle 0.1.2
+          wallet             0.1.8
+          walletPayments     0.1.8
+          ================== =======
+
 
 
 0.3.19
