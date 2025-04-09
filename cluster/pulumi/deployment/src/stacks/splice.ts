@@ -1,4 +1,9 @@
-import { CLUSTER_BASENAME, config, DeploySvRunbook } from 'splice-pulumi-common';
+import {
+  CLUSTER_BASENAME,
+  config,
+  DeploySvRunbook,
+  DeployValidatorRunbook,
+} from 'splice-pulumi-common';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
@@ -14,7 +19,7 @@ export function getSpliceStacksFromMainReference(): StackFromRef[] {
   if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
     ret.push({ project: 'multi-validator', stack: CLUSTER_BASENAME });
   }
-  if (config.envFlag('SPLICE_DEPLOY_VALIDATOR_RUNBOOK', false)) {
+  if (DeployValidatorRunbook) {
     ret.push({ project: 'validator-runbook', stack: CLUSTER_BASENAME });
   }
   if (mustInstallValidator1) {
@@ -41,7 +46,7 @@ export function installSpliceStacks(reference: GitFluxRef, envRefs: EnvRefs): vo
   if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
     createStackCR('multi-validator', 'multi-validator', false, reference, envRefs);
   }
-  if (config.envFlag('SPLICE_DEPLOY_VALIDATOR_RUNBOOK', false)) {
+  if (DeployValidatorRunbook) {
     createStackCR(
       'validator-runbook',
       'validator-runbook',

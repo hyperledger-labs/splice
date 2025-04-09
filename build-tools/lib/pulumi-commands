@@ -76,7 +76,7 @@ function subcmd_pulumi() {
 
 ###
 
-subcommand_whitelist[apply]="Apply the current Pulumi configuration (--preview to preview only)"
+subcommand_whitelist[apply]="Apply the current Pulumi configuration, without the runbooks (--preview to preview only)"
 
 function subcmd_apply() {
     _production_gate
@@ -127,7 +127,7 @@ function subcmd_apply() {
             _warning "docker-image-reference-exists bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
         fi
 
-        _cluster_apply "${args[@]}"
+        _cluster_apply "$@"
     fi
 }
 
