@@ -18,8 +18,6 @@ app_charts := \
 	splice-sv-node \
 	splice-validator
 
-all_charts := $(app_charts) splice-util-lib
-
 HELM_VERSION_TAG := cluster/helm/.version-tag
 IMAGE_DIGESTS := cluster/helm/.image-digests
 APP_CHARTS_FILE := cluster/helm/.app-charts
@@ -27,7 +25,8 @@ APP_CHARTS_FILE := cluster/helm/.app-charts
 # Makefile for each file in cluster/helm/target run `helm push $file`
 .PHONY: cluster/helm/push
 cluster/helm/push:
-	@for file in cluster/helm/target/*.tgz; do \
+	@set -e; \
+	for file in cluster/helm/target/*.tgz; do \
 	    publish_helm_chart.sh $$file;\
 	done
 
@@ -48,10 +47,10 @@ cluster/helm/copy_release_to_ghcr: cluster/helm/write-app-charts cluster/helm/wr
 	./build-tools/copy_release_helm_charts_to_ghcr.sh -v $(shell cat cluster/helm/.version-tag) -f cluster/helm/.app-charts
 
 .PHONY: cluster/helm/build
-cluster/helm/build: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-build)
+cluster/helm/build: $(foreach chart,$(app_charts),cluster/helm/$(chart)/helm-build)
 
 .PHONY: cluster/helm/clean
-cluster/helm/clean: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-clean)
+cluster/helm/clean: $(foreach chart,$(app_charts),cluster/helm/$(chart)/helm-clean)
 	rm -rfv cluster/helm/target
 
 %/values.yaml: %/values-template.yaml
@@ -91,6 +90,6 @@ prefix := cluster/helm/$(1)
 $$(prefix)/helm-build: cluster/helm/splice-util-lib/Chart.yaml
 endef
 
-$(foreach chart,$(all_charts),$(eval $(call DEFINE_PHONY_CHART_RULES,$(chart))))
+$(foreach chart,$(app_charts),$(eval $(call DEFINE_PHONY_CHART_RULES,$(chart))))
 
 $(foreach chart,$(app_charts),$(eval $(call ADD_UTIL_DEP,$(chart))))
