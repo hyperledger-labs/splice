@@ -14,7 +14,7 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   SinglePartySignatures,
 }
 import com.daml.ledger.api.v2.reassignment_commands.ReassignmentCommand
-import com.digitalasset.base.error.{ContextualizedErrorLogger, RpcError}
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.crypto.{
   Fingerprint,
   Signature,
@@ -27,6 +27,7 @@ import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidField
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
+import com.digitalasset.canton.logging.ContextualizedErrorLogger
 import com.digitalasset.canton.topology.{PartyId as TopologyPartyId, SynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.version.HashingSchemeVersion

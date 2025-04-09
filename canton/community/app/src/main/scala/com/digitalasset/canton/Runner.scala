@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton
 
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.config.SharedCantonConfig
 import com.digitalasset.canton.console.{HeadlessConsole, InteractiveConsole}
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
@@ -14,7 +15,7 @@ import java.io.{File, OutputStream, StringWriter}
 import scala.io.Source
 import scala.util.control.NonFatal
 
-/** Result for exposing the process exit code. All logging is expected to take place inside of the
+/** Result for exposing the process exit code. All logging is expected to take place inside the
   * runner.
   */
 trait Runner[C <: SharedCantonConfig[C]] extends NamedLogging {
@@ -26,11 +27,30 @@ class ServerRunner[C <: SharedCantonConfig[C]](
     bootstrapScript: Option[CantonScript] = None,
     override val loggerFactory: NamedLoggerFactory,
     exitAfterBootstrap: Boolean = false,
+    dars: Seq[String] = Seq.empty,
 ) extends Runner[C]
     with NoTracing {
 
   def run(environment: Environment[C]): Unit =
     try {
+      // TODO(#24954): Convert to using declarative api, when it becomes available
+      def uploadDar(darPath: String): Unit = {
+        val consoleEnvironment = environment.createConsole()
+        consoleEnvironment.participants.local
+          .flatMap(_.underlying)
+          .foreach(p =>
+            consoleEnvironment.run {
+              consoleEnvironment.grpcLedgerCommandRunner
+                .runCommand(
+                  "upload-dar",
+                  LedgerApiCommands.PackageManagementService.UploadDarFile(darPath),
+                  p.config.clientLedgerApi,
+                  Some(p.adminToken.secret),
+                )
+            }
+          )
+      }
+
       def start(): Unit =
         environment
           .startAll() match {
@@ -50,6 +70,7 @@ class ServerRunner[C <: SharedCantonConfig[C]](
         }
 
       bootstrapScript.fold(start())(startWithBootstrap)
+      dars.foreach(uploadDar)
       if (exitAfterBootstrap) sys.exit(0)
     } catch {
       case ex: Throwable =>

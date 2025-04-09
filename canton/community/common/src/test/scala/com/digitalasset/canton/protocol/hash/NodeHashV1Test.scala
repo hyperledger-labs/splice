@@ -43,7 +43,6 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
   private val createNode = Node.Create(
     coid = ContractId.V1.assertFromString(contractId1),
     packageName = packageName0,
-    packageVersion = None,
     templateId = defRef("module", "name"),
     arg = VA.text.inj("hello"),
     signatories =
@@ -635,6 +634,8 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
                                     |'00000001' # 1 (int)
                                     |'00000007' # 7 (int)
                                     |'636861726c6965' # charlie (string)
+                                    |# Interface Id
+                                    |'00' # None
                                     |# Acting Parties
                                     |'00000002' # 2 (int)
                                     |'00000005' # 5 (int)

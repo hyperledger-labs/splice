@@ -20,6 +20,11 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
+import com.digitalasset.canton.integration.plugins.{
+  UseH2,
+  UsePostgres,
+  UseReferenceBlockSequencerBase,
+}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
@@ -253,6 +258,40 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
         throw ex
     }
   }
+
+  /** Creates a new environment manually for a test with the storage plugins disabled, so that we
+    * can keep the persistent state from an old environment.
+    *
+    * @param oldEnvConfig
+    *   the configuration for the reference (old) environment which will serve as the configuration
+    *   to start from
+    * @param configTransform
+    *   a function that applies changes to the oldEnvConfig (with the plugins applied on top)
+    * @param runPlugins
+    *   a function that expects a plugin reference and returns whether or not it's supposed to be
+    *   run against the initial configuration
+    * @return
+    *   a new test console environment that persists the db/state of another 'older' environment
+    */
+  protected def manualCreateEnvironmentWithPreviousState(
+      oldEnvConfig: C,
+      configTransform: C => C = identity,
+      runPlugins: EnvironmentSetupPlugin[C, E] => Boolean = _ => true,
+      testName: Option[String],
+  ): TestConsoleEnvironment[C, E] =
+    manualCreateEnvironment(
+      oldEnvConfig,
+      configTransform,
+      {
+        /* the block sequencer makes use of its own db so we don't want to create a new one here since that would
+         * set a new state and lead to conflicts with the old db.
+         */
+        case _: UseH2 | _: UsePostgres | _: UseReferenceBlockSequencerBase[_] =>
+          false // to prevent creating a new fresh db, the db is only deleted when the old environment is destroyed.
+        case plugin => runPlugins(plugin)
+      },
+      testName = testName,
+    )
 
   protected def createEnvironment(testName: Option[String]): TestConsoleEnvironment[C, E] = {
     val metrics = testInfrastructureEnvironmentMetrics(testName)
