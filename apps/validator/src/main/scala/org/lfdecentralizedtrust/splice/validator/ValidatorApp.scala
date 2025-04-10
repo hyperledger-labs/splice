@@ -793,6 +793,7 @@ class ValidatorApp(
           logger.info("Not starting wallet as it's disabled")
           None
         }
+      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
       automation = new ValidatorAutomationService(
         config.automation,
         config.participantIdentitiesBackup,
@@ -830,9 +831,13 @@ class ValidatorApp(
         initialSynchronizerTime,
         config.parameters.enableCantonPackageSelection,
         loggerFactory,
-        new AmuletRulesPackageVersionSupport(scanConnection),
+        packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+          config.parameters.enableCantonPackageSelection,
+          scanConnection,
+          synchronizerId,
+          readOnlyLedgerConnection,
+        ),
       )
-      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
           setupAppInstance(

@@ -100,7 +100,11 @@ class SynchronizerNodeReconciler(
           false
       }
       supportsLegacySequencerConfig <- packageVersionSupport.supportsLegacySequencerConfig(
-        clock.now
+        Seq(
+          dsoParty,
+          svParty,
+        ),
+        clock.now,
       )
 
       updatedSequencerConfigUpdate =

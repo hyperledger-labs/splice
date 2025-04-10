@@ -745,7 +745,8 @@ class HttpSvHandler(
       dsoRules <- dsoStore.getDsoRules()
       now = clock.now
       supportsValidatorLicenseMetadata <- packageVersionSupport.supportsValidatorLicenseMetadata(
-        now
+        Seq(svParty, candidateParty, dsoParty),
+        now,
       )
       cmds = Seq(
         dsoRules.exercise(

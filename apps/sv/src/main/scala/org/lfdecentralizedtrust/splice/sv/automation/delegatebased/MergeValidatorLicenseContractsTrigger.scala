@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_Mer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.store.PageLimit
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, Codec, Contract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -48,7 +48,12 @@ class MergeValidatorLicenseContractsTrigger(
     for {
       supportsPruneAmuletConfigSchedule <- packageVersionSupport
         .supportsMergeDuplicatedValidatorLicense(
-          context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava)
+          Seq(
+            store.key.svParty,
+            store.key.dsoParty,
+            Codec.tryDecode(Codec.Party)(validator),
+          ),
+          context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )
       validatorLicenses <-
         if (supportsPruneAmuletConfigSchedule) {

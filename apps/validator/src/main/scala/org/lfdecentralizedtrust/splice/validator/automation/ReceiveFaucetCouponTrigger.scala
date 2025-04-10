@@ -112,7 +112,13 @@ class ReceiveFaucetCouponTrigger(
         .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
       supportsValidatorLivenessActivityRecord <-
         packageVersionSupport
-          .supportsValidatorLivenessActivityRecord(clock.now)
+          .supportsValidatorLivenessActivityRecord(
+            Seq(
+              validatorStore.key.dsoParty,
+              validatorParty,
+            ),
+            clock.now,
+          )
       outcome <- spliceLedgerConnection
         .submit(
           actAs = Seq(validatorParty),

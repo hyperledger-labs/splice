@@ -275,7 +275,12 @@ class SV1Initializer(
         },
         logger,
       )
-      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        config.parameters.enableCantonPackageSelection,
+        dsoStore,
+        decentralizedSynchronizer,
+        svAutomation.connection,
+      )
       dsoAutomation = newSvDsoAutomationService(
         svStore,
         dsoStore,

@@ -4,8 +4,10 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.language.Ast
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
@@ -14,155 +16,151 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait PackageVersionSupport {
 
-  def supportsValidatorLicenseMetadata(now: CantonTimestamp)(implicit
+  def supportsValidatorLicenseMetadata(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[Boolean] = {
+    isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_3)
+  }
 
-  def supportsValidatorLicenseActivity(now: CantonTimestamp)(implicit
+  def supportsValidatorLicenseActivity(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[Boolean] = {
+    isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_3)
+  }
 
-  def supportsPruneAmuletConfigSchedule(now: CantonTimestamp)(implicit
+  def supportsPruneAmuletConfigSchedule(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[Boolean] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance_0_1_5,
+    )
+  }
 
-  def supportsMergeDuplicatedValidatorLicense(now: CantonTimestamp)(implicit
+  def supportsMergeDuplicatedValidatorLicense(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[Boolean] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance_0_1_8,
+    )
+  }
 
-  def supportsLegacySequencerConfig(now: CantonTimestamp)(implicit
+  def supportsLegacySequencerConfig(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[Boolean] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance_0_1_7,
+    )
+  }
 
-  def supportsValidatorLivenessActivityRecord(now: CantonTimestamp)(implicit
+  def supportsValidatorLivenessActivityRecord(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[Boolean] = {
+    isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_5)
+  }
 
-  def supportsExternalPartyAmuletRules(now: CantonTimestamp)(implicit
+  def supportsExternalPartyAmuletRules(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Boolean] = {
+    isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_6)
+  }
+
+  private def isDarSupported(
+      parties: Seq[PartyId],
+      packageId: PackageIdResolver.Package,
+      at: CantonTimestamp,
+      dar: DarResource,
+  )(implicit tc: TraceContext) = {
+    require(packageId.packageName == dar.metadata.name)
+    require(parties.nonEmpty)
+    isPackageSupported(parties, packageId, at, dar.metadata)
+  }
+
+  def isPackageSupported(
+      parties: Seq[PartyId],
+      packageId: PackageIdResolver.Package,
+      at: CantonTimestamp,
+      metadata: Ast.PackageMetadata,
+  )(implicit
       tc: TraceContext
   ): Future[Boolean]
 
 }
 
-class AmuletRulesPackageVersionSupport(amuletRules: HasAmuletRules)(implicit
+class AmuletRulesPackageVersionSupport private[environment] (amuletRules: HasAmuletRules)(implicit
     ec: ExecutionContext
 ) extends PackageVersionSupport {
 
-  override def supportsValidatorLicenseMetadata(
-      now: CantonTimestamp
+  override def isPackageSupported(
+      parties: Seq[PartyId],
+      packageId: PackageIdResolver.Package,
+      at: CantonTimestamp,
+      metadata: Ast.PackageMetadata,
   )(implicit tc: TraceContext): Future[Boolean] = {
-    basedOnCurrentAmuletRules(supportsValidatorLicenseMetadata(now, _))
+    basedOnCurrentAmuletRules { amuletRules =>
+      val packageVersion = metadata.version
+      val packageConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(at).packageConfig
+      val activeVersion = PackageIdResolver.readPackageVersion(packageConfig, packageId)
+      packageVersion >= activeVersion
+    }
   }
 
-  override def supportsValidatorLicenseActivity(now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[Boolean] =
-    basedOnCurrentAmuletRules(
-      supportsValidatorLicenseActivity(now, _)
-    )
-
-  override def supportsPruneAmuletConfigSchedule(now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[Boolean] =
-    basedOnCurrentAmuletRules(
-      supportsPruneAmuletConfigSchedule(now, _)
-    )
-
-  override def supportsMergeDuplicatedValidatorLicense(now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[Boolean] =
-    basedOnCurrentAmuletRules(
-      supportsMergeDuplicatedValidatorLicense(now, _)
-    )
-
-  override def supportsLegacySequencerConfig(now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[Boolean] =
-    basedOnCurrentAmuletRules(
-      supportsLegacySequencerConfig(now, _)
-    )
-
-  override def supportsValidatorLivenessActivityRecord(now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[Boolean] =
-    basedOnCurrentAmuletRules(
-      supportsValidatorLivenessActivityRecord(now, _)
-    )
-
-  override def supportsExternalPartyAmuletRules(now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[Boolean] =
-    basedOnCurrentAmuletRules(
-      supportsExternalPartyAmuletRules(now, _)
-    )
   private def basedOnCurrentAmuletRules(
       condition: AmuletRules => Boolean
   )(implicit tc: TraceContext): Future[Boolean] = {
     amuletRules.getAmuletRules().map(amuletRules => condition(amuletRules.payload))
   }
 
-  private def supportsValidatorLicenseMetadata(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val spliceAmuletVersion = PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
-    spliceAmuletVersion >= DarResources.amulet_0_1_3.metadata.version
+}
+
+class TopologyAwarePackageVersionSupport private[environment] (
+    synchronizerId: SynchronizerId,
+    connection: BaseLedgerConnection,
+)(implicit ec: ExecutionContext)
+    extends PackageVersionSupport {
+
+  override def isPackageSupported(
+      parties: Seq[PartyId],
+      packageId: PackageIdResolver.Package,
+      at: CantonTimestamp,
+      metadata: Ast.PackageMetadata,
+  )(implicit tc: TraceContext): Future[Boolean] = {
+    connection
+      .getSupportedPackageVersion(
+        synchronizerId,
+        parties,
+        packageId,
+        at,
+      )
+      .map(
+        _.exists { packageReference =>
+          PackageVersion.assertFromString(packageReference.packageVersion) >= metadata.version
+        }
+      )
+  }
+}
+
+object PackageVersionSupport {
+
+  def createPackageVersionSupport(
+      enableCantonPackageSelection: Boolean,
+      amuletRules: HasAmuletRules,
+      synchronizerId: SynchronizerId,
+      connection: BaseLedgerConnection,
+  )(implicit ec: ExecutionContext): PackageVersionSupport = {
+    if (enableCantonPackageSelection) {
+      new TopologyAwarePackageVersionSupport(synchronizerId, connection)
+    } else {
+      new AmuletRulesPackageVersionSupport(amuletRules)
+    }
   }
 
-  private def supportsValidatorLicenseActivity(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean =
-    supportsValidatorLicenseMetadata(now, amuletRules)
-
-  private def supportsPruneAmuletConfigSchedule(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val dsoGovernanceVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
-    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_5.metadata.version
-  }
-
-  private def supportsMergeDuplicatedValidatorLicense(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val dsoGovernanceVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
-    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_8.metadata.version
-  }
-
-  private def supportsLegacySequencerConfig(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val dsoGovernanceVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.dsoGovernance)
-    dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_7.metadata.version
-  }
-
-  private def supportsValidatorLivenessActivityRecord(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val amuletVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
-    amuletVersion >= DarResources.amulet_0_1_5.metadata.version
-  }
-
-  private def supportsExternalPartyAmuletRules(
-      now: CantonTimestamp,
-      amuletRules: AmuletRules,
-  ): Boolean = {
-    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
-    val amuletVersion =
-      PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
-    amuletVersion >= DarResources.amulet_0_1_6.metadata.version
-  }
 }

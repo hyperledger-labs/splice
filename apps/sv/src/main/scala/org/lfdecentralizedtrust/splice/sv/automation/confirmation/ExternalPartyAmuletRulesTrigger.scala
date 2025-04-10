@@ -39,7 +39,8 @@ class ExternalPartyAmuletRulesTrigger(
     val now = context.clock.now
     for {
       supportsExternalPartyAmuletRules <- packageVersionSupport.supportsExternalPartyAmuletRules(
-        now
+        Seq(svParty, dsoParty),
+        now,
       )
       tasks <-
         if (supportsExternalPartyAmuletRules) {

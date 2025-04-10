@@ -220,7 +220,12 @@ class JoiningNodeInitializer(
         ),
         decentralizedSynchronizerId,
       )
-      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        config.parameters.enableCantonPackageSelection,
+        dsoStore,
+        decentralizedSynchronizerId,
+        svAutomation.connection,
+      )
       dsoAutomation <-
         if (dsoPartyIsAuthorized) {
           logger.info("DSO party is authorized to our participant.")

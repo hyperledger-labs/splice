@@ -40,7 +40,11 @@ class PruneAmuletConfigScheduleTrigger(
   ): Future[Seq[AssignedContract[AmuletRules.ContractId, AmuletRules]]] = for {
     amuletRules <- store.getAssignedAmuletRules()
     supportsPruneAmuletConfigSchedule <- packageVersionSupport.supportsPruneAmuletConfigSchedule(
-      now
+      Seq(
+        store.key.svParty,
+        store.key.dsoParty,
+      ),
+      now,
     )
   } yield {
     if (

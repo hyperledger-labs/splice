@@ -429,7 +429,12 @@ class SvApp(
             }
           } yield res
       }
-      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        config.parameters.enableCantonPackageSelection,
+        dsoStore,
+        decentralizedSynchronizer,
+        svAutomation.connection,
+      )
 
       (_, _, isDevNet, _, _, _, _) <- (
         // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
@@ -1257,10 +1262,12 @@ object SvApp {
               Future.unit
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
+              val dsoParty = store.key.dsoParty
               for {
                 supportsValidatorLicenseMetadata <- packageVersionSupport
                   .supportsValidatorLicenseMetadata(
-                    clock.now
+                    Seq(dsoParty, svParty),
+                    clock.now,
                   )
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_OnboardValidator(
@@ -1275,14 +1282,14 @@ object SvApp {
                 _ <- dsoStoreWithIngestion.connection
                   .submit(
                     actAs = Seq(svParty),
-                    readAs = Seq(store.key.dsoParty),
+                    readAs = Seq(dsoParty),
                     cmd,
                   )
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(
                       "org.lfdecentralizedtrust.splice.sv.createSvValidatorLicense",
                       Seq(
-                        store.key.dsoParty,
+                        dsoParty,
                         svParty,
                       ),
                       svParty.toProtoPrimitive,
