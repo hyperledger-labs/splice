@@ -9,7 +9,7 @@ import DA.Time
 
 import Splice.Schedule
 
-import Splice.Util (require)
+import Splice.Util
 
 
 -- issuance curve
@@ -169,3 +169,12 @@ computeIssuanceTranche rewardsToIssue capPerCoupon totalCoupons
       in
         IssuanceTranche with ..
 
+instance Patchable IssuanceConfig where
+  patch new base current = IssuanceConfig with
+    amuletToIssuePerYear = patch new.amuletToIssuePerYear base.amuletToIssuePerYear current.amuletToIssuePerYear
+    validatorRewardPercentage = patch new.validatorRewardPercentage base.validatorRewardPercentage current.validatorRewardPercentage
+    appRewardPercentage = patch new.appRewardPercentage base.appRewardPercentage current.appRewardPercentage
+    validatorRewardCap = patch new.validatorRewardCap base.validatorRewardCap current.validatorRewardCap
+    featuredAppRewardCap = patch new.featuredAppRewardCap base.featuredAppRewardCap current.featuredAppRewardCap
+    unfeaturedAppRewardCap = patch new.unfeaturedAppRewardCap base.unfeaturedAppRewardCap current.unfeaturedAppRewardCap
+    optValidatorFaucetCap = patch new.optValidatorFaucetCap base.optValidatorFaucetCap current.optValidatorFaucetCap

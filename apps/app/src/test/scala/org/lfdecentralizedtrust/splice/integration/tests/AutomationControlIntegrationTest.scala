@@ -19,7 +19,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class AutomationControlIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
 

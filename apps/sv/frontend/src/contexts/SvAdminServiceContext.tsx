@@ -50,7 +50,8 @@ export interface SvAdminClient {
     action: ActionRequiringConfirmation,
     url: string,
     description: string,
-    expiration: RelTime
+    expiration: RelTime,
+    effectiveTime?: Date
   ) => Promise<void>;
   listDsoRulesVoteRequests: () => Promise<ListDsoRulesVoteRequestsResponse>;
   listVoteRequestResults: (
@@ -120,7 +121,8 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         action: ActionRequiringConfirmation,
         url,
         description,
-        expiration
+        expiration,
+        effectiveAt
       ): Promise<void> => {
         const request: CreateVoteRequest = {
           requester,
@@ -128,6 +130,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           url,
           description,
           expiration: RelTime.encode(expiration),
+          effectiveTime: effectiveAt,
         };
         return await svAdminClient.createVoteRequest(request);
       },

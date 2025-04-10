@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import {
-  JSONValue,
   JsonEditor,
   JSONObject,
+  JSONValue,
 } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs, { Dayjs } from 'dayjs';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { Checkbox, FormControl, FormControlLabel, Stack, Typography } from '@mui/material';
 
@@ -17,10 +17,20 @@ import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
 
 const SetDsoRulesConfig: React.FC<{
-  expiration: Dayjs;
+  supportsVoteEffectivityAndSetConfig: boolean;
   chooseAction: (action: ActionFromForm) => void;
   setIsValidSynchronizerPauseTime: (isValid: boolean) => void;
-}> = ({ expiration, chooseAction, setIsValidSynchronizerPauseTime }) => {
+  expiration: Dayjs;
+  effectivity: Dayjs;
+  isEffective: boolean;
+}> = ({
+  supportsVoteEffectivityAndSetConfig,
+  chooseAction,
+  setIsValidSynchronizerPauseTime,
+  expiration,
+  effectivity,
+  isEffective,
+}) => {
   const dsoInfosQuery = useDsoInfos();
   // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue> | undefined>(
@@ -55,8 +65,26 @@ const SetDsoRulesConfig: React.FC<{
     }
   };
 
-  const isScheduledDateValid = (scheduledDate: string) => {
-    return dayjs(scheduledDate, dateFormat, true).isValid();
+  const isScheduledDateValid = (
+    scheduledDate: string,
+    newConfig: DsoRulesConfig,
+    baseConfig: DsoRulesConfig | null
+  ) => {
+    const scheduledDateTime = dayjs(scheduledDate, dateFormat, true);
+    const isFormatValid = scheduledDateTime.isValid();
+    const isValidAgainstEffectivity = isEffective ? effectivity.isBefore(scheduledDateTime) : true;
+    const isValidAgainstExpiration = expiration.isBefore(scheduledDateTime);
+    const scheduleDateTimeIsPastExpirationAndEffectivity =
+      isValidAgainstEffectivity && isValidAgainstExpiration;
+
+    // If the scheduled date changes, we validate that it's after the expiration and effectivity dates
+    const isScheduledDateValid = baseConfig
+      ? newConfig?.nextScheduledSynchronizerUpgrade ===
+          baseConfig?.nextScheduledSynchronizerUpgrade ||
+        scheduleDateTimeIsPastExpirationAndEffectivity
+      : scheduleDateTimeIsPastExpirationAndEffectivity;
+
+    return isFormatValid && isScheduledDateValid;
   };
 
   useEffect(() => {
@@ -100,21 +128,30 @@ const SetDsoRulesConfig: React.FC<{
     const decoded = DsoRulesConfig.decoder.run(dsoRulesConfig);
     if (decoded.ok) {
       const scheduled = dsoRulesConfig.nextScheduledSynchronizerUpgrade;
+      const newConfig = decoded.result;
+      const baseConfig = supportsVoteEffectivityAndSetConfig
+        ? dsoInfosQuery.data?.dsoRules.payload.config || null
+        : null;
       if (
         !scheduled ||
         (typeof scheduled === 'object' &&
-          isScheduledDateValid((scheduled as JSONObject).time as string))
+          isScheduledDateValid((scheduled as JSONObject).time as string, newConfig, baseConfig))
       ) {
+        setIsValidSynchronizerPauseTime(true);
         chooseAction({
           tag: 'ARC_DsoRules',
           value: {
             dsoAction: {
               tag: 'SRARC_SetConfig',
-              value: { newConfig: decoded.result },
+              value: {
+                newConfig: newConfig,
+                baseConfig: baseConfig,
+              },
             },
           },
         });
       } else {
+        setIsValidSynchronizerPauseTime(false);
         chooseAction({
           formError: {
             kind: 'DecoderError',

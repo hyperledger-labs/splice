@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.util.{ConfigScheduleUtil, SvTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
@@ -14,11 +14,7 @@ import org.slf4j.event.Level
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class BftScanConnectionIntegrationTest
-    extends IntegrationTest
-    with ConfigScheduleUtil
-    with WalletTestUtil
-    with SvTestUtil {
+class BftScanConnectionIntegrationTest extends IntegrationTest with WalletTestUtil with SvTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
@@ -57,8 +53,10 @@ class BftScanConnectionIntegrationTest
       logs =>
         (logs
           .map(_.message)
-          .forall(
-            _.contains(s"Failed to connect to scan of ${getSvName(2)} (http://localhost:5112).")
+          .forall(msg =>
+            msg
+              .contains(s"Failed to connect to scan of ${getSvName(2)} (http://localhost:5112).") ||
+              msg.contains("Encountered 4 consecutive transient failures")
           ) should be(true)).withClue(s"Actual Logs: $logs"),
     )
 

@@ -7,6 +7,7 @@ module Splice.Fees where
 import Splice.Types
 import Splice.RelRound
 import DA.Time
+import Splice.Util
 
 -- Time utilities
 -----------------
@@ -129,3 +130,16 @@ expiringAmount ratePerRound initialAmount createdAt =
 
 getValueAsOfRound0 : ExpiringAmount -> Decimal
 getValueAsOfRound0 e = e.initialAmount + e.ratePerRound.rate * intToDecimal e.createdAt.number
+
+instance Patchable SteppedRate where
+  patch new base current = SteppedRate with
+    initialRate = patch new.initialRate base.initialRate current.initialRate
+    steps = patchListAsScalar new.steps base.steps current.steps
+
+instance Patchable FixedFee where
+  patch new base current = FixedFee with
+    fee = patch new.fee base.fee current.fee
+
+instance Patchable RatePerRound where
+  patch new base current = RatePerRound with
+    rate = patch new.rate base.rate current.rate

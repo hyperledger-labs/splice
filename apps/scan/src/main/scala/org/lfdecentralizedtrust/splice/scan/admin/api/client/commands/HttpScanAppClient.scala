@@ -104,6 +104,26 @@ object HttpScanAppClient {
     }
   }
 
+  case class ListDsoRulesVoteRequests()
+      extends InternalBaseCommand[http.ListDsoRulesVoteRequestsResponse, Seq[
+        Contract[VoteRequest.ContractId, VoteRequest]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListDsoRulesVoteRequestsResponse] =
+      client.listDsoRulesVoteRequests(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListDsoRulesVoteRequestsResponse.OK(response) =>
+      response.dsoRulesVoteRequests
+        .traverse(c => Contract.fromHttp(VoteRequest.COMPANION)(c))
+        .leftMap(_.toString)
+    }
+  }
+
   case class GetDsoInfo(headers: List[HttpHeader])
       extends InternalBaseCommand[http.GetDsoInfoResponse, definitions.GetDsoInfoResponse] {
 

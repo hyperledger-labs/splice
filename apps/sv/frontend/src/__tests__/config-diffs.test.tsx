@@ -40,8 +40,11 @@ describe('SV user can', () => {
   });
 });
 
-describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () => {
-  const action = 'CRARC_AddFutureAmuletConfigSchedule';
+describe('SV can see AmuletRules config diffs', () => {
+  // Note: here we test each VoteRequest phases using both the deprecated action and the actual action
+  // the underlying components and logic are the same.
+  const deprecatedAction = 'CRARC_AddFutureAmuletConfigSchedule';
+  const action = 'CRARC_SetConfig';
 
   test('while creating a vote request.', async () => {
     const user = userEvent.setup();
@@ -57,32 +60,22 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     expect(dropdown).toBeDefined();
     fireEvent.change(dropdown!, { target: { value: action } });
 
+    const input = screen.getByTestId('transferConfig.createFee.fee-value');
+    await userEvent.type(input, '42');
+
     expect(await screen.findByText('Config diffs')).toBeDefined();
 
-    // current comparison + 1 in-flight vote request
-    checkNumberNumberOfDiffs(2);
+    // current comparison
+    checkNumberNumberOfDiffs(1);
   });
 
   test('in the action needed section.', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Action Needed', action, user);
+    await goToGovernanceTabAndClickOnAction('Action Needed', deprecatedAction, user, 1);
 
     const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '222.2');
-    await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
-
-    // current comparison
-    checkNumberNumberOfDiffs(1);
-  });
-
-  test('in the planned section.', async () => {
-    const user = userEvent.setup();
-    render(<AppWithConfig />);
-
-    await goToGovernanceTabAndClickOnAction('Planned', action, user);
-
-    const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '1.03');
     await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
     // current comparison
@@ -93,7 +86,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Executed', action, user);
+    await goToGovernanceTabAndClickOnAction('Executed', deprecatedAction, user);
 
     //TODO(#14813): when an action is executed, the AmuletConfigSchedule is updated and actualized to now, therefore the diff is empty for the first change
     await screen.findByTestId('stringify-display');
@@ -106,7 +99,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Rejected', action, user);
+    await goToGovernanceTabAndClickOnAction('Rejected', deprecatedAction, user);
 
     await screen.findByTestId('stringify-display');
 
@@ -115,7 +108,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
   });
 });
 
-describe('SV can see config diffs of SRARC_SetConfig', () => {
+describe('SV can see DsoRules config diffs', () => {
   const action = 'SRARC_SetConfig';
 
   test('while creating a vote request.', async () => {
@@ -132,25 +125,28 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
     expect(dropdown).toBeDefined();
     fireEvent.change(dropdown!, { target: { value: action } });
 
-    const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
-    await user.click(checkBox);
+    const input = screen.getByTestId(
+      'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
+    );
+    await user.clear(input);
+    await user.type(input, '481516');
 
     expect(await screen.findByText('Config diffs')).toBeDefined();
 
-    // current comparison + 1 in-flight vote request
-    checkNumberNumberOfDiffs(3);
+    // current comparison
+    checkNumberNumberOfDiffs(1);
   });
 
   test('in the action needed section.', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Action Needed', action, user, 1);
+    await goToGovernanceTabAndClickOnAction('Action Needed', action, user, 2);
     const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1600', '2100');
     await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
 
     // current comparison
-    checkNumberNumberOfDiffs(2);
+    checkNumberNumberOfDiffs(1);
   });
 
   test('of a SetConfig vote result in the executed section.', async () => {
@@ -159,7 +155,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     await goToGovernanceTabAndClickOnAction('Executed', action, user, 1);
 
-    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1800', '2200');
+    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('100', '2200');
 
     await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
@@ -175,9 +171,9 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
       await goToGovernanceTabAndClickOnAction('Executed', action, user, 2);
 
-      const mockJsonContent = getMockJsonContentForDsoRules('1800');
+      const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1900', '1800');
 
-      await checkDsoRulesExpectedConfigDiffsHTML(mockJsonContent, 0, true);
+      await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
       checkNumberNumberOfDiffs(1);
     },
@@ -190,10 +186,9 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     await goToGovernanceTabAndClickOnAction('Rejected', action, user, 1);
 
-    const mockHtmlContent = getMockJsonContentForDsoRules('2000');
+    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('20', '2000');
 
-    await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0, true);
-
+    await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
     checkNumberNumberOfDiffs(1);
   });
 });
@@ -230,53 +225,4 @@ async function goToGovernanceTabAndClickOnAction(
   const row = document.querySelector(`[data-id="${index}"]`);
 
   await user.click(row!);
-}
-
-function getMockJsonContentForDsoRules(acsCommitmentReconciliationInterval: string): string {
-  return (
-    '{\n' +
-    '  "numUnclaimedRewardsThreshold": "10",\n' +
-    '  "numMemberTrafficContractsThreshold": "5",\n' +
-    '  "actionConfirmationTimeout": {\n' +
-    '    "microseconds": "3600000000"\n' +
-    '  },\n' +
-    '  "svOnboardingRequestTimeout": {\n' +
-    '    "microseconds": "3600000000"\n' +
-    '  },\n' +
-    '  "svOnboardingConfirmedTimeout": {\n' +
-    '    "microseconds": "3600000000"\n' +
-    '  },\n' +
-    '  "voteRequestTimeout": {\n' +
-    '    "microseconds": "604800000000"\n' +
-    '  },\n' +
-    '  "dsoDelegateInactiveTimeout": {\n' +
-    '    "microseconds": "70000000"\n' +
-    '  },\n' +
-    '  "synchronizerNodeConfigLimits": {\n' +
-    '    "cometBft": {\n' +
-    '      "maxNumCometBftNodes": "2",\n' +
-    '      "maxNumGovernanceKeys": "2",\n' +
-    '      "maxNumSequencingKeys": "2",\n' +
-    '      "maxNodeIdLength": "50",\n' +
-    '      "maxPubKeyLength": "256"\n' +
-    '    }\n' +
-    '  },\n' +
-    '  "maxTextLength": "1024",\n' +
-    '  "decentralizedSynchronizer": {\n' +
-    '    "synchronizers": [\n' +
-    '      [\n' +
-    '        "global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37",\n' +
-    '        {\n' +
-    '          "state": "DS_Operational",\n' +
-    '          "cometBftGenesisJson": "TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.",\n' +
-    `          "acsCommitmentReconciliationInterval": "${acsCommitmentReconciliationInterval}"\n` +
-    '        }\n' +
-    '      ]\n' +
-    '    ],\n' +
-    '    "lastSynchronizerId": "global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37",\n' +
-    '    "activeSynchronizerId": "global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"\n' +
-    '  },\n' +
-    '  "nextScheduledSynchronizerUpgrade": null\n' +
-    '}'
-  );
 }
