@@ -244,7 +244,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     clue("rewards from round 2 are merged but not round 3") {
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
       // last listAppRewardCoupons() needs more than 20 seconds
-      eventually(40.seconds) {
+      eventually(60.seconds) {
         val currentInstant =
           sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
         getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(2, 3)
