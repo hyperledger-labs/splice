@@ -746,11 +746,15 @@
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220932286cab2eefd313d308dfe049905cd2968becdefd78c49176991b87f2d1017",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::12204eb3808b8a646470cbaedbe95811993b4d96df2bd9cd32585802d0365f9c15ed",
+                "weight": "10000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 305000
           },
           {
             "extraBeneficiaries": [
