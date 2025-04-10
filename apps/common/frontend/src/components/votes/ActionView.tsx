@@ -10,7 +10,6 @@ import {
   PartyId,
   useVotesHooks,
   VotesHooks,
-  ConfirmationDialog,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { QueryObserverSuccessResult } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -31,6 +30,7 @@ import {
   AmuletRules_AddFutureAmuletConfigSchedule,
   AmuletRules_UpdateFutureAmuletConfigSchedule,
   AmuletRules_RemoveFutureAmuletConfigSchedule,
+  AmuletRules_SetConfig,
 } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { Schedule } from '@daml.js/splice-amulet/lib/Splice/Schedule';
 import {
@@ -40,8 +40,9 @@ import {
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { Time } from '@daml/types';
 
+import { getAmuletConfigToCompareWith } from '../../utils';
 import AccordionList, { AccordionListProps } from '../AccordionList';
-import { ConfirmationDialogProps } from '../ConfirmationDialog';
+import { ConfirmationDialog, ConfirmationDialogProps } from '../ConfirmationDialog';
 import DateWithDurationDisplay from '../DateWithDurationDisplay';
 import { DsoInfo } from '../Dso';
 import { PrettyJsonDiff } from '../PrettyJsonDiff';
@@ -63,7 +64,7 @@ function findAmuletRulesScheduleItemToCompareAgainst(
   scheduleTime: string,
   votesHooks: VotesHooks,
   defaultConfig: AmuletConfig<USD>,
-  tableType?: VoteRequestResultTableType
+  voteRequestResultTableType?: VoteRequestResultTableType
 ): [string, AmuletConfig<USD>] {
   function parseAmuletRulesAction(
     action: ActionRequiringConfirmation
@@ -86,20 +87,21 @@ function findAmuletRulesScheduleItemToCompareAgainst(
     scheduleTime,
     'CRARC_AddFutureAmuletConfigSchedule',
     votesHooks,
-    tableType
+    voteRequestResultTableType
   )?.request.action;
   const latestUpdateAction = findLatestVoteResult(
     scheduleTime,
     'CRARC_UpdateFutureAmuletConfigSchedule',
     votesHooks,
-    tableType
+    voteRequestResultTableType
   )?.request.action;
 
   const currentAmuletConfig = Schedule(Time, AmuletConfig(USD)).encode(
     getAmuletConfigurationAsOfNow(schedule)
   ) as Schedule<string, AmuletConfig<USD>>;
 
-  const isExecutedOrRejected = tableType === 'Executed' || tableType === 'Rejected';
+  const isExecutedOrRejected =
+    voteRequestResultTableType === 'Executed' || voteRequestResultTableType === 'Rejected';
 
   if (isExecutedOrRejected) {
     if (!latestAddAction) {
@@ -155,11 +157,19 @@ function findAmuletRulesScheduleItemToCompareAgainst(
 
 export const ActionView: React.FC<{
   action: ActionRequiringConfirmation;
-  tableType?: VoteRequestResultTableType;
-  effectiveAt?: string;
+  voteRequestResultTableType?: VoteRequestResultTableType;
+  expiresAt?: Date;
+  effectiveAt?: Date;
   expirationInDays?: number;
   confirmationDialogProps?: ConfirmationDialogProps;
-}> = ({ action, tableType, effectiveAt, expirationInDays, confirmationDialogProps }) => {
+}> = ({
+  action,
+  voteRequestResultTableType,
+  expiresAt,
+  effectiveAt,
+  expirationInDays,
+  confirmationDialogProps,
+}) => {
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
 
@@ -229,16 +239,17 @@ export const ActionView: React.FC<{
       case 'SRARC_SetConfig': {
         return (
           <>
-            <SetConfigValueTable
+            <SetDsoConfigValueTable
               votesHooks={votesHooks}
               dsoInfosQuery={dsoInfosQuery}
               actionType={actionType}
               dsoAction={dsoAction}
+              expiresAt={expiresAt}
               effectiveAt={effectiveAt}
-              tableType={tableType}
-              confirmationDialogProps={confirmationDialogProps!}
-              expirationInDays={expirationInDays!}
+              expirationInDays={expirationInDays}
+              voteRequestResultTableType={voteRequestResultTableType}
             />
+            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
           </>
         );
       }
@@ -278,7 +289,7 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
-            tableType={tableType}
+            voteRequestResultTableType={voteRequestResultTableType}
             confirmationDialogProps={confirmationDialogProps!}
             expirationInDays={expirationInDays!}
           />
@@ -291,7 +302,7 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
-            tableType={tableType}
+            voteRequestResultTableType={voteRequestResultTableType}
             confirmationDialogProps={confirmationDialogProps!}
             expirationInDays={expirationInDays!}
           />
@@ -304,9 +315,24 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
-            tableType={tableType}
+            voteRequestResultTableType={voteRequestResultTableType}
             confirmationDialogProps={confirmationDialogProps!}
             expirationInDays={expirationInDays!}
+          />
+        );
+      }
+      case 'CRARC_SetConfig': {
+        return (
+          <SetAmuletConfigValueTable
+            votesHooks={votesHooks}
+            dsoInfosQuery={dsoInfosQuery}
+            actionType={actionType}
+            amuletAction={amuletRulesAction}
+            expiresAt={expiresAt}
+            effectiveAt={effectiveAt}
+            voteRequestResultTableType={voteRequestResultTableType}
+            expirationInDays={expirationInDays!}
+            confirmationDialogProps={confirmationDialogProps!}
           />
         );
       }
@@ -376,7 +402,7 @@ const AddFutureConfigValueTable: React.FC<{
     tag: 'CRARC_AddFutureAmuletConfigSchedule';
     value: AmuletRules_AddFutureAmuletConfigSchedule;
   };
-  tableType?: VoteRequestResultTableType;
+  voteRequestResultTableType?: VoteRequestResultTableType;
   confirmationDialogProps?: ConfirmationDialogProps;
   expirationInDays?: number;
 }> = ({
@@ -384,7 +410,7 @@ const AddFutureConfigValueTable: React.FC<{
   dsoInfosQuery,
   actionType,
   amuletRulesAction,
-  tableType,
+  voteRequestResultTableType,
   confirmationDialogProps,
   expirationInDays,
 }) => {
@@ -407,10 +433,10 @@ const AddFutureConfigValueTable: React.FC<{
     amuletRulesAction.value.newScheduleItem._1,
     votesHooks,
     amuletRulesAction.value.newScheduleItem._2,
-    tableType
+    voteRequestResultTableType
   );
 
-  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !tableType
+  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
         amuletRulesAction.tag,
         voteRequests.data.map(vr => vr.payload)
@@ -431,29 +457,30 @@ const AddFutureConfigValueTable: React.FC<{
       title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
       content: (
         <PrettyJsonDiff
-          data={amuletRulesAction.value.newScheduleItem._2}
-          compareWithData={amuletConfigToCompareWith[1]}
+          changes={{
+            newConfig: amuletRulesAction.value.newScheduleItem._2,
+            actualConfig: amuletConfigToCompareWith[1],
+          }}
         />
       ),
     },
   ];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
     title: <DateWithDurationDisplay datetime={vr[0]} />,
     content: (
-      <PrettyJsonDiff data={amuletRulesAction.value.newScheduleItem._2} compareWithData={vr[1]} />
+      <PrettyJsonDiff
+        changes={{ newConfig: amuletRulesAction.value.newScheduleItem._2, actualConfig: vr[1] }}
+      />
     ),
   }));
 
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        children: (
-          <AccordionList
-            unfoldedAccordions={unfoldedAccordions}
-            foldedAccordions={foldedAccordions}
-          />
-        ),
+        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
 
@@ -472,7 +499,8 @@ const AddFutureConfigValueTable: React.FC<{
         }}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          foldedAccordions: foldedAccordions,
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
         }}
       />
       {confirmationDialogPropsWithDiffs &&
@@ -489,7 +517,7 @@ const RemoveFutureConfigValueTable: React.FC<{
     tag: 'CRARC_RemoveFutureAmuletConfigSchedule';
     value: AmuletRules_RemoveFutureAmuletConfigSchedule;
   };
-  tableType?: VoteRequestResultTableType;
+  voteRequestResultTableType?: VoteRequestResultTableType;
   confirmationDialogProps?: ConfirmationDialogProps;
   expirationInDays?: number;
 }> = ({
@@ -497,7 +525,7 @@ const RemoveFutureConfigValueTable: React.FC<{
   dsoInfosQuery,
   actionType,
   amuletRulesAction,
-  tableType,
+  voteRequestResultTableType,
   confirmationDialogProps,
   expirationInDays,
 }) => {
@@ -519,7 +547,7 @@ const RemoveFutureConfigValueTable: React.FC<{
     amuletRulesAction.value.scheduleTime,
     votesHooks,
     dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
-    tableType
+    voteRequestResultTableType
   );
 
   // TODO(#15154): Implement config diffs of CRARC_RemoveFutureAmuletConfigSchedule action
@@ -535,8 +563,10 @@ const RemoveFutureConfigValueTable: React.FC<{
           ),
           ScheduleItem: (
             <PrettyJsonDiff
-              data={amuletConfigToCompareWith[1]}
-              compareWithData={amuletConfigToCompareWith[1]}
+              changes={{
+                newConfig: amuletConfigToCompareWith[1],
+                actualConfig: amuletConfigToCompareWith[1],
+              }}
             />
           ),
         }}
@@ -554,15 +584,15 @@ const UpdateFutureConfigValueTable: React.FC<{
     tag: 'CRARC_UpdateFutureAmuletConfigSchedule';
     value: AmuletRules_UpdateFutureAmuletConfigSchedule;
   };
-  tableType?: VoteRequestResultTableType;
-  confirmationDialogProps: ConfirmationDialogProps;
-  expirationInDays: number;
+  voteRequestResultTableType?: VoteRequestResultTableType;
+  confirmationDialogProps?: ConfirmationDialogProps;
+  expirationInDays?: number;
 }> = ({
   votesHooks,
   dsoInfosQuery,
   actionType,
   amuletRulesAction,
-  tableType,
+  voteRequestResultTableType,
   confirmationDialogProps,
   expirationInDays,
 }) => {
@@ -585,10 +615,10 @@ const UpdateFutureConfigValueTable: React.FC<{
     amuletRulesAction.value.scheduleItem._1,
     votesHooks,
     amuletRulesAction.value.scheduleItem._2,
-    tableType
+    voteRequestResultTableType
   );
 
-  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !tableType
+  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
         amuletRulesAction.tag,
         voteRequests.data.map(vr => vr.payload)
@@ -603,6 +633,19 @@ const UpdateFutureConfigValueTable: React.FC<{
         })
         .filter(v => v[0] !== amuletRulesAction.value.scheduleItem._1)
     : [];
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const foldedAccordions = inflightVoteRequests.map(vr => ({
+    title: <DateWithDurationDisplay datetime={vr[0]} />,
+    content: (
+      <PrettyJsonDiff
+        changes={{
+          newConfig: amuletRulesAction.value.scheduleItem._2,
+          actualConfig: vr[1],
+        }}
+      />
+    ),
+  }));
 
   return (
     <>
@@ -623,21 +666,16 @@ const UpdateFutureConfigValueTable: React.FC<{
               title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
               content: (
                 <PrettyJsonDiff
-                  data={amuletRulesAction.value.scheduleItem._2}
-                  compareWithData={amuletConfigToCompareWith[1]}
+                  changes={{
+                    newConfig: amuletRulesAction.value.scheduleItem._2,
+                    actualConfig: amuletConfigToCompareWith[1],
+                  }}
                 />
               ),
             },
           ],
-          foldedAccordions: inflightVoteRequests.map(vr => ({
-            title: <DateWithDurationDisplay datetime={vr[0]} />,
-            content: (
-              <PrettyJsonDiff
-                data={amuletRulesAction.value.scheduleItem._2}
-                compareWithData={vr[1]}
-              />
-            ),
-          })),
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
         }}
       />
       {getConfirmationDialog(confirmationDialogProps!, expirationInDays!)}
@@ -645,48 +683,157 @@ const UpdateFutureConfigValueTable: React.FC<{
   );
 };
 
-const SetConfigValueTable: React.FC<{
+const SetAmuletConfigValueTable: React.FC<{
+  votesHooks: BaseVotesHooks;
+  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
+  actionType: string;
+  amuletAction: { tag: 'CRARC_SetConfig'; value: AmuletRules_SetConfig };
+  expiresAt?: Date;
+  effectiveAt?: Date;
+  voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
+  confirmationDialogProps?: ConfirmationDialogProps;
+  expirationInDays?: number;
+}> = ({
+  votesHooks,
+  dsoInfosQuery,
+  actionType,
+  amuletAction,
+  expiresAt,
+  effectiveAt,
+  voteRequestResultTableType,
+  confirmationDialogProps,
+  expirationInDays,
+}) => {
+  const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+  if (voteRequests.isLoading) {
+    return <Loading />;
+  }
+  if (voteRequests.isError) {
+    return <p>Error, something went wrong.</p>;
+  }
+  if (!voteRequests.data) {
+    return <p>no VoteRequest contractId is specified</p>;
+  }
+
+  const dsoConfigToCompareWith = getAmuletConfigToCompareWith(
+    effectiveAt,
+    voteRequestResultTableType,
+    votesHooks,
+    amuletAction,
+    dsoInfosQuery
+  );
+
+  const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
+    ? filterInflightVoteRequests(
+        amuletAction.tag,
+        voteRequests.data.map(vr => vr.payload)
+      )
+        .map(vr => {
+          const newConfig = (vr.action.value as ARC_AmuletRules).amuletRulesAction
+            ?.value as AmuletRules_SetConfig;
+          return [vr.voteBefore, AmuletConfig(USD).encode(newConfig.newConfig)] as [
+            string,
+            AmuletConfig<USD>
+          ];
+        })
+        .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
+    : [];
+
+  const unfoldedAccordions = [
+    {
+      title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
+      content: (
+        <PrettyJsonDiff
+          changes={{
+            newConfig: amuletAction.value.newConfig,
+            baseConfig: amuletAction.value.baseConfig,
+            actualConfig: dsoConfigToCompareWith[1],
+          }}
+        />
+      ),
+    },
+  ];
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const foldedAccordions = inflightVoteRequests.map(vr => ({
+    title: <DateWithDurationDisplay datetime={vr[0]} />,
+    content: (
+      <PrettyJsonDiff
+        changes={{
+          newConfig: amuletAction.value.newConfig,
+          baseConfig: amuletAction.value.baseConfig,
+          actualConfig: vr[1],
+        }}
+      />
+    ),
+  }));
+
+  const confirmationDialogPropsWithDiffs = confirmationDialogProps
+    ? {
+        ...confirmationDialogProps,
+        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
+      }
+    : undefined;
+
+  return (
+    <>
+      <ActionValueTable
+        actionType={actionType}
+        actionName={amuletAction.tag}
+        accordionList={{
+          unfoldedAccordions: unfoldedAccordions,
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
+        }}
+      />
+      {confirmationDialogPropsWithDiffs &&
+        getConfirmationDialog(confirmationDialogPropsWithDiffs, expirationInDays)}
+    </>
+  );
+};
+
+const SetDsoConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
   dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
   actionType: string;
   dsoAction: { tag: 'SRARC_SetConfig'; value: DsoRules_SetConfig };
-  effectiveAt?: string;
-  expirationInDays?: number;
-  tableType?: VoteRequestResultTableType; // tableType is only defined for the Planned, Executed and Rejected tabs
+  expiresAt?: Date;
+  effectiveAt?: Date;
+  voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
   confirmationDialogProps?: ConfirmationDialogProps;
+  expirationInDays?: number;
 }> = ({
   votesHooks,
   dsoInfosQuery,
   actionType,
   dsoAction,
+  expiresAt,
   effectiveAt,
-  expirationInDays,
-  tableType,
+  voteRequestResultTableType,
   confirmationDialogProps,
+  expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
-
   if (voteRequests.isLoading) {
     return <Loading />;
   }
-
   if (voteRequests.isError) {
     return <p>Error, something went wrong.</p>;
   }
-
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
 
   const dsoConfigToCompareWith = getDsoConfigToCompareWith(
     effectiveAt,
-    tableType,
+    voteRequestResultTableType,
     votesHooks,
     dsoAction,
     dsoInfosQuery
   );
 
-  const inflightVoteRequests: [string, DsoRulesConfig][] = !tableType
+  const inflightVoteRequests: [string, DsoRulesConfig][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
         dsoAction.tag,
         voteRequests.data.map(vr => vr.payload)
@@ -699,7 +846,7 @@ const SetConfigValueTable: React.FC<{
             DsoRulesConfig
           ];
         })
-        .filter(v => !dayjs(v[0]).isSame(dayjs(effectiveAt)))
+        .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
     : [];
 
   const unfoldedAccordions = [
@@ -707,27 +854,35 @@ const SetConfigValueTable: React.FC<{
       title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
       content: (
         <PrettyJsonDiff
-          data={dsoAction.value.newConfig}
-          compareWithData={dsoConfigToCompareWith[1]}
+          changes={{
+            newConfig: dsoAction.value.newConfig,
+            baseConfig: dsoAction.value.baseConfig || dsoConfigToCompareWith[1],
+            actualConfig: dsoConfigToCompareWith[1],
+          }}
         />
       ),
     },
   ];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
     title: <DateWithDurationDisplay datetime={vr[0]} />,
-    content: <PrettyJsonDiff data={dsoAction.value.newConfig} compareWithData={vr[1]} />,
+    content: (
+      <PrettyJsonDiff
+        changes={{
+          newConfig: dsoAction.value.newConfig,
+          baseConfig: dsoAction.value.baseConfig || undefined,
+          actualConfig: vr[1],
+        }}
+      />
+    ),
   }));
 
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        children: (
-          <AccordionList
-            unfoldedAccordions={unfoldedAccordions}
-            foldedAccordions={foldedAccordions}
-          />
-        ),
+        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
 
@@ -738,7 +893,8 @@ const SetConfigValueTable: React.FC<{
         actionName={dsoAction.tag}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          foldedAccordions: foldedAccordions,
+          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          foldedAccordions: [],
         }}
       />
       {confirmationDialogPropsWithDiffs &&
@@ -762,6 +918,7 @@ const getConfirmationDialog = (
       onClose={confirmationDialogProps.onClose}
       title="Confirm Your Vote Request"
       attributePrefix="vote"
+      disableProceed={confirmationDialogProps.disableProceed}
     >
       <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
       <br />

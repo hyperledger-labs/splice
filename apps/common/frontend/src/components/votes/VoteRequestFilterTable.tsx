@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { CopyableTypography, DateDisplay } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import dayjs from 'dayjs';
 import React from 'react';
 
-import { Chip } from '@mui/material';
+import { Chip, Typography } from '@mui/material';
 import { DataGrid, GridEventListener, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
 
 import {
@@ -15,6 +16,7 @@ import {
 import { VoteRequestModalState } from './ListVoteRequests';
 
 interface ListVoteRequestsTableProps {
+  supportsVoteEffectivityAndSetConfig: boolean;
   voteRequests: Contract<VoteRequest>[];
   getAction: (action: ActionRequiringConfirmation) => string;
   openModalWithVoteRequest: (voteRequestModalState: VoteRequestModalState) => void;
@@ -22,6 +24,7 @@ interface ListVoteRequestsTableProps {
 }
 
 export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
+  supportsVoteEffectivityAndSetConfig,
   voteRequests,
   getAction,
   openModalWithVoteRequest,
@@ -77,7 +80,27 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
       type: 'date',
       width: 250,
       renderCell: (params: GridRenderCellParams) => {
-        return <DateDisplay datetime={params.value} />;
+        const now = dayjs();
+        return dayjs(params.value).isBefore(now) ? (
+          <Typography variant="h6" data-testid="vote-row-expiry-date">
+            Did not expire
+          </Typography>
+        ) : (
+          <DateDisplay datetime={params.value} id="vote-row-expiry-date" />
+        );
+      },
+    },
+    {
+      field: 'effectiveAt',
+      headerName: 'Effective At',
+      type: 'date',
+      width: 250,
+      renderCell: (params: GridRenderCellParams) => {
+        return typeof params.value === 'object' ? (
+          <DateDisplay datetime={params.value} id="vote-row-effective-at" />
+        ) : (
+          'threshold'
+        );
       },
     },
     {
@@ -97,6 +120,11 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
     action: getAction(request.payload.action),
     requester: request.payload.requester,
     expiresAt: new Date(request.payload.voteBefore),
+    // TODO(#16139): get rid of supportsVoteEffectivityAndSetConfig check
+    effectiveAt:
+      supportsVoteEffectivityAndSetConfig && request.payload?.targetEffectiveAt
+        ? new Date(request.payload.targetEffectiveAt)
+        : undefined,
     createdAt: request.createdAt,
     voteStatus: request.contractId,
     idx: index,
@@ -106,12 +134,13 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
     openModalWithVoteRequest({
       open: true,
       voteRequestContractId: params.row.trackingCid,
-      effectiveAt: params.row.expiresAt.toISOString(),
+      expiresAt: params.row.expiresAt,
+      effectiveAt: params.row.effectiveAt,
     });
   };
 
   return (
-    <div style={{ height: 450, width: '100%' }} id={tableBodyId}>
+    <div style={{ height: 450, width: '100%' }} id={tableBodyId} data-testid={tableBodyId}>
       <DataGrid
         rows={rows}
         columns={columns}
