@@ -2278,16 +2278,16 @@ the validation of the topology state in Canton. The concrete steps are:
    delete them afterwards and this is only possible after requesting PAM.
 5. Export the genesis state (roughly the synchronizer topology state)
    ```
-   sequencer.topology.transactions.genesis_state(filterDomainStore = sequencer.domain_id.filterString).writeTo(new java.io.FileOutputStream("/tmp/state-export/genesis-state"))
+   sequencer.topology.transactions.genesis_state(sequencer.synchronizer_id.filterString).writeTo(new java.io.FileOutputStream("/tmp/state-export/genesis-state"))
    ```
 6. Save the number of currently active topology transactions for future validation
    ```
-   sequencer.topology.transactions.list(filterStore = sequencer.domain_id.filterString, proposals = false, timeQuery = TimeQuery.HeadState).result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _)
+   sequencer.topology.transactions.list(store = sequencer.synchronizer_id, proposals = false, timeQuery = TimeQuery.HeadState).result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _)
    ```
    Note: This should be run immediatly after exporting the genesis state to ensure no new topology state is written between the genesis export and the current state calculations.
 7. Export the authorized topology store snapshot
    ```
-   sequencer.topology.transactions.export_topology_snapshot("Authorized", filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString).writeTo(new java.io.FileOutputStream("/tmp/state-export/authorized"))
+   sequencer.topology.transactions.export_topology_snapshot(TopologyStoreId.Authorized, filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString, timeQuery = TimeQuery.Range(None, None)).writeTo(new java.io.FileOutputStream("/tmp/state-export/authorized"))
    ```
 8. Get the sequencer id from `sequencer.id.toProtoPrimitive` and save it
 
@@ -2332,11 +2332,12 @@ diff --git a/apps/app/src/test/resources/simple-topology-canton.conf b/apps/app/
     ```
 8. Import the authorized store snapshot
     ```
-    globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/tmp/state-export/authorized", "Authorized")
+    import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+    globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/tmp/state-export/authorized", TopologyStoreId.Authorized)
     ```
 9. Initialize the sequencer from the genesis state
     ```
-    globalSequencerSv1.setup.assign_from_genesis_state(com.google.protobuf.ByteString.readFrom(new java.io.FileInputStream("/tmp/state-export/genesis-state")), StaticDomainParameters.defaults(globalSequencerSv1.config.crypto, ProtocolVersion.latest))
+    globalSequencerSv1.setup.assign_from_genesis_state(com.google.protobuf.ByteString.readFrom(new java.io.FileInputStream("/tmp/state-export/genesis-state")), StaticSynchronizerParameters.defaults(globalSequencerSv1.config.crypto, ProtocolVersion.latest))
     ```
 10. Verify that the sequencer is initialized
     ```
@@ -2360,7 +2361,7 @@ diff --git a/apps/app/src/test/resources/simple-topology-canton.conf b/apps/app/
     ```
 11. Calculate the number of currently active topology transactions after full init
    ```
-   globalSequencerSv1.topology.transactions.list(filterStore = globalSequencerSv1.domain_id.filterString, proposals = false, timeQuery = TimeQuery.HeadState).result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _)
+   globalSequencerSv1.topology.transactions.list(filterStore = globalSequencerSv1.synchronizer_id.filterString, proposals = false, timeQuery = TimeQuery.HeadState).result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _)
    ```
    Compare these numbers with the numbers from the cluster sequencer. The numbers should be identical.
 12. Check that there are no sketchy warnings or errors in the Canton logs in `log/canton.clog`
