@@ -118,8 +118,10 @@ class DamlCIUpgradeVotePreflightTest
 
           val tbody = find(id("sv-vote-results-planned-table-body"))
           inside(tbody) { case Some(tb) =>
-            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-            rows.size shouldBe 1
+            eventually() {
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe 1
+            }
           }
         }
       }
