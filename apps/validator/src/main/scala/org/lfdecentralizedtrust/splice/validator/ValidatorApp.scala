@@ -692,7 +692,8 @@ class ValidatorApp(
           voteRequests <- scanConnection.getVoteRequests()
           _ <- packageVetting.vetPackages(
             amuletRules,
-            AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+            // Don't pass in vote requests here, we just want the current config.
+            Seq.empty,
           )
         } yield ()
       }

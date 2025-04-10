@@ -14,7 +14,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, VoteRequest}
 import org.lfdecentralizedtrust.splice.environment.*
 
 import java.time.Instant
@@ -47,6 +47,7 @@ class PackageVetting(
           Future.unit
         }
       }
+      // We treat accepted voting requests like a future dated config with the date being the vote effectivity date.
       _ <- futureAmuletConfigFromVoteRequests.traverse_ { case (time, config) =>
         warnIfFutureConfigUnknown(time.map(CantonTimestamp.assertFromInstant), config)
       }
@@ -114,6 +115,10 @@ class PackageVetting(
 
 object PackageVetting {
   trait HasVoteRequests {
+
+    def getDsoRules()(implicit
+        tc: TraceContext
+    ): Future[Contract[DsoRules.ContractId, DsoRules]]
 
     def getVoteRequests()(implicit
         tc: TraceContext

@@ -55,7 +55,6 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigSchedule,
   Contract,
   PackageVetting,
   TemplateJsonDecoder,
@@ -813,10 +812,9 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
         )
-        voteRequests <- svStore.listVoteRequests()
         _ <- vetting.vetPackages(
           amuletRules.contract,
-          AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+          Seq.empty, // We don't bother passing in vote requests here, this just needs to vet the current config.
         )
         _ = logger.info("Packages vetting completed")
       } yield ()

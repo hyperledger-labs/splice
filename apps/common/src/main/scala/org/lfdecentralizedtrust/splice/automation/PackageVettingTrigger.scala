@@ -34,9 +34,10 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     for {
       amuletRules <- getAmuletRules()
       voteRequests <- getVoteRequests()
+      dsoRules <- getDsoRules()
       _ <- vetting.vetPackages(
         amuletRules,
-        AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+        AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
       )
     } yield false
   }

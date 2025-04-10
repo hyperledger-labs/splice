@@ -7,6 +7,7 @@ import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{FeaturedAppRight, ValidatorRight}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommandCounter,
@@ -76,6 +77,10 @@ trait ScanConnection
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]]
+
+  def getDsoRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[DsoRules.ContractId, DsoRules]]
 
   def getExternalPartyAmuletRules()(implicit
       ec: ExecutionContext,
