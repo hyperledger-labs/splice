@@ -2332,7 +2332,6 @@ diff --git a/apps/app/src/test/resources/simple-topology-canton.conf b/apps/app/
     ```
 8. Import the authorized store snapshot
     ```
-    import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
     globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/tmp/state-export/authorized", TopologyStoreId.Authorized)
     ```
 9. Initialize the sequencer from the genesis state
