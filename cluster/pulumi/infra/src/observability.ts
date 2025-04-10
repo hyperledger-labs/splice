@@ -17,6 +17,7 @@ import {
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
+  isMainNet,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
@@ -553,14 +554,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
       '/api/v1/write'
     );
   }
-  const grafanaPublicVirtualService = istioPublicVirtualService(
-    namespace,
-    'grafana-public',
-    'grafana',
-    80,
-    '/grafana/',
-    '/'
-  );
+  // TODO(#18897): Consider removing this also from non-MainNet clusters
+  const grafanaPublicVirtualService = isMainNet
+    ? undefined
+    : istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
@@ -584,11 +581,13 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
-  createGrafanaServiceAccount(
-    namespaceName,
-    adminPassword,
-    dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
-  );
+  if (grafanaPublicVirtualService) {
+    createGrafanaServiceAccount(
+      namespaceName,
+      adminPassword,
+      dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
+    );
+  }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 }
 

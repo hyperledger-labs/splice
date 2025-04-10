@@ -1,18 +1,34 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
+import com.daml.ledger.javaapi.data as javaApi
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.time.SimClock
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import com.google.protobuf.ByteString
+import org.apache.pekko.http.scaladsl.model.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
 import org.lfdecentralizedtrust.splice.environment.{
   BaseAppConnection,
   RetryProvider,
   SpliceLedgerClient,
 }
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
   DomainScans,
   DsoScan,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -20,34 +36,12 @@ import org.lfdecentralizedtrust.splice.util.{
   DomainRecordTimeRange,
   SpliceUtil,
 }
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.daml.ledger.javaapi.data as javaApi
-import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
-import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
-import com.google.protobuf.ByteString
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpResponse,
-  StatusCodes,
-  Uri,
-}
 import org.mockito.exceptions.base.MockitoAssertionError
 import org.scalatest.wordspec.AsyncWordSpec
+import org.slf4j.event.Level
 
 import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
-import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
-import org.slf4j.event.Level
 
 // mock verification triggers this
 @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))

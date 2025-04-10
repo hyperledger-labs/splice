@@ -196,6 +196,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
       url: '',
       body: 'Adjust fee',
     },
+    targetEffectiveAt: null,
     voteBefore: '2024-09-05T08:40:55.977789Z',
     votes: emptyMap<string, Vote>().set('Digital-Asset-2', {
       sv: 'digital-asset-2::1220a1504d87451ce6a4a1355d71c4f26677d63db5e6298d04b0d1865fd971432a41',
@@ -239,6 +240,7 @@ export const executedVoteResult: DsoRules_CloseVoteRequestResult = {
       url: '',
       body: 'Test 2',
     },
+    targetEffectiveAt: null,
     voteBefore: '2024-09-13T07:51:14.091940Z',
     votes: emptyMap<string, Vote>().set('Digital-Asset-2', {
       sv: 'digital-asset-2::1220a1504d87451ce6a4a1355d71c4f26677d63db5e6298d04b0d1865fd971432a41',
@@ -283,6 +285,7 @@ export const rejectedVoteResult: DsoRules_CloseVoteRequestResult = {
       body: 'Test reject',
     },
     voteBefore: '2024-09-12T08:45:20.307127Z',
+    targetEffectiveAt: null,
     votes: emptyMap<string, Vote>().set('Digital-Asset-2', {
       sv: 'digital-asset-2::1220a1504d87451ce6a4a1355d71c4f26677d63db5e6298d04b0d1865fd971432a41',
       accept: false,
@@ -324,6 +327,7 @@ export const votedRequest: Contract<VoteRequest> = {
       url: '',
       body: 'Test 3',
     },
+    targetEffectiveAt: null,
     trackingCid: null,
     action: {
       tag: 'ARC_DsoRules',

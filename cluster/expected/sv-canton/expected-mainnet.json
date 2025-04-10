@@ -79,6 +79,27 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-canton-migration-2-ledger-api-user",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "sv-client-id@clients"
+        }
+      }
+    },
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-2-sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
@@ -113,7 +134,7 @@
           "chainId": "main-2",
           "chainIdSuffix": "2"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -169,7 +190,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-cometbft-global-domain-2",
     "provider": "",
@@ -248,7 +269,7 @@
           "name": "cn-mainzrhnet"
         },
         "enablePostgresMetrics": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -286,7 +307,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-global-domain-2",
     "provider": "",
@@ -462,7 +483,7 @@
         },
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
@@ -473,7 +494,7 @@
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
-            "name": "splice-app-sv-ledger-api-auth",
+            "name": "splice-app-sv-canton-migration-2-ledger-api-user",
             "optional": false
           }
         },
@@ -493,7 +514,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-participant-2",
     "provider": "",

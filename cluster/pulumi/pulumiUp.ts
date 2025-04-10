@@ -1,4 +1,4 @@
-import { DeploySvRunbook } from 'splice-pulumi-common';
+import { DeploySvRunbook, DeployValidatorRunbook } from 'splice-pulumi-common';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
@@ -18,13 +18,15 @@ async function runAllStacksUp() {
     name: 'canton-network',
     promise: mainStackUp,
   });
-  // TODO(#18683): We really shouldn't deploy that here (semantically), but if we don't things currently break.
-  // Once we resolve this we can think about redoing #18615 again.
   if (DeploySvRunbook) {
     const svRunbook = await stack('sv-runbook', 'sv-runbook', true, {});
-    const svRunbookUp = upOperation(svRunbook, abortController);
-    operations.push(svRunbookUp);
+    operations.push(upOperation(svRunbook, abortController));
   }
+  if (DeployValidatorRunbook) {
+    const validatorRunbook = await stack('validator-runbook', 'validator-runbook', true, {});
+    operations.push(upOperation(validatorRunbook, abortController));
+  }
+
   const cantonStacks = runSvCantonForAllMigrations(
     'up',
     stack => {

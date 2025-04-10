@@ -821,7 +821,11 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
         )
-        _ <- vetting.vetCurrentPackages(synchronizerId, amuletRules.contract)
+        voteRequests <- svStore.listVoteRequests()
+        _ <- vetting.vetCurrentPackages(
+          synchronizerId,
+          amuletRules.contract,
+        )
         _ = logger.info("Packages vetting completed")
       } yield ()
     }

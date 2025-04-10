@@ -24,6 +24,11 @@ module Splice.Util
 
   potentiallyUnsafeArchive,
 
+  Patchable(..),
+  patchScalar,
+  patchListAsScalar,
+  patchListAsSet,
+
   -- * Assertions on ledger time
   isLedgerTimeGE,
   isLedgerTimeLE,
@@ -34,6 +39,12 @@ module Splice.Util
 ) where
 
 import DA.Action (unless, when)
+import DA.Time
+import DA.Set (Set, difference, union)
+import qualified DA.Set as Set
+import DA.Map (Map)
+import qualified DA.Map as Map
+import DA.List()
 
 -- | Require that a contract-id refers to a specific contract.
 requireMatchingContract : (Eq t, Show t, HasFetch t) => ContractId t -> t -> Update ()
@@ -157,6 +168,82 @@ checkContractGroupId expectedcgid cid co = do
     ", got " <> show cgid <> " for " <> show (cid, co)
   return co
 
+-- Patching config values
+-------------------------
+
+-- | A type class for patching values. Used in particular for changing only a subset of
+-- fields in a config value.
+class Patchable a where
+  -- | For records, `patch new base current` should set all fields in `current` to their value in `new` iff their value was changed
+  -- in `new` compared to `base`. For other kinds of values that have field-like values
+  -- (e.g. Maps with keys) the implementation should match the one for records
+  -- by analogy.
+  patch : a -> a -> a -> a
+
+patchScalar : Eq a => a -> a -> a -> a
+patchScalar new base current
+  | new == base = current
+  | otherwise = new
+
+patchListAsScalar : Eq a => [a] -> [a] -> [a] -> [a]
+patchListAsScalar new base current = patchScalar new base current
+
+patchListAsSet : (Patchable a, Ord a) => [a] -> [a] -> [a] -> [a]
+patchListAsSet new base current = Set.toList (patch (Set.fromList new) (Set.fromList base) (Set.fromList current))
+
+instance (Patchable a, Ord a) => Patchable (Set a) where
+  patch new base current =
+    let toAdd = difference new base
+        toRemove = difference base new
+    in union (difference current toRemove) toAdd
+
+instance Patchable Decimal where
+  patch = patchScalar
+
+instance Patchable Int where
+  patch = patchScalar
+
+instance Patchable Text where
+  patch = patchScalar
+
+instance Patchable RelTime where
+  patch = patchScalar
+
+instance Patchable Time where
+  patch = patchScalar
+
+mapDifference : Ord k => Map k a -> Map k a -> Map k k
+mapDifference = Map.merge (\_ _ -> None) (\k _ -> Some k) (\_ _ _ -> None)
+
+instance (Ord k, Patchable v) => Patchable (Map k v) where
+  patch new base current =
+      Map.union toAdd (Map.filterWithKey (\key _ -> not (Map.member key keysToRemove)) current)
+    where
+      toAdd = Map.merge
+        -- Keys only in `new`: Add them to the result
+        (\_ value -> Some value)
+        -- Keys only in `base`: Remove them from the result (i.e., return `None`)
+        (\_key _ -> None)
+        -- Keys in both `new` and `base`: Use `patch` to merge with `base`
+        (\key newValue baseValue ->
+          case Map.lookup key current of
+            None -> None  -- Value got removed by concurrent request
+            Some currentValue -> Some (patch newValue baseValue currentValue)
+        )
+        new
+        base
+      keysToRemove = mapDifference new base
+
+instance Patchable a => Patchable (Optional a) where
+  patch new base current =
+    case (base, new) of
+      (None, None) -> current  -- No change requested
+      (Some _, None) -> None   -- Remove the value
+      (None, Some new') -> Some new' -- Write the complete new value
+      (Some base', Some new') ->
+        case current of
+          None -> None  -- Value got removed by concurrent request
+          Some current' -> Some (patch new' base' current') -- Patch the current value
 
 -- Assertions on ledger time
 ----------------------------

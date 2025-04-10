@@ -10,10 +10,10 @@ export const disableCometBftStateSync = config.envFlag('DISABLE_COMETBFT_STATE_S
 
 export type StaticCometBftConfig = {
   privateKey?: Output<string> | string;
-  validator?: {
+  validator: {
     keyAddress: Output<string> | string;
-    privateKey: Output<string> | string;
-    publicKey: Output<string> | string;
+    privateKey?: Output<string> | string;
+    publicKey?: Output<string> | string;
   };
   nodeIndex: number;
   retainBlocks: number;

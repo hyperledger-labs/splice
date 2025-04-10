@@ -15,7 +15,11 @@ export const Alerting: React.FC<{
     return <React.Fragment />;
   } else {
     return (
-      <Alert severity={alertState.severity} id={'alerting-datetime-mismatch'}>
+      <Alert
+        severity={alertState.severity}
+        id={'voterequest-creation-alert'}
+        data-testid={'voterequest-creation-alert'}
+      >
         {alertState.message}
       </Alert>
     );

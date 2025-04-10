@@ -113,7 +113,9 @@ executeDsoRulesConfigChange app updateConfig = do
   let newConfig = updateConfig dsoRules.config
   initiateAndAcceptVote app (Map.keys dsoRules.svs) $
     ARC_DsoRules with
-      dsoAction = SRARC_SetConfig DsoRules_SetConfig with newConfig
+      dsoAction = SRARC_SetConfig DsoRules_SetConfig with
+                                      newConfig = newConfig
+                                      baseConfig = Some dsoRules.config
 
 
 executeAddAmuletConfigSchedule

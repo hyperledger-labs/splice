@@ -72,7 +72,7 @@
           "hostname": "dev.global.canton.network.digitalasset.com",
           "svNamespace": "sv"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -144,29 +144,6 @@
   },
   {
     "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
-          "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cometbft-keys",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cometbft-keys",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
     "id": "projects/test-project/global/networks/default",
     "inputs": {},
     "name": "default",
@@ -226,7 +203,7 @@
         "cometbftPorts": {
           "domains": 2
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -269,7 +246,7 @@
           }
         },
         "enablePostgresMetrics": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -592,17 +569,21 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 305000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -667,7 +648,7 @@
           }
         ],
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.dev.global.canton.network.digitalasset.com"
@@ -829,7 +810,7 @@
         "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },

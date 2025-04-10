@@ -1539,6 +1539,142 @@ class DbSvDsoStoreTest
     } yield store
   }
 
+  "listVoteRequestsReadyToBeClosed" should {
+
+    val votesAccept =
+      (1 to 4).map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", "")))
+    val votesRefuse =
+      (1 to 4).map(n => new Vote(userParty(n).toProtoPrimitive, false, new Reason("", "")))
+    val nowMinus2Hours = Instant.now.truncatedTo(ChronoUnit.MICROS).minusSeconds(7200)
+    val nowMinus1Hour = Instant.now.truncatedTo(ChronoUnit.MICROS).minusSeconds(3600)
+    val nowPlus1Hour = Instant.now.truncatedTo(ChronoUnit.MICROS).plusSeconds(3600)
+    val nowPlus2Hours = Instant.now.truncatedTo(ChronoUnit.MICROS).plusSeconds(7200)
+
+    "list only vote requests without `targetEffectiveAt` that are ready to be closed" in {
+      val readyToBeClosed = Seq(
+        // expiry reached
+        voteRequest(requester = userParty(1), votes = votesAccept, expiry = nowMinus1Hour),
+        voteRequest(requester = userParty(1), votes = votesRefuse, expiry = nowMinus1Hour),
+        voteRequest(requester = userParty(2), votes = Seq.empty, expiry = nowMinus1Hour),
+        // expiry not reached, but early closing
+        voteRequest(requester = userParty(3), votes = votesAccept, expiry = nowPlus1Hour),
+        voteRequest(requester = userParty(3), votes = votesRefuse, expiry = nowPlus1Hour),
+      )
+      val notReadyToBeClosed = Seq(
+        voteRequest(requester = userParty(1), votes = Seq.empty, expiry = nowPlus1Hour)
+      )
+      val svs = Map(
+        "sv1" -> new SvInfo("sv1", new Round(0L), 1L, "df"),
+        "sv2" -> new SvInfo("sv2", new Round(0L), 1L, "df"),
+        "sv3" -> new SvInfo("sv3", new Round(0L), 1L, "df"),
+        "sv4" -> new SvInfo("sv4", new Round(0L), 1L, "df"),
+      ).asJava
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(dsoRules(svs))(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(amuletRules())(store.multiDomainAcsStore)
+        _ <- MonadUtil.sequentialTraverse(readyToBeClosed ++ notReadyToBeClosed)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        result <- store.listVoteRequestsReadyToBeClosed(
+          CantonTimestamp.now(),
+          PageLimit.tryCreate(100),
+        )(traceContext)
+      } yield {
+        val contracts = result.map(_.contract)
+        contracts should contain theSameElementsAs readyToBeClosed
+      }
+    }
+
+    "list only vote requests with `targetEffectiveAt` that are ready to be closed" in {
+      val readyToBeClosed = Seq(
+        // effectiveAt reached
+        voteRequest(
+          requester = userParty(1),
+          votes = votesAccept,
+          expiry = nowMinus2Hours,
+          effectiveAt = Optional.of(nowMinus1Hour),
+        ),
+        voteRequest(
+          requester = userParty(1),
+          votes = votesRefuse,
+          expiry = nowMinus2Hours,
+          effectiveAt = Optional.of(nowMinus1Hour),
+        ),
+        voteRequest(
+          requester = userParty(2),
+          votes = Seq.empty,
+          expiry = nowMinus2Hours,
+          effectiveAt = Optional.of(nowMinus1Hour),
+        ),
+        // between expiration and effectiveAt
+        voteRequest(
+          requester = userParty(2),
+          votes = Seq.empty,
+          expiry = nowMinus1Hour,
+          effectiveAt = Optional.of(nowPlus1Hour),
+        ),
+        // early closing only possible if super-majority refuse
+        voteRequest(
+          requester = userParty(2),
+          votes = votesRefuse,
+          expiry = nowMinus1Hour,
+          effectiveAt = Optional.of(nowPlus1Hour),
+        ),
+        voteRequest(
+          requester = userParty(1),
+          votes = votesRefuse,
+          expiry = nowPlus1Hour,
+          effectiveAt = Optional.of(nowPlus2Hours),
+        ),
+      )
+      val notReadyToBeClosed = Seq(
+        // effectiveAt not reached
+        voteRequest(
+          requester = userParty(1),
+          votes = votesAccept,
+          expiry = nowPlus1Hour,
+          effectiveAt = Optional.of(nowPlus2Hours),
+        ),
+        voteRequest(
+          requester = userParty(2),
+          votes = Seq.empty,
+          expiry = nowPlus1Hour,
+          effectiveAt = Optional.of(nowPlus2Hours),
+        ),
+        // between expiration and effectiveAt
+        voteRequest(
+          requester = userParty(2),
+          votes = votesAccept,
+          expiry = nowMinus1Hour,
+          effectiveAt = Optional.of(nowPlus1Hour),
+        ),
+      )
+      val svs = Map(
+        "sv1" -> new SvInfo("sv1", new Round(0L), 1L, "df"),
+        "sv2" -> new SvInfo("sv2", new Round(0L), 1L, "df"),
+        "sv3" -> new SvInfo("sv3", new Round(0L), 1L, "df"),
+        "sv4" -> new SvInfo("sv4", new Round(0L), 1L, "df"),
+      ).asJava
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(dsoRules(svs))(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(amuletRules())(store.multiDomainAcsStore)
+        _ <- MonadUtil.sequentialTraverse(readyToBeClosed ++ notReadyToBeClosed)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        result <- store.listVoteRequestsReadyToBeClosed(
+          CantonTimestamp.now(),
+          PageLimit.tryCreate(100),
+        )(traceContext)
+      } yield {
+        val contracts = result.map(_.contract)
+        contracts should contain theSameElementsAs readyToBeClosed
+      }
+    }
+
+  }
+
   "listExpiredVoteRequests" should {
 
     "return all vote requests that are expired as of now" in {

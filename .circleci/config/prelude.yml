@@ -88,6 +88,10 @@ parameters:
   upgrade-version:
     type: string
     default: ""
+  git-repo:
+    type: enum
+    enum: [canton-network-internal, canton-network-node]
+    default: canton-network-node
   # branch_filter parameter of wait_for_previous_pipeline
   branch-filter:
     type: string

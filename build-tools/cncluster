@@ -2031,12 +2031,17 @@ function subcmd_purge_unused_dbs() {
 subcommand_whitelist[set_operator_deployment_reference]="Set the git reference for the operator deployment in the cluster config file"
 function subcmd_set_operator_deployment_reference() {
 
-    if [ "$#" -lt 1 ]; then
-        echo "Usage: $0 <branch>"
+    if [ "$#" -lt 2 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
+        exit 1
+    fi
+    if [ "$#" -gt 2 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
         exit 1
     fi
     deployment_config=$(cat <<EOF
-      reference: $1
+      reference:
+$(_get_flux_reference_config "$1" "$2" "        ")
 EOF
     )
     _update_cluster_config "$deployment_config" "operatorDeployment"

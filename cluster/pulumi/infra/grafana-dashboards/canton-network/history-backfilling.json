@@ -641,14 +641,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(splice_history_backfilling_complete,namespace)",
+        "definition": "label_values(splice_history_backfilling_latest_record_time,namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(splice_history_backfilling_complete,namespace)",
+          "query": "label_values(splice_history_backfilling_latest_record_time,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -664,14 +664,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(splice_history_backfilling_complete,migration)",
+        "definition": "label_values(splice_history_backfilling_latest_record_time,migration)",
         "includeAll": true,
         "multi": true,
         "name": "migration",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(splice_history_backfilling_complete,migration)",
+          "query": "label_values(splice_history_backfilling_latest_record_time,migration)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

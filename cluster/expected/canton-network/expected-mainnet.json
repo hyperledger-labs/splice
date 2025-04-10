@@ -193,7 +193,7 @@
           "name": "cn-mainzrhnet"
         },
         "enableGcsProxy": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "networkName": "main",
         "tolerations": [
           {
@@ -203,7 +203,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "docs-docs",
     "provider": "",
@@ -365,6 +365,27 @@
       }
     },
     "name": "splice-auth0-ui-secret-sv-1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-canton-migration-1-ledger-api-user",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "sv-client-id@clients"
+        }
+      }
+    },
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -549,7 +570,7 @@
           "svIngressName": "sv-2",
           "svNamespace": "sv-1"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -569,7 +590,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -611,7 +632,7 @@
         "cometbftPorts": {
           "domains": 3
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -620,7 +641,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -792,7 +813,7 @@
         },
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
         "metrics": {
           "enable": true
@@ -826,7 +847,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -967,11 +988,15 @@
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220f8a24f975dc3d070e3111279bc2bf2d713a77c5570cbdd2064acb6a4d8d6feea",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220b6cf34a2c8937dc72403e7a8b57c80049be8aff3e5e2d992063460bdc8636466",
+                "weight": "10000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 305000
           },
           {
             "name": "Digital-Asset-1",
@@ -1077,7 +1102,7 @@
           },
           "prefix": "mainzrh/sv-1"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,
@@ -1128,7 +1153,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1179,7 +1204,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -1242,7 +1267,7 @@
           }
         }
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

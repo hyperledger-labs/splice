@@ -5,7 +5,9 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   DomainMigrationIndex,
   ExactNamespace,
+  installLedgerApiUserSecret,
   SpliceCustomResourceOptions,
+  withAddedDependencies,
 } from 'splice-pulumi-common';
 import { installPostgres, Postgres } from 'splice-pulumi-common/src/postgres';
 
@@ -30,6 +32,7 @@ export function installCantonComponents(
   svConfig: {
     onboardingName: string;
     ingressName: string;
+    auth0SvAppName: string;
     isFirstSv: boolean;
     isCoreSv: boolean;
   },
@@ -61,7 +64,19 @@ export function installCantonComponents(
       : 'DEBUG';
 
   const isActiveMigration = migrationConfig.active.id === migrationId;
+
   const auth0Config = auth0Client.getCfg();
+  const ledgerApiUserSecret = installLedgerApiUserSecret(
+    auth0Client,
+    xns,
+    `sv-canton-migration-${migrationId}`,
+    svConfig.auth0SvAppName
+  );
+  const ledgerApiUserSecretSource = auth0UserNameEnvVarSource(
+    `sv-canton-migration-${migrationId}`,
+    true
+  );
+
   const migrationStillRunning = migrationConfig.isStillRunning(migrationId);
   const migrationInfo = migrationConfig.allMigrations.find(
     migration => migration.id === migrationId
@@ -115,9 +130,9 @@ export function installCantonComponents(
       logLevel,
       migrationInfo.version,
       svConfig.onboardingName,
-      auth0UserNameEnvVarSource('sv'),
+      ledgerApiUserSecretSource,
       imagePullServiceAccountName,
-      opts
+      withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
     );
     const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
       ? new InStackCantonBftDecentralizedSynchronizerNode(

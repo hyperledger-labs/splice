@@ -2,16 +2,12 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.{ConfigScheduleUtil, JavaDecodeUtil as DecodeUtil}
-
-import java.time.Duration as JavaDuration
-import scala.jdk.CollectionConverters.*
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, JavaDecodeUtil as DecodeUtil}
 
 class SvTimeBasedRoundMgmtIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
-    with ConfigScheduleUtil {
+    with AmuletConfigUtil {
 
   "round management" in { implicit env =>
     initDso()
@@ -87,19 +83,34 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
     initDsoWithSv1Only()
-    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
+    val amuletRules = sv1ScanBackend.getAmuletRules().contract
 
     val doubledTickDuration = defaultTickDuration * 2
 
-    setFutureConfigSchedule(
-      createConfigSchedule(
-        currentConfigSchedule,
-        (
-          defaultTickDuration.asJava,
-          mkUpdatedAmuletConfig(currentConfigSchedule, doubledTickDuration),
-        ),
-      )
+    actAndCheck(
+      "set doubled tick duration", {
+        setAmuletConfig(
+          Seq(
+            (
+              None,
+              mkUpdatedAmuletConfig(amuletRules, doubledTickDuration),
+              amuletRules.payload.configSchedule.initialValue,
+            )
+          )
+        )
+      },
+    )(
+      "new tickDuration set in amuletConfig",
+      _ => {
+        sv1ScanBackend
+          .getAmuletRules()
+          .payload
+          .configSchedule
+          .initialValue
+          .tickDuration shouldBe SvUtil.toRelTime(doubledTickDuration)
+      },
     )
+
     advanceRoundsByOneTick
 
     // latest OpenMiningRound was created with doubled tick duration.
@@ -188,20 +199,34 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
     initDsoWithSv1Only()
-    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
+    val amuletRules = sv1ScanBackend.getAmuletRules().contract
 
     val reducedTickDuration = defaultTickDuration * 0.5
-    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-    sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.activeSynchronizer
-    setFutureConfigSchedule(
-      createConfigSchedule(
-        currentConfigSchedule,
-        (
-          defaultTickDuration.asJava,
-          mkUpdatedAmuletConfig(currentConfigSchedule, reducedTickDuration),
-        ),
-      )
+
+    actAndCheck(
+      "set reduced tick duration", {
+        setAmuletConfig(
+          Seq(
+            (
+              None,
+              mkUpdatedAmuletConfig(amuletRules, reducedTickDuration),
+              amuletRules.payload.configSchedule.initialValue,
+            )
+          )
+        )
+      },
+    )(
+      "new tickDuration set in amuletConfig",
+      _ => {
+        sv1ScanBackend
+          .getAmuletRules()
+          .payload
+          .configSchedule
+          .initialValue
+          .tickDuration shouldBe SvUtil.toRelTime(reducedTickDuration)
+      },
     )
+
     advanceRoundsByOneTick
 
     // latest OpenMiningRound was created with reduced tick duration.
@@ -363,17 +388,39 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
   "round management with very tightly scheduled config" in { implicit env =>
     initDsoWithSv1Only()
-    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
+    val amuletRules = sv1ScanBackend.getAmuletRules().contract
 
-    val config101 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 101)
-    val config102 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 102)
+    val config101 = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 101)
+    val config102 = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 102)
 
-    setFutureConfigSchedule(
-      createConfigSchedule(
-        currentConfigSchedule,
-        (JavaDuration.ofSeconds(150), config101),
-        (JavaDuration.ofSeconds(151), config102),
-      )
+    actAndCheck(
+      "set new configurations", {
+        setAmuletConfig(
+          Seq(
+            (
+              None,
+              config101,
+              amuletRules.payload.configSchedule.initialValue,
+            ),
+            (
+              None,
+              config102,
+              config101,
+            ),
+          )
+        )
+      },
+    )(
+      "last config set in amuletConfig",
+      _ => {
+        sv1ScanBackend
+          .getAmuletRules()
+          .payload
+          .configSchedule
+          .initialValue
+          .transferConfig
+          .maxNumInputs shouldBe 102
+      },
     )
 
     advanceRoundsByOneTick
@@ -387,32 +434,61 @@ class SvTimeBasedRoundMgmtIntegrationTest
       rounds.latestOpen.data.transferConfigUsd.maxNumInputs shouldBe config102.transferConfig.maxNumInputs
     })
 
-    val config201 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 201)
-    val config202 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 202)
+    val config201 = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 201)
+    val config202 = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 202)
 
-    {
-      val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-      val configSchedule = {
-        new splice.schedule.Schedule(
-          mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration),
-          List(
-            new Tuple2(
-              now.add(tickDurationWithBuffer).toInstant,
+    actAndCheck(
+      "set reduced tick duration", {
+        setAmuletConfig(
+          Seq(
+            (
+              None,
               config201,
-            ),
-            new Tuple2(
-              now.add(tickDurationWithBuffer.plus(JavaDuration.ofSeconds(1))).toInstant,
-              config202,
-            ),
-          ).asJava,
+              amuletRules.payload.configSchedule.initialValue,
+            )
+          )
         )
-      }
+      },
+    )(
+      "new tickDuration set in amuletConfig",
+      _ => {
+        sv1ScanBackend
+          .getAmuletRules()
+          .payload
+          .configSchedule
+          .initialValue
+          .transferConfig
+          .maxNumInputs shouldBe 201
+      },
+    )
 
-      setFutureConfigSchedule(configSchedule)
-    }
-
-    // Each advanceRoundsByOneTick will advance the time by exactly 160 second.
     advanceRoundsByOneTick
+
+    actAndCheck(
+      "set reduced tick duration", {
+        setAmuletConfig(
+          Seq(
+            (
+              None,
+              config202,
+              config201,
+            )
+          )
+        )
+      },
+    )(
+      "new tickDuration set in amuletConfig",
+      _ => {
+        sv1ScanBackend
+          .getAmuletRules()
+          .payload
+          .configSchedule
+          .initialValue
+          .transferConfig
+          .maxNumInputs shouldBe 202
+      },
+    )
+
     advanceRoundsByOneTick
 
     // As the first advanceRoundsByOneTick above advances the time by exactly 160 seconds

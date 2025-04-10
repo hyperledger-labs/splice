@@ -14,7 +14,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 
 class AutomationControlIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
 

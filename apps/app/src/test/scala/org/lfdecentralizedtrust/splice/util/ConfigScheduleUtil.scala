@@ -1,40 +1,42 @@
 package org.lfdecentralizedtrust.splice.util
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.SynchronizerId
+import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
   AmuletRules_AddFutureAmuletConfigSchedule,
   AmuletRules_RemoveFutureAmuletConfigSchedule,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.schedule.Schedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ActionRequiringConfirmation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.{
   CRARC_AddFutureAmuletConfigSchedule,
   CRARC_RemoveFutureAmuletConfigSchedule,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
+import org.lfdecentralizedtrust.splice.codegen.java.splice.schedule.Schedule
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  TestCommon,
   SpliceTestConsoleEnvironment,
+  TestCommon,
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAmuletConfig
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.SynchronizerId
 
 import java.time.{Duration, Instant}
 import scala.jdk.CollectionConverters.*
 
+//TODO(#16139): remove this utility
 trait ConfigScheduleUtil extends TestCommon {
 
   /** Helper function to create AmuletConfig's in tests for amulet config changes. Uses the `currentSchedule` as a reference
     * to fill in the id of the activeSynchronizer.
     */
   protected def mkUpdatedAmuletConfig(
-      currentSchedule: Schedule[Instant, AmuletConfig[USD]],
+      amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       tickDuration: NonNegativeFiniteDuration,
       maxNumInputs: Int = 100,
       holdingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
@@ -43,7 +45,7 @@ trait ConfigScheduleUtil extends TestCommon {
       env: SpliceTests.SpliceTestConsoleEnvironment
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
     val activeSynchronizerId =
-      AmuletConfigSchedule(currentSchedule)
+      AmuletConfigSchedule(amuletRules)
         .getConfigAsOf(env.environment.clock.now)
         .decentralizedSynchronizer
         .activeSynchronizer
@@ -66,12 +68,12 @@ trait ConfigScheduleUtil extends TestCommon {
     * Intended for testing only.
     */
   def createConfigSchedule(
-      currentSchedule: Schedule[Instant, AmuletConfig[USD]],
+      amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       newSchedules: (Duration, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD])*
   )(implicit env: SpliceTestConsoleEnvironment): Schedule[Instant, AmuletConfig[USD]] = {
     val configSchedule = {
       new splice.schedule.Schedule(
-        mkUpdatedAmuletConfig(currentSchedule, defaultTickDuration),
+        mkUpdatedAmuletConfig(amuletRules, defaultTickDuration),
         newSchedules
           .map { case (durationUntilScheduled, config) =>
             new Tuple2(
@@ -132,6 +134,7 @@ trait ConfigScheduleUtil extends TestCommon {
             "url",
             "description",
             sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+            None,
           )
         },
       )(

@@ -4,21 +4,17 @@
 package org.lfdecentralizedtrust.splice.util
 
 import cats.syntax.foldable.*
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.environment.{
-  DarResource,
-  DarResources,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-  RetryFor,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.environment.*
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -56,10 +52,15 @@ class PackageVetting(
   def vetPackages(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
+      futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val vettingSchedule =
-      associatePackageVersionsByEarliestVettingDate(amuletRules.createdAt, schedule)
+      associatePackageVersionsByEarliestVettingDate(
+        amuletRules.createdAt,
+        schedule,
+        futureAmuletConfigFromVoteRequests,
+      )
     vettingSchedule.toSeq.traverse_ { case (validFrom, packages) =>
       vetPackages(domainId, packages.toSeq, Some(validFrom))
     }
@@ -124,8 +125,11 @@ class PackageVetting(
   private def associatePackageVersionsByEarliestVettingDate(
       createdAt: Instant,
       amuletConfigSchedule: AmuletConfigSchedule,
+      futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
   ) = {
-    (amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
+    (futureAmuletConfigFromVoteRequests.collect { case (Some(effectiveAt), config) =>
+      (effectiveAt, config)
+    } ++ amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
       .flatMap { case (time, config) =>
         packages.map(pkg =>
           time -> (pkg -> PackageIdResolver.readPackageVersion(config.packageConfig, pkg))
@@ -137,4 +141,13 @@ class PackageVetting(
       .groupMap(_._2)(_._1)
   }
 
+}
+
+object PackageVetting {
+  trait HasVoteRequests {
+
+    def getVoteRequests()(implicit
+        tc: TraceContext
+    ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]]
+  }
 }
