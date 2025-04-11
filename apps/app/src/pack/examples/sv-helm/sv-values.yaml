@@ -17,6 +17,9 @@ auth:
 cometBFT:
   enabled: true
   connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"
+  # Uncomment if you will be using KMS for the SV participant.
+  # You will need to provide the key via the `splice-app-sv-cometbft-governance-key` secret.
+  # externalGovernanceKey: true
 
 # MIGRATION_START
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.

@@ -2449,7 +2449,7 @@ KMS support (for SVs, validators) is actively being worked on, so expect changes
 Currently we support:
 
 - Deploying `validator1` with participant KMS. You need to set `validator1.kms` in the deployment directory `config.yaml`.
-- Deploying any SV from the main `canton-network` stack with participant KMS. You need to set `svs.sv-X.participant.kms` in the deployment directory `config.yaml` (`sv-X` being your target SV).
+- Deploying an SV with participant KMS. You need to set `svs.sv-X.participant.kms` in the deployment directory `config.yaml` (`sv-X` being your target SV; `sv` also works).
 
 In both cases, the format for `kms` is:
 

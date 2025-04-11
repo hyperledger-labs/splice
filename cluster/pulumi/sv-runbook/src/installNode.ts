@@ -40,6 +40,9 @@ import {
   InstalledHelmChart,
   ansDomainPrefix,
   svUserIds,
+  SvCometBftGovernanceKey,
+  svCometBftGovernanceKeySecret,
+  svCometBftGovernanceKeyFromSecret,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -51,11 +54,6 @@ import { svAppSecrets } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
-}
-
-const singleSv = config.envFlag('SINGLE_SV') || !isDevNet;
-if (singleSv) {
-  console.error('Launching with a single SV');
 }
 
 type BootstrapCliConfig = {
@@ -108,6 +106,10 @@ export async function installNode(
 
   const svKey = svKeyFromSecret('sv');
 
+  const cometBftGovernanceKey = svAppConfig.externalGovernanceKey
+    ? svCometBftGovernanceKeyFromSecret(svNamespaceStr.replace('-', ''))!
+    : undefined;
+
   const { sv, validator } = await installSvAndValidator(
     {
       xns,
@@ -124,6 +126,7 @@ export async function installNode(
       validatorWalletUserName: validatorAppConfig.walletUserName,
       disableOnboardingParticipantPromotionDelay:
         svAppConfig.disableOnboardingParticipantPromotionDelay,
+      cometBftGovernanceKey,
     },
     resolveValidator1PartyId
   );
@@ -170,6 +173,7 @@ type SvConfig = {
   onboardingName: string;
   validatorWalletUserName: string;
   disableOnboardingParticipantPromotionDelay: boolean;
+  cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
 };
 
 function persistenceForPostgres(pg: SplicePostgres | CloudPostgres, values: ChartValues) {
@@ -202,6 +206,7 @@ async function installSvAndValidator(
     validatorWalletUserName,
     disableOnboardingParticipantPromotionDelay,
     loopback,
+    cometBftGovernanceKey,
   } = config;
 
   const auth0Config = auth0Client.getCfg();
@@ -259,6 +264,12 @@ async function installSvAndValidator(
     domain: {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
+    },
+    cometBFT: {
+      ...(valuesFromYamlFile.cometBFT || {}),
+      externalGovernanceKey: cometBftGovernanceKey
+        ? true
+        : valuesFromYamlFile.cometBFT?.externalGovernanceKey,
     },
     migration: {
       ...valuesFromYamlFile.migration,
@@ -318,7 +329,10 @@ async function installSvAndValidator(
         .concat(canton.participant.asDependencies)
         .concat(canton.decentralizedSynchronizer.dependencies)
         .concat([svAppSecret, svAppUISecret, appsPg])
-        .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
+        .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
+        .concat(
+          cometBftGovernanceKey ? svCometBftGovernanceKeySecret(xns, cometBftGovernanceKey) : []
+        ),
     }
   );
 
