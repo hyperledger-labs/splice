@@ -621,14 +621,7 @@ object RetryProvider {
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"The following stakeholders are not active on the target synchronizer".r
                           .findFirstMatchIn(description)
-                          .isDefined || // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
-                        (statusCode == Status.Code.INVALID_ARGUMENT &&
-                          errorDetails.exists {
-                            case ed: ErrorDetails.ErrorInfoDetail =>
-                              ed.errorCodeId == com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.MalformedRequest.id &&
-                              ed.metadata.get("reason").exists(_ contains "Unknown contract")
-                            case _ => false
-                          }) || // TODO(#10160) Remove this once Canton fixes the error code.
+                          .isDefined || // TODO(#10160) Remove this once Canton fixes the error code.
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
                           description.contains(
                             SequencerErrors.MaxSequencingTimeTooFar.id

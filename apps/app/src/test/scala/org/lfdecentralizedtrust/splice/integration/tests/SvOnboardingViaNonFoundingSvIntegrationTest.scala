@@ -132,6 +132,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             "url",
             "description",
             sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+            None,
           ),
         )("the request is created", _ => sv1Backend.listVoteRequests() should not be empty)
         actAndCheck(

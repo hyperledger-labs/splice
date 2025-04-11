@@ -136,6 +136,14 @@ class BftScanConnection(
       )
   }
 
+  override def listVoteRequests()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    bftCall(
+      _.listVoteRequests()
+    )
+
   override def getDsoPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
     bftCall(
       _.getDsoPartyId()

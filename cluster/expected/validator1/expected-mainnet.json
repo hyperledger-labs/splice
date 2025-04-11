@@ -236,7 +236,7 @@
           "name": "cn-mainzrhnet",
           "svNamespace": "validator1"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
             "activeMigrationId": "2"
@@ -255,7 +255,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -359,7 +359,7 @@
         "cometbftPorts": {
           "domains": 3
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -368,7 +368,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -414,7 +414,7 @@
         },
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true,
           "migration": {
@@ -443,7 +443,7 @@
           }
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "validator1-participant-2",
     "provider": "",
@@ -627,7 +627,8 @@
           "splice-node/dars/splitwell-0.1.5.dar",
           "splice-node/dars/splitwell-0.1.6.dar",
           "splice-node/dars/splitwell-0.1.7.dar",
-          "splice-node/dars/splitwell-0.1.8.dar"
+          "splice-node/dars/splitwell-0.1.8.dar",
+          "splice-node/dars/splitwell-0.1.9.dar"
         ],
         "auth": {
           "audience": "https://canton.network.global",
@@ -642,7 +643,7 @@
         "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -708,7 +709,7 @@
           "auth0|63e3d75ff4114d87a2c1e4f5"
         ]
       },
-      "version": "0.3.15"
+      "version": "0.3.17"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

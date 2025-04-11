@@ -6,11 +6,19 @@ package org.lfdecentralizedtrust.splice.sv.admin.api.client.commands
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot as CantonSequencerSnapshot
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpClientBuilder
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
@@ -20,14 +28,6 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as http}
 import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommand
 import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, TemplateJsonDecoder}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot as CantonSequencerSnapshot
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
-import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
-import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
-import org.apache.pekko.stream.Materializer
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}

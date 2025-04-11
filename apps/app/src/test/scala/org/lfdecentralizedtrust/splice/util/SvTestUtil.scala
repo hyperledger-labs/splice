@@ -8,9 +8,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
-  SynchronizerUpgradeSchedule,
   DsoRulesConfig,
   DsoRules_SetConfig,
+  SynchronizerUpgradeSchedule,
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -22,8 +22,8 @@ import org.lfdecentralizedtrust.splice.console.{
   WalletAppClientReference,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  TestCommon,
   SpliceTestConsoleEnvironment,
+  TestCommon,
 }
 import org.lfdecentralizedtrust.splice.util.SvTestUtil.ConfirmingSv
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -32,6 +32,7 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.Assertion
 
 import java.math.RoundingMode
+import java.util.Optional
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -99,7 +100,8 @@ trait SvTestUtil extends TestCommon {
     val action = new ARC_DsoRules(
       new SRARC_SetConfig(
         new DsoRules_SetConfig(
-          updateNextScheduledSynchronizerUpgrade(dsoRules.payload.config, domainUpgradeSchedule)
+          updateNextScheduledSynchronizerUpgrade(dsoRules.payload.config, domainUpgradeSchedule),
+          Optional.empty(),
         )
       )
     )
@@ -131,6 +133,7 @@ trait SvTestUtil extends TestCommon {
               // We give everyone 30 seconds to vote. Hopefully that is a good sweet spot between
               // the vote failing because of a timeout and the test taking too long.
               new RelTime(30 * 1000 * 1000),
+              None,
             )
           },
         )(

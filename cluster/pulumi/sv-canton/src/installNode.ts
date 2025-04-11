@@ -36,6 +36,7 @@ export function installNode(
 
   const serviceAccountName = `sv-canton-migration-${migrationId}`;
   const imagePullDeps = imagePullSecretWithNonDefaultServiceAccount(xns, serviceAccountName);
+
   return installCantonComponents(
     xns,
     migrationId,
@@ -43,6 +44,7 @@ export function installNode(
     {
       ingressName: nodeConfig.ingressName,
       onboardingName: nodeConfig.onboardingName,
+      auth0SvAppName: nodeConfig.auth0SvAppName,
       isFirstSv: isFirstSv,
       isCoreSv: isCoreSv,
     },

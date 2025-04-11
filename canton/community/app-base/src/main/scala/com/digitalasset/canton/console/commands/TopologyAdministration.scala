@@ -2291,8 +2291,7 @@ class TopologyAdministrationGroup(
         force: ForceFlags = ForceFlags.none,
     ): Unit = {
 
-      val topologyChangeOp =
-        if (packages.isEmpty) TopologyChangeOp.Remove else TopologyChangeOp.Replace
+      val topologyChangeOp = TopologyChangeOp.Replace
 
       val command = TopologyAdminCommands.Write.Propose(
         mapping = VettedPackages.create(

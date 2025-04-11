@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
@@ -14,11 +15,11 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   bumpUrl,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
@@ -32,16 +33,16 @@ import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 
-import scala.jdk.CollectionConverters.*
-import scala.concurrent.duration.*
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
-import java.util.UUID
 import java.time.Duration as JDUration
+import java.util.UUID
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 class SvReonboardingIntegrationTest
     extends IntegrationTest
@@ -305,7 +306,8 @@ class SvReonboardingIntegrationTest
                 action,
                 "url",
                 "description",
-                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                new RelTime(durationUntilExpiration.toMillis * 1000),
+                Some(env.environment.clock.now.add(durationUntilOffboardingEffectivity).toInstant),
               )
             },
           )(
@@ -313,8 +315,7 @@ class SvReonboardingIntegrationTest
             _ => sv1Backend.listVoteRequests().loneElement.contractId,
           )
 
-          // We need SV4's vote here for immediate offboarding
-          Seq(sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
+          Seq(sv2Backend, sv3Backend).foreach { sv =>
             eventually() {
               sv.listVoteRequests() should have size 1
             }
@@ -323,7 +324,7 @@ class SvReonboardingIntegrationTest
             }
           }
 
-          eventually() {
+          eventually(40.seconds) {
             sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(
               sv1Party,
               sv2Party,
@@ -480,6 +481,7 @@ class SvReonboardingIntegrationTest
             "url",
             "description",
             sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+            None,
           ),
         )(
           "vote request is observed by sv1-3",

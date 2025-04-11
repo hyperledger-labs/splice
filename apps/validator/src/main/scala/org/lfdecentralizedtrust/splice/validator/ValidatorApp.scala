@@ -127,8 +127,11 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  override def packages: Seq[DarResource] =
-    super.packages ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
+  override def packagesForJsonDecoding =
+    super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
+
+  def packagesForUploading =
+    super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext

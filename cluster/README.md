@@ -428,6 +428,9 @@ All images and Helm charts are pushed to the **Development** Github Container Re
 ghcr.io/digital-asset/decentralized-canton-sync-dev/docker and ghcr.io/digital-asset/decentralized-canton-sync-dev/helm.
 This includes artifacts pushed manually, snapshots created in CCI, and release versions.
 
+The us-central1-docker.pkg.dev/da-cn-shared/ghcr Google Artifact Repository is setup as a `remote` repository to ghcr.io.
+This is used by cluster deployments and caches the ghcr repositories.
+
 Releases are copied to
 ghcr.io/digital-asset/decentralized-canton-sync/docker and ghcr.io/digital-asset/decentralized-canton-sync/helm
 when they are published using the `publish-public-artifacts` CCI workflow.
@@ -522,8 +525,12 @@ are stored in the deployment directory for the given cluster.
 `cncluster help` will provide a full list of supported cluster
 subcommands. A few highlights include the following:
 
-* `cncluster apply` - Apply the current working copy's `canton-network`
-  and `infra` Pulumi stacks to a cluster. The presence of all images referenced by that
+* `cncluster apply` - Apply the current working copy's
+  `canton-network`, `infra`, `validator1` and `splitwell` stacks to a cluster,
+  as well as all `sv-canton` stacks required by the SVs that will be deployed out of `canton-network`.
+  Useful flags include `--skip-infra` (to skip the infra stack)
+  and `--sv1-only` (to deploy only SV1 and no other SVs or validators).
+  The presence of all images referenced by that
   configuration is confirmed prior to application of the manifest.
 
   * The tag for the images to be deployed can be overridden with an
@@ -542,9 +549,9 @@ subcommands. A few highlights include the following:
           * `export OPERATOR_IMAGE_VERSION=X.X.X`
           * `export GOOGLE_CREDENTIALS=$(cat "$HOME/.config/gcloud/application_default_credentials.json")`
           * `git checkout -b <some_temp_branch>`
-          * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
-          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch>`
-          * push `config.yaml` and `.envrc.vars` to the temporary branch
+          * `cncluster update_config active 0 <X.X.X> refs/heads/<some_temp_branch> canton-network-node`
+          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch> canton-network-node`
+          * push `config.yaml` to the temporary branch
           * `cncluster apply_operator`
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.

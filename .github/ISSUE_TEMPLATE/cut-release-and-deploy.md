@@ -80,5 +80,5 @@ and upgrade the other pulumi stacks.
 
 ## Follow up
 
-- [ ] Remind next person in the [rotation](https://docs.google.com/document/d/1f0nVeRnnxKQxwPi5nI2TiMq6qtHPwgiOjtUPUVJMKIk/edit?tab=t.0) that they are up next week.
+- [ ] If you cut a release, remind the next person in the [rotation](https://docs.google.com/document/d/1f0nVeRnnxKQxwPi5nI2TiMq6qtHPwgiOjtUPUVJMKIk/edit?tab=t.0) that is up for cutting a release next week.
 - [ ] Persist any lessons learned and fix (documentation) bugs hit

@@ -17,4 +17,4 @@ validator1:
 synchronizerMigration:
   active:
     id: 0
-    version: "0.3.18-snapshot.20250402.8645.0.v8f3e3dfc"
+    version: "0.3.20-snapshot.20250407.8755.0.v4946b1b9"

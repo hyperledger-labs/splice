@@ -100,6 +100,7 @@ export function installCanton(
           {
             onboardingName: svConfig.onboardingName,
             ingressName: svConfig.ingressName,
+            auth0SvAppName: svConfig.auth0SvAppName,
             isFirstSv: svConfig.isFirstSv,
             isCoreSv: true,
           },

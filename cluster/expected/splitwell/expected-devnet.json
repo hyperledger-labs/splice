@@ -233,7 +233,7 @@
           "name": "cn-devnet",
           "svNamespace": "splitwell"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "opts": {
           "dependsOn": [
             {
@@ -400,7 +400,7 @@
           "hostname": "dev.global.canton.network.digitalasset.com",
           "name": "cn-devnet"
         },
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -455,7 +455,7 @@
         },
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true,
           "migration": {
@@ -588,7 +588,7 @@
           "name": "cn-devnet"
         },
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },
@@ -757,7 +757,7 @@
       "namespace": "splitwell",
       "timeout": 600,
       "values": {
-        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\"]\n}",
+        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\", \"splice-node/dars/splitwell-0.1.9.dar\"]\n}",
         "additionalEnvVars": [
           {
             "name": "ONBOARDING_SECRET_ONLY_FOR_TESTING",
@@ -817,7 +817,7 @@
         "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "ghcr.io/digital-asset/decentralized-canton-sync-dev/docker",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "metrics": {
           "enable": true
         },

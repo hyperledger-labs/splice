@@ -26,6 +26,9 @@ const MonitoringConfigSchema = z.object({
         kilobytes: z.number(),
         overMinutes: z.number(),
       }),
+      cloudSql: z.object({
+        maintenance: z.boolean(),
+      }),
       cometbft: z.object({
         expectedMaxBlocksPerSecond: z.number(),
       }),

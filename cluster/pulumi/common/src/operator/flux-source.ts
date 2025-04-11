@@ -1,15 +1,24 @@
 import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
 
-import { PULUMI_STACKS_DIR } from '../utils';
-
-export type GitFluxRef = k8s.apiextensions.CustomResource;
+export type GitReferenceConfig = {
+  repoUrl: string;
+  gitReference: string;
+  pulumiStacksDir: string;
+  pulumiBaseDir: string;
+  deploymentDir: string;
+  spliceRoot: string;
+};
+export type GitFluxRef = {
+  resource: k8s.apiextensions.CustomResource;
+  config: GitReferenceConfig;
+};
 export type StackFromRef = { project: string; stack: string };
 
 // https://github.com/fluxcd/source-controller/blob/main/docs/spec/v1/gitrepositories.md
 export function gitRepoForRef(
   nameSuffix: string,
-  ref: string,
+  ref: GitReferenceConfig,
   stacksToCopy: StackFromRef[] = [],
   notifications: boolean = true,
   dependsOn: Resource[] = []
@@ -29,12 +38,12 @@ export function gitRepoForRef(
         },
         spec: {
           interval: '5m',
-          url: 'https://github.com/DACH-NY/canton-network-node',
+          url: ref.repoUrl,
           ref: {
-            name: ref,
+            name: ref.gitReference,
           },
           secretRef: { name: 'github' },
-          recurseSubmodules: false,
+          recurseSubmodules: true,
         },
       },
       {
@@ -42,7 +51,7 @@ export function gitRepoForRef(
       }
     );
   }
-  return new k8s.apiextensions.CustomResource(
+  const resource = new k8s.apiextensions.CustomResource(
     `splice-node-${nameSuffix}`,
     {
       apiVersion: 'source.toolkit.fluxcd.io/v1',
@@ -56,13 +65,13 @@ export function gitRepoForRef(
       },
       spec: {
         interval: '5m',
-        url: 'https://github.com/DACH-NY/canton-network-node',
+        url: ref.repoUrl,
         ref: {
-          name: ref,
+          name: ref.gitReference,
         },
         include: stacksToCopy.map(stack => ({
-          fromPath: `${PULUMI_STACKS_DIR}/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
-          toPath: `cluster/pulumi/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
+          fromPath: `${ref.pulumiStacksDir}/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
+          toPath: `${ref.pulumiBaseDir}/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
           repository: {
             name: `splice-node-${nameSuffix}-base`,
           },
@@ -75,4 +84,9 @@ export function gitRepoForRef(
       dependsOn: dependsOn,
     }
   );
+
+  return {
+    resource: resource,
+    config: ref,
+  };
 }

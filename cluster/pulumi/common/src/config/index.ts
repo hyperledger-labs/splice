@@ -5,6 +5,10 @@ export { spliceEnvConfig as config } from './envConfig';
 export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';
 
 export const DeploySvRunbook = spliceEnvConfig.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);
+export const DeployValidatorRunbook = spliceEnvConfig.envFlag(
+  'SPLICE_DEPLOY_VALIDATOR_RUNBOOK',
+  false
+);
 
 export const clusterProdLike = spliceEnvConfig.envFlag('GCP_CLUSTER_PROD_LIKE');
 
