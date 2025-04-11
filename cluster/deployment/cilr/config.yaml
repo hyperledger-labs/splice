@@ -32,7 +32,7 @@ synchronizerMigration:
   active:
     id: 4
     provider: external
-    version: 0.3.19
+    version: 0.3.20-snapshot.20250411.8828.0.vcaa8c127
     releaseReference:
       gitReference: "refs/tags/cilr"
       repoUrl: https://github.com/DACH-NY/canton-network-node
