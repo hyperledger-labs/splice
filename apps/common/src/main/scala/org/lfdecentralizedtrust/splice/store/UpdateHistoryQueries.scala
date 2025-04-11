@@ -24,7 +24,7 @@ trait UpdateHistoryQueries extends AcsJdbcTypes {
       .getOrElse(throw new RuntimeException("Failed to decode contract"))
   }
 
-  def selectFromUpdateCreatesTableResult(
+  def selectFromUpdateTableResult(
       historyId: Long,
       where: SQLActionBuilder = sql"",
       orderLimit: SQLActionBuilder = sql"",
@@ -42,8 +42,9 @@ trait UpdateHistoryQueries extends AcsJdbcTypes {
               signatories,
               observers,
               contract_key
-       from update_history_creates
-       where history_id = $historyId and """ ++ where ++
+       from update_history_creates t
+       join update_history_transactions uht on uht.row_id = t.update_row_id
+       where t.history_id = $historyId and """ ++ where ++
       sql"""
        """ ++ orderLimit).toActionBuilder.as[SelectFromCreateEvents]
     query
