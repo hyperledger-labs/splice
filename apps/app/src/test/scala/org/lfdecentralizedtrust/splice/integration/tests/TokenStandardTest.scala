@@ -18,8 +18,9 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.util.FactoryChoiceWithDisclosures
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
-import java.time.temporal.ChronoUnit
+import java.time.Duration
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 trait TokenStandardTest extends IntegrationTest {
 
@@ -32,6 +33,7 @@ trait TokenStandardTest extends IntegrationTest {
       receiver: PartyId,
       amount: BigDecimal,
       expectedKind: transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+      timeToLife: Duration = Duration.ofMinutes(10),
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -41,6 +43,7 @@ trait TokenStandardTest extends IntegrationTest {
       receiver,
       amount,
       expectedKind,
+      timeToLife,
     )
     participant.ledger_api_extensions.commands
       .submitJava(
@@ -56,19 +59,22 @@ trait TokenStandardTest extends IntegrationTest {
       receiver: PartyId,
       amount: BigDecimal,
       expectedKind: transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+      timeToLife: Duration = Duration.ofMinutes(10),
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): FactoryChoiceWithDisclosures = {
     clue(
       s"Creating command to transfer $amount amulets via token standard from $sender to $receiver"
     ) {
+      val now = env.environment.clock.now.toInstant
+      def unlocked(optLock: java.util.Optional[holdingv1.Lock]): Boolean =
+        optLock.toScala.forall(lock => lock.expiresAt.toScala.exists(t => t.isBefore(now)))
       val senderHoldingCids = listHoldings(participant, sender)
         .collect {
           case (holdingCid, holding)
-              if holding.lock.isEmpty && holding.owner == sender.toProtoPrimitive =>
+              if holding.owner == sender.toProtoPrimitive && unlocked(holding.lock) =>
             new holdingv1.Holding.ContractId(holdingCid.contractId)
         }
-      val now = env.environment.clock.now.toInstant
       val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
         dsoParty.toProtoPrimitive,
         new transferinstructionv1.Transfer(
@@ -77,7 +83,7 @@ trait TokenStandardTest extends IntegrationTest {
           amount.bigDecimal,
           new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
           now,
-          now.plus(10, ChronoUnit.MINUTES),
+          now.plus(timeToLife),
           senderHoldingCids.asJava,
           new metadatav1.Metadata(java.util.Map.of()),
         ),

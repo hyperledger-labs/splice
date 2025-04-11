@@ -18,7 +18,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "1064.0152207200",
+                "amount" : "1064.0304414400",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"
@@ -147,7 +147,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "3113.8847792800",
+                "amount" : "4100.8695585600",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"

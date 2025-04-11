@@ -159,16 +159,27 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("64.9")) // fees!
           }
-          aliceWalletClient.tap(walletAmuletToUsd(5000.0))
+          aliceWalletClient.tap(walletAmuletToUsd(6000.0))
           val (_, bobInstructionCids) = actAndCheck(
-            "Alice creates 4 transfers to Bob who has no pre-approval",
-            for (_ <- 1 to 4) {
+            "Alice creates 5 transfers to Bob who has no pre-approval", {
+              for (_ <- 1 to 4) {
+                executeTransferViaTokenStandard(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice,
+                  bob,
+                  BigDecimal("1000.0"),
+                  transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                  timeToLife = java.time.Duration.ofMinutes(1),
+                )
+              }
+              // the fifth one uses a longer duration so that it does not expire later when passing time
               executeTransferViaTokenStandard(
                 aliceValidatorBackend.participantClientWithAdminToken,
                 alice,
                 bob,
                 BigDecimal("1000.0"),
                 transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                timeToLife = java.time.Duration.ofMinutes(20),
               )
             },
           )(
@@ -178,12 +189,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
               )
-              instructions should have size 4
+              instructions should have size 5
               instructions.map(_._1)
             },
           )
           actAndCheck(
-            "Bob accepts transfer instruction 1",
+            "Bob accepts transfer instruction #1",
             acceptTransferInstruction(
               bobValidatorBackend.participantClientWithAdminToken,
               bob,
@@ -207,17 +218,17 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               )
             },
           )(
-            "Bob sees only one remaining transfer instruction, and funds are as expected",
+            "Bob sees only two remaining transfer instructions, and funds are as expected",
             _ => {
               val instructions = listTransferInstructions(
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
               )
-              instructions should have size 1
+              instructions should have size 2
               bobWalletClient.balance().unlockedQty should beAround(BigDecimal("1000.0"))
               inside(aliceWalletClient.balance()) { aliceBalance =>
-                aliceBalance.unlockedQty should beWithin(BigDecimal("2900.0"), BigDecimal("3100.0"))
-                aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
+                aliceBalance.unlockedQty should beWithin(BigDecimal("2800.0"), BigDecimal("3000.0"))
+                aliceBalance.lockedQty should beWithin(BigDecimal("2000.0"), BigDecimal("2150.0"))
               }
             },
           )
@@ -250,7 +261,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   aliceValidatorBackend.participantClientWithAdminToken,
                   alice,
                 )
-                instructions should have size 5 // one outstanding from alice to bob, and four new ones form bob to alice
+                instructions should have size 6 // two outstanding ones from alice to bob, and four new ones form bob to alice
                 instructions.collect {
                   case instr if instr._2.transfer.receiver == alice.toProtoPrimitive =>
                     instr._1
@@ -282,17 +293,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 }
               },
             )(
-              "There are only two open transfer instructions left",
+              "There are three open transfer instructions left",
               _ => {
                 val instructions = listTransferInstructions(
                   aliceValidatorBackend.participantClientWithAdminToken,
                   alice,
                 )
-                instructions should have size 2
+                instructions should have size 3
               },
             )
           }
-          // TODO(#18825): test at least reject with expired locked amulet
 
           // Test self-transfer for party w/o pre-approval
           actAndCheck(
@@ -323,9 +333,22 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               }
             },
           )
+          // Advance by two minutes so that the short-lived 1 minute transfer instruction from Alice expires
+          val instrAboutToExpire = bobInstructionCids(3)
+          advanceTime(java.time.Duration.ofMinutes(2))
+          clue("Alice as two locked holdings") {
+            inside(
+              listHoldings(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+              )
+            ) { holdings =>
+              holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 2
+            }
+          }
           // Test self-transfer for wallet history
           actAndCheck(
-            "Alice merges her four unlocked holdings into a two using a self-transfer",
+            "Alice merges her four unlocked holdings, and the expired locked amulet into a two using a self-transfer",
             executeTransferViaTokenStandard(
               aliceValidatorBackend.participantClientWithAdminToken,
               alice,
@@ -341,9 +364,38 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 alice,
               ) should have size 3
               inside(aliceWalletClient.balance()) { aliceBalance =>
-                aliceBalance.unlockedQty should beWithin(BigDecimal("3100.0"), BigDecimal("3300.0"))
+                aliceBalance.unlockedQty should beWithin(BigDecimal("4100.0"), BigDecimal("4200.0"))
                 aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
               }
+              // there is one less locke
+            },
+          )
+          clue("Alice as one locked holding left") {
+            inside(
+              listHoldings(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+              )
+            ) { holdings =>
+              holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
+            }
+          }
+          actAndCheck(
+            "Bob rejects instruction #4, whose backing amulet has already been archived", {
+              rejectTransferInstruction(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+                instrAboutToExpire,
+              )
+            },
+          )(
+            "There are two open transfer instructions left",
+            _ => {
+              val instructions = listTransferInstructions(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+              )
+              instructions should have size 2
             },
           )
 
