@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.20
+------
 
 - Frontends
 
