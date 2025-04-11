@@ -8,6 +8,7 @@ import DA.Assert
 import Daml.Script
 
 import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig (AmuletConfig(..))
 import qualified Splice.AmuletConfig as Unit
 import Splice.AmuletRules
@@ -162,8 +163,9 @@ testExpireLockedAmulet = do
   -- Amulet is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
-  result <- testChoice [app.dso] [app.dso] $
-    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+  result <- checkTxMetadata app TxKind_ExpireDust alice.primaryParty $
+    testChoice [app.dso] [app.dso] $
+      exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
   let expireSummary = result.expireSum
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
@@ -214,7 +216,8 @@ testExpireAmulet = do
 
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
-  result <- testChoice [app.dso] [app.dso] $
+  result <- checkTxMetadata app TxKind_ExpireDust alice.primaryParty $
+    testChoice [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
   let expireSummary = result.expireSum
 

@@ -1221,7 +1221,7 @@ subcommand_whitelist[no_amulet_in_ui]='Check for Amulet and ANS in user UI'
 function subcmd_no_amulet_in_ui() {
     local illegal_patterns=(
       '(?<!TR)ANS(?!_LEDGER_NAME)'
-      "(?<!Splice[./])\bAmulet\b"
+      "(?<!Splice[./])\bAmulet\b(?!( Rules))"
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' in frontend code"

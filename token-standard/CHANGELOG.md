@@ -17,17 +17,31 @@ Major changes:
   packages. `BurnMintFactory` is intended to decouple apps like
   bridges that need to execute burns and mints from the underlying
   token model which isn't a core part of holdings.
-- Added `splice.lfdecentralizedtrust.org/tx-kind` metadata key with the following semantics:
-      1. transfer: transfer from sender to one or more receivers
-      2. expire-dust: sweep a dust holding (e.g. an expired `Amulet`)
-      3. instruct-transfer: create or evolve transfer instruction
-      4. burn-mint: burn and/or mint multiple holdings of the same owner in a single transaction.
-         The precise amounts on the input and output holdings determine whether it is a mint (output amount > input amount),
-         burn (output amount < input amount), or a redistribution (output amount == input amount).
-  Token implementations SHOULD include a `meta` field containing a `splice.lfdecentralizedtrust.org/tx-kind` field in the choice result
-  type of all non-token standard choices that manipulate holdings, transfer instructions, allocation instructions or allocations.
-  This allows wallets to parse transaction history even for choices that do not go through the
-  token standard interfaces.
+- Added additional metadata keys to support universal transaction history
+  parsing of registry-internal workflows. It is based on annotating exercise nodes on choices
+  that are not standardized with a `splice.lfdecentralizedtrust.org/tx-kind`
+  metadata key with one of the following values:
+    1. `transfer`: transfer control over a holding from sender to one or more receivers and/or lock holders
+    2. `expire-dust`: sweep a dust holding (e.g. an expired `Amulet`)
+    3. `merge-split`: a transaction that merges and then splits a number of holdings by the same owner
+    4. `burn`: a transaction intended to burn some amount of holding
+    5. `mint`: a transation for minting some amount of holding
+    6. `unlock`: unlock a locked holding
+  Transfers should additionally be annoted with `splice.lfdecentralizedtrust.org/sender` to denote
+  the sender of the transfer. These annotations are only required on the non-standardized choices.
+
+  These annotations can be provided on non-standardized choices using smart-contract upgrading to
+  add a `meta : Optional TextMap` field to the choice return type. The transaction history parser
+  will just match that field by name to extract the metadata of an unknown choice.
+
+  Additionally, both non-standard and standardized choices MAY be annotated with
+  `splice.lfdecentralizedtrust.org/burned` to annotate the amount of holdings burned in this transaction.
+  The amount minted is inferred by the transaction history parser as the difference between
+  the amount of holdings before and after the transaction minus the burn. This construction only supports
+  choices that consume holdings from a single owner and a single instrument only, which we deem
+  to be a reasonably assumption. Choices that consume holdings from multiple senders or multiple holding
+  types are parsed as a batch of multiple events.
+
 
 Polishing changes
 

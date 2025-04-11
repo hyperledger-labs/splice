@@ -181,22 +181,6 @@
                         "value" : "12"
                       }
                     ],
-                    "meta" : {
-                      "values" : [
-                        [
-                          "splice.lfdecentralizedtrust.org/reason",
-                          "transfer"
-                        ],
-                        [
-                          "splice.lfdecentralizedtrust.org/sender",
-                          "aliceValidator::normalized"
-                        ],
-                        [
-                          "splice.lfdecentralizedtrust.org/tx-kind",
-                          "transfer"
-                        ]
-                      ]
-                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -274,12 +258,16 @@
                   "meta" : {
                     "values" : [
                       [
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "61.32"
+                      ],
+                      [
                         "splice.lfdecentralizedtrust.org/reason",
                         "create TransferPreapproval"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
-                        "burn-mint"
+                        "burn"
                       ]
                     ]
                   },
@@ -291,22 +279,6 @@
                         "value" : "12"
                       }
                     ],
-                    "meta" : {
-                      "values" : [
-                        [
-                          "splice.lfdecentralizedtrust.org/reason",
-                          "transfer"
-                        ],
-                        [
-                          "splice.lfdecentralizedtrust.org/sender",
-                          "aliceValidator::normalized"
-                        ],
-                        [
-                          "splice.lfdecentralizedtrust.org/tx-kind",
-                          "transfer"
-                        ]
-                      ]
-                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -739,8 +711,8 @@
                     "meta" : {
                       "values" : [
                         [
-                          "splice.lfdecentralizedtrust.org/reason",
-                          "transfer"
+                          "splice.lfdecentralizedtrust.org/burned",
+                          "14.0"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
@@ -846,8 +818,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "14.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -1279,8 +1251,8 @@
                     "meta" : {
                       "values" : [
                         [
-                          "splice.lfdecentralizedtrust.org/reason",
-                          "transfer"
+                          "splice.lfdecentralizedtrust.org/burned",
+                          "13.0"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
@@ -1386,8 +1358,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "13.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -1788,8 +1760,8 @@
                     "meta" : {
                       "values" : [
                         [
-                          "splice.lfdecentralizedtrust.org/reason",
-                          "transfer"
+                          "splice.lfdecentralizedtrust.org/burned",
+                          "12.1"
                         ],
                         [
                           "splice.lfdecentralizedtrust.org/sender",
@@ -1895,8 +1867,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "12.1"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -2604,8 +2576,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "13.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -3167,8 +3139,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "13.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -3701,8 +3673,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "13.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -4235,8 +4207,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "13.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -4769,8 +4741,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "13.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -5356,8 +5328,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "22.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -6584,8 +6556,8 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "14.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/sender",
@@ -7552,16 +7524,12 @@
                   "meta" : {
                     "values" : [
                       [
-                        "splice.lfdecentralizedtrust.org/reason",
-                        "transfer"
-                      ],
-                      [
-                        "splice.lfdecentralizedtrust.org/sender",
-                        "alice::normalized"
+                        "splice.lfdecentralizedtrust.org/burned",
+                        "12.0"
                       ],
                       [
                         "splice.lfdecentralizedtrust.org/tx-kind",
-                        "transfer"
+                        "merge-split"
                       ]
                     ]
                   },

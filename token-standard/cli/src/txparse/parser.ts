@@ -1,36 +1,29 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import BigNumber from "bignumber.js";
+import {
+  ArchivedEvent as LedgerApiArchivedEvent, CreatedEvent as LedgerApiCreatedEvent, DefaultApi as LedgerJsonApi, Event as LedgerApiEvent,
+  ExercisedEvent as LedgerApiExercisedEvent, JsGetEventsByContractIdResponse, JsTransaction
+} from "canton-json-api-v2-openapi";
 import {
   ensureHoldingViewIsPresent,
   filtersByParty,
   getInterfaceView,
   getMetaKeyValue,
   isHoldingInterfaceId,
-  removeParsedMetaKeys,
+  removeParsedMetaKeys
 } from "../apis/ledger-api-utils";
 import {
   HoldingInterface,
   ReasonMetaKey,
   SenderMetaKey,
-  TxKindMetaKey,
+  TxKindMetaKey
 } from "../constants";
 import {
-  Transaction,
-  TokenStandardEvent,
   Holding,
   HoldingsChange,
-  Label,
+  Label, TokenStandardEvent, Transaction
 } from "./types";
-import BigNumber from "bignumber.js";
-import {
-  DefaultApi as LedgerJsonApi,
-  JsTransaction,
-  Event as LedgerApiEvent,
-  ExercisedEvent as LedgerApiExercisedEvent,
-  CreatedEvent as LedgerApiCreatedEvent,
-  ArchivedEvent as LedgerApiArchivedEvent,
-  JsGetEventsByContractIdResponse,
-} from "canton-json-api-v2-openapi";
 
 // TODO (#18819): handle two-step transfers
 export class TransactionParser {
@@ -243,7 +236,8 @@ export class TransactionParser {
           event: await this.buildTransfer(exercisedEvent),
           continueAfterNodeId: exercisedEvent.lastDescendantNodeId,
         };
-      case "burn-mint":
+      case "merge-split":
+      case "burn":
       case "mint":
         return {
           event: await this.buildBurnMint(exercisedEvent),
@@ -251,8 +245,6 @@ export class TransactionParser {
         };
       // TODO (#18819): implement these & add test data to make sure they're tested
       case "unlock":
-        return null;
-      case "instruct-transfer":
         return null;
       case "expire-dust":
         return null;

@@ -12,7 +12,12 @@
             "type": "Mint",
             "reason": "create TransferPreapproval",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "61.32"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -34,7 +39,12 @@
             "sender": "aliceValidator::normalized",
             "amount": "200",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "14.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -157,7 +167,12 @@
             ],
             "senderAmount": "-22.1",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "12.1"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -833,7 +848,12 @@
             ],
             "senderAmount": "-1022",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "22.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -1041,7 +1061,12 @@
             "sender": "bob::normalized",
             "amount": "200",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "14.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {

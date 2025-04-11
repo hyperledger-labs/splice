@@ -60,13 +60,18 @@ data TransferInstructionResult = TransferInstructionResult with
 -- | The output of instructing a transfer or advancing the state of a transfer instruction.
 data TransferInstructionResult_Output
   = TransferInstructionResult_Pending with
+    -- Use this result to communicate that the transfer is pending further steps.
       transferInstructionCid : ContractId TransferInstruction
          -- ^ Contract id of the transfer instruction that will be used to complete the transfer
   | TransferInstructionResult_Completed with
+    -- Use this result to communicate that the transfer succeeded and the receiver
+    -- has received their holdings.
       receiverHoldingCids : [ContractId Holding]
         -- ^ The newly created holdings owned by the receiver as part of successfully
         -- completing the transfer.
   | TransferInstructionResult_Failed
+    -- Use this result to communicate that the transfer did not succeed and all holdings (minus fees)
+    -- have been returned to the sender.
   deriving (Show, Eq)
 
 
@@ -81,8 +86,7 @@ data TransferInstructionStatus
       -- ^ The transfer is pending actions to be taken by actors as part
       -- registry internal workflows.
       --
-      -- This field can by used to report on the progress of registry specific
-      -- workflows that are required to execute the transfer (e.g., confirmation of OFAC checks).
+      -- This field can by used to inform wallet users whether they need to take an action or not.
   deriving (Show, Eq)
 
 -- | View for `TransferInstruction`.
@@ -103,17 +107,17 @@ data TransferInstructionView = TransferInstructionView with
 -- | An interface for tracking the status of a transfer instruction,
 -- i.e., a request to a registry app to execute a transfer.
 --
--- Registries MAY evolve the transfer instruction in multiple steps. They MUST
--- ensure that the final archival of the transfer instruction happens via the
--- choices on this interface, so that the sender's wallet can parse the transaction
--- history and determine whether instruction ultimately succeeded or failed.
+-- Registries MAY evolve the transfer instruction in multiple steps. They SHOULD
+-- do so using only the choices on this interface, so that wallets can reliably
+-- parse the transaction history and determine whether the instruction ultimately
+-- succeeded or failed.
 interface TransferInstruction where
   viewtype TransferInstructionView
 
   transferInstruction_acceptImpl : ContractId TransferInstruction -> TransferInstruction_Accept -> Update TransferInstructionResult
   transferInstruction_rejectImpl : ContractId TransferInstruction -> TransferInstruction_Reject -> Update TransferInstructionResult
   transferInstruction_withdrawImpl : ContractId TransferInstruction -> TransferInstruction_Withdraw -> Update TransferInstructionResult
-  transferInstruction_reportOutcomeImpl : ContractId TransferInstruction -> TransferInstruction_ReportOutcome -> Update TransferInstructionResult
+  transferInstruction_update : ContractId TransferInstruction -> TransferInstruction_Update -> Update TransferInstructionResult
 
   choice TransferInstruction_Accept : TransferInstructionResult
     -- ^ Accept the transfer as the receiver.
@@ -146,17 +150,18 @@ interface TransferInstruction where
     controller (view this).transfer.sender
     do transferInstruction_withdrawImpl this self arg
 
-  choice TransferInstruction_ReportOutcome : TransferInstructionResult
-    -- ^ Report the outcome of the transfer instruction. Used by the registry
-    -- to aid the wallet in parsing the transaction history.
+  choice TransferInstruction_Update : TransferInstructionResult
+    -- ^ Update the state of the transfer instruction. Used by the registry to
+    -- execute registry internal workflow steps that advance the state of the
+    -- transfer instruction. A reason may be communicated via the metadata.
     with
-      success : Bool
-        -- ^ Whether the transfer was successful. If not, then the reason is
-        -- given in the metadata.
+      extraActors : [Party]
+        -- ^ Extra actors authorizing the update. Implementations MUST check that
+        -- this field contains the expected actors for the specific update.
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).transfer.instrumentId.admin
-    do transferInstruction_reportOutcomeImpl this self arg
+    controller (view this).transfer.instrumentId.admin, extraActors
+    do transferInstruction_update this self arg
 
 
 -- Transfer Factory

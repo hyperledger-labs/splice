@@ -282,7 +282,7 @@ template AmuletRules
         result <- exercise self AmuletRules_Mint with ..
         return AmuletRules_DevNet_TapResult with
           amuletSum = result.amuletSum
-          meta = Some (holdingTxMeta "mint" "tapped faucet" None)
+          meta = Some (simpleHoldingTxMeta TxKind_Mint (Some "tapped faucet") None)
 
     nonconsuming choice AmuletRules_DevNet_FeatureApp : AmuletRules_DevNet_FeatureAppResult
       with
@@ -703,10 +703,26 @@ executeTransfer config context dso t = do
   (createdAmulets, senderChangeAmulet) <-
     createTransferOutputs csum.openRound csum.config dso t.sender summary osum
 
+  let senderRetainsControl o =
+        t.sender == o.receiver &&
+        case o.lock of
+          None -> True
+          Some l -> all (t.sender ==) l.holders
+  let (txKind, optSender)
+        | all senderRetainsControl t.outputs = (TxKind_MergeSplit, None)
+        | otherwise = (TxKind_Transfer, Some t.sender)
+  let totalBurn = totalBurnFromSummary summary
+  let rewardInputMeta = Metadata with
+        values =
+          nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
+          nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
+          nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
+          Map.empty
+
   return TransferResult with
     round = csum.openRound.round
     summary = summary
-    meta = Some (holdingTxMeta "transfer" "transfer" (Some t.sender))
+    meta = Some (holdingTxMeta txKind None optSender (Some totalBurn) <> rewardInputMeta)
     ..
 
 data TransferContextSummary = TransferContextSummary with
@@ -1485,13 +1501,21 @@ splitAndBurn sender amount inputs context dso usage = do
   let amuletAsOfRoundZero = amulet.amount.initialAmount + amulet.amount.ratePerRound.rate * intToDecimal amulet.amount.createdAt.number
   -- adjust the balance changes to account for the archival. This primarily matters for the tx log parsers in scan and the wallet.
   let result = transferResult with
+        meta = None -- the calling choice will take care of setting the metadata on its own result
         summary.balanceChanges =
           Map.insertWith
             (+)
             sender
             (BalanceChange (-amuletAsOfRoundZero) (- (amulet.amount.ratePerRound.rate)))
             transferResult.summary.balanceChanges
-  pure (result, holdingTxMeta "burn-mint" usage None)
+  let burnAmount = totalBurnFromSummary transferResult.summary + amount
+  let meta = simpleHoldingTxMeta TxKind_Burn (Some usage) (Some burnAmount) <>
+             fromOptional mempty transferResult.meta -- overwrite so we keep the reward input metadata
+  pure (result, meta)
+
+-- | Compute the total burn done as part of the transfer.
+totalBurnFromSummary : TransferSummary -> Decimal
+totalBurnFromSummary TransferSummary{..} = sum outputFees + holdingFees + senderChangeFee
 
 
 -- Token standard context parsing
