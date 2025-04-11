@@ -129,6 +129,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       val (_, (activeContractsResponse, getUpdatesResponse)) = actAndCheck(
         "Create some holdings", {
           // Amulet holdings: one transferred via token standard, one tapped (minted)
+          // TransferIn
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
             aliceValidatorBackend.getValidatorPartyId(),
@@ -139,7 +140,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("200"))
           }
-          // send some back so there's a TransferFactory_Transfer node in the other direction
+          // send some back so there's a TransferOut
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
             alice,
@@ -150,7 +151,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("87")) // fees!
           }
-          // Deliberately using a non-token-standard transfer so that this shows up as a BurnMint
+          // Deliberately using a non-token-standard transfer so that this shows up as a Transfer still (tx-kind-based)
           aliceWalletClient.transferPreapprovalSend(
             aliceValidatorBackend.getValidatorPartyId(),
             BigDecimal("10.0"),

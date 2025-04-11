@@ -24,17 +24,17 @@ export const buildLedgerApiMock = (ledgerUrl: string): HttpHandler[] => [
   }),
   http.post(`${ledgerUrl}/v2/events/events-by-contract-id`, async (req) => {
     const payload: any = await req.request.json();
-    const mocks = eventsByContractIdResponses
+    const mocks = eventsByContractIdResponses;
     const response = mocks.find(
       (mock) => mock.created.createdEvent.contractId === payload.contractId
     );
     if (!response) {
-      throw new Error(
-        `Unexpected contract id: ${
-          payload.contractId
-        }, expected one of ${mocks.map(
-          (mock) => mock.created.createdEvent.contractId
-        )}`
+      return HttpResponse.json(
+        {
+          code: 404,
+          body: { code: "CONTRACT_EVENTS_NOT_FOUND" },
+        },
+        { status: 404 }
       );
     } else {
       return HttpResponse.json(response);
