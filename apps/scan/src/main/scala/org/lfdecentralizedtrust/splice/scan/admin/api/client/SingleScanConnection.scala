@@ -4,11 +4,13 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
+import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommandCounter,
@@ -58,6 +60,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
+import io.grpc.Status
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the DSO party id.
@@ -124,6 +127,24 @@ class SingleScanConnection private[client] (
       config.adminApi.url,
       HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
     )
+  }
+
+  override def getDsoRules(
+  )(implicit
+      tc: TraceContext
+  ): Future[Contract[DsoRules.ContractId, DsoRules]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetDsoInfo(headers = List()),
+    ).map { dsoInfo =>
+      Contract
+        .fromHttp(DsoRules.COMPANION)(dsoInfo.dsoRules.contract)
+        .valueOr(err =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to decode dso rules: $err")
+            .asRuntimeException
+        )
+    }
   }
 
   override def listVoteRequests()(implicit

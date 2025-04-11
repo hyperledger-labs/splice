@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommandCounter,
@@ -148,6 +149,12 @@ class BftScanConnection(
     bftCall(
       _.getAmuletRulesWithState(cachedAmuletRules)
     )
+
+  override def getDsoRules(
+  )(implicit
+      tc: TraceContext
+  ): Future[Contract[DsoRules.ContractId, DsoRules]] =
+    bftCall(_.getDsoRules())
 
   override protected def runGetExternalPartyAmuletRules(
       cachedExternalPartyAmuletRules: Option[

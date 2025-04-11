@@ -13,6 +13,7 @@ import org.openqa.selenium.support.ui.Select
 import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
 import scala.collection.parallel.CollectionConverters.*
+import scala.concurrent.duration.DurationInt
 
 /** This test should run after a cluster has been upgraded, and will vote for new daml versions.
   * Note that it needs to run on the commit of the upgrade, so that DarResources.*_current points to the latest version.
@@ -118,8 +119,10 @@ class DamlCIUpgradeVotePreflightTest
 
           val tbody = find(id("sv-vote-results-planned-table-body"))
           inside(tbody) { case Some(tb) =>
-            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-            rows.size shouldBe 1
+            eventually(timeUntilSuccess = 1.minutes) {
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe 1
+            }
           }
         }
       }
