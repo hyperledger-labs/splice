@@ -6,9 +6,10 @@ package org.lfdecentralizedtrust.splice.util
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, VoteRequest}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
+import org.lfdecentralizedtrust.splice.config.Thresholds
 
 import java.time.Instant
 import scala.compat.java8.OptionConverters.RichOptionalGeneric
@@ -55,10 +56,12 @@ object AmuletConfigSchedule {
       }.toSeq,
     )
 
-  /** Helper to filter `CRARC_SetConfig` actions that have a `targetEffectiveAt` from all active VoteRequests
+  /** Helper to filter `CRARC_SetConfig` actions that have a `targetEffectiveAt` and have been accepted. This is
+    * used primarily by the vetting logic to vet new packages ahead of time with the effective date on the vote request.
     */
-  def filterAmuletBasedSetConfigVoteRequests(
-      voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+  def getAcceptedEffectiveVoteRequests(
+      dsoRules: Contract[DsoRules.ContractId, DsoRules],
+      voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]],
   ): Seq[(Option[Instant], AmuletConfig[USD])] = {
     voteRequests.flatMap { voteRequest =>
       voteRequest.payload.action match {
@@ -67,9 +70,17 @@ object AmuletConfigSchedule {
             case action: CRARC_SetConfig =>
               voteRequest.payload.targetEffectiveAt.asScala match {
                 case Some(effectiveAt) =>
-                  Some((Some(effectiveAt), action.amuletRules_SetConfigValue.newConfig))
-                case _ =>
-                  Some((None, action.amuletRules_SetConfigValue.newConfig))
+                  val currentSvs = dsoRules.payload.svs.asScala.keySet
+                  val uniqueSvAccepters: Set[String] = voteRequest.payload.votes.asScala.values
+                    .filter(v => currentSvs.contains(v.sv) && v.accept)
+                    .map(_.sv)
+                    .toSet
+                  Option.when(uniqueSvAccepters.size >= Thresholds.requiredNumVotes(dsoRules))(
+                    (Some(effectiveAt), action.amuletRules_SetConfigValue.newConfig)
+                  )
+                case None =>
+                  // We don't bother with votes without an effectivity. They just take effect when they're accepted.
+                  None
               }
             case _ => None
           }

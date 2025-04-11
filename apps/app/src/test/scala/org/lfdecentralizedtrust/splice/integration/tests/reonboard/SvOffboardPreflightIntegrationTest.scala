@@ -105,15 +105,21 @@ class SvOffboardPreflightIntegrationTest
           element.underlying.sendKeys(requestReasonUrl)
         }
 
+        val voteDate = DateTimeFormatter
+          .ofPattern("yyyy-MM-dd HH:mm")
+          .withZone(ZoneOffset.UTC)
+          .format(
+            now.plusSeconds(60)
+          )
         setDateTime(
           "sv1",
           "datetime-picker-vote-request-expiration",
-          DateTimeFormatter
-            .ofPattern("yyyy-MM-dd HH:mm")
-            .withZone(ZoneOffset.UTC)
-            .format(
-              now.plusSeconds(60)
-            ),
+          voteDate,
+        )
+        setDateTime(
+          "sv1",
+          "datetime-picker-vote-request-effectivity",
+          voteDate,
         )
 
         clue("wait for the submit button to become clickable") {

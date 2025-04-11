@@ -22,7 +22,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -70,13 +69,6 @@ trait SvSvStore extends AppStore {
   ): Future[Seq[Contract[?, vo.ValidatorOnboarding]]] =
     multiDomainAcsStore
       .listContracts(vo.ValidatorOnboarding.COMPANION, limit)
-      .map(_ map (_.contract))
-
-  def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    multiDomainAcsStore
-      .listContracts(VoteRequest.COMPANION, limit)
       .map(_ map (_.contract))
 
   def listExpiredValidatorOnboardings()
