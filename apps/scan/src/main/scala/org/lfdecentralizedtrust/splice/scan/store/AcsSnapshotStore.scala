@@ -73,34 +73,38 @@ class AcsSnapshotStore(
       }
     }.flatMap { _ =>
       val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
-      val previousSnapshotDataFilter = lastSnapshot match {
+      val previousSnapshotDataFiler = lastSnapshot match {
         case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId)) =>
           sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
         case None =>
           sql"where false"
       }
-      def recordTimeFilter(tableAlias: String) =
-        sql"""
-          where #$tableAlias.history_id = $historyId
-            and #$tableAlias.migration_id = $migrationId
-            and #$tableAlias.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
-            and #$tableAlias.record_time < $until
-           """
-      val statement = (sql"""
+      storage.update(
+        (sql"""
         with inserted_rows as (
             with previous_snapshot_data as (select contract_id
                                             from acs_snapshot_data snapshot
                                                      join update_history_creates creates on snapshot.create_id = creates.row_id
-                                            """ ++ previousSnapshotDataFilter ++
-        sql"""),
+                                            """ ++ previousSnapshotDataFiler ++
+          sql"""),
+                transactions_in_snapshot as not materialized ( -- materialized yields a worse plan
+                    select row_id
+                    from update_history_transactions txs
+                    where txs.history_id = $historyId
+                      and txs.migration_id = $migrationId
+                      and txs.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
+                      and txs.record_time < $until
+                    -- order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
+                    order by record_time
+                    ),
                 new_creates as (select contract_id
-                                from update_history_creates creates
-                                """ ++ recordTimeFilter("creates") ++ sql"""
+                                from transactions_in_snapshot txs
+                                         join update_history_creates creates on creates.update_row_id = txs.row_id
                     ),
                 archives as (select contract_id
-                             from update_history_exercises archives
-                             """ ++ recordTimeFilter("archives") ++ sql"""
-                               and consuming),
+                             from transactions_in_snapshot txs
+                                      join update_history_exercises archives on archives.update_row_id = txs.row_id
+                                 and consuming),
                 contracts_to_insert as (select contract_id
                                 from previous_snapshot_data
                                 union
@@ -110,27 +114,20 @@ class AcsSnapshotStore(
                                 select contract_id
                                 from archives),
                 -- these two materialized CTEs force the join order in a way that doesn't completely blow up the number of rows
-                creates_to_insert as materialized (select row_id,
-                                                          package_name,
-                                                          template_id_module_name,
-                                                          template_id_entity_name,
-                                                          signatories,
-                                                          observers,
-                                                          history_id,
-                                                          migration_id,
-                                                          created_at,
-                                                          creates.contract_id
+                creates_to_insert as materialized (select creates.*
                                                    from contracts_to_insert contracts
                                                             join update_history_creates creates
-                                                            on contracts.contract_id = creates.contract_id)
-
+                                                                 on contracts.contract_id = creates.contract_id),
+                txs_to_insert as materialized (select *, creates.row_id as create_row_id, txs.history_id as tx_history_id
+                                               from creates_to_insert creates
+                                                        join update_history_transactions txs on txs.row_id = creates.update_row_id)
                 insert into acs_snapshot_data (create_id, template_id, stakeholder)
-                select row_id,
+                select create_row_id,
                        concat(package_name, ':', template_id_module_name, ':', template_id_entity_name),
                        stakeholder
-                from creates_to_insert
+                from txs_to_insert
                          cross join unnest(array_cat(signatories, observers)) as stakeholders(stakeholder)
-                where history_id = $historyId
+                where tx_history_id = $historyId
                   and migration_id = $migrationId
                 -- consistent ordering across SVs
                 order by created_at, contract_id
@@ -141,8 +138,9 @@ class AcsSnapshotStore(
         select $until, $migrationId, $historyId, min(row_id), max(row_id)
         from inserted_rows
         having min(row_id) is not null;
-             """).toActionBuilder.asUpdate
-      storage.update(statement, "insertNewSnapshot")
+             """).toActionBuilder.asUpdate,
+        "insertNewSnapshot",
+      )
     }.andThen { _ =>
       AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.release()
     }

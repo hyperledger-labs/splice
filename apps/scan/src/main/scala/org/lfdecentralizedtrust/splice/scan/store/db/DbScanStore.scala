@@ -1087,16 +1087,15 @@ class DbScanStore(
     for {
       row <- storage
         .querySingle(
-          selectFromUpdateCreatesTableResult(
+          selectFromUpdateTableResult(
             updateHistory.historyId,
-            where = sql"""template_id_module_name = ${lengthLimited(
+            where = sql"""t.template_id_module_name = ${lengthLimited(
                 templateId.getModuleName
-              )} and template_id_entity_name = ${lengthLimited(
+              )} and t.template_id_entity_name = ${lengthLimited(
                 templateId.getEntityName
-              )} and package_name = ${lengthLimited(packageName)}
-              and record_time > $recordTime""",
-            // TODO(#14813): Order by row_id is suspicious
-            orderLimit = sql"""order by row_id asc limit 1""",
+              )} and t.package_name = ${lengthLimited(packageName)}
+              and uht.record_time > $recordTime""",
+            orderLimit = sql"""order by t.row_id asc limit 1""",
           ).headOption,
           s"lookup[$templateId]",
         )
