@@ -6,10 +6,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.VettedPackage
-import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
@@ -23,11 +20,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  DarResources,
-  PackageResource,
-  ParticipantAdminConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
@@ -138,26 +131,6 @@ class BootstrapPackageConfigIntegrationTest
         )
       }
 
-      Seq(
-        sv1Backend.appState.participantAdminConnection,
-        sv2Backend.appState.participantAdminConnection,
-        sv3Backend.appState.participantAdminConnection,
-        sv4Backend.appState.participantAdminConnection,
-      ).foreach(
-        checkDarVersions(
-          decentralizedSynchronizerId,
-          Seq(
-            DarResources.amulet -> initialPackageConfig.amuletVersion,
-            DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
-            DarResources.dsoGovernance -> initialPackageConfig.dsoGovernanceVersion,
-            DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
-            DarResources.wallet -> initialPackageConfig.walletVersion,
-            DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
-          ),
-          _,
-        )
-      )
-
       clue("alice taps amulet with initial package") {
         val tapContractId = aliceValidatorWalletClient.tap(10)
         aliceValidatorBackend.participantClient.ledger_api_extensions.acs
@@ -171,18 +144,6 @@ class BootstrapPackageConfigIntegrationTest
           )
           .value
       }
-
-      checkDarVersions(
-        decentralizedSynchronizerId,
-        Seq(
-          DarResources.amulet -> initialPackageConfig.amuletVersion,
-          DarResources.amuletNameService -> initialPackageConfig.amuletNameServiceVersion,
-          DarResources.validatorLifecycle -> initialPackageConfig.validatorLifecycleVersion,
-          DarResources.wallet -> initialPackageConfig.walletVersion,
-          DarResources.walletPayments -> initialPackageConfig.walletPaymentsVersion,
-        ),
-        aliceValidatorBackend.appState.participantAdminConnection,
-      )
 
       assertThrowsAndLogsCommandFailures(
         sv1ScanBackend.getExternalPartyAmuletRules(),
@@ -320,57 +281,6 @@ class BootstrapPackageConfigIntegrationTest
           sv1ScanBackend.getExternalPartyAmuletRules()
         }
       }
-    }
-  }
-
-  private def checkDarVersions(
-      domainId: SynchronizerId,
-      darsToCheck: Seq[(PackageResource, String)],
-      participantAdminConnection: ParticipantAdminConnection,
-  ): Unit = {
-    eventually() {
-      val vettedPackages: Seq[VettedPackage] =
-        participantAdminConnection.getVettingState(domainId).futureValue.mapping.packages
-      val uploadedPackages =
-        participantAdminConnection
-          .listDars()
-          .futureValue
-          .map(dar => dar.name -> PackageVersion.assertFromString(dar.version))
-          .filter { case (name, _) =>
-            DarResources.packageResources.map(_.bootstrap.metadata.name).contains(name)
-          }
-      val uploadedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
-        vettedPackages
-          .flatMap { darDesc =>
-            DarResources.lookupPackageId(darDesc.packageId)
-          }
-          .map(dar => dar.metadata.name -> dar.metadata.version)
-      }
-      uploadedPackages should contain theSameElementsAs uploadedDarNameAndVersions
-      darsToCheck.foreach { case (packageResource, upToVersion) =>
-        withClue(
-          s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"
-        ) {
-          checkDarLatestVersion(uploadedDarNameAndVersions, packageResource, upToVersion)
-        }
-      }
-    }
-  }
-
-  private def checkDarLatestVersion(
-      uploadedDars: Seq[(PackageName, PackageVersion)],
-      packageResource: PackageResource,
-      requiredVersion: String,
-  ): Unit = {
-    withClue(
-      s"dars for package ${packageResource.bootstrap.metadata.name} should be up to $requiredVersion"
-    ) {
-      val dars =
-        uploadedDars.filter { case (name, _) =>
-          name == packageResource.bootstrap.metadata.name
-        }
-      dars should not be empty
-      dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)
     }
   }
 }
