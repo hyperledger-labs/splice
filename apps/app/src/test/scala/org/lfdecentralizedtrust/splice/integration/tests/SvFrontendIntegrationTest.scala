@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -47,6 +48,19 @@ class SvFrontendIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .withPreSetup { implicit env =>
+        EnvironmentDefinition
+          .simpleTopology4Svs(this.getClass.getSimpleName)
+          .preSetup(env)
+        // unvetting sv1 is enough to force the old version
+        logger.info("Removing all vetted packages for sv1")
+        sv1Backend.participantClient.topology.vetted_packages.propose(
+          sv1Backend.participantClient.id,
+          Seq.empty,
+          force =
+            ForceFlags(ForceFlag.AllowUnvetPackage, ForceFlag.AllowUnvetPackageWithActiveContracts),
+        )
+      }
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(initialPackageConfig = initialPackageConfig)
