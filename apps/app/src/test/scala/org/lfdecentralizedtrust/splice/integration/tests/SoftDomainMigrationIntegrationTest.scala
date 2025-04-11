@@ -397,8 +397,8 @@ class SoftDomainMigrationIntegrationTest
           "dsorules config vote request has been created",
           _ => sv1Backend.listVoteRequests().loneElement,
         )
-        clue(s"sv2-4 accept dsorules config vote request") {
-          Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+        clue(s"sv2-3 accept dsorules config vote request") {
+          Seq(sv2Backend, sv3Backend).map(sv =>
             eventuallySucceeds() {
               sv.castVote(
                 dsoRulesVoteRequest.contractId,
