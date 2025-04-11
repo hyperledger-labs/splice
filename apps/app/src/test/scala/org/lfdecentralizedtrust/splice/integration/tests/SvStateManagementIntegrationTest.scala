@@ -62,6 +62,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
       .withPreSetup { implicit env =>
+        EnvironmentDefinition
+          .simpleTopology4Svs(this.getClass.getSimpleName)
+          .preSetup(env)
         // unvetting sv1 is enough to force the old version
         logger.info("Removing all vetted packages for sv1")
         sv1Backend.participantClient.topology.vetted_packages.propose(
