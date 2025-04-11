@@ -23,8 +23,8 @@ import org.lfdecentralizedtrust.splice.wallet.automation.AmuletMetricsTrigger
 import org.slf4j.event.Level
 
 import java.time.Instant
+import java.time.Duration
 import scala.annotation.nowarn
-import scala.concurrent.duration.DurationInt
 
 @nowarn("msg=match may not be exhaustive")
 class TimeBasedTreasuryIntegrationTestWithoutMerging
@@ -177,10 +177,11 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
     val amuletRules = sv1ScanBackend.getAmuletRules().contract
+    val updatedConfig = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 3)
     val configs = Seq(
       (
-        Some(tickDurationWithBuffer multipliedBy 4 minusSeconds 10),
-        mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 3),
+        Some(tickDurationWithBuffer multipliedBy 3 plusSeconds 20),
+        updatedConfig,
         amuletRules.payload.configSchedule.initialValue,
       )
     )
@@ -198,6 +199,14 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     // by advancing 2 rounds, both round 1 and round 2 are in their issuing phase
     advanceRoundsByOneTick
+
+    // moving beyond when the config change is applied, so that the automation triggers
+    advanceTime(Duration.ofSeconds(60))
+    // wait for real time to pass for the automation to do its work
+    eventually() {
+      updatedConfig should be(sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue)
+    }
+
     advanceRoundsByOneTick
 
     aliceValidatorWalletClient.tap(5)
@@ -243,8 +252,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     clue("rewards from round 2 are merged but not round 3") {
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
-      // last listAppRewardCoupons() needs more than 20 seconds
-      eventually(60.seconds) {
+      eventually() {
         val currentInstant =
           sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
         getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(2, 3)
