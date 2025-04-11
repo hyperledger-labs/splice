@@ -169,6 +169,9 @@ object RejectionGenerators {
         case LfInterpretationError.Dev(_, err) =>
           CommandExecutionErrors.Interpreter.InterpretationDevError
             .Reject(renderedMessage, err)
+        case LfInterpretationError.CCTP(_) =>
+          // Splice stub, replace on next fork upgrade
+          ???
       }
 
     def processInterpretationError(

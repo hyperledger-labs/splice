@@ -306,8 +306,8 @@ class SoftDomainMigrationIntegrationTest
         _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
       )
     ) {
-      clue(s"sv2-4 accept amulet config vote request") {
-        Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+      clue(s"sv2-3 accept amulet config vote request") {
+        Seq(sv2Backend, sv3Backend).map(sv =>
           eventuallySucceeds() {
             sv.castVote(
               voteRequest.contractId,

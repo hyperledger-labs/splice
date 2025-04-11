@@ -13,8 +13,9 @@ gen_project_docs () (
     local -a DAML_FILES
     readarray -t DAML_FILES < <(find daml -name '*.daml')
     "${XDG_CACHE_HOME:-$HOME/.cache}/daml-build/${DAML_COMPILER_VERSION}/damlc/damlc" docs --index-template "$DOCS_DIR/api-templates/$2-index-template.rst" "${DAML_FILES[@]}" --exclude-modules '**.Scripts.**' -f rst -o "$DOCS_DIR/src/app_dev/api/$2"
-    # Workaround to fix indentation issues in rst output due to https://github.com/digital-asset/daml/issues/16956
-    find "$DOCS_DIR/src/app_dev/api/$2" -name '*.rst' -exec sed -i -z 's!\( *\)\(Controller\\: [^\n]*map\)\n *\([^\n]*\)\n *\([^\n]*\)\n!\1\2\n\1\3\n\1\4\n!g' {} +
+    # Workaround for https://github.com/digital-asset/daml/pull/20889/files so we get toctrees again
+    # shellcheck disable=SC2016
+    find "$DOCS_DIR/src/app_dev/api/$2" -name '*.rst' -exec sed -i 's/^* :doc:`\(.*\)`$/   \1/g' {} +
 )
 
 ensure_damlc_exists() {

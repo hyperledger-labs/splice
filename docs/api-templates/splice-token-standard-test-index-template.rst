@@ -19,4 +19,8 @@ Daml Script code cannot be shared across SDK's in compiled form.
 
 See the module docs below for an overview of the functionality provided by this package.
 
+.. toctree::
+   :maxdepth: 3
+   :titlesonly:
+
 {{{body}}}

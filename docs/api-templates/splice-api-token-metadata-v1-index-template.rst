@@ -6,4 +6,8 @@
 splice-api-token-metadata-v1 docs
 =================================
 
+.. toctree::
+   :maxdepth: 3
+   :titlesonly:
+
 {{{body}}}
