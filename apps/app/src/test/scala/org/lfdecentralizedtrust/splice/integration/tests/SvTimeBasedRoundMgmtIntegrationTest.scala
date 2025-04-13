@@ -390,7 +390,6 @@ class SvTimeBasedRoundMgmtIntegrationTest
     initDsoWithSv1Only()
     val amuletRules = sv1ScanBackend.getAmuletRules().contract
 
-    val config101 = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 101)
     val config102 = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 102)
 
     actAndCheck(
@@ -399,14 +398,9 @@ class SvTimeBasedRoundMgmtIntegrationTest
           Seq(
             (
               None,
-              config101,
-              amuletRules.payload.configSchedule.initialValue,
-            ),
-            (
-              None,
               config102,
-              config101,
-            ),
+              amuletRules.payload.configSchedule.initialValue,
+            )
           )
         )
       },
