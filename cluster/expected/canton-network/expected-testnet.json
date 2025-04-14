@@ -501,8 +501,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2",
-              "1"
+              "2"
             ]
           }
         },
@@ -883,7 +882,6 @@
         },
         "migration": {
           "id": 2,
-          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
