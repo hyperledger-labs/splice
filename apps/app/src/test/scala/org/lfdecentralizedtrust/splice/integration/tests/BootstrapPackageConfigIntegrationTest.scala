@@ -5,6 +5,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
@@ -14,12 +16,22 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRul
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.console.{
+  SplitwellAppClientReference,
+  WalletAppClientReference,
+}
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
+import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
+import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SplitwellTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
 
 import java.time.Instant
@@ -29,6 +41,7 @@ import scala.jdk.CollectionConverters.*
 class BootstrapPackageConfigIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil
+    with SplitwellTestUtil
     with StandaloneCanton {
 
   override def dbsSuffix = "bootstrapdso"
@@ -65,6 +78,56 @@ class BootstrapPackageConfigIntegrationTest
           )
         )(conf)
       )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      )
+      .withSequencerConnectionsFromScanDisabled() // The direct ledger API submissions for splitwell interact poorly with domain disconnects
+
+  def splitwellPaymentRequest(
+      senderSplitwell: SplitwellAppClientReference,
+      senderWallet: WalletAppClientReference,
+      key: HttpSplitwellAppClient.GroupKey,
+      receiver: PartyId,
+      amount: BigDecimal,
+  )(implicit env: SpliceTestConsoleEnvironment) = {
+    val sender = senderWallet.userStatus().party
+    val (paymentRequestCid, _) =
+      actAndCheck(
+        s"$sender initiates transfer",
+        senderSplitwell.initiateTransfer(
+          key,
+          Seq(
+            new walletCodegen.ReceiverAmuletAmount(
+              receiver.toProtoPrimitive,
+              amount.setScale(10).bigDecimal,
+            )
+          ),
+        ),
+      )(
+        s"$sender sees payment request",
+        cid => {
+          forExactly(1, senderWallet.listAppPaymentRequests()) { request =>
+            request.contractId shouldBe cid
+          }
+        },
+      )
+
+    actAndCheck(
+      s"$sender initiates payment accept request on global domain",
+      senderWallet.acceptAppPaymentRequest(paymentRequestCid),
+    )(
+      s"$sender sees balance update",
+      _ => {
+        forExactly(1, aliceSplitwellClient.listBalanceUpdates(key)) { update =>
+          update.payload.update shouldBe new balanceupdatetype.Transfer(
+            sender,
+            receiver.toProtoPrimitive,
+            amount.setScale(10).bigDecimal,
+          )
+        }
+      },
+    )
+  }
 
   "Bootstrap with specific versions and then upgrade to latest" in { implicit env =>
     clue("alice taps amulet with initial package") {
@@ -85,6 +148,29 @@ class BootstrapPackageConfigIntegrationTest
       sv1ScanBackend.getExternalPartyAmuletRules(),
       _.errorMessage should include("Not Found"),
     )
+
+    clue("Upload all splitwell versions") {
+      // This simulates an app vetting newer versions of their own DARs depending on newer splice-amulet versions
+      // before the SVs do so. Topology aware package selection will then force the old splice-amulet and old splitwell versions
+      // for composed transactions. Note that for this to work splitwell contracts must be downgradeable.
+      Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend).foreach { p =>
+        p.participantClient.dars.upload_many(
+          DarResources.splitwell.all
+            .map(_.metadata.version)
+            .toSet
+            .toSeq
+            .map((v: PackageVersion) => s"daml/dars/splitwell-${v}.dar")
+        )
+      }
+    }
+
+    val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
+
+    aliceWalletClient.tap(50)
+
+    clue("Splitwell can complete payment request on old DAR versions") {
+      splitwellPaymentRequest(aliceSplitwellClient, aliceWalletClient, key, bobUserParty, 42.0)
+    }
 
     clue("Change AmuletConfig to latest packages") {
       // 20s picked empirically to be far enough in the future that the voting can go through before that date.
@@ -173,14 +259,20 @@ class BootstrapPackageConfigIntegrationTest
         .futureValue
 
       clue("vetting topology is updated to the new config") {
-        eventuallySucceeds() {
+        val scheduledTimestamp = CantonTimestamp.assertFromInstant(
+          scheduledTime
+        )
+        eventually() {
           Seq(
-            sv1Backend.participantClient,
-            sv2Backend.participantClient,
-            sv3Backend.participantClient,
-            sv4Backend.participantClient,
-            aliceValidatorBackend.participantClient,
-          ).foreach { participantClient =>
+            (sv1Backend.participantClient, Some(scheduledTimestamp)),
+            (sv2Backend.participantClient, Some(scheduledTimestamp)),
+            (sv3Backend.participantClient, Some(scheduledTimestamp)),
+            (sv4Backend.participantClient, Some(scheduledTimestamp)),
+            (
+              aliceValidatorBackend.participantClient,
+              None,
+            ), // due to the early splitwell dar upload this is vetted without a timestamp
+          ).foreach { case (participantClient, scheduledTimeO) =>
             clue(s"Vetting state for ${participantClient.id}") {
               val vettingTopologyState = participantClient.topology.vetted_packages.list(
                 store = Some(
@@ -193,9 +285,7 @@ class BootstrapPackageConfigIntegrationTest
               val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
                 .find(_.packageId == DarResources.amulet.bootstrap.packageId)
                 .value
-              newAmuletVettedPackage.validFrom.value shouldBe CantonTimestamp.assertFromInstant(
-                scheduledTime
-              )
+              newAmuletVettedPackage.validFrom shouldBe scheduledTimeO
             }
           }
         }
@@ -203,7 +293,7 @@ class BootstrapPackageConfigIntegrationTest
     }
 
     clue("alice taps amulet with new package") {
-      val tapContractId = aliceValidatorWalletClient.tap(10)
+      val tapContractId = aliceWalletClient.tap(10)
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
         .of_party(Amulet.COMPANION)(dsoParty)
         .filter(_.contractId == tapContractId.contractId)
@@ -216,6 +306,10 @@ class BootstrapPackageConfigIntegrationTest
       eventuallySucceeds() {
         sv1ScanBackend.getExternalPartyAmuletRules()
       }
+    }
+
+    clue("Splitwell can complete payment request on new DAR versions") {
+      splitwellPaymentRequest(aliceSplitwellClient, aliceWalletClient, key, bobUserParty, 23.0)
     }
   }
 }
