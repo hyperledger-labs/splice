@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
@@ -320,7 +319,7 @@ abstract class ScanStoreTest
         for {
           store <- mkStore()
           // Close the first 2 rounds, no events for them.
-          _ <- Seq(0L, 1L).traverse { round =>
+          _ <- MonadUtil.sequentialTraverse_(Seq(0L, 1L)) { round =>
             for {
               _ <- dummyDomain.create(
                 closedMiningRound(dsoParty, round)
@@ -329,7 +328,7 @@ abstract class ScanStoreTest
             } yield ()
           }
           amuletRulesContract = amuletRules()
-          _ <- balanceChanges.traverse { case (round, balanceChanges) =>
+          _ <- MonadUtil.sequentialTraverse_(balanceChanges) { case (round, balanceChanges) =>
             for {
               _ <- dummyDomain.exercise(
                 amuletRulesContract,

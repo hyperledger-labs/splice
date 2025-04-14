@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.store
 
-import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
@@ -502,7 +501,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             .getRecordTimeRange(1)
             .map(_ shouldBe Map.empty)
           _ <-
-            (1 to 10).toList.traverse(i =>
+            MonadUtil.sequentialTraverse(1 to 10)(i =>
               create(
                 domain1,
                 validContractId(i),

@@ -29,7 +29,6 @@ trait HasReassignmentCommandsHelpers {
   this: BaseTest & HasCommandRunnersHelpers =>
 
   import HasCommandRunnersHelpers.*
-  import HasReassignmentCommandsHelpers.*
 
   protected def unassign(
       cid: LfContractId,
@@ -39,7 +38,7 @@ trait HasReassignmentCommandsHelpers {
       participantOverride: Option[LocalParticipantReference] = None,
   )(implicit
       env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): (SingleReassignmentEvent[proto.reassignment.UnassignedEvent], Completion) = {
+  ): (UpdateService.UnassignedWrapper, Completion) = {
     import env.*
 
     val participant = participantOverride.getOrElse(participant1)
@@ -50,7 +49,7 @@ trait HasReassignmentCommandsHelpers {
     )
     participant.ledger_api.commands.submit_unassign_async(
       submitter = submittingParty,
-      contractId = cid,
+      contractIds = Seq(cid),
       source = source,
       target = target,
       commandId = commandId,
@@ -76,10 +75,7 @@ trait HasReassignmentCommandsHelpers {
     val unassignmentCompletion = completions.headOption.value
 
     updates.headOption.value match {
-
-      case UpdateService.UnassignedWrapper(reassignment, unassignedEvent) =>
-        (SingleReassignmentEvent(reassignment, unassignedEvent), unassignmentCompletion)
-
+      case w: UpdateService.UnassignedWrapper => (w, unassignmentCompletion)
       case other => throw new RuntimeException(s"Expected a reassignment event but got $other")
     }
   }
@@ -122,7 +118,7 @@ trait HasReassignmentCommandsHelpers {
       participantOverride: Option[LocalParticipantReference] = None,
   )(implicit
       env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): (SingleReassignmentEvent[proto.reassignment.AssignedEvent], Completion) = {
+  ): (UpdateService.AssignedWrapper, Completion) = {
     import env.*
 
     val participant = participantOverride.getOrElse(participant1)
@@ -158,10 +154,9 @@ trait HasReassignmentCommandsHelpers {
 
     val assignmentCompletion = completions.headOption.value
     updates.headOption.value match {
-      case UpdateService.AssignedWrapper(reassignment, assignedEvent) =>
-        (SingleReassignmentEvent(reassignment, assignedEvent), assignmentCompletion)
+      case w: UpdateService.AssignedWrapper => (w, assignmentCompletion)
       case other =>
-        throw new RuntimeException(s"Expected a reassignment event but got $other")
+        throw new RuntimeException(s"Expected an assignment event but got $other")
     }
   }
 
@@ -256,23 +251,9 @@ trait HasReassignmentCommandsHelpers {
       submissionId = submissionId.getOrElse(""),
     )
 
-  protected def getReassignmentId(out: proto.reassignment.UnassignedEvent): ReassignmentId =
+  protected def getReassignmentId(out: UpdateService.UnassignedWrapper): ReassignmentId =
     ReassignmentId(
       sourceSynchronizer = Source(SynchronizerId.tryFromString(out.source)),
       unassignmentTs = CantonTimestamp.assertFromLong(out.unassignId.toLong),
     )
-}
-
-private[integration] object HasReassignmentCommandsHelpers {
-  // To make testing a bit easier and keep track of the inner type of the event.
-  final case class SingleReassignmentEvent[E](
-      reassignment: proto.reassignment.Reassignment,
-      event: E,
-  ) {
-    val eventValues = reassignment.events.map(_.event.value)
-    assert(
-      eventValues == Seq(event),
-      s"reassignment had events $eventValues but we expected a single $event",
-    )
-  }
 }

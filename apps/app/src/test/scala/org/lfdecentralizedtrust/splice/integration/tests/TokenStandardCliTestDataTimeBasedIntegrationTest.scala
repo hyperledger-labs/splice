@@ -686,7 +686,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       val eventByIdResponses = contractIdsAtStart.map { cid =>
         tryMakeJsonApiV2Request(
           "/v2/events/events-by-contract-id",
-          JsEventServiceCodecs.jsGetEventsByContractIdRequestRW(
+          JsEventServiceCodecs.getEventsByContractIdRequestRW(
             event_query_service.GetEventsByContractIdRequest(
               cid,
               Seq.empty,

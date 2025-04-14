@@ -1196,14 +1196,18 @@ abstract class TopologyAdminConnection(
       NamespaceDelegation.create(
         namespace,
         target,
-        isRootDelegation,
+        if (isRootDelegation) DelegationRestriction.CanSignAllMappings
+        else DelegationRestriction.CanSignAllButNamespaceDelegations,
       ),
       serial = PositiveInt.one,
       isProposal = false,
     )
 
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
-    runCmd(TopologyAdminCommands.Init.InitId(id.uid.toProtoPrimitive))
+    runCmd(
+      TopologyAdminCommands.Init
+        .InitId(id.uid.identifier.toProtoPrimitive, id.uid.namespace.toProtoPrimitive, Seq.empty)
+    )
   }
 
   def identity()(implicit

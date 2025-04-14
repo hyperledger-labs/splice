@@ -70,12 +70,12 @@ trait UpdateHistoryTestUtil extends TestCommon {
             TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
             SynchronizerId.tryFromString(protoTree.synchronizerId),
           )
-        case UnassignedWrapper(protoReassignment, protoUnassignEvent) =>
+        case UnassignedWrapper(protoReassignment, Seq(protoUnassignEvent)) =>
           GetTreeUpdatesResponse(
             ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
             SynchronizerId.tryFromString(protoUnassignEvent.source),
           )
-        case AssignedWrapper(protoReassignment, protoAssignEvent) =>
+        case AssignedWrapper(protoReassignment, Seq(protoAssignEvent)) =>
           GetTreeUpdatesResponse(
             ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
             SynchronizerId.tryFromString(protoAssignEvent.target),
