@@ -451,9 +451,9 @@ class UpdateHistory(
       DBIOAction.seq[Effect.Write](
         tree.getEventsById.values().asScala.toSeq.map {
           case created: CreatedEvent =>
-            insertCreateEventRow(created, updateRowId)
+            insertCreateEventRow(created, tree, migrationId, updateRowId)
           case exercised: ExercisedEvent =>
-            insertExerciseEventRow(exercised, updateRowId)
+            insertExerciseEventRow(exercised, tree, migrationId, updateRowId)
           case _ =>
             throw new RuntimeException("Unsupported event type")
         }*
@@ -491,6 +491,8 @@ class UpdateHistory(
 
   private def insertCreateEventRow(
       event: CreatedEvent,
+      tree: TransactionTree,
+      migrationId: Long,
       updateRowId: Long,
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeEventId = lengthLimited(event.getEventId)
@@ -507,6 +509,9 @@ class UpdateHistory(
     val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
     val safeSignatories = event.getSignatories.asScala.toSeq.map(lengthLimited)
     val safeObservers = event.getObservers.asScala.toSeq.map(lengthLimited)
+    val recordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
+    val safeUpdateId = lengthLimited(tree.getUpdateId)
+    val safeDomainId = lengthLimited(tree.getDomainId)
 
     sqlu"""
       insert into update_history_creates(
@@ -514,20 +519,24 @@ class UpdateHistory(
         contract_id, created_at,
         template_id_package_id, template_id_module_name, template_id_entity_name,
         package_name, create_arguments, signatories, observers,
-        contract_key
+        contract_key,
+        record_time, update_id, domain_id, migration_id
       )
       values (
         $historyId, $safeEventId, $updateRowId,
         $safeContractId, $safeCreatedAt,
         $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
         $safePackageName, $createArguments::jsonb, $safeSignatories, $safeObservers,
-        $contractKey::jsonb
+        $contractKey::jsonb,
+        $recordTime, $safeUpdateId, $safeDomainId, $migrationId
       )
     """
   }
 
   private def insertExerciseEventRow(
       event: ExercisedEvent,
+      tree: TransactionTree,
+      migrationId: Long,
       updateRowId: Long,
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeEventId = lengthLimited(event.getEventId)
@@ -550,6 +559,9 @@ class UpdateHistory(
       event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
     val interfaceIdPackageId =
       event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
+    val recordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
+    val safeUpdateId = lengthLimited(tree.getUpdateId)
+    val safeDomainId = lengthLimited(tree.getDomainId)
 
     sqlu"""
       insert into update_history_exercises(
@@ -559,7 +571,8 @@ class UpdateHistory(
         contract_id, consuming,
         package_name, argument, result,
         acting_parties,
-        interface_id_package_id, interface_id_module_name, interface_id_entity_name
+        interface_id_package_id, interface_id_module_name, interface_id_entity_name,
+        record_time, update_id, domain_id, migration_id
       )
       values (
         $historyId, $safeEventId, $updateRowId,
@@ -568,7 +581,8 @@ class UpdateHistory(
         $safeContractId, ${event.isConsuming},
         $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb,
         $safeActingParties,
-        $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName
+        $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName,
+        $recordTime, $safeUpdateId, $safeDomainId, $migrationId
       )
     """
   }
@@ -602,23 +616,11 @@ class UpdateHistory(
         Seq(
           sqlu"""
             delete from update_history_creates
-            where update_row_id in (
-              select row_id
-              from update_history_transactions
-              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
-              -- order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
-              order by record_time
-            )
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
           """,
           sqlu"""
             delete from update_history_exercises
-            where update_row_id in (
-              select row_id
-              from update_history_transactions
-              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
-              -- order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
-              order by record_time
-            )
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
           """,
           sqlu"""
             delete from update_history_transactions
@@ -713,16 +715,10 @@ class UpdateHistory(
 
     val deleteAction = for {
       numCreates <- (
-        sql"delete from update_history_creates where update_row_id in (" ++
-          sql"select row_id from update_history_transactions where " ++ filterCondition ++
-          // order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
-          sql" order by record_time)"
+        sql"delete from update_history_creates where " ++ filterCondition
       ).toActionBuilder.asUpdate
       numExercises <- (
-        sql"delete from update_history_exercises where update_row_id in (" ++
-          sql"select row_id from update_history_transactions where " ++ filterCondition ++
-          // order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
-          sql" order by record_time)"
+        sql"delete from update_history_exercises where " ++ filterCondition
       ).toActionBuilder.asUpdate
       numTransactions <- (
         sql"delete from update_history_transactions where " ++ filterCondition
