@@ -18,6 +18,7 @@ synchronizerMigration:
       spliceRoot: "."
 pulumiProjectConfig:
   default:
+    interAppsDependencies: false
     isExternalCluster: true
     cloudSql:
       enabled: true

@@ -44,6 +44,7 @@ import {
   svCometBftGovernanceKeySecret,
   svCometBftGovernanceKeyFromSecret,
 } from 'splice-pulumi-common';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
@@ -366,7 +367,8 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([sv, svAppSecret, appsPg]),
+        .concat([svAppSecret, appsPg])
+        .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : []),
     }
   );
 
@@ -429,7 +431,8 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([sv, svValidatorAppSecret, svValidatorUISecret])
+        .concat([svValidatorAppSecret, svValidatorUISecret])
+        .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : [])
         .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])
         .concat([appsPg]),

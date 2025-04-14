@@ -47,6 +47,7 @@ import {
   installValidatorApp,
   installValidatorSecrets,
 } from 'splice-pulumi-common-validator/src/validator';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from 'splice-pulumi-common/src/initialAmuletPrice';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
@@ -337,7 +338,9 @@ async function installValidator(
           }
         : undefined,
     persistenceConfig: persistenceConfig(postgres, validatorDbName),
-    extraDependsOn: [svApp, postgres, scan],
+    extraDependsOn: spliceConfig.pulumiProjectConfig.interAppsDependencies
+      ? [svApp, postgres, scan]
+      : [postgres],
     svValidator: true,
     participantAddress: sv.participant.internalClusterAddress,
     decentralizedSynchronizerUrl: decentralizedSynchronizerUrl,
@@ -489,7 +492,9 @@ function installScan(
     enablePostgresMetrics: true,
   };
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
-    dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
+    dependsOn: spliceConfig.pulumiProjectConfig.interAppsDependencies
+      ? decentralizedSynchronizerNode.dependencies.concat([svApp])
+      : decentralizedSynchronizerNode.dependencies,
   });
   return scan;
 }

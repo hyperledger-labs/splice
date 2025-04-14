@@ -1,5 +1,6 @@
 pulumiProjectConfig:
   default:
+    interAppsDependencies: false
     cloudSql:
       enabled: true
       protected: true
