@@ -94,7 +94,12 @@
             ],
             "senderAmount": "-113",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "13.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -282,7 +287,12 @@
           "label": {
             "type": "Split",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "13.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -399,7 +409,12 @@
           "label": {
             "type": "Split",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "13.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -494,7 +509,12 @@
           "label": {
             "type": "Split",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "13.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -589,7 +609,12 @@
           "label": {
             "type": "Split",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "13.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -684,7 +709,12 @@
           "label": {
             "type": "Split",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "13.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {
@@ -1109,7 +1139,12 @@
           "label": {
             "type": "Split",
             "meta": {
-              "values": []
+              "values": [
+                [
+                  "splice.lfdecentralizedtrust.org/burned",
+                  "12.0"
+                ]
+              ]
             }
           },
           "holdingsChange": {

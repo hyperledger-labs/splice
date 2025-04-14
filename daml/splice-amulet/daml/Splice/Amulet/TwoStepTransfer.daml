@@ -71,7 +71,9 @@ holdingToTransferInputs forOwner paymentContext inputHoldingCids =
       None -> pure $ InputAmulet $ coerceContractId holdingCid
 
 -- | Prepare a two-step transfer of amulet by locking the funds.
-prepareTwoStepTransfer : TwoStepTransfer -> [ContractId Holding] -> PaymentTransferContext -> Update (ContractId LockedAmulet, [ContractId Holding])
+prepareTwoStepTransfer
+  : TwoStepTransfer -> [ContractId Holding] -> PaymentTransferContext
+  -> Update (ContractId LockedAmulet, [ContractId Holding], Metadata)
 prepareTwoStepTransfer TwoStepTransfer{..} inputHoldingCids paymentContext = do
   require "requestedAt < transferBefore" (requestedAt < transferBefore)
   -- over-approximate fees that will be due on the actual transfer
@@ -106,9 +108,15 @@ prepareTwoStepTransfer TwoStepTransfer{..} inputHoldingCids paymentContext = do
 
   result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
-  pure (lockedAmulet, toInterfaceContractId <$> optionalToList result.senderChangeAmulet)
+  pure
+    ( lockedAmulet
+    , toInterfaceContractId <$> optionalToList result.senderChangeAmulet
+    , copyOnlyBurnMeta result.meta
+    )
 
-executeTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update ([ContractId Holding], [ContractId Holding])
+executeTwoStepTransfer
+  : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs
+  -> Update ([ContractId Holding], [ContractId Holding], Metadata)
 executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore
   paymentContext <-
@@ -132,7 +140,11 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         outputs = [receiverOutput]
         beneficiaries = None  -- not featured and thus no beneficiaries
   result <- exerciseCheckedPaymentTransfer dso paymentContext amuletRulesTransfer
-  pure (optionalToList (toInterfaceContractId <$> result.senderChangeAmulet), createdAmuletToHolding <$> result.createdAmulets)
+  pure
+    ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)
+    , createdAmuletToHolding <$> result.createdAmulets
+    , copyOnlyBurnMeta result.meta
+    )
 
 abortTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update [ContractId Holding]
 abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do

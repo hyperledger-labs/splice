@@ -63,13 +63,13 @@ standardTransferToTwoStepTransfer requestedAt transfer =
 executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 executeTransferInstr instr extraArgs = do
   let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer.requestedAt instr.transfer
-  (senderHoldingCids, receiverHoldingCids) <-
+  (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
     senderChangeCids = senderHoldingCids
     output = TransferInstructionResult_Completed with
       receiverHoldingCids
-    meta = emptyMetadata
+    meta
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 abortAmuletTransferInstruction instr extraArgs = do
