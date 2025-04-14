@@ -614,6 +614,11 @@
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
