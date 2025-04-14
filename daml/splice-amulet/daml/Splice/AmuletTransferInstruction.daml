@@ -35,8 +35,8 @@ template AmuletTransferInstruction
       transferInstruction_rejectImpl _self arg =
         abortAmuletTransferInstruction this arg.extraArgs
 
-      transferInstruction_update _self _arg =
-        fail "AmuletTransferInstruction.update: not used, and thus not implemented"
+      transferInstruction_updateImpl _self _arg =
+        fail "AmuletTransferInstruction.updateImpl: not used, and thus not implemented"
 
       transferInstruction_withdrawImpl _self arg = do
         abortAmuletTransferInstruction this arg.extraArgs
