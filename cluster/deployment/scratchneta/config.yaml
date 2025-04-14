@@ -7,6 +7,12 @@ pulumiProjectConfig:
   default:
     cloudSql:
       protected: false
+svs:
+  sv:
+    participant:
+      kms:
+        keyRingId: kms-test
+        locationId: us-central1
 validator1:
   participantPruningSchedule:
     cron: "0 /10 * * * ?" # Run every 10min

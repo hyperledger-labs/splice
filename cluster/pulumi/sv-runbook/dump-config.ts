@@ -25,6 +25,7 @@ async function main() {
   const svAppConfig = {
     onboardingName: svRunbookConfig.onboardingName,
     disableOnboardingParticipantPromotionDelay: false,
+    externalGovernanceKey: false,
   };
   const validatorAppConfig = {
     // sv runbook wallet user is always defined

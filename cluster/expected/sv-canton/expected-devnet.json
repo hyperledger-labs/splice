@@ -601,7 +601,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-cometbft-global-domain-1",
     "provider": "",
@@ -718,7 +718,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-global-domain-1",
     "provider": "",
@@ -760,7 +760,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -825,7 +825,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -925,7 +925,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-participant-1",
     "provider": "",
@@ -967,7 +967,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1158,7 +1158,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-cometbft-global-domain-1",
     "provider": "",
@@ -1275,7 +1275,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-global-domain-1",
     "provider": "",
@@ -1317,7 +1317,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1382,7 +1382,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1482,7 +1482,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-participant-1",
     "provider": "",
@@ -1524,7 +1524,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1715,7 +1715,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-cometbft-global-domain-1",
     "provider": "",
@@ -1832,7 +1832,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-global-domain-1",
     "provider": "",
@@ -1874,7 +1874,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1939,7 +1939,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -2039,7 +2039,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-participant-1",
     "provider": "",
@@ -2081,7 +2081,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -2272,7 +2272,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-cometbft-global-domain-1",
     "provider": "",
@@ -2389,7 +2389,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-global-domain-1",
     "provider": "",
@@ -2431,7 +2431,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -2496,7 +2496,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -2596,7 +2596,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-participant-1",
     "provider": "",
@@ -2638,7 +2638,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -2892,7 +2892,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-cometbft-global-domain-1",
     "provider": "",
@@ -3009,7 +3009,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-global-domain-1",
     "provider": "",
@@ -3051,7 +3051,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -3116,7 +3116,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -3216,7 +3216,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-participant-1",
     "provider": "",
@@ -3258,7 +3258,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {

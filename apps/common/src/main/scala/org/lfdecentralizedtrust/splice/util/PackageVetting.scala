@@ -13,7 +13,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, VoteRequest}
 import org.lfdecentralizedtrust.splice.environment.*
 
 import java.time.Instant
@@ -145,6 +145,10 @@ class PackageVetting(
 
 object PackageVetting {
   trait HasVoteRequests {
+
+    def getDsoRules()(implicit
+        tc: TraceContext
+    ): Future[Contract[DsoRules.ContractId, DsoRules]]
 
     def getVoteRequests()(implicit
         tc: TraceContext

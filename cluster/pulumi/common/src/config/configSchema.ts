@@ -6,6 +6,7 @@ const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
   isExternalCluster: z.boolean(),
   hasPublicDocs: z.boolean(),
+  interAppsDependencies: z.boolean(),
   cloudSql: z.object({
     enabled: z.boolean(),
     // Docs on cloudsql maintenance windows: https://cloud.google.com/sql/docs/postgres/set-maintenance-window

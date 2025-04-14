@@ -14,7 +14,7 @@ async function getBranchesForCluster(deps, cluster) {
   const config = deps.jsyaml.load(configYaml);
   const active = config.synchronizerMigration.active.releaseReference.gitReference;
   const upgrade = config.synchronizerMigration.upgrade?.releaseReference.gitReference;
-  const archived = config.synchronizerMigration.archived?.map((a) => a.releaseReference.gitReference);
+  const archived = config.synchronizerMigration.archived?.map((a) => a.releaseReference?.gitReference);
 
   const envrc = await getFileFromGit(deps, `cluster/deployment/${cluster}/.envrc.vars`, 'main');
   const regex = /export OVERRIDE_VERSION=["]?[0-9]+.[0-9]+.[0-9]+["]?/g;

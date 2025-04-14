@@ -203,7 +203,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "docs-docs",
     "provider": "",
@@ -425,7 +425,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -590,7 +590,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -641,7 +641,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -683,7 +683,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -748,7 +748,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -847,7 +847,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -889,7 +889,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1062,6 +1062,11 @@
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdRk0Ef3U0VSxdBo3/azkCY2Y7VFV6sM/7O1u93VHbAgJSqIeQK3B2yklxjKvZJDUyz0jNjuSF4Zvc780nv9IHg==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQv53m25mctcprUUt3YKg+yJvqtRI+rxTy5alROf4hqCD1rb/w5G8/XPwOI5jFqAj5RTcDGyRz+LLxn28k63UxQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -1153,7 +1158,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1267,7 +1272,7 @@
           }
         }
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

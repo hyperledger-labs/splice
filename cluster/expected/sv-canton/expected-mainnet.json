@@ -190,7 +190,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-cometbft-global-domain-2",
     "provider": "",
@@ -307,7 +307,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-global-domain-2",
     "provider": "",
@@ -349,7 +349,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -414,7 +414,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -514,7 +514,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-1-participant-2",
     "provider": "",
@@ -556,7 +556,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
