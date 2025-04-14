@@ -8,7 +8,6 @@ pulumiProjectConfig:
   sv-runbook:
     cloudSql:
       enabled: true
-
 svs:
   sv-13:
     participant:
@@ -33,7 +32,7 @@ synchronizerMigration:
   active:
     id: 4
     provider: external
-    version: 0.3.20-snapshot.20250411.8828.0.vcaa8c127
+    version: "0.3.20-snapshot.20250414.8837.0.vf25d4fc7"
     releaseReference:
       gitReference: "refs/tags/cilr"
       repoUrl: https://github.com/DACH-NY/canton-network-node
