@@ -103,4 +103,7 @@ SoftDomainMigrationIntegrationTest.*The global domain global-domain-new.* is not
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
 
+# Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
+.*No data has been made available yet.*
+
 # Make sure to have a trailing newline

@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+upcoming
+--------
+
+- Frontends
+
+  - The Wallet and Scan UIs now show the Update ID of every transaction. These IDs are consistent with those
+    used in the `updates` endpoints of the Scan API.
+
+
 0.3.20
 ------
 
