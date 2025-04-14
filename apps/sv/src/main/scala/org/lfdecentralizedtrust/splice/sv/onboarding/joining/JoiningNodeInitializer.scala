@@ -821,7 +821,6 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
         )
-        voteRequests <- svStore.listVoteRequests()
         _ <- vetting.vetCurrentPackages(
           synchronizerId,
           amuletRules.contract,

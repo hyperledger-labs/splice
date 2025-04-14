@@ -31,10 +31,11 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
       domainId <- getSynchronizerId()
       amuletRules <- getAmuletRules()
       voteRequests <- getVoteRequests()
+      dsoRules <- getDsoRules()
       _ <- vetting.vetPackages(
         domainId,
         amuletRules,
-        AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+        AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
       )
     } yield false
   }

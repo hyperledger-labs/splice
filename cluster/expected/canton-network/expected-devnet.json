@@ -338,7 +338,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1030,7 +1030,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1165,7 +1165,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -1216,7 +1216,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -1292,7 +1292,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1452,6 +1452,11 @@
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -1565,7 +1570,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1668,7 +1673,7 @@
           }
         }
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -1727,7 +1732,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1862,7 +1867,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -1913,7 +1918,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -1989,7 +1994,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -2149,6 +2154,11 @@
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -2235,7 +2245,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -2331,7 +2341,7 @@
           "auth0|64afbc353bbc7ca776e27bf4"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -2390,7 +2400,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -2525,7 +2535,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -2576,7 +2586,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -2652,7 +2662,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -2812,6 +2822,11 @@
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -2898,7 +2913,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -2994,7 +3009,7 @@
           "auth0|64afbc4431b562edb8995da6"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -3053,7 +3068,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -3188,7 +3203,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -3239,7 +3254,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -3315,7 +3330,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -3475,6 +3490,11 @@
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -3561,7 +3581,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -3657,7 +3677,7 @@
           "auth0|64afbc720e20777e46fff490"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",

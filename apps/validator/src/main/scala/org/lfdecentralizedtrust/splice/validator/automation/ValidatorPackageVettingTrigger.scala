@@ -7,9 +7,9 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{PackageVettingTrigger, TriggerContext}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, VoteRequest}
 import org.lfdecentralizedtrust.splice.util.Contract
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -33,6 +33,11 @@ class ValidatorPackageVettingTrigger(
       tc: TraceContext
   ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
     scanConnection.getVoteRequests()
+
+  override def getDsoRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[DsoRules.ContractId, DsoRules]] =
+    scanConnection.getDsoRules()
 }
 
 object ValidatorPackageVettingTrigger {

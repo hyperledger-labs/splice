@@ -91,7 +91,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -300,7 +300,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "loopback",
     "provider": "",
@@ -364,7 +364,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "scan",
     "provider": "",
@@ -575,7 +575,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -724,6 +724,11 @@
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdRk0Ef3U0VSxdBo3/azkCY2Y7VFV6sM/7O1u93VHbAgJSqIeQK3B2yklxjKvZJDUyz0jNjuSF4Zvc780nv9IHg==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQv53m25mctcprUUt3YKg+yJvqtRI+rxTy5alROf4hqCD1rb/w5G8/XPwOI5jFqAj5RTcDGyRz+LLxn28k63UxQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -797,7 +802,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-app",
     "provider": "",
@@ -913,7 +918,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -985,7 +990,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1057,7 +1062,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1169,7 +1174,7 @@
           "auth0|64553aa683015a9687d9cc2e"
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.18"
     },
     "name": "validator",
     "provider": "",

@@ -2898,9 +2898,6 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            # The operator itself should use images from the branch on which this job is running.
-            OPERATOR_IMAGE_VERSION=$(build-tools/get-snapshot-version)
-
             if [ -n "<< parameters.base_version >>" ]; then
               echo "Checking out commit << parameters.base_version >>"
               git checkout << parameters.base_version >>
@@ -2957,21 +2954,11 @@ jobs:
             git checkout $DEPLOYMENT_BRANCH
             git push -f origin $DEPLOYMENT_BRANCH
             cncluster set_operator_deployment_reference refs/heads/$DEPLOYMENT_BRANCH << parameters.git_repo >>
-            echo "export OPERATOR_IMAGE_VERSION=$OPERATOR_IMAGE_VERSION" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+            echo "export OPERATOR_IMAGE_VERSION=$BASE_VERSION" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             git add **/config.yaml
             git add **/.envrc.vars
             git commit -m "Set the operator deployment reference to $DEPLOYMENT_BRANCH on << parameters.cluster >>"
             git push origin $DEPLOYMENT_BRANCH
-
-            # if the version for the operator is a release version ensure we use the public repository.
-            # we do not commit this, as this is only for deploying the operator itself which we do only here.
-            # Since the operator images are taken from the branch from which we run this, CIRCLE_BRANCH should
-            # be the corresponding branch, so if that's main or a release branch, we use the public repository too.
-            if [[ $OPERATOR_IMAGE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$CIRCLE_BRANCH" == main ]] || [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
-            else
-              echo "export SPLICE_ARTIFACTS_REPOSITORY=private" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
-            fi
 
       - deploy_operator:
           cluster: << parameters.cluster >>
@@ -3076,17 +3063,24 @@ jobs:
             git commit -m "Add config to deploy upgrade version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
 
-            # Add the new entry for the staging nodes also in the deployment branch.
-            # This will trigger the deployment stack to spin up the components for migration ID 1.
-            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
-            git checkout $DEPLOYMENT_BRANCH
-            cncluster update_config upgrade 1 $UPGRADE_VERSION $UPGRADE_RELEASE_REF << parameters.git_repo >>
+            # In order to jump over breaking changes, we create a new deployment branch based off of the upgrade version,
+            # and redeploy the operator from it. That resembles what we will do in the prod cluster.
 
-            git add **/.envrc.vars
+            DEPLOYMENT_UPGRADE_BRANCH="<< parameters.cluster >>-deployment-upgrade"
+            git branch -f $DEPLOYMENT_UPGRADE_BRANCH HEAD
+            git checkout $DEPLOYMENT_UPGRADE_BRANCH
+            git push -f origin $DEPLOYMENT_UPGRADE_BRANCH
+
+            cncluster set_operator_deployment_reference refs/heads/$DEPLOYMENT_UPGRADE_BRANCH << parameters.git_repo >>
+            echo "export OPERATOR_IMAGE_VERSION=$UPGRADE_VERSION" >> ${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             git add **/config.yaml
-            git commit -m "Add config to deploy upgrade version $UPGRADE_VERSION to << parameters.cluster >>"
-            git push origin $DEPLOYMENT_BRANCH
+            git add **/.envrc.vars
+            git commit -m "Set the operator deployment reference to $DEPLOYMENT_UPGRADE_BRANCH on << parameters.cluster >>"
+            git push origin $DEPLOYMENT_UPGRADE_BRANCH
 
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
@@ -3151,15 +3145,15 @@ jobs:
             # by back/fwd-porting the commit between the two branches, here we just apply the same
             # changes to both, to avoid conflicts that cannot be resolved automatically)
 
-            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
-            git checkout $DEPLOYMENT_BRANCH
+            DEPLOYMENT_UPGRADE_BRANCH="<< parameters.cluster >>-deployment-upgrade"
+            git checkout $DEPLOYMENT_UPGRADE_BRANCH
             cat $file >> "$envfile"
             cncluster update_config_to_migrate
 
             git add **/.envrc.vars
             git add **/config.yaml || true
             git commit -m "Update config to migrate to version $UPGRADE_VERSION on << parameters.cluster >>"
-            git push origin $DEPLOYMENT_BRANCH
+            git push origin $DEPLOYMENT_UPGRADE_BRANCH
 
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
@@ -3213,13 +3207,13 @@ jobs:
 
             # Forward-port the same change to the deployment branch
 
-            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
-            git checkout $DEPLOYMENT_BRANCH
+            DEPLOYMENT_UPGRADE_BRANCH="<< parameters.cluster >>-deployment-upgrade"
+            git checkout $DEPLOYMENT_UPGRADE_BRANCH
             cncluster update_config_to_archive_legacy_migration
 
             git add **/config.yaml || true
             git commit -m "Update config to archive legacy version on << parameters.cluster >>"
-            git push origin $DEPLOYMENT_BRANCH
+            git push origin $DEPLOYMENT_UPGRADE_BRANCH
 
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
@@ -3293,14 +3287,14 @@ jobs:
 
             # Forward-port the same change to the deployment branch
 
-            DEPLOYMENT_BRANCH="<< parameters.cluster >>-migration-deployment"
-            git checkout $DEPLOYMENT_BRANCH
+            DEPLOYMENT_UPGRADE_BRANCH="<< parameters.cluster >>-deployment-upgrade"
+            git checkout $DEPLOYMENT_UPGRADE_BRANCH
             cncluster update_config_to_remove_migrating_from
 
             git add **/.envrc.vars
             git add **/config.yaml || true
             git commit -m "Add migration config to remove migratingFrom" || true
-            git push origin $DEPLOYMENT_BRANCH
+            git push origin $DEPLOYMENT_UPGRADE_BRANCH
           cmd_retry_count: 3
 
       - wait_for_pulumi_stacks_updated:

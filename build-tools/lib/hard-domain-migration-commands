@@ -63,7 +63,7 @@ function subcmd_update_active_version() {
     if [ -z "${TARGET_CLUSTER-}" ]; then
         cluster_directory="$(pwd)"
     else
-        cluster_directory="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}"
+        cluster_directory="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}"
     fi
     set -x
     sed -i "s/^export CHARTS_VERSION=.*$/export CHARTS_VERSION=\"$1\"/" "$cluster_directory/.envrc.vars"
@@ -76,7 +76,7 @@ function subcmd_update_config_to_migrate() {
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
   else
-    configFile="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
   fi
 
   yq e 'with(.synchronizerMigration; .legacy = .active | .active = .upgrade | del(.upgrade))' -i $configFile
@@ -91,7 +91,7 @@ function subcmd_update_config_to_archive_legacy_migration() {
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
   else
-    configFile="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
   fi
 
   yq e '.synchronizerMigration.archived = [ .synchronizerMigration.legacy ] | del(.synchronizerMigration.legacy)' -i $configFile
@@ -104,7 +104,7 @@ function subcmd_update_config_to_remove_migrating_from() {
   if [ -z "${TARGET_CLUSTER-}" ]; then
     configFile="config.yaml"
   else
-    configFile="${SPLICE_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
   fi
 
   yq e 'del(.synchronizerMigration.active.migratingFrom)' -i $configFile

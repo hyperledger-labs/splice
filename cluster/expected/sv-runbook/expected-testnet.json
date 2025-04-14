@@ -76,8 +76,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2",
-              "1"
+              "2"
             ]
           }
         },
@@ -92,7 +91,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -235,7 +234,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "loopback",
     "provider": "",
@@ -299,7 +298,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "scan",
     "provider": "",
@@ -489,7 +488,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -644,6 +643,11 @@
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEX1G0Gc5kYqisXQk0GZpygZ7cOmo5AHh0+87ZVnwPUXdA9msdGm/XCCTfFz4g7x4QfhgXHEARGSTqvIq5PbUqTQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzPiiGTxeSKO+HBOekWSXKpAziP2hlRvwdYmbvmL8BwdCBsRZGc5UELlo9rS3DOfhg6/W+oundvzqzsNQKVBb4w==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -717,7 +721,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-app",
     "provider": "",
@@ -871,7 +875,7 @@
           "auth0|64553aa683015a9687d9cc2e"
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "validator",
     "provider": "",

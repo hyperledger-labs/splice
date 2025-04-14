@@ -137,7 +137,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "docs-docs",
     "provider": "",
@@ -382,7 +382,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -501,8 +501,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2",
-              "1"
+              "2"
             ]
           }
         },
@@ -518,7 +517,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -569,7 +568,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -645,7 +644,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -801,6 +800,11 @@
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEX1G0Gc5kYqisXQk0GZpygZ7cOmo5AHh0+87ZVnwPUXdA9msdGm/XCCTfFz4g7x4QfhgXHEARGSTqvIq5PbUqTQ==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzPiiGTxeSKO+HBOekWSXKpAziP2hlRvwdYmbvmL8BwdCBsRZGc5UELlo9rS3DOfhg6/W+oundvzqzsNQKVBb4w==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -878,7 +882,6 @@
         },
         "migration": {
           "id": 2,
-          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -915,7 +918,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1030,7 +1033,7 @@
           }
         }
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
