@@ -9,7 +9,6 @@ import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
-import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ReportData
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
@@ -366,11 +365,38 @@ private class JdbcLedgerDao(
     loggerFactory = loggerFactory,
   )(queryExecutionContext)
 
+  private val reassignmentPointwiseReader = new ReassignmentPointwiseReader(
+    dbDispatcher = dbDispatcher,
+    eventStorageBackend = readStorageBackend.eventStorageBackend,
+    metrics = metrics,
+    lfValueTranslation = translation,
+    loggerFactory = loggerFactory,
+  )(queryExecutionContext)
+
+  private val topologyTransactionPointwiseReader = new TopologyTransactionPointwiseReader(
+    dbDispatcher = dbDispatcher,
+    eventStorageBackend = readStorageBackend.eventStorageBackend,
+    metrics = metrics,
+    lfValueTranslation = translation,
+    loggerFactory = loggerFactory,
+  )(queryExecutionContext)
+
   private val transactionPointwiseReader = new TransactionPointwiseReader(
     dbDispatcher = dbDispatcher,
     eventStorageBackend = readStorageBackend.eventStorageBackend,
     metrics = metrics,
     lfValueTranslation = translation,
+    loggerFactory = loggerFactory,
+  )(queryExecutionContext)
+
+  private val updatePointwiseReader = new UpdatePointwiseReader(
+    dbDispatcher = dbDispatcher,
+    eventStorageBackend = readStorageBackend.eventStorageBackend,
+    parameterStorageBackend = parameterStorageBackend,
+    metrics = metrics,
+    transactionPointwiseReader = transactionPointwiseReader,
+    reassignmentPointwiseReader = reassignmentPointwiseReader,
+    topologyTransactionPointwiseReader = topologyTransactionPointwiseReader,
     loggerFactory = loggerFactory,
   )(queryExecutionContext)
 
@@ -389,8 +415,8 @@ private class JdbcLedgerDao(
       eventStorageBackend = readStorageBackend.eventStorageBackend,
       metrics = metrics,
       updatesStreamReader = updatesStreamReader,
+      updatePointwiseReader = updatePointwiseReader,
       treeTransactionsStreamReader = treeTransactionsStreamReader,
-      transactionPointwiseReader = transactionPointwiseReader,
       treeTransactionPointwiseReader = treeTransactionPointwiseReader,
       acsReader = acsReader,
     )(queryExecutionContext)
@@ -481,15 +507,6 @@ private class JdbcLedgerDao(
       }
   }
 
-  /** Returns all TransactionMetering records matching given criteria */
-  override def meteringReportData(
-      from: Timestamp,
-      to: Option[Timestamp],
-      userId: Option[UserId],
-  )(implicit loggingContext: LoggingContextWithTrace): Future[ReportData] =
-    dbDispatcher.executeSql(metrics.index.db.lookupConfiguration)(
-      readStorageBackend.meteringStorageBackend.reportData(from, to, userId)
-    )
 }
 
 private[platform] object JdbcLedgerDao {

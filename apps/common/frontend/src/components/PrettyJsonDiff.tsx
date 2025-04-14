@@ -178,15 +178,39 @@ const JsonDiffStyles = () => (
 );
 
 interface PrettyJsonDiffProps {
-  data?: DsoRulesConfig | AmuletConfig<USD>;
-  compareWithData?: DsoRulesConfig | AmuletConfig<USD>;
+  changes:
+    | {
+        newConfig: DsoRulesConfig;
+        actualConfig: DsoRulesConfig;
+        baseConfig?: DsoRulesConfig;
+      }
+    | {
+        newConfig: AmuletConfig<USD>;
+        actualConfig: AmuletConfig<USD>;
+        baseConfig?: AmuletConfig<USD>;
+      };
 }
 
-export const PrettyJsonDiff: React.FC<PrettyJsonDiffProps> = ({ data, compareWithData }) => {
-  // Calculate the difference between data objects
-  const delta = jsondiffpatchInstance.diff(compareWithData, data);
+/**
+ * Method to display config diffs
+ * @param newConfig is the config containing fields highlighted in green (that will take effect)
+ * @param baseConfig is the config containing fields highlighted in red (that will be replaced)
+ * @param actualConfig is the config containing fields that are not highlighted (these might change and depends on when
+ * the method is called)
+ *
+ * Note: voteRequests from version before dsoGovernance 0.1.11 do not contain baseConfig. Diffs for these old vote requests
+ * were done against actualConfig.
+ * @constructor
+ */
+export const PrettyJsonDiff: React.FC<PrettyJsonDiffProps> = ({
+  changes: { newConfig, baseConfig, actualConfig },
+}) => {
+  // baseConfig ensures a fixed delta independent of actualConfig
+  const baseForDiff = baseConfig || actualConfig;
+  // Calculate the difference between newConfig objects
+  const delta = jsondiffpatchInstance.diff(baseForDiff, newConfig);
 
-  // If there's no difference, render the data as pretty-printed JSON
+  // If there's no difference, render the newConfig as pretty-printed JSON
   if (!delta) {
     return (
       <Box
@@ -194,21 +218,29 @@ export const PrettyJsonDiff: React.FC<PrettyJsonDiffProps> = ({ data, compareWit
         sx={{ overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}
         data-testid="stringify-display"
       >
-        {JSON.stringify(data, null, 2)}
+        {JSON.stringify(newConfig, null, 2)}
       </Box>
     );
   }
 
   // Sanitize and format the HTML for the diff 'display'
   // @ts-ignore
-  const sanatizedHtml = DOMPurify.sanitize(htmlFormatter.format(delta, compareWithData));
+  const sanitizedHtml = DOMPurify.sanitize(htmlFormatter.format(delta, actualConfig));
 
   return (
     <>
       <JsonDiffStyles />
       <Box sx={{ overflow: 'auto' }}>
-        <Box data-testid="config-diffs-display">{parse(sanatizedHtml)}</Box>
+        <Box data-testid="config-diffs-display">{parse(sanitizedHtml)}</Box>
       </Box>
     </>
   );
 };
+
+export function computeDiff(
+  changes:
+    | { new: DsoRulesConfig; base: DsoRulesConfig }
+    | { new: AmuletConfig<USD>; base: AmuletConfig<USD> }
+): jsondiffpatch.Delta {
+  return jsondiffpatchInstance.diff(changes.new, changes.base);
+}

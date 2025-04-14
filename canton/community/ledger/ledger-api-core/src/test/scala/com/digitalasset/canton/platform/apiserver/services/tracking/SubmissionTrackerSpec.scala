@@ -5,11 +5,11 @@ package com.digitalasset.canton.platform.apiserver.services.tracking
 
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.completion.Completion
-import com.digitalasset.base.error.{ContextualizedErrorLogger, ErrorsAssertions}
+import com.digitalasset.base.error.ErrorsAssertions
 import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors
 import com.digitalasset.canton.ledger.error.{CommonErrors, LedgerApiErrors}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.LedgerErrorLoggingContext
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker.{
   SubmissionKey,
@@ -465,8 +465,8 @@ class SubmissionTrackerSpec
       actAs = submitters.toSeq,
     )
 
-    val errorLogger: ContextualizedErrorLogger =
-      LedgerErrorLoggingContext(logger, Map(), traceContext, submissionId)
+    val errorLogger: ErrorLoggingContext =
+      ErrorLoggingContext.withExplicitCorrelationId(logger, Map(), traceContext, submissionId)
 
     val completionFailedGrpcCode = io.grpc.Status.Code.NOT_FOUND
     val completionFailedMessage: String = "ledger rejection"

@@ -14,12 +14,6 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
 }
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.*
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub
-import com.daml.ledger.api.v2.admin.metering_report_service.MeteringReportServiceGrpc.MeteringReportServiceStub
-import com.daml.ledger.api.v2.admin.metering_report_service.{
-  GetMeteringReportRequest,
-  GetMeteringReportResponse,
-  MeteringReportServiceGrpc,
-}
 import com.daml.ledger.api.v2.admin.object_meta.ObjectMeta
 import com.daml.ledger.api.v2.admin.package_management_service.*
 import com.daml.ledger.api.v2.admin.package_management_service.PackageManagementServiceGrpc.PackageManagementServiceStub
@@ -60,6 +54,8 @@ import com.daml.ledger.api.v2.command_completion_service.{
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc.CommandServiceStub
 import com.daml.ledger.api.v2.command_service.{
   CommandServiceGrpc,
+  SubmitAndWaitForReassignmentRequest,
+  SubmitAndWaitForReassignmentResponse,
   SubmitAndWaitForTransactionRequest,
   SubmitAndWaitForTransactionResponse,
   SubmitAndWaitForTransactionTreeResponse,
@@ -146,6 +142,9 @@ import com.daml.ledger.api.v2.update_service.{
   GetTransactionByIdRequest,
   GetTransactionByOffsetRequest,
   GetTransactionTreeResponse,
+  GetUpdateByIdRequest,
+  GetUpdateByOffsetRequest,
+  GetUpdateResponse,
   GetUpdateTreesResponse,
   GetUpdatesRequest,
   GetUpdatesResponse,
@@ -157,9 +156,13 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   ServerEnforcedTimeout,
   TimeoutType,
 }
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
+  AssignedWrapper,
+  ReassignmentWrapper,
+  UnassignedWrapper,
+}
 import com.digitalasset.canton.admin.api.client.data.{
   LedgerApiUser,
-  LedgerMeteringReport,
   ListLedgerApiUsersResult,
   TemplateId,
   UserRights,
@@ -958,46 +961,6 @@ object LedgerApiCommands {
 
   }
 
-  object Metering {
-    abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = MeteringReportServiceStub
-
-      override def createService(channel: ManagedChannel): MeteringReportServiceStub =
-        MeteringReportServiceGrpc.stub(channel)
-    }
-
-    final case class GetReport(
-        from: CantonTimestamp,
-        to: Option[CantonTimestamp],
-        userId: Option[String],
-    ) extends BaseCommand[
-          GetMeteringReportRequest,
-          GetMeteringReportResponse,
-          String,
-        ] {
-
-      override protected def submitRequest(
-          service: MeteringReportServiceStub,
-          request: GetMeteringReportRequest,
-      ): Future[GetMeteringReportResponse] =
-        service.getMeteringReport(request)
-
-      override protected def createRequest(): Either[String, GetMeteringReportRequest] =
-        Right(
-          GetMeteringReportRequest(
-            from = Some(from.toProtoTimestamp),
-            to = to.map(_.toProtoTimestamp),
-            userId = userId.getOrElse(""),
-          )
-        )
-
-      override protected def handleResponse(
-          response: GetMeteringReportResponse
-      ): Either[String, String] =
-        LedgerMeteringReport.fromProtoV0(response).leftMap(_.toString)
-    }
-  }
-
   object UpdateService {
 
     sealed trait UpdateTreeWrapper {
@@ -1005,22 +968,19 @@ object LedgerApiCommands {
     }
     sealed trait UpdateWrapper {
       def updateId: String
-      def isUnassignment: Boolean
-      def createEvent: Option[CreatedEvent] =
+      def isUnassignment = this match {
+        case _: UnassignedWrapper => true
+        case _ => false
+      }
+      def createEvents: Iterator[CreatedEvent] =
         this match {
-          case UpdateService.TransactionWrapper(t) => t.events.headOption.map(_.getCreated)
-          case u: UpdateService.AssignedWrapper => u.assignedEvent.createdEvent
-          case _: UpdateService.UnassignedWrapper => None
-          case _: UpdateService.TopologyTransactionWrapper => None
+          case UpdateService.TransactionWrapper(t) => t.events.iterator.map(_.getCreated)
+          case u: UpdateService.AssignedWrapper => u.events.iterator.flatMap(_.createdEvent)
+          case _: UpdateService.UnassignedWrapper => Iterator.empty
+          case _: UpdateService.TopologyTransactionWrapper => Iterator.empty
         }
 
       def synchronizerId: String
-    }
-    object UpdateWrapper {
-      def isUnassignedWrapper(wrapper: UpdateWrapper): Boolean = wrapper match {
-        case UnassignedWrapper(_, _) => true
-        case _ => false
-      }
     }
     final case class TransactionTreeWrapper(transactionTree: TransactionTree)
         extends UpdateTreeWrapper {
@@ -1028,14 +988,12 @@ object LedgerApiCommands {
     }
     final case class TransactionWrapper(transaction: Transaction) extends UpdateWrapper {
       override def updateId: String = transaction.updateId
-      override def isUnassignment: Boolean = false
 
       override def synchronizerId: String = transaction.synchronizerId
     }
     final case class TopologyTransactionWrapper(topologyTransaction: TopologyTransaction)
         extends UpdateWrapper {
       override def updateId: String = topologyTransaction.updateId
-      override def isUnassignment: Boolean = false
 
       override def synchronizerId: String = topologyTransaction.synchronizerId
     }
@@ -1043,39 +1001,75 @@ object LedgerApiCommands {
       override def updateId: String = reassignment.updateId
 
       def reassignment: Reassignment
-      def event: ReassignmentEvent.Event
-      def offset: Long = reassignment.offset
     }
 
     object ReassignmentWrapper {
       def apply(reassignment: Reassignment): ReassignmentWrapper =
         reassignment.events match {
-          case Seq(ReassignmentEvent(ReassignmentEvent.Event.Assigned(evt))) =>
-            AssignedWrapper(reassignment, evt)
-          case Seq(ReassignmentEvent(ReassignmentEvent.Event.Unassigned(evt))) =>
-            UnassignedWrapper(reassignment, evt)
+          case ReassignmentEvent(ReassignmentEvent.Event.Assigned(head)) +: tail =>
+            AssignedWrapper(
+              reassignment,
+              head +: validateRest(head, tail, _.event.assigned),
+            )
+          case ReassignmentEvent(ReassignmentEvent.Event.Unassigned(head)) +: tail =>
+            UnassignedWrapper(
+              reassignment,
+              head +: validateRest(head, tail, _.event.unassigned),
+            )
           case _ =>
             throw new IllegalStateException(
-              s"Invalid reassignment event (only supported single UnassignedEvent and AssignedEvent): ${reassignment.events}"
+              s"Invalid reassignment events: ${reassignment.events}"
             )
         }
+
+      // Fields shared by AssignedEvent and UnassignedEvent that must be invariant with a batch.
+      private type ValidatableEvent = {
+        val source: String; val target: String; val unassignId: String
+      }
+
+      import scala.language.reflectiveCalls
+      private def validateRest[E <: ValidatableEvent](
+          first: E,
+          rest: Seq[ReassignmentEvent],
+          getEvent: ReassignmentEvent => Option[E],
+      ): Seq[E] = rest match {
+        case hd +: tl =>
+          getEvent(hd) match {
+            case Some(e) =>
+              if (
+                e.unassignId != first.unassignId ||
+                e.source != first.source ||
+                e.target != first.target
+              ) throw new IllegalStateException(s"Invalid event batch elements: $first vs $e")
+              e +: validateRest(first, tl, getEvent)
+            case None => throw new IllegalStateException(s"Inconsistent event type: $hd")
+          }
+        case _ => Seq.empty
+      }
     }
 
-    final case class AssignedWrapper(reassignment: Reassignment, assignedEvent: AssignedEvent)
-        extends ReassignmentWrapper {
-      override def isUnassignment: Boolean = false
-      override def synchronizerId: String = assignedEvent.target
-      override def event = ReassignmentEvent.Event.Assigned(assignedEvent)
+    final case class AssignedWrapper(
+        reassignment: Reassignment,
+        assignedEvents: Seq[AssignedEvent],
+    ) extends ReassignmentWrapper {
+      override def synchronizerId = target
+      def events: Seq[AssignedEvent] = assignedEvents
+      def source: String = assignedEvents.headOption.map(_.source).getOrElse("")
+      def target: String = assignedEvents.headOption.map(_.target).getOrElse("")
+      def unassignId: String = assignedEvents.headOption.map(_.unassignId).getOrElse("")
     }
-    final case class UnassignedWrapper(reassignment: Reassignment, unassignedEvent: UnassignedEvent)
-        extends ReassignmentWrapper {
-      override def isUnassignment: Boolean = true
-      override def synchronizerId: String = unassignedEvent.source
-      override def event = ReassignmentEvent.Event.Unassigned(unassignedEvent)
 
-      def unassignId: String = unassignedEvent.unassignId
+    final case class UnassignedWrapper(
+        reassignment: Reassignment,
+        unassignedEvents: Seq[UnassignedEvent],
+    ) extends ReassignmentWrapper {
+      override def synchronizerId = source
+      def events: Seq[UnassignedEvent] = unassignedEvents
+      def source: String = unassignedEvents.headOption.map(_.source).getOrElse("")
+      def target: String = unassignedEvents.headOption.map(_.target).getOrElse("")
+      def unassignId: String = unassignedEvents.headOption.map(_.unassignId).getOrElse("")
       def reassignmentId: ReassignmentId = ReassignmentId(
-        Source(SynchronizerId.tryFromString(unassignedEvent.source)),
+        Source(SynchronizerId.tryFromString(source)),
         CantonTimestamp.assertFromLong(unassignId.toLong),
       )
     }
@@ -1226,6 +1220,41 @@ object LedgerApiCommands {
         )
     }
 
+    final case class GetUpdateById(id: String, updateFormat: UpdateFormat)(implicit
+        ec: ExecutionContext
+    ) extends BaseCommand[GetUpdateByIdRequest, Option[GetUpdateResponse], Option[UpdateWrapper]]
+        with PrettyPrinting {
+      override protected def createRequest(): Either[String, GetUpdateByIdRequest] = Right {
+        GetUpdateByIdRequest(
+          updateId = id,
+          updateFormat = Some(updateFormat),
+        )
+      }
+
+      override protected def submitRequest(
+          service: UpdateServiceStub,
+          request: GetUpdateByIdRequest,
+      ): Future[Option[GetUpdateResponse]] =
+        // The Ledger API will throw an error if it can't find an update by ID.
+        // However, as Canton is distributed, an update ID might show up later, so we don't treat this as
+        // an error and change it to a None
+        service.getUpdateById(request).map(Some(_)).recover {
+          case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
+            None
+        }
+
+      override protected def handleResponse(
+          response: Option[GetUpdateResponse]
+      ): Either[String, Option[UpdateWrapper]] =
+        Right(extractUpdate(response))
+
+      override protected def pretty: Pretty[GetUpdateById] =
+        prettyOfClass(
+          param("id", _.id.unquoted),
+          param("updateFormat", _.updateFormat.toString.unquoted),
+        )
+    }
+
     final case class GetTransactionByOffset(parties: Set[LfPartyId], offset: Long)(implicit
         ec: ExecutionContext
     ) extends BaseCommand[GetTransactionByOffsetRequest, GetTransactionTreeResponse, Option[
@@ -1245,8 +1274,8 @@ object LedgerApiCommands {
           service: UpdateServiceStub,
           request: GetTransactionByOffsetRequest,
       ): Future[GetTransactionTreeResponse] =
-        // The Ledger API will throw an error if it can't find a transaction by ID.
-        // However, as Canton is distributed, a transaction ID might show up later, so we don't treat this as
+        // The Ledger API will throw an error if it can't find a transaction by offset.
+        // However, as Canton is distributed, a transaction offset might show up later, so we don't treat this as
         // an error and change it to a None
         service.getTransactionTreeByOffset(request).recover {
           case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
@@ -1263,6 +1292,52 @@ object LedgerApiCommands {
           param("offset", _.offset),
           param("parties", _.parties),
         )
+    }
+
+    final case class GetUpdateByOffset(offset: Long, updateFormat: UpdateFormat)(implicit
+        ec: ExecutionContext
+    ) extends BaseCommand[GetUpdateByOffsetRequest, Option[GetUpdateResponse], Option[
+          UpdateWrapper
+        ]]
+        with PrettyPrinting {
+      override protected def createRequest(): Either[String, GetUpdateByOffsetRequest] = Right {
+        GetUpdateByOffsetRequest(
+          offset = offset,
+          updateFormat = Some(updateFormat),
+        )
+      }
+
+      override protected def submitRequest(
+          service: UpdateServiceStub,
+          request: GetUpdateByOffsetRequest,
+      ): Future[Option[GetUpdateResponse]] =
+        // The Ledger API will throw an error if it can't find an update by ID.
+        // However, as Canton is distributed, an update ID might show up later, so we don't treat this as
+        // an error and change it to a None
+        service.getUpdateByOffset(request).map(Some(_)).recover {
+          case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
+            None
+        }
+
+      override protected def handleResponse(
+          response: Option[GetUpdateResponse]
+      ): Either[String, Option[UpdateWrapper]] =
+        Right(extractUpdate(response))
+
+      override protected def pretty: Pretty[GetUpdateByOffset] =
+        prettyOfClass(
+          param("offset", _.offset),
+          param("updateFormat", _.updateFormat.toString.unquoted),
+        )
+    }
+
+    private def extractUpdate(response: Option[GetUpdateResponse]): Option[UpdateWrapper] = {
+      val updateO = response.map(_.update)
+      updateO
+        .flatMap(_.transaction)
+        .map[UpdateWrapper](TransactionWrapper.apply)
+        .orElse(updateO.flatMap(_.reassignment).map(ReassignmentWrapper(_)))
+        .orElse(updateO.flatMap(_.topologyTransaction).map(TopologyTransactionWrapper(_)))
     }
 
   }
@@ -1415,7 +1490,7 @@ object LedgerApiCommands {
         commandId: String,
         submitter: LfPartyId,
         submissionId: String,
-        contractId: LfContractId,
+        contractIds: Seq[LfContractId],
         source: SynchronizerId,
         target: SynchronizerId,
     ) extends BaseCommand[SubmitReassignmentRequest, SubmitReassignmentResponse, Unit] {
@@ -1427,7 +1502,7 @@ object LedgerApiCommands {
               userId = userId,
               commandId = commandId,
               submitter = submitter.toString,
-              commands = Seq(
+              commands = contractIds.map(contractId =>
                 ReassignmentCommand(
                   ReassignmentCommand.Command.UnassignCommand(
                     UnassignCommand(
@@ -1727,6 +1802,134 @@ object LedgerApiCommands {
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
 
     }
+
+    final case class SubmitAndWaitAssign(
+        workflowId: String,
+        userId: String,
+        commandId: String,
+        submitter: LfPartyId,
+        submissionId: String,
+        unassignId: String,
+        source: SynchronizerId,
+        target: SynchronizerId,
+        eventFormat: Option[EventFormat],
+    ) extends BaseCommand[
+          SubmitAndWaitForReassignmentRequest,
+          SubmitAndWaitForReassignmentResponse,
+          AssignedWrapper,
+        ] {
+      override protected def createRequest(): Either[String, SubmitAndWaitForReassignmentRequest] =
+        Right(
+          SubmitAndWaitForReassignmentRequest(
+            reassignmentCommands = Some(
+              ReassignmentCommands(
+                workflowId = workflowId,
+                userId = userId,
+                commandId = commandId,
+                submitter = submitter.toString,
+                commands = Seq(
+                  ReassignmentCommand(
+                    ReassignmentCommand.Command.AssignCommand(
+                      AssignCommand(
+                        unassignId = unassignId,
+                        source = source.toProtoPrimitive,
+                        target = target.toProtoPrimitive,
+                      )
+                    )
+                  )
+                ),
+                submissionId = submissionId,
+              )
+            ),
+            eventFormat = eventFormat,
+          )
+        )
+
+      override protected def submitRequest(
+          service: CommandServiceStub,
+          request: SubmitAndWaitForReassignmentRequest,
+      ): Future[SubmitAndWaitForReassignmentResponse] =
+        service.submitAndWaitForReassignment(request)
+
+      override protected def handleResponse(
+          response: SubmitAndWaitForReassignmentResponse
+      ): Either[String, AssignedWrapper] =
+        response.reassignment
+          .toRight("Received response without any reassignment")
+          .map(reassignment =>
+            if (reassignment.events.isEmpty) AssignedWrapper(reassignment, Nil)
+            else ReassignmentWrapper(reassignment)
+          )
+          .flatMap {
+            case assigned: AssignedWrapper => Right(assigned)
+            case invalid => Left(s"AssignedWrapper expected, but got: $invalid")
+          }
+    }
+
+    final case class SubmitAndWaitUnassign(
+        workflowId: String,
+        userId: String,
+        commandId: String,
+        submitter: LfPartyId,
+        submissionId: String,
+        contractIds: Seq[LfContractId],
+        source: SynchronizerId,
+        target: SynchronizerId,
+        eventFormat: Option[EventFormat],
+    ) extends BaseCommand[
+          SubmitAndWaitForReassignmentRequest,
+          SubmitAndWaitForReassignmentResponse,
+          UnassignedWrapper,
+        ] {
+      override protected def createRequest(): Either[String, SubmitAndWaitForReassignmentRequest] =
+        Right(
+          SubmitAndWaitForReassignmentRequest(
+            Some(
+              ReassignmentCommands(
+                workflowId = workflowId,
+                userId = userId,
+                commandId = commandId,
+                submitter = submitter.toString,
+                commands = contractIds.map(contractId =>
+                  ReassignmentCommand(
+                    ReassignmentCommand.Command.UnassignCommand(
+                      UnassignCommand(
+                        contractId = contractId.coid.toString,
+                        source = source.toProtoPrimitive,
+                        target = target.toProtoPrimitive,
+                      )
+                    )
+                  )
+                ),
+                submissionId = submissionId,
+              )
+            ),
+            eventFormat = eventFormat,
+          )
+        )
+
+      override protected def submitRequest(
+          service: CommandServiceStub,
+          request: SubmitAndWaitForReassignmentRequest,
+      ): Future[SubmitAndWaitForReassignmentResponse] =
+        service.submitAndWaitForReassignment(request)
+
+      override protected def handleResponse(
+          response: SubmitAndWaitForReassignmentResponse
+      ): Either[String, UnassignedWrapper] =
+        response.reassignment
+          .toRight("Received response without any reassignment")
+          .map(reassignment =>
+            if (reassignment.events.isEmpty) UnassignedWrapper(reassignment, Nil)
+            else ReassignmentWrapper(reassignment)
+          )
+          .flatMap {
+            case unassigned: UnassignedWrapper => Right(unassigned)
+            case invalid => Left(s"UnassignedWrapper expected, but got: $invalid")
+          }
+
+    }
+
   }
 
   object StateService {

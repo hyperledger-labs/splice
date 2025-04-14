@@ -68,10 +68,10 @@ data AmuletRegistry = AmuletRegistry with
 instance RegistryApi AmuletRegistry where
   getTransferFactory = registryApi_getTransferFactory
   getAllocationFactory = registryApi_getAllocationFactory
-  getAllocationTransferContext = registryApi_getAllocationTransferContext
-  getTransferInstruction_AcceptContext = registryApi_getTransferInstruction_AcceptContext
-  getTransferInstruction_RejectContext = registryApi_getTransferInstruction_abortTwoStepTransferContext
-  getTransferInstruction_WithdrawContext = registryApi_getTransferInstruction_abortTwoStepTransferContext
+  getAllocationTransferContext app cid _meta = registryApi_getAllocationTransferContext app cid
+  getTransferInstruction_AcceptContext app cid _meta = registryApi_getTransferInstruction_AcceptContext app cid
+  getTransferInstruction_RejectContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
+  getTransferInstruction_WithdrawContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
 
 
 -- Registry initialization
@@ -199,7 +199,6 @@ registryApi_getAllocationFactory registry arg = do
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
     disclosures = fullContext.disclosures
 
--- TODO(#18152): consider whether to pass in metadata when fetching this choice context, for extensibility
 registryApi_getAllocationTransferContext
   : AmuletRegistry -> ContractId Allocation -> Script OpenApiChoiceContext
 registryApi_getAllocationTransferContext registry allocCid = do
@@ -353,11 +352,10 @@ tapLockedAndUnlockedFunds : AmuletRegistry -> Party -> Decimal -> Script [Contra
 tapLockedAndUnlockedFunds registry user amount = do
   let lockedAmount = amount / 2.0
   let unlockedAmount = amount - lockedAmount
-  unlockedCid <- tapFaucet registry user (unlockedAmount + lockedAmount)
-  -- TODO(#18760) Reenable the locked amulet
-  -- now <- getTime
-  -- lockedCid <- createLockedAmulet registry user lockedAmount TimeLock with
-  --  holders = [registry.dso]
-  --  expiresAt = now -- we want these funds to already be expired
-   --  optContext = Some "test expired lock"
-  pure [unlockedCid] -- , lockedCid]
+  unlockedCid <- tapFaucet registry user unlockedAmount
+  now <- getTime
+  lockedCid <- createLockedAmulet registry user lockedAmount TimeLock with
+   holders = [registry.dso]
+   expiresAt = now -- we want these funds to already be expired
+   optContext = Some "test expired lock"
+  pure [unlockedCid, lockedCid]

@@ -14,7 +14,6 @@ import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.SessionSigningKeysConfig
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi, SyncCryptoApiParticipantProvider}
@@ -28,7 +27,6 @@ import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, CantonMutableHan
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap.ParticipantServices
 import com.digitalasset.canton.participant.admin.*
 import com.digitalasset.canton.participant.admin.grpc.*
-import com.digitalasset.canton.participant.admin.workflows.java.canton
 import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.health.admin.ParticipantStatus
 import com.digitalasset.canton.participant.ledger.api.{
@@ -375,9 +373,7 @@ class ParticipantNodeBootstrap(
           participantId,
           ips,
           crypto,
-          // TODO(#22362): Enable correct config
-          // parameters.sessionSigningKeys
-          SessionSigningKeysConfig.disabled,
+          parameters.sessionSigningKeys,
           parameters.batchingConfig.parallelism,
           timeouts,
           futureSupervisor,
@@ -441,7 +437,6 @@ class ParticipantNodeBootstrap(
           indexedStringStore,
           persistentState.map(_.acsCounterParticipantConfigStore).value,
           parameters,
-          config.topology,
           crypto,
           clock,
           tryGetPackageDependencyResolver(),
@@ -482,20 +477,6 @@ class ParticipantNodeBootstrap(
           loggerFactory,
         )
 
-        excludedPackageIds =
-          if (parameters.excludeInfrastructureTransactions) {
-            Set(
-              canton.internal.ping.Ping.PACKAGE_ID,
-              canton.internal.bong.BongProposal.PACKAGE_ID,
-              canton.internal.bong.Bong.PACKAGE_ID,
-              canton.internal.bong.Merge.PACKAGE_ID,
-              canton.internal.bong.Explode.PACKAGE_ID,
-              canton.internal.bong.Collapse.PACKAGE_ID,
-            ).map(LfPackageId.assertFromString)
-          } else {
-            Set.empty[LfPackageId]
-          }
-
         commandProgressTracker =
           if (parameters.commandProgressTracking.enabled)
             new CommandProgressTrackerImpl(parameters.commandProgressTracking, clock, loggerFactory)
@@ -523,7 +504,6 @@ class ParticipantNodeBootstrap(
                   indexerConfig = config.parameters.ledgerApiServer.indexer,
                   indexerHaConfig = ledgerApiServerFactory.createHaConfig(config),
                   ledgerParticipantId = participantId.toLf,
-                  excludedPackageIds = excludedPackageIds,
                   onlyForTestingEnableInMemoryTransactionStore =
                     arguments.testingConfig.enableInMemoryTransactionStoreForParticipants,
                 ),
@@ -729,6 +709,7 @@ class ParticipantNodeBootstrap(
           arguments.testingConfig,
           ledgerApiIndexerContainer,
           connectedSynchronizersLookupContainer,
+          () => triggerDeclarativeChange(),
         )
 
         _ = {

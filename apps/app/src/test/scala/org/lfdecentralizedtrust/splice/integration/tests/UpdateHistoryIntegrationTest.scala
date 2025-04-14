@@ -20,7 +20,6 @@ import scala.concurrent.duration.*
 
 class UpdateHistoryIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil
     with WalletTestUtil
     with SplitwellTestUtil
     with TimeTestUtil

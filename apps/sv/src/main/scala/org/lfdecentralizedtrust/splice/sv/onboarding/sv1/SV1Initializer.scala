@@ -199,26 +199,27 @@ class SV1Initializer(
               s"Starting with initial package ${sv1Config.initialPackageConfig} and vetting ${packages
                   .map(_.resourcePath)}"
             )
-            packages
-              .traverse { packageToVet =>
-                logger.info(
-                  s"Vetting initial package ${packageToVet.packageId} - ${packageToVet.resourcePath} on synchronizer $synchronizerId"
-                )
+            participantAdminConnection
+              .uploadDarFiles(
+                packages,
+                RetryFor.WaitingOnInitDependency,
+              )
+              .flatMap(_ =>
                 participantAdminConnection
-                  .vetDar(
+                  .vetDars(
                     synchronizerId,
-                    DarResource(packageToVet.resourcePath),
+                    packages.map(packageToVet => DarResource(packageToVet.resourcePath)),
                     None,
                   )
-              }
-              .flatMap { _ =>
-                initConnection.ensureUserMetadataAnnotation(
-                  config.ledgerApiUser,
-                  BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
-                  "true",
-                  RetryFor.WaitingOnInitDependency,
-                )
-              }
+                  .flatMap { _ =>
+                    initConnection.ensureUserMetadataAnnotation(
+                      config.ledgerApiUser,
+                      BaseLedgerConnection.SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY,
+                      "true",
+                      RetryFor.WaitingOnInitDependency,
+                    )
+                  }
+              )
           },
           logger,
         ),
@@ -274,7 +275,12 @@ class SV1Initializer(
         },
         logger,
       )
-      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        config.parameters.enableCantonPackageSelection,
+        dsoStore,
+        decentralizedSynchronizer,
+        svAutomation.connection,
+      )
       dsoAutomation = newSvDsoAutomationService(
         svStore,
         dsoStore,

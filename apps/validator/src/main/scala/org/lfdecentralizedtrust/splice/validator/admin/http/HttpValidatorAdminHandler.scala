@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.validator.admin.http
 
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
-import cats.syntax.foldable.*
 import com.daml.ledger.api.v2.interactive
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
@@ -356,12 +355,10 @@ class HttpValidatorAdminHandler(
           .mapping
         val partyId = partyToParticipant.partyId
         for {
-          _ <- body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)).traverse_ { tx =>
-            participantAdminConnection.addTopologyTransactions(
-              store = TopologyStoreId.AuthorizedStore,
-              txs = Seq(tx),
-            )
-          }
+          _ <- participantAdminConnection.addTopologyTransactions(
+            store = TopologyStoreId.AuthorizedStore,
+            txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
+          )
           // Check the authorized store first
           _ <- participantAdminConnection
             .listPartyToKey(

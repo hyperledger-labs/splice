@@ -1,12 +1,17 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AmuletRules_AddFutureAmuletConfigSchedule,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
@@ -17,12 +22,13 @@ import org.openqa.selenium.By
 import spray.json.DefaultJsonProtocol.StringJsonFormat
 
 import java.time.{Duration, Instant}
+import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
     with FrontendLoginUtil
-    with ConfigScheduleUtil
+    with AmuletConfigUtil
     with WalletTestUtil
     with WalletFrontendTestUtil
     with TimeTestUtil
@@ -264,71 +270,34 @@ class ScanFrontendTimeBasedIntegrationTest
         )
       }
 
-      val newHoldingFee = 0.1
-
       // Note that the ledger time is in 1970. It will however not change anything because
       // `sv1ScanBackend.getAmuletRules().contract.payload.configSchedule`
       // is a contract such as it was written when it got accepted (e.g. like in 1970).
       // The values are not processed as of now, but the frontend does post-process
       // the Amulet Rules contract to get the actual amulet configurations (see getAmuletConfigurationAsOfNow()).
       val ledgerNow = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-      val javaYesterday = Instant.now().minusSeconds(86400) // yesterday
       val javaTomorrow = Instant.now().plusSeconds(86400) // tomorrow
 
-      actAndCheck(
-        "schedule a amulet configuration in which the last configuration's time was yesterday", {
-          val currentConfigSchedule =
-            sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
-
-          val configSchedule =
-            createConfigSchedule(
-              currentConfigSchedule,
-              (
-                Duration.between(ledgerNow.toInstant, javaYesterday),
-                mkUpdatedAmuletConfig(
-                  currentConfigSchedule,
-                  tickDuration = defaultTickDuration,
-                  holdingFee = 2 * newHoldingFee,
-                ),
-              ),
-            )
-
-          setFutureConfigSchedule(configSchedule)
-        },
-      )(
-        "check that the new config has changed in the UI",
-        _ => {
-          withFrontEnd("scan-ui") { implicit webDriver =>
-            find(id("holding-fee")).value.text should matchText(
-              s"${2 * newHoldingFee} USD/Round"
-            )
-
-            find(id("next-config-update-time")).value.text should equal(
-              "No currently scheduled configuration changes"
-            )
-          }
-        },
-      )
+      val newHoldingFee = 0.1
 
       actAndCheck(
-        "schedule a amulet configuration in which the configuration's time is tomorrow", {
-          val currentConfigSchedule =
-            sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
+        "add an amulet configuration effective from tomorrow", {
+          val amuletRules =
+            sv1ScanBackend.getAmuletRules().contract
 
-          val configSchedule =
-            createConfigSchedule(
-              currentConfigSchedule,
-              (
-                Duration.between(ledgerNow.toInstant, javaTomorrow),
-                mkUpdatedAmuletConfig(
-                  currentConfigSchedule,
-                  tickDuration = defaultTickDuration,
-                  holdingFee = 3 * newHoldingFee,
-                ),
+          val configs = Seq(
+            (
+              Some(Duration.between(ledgerNow.toInstant, javaTomorrow)), // effective in 1 day
+              mkUpdatedAmuletConfig(
+                amuletRules,
+                defaultTickDuration,
+                holdingFee = 3 * newHoldingFee,
               ),
+              amuletRules.payload.configSchedule.initialValue,
             )
-
-          setFutureConfigSchedule(configSchedule)
+          )
+          setAmuletConfig(configs)
+          advanceTime(Duration.ofSeconds(70))
         },
       )(
         "check that the next change will be applied in 24 hours",
@@ -408,17 +377,20 @@ class ScanFrontendTimeBasedIntegrationTest
             aliceValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
+            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           advanceRoundsByOneTick
           buyMemberTraffic(
             aliceValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
+            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           buyMemberTraffic(
             bobValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
+            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           (1 to 5).foreach(_ => advanceRoundsByOneTick)
         },
@@ -604,6 +576,7 @@ class ScanFrontendTimeBasedIntegrationTest
         "url",
         "Testing Testingaton",
         dsoInfo.dsoRules.payload.config.voteRequestTimeout,
+        None,
       )
 
       withFrontEnd("scan-ui") { implicit webDriver =>
@@ -720,4 +693,12 @@ class ScanFrontendTimeBasedIntegrationTest
       row.childElement(className("amulet-price")).text shouldBe amuletPrice
     }
   }
+}
+
+case class HasAmuletRulesWrapper(amuletRules: Contract[AmuletRules.ContractId, AmuletRules])
+    extends HasAmuletRules {
+  override def getAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[AmuletRules.ContractId, AmuletRules]] =
+    Future.successful(amuletRules)
 }

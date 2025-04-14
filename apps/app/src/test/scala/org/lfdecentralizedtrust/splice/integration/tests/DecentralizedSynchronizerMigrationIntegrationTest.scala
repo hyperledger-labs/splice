@@ -669,7 +669,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 .plus(12, ChronoUnit.SECONDS)
               scheduleDomainMigration(
                 sv1Backend,
-                Seq(sv2Backend, sv3Backend, sv4Backend),
+                Seq(sv2Backend, sv3Backend),
                 Some(new SynchronizerUpgradeSchedule(scheduledTime, 1L)),
               )
             },
@@ -1039,6 +1039,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 "url",
                 "description",
                 sv1LocalBackend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                None,
               ),
             )(
               "VoteRequest and Vote should be there",

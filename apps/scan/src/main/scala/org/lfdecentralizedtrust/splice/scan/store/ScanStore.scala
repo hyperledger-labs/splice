@@ -501,6 +501,15 @@ object ScanStore {
               Some(Timestamp.assertFromInstant(contract.payload.allocation.settlement.settleBefore)),
           )
         },
+        mkFilter(splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION)(co =>
+          co.payload.transfer.instrumentId.admin == dso
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt =
+              Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
+          )
+        },
       ),
     )
   }

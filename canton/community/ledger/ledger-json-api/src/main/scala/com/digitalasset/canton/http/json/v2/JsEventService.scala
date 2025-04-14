@@ -4,17 +4,17 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.ledger.api.v2.event_query_service
+import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
-import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
-import sttp.tapir.AnyEndpoint
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.*
+import sttp.tapir.{AnyEndpoint, Schema}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -44,7 +44,6 @@ class JsEventService(
   ): TracedInput[event_query_service.GetEventsByContractIdRequest] => Future[
     Either[JsCantonError, JsGetEventsByContractIdResponse]
   ] = req => {
-    implicit val token = callerContext.token()
     implicit val tc = req.traceContext
     eventServiceClient(callerContext.token())(req.traceContext)
       .getEventsByContractId(req.in)
@@ -83,13 +82,18 @@ object JsEventService extends DocumentationEndpoints {
   )
 }
 object JsEventServiceCodecs {
-  import JsSchema.JsServicesCommonCodecs.eventFormatRW
+  import JsSchema.*
+  import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
+  import JsServicesCommonCodecs.*
 
-  implicit val jsCreatedRW: Codec[JsCreated] = deriveCodec
-  implicit val jsArchivedRW: Codec[JsArchived] = deriveCodec
+  implicit val jsCreatedRW: Codec[JsCreated] = deriveConfiguredCodec
+  implicit val jsArchivedRW: Codec[JsArchived] = deriveConfiguredCodec
   implicit val jsGetEventsByContractIdResponseRW: Codec[JsGetEventsByContractIdResponse] =
-    deriveCodec
-  implicit val jsGetEventsByContractIdRequestRW
+    deriveConfiguredCodec
+
+  implicit val getEventsByContractIdRequestRW
       : Codec[event_query_service.GetEventsByContractIdRequest] =
-    deriveCodec
+    deriveRelaxedCodec
+
+  implicit val jsCreatedSchema: Schema[JsCreated] = Schema.derived
 }

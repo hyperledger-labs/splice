@@ -6,14 +6,19 @@ package com.digitalasset.canton.platform.index
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.resources.ProgramResource.StartupException
 import com.daml.timer.RetryStrategy
-import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.error.IndexErrors.IndexDbException
 import com.digitalasset.canton.ledger.participant.state.index.IndexService
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
-import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  LoggingContextWithTrace,
+  NamedLoggerFactory,
+  NamedLogging,
+}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.InMemoryState
 import com.digitalasset.canton.platform.apiserver.TimedIndexService
@@ -55,7 +60,12 @@ final class IndexServiceOwner(
         TraceContext,
     ) => FutureUnlessShutdown[Vector[Offset]],
     contractLoader: ContractLoader,
-    getPackageMetadataSnapshot: ContextualizedErrorLogger => PackageMetadata,
+    getPackageMetadataSnapshot: ErrorLoggingContext => PackageMetadata,
+    getPackagePreference: logging.LoggingContextWithTrace => Ref.PackageName => Set[
+      Ref.PackageId
+    ] => FutureUnlessShutdown[
+      Option[Ref.PackageId]
+    ],
     lfValueTranslation: LfValueTranslation,
     queryExecutionContext: ExecutionContextExecutorService,
     commandExecutionContext: ExecutionContextExecutorService,
@@ -85,7 +95,7 @@ final class IndexServiceOwner(
 
       bufferedTransactionsReader = BufferedUpdateReader(
         delegate = ledgerDao.updateReader,
-        transactionsBuffer = inMemoryState.inMemoryFanoutBuffer,
+        updatesBuffer = inMemoryState.inMemoryFanoutBuffer,
         lfValueTranslation = lfValueTranslation,
         metrics = metrics,
         eventProcessingParallelism = config.bufferedEventsProcessingParallelism,
@@ -112,6 +122,7 @@ final class IndexServiceOwner(
         metrics = metrics,
         loggerFactory = loggerFactory,
         idleStreamOffsetCheckpointTimeout = config.idleStreamOffsetCheckpointTimeout,
+        getPreferredPackageVersion = getPackagePreference,
       )
     } yield new TimedIndexService(indexService, metrics)
   }

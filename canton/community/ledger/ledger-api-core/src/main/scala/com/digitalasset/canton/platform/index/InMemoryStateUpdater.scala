@@ -283,7 +283,8 @@ private[platform] object InMemoryStateUpdater {
     }
     // must be after LedgerEnd update because this could trigger API actions relating to this LedgerEnd
     // it is expected to be okay to run these in repair mode, as repair operations are not related to tracking
-    trackSubmissions(inMemoryState.submissionTracker, result.updates)
+    trackTransactionSubmissions(inMemoryState.transactionSubmissionTracker, result.updates)
+    trackReassignmentSubmissions(inMemoryState.reassignmentSubmissionTracker, result.updates)
     // can be done at any point in the pipeline, it is for debugging only
     trackCommandProgress(inMemoryState.commandProgressTracker, result.updates)
 
@@ -294,7 +295,7 @@ private[platform] object InMemoryStateUpdater {
     )
   }
 
-  private def trackSubmissions(
+  private def trackTransactionSubmissions(
       submissionTracker: SubmissionTracker,
       updates: Vector[TransactionLogUpdate],
   ): Unit =
@@ -305,6 +306,21 @@ private[platform] object InMemoryStateUpdater {
 
         case txRejected: TransactionLogUpdate.TransactionRejected =>
           Some(txRejected.completionStreamResponse)
+      }
+      .flatten
+      .foreach(submissionTracker.onCompletion)
+
+  private def trackReassignmentSubmissions(
+      submissionTracker: SubmissionTracker,
+      updates: Vector[TransactionLogUpdate],
+  ): Unit =
+    updates.view
+      .collect {
+        case txRejected: TransactionLogUpdate.TransactionRejected =>
+          Some(txRejected.completionStreamResponse)
+
+        case reassignmentAccepted: TransactionLogUpdate.ReassignmentAccepted =>
+          reassignmentAccepted.completionStreamResponse
       }
       .flatten
       .foreach(submissionTracker.onCompletion)
@@ -324,7 +340,7 @@ private[platform] object InMemoryStateUpdater {
       .collect { case TransactionLogUpdate.TopologyTransactionEffective(_, _, _, _, events) =>
         events.collect { case u: TransactionLogUpdate.PartyToParticipantAuthorization =>
           PartyAllocation.Completed(
-            PartyAllocation.TrackerKey.of(u.party, u.participant, u.level),
+            PartyAllocation.TrackerKey.of(u.party, u.participant, u.authorizationEvent),
             IndexerPartyDetails(party = u.party, isLocal = u.participant == participantId),
           )
         }
@@ -370,7 +386,6 @@ private[platform] object InMemoryStateUpdater {
         contractId = createdEvent.contractId,
         contract = Contract(
           packageName = createdEvent.packageName,
-          packageVersion = createdEvent.packageVersion,
           template = createdEvent.templateId,
           arg = createdEvent.createArgument,
         ),
@@ -432,7 +447,7 @@ private[platform] object InMemoryStateUpdater {
           ledgerEffectiveTime = txAccepted.transactionMeta.ledgerEffectiveTime,
           templateId = create.templateId,
           packageName = create.packageName,
-          packageVersion = create.packageVersion,
+          packageVersion = None,
           commandId = txAccepted.completionInfoO.map(_.commandId).getOrElse(""),
           workflowId = txAccepted.transactionMeta.workflowId.getOrElse(""),
           contractKey = create.keyOpt.map(k =>
@@ -596,7 +611,7 @@ private[platform] object InMemoryStateUpdater {
               ledgerEffectiveTime = assign.ledgerEffectiveTime,
               templateId = create.templateId,
               packageName = create.packageName,
-              packageVersion = create.packageVersion,
+              packageVersion = None,
               commandId = u.optCompletionInfo.map(_.commandId).getOrElse(""),
               workflowId = u.workflowId.getOrElse(""),
               contractKey = create.keyOpt.map(k =>
@@ -638,7 +653,7 @@ private[platform] object InMemoryStateUpdater {
             TransactionLogUpdate.PartyToParticipantAuthorization(
               party = event.party,
               participant = event.participant,
-              level = event.level,
+              authorizationEvent = event.authorizationEvent,
             )
         }
         .toVector,

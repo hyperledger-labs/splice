@@ -8,7 +8,6 @@ import com.daml.ledger.api.v2.event.{ArchivedEvent, CreatedEvent, ExercisedEvent
 import com.daml.ledger.api.v2.value
 import com.daml.ledger.api.v2.value.{Record as ApiRecord, Value as ApiValue}
 import com.daml.metrics.Timed
-import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.ledger.api.util.{LfEngineToApi, TimestampConversion}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -370,7 +369,6 @@ final class LfValueTranslation(
           coid = rawCreatedEvent.contractId,
           templateId = rawCreatedEvent.templateId,
           packageName = rawCreatedEvent.packageName,
-          packageVersion = rawCreatedEvent.packageVersion,
           arg = createArgument.unversioned,
           signatories = signatories,
           stakeholders = signatories ++ observers,
@@ -451,11 +449,24 @@ final class LfValueTranslation(
     )
     def asyncInterfaceViews =
       MonadUtil.sequentialTraverse(renderResult.interfaces.toList)(interfaceId =>
-        computeInterfaceView(
-          templateId,
-          value.unversioned,
-          interfaceId,
-        ).flatMap(toInterfaceView(eventProjectionProperties.verbose, interfaceId))
+        for {
+          upgradedInstanceIdentifierResultE <- eventProjectionProperties.interfaceViewPackageUpgrade
+            .upgrade(interfaceId, templateId)
+          viewResult <- upgradedInstanceIdentifierResultE.fold(
+            failureStatus => Future.successful(Left(failureStatus)),
+            upgradedInstanceIdentifier =>
+              computeInterfaceView(
+                templateId = upgradedInstanceIdentifier,
+                value = value.unversioned,
+                interfaceId = interfaceId,
+              ),
+          )
+          interfaceView <- toInterfaceView(
+            verbose = eventProjectionProperties.verbose,
+            interfaceId = interfaceId,
+            result = viewResult,
+          )
+        } yield interfaceView
       )
 
     def asyncCreatedEventBlob = condFuture(renderResult.createdEventBlob) {
@@ -495,8 +506,10 @@ final class LfValueTranslation(
     .map(LfEngineToApi.toApiIdentifier)
     .toSeq
 
-  private def toInterfaceView(verbose: Boolean, interfaceId: Identifier)(
-      result: Either[Status, Versioned[Value]]
+  private def toInterfaceView(
+      verbose: Boolean,
+      interfaceId: Identifier,
+      result: Either[Status, Versioned[Value]],
   )(implicit ec: ExecutionContext, loggingContext: LoggingContextWithTrace): Future[InterfaceView] =
     result match {
       case Right(versionedValue) =>
@@ -558,7 +571,7 @@ final class LfValueTranslation(
       executionContext: ExecutionContext,
   ): Future[Either[Status, Versioned[Value]]] = Timed.future(
     metrics.index.lfValue.computeInterfaceView, {
-      implicit val errorLogger: ContextualizedErrorLogger =
+      implicit val errorLogger: ErrorLoggingContext =
         ErrorLoggingContext(logger, loggingContext)
 
       def goAsync(

@@ -8,10 +8,10 @@ import Prelude hiding (forA)
 import DA.Action (when, void, foldlA)
 import DA.Exception
 import DA.Foldable (forA_)
-import DA.List (dedupSort, last)
+import DA.List (dedupSort)
 import DA.Map (Map)
 import qualified DA.Map as Map
-import DA.Optional (fromOptional, mapOptional, optionalToList)
+import DA.Optional (fromOptional, optionalToList)
 import DA.Set (Set)
 import qualified DA.Set as Set
 import DA.Traversable (forA)
@@ -46,6 +46,7 @@ data AmuletRules_MintResult = AmuletRules_MintResult with
 
 data AmuletRules_DevNet_TapResult = AmuletRules_DevNet_TapResult with
     amuletSum : AmuletCreateSummary (ContractId Amulet)
+    meta : Optional Metadata
 
 data AmuletRules_DevNet_FeatureAppResult = AmuletRules_DevNet_FeatureAppResult with
     featuredAppRightCid : ContractId FeaturedAppRight
@@ -71,6 +72,9 @@ data AmuletRules_ClaimExpiredRewardsResult = AmuletRules_ClaimExpiredRewardsResu
 data AmuletRules_MergeUnclaimedRewardsResult = AmuletRules_MergeUnclaimedRewardsResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data AmuletRules_SetConfigResult = AmuletRules_SetConfigResult with
+    newAmuletRules : ContractId AmuletRules
+
 data AmuletRules_AddFutureAmuletConfigScheduleResult = AmuletRules_AddFutureAmuletConfigScheduleResult with
     newAmuletRules : ContractId AmuletRules
 
@@ -94,16 +98,6 @@ template AmuletRules
 
     signatory dso
 
-    interface instance Api.Token.HoldingV1.BurnMintFactory for AmuletRules where
-      view = Api.Token.HoldingV1.BurnMintFactoryView with
-        admin = dso
-        meta = emptyMetadata
-
-      burnMintFactory_burnMintImpl self arg = amulet_burnMintFactory_burnMintImpl this self arg
-      burnMintFactory_publicFetchImpl _self arg = do
-        requireExpectedAdminMatch arg.expectedAdmin dso
-        pure (view $ toInterface @Api.Token.HoldingV1.BurnMintFactory this)
-
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context
       with
@@ -123,7 +117,7 @@ template AmuletRules
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
-        executeTransfer self rewardsConfig context dso "transfer" transfer
+        executeTransfer rewardsConfig context dso transfer
 
     nonconsuming choice AmuletRules_CreateExternalPartySetupProposal : AmuletRules_CreateExternalPartySetupProposalResult
       -- ^ Propose to host an external party
@@ -141,14 +135,14 @@ template AmuletRules
         require "preapprovalExpiresAt is not in the past" (preapprovalExpiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (preapprovalExpiresAt `subTime` now) configUsd context.context dso
-        transferResult <- splitAndBurn self validator amuletPaid inputs context.context dso "create ExternalPartySetupProposal"
+        (transferResult, meta) <- splitAndBurn validator amuletPaid inputs context.context dso "create ExternalPartySetupProposal"
         proposalCid <- create ExternalPartySetupProposal with
           user
           validator
           dso
           createdAt = now
           preapprovalExpiresAt
-        return AmuletRules_CreateExternalPartySetupProposalResult with ..
+        return AmuletRules_CreateExternalPartySetupProposalResult with meta = Some meta, ..
 
     nonconsuming choice AmuletRules_CreateTransferPreapproval : AmuletRules_CreateTransferPreapprovalResult
       -- ^ Pre-approve incoming amulet transfers
@@ -164,7 +158,7 @@ template AmuletRules
         require "expiresAt is not in the past" (expiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (expiresAt `subTime` now) configUsd context.context dso
-        transferResult <- splitAndBurn self provider amuletPaid inputs context.context dso "create TransferPreapproval"
+        (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "create TransferPreapproval"
         transferPreapprovalCid <- create TransferPreapproval with
           receiver
           provider
@@ -172,7 +166,7 @@ template AmuletRules
           validFrom = now
           lastRenewedAt = now
           expiresAt
-        return AmuletRules_CreateTransferPreapprovalResult with ..
+        return AmuletRules_CreateTransferPreapprovalResult with meta = Some meta, ..
 
     -- Decentralized synchronizer usage
     ----------------------
@@ -198,7 +192,7 @@ template AmuletRules
         let transferConfigAmulet = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
         (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees provider trafficAmount this context
         -- We want to burn exactly trafficCostAmulet, and createFee is already burnt by the self-transfer itself, so we subtract the createFee from the amount we split off and burn explicitly.
-        transferResult <- splitAndBurn self provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso "traffic purchase"
+        (transferResult, meta) <- splitAndBurn provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso "traffic purchase"
         -- create a new MemberTraffic contract for the purchased traffic
         purchasedTraffic <- create MemberTraffic with
           dso
@@ -216,6 +210,7 @@ template AmuletRules
           amuletPaid = trafficCostAmulet
           purchasedTraffic
           senderChangeAmulet = transferResult.senderChangeAmulet
+          meta = Some meta
 
 
     nonconsuming choice AmuletRules_MergeMemberTrafficContracts : AmuletRules_MergeMemberTrafficContractsResult
@@ -260,28 +255,20 @@ template AmuletRules
         openRound: ContractId OpenMiningRound
       controller dso, receiver
       do
-        openRoundPayload <- fetchReferenceData (ForDso with dso) openRound
-        result <- exercise (toInterfaceContractId @Api.Token.HoldingV1.BurnMintFactory self) Api.Token.HoldingV1.BurnMintFactory_BurnMint with
-          expectedAdmin = dso
-          sender = receiver
-          instrumentId = amuletInstrumentId dso
-          inputHoldingCids = []
-          outputs = [
-              Api.Token.HoldingV1.BurnMintOutput with
-                owner = receiver
-                amount = amount
-                context = Api.Token.MetadataV1.emptyChoiceContext
-            ]
-          extraActors = [receiver]
-          -- We always put in tap here, AmuletRules_Mint is only called from tap.
-          extraArgs = burnMintExtraArgs openRound "tap"
-        amulet <- case result.outputCids of
-          [cid] -> pure (fromInterfaceContractId cid)
-          cids -> abort ("Unexpected number of output contract ids, expected exactly one: " <> show cids)
+        openRound <- fetchReferenceData (ForDso with dso) openRound
+        let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
+            expiringAmount = ExpiringAmount with
+                        initialAmount = amount
+                        createdAt = openRound.round
+                        ratePerRound = transferConfigAmulet.holdingFee
+        amulet <- create Amulet with
+                  owner = receiver
+                  amount = expiringAmount
+                  ..
         let amuletSum = AmuletCreateSummary with
                   amulet
-                  amuletPrice = openRoundPayload.amuletPrice
-                  round = openRoundPayload.round
+                  amuletPrice = openRound.amuletPrice
+                  round = openRound.round
         return AmuletRules_MintResult with ..
 
     nonconsuming choice AmuletRules_DevNet_Tap: AmuletRules_DevNet_TapResult
@@ -295,6 +282,7 @@ template AmuletRules
         result <- exercise self AmuletRules_Mint with ..
         return AmuletRules_DevNet_TapResult with
           amuletSum = result.amuletSum
+          meta = Some (simpleHoldingTxMeta TxKind_Mint (Some "tapped faucet") None)
 
     nonconsuming choice AmuletRules_DevNet_FeatureApp : AmuletRules_DevNet_FeatureAppResult
       with
@@ -563,6 +551,20 @@ template AmuletRules
       do
         pure this
 
+    choice AmuletRules_SetConfig: AmuletRules_SetConfigResult
+      with
+        newConfig : AmuletConfig Unit.USD
+        baseConfig : AmuletConfig Unit.USD
+      controller dso
+      do
+        require "futureValues is empty" (null this.configSchedule.futureValues)
+        newAmuletRules <- create this with
+          configSchedule = Schedule with
+            initialValue = patch newConfig baseConfig this.configSchedule.initialValue
+            futureValues = []
+        return AmuletRules_SetConfigResult with ..
+
+    -- TODO(#16139): mark these choices as "deprecated"
     -- This inserts a new AmuletConfig Schedule into the future Schedules
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult
       with
@@ -683,11 +685,11 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
     issueValidatorRewards : Bool
 
 -- | Execute a transfer.
-executeTransfer : ContractId AmuletRules -> RewardsIssuanceConfig -> TransferContext -> Party -> Text -> Transfer -> Update TransferResult
-executeTransfer self config context dso reason t = do
+executeTransfer : RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer config context dso t = do
   -- compute summaries
   csum <- summarizeAndValidateContext context dso t
-  isum <- summarizeInputsAndConsumeRewardInputs csum dso t.sender t.inputs
+  isum <- summarizeAndConsumeInputs csum dso t.sender t.inputs
   osum <- preprocessOutputs csum.config t.sender t.outputs
   summary <- summarizeTransfer t.sender csum.openRound csum.config isum osum
   -- check that overall transfer constraints are satisfied
@@ -698,46 +700,30 @@ executeTransfer self config context dso reason t = do
   -- issue rewards for burns
   issueRewards config csum t.sender t.provider t.beneficiaries summary
   -- record outputs
-  let (burnMintOutputs, senderChangeBurnMintOutput) = toBurnMintOutputs t.sender summary osum
+  (createdAmulets, senderChangeAmulet) <-
+    createTransferOutputs csum.openRound csum.config dso t.sender summary osum
 
-  result <- exercise (toInterfaceContractId @Api.Token.HoldingV1.BurnMintFactory self) Api.Token.HoldingV1.BurnMintFactory_BurnMint with
-    expectedAdmin = dso
-    sender = t.sender
-    instrumentId = amuletInstrumentId dso
-    inputHoldingCids = mapOptional
-      (\case
-          InputAmulet amuletCid -> Some (toInterfaceContractId amuletCid)
-          InputAppRewardCoupon {} -> None
-          InputValidatorRewardCoupon {} -> None
-          InputSvRewardCoupon {} -> None
-          InputValidatorLivenessActivityRecord {} -> None
-          ExtTransferInput {} -> None
-      )
-      t.inputs
-    outputs = burnMintOutputs ++ optionalToList senderChangeBurnMintOutput
-    extraArgs = burnMintExtraArgs context.openMiningRound reason
-    extraActors = t.sender :: concatMap (\o -> o.owner :: optional [] (.holders) o.lock) osum
-
-  -- no need to drop sender change from outputCids, zipWith just stops once we reach the end of burnMintOutputs
-  let createdAmulets = zipWith toCreatedAmulet burnMintOutputs result.outputCids
-      senderChangeAmulet = fmap (\_ -> fromInterfaceContractId @Amulet $ last result.outputCids) senderChangeBurnMintOutput
+  let senderRetainsControl o =
+        t.sender == o.receiver &&
+        case o.lock of
+          None -> True
+          Some l -> all (t.sender ==) l.holders
+  let (txKind, optSender)
+        | all senderRetainsControl t.outputs = (TxKind_MergeSplit, None)
+        | otherwise = (TxKind_Transfer, Some t.sender)
+  let totalBurn = totalBurnFromSummary summary
+  let rewardInputMeta = Metadata with
+        values =
+          nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
+          nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
+          nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
+          Map.empty
 
   return TransferResult with
     round = csum.openRound.round
     summary = summary
+    meta = Some (holdingTxMeta txKind None optSender (Some totalBurn) <> rewardInputMeta)
     ..
-
-burnMintExtraArgs : ContractId OpenMiningRound -> Text -> ExtraArgs
-burnMintExtraArgs openMiningRound reason = ExtraArgs with
-  context = ChoiceContext with
-    values = Map.fromList [(openRoundContextKey, AV_ContractId (coerceContractId openMiningRound))]
-  meta = Metadata (Map.fromList [(reasonMetaKey, reason)])
-
-toCreatedAmulet : Api.Token.HoldingV1.BurnMintOutput -> ContractId Api.Token.HoldingV1.Holding -> CreatedAmulet
-toCreatedAmulet Api.Token.HoldingV1.BurnMintOutput{context} holdingCid = case getContextLock context of
-  None -> TransferResultAmulet (fromInterfaceContractId holdingCid)
-  Some _ -> TransferResultLockedAmulet (fromInterfaceContractId holdingCid)
-
 
 data TransferContextSummary = TransferContextSummary with
     featuredAppProvider : Optional Party
@@ -809,9 +795,9 @@ getIssuingMiningRound csum round = do
     None -> abort $ "TransferContext did not contain issuing mining round found for " <> show round
     Some issuingRound -> pure issuingRound
 
-summarizeInputsAndConsumeRewardInputs
+summarizeAndConsumeInputs
   : TransferContextSummary -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
-summarizeInputsAndConsumeRewardInputs csum dso sender inps = do
+summarizeAndConsumeInputs csum dso sender inps = do
     foldlA (summarizeAndConsumeInput csum.openRound.round) initialSummary inps
   where
     forOwner = ForOwner with dso; owner = sender
@@ -827,8 +813,7 @@ summarizeInputsAndConsumeRewardInputs csum dso sender inps = do
       changeToHoldingFeesRate = 0.0
 
     summarizeAndConsumeInput round s (InputAmulet amuletCid) = do
-      -- Note that we do not archive here, this is instead taken care of by the call to BurnMintFactory_BurnMint
-      amulet <- fetchChecked forOwner amuletCid
+      amulet <- fetchAndArchive forOwner amuletCid
       -- compute balance change
       let amount = actualAmount round amulet.amount
           holdingFee = amulet.amount.initialAmount - amount
@@ -1046,26 +1031,35 @@ issueRewards config csum sender provider beneficiaries summary
     featured = Some provider == csum.featuredAppProvider
     extraAppReward = if featured then csum.config.extraFeaturedAppRewardAmount else 0.0
 
-toBurnMintOutputs
-  : Party -> TransferSummary -> TransferOutputsSummary
-  -> ([Api.Token.HoldingV1.BurnMintOutput], Optional Api.Token.HoldingV1.BurnMintOutput)
-toBurnMintOutputs sender summary preprocessedOutputs =
-    let outputAmulets = map createOutput preprocessedOutputs
-        senderChangeAmulet = createSenderChange
-    in (outputAmulets, senderChangeAmulet)
+createTransferOutputs
+  : OpenMiningRound -> TransferConfig Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
+  -> Update ([CreatedAmulet], Optional (ContractId Amulet))
+createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
+    outputAmulets <- mapA createOutput preprocessedOutputs
+    senderChangeAmulet <- createSenderChange
+    return (outputAmulets, senderChangeAmulet)
   where
     createSenderChange
-      | summary.senderChangeAmount <= 0.0 = None
+      | summary.senderChangeAmount <= 0.0 = return None
       | otherwise =
-          Some $ Api.Token.HoldingV1.BurnMintOutput with
+          Some <$> create Amulet with
+            dso
             owner = sender
-            amount = summary.senderChangeAmount
-            context = emptyChoiceContext
-    createOutput out = Api.Token.HoldingV1.BurnMintOutput with
-        owner = out.owner
-        amount = out.amount
-        context = ChoiceContext with
-          values = addOptionalAnyValue lockContextKey out.lock Map.empty
+            amount = expiringAmount transferConfigAmulet.holdingFee summary.senderChangeAmount currentOpenRound.round
+    createOutput out = do
+      let amulet = Amulet with
+            dso
+            owner = out.owner
+            amount = expiringAmount transferConfigAmulet.holdingFee out.amount currentOpenRound.round
+
+      case out.lock of
+        None -> TransferResultAmulet <$> create amulet
+        Some lock -> do
+          -- We require the lock to expire before the amulet to allow app authors to
+          -- assume that a locked amulet is never archived by standard DSO while the lock is held.
+          require "lock expires before amulet"
+            (doesLockExpireBeforeAmulet currentOpenRound lock amulet.amount currentOpenRound.tickDuration)
+          TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
 
 -- | Scale the 'AmuletConfig' such that the fees charged are scaled by the same scale factor.
 scaleFees : Decimal -> TransferConfig Unit.USD -> TransferConfig Amulet
@@ -1227,6 +1221,7 @@ data TransferResult
     senderChangeAmulet: Optional (ContractId Amulet)
       -- ^ Optional reference to the amulet for the change returned to the sender.
       -- Only created if there was some change to be returned after deducting the fee for returning change.
+    meta : Optional Api.Token.MetadataV1.Metadata
   deriving (Show, Eq)
 
 data AmuletRules_BuyMemberTrafficResult = AmuletRules_BuyMemberTrafficResult with
@@ -1235,6 +1230,7 @@ data AmuletRules_BuyMemberTrafficResult = AmuletRules_BuyMemberTrafficResult wit
     amuletPaid : Decimal
     purchasedTraffic : ContractId MemberTraffic
     senderChangeAmulet : Optional (ContractId Amulet)
+    meta : Optional Metadata
   deriving (Show, Eq)
 
 data AmuletRules_CreateExternalPartySetupProposalResult = AmuletRules_CreateExternalPartySetupProposalResult
@@ -1244,6 +1240,7 @@ data AmuletRules_CreateExternalPartySetupProposalResult = AmuletRules_CreateExte
     validator: Party
     transferResult : TransferResult
     amuletPaid : Decimal
+    meta : Optional Metadata
   deriving (Show, Eq)
 
 data AmuletRules_CreateTransferPreapprovalResult = AmuletRules_CreateTransferPreapprovalResult
@@ -1251,6 +1248,7 @@ data AmuletRules_CreateTransferPreapprovalResult = AmuletRules_CreateTransferPre
     transferPreapprovalCid : ContractId TransferPreapproval
     transferResult : TransferResult
     amuletPaid : Decimal
+    meta : Optional Metadata
   deriving (Show, Eq)
 
 -- | Summary of input and output amounts and fees paid.
@@ -1416,11 +1414,11 @@ template TransferPreapproval
          amuletRules <- fetchPublicReferenceData (ForDso dso) context.amuletRules (AmuletRules_Fetch dso)
          let configUsd = getValueAsOf now amuletRules.configSchedule
          (amuletPaid, _) <- computeTransferPreapprovalFee extension configUsd context.context dso
-         transferResult <- splitAndBurn context.amuletRules provider amuletPaid inputs context.context dso "renew TransferPreapproval"
+         (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "renew TransferPreapproval"
          transferPreapprovalCid <- create this with
            lastRenewedAt = now
            expiresAt = newExpiresAt
-         return TransferPreapproval_RenewResult with ..
+         return TransferPreapproval_RenewResult with meta = Some meta, ..
 
     -- Used by the DSO party to archive expired contracts
     choice TransferPreapproval_Expire : TransferPreapproval_ExpireResult
@@ -1456,6 +1454,7 @@ data TransferPreapproval_RenewResult = TransferPreapproval_RenewResult
     receiver: Party
     provider: Party
     amuletPaid : Decimal
+    meta : Optional Metadata
   deriving (Show, Eq)
 
 data TransferPreapproval_ExpireResult = TransferPreapproval_ExpireResult {}
@@ -1472,13 +1471,13 @@ computeTransferPreapprovalFee duration amuletConfig context dso = do
   let feeAmulet = feeUsd / contextMiningRound.amuletPrice
   pure (feeAmulet, feeUsd)
 
-splitAndBurn : ContractId AmuletRules -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Update TransferResult
-splitAndBurn self sender amount inputs context dso usage = do
+splitAndBurn : Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Text -> Update (TransferResult, Metadata)
+splitAndBurn sender amount inputs context dso usage = do
 -- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = False
         issueValidatorRewards = False
-  transferResult <- executeTransfer self rewardsConfig context dso ("split before " <> usage) Transfer with
+  transferResult <- executeTransfer rewardsConfig context dso Transfer with
     sender
     provider = sender
     inputs
@@ -1492,15 +1491,7 @@ splitAndBurn self sender amount inputs context dso usage = do
     beneficiaries = None -- No beneficiaries for self-transfer
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
-  amulet <- fetchChecked (ForOwner with dso; owner = sender) amuletCid
-  exercise (toInterfaceContractId @Api.Token.HoldingV1.BurnMintFactory self) Api.Token.HoldingV1.BurnMintFactory_BurnMint with
-    expectedAdmin = dso
-    sender
-    instrumentId = amuletInstrumentId dso
-    inputHoldingCids = [toInterfaceContractId amuletCid]
-    outputs = []
-    extraArgs = burnMintExtraArgs context.openMiningRound ("burn for " <> usage)
-    extraActors = [sender]
+  amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- create validator activity rewards over the whole burn.
   create ValidatorRewardCoupon with
     dso
@@ -1509,13 +1500,22 @@ splitAndBurn self sender amount inputs context dso usage = do
     amount = amount + sum transferResult.summary.outputFees
   let amuletAsOfRoundZero = amulet.amount.initialAmount + amulet.amount.ratePerRound.rate * intToDecimal amulet.amount.createdAt.number
   -- adjust the balance changes to account for the archival. This primarily matters for the tx log parsers in scan and the wallet.
-  return transferResult with
-    summary.balanceChanges =
-      Map.insertWith
-        (+)
-        sender
-        (BalanceChange (-amuletAsOfRoundZero) (- (amulet.amount.ratePerRound.rate)))
-        transferResult.summary.balanceChanges
+  let result = transferResult with
+        meta = None -- the calling choice will take care of setting the metadata on its own result
+        summary.balanceChanges =
+          Map.insertWith
+            (+)
+            sender
+            (BalanceChange (-amuletAsOfRoundZero) (- (amulet.amount.ratePerRound.rate)))
+            transferResult.summary.balanceChanges
+  let burnAmount = totalBurnFromSummary transferResult.summary + amount
+  let meta = simpleHoldingTxMeta TxKind_Burn (Some usage) (Some burnAmount) <>
+             fromOptional mempty transferResult.meta -- overwrite so we keep the reward input metadata
+  pure (result, meta)
+
+-- | Compute the total burn done as part of the transfer.
+totalBurnFromSummary : TransferSummary -> Decimal
+totalBurnFromSummary TransferSummary{..} = sum outputFees + holdingFees + senderChangeFee
 
 
 -- Token standard context parsing
@@ -1544,49 +1544,3 @@ unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
   pure PaymentTransferContext with
     amuletRules
     context = context with featuredAppRight = None
-
-amulet_burnMintFactory_burnMintImpl : AmuletRules -> ContractId Api.Token.HoldingV1.BurnMintFactory -> Api.Token.HoldingV1.BurnMintFactory_BurnMint -> Update Api.Token.HoldingV1.BurnMintFactory_BurnMintResult
-amulet_burnMintFactory_burnMintImpl this _self Api.Token.HoldingV1.BurnMintFactory_BurnMint{expectedAdmin, sender, instrumentId, inputHoldingCids, outputs, extraArgs, extraActors} = do
-  requireExpectedAdminMatch expectedAdmin this.dso
-  require "extraActors contains sender, receivers and lock holders"
-    (all
-       (`elem` extraActors) (sender :: concatMap (\o -> o.owner :: optional [] (.holders) (getContextLock o.context))
-       outputs))
-  require "Instrument-id must match the factory" (instrumentId == amuletInstrumentId this.dso)
-  openRoundCid <- getFromContextU @(ContractId OpenMiningRound) extraArgs.context openRoundContextKey
-  openRound <- fetchChecked (ForDso this.dso) openRoundCid
-  let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
-  let amuletInputs = map (fromInterfaceContractId @Amulet) inputHoldingCids
-  _ <- forA amuletInputs (fetchAndArchive (ForOwner with dso = this.dso, owner = sender))
-  outputCids <- forA outputs $ \output -> do
-    let amulet = Amulet with
-          dso = this.dso
-          owner = output.owner
-          amount = ExpiringAmount with
-            initialAmount = output.amount
-            createdAt = openRound.round
-            ratePerRound = transferConfigAmulet.holdingFee
-    case getContextLock output.context of
-      None -> do
-        toInterfaceContractId @Api.Token.HoldingV1.Holding <$> create amulet
-      Some lock -> do
-        -- We require the lock to expire before the amulet to allow app authors to
-        -- assume that a locked amulet is never archived by standard DSO while the lock is held.
-        require "lock expires before amulet"
-          (doesLockExpireBeforeAmulet openRound lock amulet.amount openRound.tickDuration)
-        toInterfaceContractId @Api.Token.HoldingV1.Holding <$> create LockedAmulet with
-          amulet
-          lock
-  pure Api.Token.HoldingV1.BurnMintFactory_BurnMintResult with
-    outputCids = map toInterfaceContractId outputCids
-
-
-requireExpectedAdminMatch : Party -> Party -> Update ()
-requireExpectedAdminMatch expected actual = require ("Expected admin " <> show expected <> " matches actual admin " <> show actual) (expected == actual)
-
--- | Convenience function that throws an error if the lock fails to parse.
-getContextLock : ChoiceContext -> Optional TimeLock
-getContextLock choiceContext =
-  case lookupFromContext choiceContext lockContextKey of
-    Left err -> error $ "Failed to parse lock context: " <> show err
-    Right optLock -> optLock

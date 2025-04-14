@@ -123,4 +123,10 @@ LEDGER_API_INTERNAL_ERROR.*Daml-Engine interpretation failed with internal.*cann
 Unhandled internal error.*c.d.c.p.a.s.c.CommandSubmissionServiceImpl
 SubmitAndWaitForTransactionTree.*failed with INTERNAL
 
+# TODO(#18866) Remove once CantonBFT does no longer raise this spurious warning
+failed to ping endpoint PlainTextP2PEndpoint.*UNAVAILABLE
+
+# Sometimes Canton is a bit slow in tests
+Timeout .*expired, but readers are still active
+
 # Make sure to have a trailing newline

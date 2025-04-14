@@ -9,7 +9,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
-import com.digitalasset.base.error.{ContextualizedErrorLogger, RpcError}
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.{PackageMetadataViewConfig, ProcessingTimeout}
@@ -601,7 +601,7 @@ object PackageService {
       attempt: Either[LfArchiveError, E]
   )(implicit
       executionContext: ExecutionContext,
-      contextualizedErrorLogger: ContextualizedErrorLogger,
+      errorLoggingContext: ErrorLoggingContext,
   ): EitherT[FutureUnlessShutdown, RpcError, E] =
     EitherT.fromEither(attempt match {
       case Right(value) => Right(value)

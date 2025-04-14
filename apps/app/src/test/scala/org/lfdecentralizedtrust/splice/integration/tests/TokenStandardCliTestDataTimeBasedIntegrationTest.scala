@@ -49,6 +49,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.nio.file.{Files, Paths}
 import java.util.UUID
@@ -61,6 +62,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     with HasActorSystem
     with TimeTestUtil
     with HasExecutionContext {
+
+  // TODO(#18823): scan txlog script doesn't support two-step transfer yet
+  override def runUpdateHistorySanityCheck = false
 
   private val sampleHoldingDarPath = Paths
     .get(
@@ -91,7 +95,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     Seq(
       transferinstructionv1.TransferFactory.TEMPLATE_ID,
       holdingv1.Holding.TEMPLATE_ID,
-      holdingv1.BurnMintFactory.TEMPLATE_ID,
     )
 
   def replaceOrFail[R](targetPath: String, normalizedContent: R, encoder: Encoder[R]): Unit = {
@@ -112,6 +115,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       advanceTime(java.time.Duration.ofMinutes(1L))
 
       val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       aliceValidatorWalletClient.tap(BigDecimal(1000))
       aliceWalletClient.createTransferPreapproval()
       aliceValidatorWalletClient.createTransferPreapproval()
@@ -122,38 +126,32 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           s" validator: ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"
       )
 
-      val (
-        _,
-        (
-          activeContractsResponse,
-          getUpdatesResponse,
-          (amuletBeforeFirstTransferCid, amuletBeforeSecondTransferCid),
-        ),
-      ) = actAndCheck(
+      val (_, (activeContractsResponse, getUpdatesResponse)) = actAndCheck(
         "Create some holdings", {
           // Amulet holdings: one transferred via token standard, one tapped (minted)
+          // TransferIn
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
             aliceValidatorBackend.getValidatorPartyId(),
             alice,
             BigDecimal("200.0"),
+            transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
           )
-          val amuletBeforeFirstTransferCid = eventually() {
+          eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("200"))
-            aliceWalletClient.list().amulets.loneElement.contract.contractId.contractId
           }
-          // send some back so there's a TransferFactory_Transfer node in the other direction
+          // send some back so there's a TransferOut
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
             alice,
             aliceValidatorBackend.getValidatorPartyId(),
             BigDecimal("100.0"),
+            transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
           )
-          val amuletBeforeSecondTransferCid = eventually() {
+          eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("87")) // fees!
-            aliceWalletClient.list().amulets.loneElement.contract.contractId.contractId
           }
-          // Deliberately using a non-token-standard transfer so that this shows up as a BurnMint
+          // Deliberately using a non-token-standard transfer so that this shows up as a Transfer still (tx-kind-based)
           aliceWalletClient.transferPreapprovalSend(
             aliceValidatorBackend.getValidatorPartyId(),
             BigDecimal("10.0"),
@@ -162,7 +160,245 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("64.9")) // fees!
           }
-          aliceWalletClient.tap(BigDecimal("100.0"))
+          aliceWalletClient.tap(walletAmuletToUsd(6000.0))
+          val (_, bobInstructionCids) = actAndCheck(
+            "Alice creates 5 transfers to Bob who has no pre-approval", {
+              for (_ <- 1 to 4) {
+                executeTransferViaTokenStandard(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice,
+                  bob,
+                  BigDecimal("1000.0"),
+                  transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                  timeToLife = java.time.Duration.ofMinutes(1),
+                )
+              }
+              // the fifth one uses a longer duration so that it does not expire later when passing time
+              executeTransferViaTokenStandard(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+                bob,
+                BigDecimal("1000.0"),
+                transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                timeToLife = java.time.Duration.ofMinutes(20),
+              )
+            },
+          )(
+            "Bob can see the transfer instructions",
+            _ => {
+              val instructions = listTransferInstructions(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+              )
+              instructions should have size 5
+              instructions.map(_._1)
+            },
+          )
+          actAndCheck(
+            "Bob accepts transfer instruction #1",
+            acceptTransferInstruction(
+              bobValidatorBackend.participantClientWithAdminToken,
+              bob,
+              bobInstructionCids(0),
+            ),
+          )(
+            "Bob sees the funds",
+            _ => bobWalletClient.balance().unlockedQty should beAround(BigDecimal("1000.0")),
+          )
+          actAndCheck(
+            "Bob rejects transfer instruction #2 and Alice withdraws #3", {
+              rejectTransferInstruction(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+                bobInstructionCids(1),
+              )
+              withdrawTransferInstruction(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+                bobInstructionCids(2),
+              )
+            },
+          )(
+            "Bob sees only two remaining transfer instructions, and funds are as expected",
+            _ => {
+              val instructions = listTransferInstructions(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+              )
+              instructions should have size 2
+              bobWalletClient.balance().unlockedQty should beAround(BigDecimal("1000.0"))
+              inside(aliceWalletClient.balance()) { aliceBalance =>
+                aliceBalance.unlockedQty should beWithin(BigDecimal("2800.0"), BigDecimal("3000.0"))
+                aliceBalance.lockedQty should beWithin(BigDecimal("2000.0"), BigDecimal("2150.0"))
+              }
+            },
+          )
+          clue("Test receiving two-step transfers") {
+            actAndCheck(
+              "Alice validator cancels TransferPreapproval for alice",
+              aliceValidatorBackend.cancelTransferPreapprovalByParty(alice),
+            )(
+              "See that TransferPreapproval for alice has been cancelled",
+              _ => {
+                aliceValidatorBackend.lookupTransferPreapprovalByParty(alice) shouldBe None
+                sv1ScanBackend.lookupTransferPreapprovalByParty(alice) shouldBe None
+              },
+            )
+            val (_, aliceInstructionCids) = actAndCheck(
+              "Bob creates 4 transfers to Alice who has no longer a pre-approval",
+              for (_ <- 1 to 4) {
+                executeTransferViaTokenStandard(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob,
+                  alice,
+                  BigDecimal("200.0"),
+                  transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                )
+              },
+            )(
+              "Alice can see the transfer instructions",
+              _ => {
+                val instructions = listTransferInstructions(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice,
+                )
+                instructions should have size 6 // two outstanding ones from alice to bob, and four new ones form bob to alice
+                instructions.collect {
+                  case instr if instr._2.transfer.receiver == alice.toProtoPrimitive =>
+                    instr._1
+                }
+              },
+            )
+            actAndCheck(
+              "Alice accepts instruction #1 and rejects #2; and bob withdraws #3; while #4 is left as-is", {
+                clue("Accept instruction #1") {
+                  acceptTransferInstruction(
+                    aliceValidatorBackend.participantClientWithAdminToken,
+                    alice,
+                    aliceInstructionCids(0),
+                  )
+                }
+                clue("Reject instruction #2") {
+                  rejectTransferInstruction(
+                    aliceValidatorBackend.participantClientWithAdminToken,
+                    alice,
+                    aliceInstructionCids(1),
+                  )
+                }
+                clue("Withdraw instruction #3") {
+                  withdrawTransferInstruction(
+                    bobValidatorBackend.participantClientWithAdminToken,
+                    bob,
+                    aliceInstructionCids(2),
+                  )
+                }
+              },
+            )(
+              "There are three open transfer instructions left",
+              _ => {
+                val instructions = listTransferInstructions(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice,
+                )
+                instructions should have size 3
+              },
+            )
+          }
+
+          // Test self-transfer for party w/o pre-approval
+          actAndCheck(
+            "Bob splits his holdings into two using a self-transfer",
+            executeTransferViaTokenStandard(
+              bobValidatorBackend.participantClientWithAdminToken,
+              bob,
+              bob,
+              BigDecimal("250.0"),
+              transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
+            ),
+          )(
+            "Bob's has three holdings and the balance remained the same (modulo fees)",
+            _ => {
+              listHoldings(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+              ) should have size 3
+              inside(bobWalletClient.balance()) { balance =>
+                balance.unlockedQty should beWithin(
+                  BigDecimal("450.0"),
+                  BigDecimal("600.0"),
+                ) // received 1_000, transferred back 200, and 200 in-flight
+                balance.lockedQty should beWithin(
+                  BigDecimal("200.0"),
+                  BigDecimal("270.0"),
+                ) // locked amount + fee reserve
+              }
+            },
+          )
+          // Advance by two minutes so that the short-lived 1 minute transfer instruction from Alice expires
+          val instrAboutToExpire = bobInstructionCids(3)
+          advanceTime(java.time.Duration.ofMinutes(2))
+          clue("Alice as two locked holdings") {
+            inside(
+              listHoldings(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+              )
+            ) { holdings =>
+              holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 2
+            }
+          }
+          // Test self-transfer for wallet history
+          actAndCheck(
+            "Alice merges her four unlocked holdings, and the expired locked amulet into a two using a self-transfer",
+            executeTransferViaTokenStandard(
+              aliceValidatorBackend.participantClientWithAdminToken,
+              alice,
+              alice,
+              BigDecimal("1.0"),
+              transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
+            ),
+          )(
+            "Alice's has three holdings and the balance remained the same (modulo fees)",
+            _ => {
+              listHoldings(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+              ) should have size 3
+              inside(aliceWalletClient.balance()) { aliceBalance =>
+                aliceBalance.unlockedQty should beWithin(BigDecimal("4100.0"), BigDecimal("4200.0"))
+                aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
+              }
+              // there is one less locke
+            },
+          )
+          clue("Alice as one locked holding left") {
+            inside(
+              listHoldings(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+              )
+            ) { holdings =>
+              holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
+            }
+          }
+          actAndCheck(
+            "Bob rejects instruction #4, whose backing amulet has already been archived", {
+              rejectTransferInstruction(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+                instrAboutToExpire,
+              )
+            },
+          )(
+            "There are two open transfer instructions left",
+            _ => {
+              val instructions = listTransferInstructions(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                alice,
+              )
+              instructions should have size 2
+            },
+          )
 
           // SampleHolding holdings
           Seq("30.0", "40.0").foreach { amount =>
@@ -193,12 +429,10 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 ),
               )
           }
-
-          (amuletBeforeFirstTransferCid, amuletBeforeSecondTransferCid)
         },
       )(
         "holdings and transactions are returned",
-        amuletsBeforeTransfersCid => {
+        _ => {
           val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
             GetActiveContractsRequest(
               filter = Some(
@@ -216,7 +450,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               io.circe.Decoder.decodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
             )
 
-          activeContractsResponse should have size 4 // 2 amulets, 2 sample holdings
+          activeContractsResponse should have size 5 // 2 unlocked amulets, 1 locked amulet, 2 sample holdings
 
           val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequest(
             GetUpdatesRequest(
@@ -239,9 +473,20 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             io.circe.Decoder.decodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
           )
 
-          (activeContractsResponse, getUpdatesResponse, amuletsBeforeTransfersCid)
+          (activeContractsResponse, getUpdatesResponse)
         },
       )
+
+      def mkTimestamp(major: Long, minor: Int) = {
+        // move to a date that's far away from 1970, so we can grep for
+        // un-normalized timestamps
+        protobuf.timestamp.Timestamp.of(365 * 24 * 3600 + major, 10_000 * minor)
+      }
+
+      val replaceTemplateIdR = "^[^:]+".r
+      def stableTemplateId(templateId: String) = {
+        replaceTemplateIdR.replaceFirstIn(templateId, "#package-name")
+      }
 
       // Only works under the assumption that they always appear in the same order
       val contractIds = mutable.ArrayBuffer[String]()
@@ -253,18 +498,17 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         } else idx
       }
 
-      val replaceTemplateIdR = "^[^:]+".r
-      def stableTemplateId(templateId: String) = {
-        replaceTemplateIdR.replaceFirstIn(templateId, "#package-name")
-      }
-
       val expectedParties = Map(
-        alice.toProtoPrimitive -> "party::normalized",
+        alice.toProtoPrimitive -> "alice::normalized",
         dsoParty.toProtoPrimitive -> "dso::normalized",
-        aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive -> "validator::normalized",
+        aliceValidatorBackend
+          .getValidatorPartyId()
+          .toProtoPrimitive -> "aliceValidator::normalized",
+        bob.toProtoPrimitive -> "bob::normalized",
       )
       val dateFields =
         Seq(
+          "createdAt",
           "expiresAt",
           "lastRenewedAt",
           "validFrom",
@@ -272,6 +516,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           "executeBefore",
           "opensAt",
           "targetClosesAt",
+          "value", // due to BurnMint using `AV_Time` for the expiresAt field of the locked output
         )
       def replaceStringsInJson(viewValue: Json) = {
         val current = viewValue.spaces2SortKeys
@@ -296,7 +541,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         val stableDates = dateFields.foldLeft(stableContractIdsAndParties) {
           case (acc, fieldToReplace) =>
             acc.replaceAll(
-              s"\"${fieldToReplace}\" : \"(.*)\"",
+              s"\"${fieldToReplace}\" : \"(\\d{4}-\\d{2}-\\d{2}T.*Z)\"",
               s"\"${fieldToReplace}\" : \"2025-06-18T00:00:00.000000Z\"",
             )
         }
@@ -352,7 +597,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 contractId =
                   replaceContractIdWithStableString(active.createdEvent.contractId).toString,
                 templateId = stableTemplateId(active.createdEvent.templateId),
-                createdAt = protobuf.timestamp.Timestamp.of(0, 0),
+                createdAt = mkTimestamp(0, 0),
                 createdEventBlob = ByteString.empty(),
                 interfaceViews = active.createdEvent.interfaceViews.map(iv =>
                   iv.copy(
@@ -399,17 +644,17 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             transaction.value.copy(
               updateId = s"update-$idx",
               commandId = s"command-$idx",
-              effectiveAt = protobuf.timestamp.Timestamp.of(idx.toLong, 0),
+              effectiveAt = mkTimestamp(idx.toLong, 0),
               offset = idx.toLong,
               synchronizerId = "sync::normalized",
               traceContext = None,
-              recordTime = protobuf.timestamp.Timestamp.of(idx.toLong, 0),
+              recordTime = mkTimestamp(idx.toLong, 0),
               events = transaction.value.events.zipWithIndex.map {
                 case (created: JsEvent.CreatedEvent, eventIdx) =>
                   normalizeCreatedEvent(
                     created,
                     idx.toLong,
-                    protobuf.timestamp.Timestamp.of(idx.toLong, eventIdx),
+                    mkTimestamp(idx.toLong, eventIdx),
                   )
                 case (archived: JsEvent.ArchivedEvent, _) =>
                   normalizeArchivedEvent(archived, idx.toLong)
@@ -437,50 +682,62 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         io.circe.Encoder.encodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
       )
 
-      Seq(amuletBeforeFirstTransferCid, amuletBeforeSecondTransferCid).zipWithIndex.foreach {
-        case (amuletBeforeTransferCid, idx) =>
-          val getEventsByContractIdResponse = makeJsonApiV2Request(
-            "/v2/events/events-by-contract-id",
-            JsEventServiceCodecs.jsGetEventsByContractIdRequestRW(
-              event_query_service.GetEventsByContractIdRequest(
-                amuletBeforeTransferCid,
-                Seq.empty,
-                Some(EventFormat(filtersByParty(alice, includeWildcard = true))),
+      val contractIdsAtStart = contractIds.toVector
+      val eventByIdResponses = contractIdsAtStart.map { cid =>
+        tryMakeJsonApiV2Request(
+          "/v2/events/events-by-contract-id",
+          JsEventServiceCodecs.getEventsByContractIdRequestRW(
+            event_query_service.GetEventsByContractIdRequest(
+              cid,
+              Seq.empty,
+              Some(EventFormat(filtersByParty(alice, includeWildcard = true))),
+            )
+          ),
+          JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,
+        ) match {
+          case Left(err) =>
+            logger.debug(s"FAILED: /v2/events/events-by-contract-id/$cid\n$err")
+            None
+          case Right(getEventsByContractIdResponse) =>
+            Some(
+              getEventsByContractIdResponse.copy(
+                created = getEventsByContractIdResponse.created.map(created =>
+                  created.copy(
+                    createdEvent = normalizeCreatedEvent(
+                      created.createdEvent,
+                      42L,
+                      mkTimestamp(42L, 42),
+                    ),
+                    synchronizerId = "sync::normalized",
+                  )
+                ),
+                archived = getEventsByContractIdResponse.archived.map(archived =>
+                  archived.copy(
+                    archivedEvent = normalizeArchivedEvent(archived.archivedEvent, 42L),
+                    synchronizerId = "sync::normalized",
+                  )
+                ),
               )
-            ),
-            JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,
-          )
-          replaceOrFail(
-            s"token-standard/cli/__tests__/mocks/data/eventsByContractIdResponse-$idx.json",
-            getEventsByContractIdResponse.copy(
-              created = getEventsByContractIdResponse.created.map(created =>
-                created.copy(
-                  createdEvent = normalizeCreatedEvent(
-                    created.createdEvent,
-                    42L,
-                    protobuf.timestamp.Timestamp.of(42L, 42),
-                  ),
-                  synchronizerId = "sync::normalized",
-                )
-              ),
-              archived = getEventsByContractIdResponse.archived.map(archived =>
-                archived.copy(
-                  archivedEvent = normalizeArchivedEvent(archived.archivedEvent, 42L),
-                  synchronizerId = "sync::normalized",
-                )
-              ),
-            ),
-            JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,
-          )
+            )
+        }
       }
+      replaceOrFail(
+        s"token-standard/cli/__tests__/mocks/data/eventsByContractIdResponses.json",
+        eventByIdResponses.flatten,
+        io.circe.Encoder.encodeSeq(JsEventServiceCodecs.jsGetEventsByContractIdResponseRW),
+      )
     }
-
   }
 
   private val jsonApiPort = 16201
   private def makeJsonApiV2Request[R](subPath: String, payload: Json, decode: Decoder[R])(implicit
       env: SpliceTestConsoleEnvironment
-  ): R = {
+  ): R =
+    tryMakeJsonApiV2Request(subPath, payload, decode).value
+
+  private def tryMakeJsonApiV2Request[R](subPath: String, payload: Json, decode: Decoder[R])(
+      implicit env: SpliceTestConsoleEnvironment
+  ): Either[String, R] = {
     val response = Http()
       .singleRequest(
         Post(
@@ -498,13 +755,13 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       .futureValue
     val rawResponse = Unmarshal(response).to[String].futureValue
     if (response.status.isFailure()) {
-      throw new RuntimeException(s"Failed to execute request to $subPath: $rawResponse")
+      Left(s"Failed to execute request to $subPath: $rawResponse")
     } else {
       io.circe.parser
         .parse(rawResponse)
         .valueOrFail("failed to parse json")
         .as[R](decode)
-        .valueOrFail(s"Failed to decode $rawResponse")
+        .fold(fa => Left(s"Failed to decode $rawResponse: $fa"), Right(_))
     }
   }
 

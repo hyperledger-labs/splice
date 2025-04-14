@@ -179,4 +179,7 @@ abstract class NodeBootstrapBase[
       }
     }
   }
+
+  // unused in splice
+  override def registerDeclarativeChangeTrigger(trigger: () => Unit): Unit = ???
 }

@@ -6,4 +6,8 @@
 splice-amulet-name-service docs
 ===============================
 
+.. toctree::
+   :maxdepth: 3
+   :titlesonly:
+
 {{{body}}}

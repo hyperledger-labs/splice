@@ -48,6 +48,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology.NodeTopologyInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   Membership,
+  MessageAuthorizer,
   OrderingTopology,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.{
@@ -310,7 +311,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     ABatchId -> AMissingBatchStatusNode1And2AcksWithNode1ToTry
   protected val AMissingBatchStatusFromStateTransferWithNoAttemptsLeft =
     AMissingBatchStatusNode1And2AcksWithNoAttemptsLeft
-      .copy(mode = OrderedBlockForOutput.Mode.StateTransfer.MiddleBlock)
+      .copy(mode = OrderedBlockForOutput.Mode.FromStateTransfer)
   protected val AToBeProvidedToConsensus =
     ToBeProvidedToConsensus(
       BftBlockOrdererConfig.DefaultMaxBatchesPerProposal,
@@ -346,6 +347,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       p2pNetworkOut: ModuleRef[P2PNetworkOut.Message] = fakeIgnoringModule,
       disseminationProtocolState: DisseminationProtocolState = new DisseminationProtocolState(),
       outputFetchProtocolState: MainOutputFetchProtocolState = new MainOutputFetchProtocolState(),
+      customMessageAuthorizer: Option[MessageAuthorizer] = None,
   )(implicit context: E#ActorContextT[Availability.Message[E]]): AvailabilityModule[E] = {
     val config = AvailabilityModuleConfig(
       maxRequestsInBatch,
@@ -358,14 +360,15 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       consensus,
       output,
     )
+    val membership = Membership.forTesting(
+      myId,
+      otherNodes,
+      nodesTopologyInfos = otherNodesCustomKeys.map { case (nodeId, keyId) =>
+        nodeId -> NodeTopologyInfo(TopologyActivationTime(CantonTimestamp.MinValue), Set(keyId))
+      },
+    )
     val availability = new AvailabilityModule[E](
-      Membership.forTesting(
-        myId,
-        otherNodes,
-        nodesTopologyInfos = otherNodesCustomKeys.map { case (nodeId, keyId) =>
-          nodeId -> NodeTopologyInfo(TopologyActivationTime(CantonTimestamp.MinValue), Set(keyId))
-        },
-      ),
+      membership,
       initialEpochNumber,
       cryptoProvider,
       availabilityStore,
@@ -378,7 +381,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       timeouts,
       disseminationProtocolState,
       outputFetchProtocolState,
-    )(MetricsContext.Empty)
+    )(customMessageAuthorizer.getOrElse(membership.orderingTopology))(MetricsContext.Empty)
     availability.receive(Availability.Start)
     availability
   }

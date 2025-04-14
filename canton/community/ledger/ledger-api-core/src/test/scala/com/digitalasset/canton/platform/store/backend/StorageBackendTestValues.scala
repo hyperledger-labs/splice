@@ -6,9 +6,15 @@ package com.digitalasset.canton.platform.store.backend
 import com.digitalasset.canton.data
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
-import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel
-import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.TransactionMetering
-import com.digitalasset.canton.platform.store.backend.MeteringParameterStorageBackend.LedgerMeteringEnd
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.Added
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.{
+  AuthorizationEvent,
+  AuthorizationLevel,
+}
+import com.digitalasset.canton.platform.store.backend.Conversions.{
+  authorizationEventInt,
+  participantPermissionInt,
+}
 import com.digitalasset.canton.platform.store.dao.JdbcLedgerDao
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
@@ -46,7 +52,6 @@ private[store] object StorageBackendTestValues {
   val someTemplateId2: Ref.Identifier = Ref.Identifier.assertFromString("pkg:Mod:Template2")
   val someTemplateId3: Ref.Identifier = Ref.Identifier.assertFromString("pkg:Mod:Template3")
   val somePackageName: Ref.PackageName = Ref.PackageName.assertFromString("pkg-name")
-  val somePackageVersion: Ref.PackageVersion = Ref.PackageVersion.assertFromString("1.2.3")
   val someIdentityParams: ParameterStorageBackend.IdentityParams =
     ParameterStorageBackend.IdentityParams(someParticipantId)
   val someParty: Ref.Party = Ref.Party.assertFromString("party")
@@ -54,7 +59,6 @@ private[store] object StorageBackendTestValues {
   val someParty3: Ref.Party = Ref.Party.assertFromString("party3")
   val someUserId: Ref.UserId = Ref.UserId.assertFromString("user_id")
   val someSubmissionId: Ref.SubmissionId = Ref.SubmissionId.assertFromString("submission_id")
-  val someLedgerMeteringEnd: LedgerMeteringEnd = LedgerMeteringEnd(None, someTime)
   val someDriverMetadata: Bytes = Bytes.assertFromString("00abcd")
   val someDriverMetadataBytes: Array[Byte] = someDriverMetadata.toByteArray
 
@@ -121,7 +125,6 @@ private[store] object StorageBackendTestValues {
       contract_id = contractId.toBytes.toByteArray,
       template_id = someTemplateId.toString,
       package_name = somePackageName.toString,
-      package_version = Some(somePackageVersion.toString()),
       flat_event_witnesses = stakeholders,
       tree_event_witnesses = informees,
       create_argument = someSerializedDamlLfValue,
@@ -216,7 +219,6 @@ private[store] object StorageBackendTestValues {
       contract_id = contractId.toBytes.toByteArray,
       template_id = someTemplateId.toString,
       package_name = somePackageName.toString,
-      package_version = Some(somePackageVersion.toString()),
       flat_event_witnesses = Set(signatory, observer),
       create_argument = someSerializedDamlLfValue,
       create_signatories = Set(signatory),
@@ -279,7 +281,7 @@ private[store] object StorageBackendTestValues {
       eventSequentialId: Long,
       party: String = someParty,
       participant: String = someParticipantId.toString,
-      authorizationLevel: AuthorizationLevel = AuthorizationLevel.Submission,
+      authorizationEvent: AuthorizationEvent = Added(AuthorizationLevel.Submission),
       synchronizerId: String = "x::sourcesynchronizer",
       recordTime: Timestamp = someTime,
       traceContext: Array[Byte] = serializableTraceContext,
@@ -291,7 +293,8 @@ private[store] object StorageBackendTestValues {
       update_id = updateId,
       party_id = party,
       participant_id = participant,
-      participant_permission = UpdateToDbDto.authorizationLevelToInt(authorizationLevel),
+      participant_permission = participantPermissionInt(authorizationEvent),
+      participant_authorization_event = authorizationEventInt(authorizationEvent),
       synchronizer_id = synchronizerId,
       record_time = recordTime.micros,
       trace_context = traceContext,
@@ -353,18 +356,6 @@ private[store] object StorageBackendTestValues {
     event_sequential_id_first = event_sequential_id_first,
     event_sequential_id_last = event_sequential_id_last,
   )
-
-  def dtoTransactionMetering(
-      metering: TransactionMetering
-  ): DbDto.TransactionMetering = {
-    import metering.*
-    DbDto.TransactionMetering(
-      userId,
-      actionCount,
-      meteringTimestamp.micros,
-      ledgerOffset.unwrap,
-    )
-  }
 
   def dtoCreateFilter(
       event_sequential_id: Long,

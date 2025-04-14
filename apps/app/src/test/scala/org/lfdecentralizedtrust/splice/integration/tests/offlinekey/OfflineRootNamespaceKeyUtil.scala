@@ -6,8 +6,8 @@ import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.transaction.{
+  DelegationRestriction,
   NamespaceDelegation,
   OwnerToKeyMapping,
   SignedTopologyTransaction,
@@ -86,7 +86,7 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
         offlineParticipantClient.topology.namespace_delegations.propose_delegation(
           offlineGeneratedNamespace,
           offlineRootKey,
-          isRootDelegation = true,
+          delegationRestriction = DelegationRestriction.CanSignAllMappings,
           signedBy = Seq(offlineGeneratedNamespace.fingerprint),
         )
 
@@ -94,7 +94,7 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
         offlineParticipantClient.topology.namespace_delegations.propose_delegation(
           offlineGeneratedNamespace,
           delegateKey,
-          isRootDelegation = false,
+          delegationRestriction = DelegationRestriction.CanSignAllButNamespaceDelegations,
           signedBy = Seq(offlineRootKey.fingerprint),
         )
 
@@ -120,14 +120,7 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
     node.topology.init_id(
       ParticipantId(name, offlineGeneratedNamespace).uid,
       waitForReady = false,
-    )
-    node.topology.transactions.load(
-      Seq(rootNamespaceDelegation),
-      Authorized,
-    )
-    node.topology.transactions.load(
-      Seq(delegationTopologyTransaction),
-      Authorized,
+      delegations = Seq(rootNamespaceDelegation, delegationTopologyTransaction),
     )
     val encryptionKey =
       node.keys.secret.generate_encryption_key("ecryption")

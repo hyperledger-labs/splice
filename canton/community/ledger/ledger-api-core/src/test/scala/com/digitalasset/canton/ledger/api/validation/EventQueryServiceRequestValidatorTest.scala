@@ -6,9 +6,9 @@ package com.digitalasset.canton.ledger.api.validation
 import com.daml.ledger.api.v2.event_query_service
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{Filters, WildcardFilter}
-import com.digitalasset.base.error.{ContextualizedErrorLogger, NoLogging}
 import com.digitalasset.canton.ledger.api.messages.event
 import com.digitalasset.canton.ledger.api.{CumulativeFilter, EventFormat, TemplateWildcardFilter}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import io.grpc.Status.Code.*
 import org.mockito.MockitoSugar
 import org.scalatest.wordspec.AnyWordSpec
@@ -18,7 +18,7 @@ class EventQueryServiceRequestValidatorTest
     with ValidatorTestUtils
     with MockitoSugar {
 
-  private implicit val noLogging: ContextualizedErrorLogger = NoLogging
+  private implicit val noLogging: ErrorLoggingContext = NoLogging
 
   "EventQueryServiceRequestValidator" when {
 

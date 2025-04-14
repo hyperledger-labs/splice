@@ -1,7 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.daml.ledger.api.v2
 import com.daml.ledger.api.v2.value.Identifier
+import com.daml.ledger.javaapi
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   holdingv1,
   metadatav1,
@@ -13,17 +16,24 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.FactoryChoiceWithDisclosures
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
-import java.time.temporal.ChronoUnit
+import java.time.Duration
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 trait TokenStandardTest extends IntegrationTest {
+
+  val emptyExtraArgs =
+    org.lfdecentralizedtrust.splice.util.ChoiceContextWithDisclosures.emptyExtraArgs
 
   def executeTransferViaTokenStandard(
       participant: ParticipantClientReference,
       sender: PartyId,
       receiver: PartyId,
       amount: BigDecimal,
+      expectedKind: transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+      timeToLife: Duration = Duration.ofMinutes(10),
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -32,6 +42,8 @@ trait TokenStandardTest extends IntegrationTest {
       sender,
       receiver,
       amount,
+      expectedKind,
+      timeToLife,
     )
     participant.ledger_api_extensions.commands
       .submitJava(
@@ -46,25 +58,23 @@ trait TokenStandardTest extends IntegrationTest {
       sender: PartyId,
       receiver: PartyId,
       amount: BigDecimal,
+      expectedKind: transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+      timeToLife: Duration = Duration.ofMinutes(10),
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): FactoryChoiceWithDisclosures = {
     clue(
       s"Creating command to transfer $amount amulets via token standard from $sender to $receiver"
     ) {
-      val senderHoldings =
-        participant.ledger_api.state.acs.of_party(
-          party = sender,
-          filterInterfaces = Seq(holdingv1.Holding.TEMPLATE_ID).map(templateId =>
-            Identifier(
-              templateId.getPackageId,
-              templateId.getModuleName,
-              templateId.getEntityName,
-            )
-          ),
-          includeCreatedEventBlob = true,
-        )
       val now = env.environment.clock.now.toInstant
+      def unlocked(optLock: java.util.Optional[holdingv1.Lock]): Boolean =
+        optLock.toScala.forall(lock => lock.expiresAt.toScala.exists(t => t.isBefore(now)))
+      val senderHoldingCids = listHoldings(participant, sender)
+        .collect {
+          case (holdingCid, holding)
+              if holding.owner == sender.toProtoPrimitive && unlocked(holding.lock) =>
+            new holdingv1.Holding.ContractId(holdingCid.contractId)
+        }
       val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
         dsoParty.toProtoPrimitive,
         new transferinstructionv1.Transfer(
@@ -73,22 +83,144 @@ trait TokenStandardTest extends IntegrationTest {
           amount.bigDecimal,
           new holdingv1.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
           now,
-          now.plus(10, ChronoUnit.MINUTES),
-          senderHoldings
-            .map(senderHolding => new holdingv1.Holding.ContractId(senderHolding.contractId))
-            .asJava,
+          now.plus(timeToLife),
+          senderHoldingCids.asJava,
           new metadatav1.Metadata(java.util.Map.of()),
         ),
-        new metadatav1.ExtraArgs(
-          new metadatav1.ChoiceContext(
-            java.util.Map.of()
-          ),
-          new metadatav1.Metadata(java.util.Map.of()),
-        ),
+        emptyExtraArgs,
       )
-      val factoryChoice = sv1ScanBackend.getTransferFactory(choiceArgs)
-      factoryChoice.copy(disclosedContracts = factoryChoice.disclosedContracts)
+      val (factory, kind) = sv1ScanBackend.getTransferFactory(choiceArgs)
+      kind shouldBe expectedKind
+      factory
     }
   }
 
+  def listHoldings(
+      participantClient: ParticipantClientReference,
+      party: PartyId,
+  ): Seq[
+    (
+        holdingv1.Holding.ContractId,
+        holdingv1.HoldingView,
+    )
+  ] = {
+    val holdings =
+      participantClient.ledger_api.state.acs.of_party(
+        party = party,
+        filterInterfaces = Seq(holdingv1.Holding.TEMPLATE_ID).map(templateId =>
+          Identifier(
+            templateId.getPackageId,
+            templateId.getModuleName,
+            templateId.getEntityName,
+          )
+        ),
+      )
+    holdings.map(instr => {
+      val instrViewRaw = (instr.event.interfaceViews.head.viewValue
+        .getOrElse(throw new RuntimeException("expected an interface view to be present")))
+      val instrView = holdingv1.HoldingView
+        .valueDecoder()
+        .decode(
+          javaapi.data.DamlRecord.fromProto(
+            v2.value.Record.toJavaProto(instrViewRaw)
+          )
+        )
+      (new holdingv1.Holding.ContractId(instr.contractId), instrView)
+    })
+  }
+
+  def listTransferInstructions(
+      participantClient: ParticipantClientReference,
+      party: PartyId,
+  ): Seq[
+    (
+        transferinstructionv1.TransferInstruction.ContractId,
+        transferinstructionv1.TransferInstructionView,
+    )
+  ] = {
+    val instructions =
+      participantClient.ledger_api.state.acs.of_party(
+        party = party,
+        filterInterfaces =
+          Seq(transferinstructionv1.TransferInstruction.TEMPLATE_ID).map(templateId =>
+            Identifier(
+              templateId.getPackageId,
+              templateId.getModuleName,
+              templateId.getEntityName,
+            )
+          ),
+      )
+    instructions.map(instr => {
+      val instrViewRaw = (instr.event.interfaceViews.head.viewValue
+        .getOrElse(throw new RuntimeException("expected an interface view to be present")))
+      val instrView = transferinstructionv1.TransferInstructionView
+        .valueDecoder()
+        .decode(
+          javaapi.data.DamlRecord.fromProto(
+            v2.value.Record.toJavaProto(instrViewRaw)
+          )
+        )
+      (new TransferInstruction.ContractId(instr.contractId), instrView)
+    })
+  }
+
+  def acceptTransferInstruction(
+      participant: ParticipantClientReference,
+      receiver: PartyId,
+      instructionCid: transferinstructionv1.TransferInstruction.ContractId,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val choiceContext = sv1ScanBackend.getTransferInstructionAcceptContext(instructionCid)
+    participant.ledger_api_extensions.commands
+      .submitJava(
+        Seq(receiver),
+        commands = instructionCid
+          .exerciseTransferInstruction_Accept(choiceContext.toExtraArgs())
+          .commands()
+          .asScala
+          .toSeq,
+        disclosedContracts = choiceContext.disclosedContracts,
+      )
+  }
+
+  def rejectTransferInstruction(
+      participant: ParticipantClientReference,
+      receiver: PartyId,
+      instructionCid: transferinstructionv1.TransferInstruction.ContractId,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val choiceContext = sv1ScanBackend.getTransferInstructionRejectContext(instructionCid)
+    participant.ledger_api_extensions.commands
+      .submitJava(
+        Seq(receiver),
+        commands = instructionCid
+          .exerciseTransferInstruction_Reject(choiceContext.toExtraArgs())
+          .commands()
+          .asScala
+          .toSeq,
+        disclosedContracts = choiceContext.disclosedContracts,
+      )
+  }
+
+  def withdrawTransferInstruction(
+      participant: ParticipantClientReference,
+      receiver: PartyId,
+      instructionCid: transferinstructionv1.TransferInstruction.ContractId,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val choiceContext = sv1ScanBackend.getTransferInstructionWithdrawContext(instructionCid)
+    participant.ledger_api_extensions.commands
+      .submitJava(
+        Seq(receiver),
+        commands = instructionCid
+          .exerciseTransferInstruction_Withdraw(choiceContext.toExtraArgs())
+          .commands()
+          .asScala
+          .toSeq,
+        disclosedContracts = choiceContext.disclosedContracts,
+      )
+  }
 }

@@ -4,31 +4,25 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import cats.data.OptionT
-import org.lfdecentralizedtrust.splice.automation.{
-  ScheduledTaskTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.ReassignmentCommand
-import org.lfdecentralizedtrust.splice.store.AppStore
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
-  ConstrainedTemplate,
-  ContractState,
-}
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, AssignedContract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.AmuletConfigReassignmentTrigger.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.ReassignmentCommand
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.ReassignmentCommand.Out.pretty
+import org.lfdecentralizedtrust.splice.store.AppStore
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
+  ConstrainedTemplate,
+  ContractState,
+}
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, AssignedContract}
 
 import scala.concurrent.{ExecutionContext, Future}
-import AmuletConfigReassignmentTrigger.*
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.ReassignmentCommand.Out.pretty
 
 /** Trigger that reassigns contracts of the given templates based on the amulet config.
   * We aim to keep usage of this to a minimum and rely on Canton's auto-reassignments instead.
@@ -52,7 +46,7 @@ final class AmuletConfigReassignmentTrigger(
   ): Future[Seq[Task]] = {
     val run = for {
       amuletRules <- OptionT(lookupAmuletRules(tc))
-      config = AmuletConfigSchedule(amuletRules.payload.configSchedule).getConfigAsOf(now)
+      config = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
       activeSynchronizer <- OptionT.fromOption[Future](
         SynchronizerId.fromString(config.decentralizedSynchronizer.activeSynchronizer).toOption
       )
@@ -85,7 +79,7 @@ final class AmuletConfigReassignmentTrigger(
     } yield contractStateO.forall { contractState =>
       amuletRulesO.forall { amuletRules =>
         val config =
-          AmuletConfigSchedule(amuletRules.payload.configSchedule).getConfigAsOf(task.readyAt)
+          AmuletConfigSchedule(amuletRules).getConfigAsOf(task.readyAt)
         val activeSynchronizer =
           SynchronizerId.tryFromString(config.decentralizedSynchronizer.activeSynchronizer)
         task.work.source != activeSynchronizer ||

@@ -7,8 +7,9 @@ module Splice.Schedule where
 
 import DA.Functor ()
 import DA.List (dedupSort, head)
-
-import Splice.Util (isLedgerTimeLT)
+import Splice.Util
+import DA.Map()
+import qualified DA.Map as Map
 
 -- | A schedule of values that change over time.
 data Schedule t a = Schedule with
@@ -97,3 +98,8 @@ update item schedule =
       initialValue = schedule.initialValue
       futureValues = prefix ++ [item] ++ suffix
     None -> error "No future value was found at this time."
+
+instance (Patchable t, Patchable a, Ord t, Eq a) => Patchable (Schedule t a) where
+  patch new base current = Schedule with
+     initialValue = patch new.initialValue base.initialValue current.initialValue
+     futureValues = Map.toList (patch (Map.fromList new.futureValues) (Map.fromList base.futureValues) (Map.fromList current.futureValues))

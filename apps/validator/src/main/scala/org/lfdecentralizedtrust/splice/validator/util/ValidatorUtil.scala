@@ -179,7 +179,7 @@ private[validator] object ValidatorUtil {
         .create(
           namespace = partyId.uid.namespace,
           target = publicKey,
-          isRootDelegation = true,
+          restrictedToMappings = DelegationRestriction.CanSignAllMappings,
         )
         .valueOr(error =>
           throw Status.INVALID_ARGUMENT

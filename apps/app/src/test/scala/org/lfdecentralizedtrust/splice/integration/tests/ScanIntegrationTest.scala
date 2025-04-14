@@ -37,11 +37,7 @@ import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 
 import scala.util.Success
 
-class ScanIntegrationTest
-    extends IntegrationTest
-    with ConfigScheduleUtil
-    with WalletTestUtil
-    with TimeTestUtil {
+class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
   private val defaultPageSize = Limit.MaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

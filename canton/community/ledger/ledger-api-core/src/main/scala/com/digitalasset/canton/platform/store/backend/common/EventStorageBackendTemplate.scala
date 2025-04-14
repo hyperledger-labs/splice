@@ -8,6 +8,7 @@ import anorm.{Row, RowParser, SimpleSql, ~}
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.store.backend.Conversions.{
+  authorizationEventParser,
   contractId,
   hashFromHexString,
   offset,
@@ -22,11 +23,11 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawCreatedEvent,
   RawExercisedEvent,
   RawFlatEvent,
+  RawReassignmentEvent,
   RawTreeEvent,
   RawUnassignEvent,
   SynchronizerOffset,
   UnassignProperties,
-  intToAuthorizationLevel,
 }
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   CompositeSql,
@@ -39,6 +40,7 @@ import com.digitalasset.canton.platform.{Identifier, Party}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.crypto.Hash
+import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.value.Value.ContractId
 
@@ -60,7 +62,6 @@ object EventStorageBackendTemplate {
       "contract_id",
       "template_id",
       "package_name",
-      "package_version",
       "create_argument",
       "create_argument_compression",
       "create_signatories",
@@ -87,7 +88,6 @@ object EventStorageBackendTemplate {
       "contract_id",
       "template_id",
       "package_name",
-      "NULL as package_version",
       "NULL as create_argument",
       "NULL as create_argument_compression",
       "NULL as create_signatories",
@@ -133,7 +133,7 @@ object EventStorageBackendTemplate {
   private type CreatedEventRow =
     SharedRow ~ Array[Byte] ~ Option[Int] ~ Array[Int] ~ Array[Int] ~
       Option[Array[Byte]] ~ Option[Hash] ~ Option[Int] ~ Option[Array[Int]] ~
-      Array[Byte] ~ Option[Int]
+      Array[Byte]
 
   private val createdEventRow: RowParser[CreatedEventRow] =
     sharedRow ~
@@ -145,8 +145,7 @@ object EventStorageBackendTemplate {
       hashFromHexString("create_key_hash").? ~
       int("create_key_value_compression").? ~
       array[Int]("create_key_maintainers").? ~
-      byteArray("driver_metadata") ~
-      int("package_version").?
+      byteArray("driver_metadata")
 
   private type ExercisedEventRow =
     SharedRow ~ Boolean ~ String ~ Array[Byte] ~ Option[Int] ~ Option[Array[Byte]] ~ Option[Int] ~
@@ -184,6 +183,7 @@ object EventStorageBackendTemplate {
           packageName ~
           commandId ~
           workflowId ~
+
           eventWitnesses ~
           submitters ~
           internedSynchronizerId ~
@@ -197,8 +197,7 @@ object EventStorageBackendTemplate {
           createKeyHash ~
           createKeyValueCompression ~
           createKeyMaintainers ~
-          driverMetadata ~
-          packageVersion =>
+          driverMetadata =>
         Entry(
           offset = offset,
           updateId = updateId,
@@ -213,7 +212,6 @@ object EventStorageBackendTemplate {
             contractId = contractId,
             templateId = stringInterning.templateId.externalize(templateId),
             packageName = stringInterning.packageName.externalize(packageName),
-            packageVersion = packageVersion.map(stringInterning.packageVersion.externalize),
             witnessParties = filterAndExternalizeWitnesses(
               allQueryingPartiesO,
               eventWitnesses,
@@ -374,7 +372,6 @@ object EventStorageBackendTemplate {
     "ledger_effective_time",
     "template_id",
     "package_name",
-    "package_version",
     "workflow_id",
     "create_argument",
     "create_argument_compression",
@@ -407,7 +404,6 @@ object EventStorageBackendTemplate {
     "ledger_effective_time",
     "template_id",
     "package_name",
-    "NULL as package_version",
     "workflow_id",
     "NULL as create_argument",
     "NULL as create_argument_compression",
@@ -443,12 +439,12 @@ object EventStorageBackendTemplate {
       str("update_id") ~
       int("party_id") ~
       str("participant_id") ~
-      int("participant_permission") ~
+      authorizationEventParser("participant_permission", "participant_authorization_event") ~
       int("synchronizer_id") ~
       timestampFromMicros("record_time") ~
       byteArray("trace_context").?
 
-  private def partyToParticipantEventParser(
+  def partyToParticipantEventParser(
       stringInterning: StringInterning
   ): RowParser[EventStorageBackend.RawParticipantAuthorization] =
     partyToParticipantEventRow map {
@@ -457,7 +453,7 @@ object EventStorageBackendTemplate {
           updateId ~
           partyId ~
           participantId ~
-          participant_permission ~
+          authorizationEvent ~
           synchronizerId ~
           recordTime ~
           traceContext =>
@@ -466,7 +462,7 @@ object EventStorageBackendTemplate {
           updateId = updateId,
           partyId = stringInterning.party.unsafe.externalize(partyId),
           participantId = participantId,
-          participant_permission = intToAuthorizationLevel(participant_permission),
+          authorizationEvent = authorizationEvent,
           recordTime = recordTime,
           synchronizerId = stringInterning.synchronizerId.unsafe.externalize(synchronizerId),
           traceContext = traceContext,
@@ -486,7 +482,6 @@ object EventStorageBackendTemplate {
       contractId("contract_id") ~
       int("template_id") ~
       int("package_name") ~
-      int("package_version").? ~
       array[Int]("flat_event_witnesses") ~
       array[Int]("create_signatories") ~
       array[Int]("create_observers") ~
@@ -520,7 +515,6 @@ object EventStorageBackendTemplate {
           contractId ~
           templateId ~
           packageName ~
-          packageVersion ~
           flatEventWitnesses ~
           createSignatories ~
           createObservers ~
@@ -562,7 +556,6 @@ object EventStorageBackendTemplate {
               contractId = contractId,
               templateId = stringInterning.templateId.externalize(templateId),
               packageName = stringInterning.packageName.externalize(packageName),
-              packageVersion = packageVersion.map(stringInterning.packageVersion.externalize),
               witnessParties = filterAndExternalizeWitnesses(
                 allQueryingPartiesO,
                 flatEventWitnesses,
@@ -662,6 +655,15 @@ object EventStorageBackendTemplate {
         )
     }
 
+  def rawReassignmentEventParser(
+      allQueryingParties: Option[Set[Int]],
+      stringInterning: StringInterning,
+  ): RowParser[Entry[RawReassignmentEvent]] =
+    (assignEventParser(allQueryingParties, stringInterning): RowParser[
+      Entry[RawReassignmentEvent]
+    ]) |
+      unassignEventParser(allQueryingParties, stringInterning)
+
   val assignActiveContractRow =
     str("workflow_id").? ~
       int("target_synchronizer_id") ~
@@ -671,7 +673,6 @@ object EventStorageBackendTemplate {
       contractId("contract_id") ~
       int("template_id") ~
       int("package_name") ~
-      int("package_version").? ~
       array[Int]("flat_event_witnesses") ~
       array[Int]("create_signatories") ~
       array[Int]("create_observers") ~
@@ -698,7 +699,6 @@ object EventStorageBackendTemplate {
           contractId ~
           templateId ~
           packageName ~
-          packageVersion ~
           flatEventWitnesses ~
           createSignatories ~
           createObservers ~
@@ -722,7 +722,6 @@ object EventStorageBackendTemplate {
             contractId = contractId,
             templateId = stringInterning.templateId.externalize(templateId),
             packageName = stringInterning.packageName.externalize(packageName),
-            packageVersion = packageVersion.map(stringInterning.packageVersion.externalize),
             witnessParties = filterAndExternalizeWitnesses(
               allQueryingPartiesO,
               flatEventWitnesses,
@@ -754,7 +753,6 @@ object EventStorageBackendTemplate {
       contractId("contract_id") ~
       int("template_id") ~
       int("package_name") ~
-      int("package_version").? ~
       array[Int]("flat_event_witnesses") ~
       array[Int]("create_signatories") ~
       array[Int]("create_observers") ~
@@ -781,7 +779,6 @@ object EventStorageBackendTemplate {
           contractId ~
           templateId ~
           packageName ~
-          packageVersion ~
           flatEventWitnesses ~
           createSignatories ~
           createObservers ~
@@ -806,7 +803,6 @@ object EventStorageBackendTemplate {
             contractId = contractId,
             templateId = stringInterning.templateId.externalize(templateId),
             packageName = stringInterning.packageName.externalize(packageName),
-            packageVersion = packageVersion.map(stringInterning.packageVersion.externalize),
             witnessParties = filterAndExternalizeWitnesses(
               allQueryingPartiesO,
               flatEventWitnesses,
@@ -896,16 +892,15 @@ abstract class EventStorageBackendTemplate(
   import EventStorageBackendTemplate.*
   import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
 
-  override def transactionPointwiseQueries: TransactionPointwiseQueries =
-    new TransactionPointwiseQueries(
+  override def updatePointwiseQueries: UpdatePointwiseQueries =
+    new UpdatePointwiseQueries(
       ledgerEndCache = ledgerEndCache,
       stringInterning = stringInterning,
     )
 
-  override def transactionStreamingQueries: TransactionStreamingQueries =
-    new TransactionStreamingQueries(
-      queryStrategy = queryStrategy,
-      stringInterning = stringInterning,
+  override def updateStreamingQueries: UpdateStreamingQueries =
+    new UpdateStreamingQueries(
+      stringInterning = stringInterning
     )
 
   override def eventReaderQueries: EventReaderQueries =
@@ -1453,7 +1448,7 @@ abstract class EventStorageBackendTemplate(
       endInclusive: Long,
       limit: Int,
   )(connection: Connection): Vector[Long] =
-    TransactionStreamingQueries.fetchEventIds(
+    UpdateStreamingQueries.fetchEventIds(
       tableName = "lapi_pe_assign_id_filter_stakeholder",
       witnessO = stakeholderO,
       templateIdO = templateId,
@@ -1470,7 +1465,7 @@ abstract class EventStorageBackendTemplate(
       endInclusive: Long,
       limit: Int,
   )(connection: Connection): Vector[Long] =
-    TransactionStreamingQueries.fetchEventIds(
+    UpdateStreamingQueries.fetchEventIds(
       tableName = "lapi_pe_unassign_id_filter_stakeholder",
       witnessO = stakeholderO,
       templateIdO = templateId,
@@ -1720,7 +1715,7 @@ abstract class EventStorageBackendTemplate(
       endInclusive: Long,
       limit: Int,
   )(connection: Connection): Vector[Long] =
-    TransactionStreamingQueries.fetchEventIds(
+    UpdateStreamingQueries.fetchEventIds(
       tableName = "lapi_events_party_to_participant",
       witnessO = party,
       templateIdO = None,
@@ -1742,12 +1737,13 @@ abstract class EventStorageBackendTemplate(
       .withFetchSize(Some(eventSequentialIds.size))
       .asVectorOf(partyToParticipantEventParser(stringInterning))(connection)
 
-  override def topologyEventPublishedOnRecordTime(
+  override def topologyEventOffsetPublishedOnRecordTime(
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
-  )(connection: Connection): Boolean =
-    stringInterning.synchronizerId.tryInternalize(synchronizerId) match {
-      case Some(synchronizerInternedId) =>
+  )(connection: Connection): Option[Offset] =
+    stringInterning.synchronizerId
+      .tryInternalize(synchronizerId)
+      .flatMap(synchronizerInternedId =>
         SQL"""
           SELECT event_offset
           FROM lapi_events_party_to_participant
@@ -1758,9 +1754,117 @@ abstract class EventStorageBackendTemplate(
           """
           .asVectorOf(offset("event_offset"))(connection)
           .headOption
-          .exists(offset => Option(offset) <= ledgerEndCache().map(_.lastOffset))
+          .filter(offset => Option(offset) <= ledgerEndCache().map(_.lastOffset))
+      )
 
-      case None =>
-        false
+  private def fetchAcsDeltaEvents(
+      tableName: String,
+      selectColumns: String,
+      eventSequentialIds: Iterable[Long],
+      allFilterParties: Option[Set[Ref.Party]],
+  )(connection: Connection): Vector[Entry[RawFlatEvent]] = {
+    val internedAllParties: Option[Set[Int]] = allFilterParties
+      .map(
+        _.iterator
+          .map(stringInterning.party.tryInternalize)
+          .flatMap(_.iterator)
+          .toSet
+      )
+    SQL"""
+        SELECT
+          #$selectColumns,
+          flat_event_witnesses as event_witnesses,
+          command_id
+        FROM
+          #$tableName
+        WHERE
+          event_sequential_id ${queryStrategy.anyOf(eventSequentialIds)}
+        ORDER BY
+          event_sequential_id
+      """
+      .withFetchSize(Some(eventSequentialIds.size))
+      .asVectorOf(rawAcsDeltaEventParser(internedAllParties, stringInterning))(connection)
+  }
+
+  override def fetchEventPayloadsAcsDelta(target: EventPayloadSourceForUpdatesAcsDelta)(
+      eventSequentialIds: Iterable[Long],
+      requestingParties: Option[Set[Ref.Party]],
+  )(connection: Connection): Vector[Entry[RawFlatEvent]] =
+    target match {
+      case EventPayloadSourceForUpdatesAcsDelta.Consuming =>
+        fetchAcsDeltaEvents(
+          tableName = "lapi_events_consuming_exercise",
+          selectColumns = selectColumnsForFlatTransactionsExercise,
+          eventSequentialIds = eventSequentialIds,
+          allFilterParties = requestingParties,
+        )(connection)
+      case EventPayloadSourceForUpdatesAcsDelta.Create =>
+        fetchAcsDeltaEvents(
+          tableName = "lapi_events_create",
+          selectColumns = selectColumnsForFlatTransactionsCreate,
+          eventSequentialIds = eventSequentialIds,
+          allFilterParties = requestingParties,
+        )(connection)
     }
+
+  private def fetchLedgerEffectsEvents(
+      tableName: String,
+      selectColumns: String,
+      eventSequentialIds: Iterable[Long],
+      allFilterParties: Option[Set[Ref.Party]],
+  )(connection: Connection): Vector[Entry[RawTreeEvent]] = {
+    val internedAllParties: Option[Set[Int]] = allFilterParties
+      .map(
+        _.iterator
+          .map(stringInterning.party.tryInternalize)
+          .flatMap(_.iterator)
+          .toSet
+      )
+    SQL"""
+        SELECT
+          #$selectColumns,
+          tree_event_witnesses as event_witnesses,
+          command_id
+        FROM
+          #$tableName
+        WHERE
+          event_sequential_id ${queryStrategy.anyOf(eventSequentialIds)}
+        ORDER BY
+          event_sequential_id
+      """
+      .withFetchSize(Some(eventSequentialIds.size))
+      .asVectorOf(rawTreeEventParser(internedAllParties, stringInterning))(connection)
+  }
+
+  def fetchEventPayloadsLedgerEffects(target: EventPayloadSourceForUpdatesLedgerEffects)(
+      eventSequentialIds: Iterable[Long],
+      requestingParties: Option[Set[Ref.Party]],
+  )(connection: Connection): Vector[Entry[RawTreeEvent]] =
+    target match {
+      case EventPayloadSourceForUpdatesLedgerEffects.Consuming =>
+        fetchLedgerEffectsEvents(
+          tableName = "lapi_events_consuming_exercise",
+          selectColumns =
+            s"$selectColumnsForTransactionTreeExercise, ${QueryStrategy.constBooleanSelect(true)} as exercise_consuming",
+          eventSequentialIds = eventSequentialIds,
+          allFilterParties = requestingParties,
+        )(connection)
+      case EventPayloadSourceForUpdatesLedgerEffects.Create =>
+        fetchLedgerEffectsEvents(
+          tableName = "lapi_events_create",
+          selectColumns =
+            s"$selectColumnsForTransactionTreeCreate, ${QueryStrategy.constBooleanSelect(false)} as exercise_consuming",
+          eventSequentialIds = eventSequentialIds,
+          allFilterParties = requestingParties,
+        )(connection)
+      case EventPayloadSourceForUpdatesLedgerEffects.NonConsuming =>
+        fetchLedgerEffectsEvents(
+          tableName = "lapi_events_non_consuming_exercise",
+          selectColumns =
+            s"$selectColumnsForTransactionTreeExercise, ${QueryStrategy.constBooleanSelect(false)} as exercise_consuming",
+          eventSequentialIds = eventSequentialIds,
+          allFilterParties = requestingParties,
+        )(connection)
+    }
+
 }

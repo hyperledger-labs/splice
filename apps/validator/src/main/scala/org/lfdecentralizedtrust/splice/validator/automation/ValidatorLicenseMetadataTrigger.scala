@@ -42,7 +42,8 @@ class ValidatorLicenseMetadataTrigger(
   ): Future[Seq[ValidatorLicenseMetadataTrigger.Task]] =
     for {
       supportsValidatorLicenseMetadata <- packageVersionSupport.supportsValidatorLicenseMetadata(
-        now
+        Seq(validator, store.key.dsoParty),
+        now,
       )
       tasks <-
         if (supportsValidatorLicenseMetadata) {

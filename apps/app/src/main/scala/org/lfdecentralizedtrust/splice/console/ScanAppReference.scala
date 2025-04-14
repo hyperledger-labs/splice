@@ -50,6 +50,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
   transferinstructionv1,
 }
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
@@ -490,9 +491,36 @@ abstract class ScanAppReference(
 
   def getTransferFactory(
       choiceArgs: transferinstructionv1.TransferFactory_Transfer
-  ): FactoryChoiceWithDisclosures = {
+  ): (
+      FactoryChoiceWithDisclosures,
+      transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+  ) = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTransferFactory(choiceArgs))
+    }
+  }
+
+  def getTransferInstructionAcceptContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferInstructionAcceptContext(transferInstructionId))
+    }
+  }
+
+  def getTransferInstructionRejectContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferInstructionRejectContext(transferInstructionId))
+    }
+  }
+
+  def getTransferInstructionWithdrawContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferInstructionWithdrawContext(transferInstructionId))
     }
   }
 

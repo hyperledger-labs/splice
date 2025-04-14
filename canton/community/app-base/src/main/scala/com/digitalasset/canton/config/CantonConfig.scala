@@ -88,7 +88,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.dri
 import com.digitalasset.canton.synchronizer.sequencer.config.{
   RemoteSequencerConfig,
   SequencerNodeConfig,
-  SequencerNodeInitConfig,
   SequencerNodeParameterConfig,
   SequencerNodeParameters,
 }
@@ -434,7 +433,6 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
           dontWarnOnDeprecatedPV = participantParameters.dontWarnOnDeprecatedPV,
         ),
         ledgerApiServerParameters = participantParameters.ledgerApiServer,
-        excludeInfrastructureTransactions = participantParameters.excludeInfrastructureTransactions,
         engine = participantParameters.engine,
         journalGarbageCollectionDelay =
           participantParameters.journalGarbageCollectionDelay.toInternal,
@@ -798,29 +796,33 @@ object CantonConfig {
       deriveReader[TlsServerConfig]
     }
 
-    lazy implicit final val initBaseIdentityConfigReader: ConfigReader[InitConfigBase.Identity] =
-      deriveReader[InitConfigBase.Identity]
     lazy implicit final val stateConfigReader: ConfigReader[StateConfig] = deriveReader[StateConfig]
+
+    implicit val identityConfigReaderAuto: ConfigReader[IdentityConfig.Auto] = {
+      implicit val nodeNameReader: ConfigReader[NodeIdentifierConfig] = {
+        implicit val nodeNameConfigReader: ConfigReader[NodeIdentifierConfig.Config.type] =
+          deriveReader[NodeIdentifierConfig.Config.type]
+        implicit val nodeNameRandomReader: ConfigReader[NodeIdentifierConfig.Random.type] =
+          deriveReader[NodeIdentifierConfig.Random.type]
+        implicit val nodeNameExplicitReader: ConfigReader[NodeIdentifierConfig.Explicit] =
+          deriveReader[NodeIdentifierConfig.Explicit]
+        deriveReader[NodeIdentifierConfig]
+      }
+      deriveReader[IdentityConfig.Auto]
+    }
+    implicit val identityConfigReaderManual: ConfigReader[IdentityConfig.Manual.type] =
+      deriveReader[IdentityConfig.Manual.type]
+    implicit val identityConfigReaderExternal: ConfigReader[IdentityConfig.External] =
+      deriveReader[IdentityConfig.External]
+    implicit val initBaseIdentityConfigReader: ConfigReader[IdentityConfig] =
+      deriveReader[IdentityConfig]
     lazy implicit final val initConfigReader: ConfigReader[InitConfig] =
       deriveReader[InitConfig]
-        .enableNestedOpt("auto-init", _.copy(identity = None))
-
-    lazy implicit final val nodeNameReader: ConfigReader[NodeIdentifierConfig] = {
-      implicit val nodeNameConfigReader: ConfigReader[NodeIdentifierConfig.Config.type] =
-        deriveReader[NodeIdentifierConfig.Config.type]
-      implicit val nodeNameRandomReader: ConfigReader[NodeIdentifierConfig.Random.type] =
-        deriveReader[NodeIdentifierConfig.Random.type]
-      implicit val nodeNameExplicitReader: ConfigReader[NodeIdentifierConfig.Explicit] =
-        deriveReader[NodeIdentifierConfig.Explicit]
-      deriveReader[NodeIdentifierConfig]
-    }
     lazy implicit final val participantInitConfigReader: ConfigReader[ParticipantInitConfig] = {
       implicit val ledgerApiParticipantInitConfigReader
           : ConfigReader[ParticipantLedgerApiInitConfig] =
         deriveReader[ParticipantLedgerApiInitConfig]
-
       deriveReader[ParticipantInitConfig]
-        .enableNestedOpt("auto-init", _.copy(identity = None))
     }
 
     lazy implicit final val pemFileReader: ConfigReader[PemFile] = new ConfigReader[PemFile] {
@@ -1012,9 +1014,6 @@ object CantonConfig {
     lazy implicit final val sequencerPruningConfig
         : ConfigReader[DatabaseSequencerConfig.SequencerPruningConfig] =
       deriveReader[DatabaseSequencerConfig.SequencerPruningConfig]
-    lazy implicit final val sequencerNodeInitConfigReader: ConfigReader[SequencerNodeInitConfig] =
-      deriveReader[SequencerNodeInitConfig]
-        .enableNestedOpt("auto-init", _.copy(identity = None))
 
     lazy implicit val sequencerReaderConfigReader: ConfigReader[SequencerReaderConfig] =
       deriveReader[SequencerReaderConfig]
@@ -1422,27 +1421,32 @@ object CantonConfig {
       deriveWriter[TlsServerConfig]
     }
 
-    lazy implicit final val initBaseIdentityConfigWriter: ConfigWriter[InitConfigBase.Identity] =
-      deriveWriter[InitConfigBase.Identity]
-    lazy implicit final val stateConfigWriter: ConfigWriter[StateConfig] = deriveWriter[StateConfig]
-    lazy implicit final val initConfigWriter: ConfigWriter[InitConfig] =
-      InitConfigBase.writerForSubtype(deriveWriter[InitConfig])
-
-    lazy implicit final val nodeNameWriter: ConfigWriter[NodeIdentifierConfig] = {
-      implicit val nodeNameConfigWriter: ConfigWriter[NodeIdentifierConfig.Config.type] =
-        deriveWriter[NodeIdentifierConfig.Config.type]
-      implicit val nodeNameRandomWriter: ConfigWriter[NodeIdentifierConfig.Random.type] =
-        deriveWriter[NodeIdentifierConfig.Random.type]
-      implicit val nodeNameExplicitWriter: ConfigWriter[NodeIdentifierConfig.Explicit] =
-        deriveWriter[NodeIdentifierConfig.Explicit]
-      deriveWriter[NodeIdentifierConfig]
+    lazy implicit final val identityConfigWriter: ConfigWriter[IdentityConfig] = {
+      implicit val nodeNameWriter: ConfigWriter[NodeIdentifierConfig] = {
+        implicit val nodeNameConfigWriter: ConfigWriter[NodeIdentifierConfig.Config.type] =
+          deriveWriter[NodeIdentifierConfig.Config.type]
+        implicit val nodeNameRandomWriter: ConfigWriter[NodeIdentifierConfig.Random.type] =
+          deriveWriter[NodeIdentifierConfig.Random.type]
+        implicit val nodeNameExplicitWriter: ConfigWriter[NodeIdentifierConfig.Explicit] =
+          deriveWriter[NodeIdentifierConfig.Explicit]
+        deriveWriter[NodeIdentifierConfig]
+      }
+      implicit val identityConfigWriterAuto: ConfigWriter[IdentityConfig.Auto] =
+        deriveWriter[IdentityConfig.Auto]
+      implicit val identityConfigWriterManual: ConfigWriter[IdentityConfig.Manual.type] =
+        deriveWriter[IdentityConfig.Manual.type]
+      implicit val identityConfigWriterExternal: ConfigWriter[IdentityConfig.External] =
+        deriveWriter[IdentityConfig.External]
+      deriveWriter[IdentityConfig]
     }
+    lazy implicit final val stateConfigWriter: ConfigWriter[StateConfig] = deriveWriter[StateConfig]
+    lazy implicit final val initConfigWriter: ConfigWriter[InitConfig] = deriveWriter[InitConfig]
 
     lazy implicit final val participantInitConfigWriter: ConfigWriter[ParticipantInitConfig] = {
       implicit val ledgerApiParticipantInitConfigWriter
           : ConfigWriter[ParticipantLedgerApiInitConfig] =
         deriveWriter[ParticipantLedgerApiInitConfig]
-      InitConfigBase.writerForSubtype(deriveWriter[ParticipantInitConfig])
+      deriveWriter[ParticipantInitConfig]
     }
 
     implicit val tlsClientConfigWriter: ConfigWriter[TlsClientConfig] =
@@ -1618,8 +1622,6 @@ object CantonConfig {
     lazy implicit val sequencerPruningConfigWriter
         : ConfigWriter[DatabaseSequencerConfig.SequencerPruningConfig] =
       deriveWriter[DatabaseSequencerConfig.SequencerPruningConfig]
-    lazy implicit final val sequencerNodeInitConfigWriter: ConfigWriter[SequencerNodeInitConfig] =
-      InitConfigBase.writerForSubtype(deriveWriter[SequencerNodeInitConfig])
 
     implicit def sequencerConfigWriter[C]: ConfigWriter[SequencerConfig] = {
       case dbSequencerConfig: SequencerConfig.Database =>

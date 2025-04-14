@@ -7,13 +7,8 @@ import com.daml.ledger.api.v2.command_completion_service.CompletionStreamRespons
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
-import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel
-import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel.*
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
-import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.{
-  ParticipantMetering,
-  ReportData,
-}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.indexer.parallel.PostPublishData
@@ -21,17 +16,20 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
   RawActiveContract,
   RawAssignEvent,
+  RawFlatEvent,
   RawParticipantAuthorization,
+  RawTreeEvent,
   RawUnassignEvent,
   SynchronizerOffset,
   UnassignProperties,
 }
-import com.digitalasset.canton.platform.store.backend.MeteringParameterStorageBackend.LedgerMeteringEnd
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.PruneUptoInclusiveAndLedgerEnd
 import com.digitalasset.canton.platform.store.backend.common.{
+  EventPayloadSourceForUpdatesAcsDelta,
+  EventPayloadSourceForUpdatesLedgerEffects,
   EventReaderQueries,
-  TransactionPointwiseQueries,
-  TransactionStreamingQueries,
+  UpdatePointwiseQueries,
+  UpdateStreamingQueries,
 }
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader.KeyState
@@ -39,7 +37,7 @@ import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
 
 import java.sql.Connection
@@ -174,29 +172,6 @@ trait ParameterStorageBackend {
   def ledgerIdentity(connection: Connection): Option[ParameterStorageBackend.IdentityParams]
 }
 
-object MeteringParameterStorageBackend {
-  final case class LedgerMeteringEnd(offset: Option[Offset], timestamp: Timestamp)
-}
-
-trait MeteringParameterStorageBackend {
-
-  /** Initialize the ledger metering end parameters if unset */
-  def initializeLedgerMeteringEnd(init: LedgerMeteringEnd, loggerFactory: NamedLoggerFactory)(
-      connection: Connection
-  )(implicit
-      traceContext: TraceContext
-  ): Unit
-
-  /** The timestamp and offset for which billable metering is available */
-  def ledgerMeteringEnd(connection: Connection): Option[LedgerMeteringEnd]
-
-  /** The timestamp and offset for which final metering is available */
-  def assertLedgerMeteringEnd(connection: Connection): LedgerMeteringEnd
-
-  /** Update the timestamp and offset for which billable metering is available */
-  def updateLedgerMeteringEnd(ledgerMeteringEnd: LedgerMeteringEnd)(connection: Connection): Unit
-}
-
 object ParameterStorageBackend {
   final case class LedgerEnd(
       lastOffset: Offset,
@@ -277,7 +252,6 @@ object ContractStorageBackend {
   final case class RawCreatedContract(
       templateId: String,
       packageName: String,
-      packageVersion: Option[String],
       flatEventWitnesses: Set[Party],
       createArgument: Array[Byte],
       createArgumentCompression: Option[Int],
@@ -296,8 +270,8 @@ object ContractStorageBackend {
 
 trait EventStorageBackend {
 
-  def transactionPointwiseQueries: TransactionPointwiseQueries
-  def transactionStreamingQueries: TransactionStreamingQueries
+  def updatePointwiseQueries: UpdatePointwiseQueries
+  def updateStreamingQueries: UpdateStreamingQueries
   def eventReaderQueries: EventReaderQueries
 
   /** Part of pruning process, this needs to be in the same transaction as the other pruning related
@@ -405,10 +379,21 @@ trait EventStorageBackend {
       eventSequentialIds: Iterable[Long]
   )(connection: Connection): Vector[RawParticipantAuthorization]
 
-  def topologyEventPublishedOnRecordTime(
+  def topologyEventOffsetPublishedOnRecordTime(
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
-  )(connection: Connection): Boolean
+  )(connection: Connection): Option[Offset]
+
+  def fetchEventPayloadsAcsDelta(target: EventPayloadSourceForUpdatesAcsDelta)(
+      eventSequentialIds: Iterable[Long],
+      requestingParties: Option[Set[Party]],
+  )(connection: Connection): Vector[Entry[RawFlatEvent]]
+
+  def fetchEventPayloadsLedgerEffects(target: EventPayloadSourceForUpdatesLedgerEffects)(
+      eventSequentialIds: Iterable[Long],
+      requestingParties: Option[Set[Ref.Party]],
+  )(connection: Connection): Vector[Entry[RawTreeEvent]]
+
 }
 
 object EventStorageBackend {
@@ -429,10 +414,12 @@ object EventStorageBackend {
     def templateId: Identifier
     def witnessParties: Set[String]
   }
-  // TODO(#23504) keep only RawEvent or RawAcsDeltaEvent
+  // TODO(#23504) rename to RawAcsDeltaEvent?
   sealed trait RawFlatEvent extends RawEvent
-  // TODO(#23504) keep only RawEvent or RawLedgerEffectsEvent
+  // TODO(#23504) rename to RawLedgerEffectsEvent?
   sealed trait RawTreeEvent extends RawEvent
+
+  sealed trait RawReassignmentEvent extends RawEvent
 
   final case class RawCreatedEvent(
       updateId: String,
@@ -441,7 +428,6 @@ object EventStorageBackend {
       contractId: ContractId,
       templateId: Identifier,
       packageName: PackageName,
-      packageVersion: Option[PackageVersion],
       witnessParties: Set[String],
       signatories: Set[String],
       observers: Set[String],
@@ -504,7 +490,7 @@ object EventStorageBackend {
       witnessParties: Set[String],
       assignmentExclusivity: Option[Timestamp],
       nodeId: Int,
-  )
+  ) extends RawReassignmentEvent
 
   final case class RawAssignEvent(
       sourceSynchronizerId: String,
@@ -513,7 +499,10 @@ object EventStorageBackend {
       submitter: Option[String],
       reassignmentCounter: Long,
       rawCreatedEvent: RawCreatedEvent,
-  )
+  ) extends RawReassignmentEvent {
+    override def templateId: Identifier = rawCreatedEvent.templateId
+    override def witnessParties: Set[String] = rawCreatedEvent.witnessParties
+  }
 
   final case class SynchronizerOffset(
       offset: Offset,
@@ -527,18 +516,11 @@ object EventStorageBackend {
       updateId: String,
       partyId: String,
       participantId: String,
-      participant_permission: AuthorizationLevel,
+      authorizationEvent: AuthorizationEvent,
       recordTime: Timestamp,
       synchronizerId: String,
       traceContext: Option[Array[Byte]],
   )
-
-  def intToAuthorizationLevel(n: Int): AuthorizationLevel = n match {
-    case 0 => Revoked
-    case 1 => Submission
-    case 2 => Confirmation
-    case 3 => Observation
-  }
 
   final case class UnassignProperties(
       contractId: ContractId,
@@ -619,46 +601,4 @@ trait StringInterningStorageBackend {
   def loadStringInterningEntries(fromIdExclusive: Int, untilIdInclusive: Int)(
       connection: Connection
   ): Iterable[(Int, String)]
-}
-
-trait MeteringStorageReadBackend {
-
-  def reportData(
-      from: Timestamp,
-      to: Option[Timestamp],
-      userId: Option[UserId],
-  )(connection: Connection): ReportData
-}
-
-trait MeteringStorageWriteBackend {
-
-  /** This method will return the maximum offset of the lapi_transaction_metering record which has
-    * an offset greater than the from offset and a timestamp prior to the to timestamp, if any.
-    *
-    * Note that the offset returned may not have been fully ingested. This is to allow the metering
-    * to wait if there are still un-fully ingested records withing the time window.
-    */
-  def transactionMeteringMaxOffset(from: Option[Offset], to: Timestamp)(
-      connection: Connection
-  ): Option[Offset]
-
-  /** This method will return all transaction metering records between the from offset (exclusive)
-    * and the to offset (inclusive). It is called prior to aggregation.
-    */
-  def selectTransactionMetering(from: Option[Offset], to: Offset)(
-      connection: Connection
-  ): Map[UserId, Int]
-
-  /** This method will delete transaction metering records between the from offset (exclusive) and
-    * the to offset (inclusive). It is called following aggregation.
-    */
-  def deleteTransactionMetering(from: Option[Offset], to: Offset)(
-      connection: Connection
-  ): Unit
-
-  def insertParticipantMetering(metering: Vector[ParticipantMetering])(connection: Connection): Unit
-
-  /** Test Only - will be removed once reporting can be based if participant metering */
-  def allParticipantMetering()(connection: Connection): Vector[ParticipantMetering]
-
 }

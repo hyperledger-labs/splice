@@ -4,12 +4,10 @@
 package com.digitalasset.canton.platform.store.backend
 
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.TransactionMetering
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.platform.store.backend.common.EventIdSource
-import com.digitalasset.canton.platform.store.backend.common.TransactionPointwiseQueries.LookupKey
+import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.scalatest.Inside
 import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AnyFlatSpec
@@ -24,16 +22,6 @@ private[backend] trait StorageBackendTestsInitializeIngestion
   behavior of "StorageBackend (initializeIngestion)"
 
   import StorageBackendTestValues.*
-
-  private def dtoMetering(app: String, offset: Offset) =
-    dtoTransactionMetering(
-      TransactionMetering(
-        userId = Ref.UserId.assertFromString(app),
-        actionCount = 1,
-        meteringTimestamp = someTime,
-        ledgerOffset = offset,
-      )
-    )
 
   private val signatory = Ref.Party.assertFromString("signatory")
 
@@ -72,50 +60,6 @@ private[backend] trait StorageBackendTestsInitializeIngestion
         checkContentsAfter = () => {
           val parties2 = executeSql(backend.party.knownParties(None, 10))
           parties2 shouldBe empty
-        },
-      )
-    }
-  }
-
-  {
-    val dtos = Vector(
-      dtoMetering("AppA", offset(1)),
-      dtoMetering("AppB", offset(4)),
-    )
-    it should "delete overspill entries - metering" in {
-      fixture(
-        dtos1 = dtos,
-        lastOffset1 = 4L,
-        lastEventSeqId1 = 0L,
-        dtos2 = Vector(
-          dtoMetering("AppC", offset(6))
-        ),
-        lastOffset2 = 6L,
-        lastEventSeqId2 = 0L,
-        checkContentsBefore = () => {
-          val metering =
-            executeSql(backend.metering.read.reportData(Timestamp.Epoch, None, None))
-          // Metering report can include partially ingested data in non-final reports
-          metering.applicationData should have size 3
-          metering.isFinal shouldBe false
-        },
-        checkContentsAfter = () => {
-          val metering =
-            executeSql(backend.metering.read.reportData(Timestamp.Epoch, None, None))
-          metering.applicationData should have size 2 // Partially ingested data removed
-        },
-      )
-    }
-
-    it should "delete overspill entries written before first ledger end update - metering" in {
-      fixtureOverspillEntriesPriorToFirstLedgerEndUpdate(
-        dtos = dtos,
-        lastOffset = 4,
-        lastEventSeqId = 0L,
-        checkContentsAfter = () => {
-          val metering2 =
-            executeSql(backend.metering.read.reportData(Timestamp.Epoch, None, None))
-          metering2.applicationData shouldBe empty
         },
       )
     }
@@ -423,7 +367,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsNonConsuming(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries.fetchEventIds(
+      backend.event.updateStreamingQueries.fetchEventIds(
         EventIdSource.NonConsumingInformee
       )(
         stakeholderO = Some(someParty),
@@ -436,7 +380,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsConsumingNonStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
+      backend.event.updateStreamingQueries
         .fetchEventIds(EventIdSource.ConsumingNonStakeholder)(
           stakeholderO = Some(someParty),
           templateIdO = None,
@@ -448,7 +392,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsConsumingStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
+      backend.event.updateStreamingQueries
         .fetchEventIds(EventIdSource.ConsumingStakeholder)(
           stakeholderO = Some(someParty),
           templateIdO = None,
@@ -460,7 +404,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsCreateNonStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
+      backend.event.updateStreamingQueries
         .fetchEventIds(EventIdSource.CreateNonStakeholder)(
           stakeholderO = Some(someParty),
           templateIdO = None,
@@ -472,7 +416,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsCreateStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
+      backend.event.updateStreamingQueries
         .fetchEventIds(EventIdSource.CreateStakeholder)(
           stakeholderO = Some(someParty),
           templateIdO = None,
@@ -515,22 +459,30 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     )
 
   private def fetchIdsFromTransactionMetaUpdateIds(udpateIds: Seq[String]): Set[(Long, Long)] = {
-    val txPointwiseQueries = backend.event.transactionPointwiseQueries
+    val txPointwiseQueries = backend.event.updatePointwiseQueries
     udpateIds
       .map(Ref.TransactionId.assertFromString)
       .map { updateId =>
-        executeSql(txPointwiseQueries.fetchIdsFromTransactionMeta(LookupKey.UpdateId(updateId)))
+        executeSql(
+          txPointwiseQueries.fetchIdsFromTransactionMeta(
+            lookupKey = LookupKey.UpdateId(updateId)
+          )
+        )
       }
       .flatMap(_.toList)
       .toSet
   }
 
   private def fetchIdsFromTransactionMetaOffsets(offsets: Seq[Long]): Set[(Long, Long)] = {
-    val txPointwiseQueries = backend.event.transactionPointwiseQueries
+    val txPointwiseQueries = backend.event.updatePointwiseQueries
     offsets
       .map(Offset.tryFromLong)
       .map { offset =>
-        executeSql(txPointwiseQueries.fetchIdsFromTransactionMeta(LookupKey.Offset(offset)))
+        executeSql(
+          txPointwiseQueries.fetchIdsFromTransactionMeta(
+            lookupKey = LookupKey.Offset(offset)
+          )
+        )
       }
       .flatMap(_.toList)
       .toSet
@@ -549,9 +501,6 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     val loggerFactory = SuppressingLogger(getClass)
     // Initialize
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(
-      backend.meteringParameter.initializeLedgerMeteringEnd(someLedgerMeteringEnd, loggerFactory)
-    )
     // Start the indexer (a no-op in this case)
     val end1 = executeSql(backend.parameter.ledgerEnd)
     executeSql(backend.ingestion.deletePartiallyIngestedData(end1))
@@ -580,9 +529,6 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     val loggerFactory = SuppressingLogger(getClass)
     // Initialize
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(
-      backend.meteringParameter.initializeLedgerMeteringEnd(someLedgerMeteringEnd, loggerFactory)
-    )
     // Start the indexer (a no-op in this case)
     val end1 = executeSql(backend.parameter.ledgerEnd)
     executeSql(backend.ingestion.deletePartiallyIngestedData(end1))

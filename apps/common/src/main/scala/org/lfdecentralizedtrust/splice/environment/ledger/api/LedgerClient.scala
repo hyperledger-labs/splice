@@ -19,6 +19,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
 }
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
+import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.javaapi.data.{Command, CreateUserResponse, ListUserRightsResponse, User}
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -31,11 +32,12 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
@@ -44,6 +46,7 @@ import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
 
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
@@ -314,7 +317,7 @@ private[environment] class LedgerClient(
           userId = userId,
           submissionId = submissionId,
           hashingSchemeVersion =
-            lapi.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V1,
+            lapi.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2,
         )
       )
     } yield result
@@ -653,6 +656,27 @@ private[environment] class LedgerClient(
         )
       )
     } yield ()
+  }
+
+  def getSupportedPackageVersion(
+      synchronizerId: SynchronizerId,
+      involvedParties: Seq[PartyId],
+      packageName: PackageIdResolver.Package,
+      vettingAsOfTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Option[PackageReference]] = {
+    for {
+      stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
+      response <- stub.getPreferredPackageVersion(
+        lapi.interactive.interactive_submission_service.GetPreferredPackageVersionRequest(
+          parties = involvedParties.map(_.toProtoPrimitive),
+          packageName = packageName.packageName,
+          synchronizerId = synchronizerId.toProtoPrimitive,
+          vettingValidAt = Some(vettingAsOfTime.toProtoTimestamp),
+        )
+      )
+    } yield {
+      response.packagePreference.flatMap(_.packageReference)
+    }
   }
 }
 

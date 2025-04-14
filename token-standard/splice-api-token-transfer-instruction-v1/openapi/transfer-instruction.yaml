@@ -33,7 +33,96 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-# TODO(#18643): add endpoints for withdraw, reject, accept
+
+  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/accept:
+    post:
+      operationId: "getTransferInstructionAcceptContext"
+      description: |
+        Get the choice context to accept a transfer instruction.
+      parameters:
+        - name: transferInstructionId
+          description: "The contract ID of the transfer instruction to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/reject:
+    post:
+      operationId: "getTransferInstructionRejectContext"
+      description: |
+        Get the choice context to reject a transfer instruction.
+      parameters:
+        - name: transferInstructionId
+          description: "The contract ID of the transfer instruction to reject."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/withdraw:
+    post:
+      operationId: "getTransferInstructionWithdrawContext"
+      description: |
+        Get the choice context to withdraw a transfer instruction.
+      parameters:
+        - name: transferInstructionId
+          description: "The contract ID of the transfer instruction to withdraw."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
 
 components:
   responses:
@@ -65,10 +154,6 @@ components:
 
             The choice arguments are provided so that the registry can also provide choice-argument
             specific contracts, e.g., the configuration for a specific instrument-id.
-
-            The registry MAY react to such a request by creating extra contracts required to enable the exercising
-            of the choice. In that case the `validUntil` field of the returned choice context should be set
-            to the time until which these contracts expire.
         excludeDebugFields:
           description: "If set to true, the response will not include debug fields."
           default: false
@@ -77,6 +162,19 @@ components:
         [
           "choiceArguments",
         ]
+
+    GetChoiceContextRequest:
+      description: |
+        A request to get the context for executing a choice on a contract.
+      type: object
+      properties:
+        meta:
+          description: |
+            Metadata that will be passed to the choice, and should be incorporated
+            into the choice context. Provided for extensibility.
+          type: object
+          additionalProperties:
+            type: string
 
     TransferFactoryWithChoiceContext:
       description: |
@@ -106,20 +204,11 @@ components:
             - "offer"
         choiceContext:
           $ref: "#/components/schemas/ChoiceContext"
-        validUntil:
-          description: |
-            The time until which the choice context can be expected to be valid, and can thus be used to exercise the
-            choice. However concurrent activity can invalidate the choice context earlier;
-            Thus the in case of a failure to exercise the choice, the client SHOULD also request a new choice context
-            as part of retrying the operation.
-          type: string
-          format: date-time
       required:
         [
           "factoryId",
           "choiceContext",
           "transferKind",
-          "validUntil",
         ]
 
     ChoiceContext:
@@ -141,7 +230,7 @@ components:
             $ref: "#/components/schemas/DisclosedContract"
       required:
         [
-          "transferExecutionChoiceContext",
+          "choiceContextData",
           "disclosedContracts",
         ]
 

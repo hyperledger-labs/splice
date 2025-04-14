@@ -3,11 +3,12 @@
 
 module Splice.DsoRules where
 
-import DA.Action (void, when, unless)
+import Prelude hiding (all)
+import DA.Action (void, unless)
 import DA.Either (partitionEithers)
 import DA.Exception
-import DA.Foldable (forA_)
-import DA.List as List
+import DA.Foldable (forA_, all)
+import DA.List as List hiding (all)
 import DA.Optional (isNone, fromSome, fromOptional, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
@@ -32,6 +33,7 @@ import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
+import Splice.CometBft()
 
 
 -- Types
@@ -88,6 +90,8 @@ data AmuletRules_ActionRequiringConfirmation
     -- ^ Voted action to remove a config schedule from the `AmuletRules`.
   | CRARC_UpdateFutureAmuletConfigSchedule AmuletRules_UpdateFutureAmuletConfigSchedule
     -- ^ Voted action to update a config schedule in the `AmuletRules`.
+  | CRARC_SetConfig AmuletRules_SetConfig
+    -- ^ Voted action to change the `AmuletConfig`. Not idempotent.
   deriving (Eq, Show)
 
 data DsoRules_ActionRequiringConfirmation
@@ -330,7 +334,7 @@ template Confirmation with
 --
 -- See the comments on `ActionRequiringConfirmation` for details.
 --
--- Version2, which tracks all votes in a single contract.
+-- Version 3, which introduces effectivity in vote request.
 template VoteRequest
   with
     dso : Party
@@ -348,7 +352,10 @@ template VoteRequest
     trackingCid : Optional (ContractId VoteRequest)
       -- ^ An optional tracking ContractId to be used for tracking the vote request through its updates.
       -- This is always set to the first ContractId of the original vote request (None on creation).
+    targetEffectiveAt : Optional Time
+      -- ^ The time when the action is targeted to be made effective. If None, the action is immediately effective upon 2/3 votes in favor.
   where
+    ensure all (voteBefore <=) targetEffectiveAt
     signatory dso
 
 data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with
@@ -655,7 +662,7 @@ template DsoRules with
         return DsoRules_ExecuteConfirmedActionResult
 
 
-    -- Voting as part of on-ledger governance (version 2)
+    -- Voting as part of on-ledger governance (version 3)
     -----------------------------------------------------
 
     -- TODO(#9317): rate limit inidiviual SVs wrt requesting votes
@@ -665,6 +672,7 @@ template DsoRules with
         action : ActionRequiringConfirmation
         reason : Reason
         voteRequestTimeout : Optional RelTime
+        targetEffectiveAt : Optional Time
       controller requester
       do
         requesterName <- case requester `Map.lookup` svs of
@@ -690,6 +698,7 @@ template DsoRules with
           voteBefore
           votes = Map.fromList [(requesterName, requesterVote)]
           trackingCid = None
+          targetEffectiveAt
         return DsoRules_RequestVoteResult with ..
 
 
@@ -707,9 +716,7 @@ template DsoRules with
           None -> fail "Voter is not an SV"
           Some info -> pure info.name
         -- validate and archive request
-        now <- getTime
         request <- fetchAndArchive (ForDso with dso) requestCid
-        require "request is open" (now < request.voteBefore)
         -- store vote
         voteRequest <- create request with
           votes = Map.insert voterName vote request.votes
@@ -718,16 +725,39 @@ template DsoRules with
 
     -- We expect the TxHistory log of the SV app to store the choice argument together
     -- with its result for historical reference.
+    --
+    --  Vote request semantics:
+    --
+    --  1. For vote requests with effective date-time (targetEffectiveAt != None)
+    --    a. Voting Period Starts (now < voteBefore)
+    --      -> early closing occurs if a super-majority of SVs rejects the vote request.
+    --    b. Voting Period Ends (now >= voteBefore and now < targetEffectiveAt)
+    --      -> if a super-majority has voted, the vote request remains open and SVs can still change their votes.
+    --      -> otherwise, the vote request is marked as expired.
+    --      -> early closing occurs upon a super-majority of rejections after expiration.
+    --    c. Effective Date-Time Reached (now >= targetEffectiveAt)
+    --      -> if a super-majority still accepts, then the change takes effect
+    --      -> otherwise, the vote request is registered as rejected
+    --  2. For vote requests without effective date-time (targetEffectiveAt = None)
+    --    a. Voting Period Starts (now < voteBefore)
+    --      -> early closing when a super-majority rejects
+    --      -> early acceptance when a super-majority agrees
+    --    b. Voting Period Ends (now >= voteBefore)
+    --      -> the vote request gets closed as expired
+    --
     nonconsuming choice DsoRules_CloseVoteRequest : DsoRules_CloseVoteRequestResult
       with
         requestCid : ContractId VoteRequest
         amuletRulesCid : Optional (ContractId AmuletRules)
       controller dsoDelegate
       do
-        request <- fetchAndArchive (ForDso with dso) requestCid
-        -- count the votes
         now <- getTime
+
+        let s = summarizeDso this
+        request <- fetchAndArchive (ForDso with dso) requestCid
+
         let activeSvs = map (.name) $ Map.values svs
+
         let activeSvSet = Set.fromList activeSvs
         let (validVotes, offboardedVoters) = partitionEithers
               [ if voterName `Set.member` activeSvSet then Left vote else Right voterName
@@ -735,29 +765,54 @@ template DsoRules with
               ]
         let abstainingSvs = [ name | name <- activeSvs, not (name `Map.member` request.votes) ]
         let (yays, nays) = partition (.accept) validVotes
-        let s = summarizeDso this
-        outcome <-
-          if length yays >= s.requiredNumVotes
-            then do
-              try do
-                executeActionRequiringConfirmation self amuletRulesCid request.action
-                pure $ VRO_Accepted with
-                  effectiveAt = fromOptional now $
-                    actionRequiringConfirmationEffectiveAt request.action
-              catch
-                (ex : AnyException) ->
-                  pure $ VRO_AcceptedButActionFailed with
-                    description = message ex
-            else
-              if length nays >= s.requiredNumVotes
-              then pure VRO_Rejected
-              else pure VRO_Expired
-        -- check if the request is ready to be closed
-        when (now < request.voteBefore) $ do
-          require "All svs must have voted to allow early closing" $
-            all (\m -> m `Map.member` request.votes) activeSvs
-          require "The outcome must be determined allow early closing" (outcome /= VRO_Expired)
-        -- report the result
+        let numYays = length yays
+        let numNays = length nays
+        let numVotes = numYays + numNays
+
+        outcome <- case request.targetEffectiveAt of
+
+                    Some _ | numNays >= s.requiredNumVotes ->
+                      pure $ VRO_Rejected
+
+                    Some _ | now >= request.voteBefore && numVotes < s.requiredNumVotes ->
+                      pure $ VRO_Expired
+
+                    Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
+                      try do
+                        executeActionRequiringConfirmation self amuletRulesCid request.action
+                        pure $ VRO_Accepted with
+                          effectiveAt = effectiveTime
+                      catch
+                        (ex : AnyException) ->
+                          pure $ VRO_AcceptedButActionFailed with description = message ex
+
+                    Some effectiveTime | now >= effectiveTime ->
+                      pure $ VRO_Rejected
+
+                    Some _ ->
+                      fail "no definitive outcome for voting request with effectivity"
+
+                    None | numNays >= s.requiredNumVotes ->
+                      pure $ VRO_Rejected
+
+                    None | numYays >= s.requiredNumVotes ->
+                      try do
+                        executeActionRequiringConfirmation self amuletRulesCid request.action
+                        -- TODO(#16139): Remove Config Schedule from AmuletConfig
+                        -- TODO(#16137): Implement effectivity on all actions
+                        pure $ VRO_Accepted with
+                            effectiveAt = fromOptional now $
+                              actionRequiringConfirmationEffectiveAt request.action
+                      catch
+                        (ex : AnyException) ->
+                          pure $ VRO_AcceptedButActionFailed with description = message ex
+
+                    None | now >= request.voteBefore ->
+                      pure $ VRO_Expired
+
+                    None -> fail "no definite outcome for voting request without effectivity"
+
+        -- archive vote request if it has a definitive outcome
         pure DsoRules_CloseVoteRequestResult with
             request
             completedAt = now
@@ -833,10 +888,14 @@ template DsoRules with
     choice DsoRules_SetConfig : DsoRules_SetConfigResult
       with
         newConfig : DsoRulesConfig
+        baseConfig: Optional DsoRulesConfig
       controller dso
       do
         -- TODO(M3-57): sanity check the newConfig to avoid locking up operations, e.g., by setting `maxTextLength = -1`
-        newDsoRules <- create this with config = newConfig
+        newDsoRules <- case baseConfig of
+          None -> create this with config = newConfig
+          Some baseConfig -> do
+             create this with config = patch newConfig baseConfig this.config
         return DsoRules_SetConfigResult with ..
 
     choice DsoRules_UpdateSvRewardWeight : DsoRules_UpdateSvRewardWeightResult
@@ -1302,6 +1361,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
         case amuletRulesAction of
           CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_MiningRound_Archive choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_SetConfig choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
@@ -1413,6 +1473,7 @@ actionRequiringConfirmationEffectiveAt action =
   case action of
     ARC_AmuletRules with .. ->
       case amuletRulesAction of
+        CRARC_SetConfig _ -> None
         CRARC_AddFutureAmuletConfigSchedule choiceArg -> Some choiceArg.newScheduleItem._1
         CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleTime
         CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1
@@ -1532,3 +1593,22 @@ instance HasCheckedFetch FeaturedAppRight ForDso where
 
 instance HasCheckedFetch Confirmation ForDso where
   contractGroupId Confirmation {..} = ForDso with dso
+
+instance Patchable DsoRulesConfig where
+  patch new base current = DsoRulesConfig with
+    numUnclaimedRewardsThreshold = patch new.numUnclaimedRewardsThreshold base.numUnclaimedRewardsThreshold current.numUnclaimedRewardsThreshold
+    numMemberTrafficContractsThreshold = patch new.numMemberTrafficContractsThreshold base.numMemberTrafficContractsThreshold current.numMemberTrafficContractsThreshold
+    actionConfirmationTimeout = patch new.actionConfirmationTimeout base.actionConfirmationTimeout current.actionConfirmationTimeout
+    svOnboardingRequestTimeout = patch new.svOnboardingRequestTimeout base.svOnboardingRequestTimeout current.svOnboardingRequestTimeout
+    svOnboardingConfirmedTimeout = patch new.svOnboardingConfirmedTimeout base.svOnboardingConfirmedTimeout current.svOnboardingConfirmedTimeout
+    voteRequestTimeout = patch new.voteRequestTimeout base.voteRequestTimeout current.voteRequestTimeout
+    dsoDelegateInactiveTimeout = patch new.dsoDelegateInactiveTimeout base.dsoDelegateInactiveTimeout current.dsoDelegateInactiveTimeout
+    synchronizerNodeConfigLimits = patch new.synchronizerNodeConfigLimits base.synchronizerNodeConfigLimits current.synchronizerNodeConfigLimits
+    maxTextLength = patch new.maxTextLength base.maxTextLength current.maxTextLength
+    decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
+    nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
+
+instance Patchable SynchronizerUpgradeSchedule where
+  patch new base current = SynchronizerUpgradeSchedule with
+        time = patch new.time base.time current.time
+        migrationId = patch new.migrationId base.migrationId current.migrationId

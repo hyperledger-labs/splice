@@ -8,7 +8,6 @@ import com.digitalasset.canton.admin.sequencer.v30.SequencerStatusServiceGrpc
 import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.SessionSigningKeysConfig
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.crypto.{Crypto, SynchronizerCryptoClient, SynchronizerCryptoPureApi}
@@ -190,7 +189,7 @@ class SequencerNodeBootstrap(
         description = "wait-for-sequencer-to-synchronizer-init",
         bootstrapStageCallback,
         storage,
-        config.init.autoInit,
+        false, // has no auto-init
       )
       with GrpcSequencerInitializationService.Callback {
 
@@ -499,11 +498,9 @@ class SequencerNodeBootstrap(
                 EitherT.rightT[FutureUnlessShutdown, String](Set.empty[Member])
               case Some((initialTopologyTransactions, sequencerSnapshot)) =>
                 val topologySnapshotValidator = new InitialTopologySnapshotValidator(
-                  synchronizerId,
                   staticSynchronizerParameters.protocolVersion,
                   new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
                   synchronizerTopologyStore,
-                  config.topology.insecureIgnoreMissingExtraKeySignaturesInInitialSnapshot,
                   parameters.processingTimeouts,
                   loggerFactory,
                 )
@@ -623,9 +620,7 @@ class SequencerNodeBootstrap(
               staticSynchronizerParameters,
               crypto,
               new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
-              // TODO(#22362): Enable correct config
-              // parameters.sessionSigningKeys
-              SessionSigningKeysConfig.disabled,
+              parameters.sessionSigningKeys,
               parameters.batchingConfig.parallelism,
               parameters.processingTimeouts,
               futureSupervisor,
@@ -758,6 +753,7 @@ class SequencerNodeBootstrap(
             staticSynchronizerParameters.protocolVersion,
             topologyStateForInitializationService,
             loggerFactory,
+            config.acknowledgementsConflateWindow,
           )
           _ = sequencerServiceCell.putIfAbsent(sequencerService)
 

@@ -3,11 +3,18 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import cats.instances.future.*
+import cats.instances.seq.*
+import cats.syntax.foldable.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.topology.{MediatorId, SequencerId}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
-  SRARC_OffboardSv,
   SRARC_CreateTransferCommandCounter,
+  SRARC_OffboardSv,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -16,20 +23,14 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
 }
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import org.scalatest.time.{Minute, Span}
-import cats.syntax.foldable.*
-import cats.instances.future.*
-import cats.instances.seq.*
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -155,7 +156,8 @@ class SvOffboardingIntegrationTest
             action,
             "https://vote-request-url.com",
             "description",
-            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+            new RelTime(durationUntilExpiration.toMillis * 1000),
+            Some(env.environment.clock.now.add(durationUntilOffboardingEffectivity).toInstant),
           )
         },
       )(
@@ -195,7 +197,7 @@ class SvOffboardingIntegrationTest
         },
       )
 
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 40.seconds)(
         // We need SV4's vote here for immediate offboarding
         "SV3 and SV4 vote on removing sv4", {
           sv3Backend.castVote(voteRequestCid4, true, "https://vote-request-url.com", "description")

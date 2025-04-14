@@ -3524,7 +3524,7 @@ class State:
                 f"Could not find TransferPreapproval_Send child event for TransferFactory_Transfer: {transaction}"
             )
         else:
-            # TODO(#18643) Support two-step transfers
+            # TODO(#18823) Support two-step transfers
             raise Exception(
                 f"Unexpected output tag for TransferFactory_Transfer: {output.tag}"
             )

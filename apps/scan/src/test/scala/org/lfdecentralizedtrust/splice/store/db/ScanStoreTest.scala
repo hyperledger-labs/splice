@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
@@ -215,7 +214,8 @@ abstract class ScanStoreTest
                 new splice.types.Round(2),
                 changeToInitialAmountAsOfRoundZero.bigDecimal,
                 holdingFee.bigDecimal,
-              )
+              ),
+              Optional.empty(),
             ).toValue,
             nextOffset(),
           )(
@@ -319,7 +319,7 @@ abstract class ScanStoreTest
         for {
           store <- mkStore()
           // Close the first 2 rounds, no events for them.
-          _ <- Seq(0L, 1L).traverse { round =>
+          _ <- MonadUtil.sequentialTraverse_(Seq(0L, 1L)) { round =>
             for {
               _ <- dummyDomain.create(
                 closedMiningRound(dsoParty, round)
@@ -328,7 +328,7 @@ abstract class ScanStoreTest
             } yield ()
           }
           amuletRulesContract = amuletRules()
-          _ <- balanceChanges.traverse { case (round, balanceChanges) =>
+          _ <- MonadUtil.sequentialTraverse_(balanceChanges) { case (round, balanceChanges) =>
             for {
               _ <- dummyDomain.exercise(
                 amuletRulesContract,
@@ -2013,6 +2013,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       ),
       java.util.List.of(),
       Optional.empty(),
+      Optional.empty(),
     )
 
   def mkTransferResultRecord(
@@ -2055,6 +2056,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       ),
       new java.math.BigDecimal(inputAmuletAmount),
       memberTrafficCid,
+      Optional.empty(),
       Optional.empty(),
     ).toValue
 
@@ -2183,7 +2185,8 @@ trait AmuletTransferUtil { self: StoreTest =>
         new splice.types.Round(round),
         changeToInitialAmountAsOfRoundZero.bigDecimal,
         changeToHoldingFeesRate.bigDecimal,
-      )
+      ),
+      Optional.empty(),
     ).toValue
 
   def amuletTemplate(amount: Double, owner: PartyId) = {
