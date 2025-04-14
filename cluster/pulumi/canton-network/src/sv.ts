@@ -183,7 +183,9 @@ export async function installSvNode(
         : []
     )
     .concat(
-      config.onboarding.type == 'join-with-key' && config.onboarding.sponsorRelease
+      config.onboarding.type == 'join-with-key' &&
+        config.onboarding.sponsorRelease &&
+        spliceConfig.pulumiProjectConfig.interAppsDependencies
         ? [config.onboarding.sponsorRelease]
         : []
     )
