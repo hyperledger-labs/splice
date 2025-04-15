@@ -121,15 +121,16 @@ class TokenStandardAllocationIntegrationTest
           ),
           includeCreatedEventBlob = true,
         )
-      val allocation = new allocationv1.AllocationView(
+      val allocation = new allocationv1.AllocationSpecification(
         request.settlement,
         legId,
         leg,
-        emptyMetadata,
       )
+      val now = env.environment.clock.now.toInstant
       val choiceArgs = new allocationinstructionv1.AllocationFactory_Allocate(
         dsoParty.toProtoPrimitive,
         allocation,
+        /*requestedAt =*/ now,
         senderHoldings
           .map(senderHolding => new holdingv1.Holding.ContractId(senderHolding.contractId))
           .asJava,

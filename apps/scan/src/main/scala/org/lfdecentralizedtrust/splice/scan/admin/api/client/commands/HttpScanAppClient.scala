@@ -1630,6 +1630,7 @@ object HttpScanAppClient {
               new allocationinstructionv1.AllocationFactory_Allocate(
                 choiceArgs.expectedAdmin,
                 choiceArgs.allocation,
+                choiceArgs.requestedAt,
                 choiceArgs.inputHoldingCids,
                 new metadatav1.ExtraArgs(
                   choiceContext,

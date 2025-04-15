@@ -42,7 +42,6 @@ data TwoStepTransfer = TwoStepTransfer with
     lockContext : Text
       -- ^ Context description of the lock. This is used to display the reason for
       -- the lock in wallets.
-    requestedAt : Time
     transferBefore : Time
     transferBeforeDeadline : Text -- ^ Name of the deadline for the transfer
     provider : Party
@@ -72,9 +71,9 @@ holdingToTransferInputs forOwner paymentContext inputHoldingCids =
 
 -- | Prepare a two-step transfer of amulet by locking the funds.
 prepareTwoStepTransfer
-  : TwoStepTransfer -> [ContractId Holding] -> PaymentTransferContext
+  : TwoStepTransfer -> Time -> [ContractId Holding] -> PaymentTransferContext
   -> Update (ContractId LockedAmulet, [ContractId Holding], Metadata)
-prepareTwoStepTransfer TwoStepTransfer{..} inputHoldingCids paymentContext = do
+prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentContext = do
   require "requestedAt < transferBefore" (requestedAt < transferBefore)
   -- over-approximate fees that will be due on the actual transfer
   let receiverOutputForActualTransfer = TransferOutput with

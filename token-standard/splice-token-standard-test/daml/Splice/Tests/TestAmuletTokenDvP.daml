@@ -104,6 +104,7 @@ testDvP = script do
     expectedAdmin = alice
     allocation = aliceAlloc
     inputHoldingCids
+    requestedAt = now
     extraArgs = emptyExtraArgs
   submitWithDisclosuresMustFail' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
@@ -115,6 +116,7 @@ testDvP = script do
     expectedAdmin = registry.dso
     allocation = aliceAlloc
     inputHoldingCids
+    requestedAt = now
     extraArgs = emptyExtraArgs
   result <- submitWithDisclosures' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
@@ -141,6 +143,7 @@ testDvP = script do
     expectedAdmin = registry.dso
     allocation = bobAlloc
     inputHoldingCids
+    requestedAt = now
     extraArgs = emptyExtraArgs
   submitWithDisclosures' bob enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
@@ -209,10 +212,10 @@ appBackendListAllocations : Party -> Reference -> Script [(ContractId Allocation
 appBackendListAllocations p ref = do
   allocs <- queryInterface @Allocation p
   let matchingAllocs = do
-        (cid, Some alloc) <- allocs
-        guard (alloc.settlement.settlementRef == ref)
-        pure (cid, alloc)
-  pure $ sortOn (\(_, alloc) -> alloc.transferLegId) matchingAllocs
+        (cid, Some fundedAllocation) <- allocs
+        guard (fundedAllocation.allocation.settlement.settlementRef == ref)
+        pure (cid, fundedAllocation)
+  pure $ sortOn (\(_, fundedAllocation) -> fundedAllocation.allocation.transferLegId) matchingAllocs
 
 expectBurn : Metadata -> Script ()
 expectBurn meta =

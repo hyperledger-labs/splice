@@ -61,14 +61,13 @@ template OTCTradeProposal with
           prepareUntil
           settleBefore
 
-tradeAllocations : SettlementInfo -> [Api.Token.AllocationV1.TransferLeg] -> [AllocationView]
+tradeAllocations : SettlementInfo -> [Api.Token.AllocationV1.TransferLeg] -> [AllocationSpecification]
 tradeAllocations settlementInfo transferLegs = do
   (i, transferLeg) <- zip [0..length transferLegs] transferLegs
-  pure AllocationView with
+  pure AllocationSpecification with
     settlement = settlementInfo
     transferLegId = i
     transferLeg
-    meta = emptyMetadata
 
 template OTCTrade
   with
@@ -99,12 +98,13 @@ template OTCTrade
               settlementRef = makeTradeRef tradeCid
               allocateBefore = prepareUntil
               settleBefore
+              meta = emptyMetadata
         let expectedAllocations = tradeAllocations settlementInfo transferLegs
         forA (zip3 allocationInstructions extraArgss expectedAllocations) \(instrCid, extraArgs, expectedAlloc) -> do
           -- fetch and validate the allocation instruction
           instr <- fetch @Allocation instrCid
           let instrView = view @Allocation instr
-          require "Allocation matches expected allocation" (instrView == expectedAlloc)
+          require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
           exercise instrCid (Allocation_ExecuteTransfer extraArgs)
 
     interface instance AllocationRequest for OTCTrade where
@@ -115,6 +115,7 @@ template OTCTrade
           settlementRef = makeTradeRef tradeCid
           allocateBefore = prepareUntil
           settleBefore
+          meta = emptyMetadata
         transferLegs
         meta = emptyMetadata
 

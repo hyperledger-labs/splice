@@ -45,16 +45,14 @@ template AmuletTransferInstruction
 -- Transfer instruction evolution
 ---------------------------------
 
-standardTransferToTwoStepTransfer
-  : Time -> Splice.Api.Token.TransferInstructionV1.Transfer-> TwoStepTransfer
-standardTransferToTwoStepTransfer requestedAt transfer =
+standardTransferToTwoStepTransfer : Splice.Api.Token.TransferInstructionV1.Transfer-> TwoStepTransfer
+standardTransferToTwoStepTransfer transfer =
   TwoStepTransfer with
     dso = transfer.instrumentId.admin
     sender = transfer.sender
     provider = transfer.sender
     receiver = transfer.receiver
     amount = transfer.amount
-    requestedAt
     transferBefore = transfer.executeBefore
     transferBeforeDeadline = "Transfer.executeBefore"
     allowFeaturing = False -- unfeatured as the sender is serving as its own "app provider"
@@ -62,7 +60,7 @@ standardTransferToTwoStepTransfer requestedAt transfer =
 
 executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 executeTransferInstr instr extraArgs = do
-  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer.requestedAt instr.transfer
+  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
@@ -73,7 +71,7 @@ executeTransferInstr instr extraArgs = do
 
 abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
 abortAmuletTransferInstruction instr extraArgs = do
-  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer.requestedAt instr.transfer
+  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
   senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
   pure TransferInstructionResult with
     senderChangeCids = senderHoldingCids
