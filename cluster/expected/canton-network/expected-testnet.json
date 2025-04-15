@@ -501,7 +501,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2"
+              "2",
+              "3"
             ]
           }
         },
@@ -557,7 +558,7 @@
           "name": "cn-testzrhnet"
         },
         "cometbftPorts": {
-          "domains": 3
+          "domains": 4
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
