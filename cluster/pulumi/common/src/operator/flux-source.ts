@@ -15,6 +15,9 @@ export type GitFluxRef = {
 };
 export type StackFromRef = { project: string; stack: string };
 
+// Trim non-splitwell DARs to avoid blowing the hardcoded operator size limit of 50mb
+const repoIgnore = 'daml/dars\n!daml/dars/splitwell*';
+
 // https://github.com/fluxcd/source-controller/blob/main/docs/spec/v1/gitrepositories.md
 export function gitRepoForRef(
   nameSuffix: string,
@@ -44,6 +47,7 @@ export function gitRepoForRef(
           },
           secretRef: { name: 'github' },
           recurseSubmodules: true,
+          ignore: repoIgnore,
         },
       },
       {
@@ -76,6 +80,7 @@ export function gitRepoForRef(
             name: `splice-node-${nameSuffix}-base`,
           },
         })),
+        ignore: repoIgnore,
         secretRef: { name: 'github' },
         recurseSubmodules: true,
       },
