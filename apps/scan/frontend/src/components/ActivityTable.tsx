@@ -8,6 +8,8 @@ import {
   Loading,
   RateDisplay,
   TitledTable,
+  UpdateId,
+  updateIdFromEventId,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useActivity } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import BigNumber from 'bignumber.js';
@@ -74,6 +76,7 @@ export const ActivityTable: React.FC = () => {
               <TableCell align="right">Rewards Created</TableCell>
               <TableCell align="right">Total Fees Burnt</TableCell>
               <TableCell align="right">Price</TableCell>
+              <TableCell align="right">Update ID</TableCell>
             </TableRow>
           </TableHead>
 
@@ -287,6 +290,9 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
       </TableCell>
       <TableCell align="right">
         <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={activity.amuletPrice} />
+      </TableCell>
+      <TableCell>
+        <UpdateId updateId={updateIdFromEventId(activity.eventId)} />
       </TableCell>
     </TableRow>
   );
