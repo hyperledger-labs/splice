@@ -1,5 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import * as std from '@pulumi/std';
 import {
   CLUSTER_BASENAME,
@@ -43,7 +44,7 @@ export const getParticipantKmsHelmResources = (
   kmsConfig: KmsConfig
 ): {
   kmsValues: ParticipantKmsHelmResources;
-  gkeCredentialsSecret: k8s.core.v1.Secret;
+  kmsDependencies: pulumi.Resource[];
 } => {
   const gkeCredentialsSecret = new k8s.core.v1.Secret('gke-credentials', {
     metadata: {
@@ -70,8 +71,22 @@ export const getParticipantKmsHelmResources = (
     }
   );
 
+  // Note that by design, GCP keyrings cannot be deleted; a pulumi delete just deletes the resource.
+  // So we might want a "get-or-create" pattern here. But that doesn't work: https://github.com/pulumi/pulumi/issues/3364
+  // So please create the keyring yourself through the UI. Pick a single-region keyring that matches the region of your deployment.
+  // The code below is just there to ensure that the keyring exists before deploying, which will make debugging easier.
+  const keyRing = gcp.kms.KeyRing.get(
+    `${kmsConfig.keyRingId}_keyring`,
+    `projects/${kmsConfig.projectId}/locations/${kmsConfig.locationId}/keyRings/${kmsConfig.keyRingId}`,
+    {
+      name: kmsConfig.keyRingId,
+      location: kmsConfig.locationId,
+      project: kmsConfig.projectId,
+    }
+  );
+
   return {
     kmsValues,
-    gkeCredentialsSecret,
+    kmsDependencies: [gkeCredentialsSecret, keyRing],
   };
 };

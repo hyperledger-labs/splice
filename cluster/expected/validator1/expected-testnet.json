@@ -903,6 +903,18 @@
   },
   {
     "custom": true,
+    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test",
+    "inputs": {
+      "location": "us-central1",
+      "name": "validator1_test",
+      "project": "da-cn-devnet"
+    },
+    "name": "validator1_test_keyring",
+    "provider": "",
+    "type": "gcp:kms/keyRing:KeyRing"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
