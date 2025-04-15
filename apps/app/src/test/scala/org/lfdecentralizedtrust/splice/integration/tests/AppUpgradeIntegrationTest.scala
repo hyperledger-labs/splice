@@ -244,6 +244,7 @@ class AppUpgradeIntegrationTest
             java.util.Optional.empty(),
             java.util.Optional.empty(),
           )
+          // TODO(#16139): adaptation to this test required
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_AddFutureAmuletConfigSchedule(
               new AmuletRules_AddFutureAmuletConfigSchedule(
@@ -266,6 +267,7 @@ class AppUpgradeIntegrationTest
                     "url",
                     "description",
                     sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                    None,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -329,6 +331,7 @@ class AppUpgradeIntegrationTest
                     "url",
                     "description",
                     sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                    None,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)

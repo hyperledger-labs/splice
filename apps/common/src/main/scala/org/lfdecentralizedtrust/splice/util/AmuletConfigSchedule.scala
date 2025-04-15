@@ -5,8 +5,13 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 
 import java.time.Instant
+import scala.compat.java8.OptionConverters.RichOptionalGeneric
 import scala.jdk.CollectionConverters.*
 
 /** Scala representation of amulet configuration schedule. */
@@ -49,4 +54,27 @@ object AmuletConfigSchedule {
         t._1 -> t._2
       }.toSeq,
     )
+
+  /** Helper to filter `CRARC_SetConfig` actions that have a `targetEffectiveAt` from all active VoteRequests
+    */
+  def filterAmuletBasedSetConfigVoteRequests(
+      voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+  ): Seq[(Option[Instant], AmuletConfig[USD])] = {
+    voteRequests.flatMap { voteRequest =>
+      voteRequest.payload.action match {
+        case action: ARC_AmuletRules =>
+          action.amuletRulesAction match {
+            case action: CRARC_SetConfig =>
+              voteRequest.payload.targetEffectiveAt.asScala match {
+                case Some(effectiveAt) =>
+                  Some((Some(effectiveAt), action.amuletRules_SetConfigValue.newConfig))
+                case _ =>
+                  Some((None, action.amuletRules_SetConfigValue.newConfig))
+              }
+            case _ => None
+          }
+        case _ => None
+      }
+    }
+  }
 }

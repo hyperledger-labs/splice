@@ -60,22 +60,20 @@ class HttpTokenStandardAllocationInstructionHandler(
           definitions.FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
             definitions.ChoiceContext(
-              choiceContextData = Some(
-                io.circe.parser
-                  .parse(
-                    new metadatav1.ChoiceContext(
-                      Map(
-                        "amulet-rules" -> amuletRules.contractId.contractId,
-                        "open-round" -> newestOpenRound.contractId.contractId,
-                      ).map[String, metadatav1.AnyValue] { case (k, v) =>
-                        k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
-                      }.asJava
-                    ).toJson
-                  )
-                  .getOrElse(
-                    throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
-                  )
-              ),
+              choiceContextData = io.circe.parser
+                .parse(
+                  new metadatav1.ChoiceContext(
+                    Map(
+                      "amulet-rules" -> amuletRules.contractId.contractId,
+                      "open-round" -> newestOpenRound.contractId.contractId,
+                    ).map[String, metadatav1.AnyValue] { case (k, v) =>
+                      k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
+                    }.asJava
+                  ).toJson
+                )
+                .getOrElse(
+                  throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
+                ),
               disclosedContracts = Vector(
                 toTokenStandardDisclosedContract(
                   externalPartyAmuletRules.contract,
@@ -84,9 +82,6 @@ class HttpTokenStandardAllocationInstructionHandler(
                 toTokenStandardDisclosedContract(amuletRules, activeSynchronizerId),
                 toTokenStandardDisclosedContract(newestOpenRound.contract, activeSynchronizerId),
               ),
-            ),
-            validUntil = newestOpenRound.payload.targetClosesAt.atOffset(
-              ZoneOffset.UTC
             ),
           )
         )

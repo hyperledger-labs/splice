@@ -26,35 +26,23 @@ import io.grpc.Status
 import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.HasParticipantId
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
-import org.lfdecentralizedtrust.splice.util.{DarUtil, UploadablePackage}
+import org.lfdecentralizedtrust.splice.util.UploadablePackage
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.Future
+import scala.util.Using
 
 trait ParticipantAdminDarsConnection {
   this: ParticipantAdminConnection & HasParticipantId =>
 
   def uploadDarFiles(
-      pkgs: Seq[UploadablePackage],
-      retryFor: RetryFor,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] =
-    pkgs.parTraverse_(
-      uploadDarFile(_, retryFor)
-    )
-
-  private def uploadDarFile(
-      pkg: UploadablePackage,
+      pkg: Seq[UploadablePackage],
       retryFor: RetryFor,
       vetTheDar: Boolean = false,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val file = ByteString.readFrom(pkg.inputStream())
-    uploadDarLocally(
-      pkg.resourcePath,
-      file,
-      pkg.packageId,
+    uploadDarsLocally(
+      pkg,
       retryFor,
       vetTheDar,
     )
@@ -66,47 +54,47 @@ trait ParticipantAdminDarsConnection {
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       darFile <- Future {
-        ByteString.readFrom(Files.newInputStream(path))
+        Using.resource(Files.newInputStream(path)) { stream =>
+          ByteString.readFrom(stream)
+        }
       }
       // we vet the dar ourselves to ensure we have retries around topology failures
-      _ <- uploadDarLocally(
-        path.toString,
-        darFile,
-        DarUtil.readPackageId(path.toString, Files.newInputStream(path)),
+      _ <- uploadDarsLocally(
+        Seq(UploadablePackage.fromByteString(path.getFileName.toString, darFile)),
         retryFor,
         vetTheDar = false,
       )
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
       _ <- domains.traverse { domainId =>
-        vetDar(domainId, darResource, None)
+        vetDars(domainId, Seq(darResource), None)
       }
     } yield ()
 
-  def vetDar(domainId: SynchronizerId, dar: DarResource, fromDate: Option[Instant])(implicit
+  def vetDars(domainId: SynchronizerId, dars: Seq[DarResource], fromDate: Option[Instant])(implicit
       tc: TraceContext
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
     ensureTopologyMapping[VettedPackages](
       // we publish to the authorized store so that it pushed on all the domains and the console commands are still useful when dealing with dars
       AuthorizedStore,
-      s"dar ${dar.packageId} ${dar.metadata} is vetted in the authorized store",
+      s"dars ${dars.map(_.packageId)} are vetted in the authorized store",
       EitherT(
         getVettingState(None).map { vettedPackages =>
-          val packages = vettedPackages.mapping.packages
-          packages.find(_.packageId == dar.packageId) match {
-            case Some(_) =>
-              // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
-              Right(vettedPackages)
-            case None =>
-              Left(vettedPackages)
+          if (
+            dars.forall(dar => vettedPackages.mapping.packages.exists(_.packageId == dar.packageId))
+          ) {
+            // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
+            Right(vettedPackages)
+          } else {
+            Left(vettedPackages)
           }
         }
       ),
       currentVettingState =>
         Right(
-          updateVettingStateForDar(
-            dar = dar,
+          updateVettingStateForDars(
+            dars = dars,
             packageValidFrom = cantonFromDate,
             currentVetting = currentVettingState,
           )
@@ -115,19 +103,20 @@ trait ParticipantAdminDarsConnection {
     ).flatMap(_ =>
       retryProvider.waitUntil(
         RetryFor.Automation,
-        s"vet_dar_on_domain",
-        s"Dar ${dar.packageId} is vetted on domain $domainId",
-        getVettingState(domainId).map(
-          _.mapping.packages
-            .find(_.packageId == dar.packageId)
-            .fold(
-              throw Status.NOT_FOUND
-                .withDescription(
-                  s"Dar ${dar.packageId} is not vetted on domain $domainId"
-                )
-                .asRuntimeException
-            )(_ => ())
-        ),
+        s"vet_dars_on_domain",
+        s"Dars ${dars.map(_.packageId)} are vetted on domain $domainId",
+        getVettingState(domainId).map { vettingState =>
+          val packagesNotVetted = dars.filterNot(dar =>
+            vettingState.mapping.packages.exists(_.packageId == dar.packageId)
+          )
+          if (packagesNotVetted.nonEmpty) {
+            throw Status.NOT_FOUND
+              .withDescription(
+                s"Dar ${packagesNotVetted.map(_.packageId)} are not vetted on domain $domainId"
+              )
+              .asRuntimeException
+          }
+        },
         logger,
       )
     )
@@ -139,6 +128,15 @@ trait ParticipantAdminDarsConnection {
     runCmd(
       ParticipantAdminConnection.LookupDarByteString(mainPackageId)
     )
+  private def updateVettingStateForDars(
+      dars: Seq[DarResource],
+      packageValidFrom: Option[CantonTimestamp],
+      currentVetting: VettedPackages,
+  ) = {
+    dars.foldLeft(currentVetting)((currentVetting, dar) =>
+      updateVettingStateForDar(dar, packageValidFrom, currentVetting)
+    )
+  }
 
   private def updateVettingStateForDar(
       dar: DarResource,
@@ -251,39 +249,47 @@ trait ParticipantAdminDarsConnection {
       ParticipantAdminCommands.Package.ListDars(filterName = "", limit)
     )
 
-  private def uploadDarLocally(
-      path: String,
-      darFile: => ByteString,
-      mainPackageId: String,
+  private def uploadDarsLocally(
+      dars: Seq[UploadablePackage],
       retryFor: RetryFor,
       vetTheDar: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
-      _ <- retryProvider
-        .ensureThatO(
-          retryFor,
-          "upload_dar",
-          s"DAR file $path with package id $mainPackageId has been uploaded.",
-          // TODO(#5141) and TODO(#5755): consider if we still need a check here
-          lookupDar(mainPackageId).map(_.map(_ => ())),
-          runCmd(
-            ParticipantAdminCommands.Package
-              .UploadDar(
-                path,
-                vetAllPackages = vetTheDar,
-                synchronizeVetting = vetTheDar,
-                description = "",
-                expectedMainPackageId = mainPackageId,
-                requestHeaders = Map.empty,
-                logger,
-                Some(darFile),
-              )
-          ).map(_ => ()),
-          logger,
-        )
-    } yield ()
+      existingDars <- listDars().map(_.map(_.mainPackageId))
+      darsToUploads = dars.filterNot(dar => existingDars.contains(dar.packageId))
+      _ <- darsToUploads.parTraverse_(uploadDar(_, vetTheDar, retryFor))
+    } yield {}
   }
 
+  private def uploadDar(dar: UploadablePackage, vetTheDar: Boolean, retryFor: RetryFor)(implicit
+      tc: TraceContext
+  ) = {
+    retryProvider.retry(
+      retryFor,
+      "upload_dar",
+      s"Upload dar ${dar.packageId} with vetting $vetTheDar",
+      runCmd(
+        ParticipantAdminCommands.Package
+          .UploadDar(
+            dar.resourcePath,
+            vetAllPackages = vetTheDar,
+            synchronizeVetting = vetTheDar,
+            description = "",
+            expectedMainPackageId = dar.packageId,
+            requestHeaders = Map.empty,
+            logger,
+            Some(
+              Using.resource(
+                dar.inputStream()
+              ) { stream =>
+                ByteString.readFrom(stream)
+              }
+            ),
+          )
+      ).map(_ => ()),
+      logger,
+    )
+  }
 }

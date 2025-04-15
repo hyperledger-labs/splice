@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250331.13697.0.vef800592"
+  val version: String = "3.3.0-snapshot.20250409.13732.0.v6b38b804"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -23,7 +23,7 @@ object CantonDependencies {
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
-  lazy val apispec_version = "0.7.2"
+  lazy val apispec_version = "0.11.7"
   lazy val pekko_version = "1.1.2"
   lazy val pekko_http_version = "1.1.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
@@ -240,7 +240,7 @@ object CantonDependencies {
   lazy val sttp_okhttp = "com.softwaremill.sttp.client3" %% "okhttp-backend" % sttp_version
   lazy val sttp_circe = "com.softwaremill.sttp.client3" %% "circe" % sttp_version
 
-  lazy val tapir_version = "1.8.5"
+  lazy val tapir_version = "1.11.7"
   lazy val tapir_json_circe = "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % tapir_version
   lazy val tapir_pekko_http_server =
     "com.softwaremill.sttp.tapir" %% "tapir-pekko-http-server" % tapir_version

@@ -57,7 +57,6 @@ object ContractCompanions {
 
   // Unfortunately interfaces need to be declared explicitly, as there's no auto-generated list of decoders
   private val interfaces = Seq(
-    holdingv1.BurnMintFactory.INTERFACE,
     holdingv1.Holding.INTERFACE,
     transferinstructionv1.TransferInstruction.INTERFACE,
     transferinstructionv1.TransferFactory.INTERFACE,

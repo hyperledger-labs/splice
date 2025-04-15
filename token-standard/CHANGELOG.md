@@ -13,6 +13,35 @@ Major changes:
   difficult to standardize in a uniform way. We expect to reintroduce a separate standard to
   aid wallets in navigating to registry specific UIs running locally against an investor's
   Canton node in the future.
+- Moved `BurnMintFactory` to a dedicated `splice-api-burn-mint-v1`
+  packages. `BurnMintFactory` is intended to decouple apps like
+  bridges that need to execute burns and mints from the underlying
+  token model which isn't a core part of holdings.
+- Added additional metadata keys to support universal transaction history
+  parsing of registry-internal workflows. It is based on annotating exercise nodes on choices
+  that are not standardized with a `splice.lfdecentralizedtrust.org/tx-kind`
+  metadata key with one of the following values:
+    1. `transfer`: transfer control over a holding from sender to one or more receivers and/or lock holders
+    2. `expire-dust`: sweep a dust holding (e.g. an expired `Amulet`)
+    3. `merge-split`: a transaction that merges and then splits a number of holdings by the same owner
+    4. `burn`: a transaction intended to burn some amount of holding
+    5. `mint`: a transation for minting some amount of holding
+    6. `unlock`: unlock a locked holding
+  Transfers should additionally be annoted with `splice.lfdecentralizedtrust.org/sender` to denote
+  the sender of the transfer. These annotations are only required on the non-standardized choices.
+
+  These annotations can be provided on non-standardized choices using smart-contract upgrading to
+  add a `meta : Optional TextMap` field to the choice return type. The transaction history parser
+  will just match that field by name to extract the metadata of an unknown choice.
+
+  Additionally, both non-standard and standardized choices MAY be annotated with
+  `splice.lfdecentralizedtrust.org/burned` to annotate the amount of holdings burned in this transaction.
+  The amount minted is inferred by the transaction history parser as the difference between
+  the amount of holdings before and after the transaction minus the burn. This construction only supports
+  choices that consume holdings from a single owner and a single instrument only, which we deem
+  to be a reasonably assumption. Choices that consume holdings from multiple senders or multiple holding
+  types are parsed as a batch of multiple events.
+
 
 Polishing changes
 
@@ -22,6 +51,17 @@ Polishing changes
   holding by contract id.
 - Rename the `AllocationInstruction.inputHoldings` field and the
   `Transfer.holdingCids` field to `inputHoldingCids` for uniformity
+- Removed the `validUntil` field from choice contexts returned by off-ledger APIs,
+  as that is a left-over from a design stage where we did not require registries to support
+  a 24h prepare-submission delay time by default.
+- Improve extensibility by allowing to pass the metadata intended to be used
+  when exercising a choice into the off-ledger API for fetching the choice context.
+- Distinguish in the `TransferInstructionResult` betweeen successful and failed completions
+  of a transfer instruction; and allow both create and update steps for transfer instructions
+  to return "change" to the sender. Thereby improving the sender's ability to batch multiple
+  transfer instruction steps in a single Daml transaction for high throughput use-cases.
+- Move amulet specific metadata keys under `amulet.splice.lfdecentralizedtrust.org/`
+  to distinguish them from keys that are intended for all tokens implementing the token standard.
 
 ## 2025-03-31
 

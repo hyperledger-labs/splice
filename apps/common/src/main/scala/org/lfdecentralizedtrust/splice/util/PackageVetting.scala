@@ -4,18 +4,17 @@
 package org.lfdecentralizedtrust.splice.util
 
 import cats.syntax.foldable.*
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.environment.{
-  DarResources,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.environment.*
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -25,8 +24,9 @@ class PackageVetting(
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext)
-    extends NamedLogging {
+)(implicit ec: ExecutionContext, tracer: Tracer)
+    extends NamedLogging
+    with Spanning {
 
   def vetCurrentPackages(
       domainId: SynchronizerId,
@@ -36,42 +36,45 @@ class PackageVetting(
     val currentPackageConfig = schedule.getConfigAsOf(clock.now).packageConfig
     val currentRequiredPackages =
       packages.map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
-    currentRequiredPackages.toSeq.traverse_ { case (pkg, packageVersion) =>
+    val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
       DarResources
         .lookupAllPackageVersions(pkg.packageName)
         .filter(_.metadata.version <= packageVersion)
-        .traverse_(darResource =>
-          vetPackage(
-            domainId,
-            pkg,
-            darResource.metadata.version,
-            None,
-          )
-        )
+        .map(versionToVet => pkg -> versionToVet.metadata.version)
     }
+    vetPackages(
+      domainId,
+      packagesToVet,
+      None,
+    )
   }
 
   def vetPackages(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
+      futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val vettingSchedule =
-      associatePackageVersionsByEarliestVettingDate(amuletRules.createdAt, schedule)
-    vettingSchedule.toSeq.traverse_ { case ((packageName, packageVersion), validFrom) =>
-      vetPackage(domainId, packageName, packageVersion, Some(validFrom))
+      associatePackageVersionsByEarliestVettingDate(
+        amuletRules.createdAt,
+        schedule,
+        futureAmuletConfigFromVoteRequests,
+      )
+    vettingSchedule.toSeq.traverse_ { case (validFrom, packages) =>
+      vetPackages(domainId, packages.toSeq, Some(validFrom))
     }
   }
 
-  private def vetPackage(
+  private def vetPackages(
       domainId: SynchronizerId,
-      pkg: PackageIdResolver.Package,
-      packageVersion: PackageVersion,
+      packages: Seq[(PackageIdResolver.Package, PackageVersion)],
       validFrom: Option[Instant],
   )(implicit tc: TraceContext): Future[Unit] = {
-    for {
+    logger.debug(s"Vetting packages: ${packages.mkString(", ")} on $domainId valid from $validFrom")
+    val resources = packages.flatMap { case (pkg, packageVersion) =>
       // Upload the version required by current config, and log an error if it is not part of the deployed release
-      _ <- DarResources.lookupPackageMetadata(pkg.packageName, packageVersion) match {
+      DarResources.lookupPackageMetadata(pkg.packageName, packageVersion) match {
         case None =>
           validFrom match {
             case Some(time) =>
@@ -83,22 +86,50 @@ class PackageVetting(
                 show"Package ${pkg.packageName} is required in version ${packageVersion.toString()} according to AmuletConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
               )
           }
-          Future.unit
-        case Some(resource) =>
-          participantAdminConnection.vetDar(
-            domainId,
-            resource,
-            fromDate = validFrom,
-          )
+          None
+        case valid =>
+          valid
       }
-    } yield ()
+    }
+    uploadDarsAndVet(
+      domainId = domainId,
+      validFrom = validFrom,
+      resources,
+    )
+  }
+
+  private def uploadDarsAndVet(
+      domainId: SynchronizerId,
+      validFrom: Option[Instant],
+      resources: Seq[DarResource],
+  )(implicit tc: TraceContext) = {
+    for {
+      _ <- withSpan("upload_dars") { implicit tc => _ =>
+        participantAdminConnection.uploadDarFiles(
+          resources.map(
+            UploadablePackage.fromResource
+          ),
+          RetryFor.Automation,
+        )
+      }
+      _ <- withSpan("vet_dars") { implicit tc => _ =>
+        participantAdminConnection.vetDars(
+          domainId,
+          resources,
+          fromDate = validFrom,
+        )
+      }
+    } yield {}
   }
 
   private def associatePackageVersionsByEarliestVettingDate(
       createdAt: Instant,
       amuletConfigSchedule: AmuletConfigSchedule,
+      futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
   ) = {
-    (amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
+    (futureAmuletConfigFromVoteRequests.collect { case (Some(effectiveAt), config) =>
+      (effectiveAt, config)
+    } ++ amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
       .flatMap { case (time, config) =>
         packages.map(pkg =>
           time -> (pkg -> PackageIdResolver.readPackageVersion(config.packageConfig, pkg))
@@ -107,6 +138,16 @@ class PackageVetting(
       .groupMapReduce(_._2)(_._1) { case (time1, time2) =>
         if (time1.isBefore(time2)) time1 else time2
       }
+      .groupMap(_._2)(_._1)
   }
 
+}
+
+object PackageVetting {
+  trait HasVoteRequests {
+
+    def getVoteRequests()(implicit
+        tc: TraceContext
+    ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]]
+  }
 }

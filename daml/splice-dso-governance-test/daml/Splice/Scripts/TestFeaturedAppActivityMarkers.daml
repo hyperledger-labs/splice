@@ -64,10 +64,10 @@ testFeaturedAppActivityMarkers = do
     with
       beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.3]
 
-  -- Fails if weight is smaller than 0.05
+  -- Fails if length beneficiaries > 20
   submitMustFail provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
-      beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.96, Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.04]
+      beneficiaries = Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.8 :: replicate 20 (Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.01)
 
   FeaturedAppRight_CreateActivityMarkerResult [marker1Iface, marker2Iface] <- submit provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
@@ -169,4 +169,3 @@ testFeaturedAppActivityMarkersConfigDisabled = do
   None <- queryInterfaceContractId app.dso markerIface
 
   pure ()
-

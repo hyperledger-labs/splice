@@ -5,7 +5,6 @@ package com.digitalasset.canton.protocol.messages
 
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.ProtoDeserializationError.{InvariantViolation, OtherError}
@@ -20,8 +19,9 @@ import com.google.protobuf.empty
 import pprint.Tree
 
 trait TransactionRejection {
-  def logWithContext(extra: Map[String, String] = Map())(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+
+  def logRejection(extra: Map[String, String] = Map())(implicit
+      errorLoggingContext: ErrorLoggingContext
   ): Unit
 
   def reason(): com.google.rpc.status.Status
@@ -95,17 +95,18 @@ object Verdict
       param("isMalformed", _.isMalformed),
     )
 
-    override def logWithContext(
+    override def logRejection(
         extra: Map[String, String]
-    )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Unit =
+    )(implicit errorLoggingContext: ErrorLoggingContext): Unit =
       // Log with level INFO, leave it to MediatorError to log the details.
-      contextualizedErrorLogger.withContext(extra) {
+      errorLoggingContext.withContext(extra) {
         lazy val action = if (isMalformed) "malformed" else "rejected"
-        contextualizedErrorLogger.info(show"Request is finalized as $action. $reason")
+        errorLoggingContext.info(show"Request is finalized as $action. $reason")
       }
 
     override def isTimeoutDeterminedByMediator: Boolean =
       DecodedCantonError.fromGrpcStatus(reason).exists(_.code.id == MediatorError.Timeout.id)
+
   }
 
   object MediatorReject {
@@ -163,7 +164,7 @@ object Verdict
     def keyEvent(implicit loggingContext: ErrorLoggingContext): LocalReject = {
       if (reasons.lengthCompare(1) > 0) {
         val message = show"Request was rejected with multiple reasons. $reasons"
-        loggingContext.logger.info(message)(loggingContext.traceContext)
+        loggingContext.info(message)
       }
       reasons.map { case (_, localReject) => localReject }.head1
     }

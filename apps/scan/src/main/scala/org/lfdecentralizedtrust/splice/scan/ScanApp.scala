@@ -92,8 +92,8 @@ class ScanApp(
       nodeMetrics,
     ) {
 
-  override def packages =
-    super.packages ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
+  override def packagesForJsonDecoding =
+    super.packagesForJsonDecoding ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,

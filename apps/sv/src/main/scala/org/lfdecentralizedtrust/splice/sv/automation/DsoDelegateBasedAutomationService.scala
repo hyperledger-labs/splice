@@ -3,9 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
+  TriggerClass,
+  aTrigger,
+}
 import org.lfdecentralizedtrust.splice.automation.{AutomationService, AutomationServiceCompanion}
-import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -13,9 +19,6 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.*
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.time.Clock
-import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
 
@@ -49,7 +52,6 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
     if (config.automation.enableDsoGovernance) {
       registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
-      registerTrigger(new CloseVoteRequestWithEarlyClosingTrigger(triggerContext, svTaskContext))
     }
     registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
@@ -104,7 +106,6 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[AdvanceOpenMiningRoundTrigger],
     aTrigger[CompletedSvOnboardingTrigger],
     aTrigger[ExecuteConfirmedActionTrigger],
-    aTrigger[CloseVoteRequestWithEarlyClosingTrigger],
     aTrigger[MergeMemberTrafficContractsTrigger],
     aTrigger[ExpiredAmuletTrigger],
     aTrigger[ExpiredLockedAmuletTrigger],

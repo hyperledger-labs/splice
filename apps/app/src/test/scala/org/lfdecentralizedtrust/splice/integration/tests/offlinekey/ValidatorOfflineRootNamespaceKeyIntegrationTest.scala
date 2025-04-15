@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.DelegationRestriction
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -107,7 +108,7 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
       val aliceParticipant = aliceValidatorBackend.participantClientWithAdminToken
       val rootKeyId = aliceParticipant.topology.namespace_delegations
         .list(TopologyStoreId.Authorized)
-        .filter(_.item.isRootDelegation)(0)
+        .filter(_.item.restrictedToMappings == DelegationRestriction.CanSignAllMappings)(0)
         .item
         .target
         .id
@@ -122,7 +123,7 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
           aliceParticipant.topology.namespace_delegations.propose_delegation(
             aliceParticipant.id.namespace,
             delegateKey,
-            isRootDelegation = false,
+            delegationRestriction = DelegationRestriction.CanSignAllButNamespaceDelegations,
           )
         },
       )(

@@ -5,14 +5,15 @@ package org.lfdecentralizedtrust.splice.automation
 
 import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
-import org.lfdecentralizedtrust.splice.util.PackageVetting
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, PackageVetting}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
 
 abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     extends PollingTrigger
-    with PackageIdResolver.HasAmuletRules {
+    with PackageIdResolver.HasAmuletRules
+    with PackageVetting.HasVoteRequests {
 
   def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId]
 
@@ -29,7 +30,12 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     for {
       domainId <- getSynchronizerId()
       amuletRules <- getAmuletRules()
-      _ <- vetting.vetPackages(domainId, amuletRules)
+      voteRequests <- getVoteRequests()
+      _ <- vetting.vetPackages(
+        domainId,
+        amuletRules,
+        AmuletConfigSchedule.filterAmuletBasedSetConfigVoteRequests(voteRequests),
+      )
     } yield false
   }
 }

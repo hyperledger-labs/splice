@@ -17,7 +17,6 @@ import com.daml.ledger.api.v2.package_service.{
 }
 import com.daml.logging.LoggingContext
 import com.daml.tracing.Telemetry
-import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.grpc.Logging.traceId
@@ -83,7 +82,7 @@ private[apiserver] final class ApiPackageService(
               Future.failed[GetPackageResponse](
                 RequestValidationErrors.NotFound.Package
                   .Reject(packageId = packageId)(
-                    createContextualizedErrorLogger
+                    createerrorLoggingContext
                   )
                   .asGrpcError
               )
@@ -131,7 +130,7 @@ private[apiserver] final class ApiPackageService(
               request,
               ValidationErrors
                 .invalidArgument(s"Invalid package id: $errorMessage")(
-                  createContextualizedErrorLogger
+                  createerrorLoggingContext
                 ),
             )
           ),
@@ -150,8 +149,8 @@ private[apiserver] final class ApiPackageService(
     )
   }
 
-  private def createContextualizedErrorLogger(implicit
+  private def createerrorLoggingContext(implicit
       loggingContext: LoggingContextWithTrace
-  ): ContextualizedErrorLogger =
+  ): ErrorLoggingContext =
     ErrorLoggingContext(logger, loggingContext)
 }

@@ -5,7 +5,6 @@ package com.digitalasset.canton.platform.apiserver.services.command
 
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.timer.Delayed
-import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
@@ -115,7 +114,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
           .toSeq
           .mkString("\n  ")}")
 
-      implicit val errorLoggingContext: ContextualizedErrorLogger =
+      implicit val errorLoggingContext: ErrorLoggingContext =
         ErrorLoggingContext.fromOption(
           logger,
           loggingContext,
@@ -156,7 +155,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
       commands: ApiCommands,
   )(implicit
       loggingContext: LoggingContextWithTrace,
-      errorLoggingContext: ContextualizedErrorLogger,
+      errorLoggingContext: ErrorLoggingContext,
   ): FutureUnlessShutdown[state.SubmissionResult] =
     checkOverloaded(loggingContext.traceContext)
       .map(FutureUnlessShutdown.pure)
@@ -230,7 +229,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
   private def failedOnCommandProcessing(
       error: ErrorCause
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): FutureUnlessShutdown[SubmissionResult] =
     FutureUnlessShutdown.failed(
       RejectionGenerators

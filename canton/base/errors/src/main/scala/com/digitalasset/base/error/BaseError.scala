@@ -50,9 +50,9 @@ trait BaseError extends LocationMixin {
   def resources: Seq[(ErrorResource, String)] = Seq()
 
   def logWithContext(extra: Map[String, String] = Map())(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: BaseErrorLogger
   ): Unit =
-    contextualizedErrorLogger.logError(this, extra)
+    errorLoggingContext.logError(this, extra)
 
   /** Returns retryability information of this particular error
     *
@@ -68,7 +68,7 @@ trait BaseError extends LocationMixin {
   def definiteAnswerO: Option[Boolean] = None
 
   def rpcStatus()(implicit
-      loggingContext: ContextualizedErrorLogger
+      loggingContext: BaseErrorLogger
   ): com.google.rpc.status.Status =
     ProtoStatus.fromJavaProto(ErrorCode.asGrpcStatus(this))
 

@@ -153,6 +153,7 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
       "description",
       // The offboarding becomes effective after the timeout set here, unless we have SV4 vote as well.
       new RelTime(30_000_000),
+      None,
     )
     val trackingCid = sv1Backend.getLatestVoteRequestTrackingCid()
     Seq(sv2Backend, sv3Backend).foreach { sv =>

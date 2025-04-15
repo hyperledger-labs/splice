@@ -3,19 +3,14 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.digitalasset.base.error.{
-  BaseError,
-  ContextualizedErrorLogger,
-  DamlErrorWithDefiniteAnswer,
-  NoLogging,
-  RpcError,
-}
+import com.digitalasset.base.error.{BaseError, DamlErrorWithDefiniteAnswer, RpcError}
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.groups.{
   CommandExecutionErrors,
   ConsistencyErrors,
   RequestValidationErrors,
 }
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
@@ -51,7 +46,7 @@ object ErrorCause {
 object RejectionGenerators {
 
   def commandExecutorError(cause: ErrorCause)(implicit
-      errorLoggingContext: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): RpcError = {
 
     def processPackageError(err: LfError.Package.Error): RpcError = err match {
@@ -102,6 +97,9 @@ object RejectionGenerators {
         case _: LfInterpretationError.FailedAuthorization =>
           CommandExecutionErrors.Interpreter.AuthorizationError
             .Reject(renderedMessage)
+        case LfInterpretationError.UnresolvedPackageName(packageName) =>
+          CommandExecutionErrors.Interpreter.LookupErrors.UnresolvedPackageName
+            .Reject(renderedMessage, packageName)
         case e: LfInterpretationError.ContractNotActive =>
           CommandExecutionErrors.Interpreter.ContractNotActive
             .Reject(renderedMessage, e)
@@ -154,7 +152,7 @@ object RejectionGenerators {
             .Reject(renderedMessage, e)
         case e: LfInterpretationError.FailureStatus =>
           CommandExecutionErrors.Interpreter.FailureStatus
-            .Reject(renderedMessage, e)
+            .Reject(renderedMessage, e, transactionTrace)
         case LfInterpretationError.Upgrade(error: LfInterpretationError.Upgrade.ValidationFailed) =>
           CommandExecutionErrors.Interpreter.UpgradeError.ValidationFailed
             .Reject(renderedMessage, error)
@@ -168,9 +166,27 @@ object RejectionGenerators {
             ) =>
           CommandExecutionErrors.Interpreter.UpgradeError.DowngradeFailed
             .Reject(renderedMessage, error)
+        case LfInterpretationError.CCTP(
+              error: LfInterpretationError.CCTP.MalformedByteEncoding
+            ) =>
+          CommandExecutionErrors.Interpreter.CryptoError.MalformedByteEncoding
+            .Reject(renderedMessage, error)
+        case LfInterpretationError.CCTP(
+              error: LfInterpretationError.CCTP.MalformedKey
+            ) =>
+          CommandExecutionErrors.Interpreter.CryptoError.MalformedKey
+            .Reject(renderedMessage, error)
+        case LfInterpretationError.CCTP(
+              error: LfInterpretationError.CCTP.MalformedSignature
+            ) =>
+          CommandExecutionErrors.Interpreter.CryptoError.MalformedSignature
+            .Reject(renderedMessage, error)
         case LfInterpretationError.Dev(_, err) =>
           CommandExecutionErrors.Interpreter.InterpretationDevError
             .Reject(renderedMessage, err)
+        case LfInterpretationError.CCTP(_) =>
+          // Splice stub, replace on next fork upgrade
+          ???
       }
 
     def processInterpretationError(

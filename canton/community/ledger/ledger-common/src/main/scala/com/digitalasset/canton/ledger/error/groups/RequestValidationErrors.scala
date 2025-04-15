@@ -5,7 +5,6 @@ package com.digitalasset.canton.ledger.error.groups
 
 import com.digitalasset.base.error.{
   ContextualizedDamlError,
-  ContextualizedErrorLogger,
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
   ErrorCode,
@@ -19,8 +18,10 @@ import com.digitalasset.canton.ledger.error.LedgerApiErrors.{
   LatestOffsetMetadataKey,
 }
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.RequestValidationErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.language.{LookupError, Reference}
+import com.digitalasset.daml.lf.value.Value.ContractId
 
 import java.time.Duration
 
@@ -39,7 +40,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
           ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
       final case class Reject(packageId: String)(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = "Could not find package."
           ) {
@@ -52,12 +53,13 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
           pkgRef: Ref.PackageRef,
           reference: Reference,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = LookupError.MissingPackage.pretty(pkgRef, reference)
           )
     }
 
+    // TODO(#23504) remove the error when it is no longer used
     @Explanation(
       "The transaction does not exist or the requesting set of parties are not authorized to fetch it."
     )
@@ -71,7 +73,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         ) {
 
       final case class RejectWithTxId(transactionId: String)(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(cause = "Transaction not found, or not visible.") {
         override def resources: Seq[(ErrorResource, String)] = Seq(
           (ErrorResource.TransactionId, transactionId)
@@ -79,10 +81,60 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
       }
 
       final case class RejectWithOffset(offset: Long)(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(cause = "Transaction not found, or not visible.") {
         override def resources: Seq[(ErrorResource, String)] = Seq(
           (ErrorResource.Offset, offset.toString)
+        )
+      }
+    }
+
+    @Explanation(
+      "The update does not exist or the update format specified filters it out."
+    )
+    @Resolution(
+      "Check the update id or offset and verify that the requested update is not being filtered out by the update format."
+    )
+    object Update
+        extends ErrorCode(
+          id = "UPDATE_NOT_FOUND",
+          ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+        ) {
+
+      final case class RejectWithTxId(updateId: String)(implicit
+          loggingContext: ErrorLoggingContext
+      ) extends DamlErrorWithDefiniteAnswer(cause = "Update not found, or not visible.") {
+        override def resources: Seq[(ErrorResource, String)] = Seq(
+          (ErrorResource.UpdateId, updateId)
+        )
+      }
+
+      final case class RejectWithOffset(offset: Long)(implicit
+          loggingContext: ErrorLoggingContext
+      ) extends DamlErrorWithDefiniteAnswer(cause = "Update not found, or not visible.") {
+        override def resources: Seq[(ErrorResource, String)] = Seq(
+          (ErrorResource.Offset, offset.toString)
+        )
+      }
+    }
+
+    @Explanation(
+      "Events for the specified contract ID do not exist or the event format specified filters them out."
+    )
+    @Resolution(
+      "Check the contract ID and verify that the requested events are not being filtered out by the event format."
+    )
+    object ContractEvents
+        extends ErrorCode(
+          id = "CONTRACT_EVENTS_NOT_FOUND",
+          ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+        ) {
+
+      final case class Reject(contractId: ContractId)(implicit
+          loggingContext: ErrorLoggingContext
+      ) extends DamlErrorWithDefiniteAnswer(cause = "Contract events not found, or not visible.") {
+        override def resources: Seq[(ErrorResource, String)] = Seq(
+          (ErrorResource.ContractId, contractId.coid)
         )
       }
     }
@@ -120,7 +172,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
       final case class Reject(
           unknownTemplatesOrInterfaces: Seq[Either[Ref.Identifier, Ref.Identifier]]
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(cause = buildCause(unknownTemplatesOrInterfaces)) {
         override def resources: Seq[(ErrorResource, String)] =
           unknownTemplatesOrInterfaces.map {
@@ -142,7 +194,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
           category = ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
       final case class Reject(unknownPackageNames: Set[Ref.PackageName])(implicit
-          contextualizedErrorLogger: ContextualizedErrorLogger
+          errorLoggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause =
               s"The following package names do not match upgradable packages uploaded on this participant: [${unknownPackageNames
@@ -162,7 +214,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
           category = ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
       final case class Reject(noKnownReferences: Set[(Ref.PackageName, Ref.QualifiedName)])(implicit
-          contextualizedErrorLogger: ContextualizedErrorLogger
+          errorLoggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause =
               s"The following package-name/template qualified-name pairs do not reference any template-id uploaded on this participant: [${noKnownReferences
@@ -182,7 +234,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
           category = ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
       final case class Reject(noKnownReferences: Set[(Ref.PackageName, Ref.QualifiedName)])(implicit
-          contextualizedErrorLogger: ContextualizedErrorLogger
+          errorLoggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause =
               s"The following package-name/interface qualified-name pairs do not reference any interface-id uploaded on this participant: [${noKnownReferences
@@ -199,7 +251,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(override val cause: String, earliestOffset: Long)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = cause,
           extraContext = Map(EarliestOffsetMetadataKey -> earliestOffset),
@@ -216,7 +268,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(override val cause: String, latestOffset: Long)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = cause,
           extraContext = Map(LatestOffsetMetadataKey -> latestOffset),
@@ -233,7 +285,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateSeekAfterEnd,
       ) {
     final case class Reject(offsetType: String, requestedOffset: Long, ledgerEnd: Long)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$offsetType offset ($requestedOffset) is after ledger end ($ledgerEnd)"
         )
@@ -249,7 +301,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(message: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(cause = message)
   }
 
@@ -260,7 +312,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
   object MissingField
       extends ErrorCode(id = "MISSING_FIELD", ErrorCategory.InvalidIndependentOfSystemState) {
     final case class Reject(missingField: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"The submitted command is missing a mandatory field: $missingField",
           extraContext = Map("field_name" -> missingField),
@@ -274,10 +326,30 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
   object InvalidArgument
       extends ErrorCode(id = "INVALID_ARGUMENT", ErrorCategory.InvalidIndependentOfSystemState) {
     final case class Reject(reason: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"The submitted request has invalid arguments: $reason"
         )
+  }
+
+  @Explanation(
+    """This error is emitted when a submitted ledger API command refers to a non-existing resource."""
+  )
+  @Resolution("Inspect the reason given and correct your application.")
+  object UnknownResource
+      extends ErrorCode(
+        id = "UNKNOWN_RESOURCE",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+      ) {
+    final case class Reject(errorResource: ErrorResource, items: Seq[String], reason: String)(
+        implicit loggingContext: ErrorLoggingContext
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause =
+            s"The submitted request refers to a non-existing ${errorResource.asString}: $reason"
+        ) {
+      override def resources: Seq[(ErrorResource, String)] =
+        super.resources ++ items.map(s => (errorResource, s))
+    }
   }
 
   @Explanation(
@@ -287,7 +359,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
   object InvalidField
       extends ErrorCode(id = "INVALID_FIELD", ErrorCategory.InvalidIndependentOfSystemState) {
     final case class Reject(fieldName: String, message: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
             s"The submitted command has a field with invalid value: Invalid field $fieldName: $message"
@@ -310,7 +382,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         reason: String,
         maxDeduplicationDuration: Option[Duration],
     )(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"The submitted command had an invalid deduplication period: $reason"
         ) {
@@ -333,7 +405,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         offsetValue: Long,
         message: String,
     )(implicit
-        val loggingContext: ContextualizedErrorLogger
+        val loggingContext: ErrorLoggingContext
     ) extends ContextualizedDamlError(
           cause = s"Offset $offsetValue in $fieldName is not a positive integer: $message"
         )
@@ -351,7 +423,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         offsetValue: Long,
         message: String,
     )(implicit
-        val loggingContext: ContextualizedErrorLogger
+        val loggingContext: ErrorLoggingContext
     ) extends ContextualizedDamlError(
           cause = s"Offset $offsetValue in $fieldName is a negative integer: $message"
         )

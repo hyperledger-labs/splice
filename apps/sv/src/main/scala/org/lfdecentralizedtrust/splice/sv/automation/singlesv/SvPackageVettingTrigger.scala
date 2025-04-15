@@ -9,6 +9,8 @@ import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, Participa
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.util.Contract
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,6 +28,11 @@ class SvPackageVettingTrigger(
 
   override def getAmuletRules()(implicit tc: TraceContext) =
     store.getAmuletRules()
+
+  override def getVoteRequests()(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    store.listVoteRequests()
 }
 
 object SvPackageVettingTrigger {

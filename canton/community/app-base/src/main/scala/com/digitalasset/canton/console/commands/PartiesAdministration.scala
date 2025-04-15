@@ -18,6 +18,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{
+  AddPartyStatus,
   ListConnectedSynchronizersResult,
   ListPartiesResult,
   PartyDetails,
@@ -25,7 +26,7 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.admin.participant.v30.ExportAcsResponse
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.console.commands.TopologyTxFiltering.{ChangedFilter, RevokedFilter}
+import com.digitalasset.canton.console.commands.TopologyTxFiltering.{AddedFilter, RevokedFilter}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CantonInternalError,
@@ -358,7 +359,7 @@ class ParticipantPartiesAdministrationGroup(
   @Help.Summary("Add a previously existing party to the local participant", FeatureFlag.Preview)
   @Help.Description(
     """Initiate adding a previously existing party to this participant on the specified synchronizer.
-      |Performs some checks synchronously and then initiates party replication asynchronously. The returned `id`
+      |Performs some checks synchronously and then initiates party replication asynchronously. The returned `addPartyRequestId`
       |parameter allows identifying asynchronous progress and errors."""
   )
   def add_party_async(
@@ -375,6 +376,19 @@ class ParticipantPartiesAdministrationGroup(
           sourceParticipant,
           serial,
         )
+      )
+    }
+  }
+
+  @Help.Summary("Obtain status on a pending `add_party_async` call", FeatureFlag.Preview)
+  @Help.Description(
+    """Retrieve status information on a party previously added via the `add_party_async` endpoint
+      |by specifying the previously returned `addPartyRequestId` parameter."""
+  )
+  def get_add_party_status(addPartyRequestId: String): AddPartyStatus = check(FeatureFlag.Preview) {
+    consoleEnvironment.run {
+      reference.adminCommand(
+        ParticipantAdminCommands.PartyManagement.GetAddPartyStatus(addPartyRequestId)
       )
     }
   }
@@ -445,7 +459,7 @@ class ParticipantPartiesAdministrationGroup(
       participantId,
       synchronizerId,
       validFrom,
-      ChangedFilter,
+      AddedFilter,
     )(consoleEnvironment)
 
     findTopologyOffset(
@@ -638,7 +652,7 @@ object TopologySynchronisation {
 
 private object TopologyTxFiltering {
   sealed trait AuthorizationFilterKind
-  case object ChangedFilter extends AuthorizationFilterKind
+  case object AddedFilter extends AuthorizationFilterKind
   case object RevokedFilter extends AuthorizationFilterKind
 
   def getTopologyFilter(
@@ -669,9 +683,9 @@ private object TopologyTxFiltering {
           synchronizerId.toProtoPrimitive == wrapper.synchronizerId &&
           tx.events.exists { tx =>
             filterType match {
-              case ChangedFilter =>
-                val changed = tx.getParticipantAuthorizationChanged
-                changed.partyId == partyId.toLf && changed.participantId == participantId.toLf
+              case AddedFilter =>
+                val added = tx.getParticipantAuthorizationAdded
+                added.partyId == partyId.toLf && added.participantId == participantId.toLf
               case RevokedFilter =>
                 val revoked = tx.getParticipantAuthorizationRevoked
                 revoked.partyId == partyId.toLf && revoked.participantId == participantId.toLf

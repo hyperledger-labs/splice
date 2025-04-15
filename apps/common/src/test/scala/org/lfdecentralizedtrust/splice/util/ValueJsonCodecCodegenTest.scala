@@ -97,7 +97,8 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
           /*amulet =*/ new amuletCodegen.Amulet.ContractId(validContractId(2)),
           /*amuletPrice =*/ BigDecimal(0.5).bigDecimal,
           /*round =*/ new typesCodegen.Round(31L),
-        )
+        ),
+        /*meta = */ Optional.of(someMetadata),
       ).toValue
       val event = exercisedEvent(
         contractId = validContractId(3),
@@ -166,6 +167,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
           new transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending(
             new transferinstructionv1.TransferInstruction.ContractId(validContractId(333))
           ),
+          /*senderChangeCids =*/ List.empty.asJava,
           someMetadata,
         ).toValue
 

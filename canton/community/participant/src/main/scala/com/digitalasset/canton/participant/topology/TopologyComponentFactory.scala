@@ -4,12 +4,7 @@
 package com.digitalasset.canton.participant.topology
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{
-  BatchingConfig,
-  CachingConfigs,
-  ProcessingTimeout,
-  TopologyConfig,
-}
+import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{Crypto, SynchronizerCryptoPureApi}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -49,7 +44,6 @@ class TopologyComponentFactory(
     unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig],
     exitOnFatalFailures: Boolean,
     topologyStore: TopologyStore[SynchronizerStore],
-    topologyConfig: TopologyConfig,
     loggerFactory: NamedLoggerFactory,
 ) {
 
@@ -82,13 +76,14 @@ class TopologyComponentFactory(
       val terminateTopologyProcessingFUS =
         for {
           topologyEventPublishedOnInitialRecordTime <- FutureUnlessShutdown.outcomeF(
-            ledgerApiStore.topologyEventPublishedOnRecordTime(
+            ledgerApiStore.topologyEventOffsetPublishedOnRecordTime(
               synchronizerId,
               recordOrderPublisher.initTimestamp,
             )
           )
           _ <- participantTerminateProcessing.scheduleMissingTopologyEventsAtInitialization(
-            topologyEventPublishedOnInitialRecordTime = topologyEventPublishedOnInitialRecordTime,
+            topologyEventPublishedOnInitialRecordTime =
+              topologyEventPublishedOnInitialRecordTime.isDefined,
             traceContextForSequencedEvent = sequencedEventStore.traceContext(_),
             parallelism = batching.parallelism,
           )
@@ -121,11 +116,9 @@ class TopologyComponentFactory(
       executionContext: ExecutionContext
   ): InitialTopologySnapshotValidator =
     new InitialTopologySnapshotValidator(
-      synchronizerId,
       protocolVersion,
       new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto),
       topologyStore,
-      topologyConfig.insecureIgnoreMissingExtraKeySignaturesInInitialSnapshot,
       timeouts,
       loggerFactory,
     )

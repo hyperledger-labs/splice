@@ -1,14 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { CommandOptions } from "../cli";
+import { AllKnownMetaKeys } from "../constants";
 import {
   createConfiguration,
+  CreatedEvent as LedgerApiCreatedEvent,
   DefaultApi as LedgerJsonApi,
   HttpAuthAuthentication,
+  JsInterfaceView,
   ServerConfiguration,
   TransactionFilter,
-  JsInterfaceView,
-  CreatedEvent as LedgerApiCreatedEvent,
 } from "canton-json-api-v2-openapi";
 
 export function createLedgerApiClient(opts: CommandOptions): LedgerJsonApi {
@@ -66,8 +67,20 @@ export function filtersByParty(
   };
 }
 
-type HoldingView = JsInterfaceView["viewValue"];
+export function isHoldingInterfaceId(interfaceId: string | undefined): boolean {
+  return (
+    !!interfaceId && interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding")
+  );
+}
 
+export function getInterfaceView(
+  createdEvent: LedgerApiCreatedEvent
+): JsInterfaceView | null {
+  const interfaceViews = createdEvent.interfaceViews || null;
+  return (interfaceViews && interfaceViews[0]) || null;
+}
+
+// TODO (#18500): handle allocations in such a way that any callers have to handle them too
 /**
  * Use this when `createdEvent` is guaranteed to have a Holding interface view because the ledger api filters
  * include it, and thus is guaranteed to be returned by the API.
@@ -75,13 +88,41 @@ type HoldingView = JsInterfaceView["viewValue"];
 export function ensureHoldingViewIsPresent(
   createdEvent: LedgerApiCreatedEvent
 ): JsInterfaceView {
-  const interfaceViews = createdEvent.interfaceViews;
-  if (!interfaceViews || !interfaceViews[0]) {
+  const interfaceView = getInterfaceView(createdEvent);
+  if (!interfaceView) {
     throw new Error(
-      `CreatedEvent has no interface views. They should be included in all ledger-api responses. CreatedEvent: ${JSON.stringify(
+      `Expected to have interface views, but didn't: ${JSON.stringify(
         createdEvent
       )}`
     );
   }
-  return interfaceViews[0];
+  if (
+    !interfaceView.interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding")
+  ) {
+    throw new Error(
+      `Not a Holding but a ${interfaceView.interfaceId}: ${JSON.stringify(
+        createdEvent
+      )}`
+    );
+  }
+  return interfaceView;
+}
+
+type Meta = { values: Array<[string, string]> } | undefined;
+export function getMetaKeyValue(key: string, meta: Meta): string | undefined {
+  const keyValue = (meta?.values || []).find(([k, _]) => key === k);
+  return keyValue && keyValue[1];
+}
+
+/**
+ * From the view of making it easy to build the display for the wallet,
+ * we remove all metadata fields that were fully parsed, and whose content is reflected in the TypeScript structure.
+ * Otherwise, the display code has to do so, overloading the user with superfluous metadata entries.
+ */
+export function removeParsedMetaKeys(meta: Meta): Meta {
+  return {
+    values: (meta?.values || []).filter(
+      ([k, _]) => !AllKnownMetaKeys.includes(k)
+    ),
+  };
 }

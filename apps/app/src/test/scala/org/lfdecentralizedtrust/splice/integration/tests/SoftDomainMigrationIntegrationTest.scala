@@ -1,8 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.FullClientConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
@@ -11,7 +12,7 @@ import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.{BaseTest, SequencerAlias, SynchronizerAlias}
 import org.lfdecentralizedtrust.splice.automation.{AmuletConfigReassignmentTrigger, AssignTrigger}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.AmuletConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.AmuletDecentralizedSynchronizerConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   DsoDecentralizedSynchronizerConfig,
@@ -22,7 +23,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRulesConfig,
@@ -57,7 +58,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
 }
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
-  ConfigScheduleUtil,
   SplitwellTestUtil,
   SynchronizerFeesTestUtil,
   TriggerTestUtil,
@@ -68,6 +68,7 @@ import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerCo
 import org.scalatest.time.{Minute, Span}
 
 import java.time.temporal.ChronoUnit
+import java.util.Optional
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -75,7 +76,6 @@ import scala.jdk.OptionConverters.*
 
 class SoftDomainMigrationIntegrationTest
     extends IntegrationTest
-    with ConfigScheduleUtil
     with SplitwellTestUtil
     with TriggerTestUtil
     with WalletTestUtil
@@ -285,18 +285,17 @@ class SoftDomainMigrationIntegrationTest
         sv1Backend.createVoteRequest(
           sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
           new ARC_AmuletRules(
-            new CRARC_AddFutureAmuletConfigSchedule(
-              new AmuletRules_AddFutureAmuletConfigSchedule(
-                new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-                  scheduledTime,
-                  newAmuletConfig,
-                )
+            new CRARC_SetConfig(
+              new AmuletRules_SetConfig(
+                newAmuletConfig,
+                amuletConfig,
               )
             )
           ),
           "url",
           "description",
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+          None,
         )
       },
     )("amulet config vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -307,8 +306,8 @@ class SoftDomainMigrationIntegrationTest
         _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
       )
     ) {
-      clue(s"sv2-4 accept amulet config vote request") {
-        Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+      clue(s"sv2-3 accept amulet config vote request") {
+        Seq(sv2Backend, sv3Backend).map(sv =>
           eventuallySucceeds() {
             sv.castVote(
               voteRequest.contractId,
@@ -319,10 +318,6 @@ class SoftDomainMigrationIntegrationTest
           }
         )
       }
-    }
-
-    eventually() {
-      sv1ScanBackend.getAmuletRules().payload.configSchedule.futureValues should not be empty
     }
 
     val dsoRules = sv1Backend.getDsoInfo().dsoRules
@@ -387,21 +382,23 @@ class SoftDomainMigrationIntegrationTest
                         newSynchronizerId.toProtoPrimitive,
                       ),
                       dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
-                    )
+                    ),
+                    Optional.empty(),
                   )
                 )
               ),
               "url",
               "description",
               sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
             )
           },
         )(
           "dsorules config vote request has been created",
           _ => sv1Backend.listVoteRequests().loneElement,
         )
-        clue(s"sv2-4 accept dsorules config vote request") {
-          Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+        clue(s"sv2-3 accept dsorules config vote request") {
+          Seq(sv2Backend, sv3Backend).map(sv =>
             eventuallySucceeds() {
               sv.castVote(
                 dsoRulesVoteRequest.contractId,

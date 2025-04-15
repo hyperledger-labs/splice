@@ -381,7 +381,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
       instance.getNode match {
         case None =>
           // should not happen, but if it does, display at least a warning.
-          if (instance.config.init.autoInit) {
+          if (!instance.config.init.identity.isManual) {
             logger.error(
               s"Auto-initialisation failed or was too slow for ${instance.name}. Will not automatically re-connect to synchronizers."
             )

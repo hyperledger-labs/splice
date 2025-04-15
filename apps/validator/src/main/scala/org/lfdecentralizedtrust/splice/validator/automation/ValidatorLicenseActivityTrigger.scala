@@ -37,7 +37,8 @@ class ValidatorLicenseActivityTrigger(
   ): Future[Seq[ValidatorLicenseActivityTrigger.Task]] =
     for {
       supportsValidatorLicenseActivity <- packageVersionSupport.supportsValidatorLicenseActivity(
-        now
+        Seq(store.key.dsoParty, validator),
+        now,
       )
       tasks <-
         if (supportsValidatorLicenseActivity) {

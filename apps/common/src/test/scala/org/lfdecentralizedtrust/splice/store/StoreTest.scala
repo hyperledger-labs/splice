@@ -12,9 +12,20 @@ import com.daml.ledger.javaapi.data.{
   Unit as damlUnit,
   Value as damlValue,
 }
+import com.digitalasset.canton.config.CantonRequireTypes.String3
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
+import com.digitalasset.canton.protocol.LfContractId
+import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
+  payment as paymentCodegen,
+  subscriptions as subCodegen,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
+  ans as ansCodegen,
   expiry as expiryCodegen,
   externalpartyamuletrules as externalpartyamuletrulesCodegen,
   fees as feesCodegen,
@@ -22,10 +33,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   schedule as scheduleCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as subCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as paymentCodegen
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -36,12 +43,11 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdate,
 }
-import org.lfdecentralizedtrust.splice.util.{Contract, EventId, SpliceUtil, Trees}
+import org.lfdecentralizedtrust.splice.util.EventId
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.scalatest.wordspec.AsyncWordSpec
 import com.digitalasset.daml.lf.data.Numeric
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
@@ -62,19 +68,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.history.{AmuletCreate, AppRewardCreate}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
 import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
-import com.digitalasset.canton.config.CantonRequireTypes.String3
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
-import com.digitalasset.canton.protocol.LfContractId
-import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.util.{Contract, SpliceUtil, Trees}
+import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
 
-import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
+import java.time.{Duration, Instant}
 import java.util
 import java.util.Optional
-import scala.concurrent.blocking
-import scala.concurrent.Future
+import scala.concurrent.{Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -524,6 +526,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       requester: PartyId,
       votes: Seq[Vote],
       expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600L),
+      effectiveAt: Optional[Instant] = Optional.empty(),
       action: ActionRequiringConfirmation = addUser666Action,
   ) = {
     val cid = new VoteRequest.ContractId(nextCid())
@@ -535,6 +538,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       expiry,
       votes.map(e => (e.sv, e)).toMap.asJava,
       Optional.of(cid),
+      effectiveAt,
     )
 
     contract(

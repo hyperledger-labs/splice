@@ -3,10 +3,10 @@
 # classes. You should either use `daml build` or `sbt ~compile`, but NOT both
 # at the same time (see #179 for more context).
 
-sdk-version: 3.3.0-snapshot.20250227.13636.0.vdeaa9235
+sdk-version: 3.3.0-snapshot.20250409.13730.0.v6972616a
 name: splice-amulet
 source: daml
-version: 0.1.8
+version: 0.1.9
 dependencies:
   - daml-prim
   - daml-stdlib

@@ -7,6 +7,7 @@ module Splice.DSO.DecentralizedSynchronizer where
 import qualified DA.Map as Map
 
 import Splice.CometBft
+import Splice.Util
 
 -- DSO-level configuration
 -- ==============================
@@ -147,3 +148,52 @@ validSynchronizerNodeConfig limits config =
 
 defaultSynchronizerNodeConfigLimits : SynchronizerNodeConfigLimits
 defaultSynchronizerNodeConfigLimits = SynchronizerNodeConfigLimits with cometBft = defaultCometBftConfigLimits
+
+instance Patchable SynchronizerNodeConfigLimits where
+  patch new base current = SynchronizerNodeConfigLimits with
+    cometBft = patch new.cometBft base.cometBft current.cometBft
+
+instance Patchable SynchronizerNodeConfig where
+  patch new base current = SynchronizerNodeConfig with
+    cometBft = patch new.cometBft base.cometBft current.cometBft
+    sequencer = patch new.sequencer base.sequencer current.sequencer
+    mediator = patch new.mediator base.mediator current.mediator
+    scan = patch new.scan base.scan current.scan
+    legacySequencerConfig = patch new.legacySequencerConfig base.legacySequencerConfig current.legacySequencerConfig
+
+instance Patchable SynchronizerConfig where
+  patch new base current = SynchronizerConfig with
+    state = patch new.state base.state current.state
+    cometBftGenesisJson = patch new.cometBftGenesisJson base.cometBftGenesisJson current.cometBftGenesisJson
+    acsCommitmentReconciliationInterval = patch new.acsCommitmentReconciliationInterval base.acsCommitmentReconciliationInterval current.acsCommitmentReconciliationInterval
+
+instance Patchable SequencerConfig where
+  patch new base current = SequencerConfig with
+    migrationId = patch new.migrationId base.migrationId current.migrationId
+    sequencerId = patch new.sequencerId base.sequencerId current.sequencerId
+    url = patch new.url base.url current.url
+    availableAfter = patch new.availableAfter base.availableAfter current.availableAfter
+    peerUrl = patch new.peerUrl base.peerUrl current.peerUrl
+
+instance Patchable LegacySequencerConfig where
+  patch new base current = LegacySequencerConfig with
+    migrationId = patch new.migrationId base.migrationId current.migrationId
+    sequencerId = patch new.sequencerId base.sequencerId current.sequencerId
+    url = patch new.url base.url current.url
+
+instance Patchable ScanConfig where
+  patch new base current = ScanConfig with
+    publicUrl = patch new.publicUrl base.publicUrl current.publicUrl
+
+instance Patchable MediatorConfig where
+  patch new base current = MediatorConfig with
+    mediatorId = patch new.mediatorId base.mediatorId current.mediatorId
+
+instance Patchable DsoDecentralizedSynchronizerConfig where
+  patch new base current = DsoDecentralizedSynchronizerConfig with
+    synchronizers = patch new.synchronizers base.synchronizers current.synchronizers
+    lastSynchronizerId = patch new.lastSynchronizerId base.lastSynchronizerId current.lastSynchronizerId
+    activeSynchronizerId = patch new.activeSynchronizerId base.activeSynchronizerId current.activeSynchronizerId
+
+instance Patchable SynchronizerState where
+  patch new base current = patchScalar new base current

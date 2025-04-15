@@ -14,7 +14,6 @@ import com.daml.logging.entries.LoggingEntry
 import com.daml.metrics.DatabaseMetrics
 import com.daml.metrics.api.MetricHandle.Timer
 import com.daml.metrics.api.MetricName
-import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
@@ -124,7 +123,7 @@ private[dao] final class DbDispatcherImpl private[dao] (
   private def handleError(
       throwable: Throwable
   )(implicit loggingContext: LoggingContextWithTrace): Nothing = {
-    implicit val errorLoggingContext: ContextualizedErrorLogger =
+    implicit val errorLoggingContext: ErrorLoggingContext =
       ErrorLoggingContext(logger, loggingContext)
 
     throwable match {

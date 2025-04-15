@@ -17,8 +17,10 @@ import Daml.Script
 
 import DA.Action (unless)
 import DA.Assert
-import DA.Foldable (foldMap)
+import DA.Foldable (forA_, foldMap)
 import DA.List (sortOn)
+import DA.Map qualified as Map
+import DA.Optional (isSome)
 import DA.Time
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
@@ -28,6 +30,7 @@ import Splice.Api.Token.AllocationRequestV1
 import Splice.Api.Token.AllocationInstructionV1
 
 import Splice.Amulet (AppRewardCoupon(..))
+import Splice.Amulet.TokenApiUtils (burnedMetaKey)
 
 import Splice.Testing.Apps.TradingApp hiding (require)
 import Splice.Testing.Utils
@@ -113,8 +116,11 @@ testDvP = script do
     allocation = aliceAlloc
     inputHoldingCids
     extraArgs = emptyExtraArgs
-  submitWithDisclosures' alice enrichedChoice.disclosures $
+  result <- submitWithDisclosures' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  -- check metadata
+  expectBurn result.meta
 
   -- check lock context
   [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
@@ -154,16 +160,19 @@ testDvP = script do
   length allocations === 2
 
   contexts <- forA allocations $ \(allocCid, _) ->
-     RegistryApi.getAllocationTransferContext registry allocCid
+     RegistryApi.getAllocationTransferContext registry allocCid emptyMetadata
   let disclosures = foldMap (.disclosures) contexts
   let extraArgss = do
         context <- contexts
         pure ExtraArgs with
           context = context.choiceContext
           meta = emptyMetadata
-  submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
+  results <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
     allocationInstructions = map fst allocations
     extraArgss
+
+  -- check metadata
+  forA_ results $ \result -> expectBurn result.meta
 
   -- check that the expected transfers happened
   WalletClient.checkHoldingWithAmountExists alice amuletId 20.0
@@ -204,3 +213,8 @@ appBackendListAllocations p ref = do
         guard (alloc.settlement.settlementRef == ref)
         pure (cid, alloc)
   pure $ sortOn (\(_, alloc) -> alloc.transferLegId) matchingAllocs
+
+expectBurn : Metadata -> Script ()
+expectBurn meta =
+  unless (isSome $ Map.lookup burnedMetaKey meta.values) $
+    fail $ "Expected burned meta key to be present in " <> show meta

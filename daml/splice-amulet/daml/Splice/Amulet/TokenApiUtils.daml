@@ -5,6 +5,8 @@
 
 module Splice.Amulet.TokenApiUtils where
 
+import DA.Optional
+import DA.Monoid ()
 import DA.Time
 import DA.Map qualified as Map
 
@@ -15,23 +17,107 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 splicePrefix : Text
 splicePrefix = "splice.lfdecentralizedtrust.org/"
 
+amuletPrefix : Text
+amuletPrefix = "amulet." <> splicePrefix
+
 -- | Shared definition of the instrument-id used for amulets.
 amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
 amuletInstrumentId dso =
   Api.Token.HoldingV1.InstrumentId with admin = dso; id = "Amulet"
 
+-- | Add an optional metadata entry.
+optionalMetadata : Text -> (a -> Text) -> Optional a -> Map.Map Text Text -> Map.Map Text Text
+optionalMetadata k f optValue m =
+  case optValue of
+    None -> m
+    Some v -> Map.insert k (f v) m
 
--- Metadata keys
-----------------
+-- | Add an metadata entry if it is non-zero number.
+nonZeroMetadata : (Eq a, Additive a, Show a) => Text -> a -> Map.Map Text Text -> Map.Map Text Text
+nonZeroMetadata k n m
+  | n == aunit = m
+  | otherwise = Map.insert k (show n) m
+
+
+-- Amulet Metadata keys
+-----------------------
 
 createdInRoundMetaKey : Text
-createdInRoundMetaKey = splicePrefix <> "created-in-round"
+createdInRoundMetaKey = amuletPrefix <> "created-in-round"
 
 ratePerRoundMetaKey : Text
-ratePerRoundMetaKey = splicePrefix <> "rate-per-round"
+ratePerRoundMetaKey = amuletPrefix <> "rate-per-round"
 
+svRewardAmountMetaKey : Text
+svRewardAmountMetaKey = amuletPrefix <> "sv-rewards"
+
+appRewardAmountMetaKey : Text
+appRewardAmountMetaKey = amuletPrefix <> "app-rewards"
+
+validatorRewardAmountMetaKey : Text
+validatorRewardAmountMetaKey = amuletPrefix <> "validator-rewards"
+
+
+-- Splice API Metadata keys
+---------------------------
+
+-- | Short, human-readable reason for the transaction.
 reasonMetaKey : Text
 reasonMetaKey = splicePrefix <> "reason"
+
+-- | Kind of the transaction.
+txKindMetaKey : Text
+txKindMetaKey = splicePrefix <> "tx-kind"
+
+-- | The sender of a transfer.
+senderMetaKey : Text
+senderMetaKey = splicePrefix <> "sender"
+
+-- | The amount of token holdings burned as part of a transaction.
+burnedMetaKey : Text
+burnedMetaKey = splicePrefix <> "burned"
+
+-- | Build the metadata for a transaction affecting the amulet holdings.
+holdingTxMeta : TxKind -> Optional Text -> Optional Party -> Optional Decimal -> Metadata
+holdingTxMeta kind reason sender burned =
+  Metadata with
+    values =
+      nonZeroMetadata burnedMetaKey (fromOptional 0.0 burned) $
+      optionalMetadata senderMetaKey partyToText sender $
+      optionalMetadata reasonMetaKey identity reason $
+      Map.fromList [(txKindMetaKey, txKindToText kind)]
+
+-- | Exported for testing only
+txKindToText : TxKind -> Text
+txKindToText kind = case kind of
+  TxKind_Transfer -> "transfer"
+  TxKind_Unlock -> "unlock"
+  TxKind_MergeSplit -> "merge-split"
+  TxKind_Burn -> "burn"
+  TxKind_Mint -> "mint"
+  TxKind_ExpireDust -> "expire-dust"
+
+-- | Simplified version for a few of the common cases.
+simpleHoldingTxMeta : TxKind -> Optional Text -> Optional Decimal -> Metadata
+simpleHoldingTxMeta kind reason burned = holdingTxMeta kind reason None burned
+
+-- | Internal type for the transaction kind.
+data TxKind
+  = TxKind_Transfer
+  | TxKind_Unlock
+  | TxKind_MergeSplit
+  | TxKind_Burn
+  | TxKind_Mint
+  | TxKind_ExpireDust
+  deriving (Eq) -- intentionally no Show to avoid SCU contraints on code changes
+
+-- helper instances: defined here as they are not part of the API
+instance Semigroup Metadata  where
+  (<>) (Metadata a) (Metadata b) = Metadata with values = a <> b
+
+instance Monoid Metadata  where
+  mempty = emptyMetadata
+
 
 -- Choice context keys for splice
 ---------------------------------
@@ -66,6 +152,20 @@ lockContextContextKey = "lock-context"
 -- unlocked.
 expireLockKey : Text
 expireLockKey = "expire-lock"
+
+
+-- Metadata utilities
+---------------------
+
+-- | Copy only the burn metadata. Used for token standard choices to copy the burn
+-- from a transfer result.
+copyOnlyBurnMeta : Optional Metadata -> Metadata
+copyOnlyBurnMeta optOrigMeta = fromOptional emptyMetadata $ do
+  origMeta <- optOrigMeta
+  origValue <- Map.lookup burnedMetaKey origMeta.values
+  pure $ Metadata with
+    values =
+      Map.singleton burnedMetaKey origValue
 
 
 -- Choice context creation and parsing

@@ -41,8 +41,9 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
+import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
-import com.digitalasset.canton.topology.{SynchronizerId, Namespace, PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -54,13 +55,14 @@ import io.grpc.{Status, StatusRuntimeException}
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
-import scala.annotation.{implicitNotFound}
+import scala.annotation.implicitNotFound
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 import shapeless.<:!<
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.daml.lf.data.Ref
 
@@ -599,6 +601,25 @@ class BaseLedgerConnection(
       },
       logger,
     )
+
+  def getSupportedPackageVersion(
+      synchronizerId: SynchronizerId,
+      parties: Seq[PartyId],
+      packageName: PackageIdResolver.Package,
+      vettingAsOfTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Option[PackageReference]] = {
+    retryProvider.retryForClientCalls(
+      "get_supported_package_version",
+      s"Get the supported package version for package $packageName on synchronizer $synchronizerId and parties $parties with vetting time ${vettingAsOfTime}",
+      client.getSupportedPackageVersion(
+        synchronizerId,
+        parties,
+        packageName,
+        vettingAsOfTime,
+      ),
+      logger,
+    )
+  }
 }
 
 /** Subscription for reading the ledger */

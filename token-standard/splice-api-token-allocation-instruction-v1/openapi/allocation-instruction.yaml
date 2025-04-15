@@ -63,10 +63,6 @@ components:
 
             The choice arguments are provided so that the registry can also provide choice-argument
             specific contracts, e.g., the configuration for a specific instrument-id.
-
-            The registry MAY react to such a request by creating extra contracts required to enable the exercising
-            of the choice. In that case the `validUntil` field of the returned choice context should be set
-            to the time until which these contracts expire.
         excludeDebugFields:
           description: "If set to true, the response will not include debug fields."
           default: false
@@ -91,19 +87,10 @@ components:
           type: string
         choiceContext:
           $ref: "#/components/schemas/ChoiceContext"
-        validUntil:
-          description: |
-            The time until which the choice context can be expected to be valid, and can thus be used to exercise the
-            choice. However concurrent activity can invalidate the choice context earlier;
-            Thus the in case of a failure to exercise the choice, the client SHOULD also request a new choice context
-            as part of retrying the operation.
-          type: string
-          format: date-time
       required:
         [
           "factoryId",
           "choiceContext",
-          "validUntil",
         ]
 
     ChoiceContext:
@@ -125,7 +112,7 @@ components:
             $ref: "#/components/schemas/DisclosedContract"
       required:
         [
-          "transferExecutionChoiceContext",
+          "choiceContextData",
           "disclosedContracts",
         ]
 

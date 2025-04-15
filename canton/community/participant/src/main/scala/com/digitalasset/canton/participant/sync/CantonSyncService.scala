@@ -11,7 +11,7 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.base.error.{ContextualizedErrorLogger, RpcError}
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.*
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -44,7 +44,6 @@ import com.digitalasset.canton.participant.admin.inspection.{
   JournalGarbageCollectorControl,
   SyncStateInspection,
 }
-import com.digitalasset.canton.participant.admin.party.PartyReplicator
 import com.digitalasset.canton.participant.admin.repair.RepairService
 import com.digitalasset.canton.participant.admin.repair.RepairService.SynchronizerLookup
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
@@ -162,6 +161,7 @@ class CantonSyncService(
     metrics: ParticipantMetrics,
     sequencerInfoLoader: SequencerInfoLoader,
     val isActive: () => Boolean,
+    declarativeChangeTrigger: () => Unit,
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
     testingConfig: TestingConfigInternal,
@@ -309,6 +309,10 @@ class CantonSyncService(
       parameters.reassignmentTimeProofFreshnessProportion,
       syncPersistentStateManager,
       connectedSynchronizersLookup.get,
+      synchronizerId =>
+        connectedSynchronizersLookup
+          .get(synchronizerId.unwrap)
+          .map(_.ephemeral.reassignmentSynchronizer),
       syncCrypto,
       loggerFactory,
     )(ec)
@@ -380,11 +384,6 @@ class CantonSyncService(
     connectQueue,
     loggerFactory,
   )
-
-  val partyReplicatorO: Option[PartyReplicator] =
-    parameters.unsafeOnlinePartyReplication.map(_ =>
-      new PartyReplicator(participantId, this, parameters.processingTimeouts, loggerFactory)
-    )
 
   private val migrationService =
     new SynchronizerMigration(
@@ -733,7 +732,7 @@ class CantonSyncService(
       .failOnShutdownTo(CommonErrors.ServerIsShuttingDown.Reject().asGrpcError)
 
   override def getPackageMetadataSnapshot(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): PackageMetadata = packageService.value.packageMetadataView.getSnapshot
 
   /** Executes ordered sequence of steps to recover any state that might have been lost if the
@@ -1511,6 +1510,7 @@ class CantonSyncService(
       } yield {
         // remove this one from the reconnect attempt list, as we are successfully connected now
         this.resolveReconnectAttempts(synchronizerAlias)
+        declarativeChangeTrigger()
       }
 
       def disconnectOn(): Unit =
@@ -1722,7 +1722,7 @@ class CantonSyncService(
       migrationService,
       repairService,
       pruningProcessor,
-    ) ++ partyReplicatorO.toList ++ syncCrypto.ips.allSynchronizers.toSeq ++ connectedSynchronizersMap.values.toSeq ++ Seq(
+    ) ++ syncCrypto.ips.allSynchronizers.toSeq ++ connectedSynchronizersMap.values.toSeq ++ Seq(
       transactionRoutingProcessor,
       synchronizerRegistry,
       synchronizerConnectionConfigStore,
@@ -1982,6 +1982,7 @@ class CantonSyncService(
       traceContext: TraceContext
   ): RoutingSynchronizerState =
     RoutingSynchronizerStateFactory.create(connectedSynchronizersLookup)
+
 }
 
 object CantonSyncService {
@@ -2057,6 +2058,7 @@ object CantonSyncService {
         testingConfig: TestingConfigInternal,
         ledgerApiIndexer: LifeCycleContainer[LedgerApiIndexer],
         connectedSynchronizersLookupContainer: ConnectedSynchronizersLookupContainer,
+        triggerDeclarativeChange: () => Unit,
     )(implicit ec: ExecutionContextExecutor, mat: Materializer, tracer: Tracer): T
   }
 
@@ -2091,6 +2093,7 @@ object CantonSyncService {
         testingConfig: TestingConfigInternal,
         ledgerApiIndexer: LifeCycleContainer[LedgerApiIndexer],
         connectedSynchronizersLookupContainer: ConnectedSynchronizersLookupContainer,
+        triggerDeclarativeChange: () => Unit,
     )(implicit
         ec: ExecutionContextExecutor,
         mat: Materializer,
@@ -2121,6 +2124,7 @@ object CantonSyncService {
         metrics,
         sequencerInfoLoader,
         () => storage.isActive,
+        triggerDeclarativeChange,
         futureSupervisor,
         loggerFactory,
         testingConfig,

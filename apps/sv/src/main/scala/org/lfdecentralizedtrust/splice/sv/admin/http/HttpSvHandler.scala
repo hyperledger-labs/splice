@@ -25,9 +25,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.V
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStoreWithIngestion}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
@@ -62,15 +63,19 @@ class HttpSvHandler(
     packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContext,
-    tracer: Tracer,
+    protected val tracer: Tracer,
 ) extends v0.SvHandler[TraceContext]
     with Spanning
-    with NamedLogging {
-  private val workflowId = this.getClass.getSimpleName
+    with NamedLogging
+    with HttpVotesHandler {
+
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
   private val svParty = dsoStore.key.svParty
   private val dsoParty = dsoStore.key.dsoParty
+
+  override protected val votesStore: ActiveVotesStore = dsoStore
+  override protected val workflowId: String = this.getClass.getSimpleName
 
   private def decodeValidatorOnboardingSecret(secret: String): ValidatorOnboardingSecret =
     // There are two ways to create secrets:
@@ -745,7 +750,8 @@ class HttpSvHandler(
       dsoRules <- dsoStore.getDsoRules()
       now = clock.now
       supportsValidatorLicenseMetadata <- packageVersionSupport.supportsValidatorLicenseMetadata(
-        now
+        Seq(svParty, candidateParty, dsoParty),
+        now,
       )
       cmds = Seq(
         dsoRules.exercise(

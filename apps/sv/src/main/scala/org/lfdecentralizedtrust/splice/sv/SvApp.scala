@@ -71,13 +71,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{
   SvUtil,
   ValidatorOnboardingSecret,
 }
-import org.lfdecentralizedtrust.splice.util.{
-  BackupDump,
-  Contract,
-  HasHealth,
-  UploadablePackage,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CryptoConfig,
@@ -102,9 +96,10 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 
 import java.nio.file.Paths
+import java.time.Instant
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -139,8 +134,8 @@ class SvApp(
   private val cometBftConfig = config.cometBftConfig
     .filter(_.enabled)
 
-  override def packages: Seq[DarResource] =
-    super.packages ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.amuletNameService.all
+  override def packagesForJsonDecoding: Seq[DarResource] =
+    super.packagesForJsonDecoding ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit tc: TraceContext): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
@@ -299,13 +294,6 @@ class SvApp(
         retryProvider,
         loggerFactory,
       )
-      _ <- appInitStep("Upload dars") {
-        val darFiles = SvPackageVettingTrigger.packages
-          .flatMap(pkg => DarResources.lookupAllPackageVersions(pkg.packageName))
-          .map(dar => UploadablePackage.fromResource(dar))
-          .toSeq
-        participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
-      }
       newJoiningNodeInitializer = (
           joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
           cometBftNode: Option[CometBftNode],
@@ -443,7 +431,12 @@ class SvApp(
             }
           } yield res
       }
-      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        config.parameters.enableCantonPackageSelection,
+        dsoStore,
+        decentralizedSynchronizer,
+        svAutomation.connection,
+      )
 
       (_, _, isDevNet, _, _, _, _) <- (
         // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
@@ -1020,6 +1013,7 @@ object SvApp {
       reasonUrl: String,
       reasonDescription: String,
       expiration: Json,
+      effectiveTime: Optional[Instant],
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
   )(implicit
       ec: ExecutionContext,
@@ -1054,6 +1048,7 @@ object SvApp {
               decodedAction,
               reason,
               java.util.Optional.of(decodedExpiration),
+              effectiveTime,
             )
             cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
             _ <- dsoStoreWithIngestion.connection
@@ -1271,10 +1266,12 @@ object SvApp {
               Future.unit
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
+              val dsoParty = store.key.dsoParty
               for {
                 supportsValidatorLicenseMetadata <- packageVersionSupport
                   .supportsValidatorLicenseMetadata(
-                    clock.now
+                    Seq(dsoParty, svParty),
+                    clock.now,
                   )
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_OnboardValidator(
@@ -1289,14 +1286,14 @@ object SvApp {
                 _ <- dsoStoreWithIngestion.connection
                   .submit(
                     actAs = Seq(svParty),
-                    readAs = Seq(store.key.dsoParty),
+                    readAs = Seq(dsoParty),
                     cmd,
                   )
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(
                       "org.lfdecentralizedtrust.splice.sv.createSvValidatorLicense",
                       Seq(
-                        store.key.dsoParty,
+                        dsoParty,
                         svParty,
                       ),
                       svParty.toProtoPrimitive,

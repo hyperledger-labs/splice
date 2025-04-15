@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import com.digitalasset.base.error.ContextualizedErrorLogger
 import com.digitalasset.canton.ProtoDeserializationError.{FieldNotSet, OtherError}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.protocol.v30.LocalVerdict.VerdictCode.{
@@ -105,13 +105,13 @@ final case class LocalReject(reason: com.google.rpc.status.Status, isMalformed: 
     with PrettyPrinting {
   override def isApprove: Boolean = false
 
-  override def logWithContext(
+  override def logRejection(
       extra: Map[String, String]
-  )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Unit =
+  )(implicit errorLoggingContext: ErrorLoggingContext): Unit =
     // Log with level INFO, leave it to LocalRejectError to log the details.
-    contextualizedErrorLogger.withContext(extra) {
+    errorLoggingContext.withContext(extra) {
       lazy val action = if (isMalformed) "malformed" else "rejected"
-      contextualizedErrorLogger.info(show"Request is $action. $reason")
+      errorLoggingContext.info(show"Request is $action. $reason")
     }
 
   override private[messages] def toProtoV30: v30.LocalVerdict = {

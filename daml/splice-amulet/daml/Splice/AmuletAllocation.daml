@@ -59,7 +59,7 @@ allocationToTwoStepTransfer allocation =
 transferAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update Allocation_ExecuteTransferResult
 transferAmuletAllocation amuletAllocation extraArgs = do
   let twoStepTransfer = allocationToTwoStepTransfer amuletAllocation.allocation
-  (senderHoldingCids, receiverHoldingCids) <-
+  (senderHoldingCids, receiverHoldingCids, meta) <-
     executeTwoStepTransfer twoStepTransfer amuletAllocation.lockedAmulet extraArgs
   pure Allocation_ExecuteTransferResult
     with
@@ -67,7 +67,7 @@ transferAmuletAllocation amuletAllocation extraArgs = do
         with
           senderHoldingCids
           receiverHoldingCids
-      meta = emptyMetadata
+      meta
 
 unlockAmuletAllocation : AmuletAllocation -> ExtraArgs -> Update ChoiceExecutionMetadata
 unlockAmuletAllocation AmuletAllocation{..} extraArgs = do

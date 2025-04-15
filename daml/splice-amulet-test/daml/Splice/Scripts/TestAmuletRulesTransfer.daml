@@ -13,6 +13,7 @@ import Daml.Script
 
 import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Expiry
 import Splice.Fees
@@ -41,44 +42,47 @@ testUsageFees = do
   context <- getPaymentTransferContext app alice
   runNextIssuance app
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
-    transfer = Transfer with
-      sender = alice.primaryParty
-      provider = alice.primaryParty
-      inputs = map (\c -> InputAmulet c)[amulet1, amulet2, amulet3]
-      outputs = [ TransferOutput with
-                    receiver = alice.primaryParty
-                    receiverFeeRatio = 0.0
-                    amount = outputAmount1
-                    lock = None
-                  -- test locking a amulet with no lock-holder
-                , TransferOutput with
-                    receiver = alice.primaryParty
-                    receiverFeeRatio = 0.0
-                    amount = outputAmount2
-                    lock = Some TimeLock with
-                      expiresAt = addRelTime now (days 2)
-                      holders = []
-                      optContext = None
-                -- normal receiver amulet
-                , TransferOutput with
-                    receiver = bob.primaryParty
-                    receiverFeeRatio = 0.4
-                    amount = outputAmount2
-                    lock = None
-                  -- test locking a amulet owned by a non-sender party
-                , TransferOutput with
-                    receiver = bob.primaryParty
-                    receiverFeeRatio = 0.75
-                    amount = outputAmount3
-                    lock = Some TimeLock with
-                      expiresAt = addRelTime now (days 2)
-                      holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
-                      optContext = None
+  transferResult <-
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $
+    submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = map (\c -> InputAmulet c)[amulet1, amulet2, amulet3]
+        outputs = [ TransferOutput with
+                      receiver = alice.primaryParty
+                      receiverFeeRatio = 0.0
+                      amount = outputAmount1
+                      lock = None
+                    -- test locking a amulet with no lock-holder
+                  , TransferOutput with
+                      receiver = alice.primaryParty
+                      receiverFeeRatio = 0.0
+                      amount = outputAmount2
+                      lock = Some TimeLock with
+                        expiresAt = addRelTime now (days 2)
+                        holders = []
+                        optContext = None
+                  -- normal receiver amulet
+                  , TransferOutput with
+                      receiver = bob.primaryParty
+                      receiverFeeRatio = 0.4
+                      amount = outputAmount2
+                      lock = None
+                    -- test locking a amulet owned by a non-sender party
+                  , TransferOutput with
+                      receiver = bob.primaryParty
+                      receiverFeeRatio = 0.75
+                      amount = outputAmount3
+                      lock = Some TimeLock with
+                        expiresAt = addRelTime now (days 2)
+                        holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
+                        optContext = None
 
-                ]
-      beneficiaries = None
-    context = context.context
+                  ]
+        beneficiaries = None
+      context = context.context
 
   let config = scaleFees 1.0 defaultTransferConfig
       expectedTransferFee = 0.03 + chargeSteppedRate config.transferFee 10.0
@@ -147,7 +151,9 @@ testAmuletUsedInRoundBeforeItsCreation = do
   amuletRound2.amount.createdAt.number === 2
   round1.round.number === 1
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+  transferResult <-
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
     exerciseCmd contextWithRound1.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
@@ -211,10 +217,16 @@ testAmuletUsedAfterHoldingFeeChanged = do
   context <- getPaymentTransferContext app alice
 
   -- use the amulet created in round 2 before holding fee changes
-  transferResult2 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.dso alice.primaryParty bob.primaryParty amuletRound2Cid transferAmount
+  transferResult2 <-
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $
+    submitTransfer context.amuletRules context.context app alice.primaryParty bob.primaryParty amuletRound2Cid transferAmount
 
   -- use the amulet created in round 3 when holding fee changes
-  transferResult3 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.dso alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
+  transferResult3 <-
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $
+    submitTransfer context.amuletRules context.context app alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
 
   -- Both amulets are used as transfer input at round 7
 
@@ -225,21 +237,22 @@ testAmuletUsedAfterHoldingFeeChanged = do
   -- Smaller holding fee is used as the amulet is created in round 3 when holding fee is redueced
   transferResult3.summary.holdingFees === smallerHoldingFee * (7.0 - 3.0)
 
-submitTransfer: ContractId AmuletRules -> TransferContext -> Party -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
-submitTransfer amuletRulesCid transferContext dso sender receiver amuletCid amount = do
-  submitMulti [sender, receiver] [dso] $
-    exerciseCmd amuletRulesCid AmuletRules_Transfer with
-      transfer = Transfer with
-        sender = sender
-        provider = sender
-        inputs = [InputAmulet amuletCid]
-        outputs = [ TransferOutput with
-                      receiver
-                      amount
-                      lock = None
-                      receiverFeeRatio = 1.0]
-        beneficiaries = None -- test code, no beneficiaries
-      context = transferContext
+submitTransfer: ContractId AmuletRules -> TransferContext -> AmuletApp -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
+submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amount =
+  checkTransferMetadata app TxKind_Transfer sender $
+    submitMulti [sender, receiver] [app.dso] $
+      exerciseCmd amuletRulesCid AmuletRules_Transfer with
+        transfer = Transfer with
+          sender = sender
+          provider = sender
+          inputs = [InputAmulet amuletCid]
+          outputs = [ TransferOutput with
+                        receiver
+                        amount
+                        lock = None
+                        receiverFeeRatio = 1.0]
+          beneficiaries = None -- test code, no beneficiaries
+        context = transferContext
 
 testSenderChangeAndOutput: Script ()
 testSenderChangeAndOutput = do
@@ -258,7 +271,9 @@ testSenderChangeAndOutput = do
   runNextIssuance app
   aliceNormalizedBalanceBefore <- getNormalizedBalance alice.primaryParty
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  transferResult <-
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -308,7 +323,9 @@ testSenderNoChange = do
   context <- getPaymentTransferContext app alice
   runNextIssuance app
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  transferResult <-
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -355,7 +372,9 @@ testSenderNoChangeNoSenderOutput = do
   context <- getPaymentTransferContext app alice
   runNextIssuance app
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  transferResult <-
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -417,12 +436,13 @@ testAppRewardBeneficiaries = do
       beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2]
     context = context.context
 
-  -- Beneficiary weight < 0.05
+  -- length beneficiaries > 20
+
   _ <- submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
-      inputs = map (\c -> InputAmulet c)[amulet]
+      inputs = map (\c -> InputAmulet c) [amulet]
       outputs = [
                   TransferOutput with
                     receiver = bob.primaryParty
@@ -430,7 +450,7 @@ testAppRewardBeneficiaries = do
                     amount = 10.0
                     lock = None
                 ]
-      beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.04, AppRewardBeneficiary alice.primaryParty 0.96]
+      beneficiaries = Some (AppRewardBeneficiary alice.primaryParty 0.8 :: replicate 20 (AppRewardBeneficiary alice.primaryParty 0.01))
     context = context.context
 
   forA_ [False, True] $ \featured -> do
@@ -440,7 +460,9 @@ testAppRewardBeneficiaries = do
 
     context <- getPaymentTransferContextFeaturedApp app alice (if featured then Some featuredAppRightCid else None)
 
-    transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    transferResult <-
+      checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+      submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
@@ -461,20 +483,21 @@ testAppRewardBeneficiaries = do
 
     -- unfeatured with beneficiaries
 
-    submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
-      transfer = Transfer with
-        sender = alice.primaryParty
-        provider = alice.primaryParty
-        inputs = map (\c -> InputAmulet c) (optionalToList transferResult.senderChangeAmulet)
-        outputs = [
-                    TransferOutput with
-                      receiver = bob.primaryParty
-                      receiverFeeRatio = 0.0
-                      amount = 10.0
-                      lock = None
-                  ]
-        beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
-      context = context.context
+    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+      submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = map (\c -> InputAmulet c) (optionalToList transferResult.senderChangeAmulet)
+          outputs = [
+                      TransferOutput with
+                        receiver = bob.primaryParty
+                        receiverFeeRatio = 0.0
+                        amount = 10.0
+                        lock = None
+                    ]
+          beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
+        context = context.context
 
     [(rewardCid1, aliceAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon alice.primaryParty (\r -> r.beneficiary == Some alice.primaryParty)
 

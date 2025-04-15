@@ -6,9 +6,9 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{
-  AmuletRulesPackageVersionSupport,
   BaseLedgerConnection,
   MediatorAdminConnection,
+  PackageVersionSupport,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
@@ -31,8 +31,8 @@ import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchroni
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftClient, CometBftNode}
 import org.lfdecentralizedtrust.splice.sv.config.{
-  SvCometBftConfig,
   SvAppBackendConfig,
+  SvCometBftConfig,
   SvOnboardingConfig,
 }
 import org.lfdecentralizedtrust.splice.sv.migration.{
@@ -195,7 +195,12 @@ class DomainMigrationInitializer(
         loggerFactory,
         retryProvider,
       )
-      packageVersionSupport = new AmuletRulesPackageVersionSupport(dsoStore)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        config.parameters.enableCantonPackageSelection,
+        dsoStore,
+        decentralizedSynchronizerId,
+        svAutomation.connection,
+      )
       dsoAutomationService =
         new SvDsoAutomationService(
           clock,

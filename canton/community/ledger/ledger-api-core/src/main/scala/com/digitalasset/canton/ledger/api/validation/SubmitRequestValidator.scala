@@ -13,8 +13,7 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   SignatureFormat as InteractiveSignatureFormat,
   SinglePartySignatures,
 }
-import com.daml.ledger.api.v2.reassignment_commands.ReassignmentCommand
-import com.digitalasset.base.error.{ContextualizedErrorLogger, RpcError}
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.crypto.{
   Fingerprint,
   Signature,
@@ -27,17 +26,15 @@ import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidField
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{PartyId as TopologyPartyId, SynchronizerId}
-import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.version.HashingSchemeVersion
-import com.digitalasset.canton.version.HashingSchemeVersion.V1
-import com.digitalasset.daml.lf.data.Time
+import com.digitalasset.canton.version.HashingSchemeVersion.V2
 import io.grpc.StatusRuntimeException
 import scalaz.syntax.tag.*
 
 import java.time.{Duration, Instant}
 import scala.annotation.nowarn
-import scala.util.Try
 
 class SubmitRequestValidator(
     commandsValidator: CommandsValidator
@@ -49,7 +46,7 @@ class SubmitRequestValidator(
       currentUtcTime: Instant,
       maxDeduplicationDuration: Duration,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, submission.SubmitRequest] =
     for {
       commands <- requirePresence(req.commands, "commands")
@@ -67,7 +64,7 @@ class SubmitRequestValidator(
       currentUtcTime: Instant,
       maxDeduplicationDuration: Duration,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, submission.SubmitRequest] =
     for {
       validatedCommands <- commandsValidator.validatePrepareRequest(
@@ -82,7 +79,7 @@ class SubmitRequestValidator(
       formatP: InteractiveSignatureFormat,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, SignatureFormat] =
     formatP match {
       case InteractiveSignatureFormat.SIGNATURE_FORMAT_DER => Right(SignatureFormat.Der)
@@ -98,7 +95,7 @@ class SubmitRequestValidator(
       signingAlgorithmSpecP: iss.SigningAlgorithmSpec,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, SigningAlgorithmSpec] =
     signingAlgorithmSpecP match {
       case iss.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519 =>
@@ -115,7 +112,7 @@ class SubmitRequestValidator(
       issSignatureP: iss.Signature,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Signature] = {
     val InteractiveSignature(formatP, signatureP, signedByP, signingAlgorithmSpecP) =
       issSignatureP
@@ -132,7 +129,7 @@ class SubmitRequestValidator(
   private def validatePartySignatures(
       proto: PartySignatures
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Map[TopologyPartyId, Seq[Signature]]] =
     proto.signatures
       .traverse { case SinglePartySignatures(partyP, signaturesP) =>
@@ -157,7 +154,7 @@ class SubmitRequestValidator(
       submissionIdGenerator: SubmissionIdGenerator,
       maxDeduplicationDuration: Duration,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, ExecuteRequest] = {
     val iss.ExecuteSubmissionRequest(
       preparedTransactionP,
@@ -205,7 +202,7 @@ class SubmitRequestValidator(
   }
 
   private def validateSynchronizerId(string: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[RpcError, SynchronizerId] =
     SynchronizerId
       .fromString(string)
@@ -215,9 +212,9 @@ class SubmitRequestValidator(
       )
 
   private def validateHashingSchemeVersion(protoVersion: iss.HashingSchemeVersion)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[RpcError, HashingSchemeVersion] = protoVersion match {
-    case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_V1 => Right(V1)
+    case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2 => Right(V2)
     case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_UNSPECIFIED =>
       Left(
         RequestValidationErrors.InvalidField
@@ -233,59 +230,13 @@ class SubmitRequestValidator(
   def validateReassignment(
       req: SubmitReassignmentRequest
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, submission.SubmitReassignmentRequest] =
     for {
-      reassignmentCommand <- requirePresence(req.reassignmentCommands, "reassignment_commands")
-      submitter <- requirePartyField(reassignmentCommand.submitter, "submitter")
-      userId <- requireUserId(reassignmentCommand.userId, "user_id")
-      commandId <- requireCommandId(reassignmentCommand.commandId, "command_id")
-      submissionId <- requireSubmissionId(reassignmentCommand.submissionId, "submission_id")
-      workflowId <- validateOptional(Some(reassignmentCommand.workflowId).filter(_.nonEmpty))(
-        requireWorkflowId(_, "workflow_id")
+      commands <- requirePresence(req.reassignmentCommands, "reassignment_commands")
+      submitReassignmentRequest <- commandsValidator.validateReassignmentCommands(
+        commands
       )
-      reassignmentCommands <- reassignmentCommand.commands.traverse {
-        _.command match {
-          case ReassignmentCommand.Command.Empty =>
-            Left(ValidationErrors.missingField("command"))
-          case assignCommand: ReassignmentCommand.Command.AssignCommand =>
-            for {
-              sourceSynchronizerId <- requireSynchronizerId(assignCommand.value.source, "source")
-              targetSynchronizerId <- requireSynchronizerId(assignCommand.value.target, "target")
-              longUnassignId <- Try(assignCommand.value.unassignId.toLong).toEither.left.map(_ =>
-                ValidationErrors.invalidField("unassign_id", "Invalid unassign ID")
-              )
-              timestampUnassignId <- Time.Timestamp
-                .fromLong(longUnassignId)
-                .left
-                .map(_ => ValidationErrors.invalidField("unassign_id", "Invalid unassign ID"))
-            } yield Left(
-              submission.AssignCommand(
-                sourceSynchronizerId = Source(sourceSynchronizerId),
-                targetSynchronizerId = Target(targetSynchronizerId),
-                unassignId = timestampUnassignId,
-              )
-            )
-          case unassignCommand: ReassignmentCommand.Command.UnassignCommand =>
-            for {
-              sourceSynchronizerId <- requireSynchronizerId(unassignCommand.value.source, "source")
-              targetSynchronizerId <- requireSynchronizerId(unassignCommand.value.target, "target")
-              cid <- requireContractId(unassignCommand.value.contractId, "contract_id")
-            } yield Right(
-              submission.UnassignCommand(
-                sourceSynchronizerId = Source(sourceSynchronizerId),
-                targetSynchronizerId = Target(targetSynchronizerId),
-                contractId = cid,
-              )
-            )
-        }
-      }
-    } yield submission.SubmitReassignmentRequest(
-      submitter = submitter,
-      userId = userId,
-      commandId = commandId,
-      submissionId = submissionId,
-      workflowId = workflowId,
-      reassignmentCommands = reassignmentCommands,
-    )
+    } yield submitReassignmentRequest
+
 }

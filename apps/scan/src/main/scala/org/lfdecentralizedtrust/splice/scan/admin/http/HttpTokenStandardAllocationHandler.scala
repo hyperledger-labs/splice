@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1
+import org.lfdecentralizedtrust.tokenstandard.allocation.v1.definitions.GetChoiceContextRequest
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.{Resource, definitions}
 
 import java.time.ZoneOffset
@@ -38,7 +39,8 @@ class HttpTokenStandardAllocationHandler(
   override def getAllocationTransferContext(
       respond: Resource.GetAllocationTransferContextResponse.type
   )(
-      allocationId: String
+      allocationId: String,
+      body: GetChoiceContextRequest,
   )(extracted: TraceContext): Future[Resource.GetAllocationTransferContextResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAllocationTransferContext") { _ => _ =>
@@ -86,23 +88,21 @@ class HttpTokenStandardAllocationHandler(
             .activeSynchronizer
         v1.Resource.GetAllocationTransferContextResponseOK(
           definitions.ChoiceContext(
-            choiceContextData = Some(
-              io.circe.parser
-                .parse(
-                  new metadatav1.ChoiceContext(
-                    Map(
-                      // TODO(#18575): also retrieve and serve featured app right
-                      "amulet-rules" -> amuletRules.contractId.contractId,
-                      "open-round" -> newestOpenRound.contractId.contractId,
-                    ).map[String, metadatav1.AnyValue] { case (k, v) =>
-                      k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
-                    }.asJava
-                  ).toJson
-                )
-                .getOrElse(
-                  throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
-                )
-            ),
+            choiceContextData = io.circe.parser
+              .parse(
+                new metadatav1.ChoiceContext(
+                  Map(
+                    // TODO(#18575): also retrieve and serve featured app right
+                    "amulet-rules" -> amuletRules.contractId.contractId,
+                    "open-round" -> newestOpenRound.contractId.contractId,
+                  ).map[String, metadatav1.AnyValue] { case (k, v) =>
+                    k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
+                  }.asJava
+                ).toJson
+              )
+              .getOrElse(
+                throw new IllegalArgumentException("Just-serialized JSON cannot be parsed.")
+              ),
             disclosedContracts = Vector(
               toTokenStandardDisclosedContract(lockedAmulet.contract, activeSynchronizerId),
               toTokenStandardDisclosedContract(amuletRules, activeSynchronizerId),
@@ -112,24 +112,6 @@ class HttpTokenStandardAllocationHandler(
         )
       }
     }
-  }
-
-  override def getAllocationCancelContext(
-      respond: Resource.GetAllocationCancelContextResponse.type
-  )(allocationId: String)(
-      extracted: TraceContext
-  ): Future[Resource.GetAllocationCancelContextResponse] = {
-    // TODO(#18576): implement cancel
-    ???
-  }
-
-  override def getAllocationWithdrawContext(
-      respond: Resource.GetAllocationWithdrawContextResponse.type
-  )(allocationId: String)(
-      extracted: TraceContext
-  ): Future[Resource.GetAllocationWithdrawContextResponse] = {
-    // TODO(#18576): implement withdraw
-    ???
   }
 
   // The HTTP definition of the standard differs from any other
@@ -150,4 +132,16 @@ class HttpTokenStandardAllocationHandler(
     )
   }
 
+  // TODO(#18576): implement cancel and withdraw
+  override def getAllocationCancelContext(
+      respond: Resource.GetAllocationCancelContextResponse.type
+  )(allocationId: String, body: Option[GetChoiceContextRequest])(
+      extracted: TraceContext
+  ): Future[Resource.GetAllocationCancelContextResponse] = ???
+
+  override def getAllocationWithdrawContext(
+      respond: Resource.GetAllocationWithdrawContextResponse.type
+  )(allocationId: String, body: GetChoiceContextRequest)(
+      extracted: TraceContext
+  ): Future[Resource.GetAllocationWithdrawContextResponse] = ???
 }

@@ -6,7 +6,6 @@ package com.digitalasset.canton.ledger.api.validation
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter as ProtoCumulativeFilter,
-  Filters,
   InterfaceFilter as ProtoInterfaceFilter,
   TemplateFilter as ProtoTemplateFilter,
   *,
@@ -17,8 +16,8 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdatesRequest,
 }
 import com.daml.ledger.api.v2.value.Identifier
-import com.digitalasset.base.error.{ContextualizedErrorLogger, NoLogging}
 import com.digitalasset.canton.ledger.api.{CumulativeFilter, InterfaceFilter, TemplateFilter}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.TypeConRef
 import io.grpc.Status.Code.*
@@ -29,7 +28,7 @@ class UpdateServiceRequestValidatorTest
     extends AnyWordSpec
     with ValidatorTestUtils
     with MockitoSugar {
-  private implicit val noLogging: ContextualizedErrorLogger = NoLogging
+  private implicit val noLogging: ErrorLoggingContext = NoLogging
 
   private val templateId = Identifier(packageId, includedModule, includedTemplate)
 
