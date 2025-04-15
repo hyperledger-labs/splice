@@ -988,7 +988,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by (errorCodeId, namespace, node_type, trigger_name) (rate(splice_trigger_attempted_total{namespace=~\"$namespace\",node_type=~\"$app\",trigger_name=~\"$trigger_name\",isDsoDelegateTrigger=~\"$isDsoDelegateTrigger\", errorCodeId!~\"CONTRACT_NOT_FOUND|LOCAL_VERDICT_INACTIVE_CONTRACTS|LOCAL_VERDICT_LOCKED_CONTRACTS\"}[$__rate_interval]))",
+          "expr": "sum by (errorCodeId, namespace, node_type, trigger_name) (rate(splice_trigger_attempted_total{namespace=~\"$namespace\",node_type=~\"$app\",trigger_name=~\"$trigger_name\",isDsoDelegateTrigger=~\"$isDsoDelegateTrigger\", errorCodeId!~\"CONTRACT_NOT_FOUND|LOCAL_VERDICT_INACTIVE_CONTRACTS|LOCAL_VERDICT_LOCKED_CONTRACTS\", statusCode!~\"OK\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
