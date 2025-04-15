@@ -1,29 +1,42 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import BigNumber from "bignumber.js";
-import {
-  ArchivedEvent as LedgerApiArchivedEvent, CreatedEvent as LedgerApiCreatedEvent, DefaultApi as LedgerJsonApi, Event as LedgerApiEvent,
-  ExercisedEvent as LedgerApiExercisedEvent, JsGetEventsByContractIdResponse, JsTransaction
-} from "canton-json-api-v2-openapi";
 import {
   ensureHoldingViewIsPresent,
   filtersByParty,
   getInterfaceView,
   getMetaKeyValue,
-  isHoldingInterfaceId,
-  removeParsedMetaKeys
+  hasHoldingInterfaceId,
+  mergeMetas,
+  removeParsedMetaKeys,
 } from "../apis/ledger-api-utils";
 import {
+  BurnedMetaKey,
   HoldingInterface,
   ReasonMetaKey,
   SenderMetaKey,
-  TxKindMetaKey
+  TxKindMetaKey,
 } from "../constants";
 import {
   Holding,
+  HoldingsChangeSummary,
+  HoldingLock,
   HoldingsChange,
-  Label, TokenStandardEvent, Transaction
+  Label,
+  TokenStandardEvent,
+  Transaction,
+  EmptyHoldingsChangeSummary,
+  TokenStandardChoice,
 } from "./types";
+import BigNumber from "bignumber.js";
+import {
+  ArchivedEvent as LedgerApiArchivedEvent,
+  CreatedEvent as LedgerApiCreatedEvent,
+  DefaultApi as LedgerJsonApi,
+  Event as LedgerApiEvent,
+  ExercisedEvent as LedgerApiExercisedEvent,
+  JsGetEventsByContractIdResponse,
+  JsTransaction,
+} from "canton-json-api-v2-openapi";
 
 // TODO (#18819): handle two-step transfers
 export class TransactionParser {
@@ -84,30 +97,19 @@ export class TransactionParser {
         throw new Error(`Impossible event: ${JSON.stringify(currentEvent)}`);
       }
 
-      if (!parsed || isLeafEventNode(parsed)) {
-        if (
-          parsed &&
-          (parsed.event.holdingsChange.creates.length > 0 ||
-            parsed.event.holdingsChange.archives.length > 0)
-        ) {
+      if (parsed && isLeafEventNode(parsed)) {
+        // Exclude events where nothing happened
+        if (holdingChangesNonEmpty(parsed.event)) {
           result.push({
-            label: Object.assign(parsed.event.label, {
+            ...parsed.event,
+            label: {
+              ...parsed.event.label,
               meta: removeParsedMetaKeys(parsed.event.label.meta),
-            }),
-            // only this partyId's holdings are relevant for display
-            holdingsChange: {
-              creates: parsed.event.holdingsChange.creates.filter(
-                (h) => h.owner === this.partyId
-              ),
-              archives: parsed.event.holdingsChange.archives.filter(
-                (h) => h.owner === this.partyId
-              ),
             },
           });
         }
-        continueAfterNodeId =
-          parsed?.continueAfterNodeId || continueAfterNodeId;
-      } else {
+        continueAfterNodeId = parsed.continueAfterNodeId;
+      } else if (parsed) {
         callStack.push({
           parentChoiceName: parsed.parentChoiceName,
           untilNodeId: parsed.lastDescendantNodeId,
@@ -134,6 +136,14 @@ export class TransactionParser {
       meta: holdingView.meta,
       lock: holdingView.lock,
     };
+    const isLocked = !!holdingView.lock;
+    const summary: HoldingsChangeSummary = {
+      amountChange: holdingView.amount,
+      numInputs: 0,
+      inputAmount: "0",
+      numOutputs: 1,
+      outputAmount: holdingView.amount,
+    };
     return {
       continueAfterNodeId: create.nodeId,
       event: {
@@ -147,10 +157,20 @@ export class TransactionParser {
           payload,
           meta: undefined,
         },
-        holdingsChange: {
-          creates: [payload],
+        unlockedHoldingsChange: {
+          creates: isLocked ? [] : [payload],
           archives: [],
         },
+        lockedHoldingsChange: {
+          creates: isLocked ? [payload] : [],
+          archives: [],
+        },
+        lockedHoldingsChangeSummary: isLocked
+          ? summary
+          : EmptyHoldingsChangeSummary,
+        unlockedHoldingsChangeSummary: isLocked
+          ? EmptyHoldingsChangeSummary
+          : summary,
       },
     };
   }
@@ -175,6 +195,14 @@ export class TransactionParser {
       meta: holdingView.meta,
       lock: holdingView.lock,
     };
+    const isLocked = !!payload.lock;
+    const summary: HoldingsChangeSummary = {
+      amountChange: holdingView.amount,
+      numInputs: 1,
+      inputAmount: holdingView.amount,
+      numOutputs: 0,
+      outputAmount: "0",
+    };
     return {
       continueAfterNodeId: archive.nodeId,
       event: {
@@ -190,10 +218,20 @@ export class TransactionParser {
           payload,
           meta: undefined,
         },
-        holdingsChange: {
+        unlockedHoldingsChange: {
+          archives: isLocked ? [] : [payload],
           creates: [],
-          archives: [payload],
         },
+        lockedHoldingsChange: {
+          archives: isLocked ? [payload] : [],
+          creates: [],
+        },
+        lockedHoldingsChangeSummary: isLocked
+          ? summary
+          : EmptyHoldingsChangeSummary,
+        unlockedHoldingsChangeSummary: isLocked
+          ? EmptyHoldingsChangeSummary
+          : summary,
       },
     };
   }
@@ -201,53 +239,84 @@ export class TransactionParser {
   private async parseExercise(
     exercise: LedgerApiExercisedEvent
   ): Promise<EventParseResult | null> {
+    let result: ParsedKnownExercisedEvent | null = null;
+    const tokenStandardChoice = {
+      name: exercise.choice,
+      choiceArgument: exercise.choiceArgument,
+      exerciseResult: exercise.exerciseResult,
+    };
     switch (exercise.choice) {
       case "TransferFactory_Transfer":
-        return {
-          event: await this.buildTransfer(exercise),
-          continueAfterNodeId: exercise.lastDescendantNodeId,
-        };
+        result = await this.buildTransfer(exercise, tokenStandardChoice);
+        break;
       case "BurnMintFactory_BurnMint":
-        return {
-          event: await this.buildBurnMint(exercise),
-          continueAfterNodeId: exercise.lastDescendantNodeId,
-        };
+        result = await this.buildMergeSplit(exercise, tokenStandardChoice);
+        break;
       default:
-        const meta = exercise.exerciseResult.meta;
+        const meta = mergeMetas(exercise);
         const txKind = getMetaKeyValue(TxKindMetaKey, meta);
         if (txKind) {
-          return this.parseViaTxKind(exercise, txKind);
-        } else {
-          return {
-            lastDescendantNodeId: exercise.nodeId,
-            parentChoiceName: exercise.choice,
-          };
+          result = await this.parseViaTxKind(exercise, txKind);
         }
+        break;
+    }
+    if (!result) {
+      return {
+        lastDescendantNodeId: exercise.lastDescendantNodeId,
+        parentChoiceName: exercise.choice,
+      };
+    } else {
+      // only this.partyId's holdings should be included in the response
+      const lockedHoldingsChange: HoldingsChange = {
+        creates: result.children.creates.filter(
+          (h) => !!h.lock && h.owner === this.partyId
+        ),
+        archives: result.children.archives.filter(
+          (h) => !!h.lock && h.owner === this.partyId
+        ),
+      };
+      const unlockedHoldingsChange: HoldingsChange = {
+        creates: result.children.creates.filter(
+          (h) => !h.lock && h.owner === this.partyId
+        ),
+        archives: result.children.archives.filter(
+          (h) => !h.lock && h.owner === this.partyId
+        ),
+      };
+      return {
+        event: {
+          label: result.label,
+          lockedHoldingsChange,
+          lockedHoldingsChangeSummary: computeSummary(
+            lockedHoldingsChange,
+            this.partyId
+          ),
+          unlockedHoldingsChange,
+          unlockedHoldingsChangeSummary: computeSummary(
+            unlockedHoldingsChange,
+            this.partyId
+          ),
+        },
+        continueAfterNodeId: exercise.lastDescendantNodeId,
+      };
     }
   }
 
   private async parseViaTxKind(
     exercisedEvent: LedgerApiExercisedEvent,
     txKind: string
-  ): Promise<EventParseResult | null> {
+  ): Promise<ParsedKnownExercisedEvent | null> {
     switch (txKind) {
       case "transfer":
-        return {
-          event: await this.buildTransfer(exercisedEvent),
-          continueAfterNodeId: exercisedEvent.lastDescendantNodeId,
-        };
+        return await this.buildTransfer(exercisedEvent, null);
       case "merge-split":
       case "burn":
       case "mint":
-        return {
-          event: await this.buildBurnMint(exercisedEvent),
-          continueAfterNodeId: exercisedEvent.lastDescendantNodeId,
-        };
-      // TODO (#18819): implement these & add test data to make sure they're tested
+        return await this.buildMergeSplit(exercisedEvent, null);
       case "unlock":
-        return null;
+        return await this.buildBasic(exercisedEvent, "Unlock", null);
       case "expire-dust":
-        return null;
+        return await this.buildBasic(exercisedEvent, "ExpireDust", null);
       default:
         throw new Error(
           `Unknown tx-kind '${txKind}' in ${JSON.stringify(exercisedEvent)}`
@@ -256,25 +325,23 @@ export class TransactionParser {
   }
 
   private async buildTransfer(
-    exercisedEvent: LedgerApiExercisedEvent
-  ): Promise<TokenStandardEvent> {
-    const meta = exercisedEvent.exerciseResult.meta;
+    exercisedEvent: LedgerApiExercisedEvent,
+    tokenStandardChoice: TokenStandardChoice | null
+  ): Promise<ParsedKnownExercisedEvent | null> {
+    const meta = mergeMetas(exercisedEvent);
+    const reason = getMetaKeyValue(ReasonMetaKey, meta);
     const sender: string =
       getMetaKeyValue(SenderMetaKey, meta) ||
       exercisedEvent.choiceArgument.transfer.sender;
     if (!sender) {
-      throw new Error(
-        `Malformed transfer didn't contain sender: ${JSON.stringify(
-          exercisedEvent
-        )}`
+      console.error(
+        `Malformed transfer didn't contain sender. Will instead attempt to parse the children.
+        Transfer: ${JSON.stringify(exercisedEvent)}`
       );
+      return null;
     }
 
     const children = await this.getChildren(exercisedEvent);
-    const senderAmount = sumHoldingsChange(
-      children,
-      (owner) => owner === this.partyId
-    );
     const receiverAmounts = new Map<string, BigNumber>();
     children.creates
       .filter((h) => h.owner !== this.partyId)
@@ -286,73 +353,100 @@ export class TransactionParser {
           )
         )
       );
+    const amountChanges = computeAmountChanges(children, meta, this.partyId);
 
+    // TODO (#18819): when supporting two-step transfers, use a better type as opposed to TransferX to aid readability
     let label: Label;
-    if (sender === this.partyId) {
-      const isSplit = children.creates
-        .concat(children.archives)
-        .every((holding) => holding.owner === this.partyId);
-      if (isSplit) {
-        label = {
-          type: "Split",
-          meta,
-        };
-      } else {
-        label = {
-          type: "TransferOut",
-          receiverAmounts: [...receiverAmounts].map(([k, v]) => {
-            return { receiver: k, amount: v.toString() };
-          }),
-          senderAmount: senderAmount.toString(),
-          meta,
-        };
-      }
+    if (receiverAmounts.size === 0) {
+      label = {
+        ...amountChanges,
+        type: "MergeSplit",
+        tokenStandardChoice,
+        reason,
+        meta,
+      };
+    } else if (sender === this.partyId) {
+      label = {
+        ...amountChanges,
+        type: "TransferOut",
+        receiverAmounts: [...receiverAmounts].map(([k, v]) => {
+          return { receiver: k, amount: v.toString() };
+        }),
+        tokenStandardChoice,
+        reason,
+        meta,
+      };
     } else {
       label = {
         type: "TransferIn",
+        // for Transfers, the burn/mint is always 0 for the receiving party (i.e., 0 for TransferIn)
+        burnAmount: "0",
+        mintAmount: "0",
         sender,
-        amount: senderAmount.toString(),
+        tokenStandardChoice,
+        reason,
         meta,
       };
     }
 
     return {
       label,
-      holdingsChange: children,
+      children,
     };
   }
 
-  private async buildBurnMint(
-    exercisedEvent: LedgerApiExercisedEvent
-  ): Promise<TokenStandardEvent> {
-    const meta = exercisedEvent.exerciseResult.meta;
-    const reason = getMetaKeyValue(ReasonMetaKey, meta) || null;
-    const children = await this.getChildren(exercisedEvent);
-
-    let label: Label;
-    if (children.creates.length >= 0 && children.archives.length === 0) {
-      label = {
-        type: "Mint",
-        reason,
-        meta,
-      };
-    } else if (children.archives.length >= 0 && children.creates.length === 0) {
-      label = {
-        type: "Burn",
-        reason,
-        meta,
-      };
-    } else {
-      label = {
-        type: "CombinedBurnMint",
-        reason,
-        meta,
-      };
+  private async buildMergeSplit(
+    exercisedEvent: LedgerApiExercisedEvent,
+    tokenStandardChoice: TokenStandardChoice | null
+  ): Promise<ParsedKnownExercisedEvent> {
+    let type: "MergeSplit" | "Mint" | "Burn";
+    const meta = mergeMetas(exercisedEvent);
+    switch (getMetaKeyValue(TxKindMetaKey, meta)) {
+      case "burn":
+        type = "Burn";
+        break;
+      case "mint":
+        type = "Mint";
+        break;
+      default:
+        type = "MergeSplit";
     }
+    const reason = getMetaKeyValue(ReasonMetaKey, meta);
+    const children = await this.getChildren(exercisedEvent);
+    const amountChanges = computeAmountChanges(children, meta, this.partyId);
+
+    const label: Label = {
+      ...amountChanges,
+      type,
+      tokenStandardChoice,
+      reason,
+      meta,
+    };
 
     return {
       label,
-      holdingsChange: children,
+      children,
+    };
+  }
+
+  private async buildBasic(
+    exercisedEvent: LedgerApiExercisedEvent,
+    type: "Unlock" | "ExpireDust",
+    tokenStandardChoice: TokenStandardChoice | null
+  ): Promise<ParsedKnownExercisedEvent> {
+    const children = await this.getChildren(exercisedEvent);
+    const meta = mergeMetas(exercisedEvent);
+    const amountChanges = computeAmountChanges(children, meta, this.partyId);
+    const reason = getMetaKeyValue(ReasonMetaKey, meta);
+    return {
+      label: {
+        ...amountChanges,
+        type,
+        tokenStandardChoice,
+        reason,
+        meta,
+      },
+      children,
     };
   }
 
@@ -368,10 +462,7 @@ export class TransactionParser {
           nodeId <= exercisedEvent.lastDescendantNodeId
       );
 
-    if (
-      exercisedEvent.consuming &&
-      isHoldingInterfaceId(exercisedEvent.interfaceId)
-    ) {
+    if (exercisedEvent.consuming && hasHoldingInterfaceId(exercisedEvent)) {
       const selfEvent = await this.getEventsForArchive(exercisedEvent);
       if (selfEvent) {
         const holdingView = ensureHoldingViewIsPresent(
@@ -388,7 +479,11 @@ export class TransactionParser {
       }
     }
 
-    for (const { createdEvent, archivedEvent } of childrenEventsSlice) {
+    for (const {
+      createdEvent,
+      archivedEvent,
+      exercisedEvent,
+    } of childrenEventsSlice) {
       if (createdEvent) {
         const interfaceView = getInterfaceView(createdEvent);
         if (interfaceView) {
@@ -402,8 +497,15 @@ export class TransactionParser {
             lock: holdingView.lock,
           });
         }
-      } else if (archivedEvent) {
-        const contractEvents = await this.getEventsForArchive(archivedEvent);
+      } else if (
+        archivedEvent ||
+        (exercisedEvent &&
+          exercisedEvent.consuming &&
+          hasHoldingInterfaceId(exercisedEvent))
+      ) {
+        const contractEvents = await this.getEventsForArchive(
+          archivedEvent || exercisedEvent!
+        );
         if (contractEvents) {
           const holdingView = ensureHoldingViewIsPresent(
             contractEvents.created?.createdEvent
@@ -411,7 +513,7 @@ export class TransactionParser {
           mutatingResult.archives.push({
             amount: holdingView.amount,
             instrumentId: holdingView.instrumentId,
-            contractId: archivedEvent.contractId,
+            contractId: archivedEvent?.contractId || exercisedEvent!.contractId,
             owner: holdingView.owner,
             meta: holdingView.meta,
             lock: holdingView.lock,
@@ -497,6 +599,11 @@ interface ParseChildren {
   lastDescendantNodeId: number;
 }
 
+interface ParsedKnownExercisedEvent {
+  label: Label;
+  children: HoldingsChange;
+}
+
 // a naive implementation like event.X?.nodeId || event.Y?.nodeId || event.Z?.nodeId fails when nodeId=0
 interface NodeIdAndEvent {
   nodeId: number;
@@ -533,17 +640,67 @@ function getNodeIdAndEvent(event: LedgerApiEvent): NodeIdAndEvent {
 
 function sumHoldingsChange(
   change: HoldingsChange,
-  filter: (owner: string) => boolean
+  filter: (owner: string, lock: HoldingLock | null) => boolean
 ): BigNumber {
   return sumHoldings(
-    change.creates.filter((create) => filter(create.owner))
+    change.creates.filter((create) => filter(create.owner, create.lock))
   ).minus(
-    sumHoldings(change.archives.filter((archive) => filter(archive.owner)))
+    sumHoldings(
+      change.archives.filter((archive) => filter(archive.owner, archive.lock))
+    )
   );
 }
 
 function sumHoldings(holdings: Holding[]): BigNumber {
   return BigNumber.sum(
     ...holdings.map((h) => h.amount).concat(["0"]) // avoid NaN
+  );
+}
+
+function computeAmountChanges(
+  children: HoldingsChange,
+  meta: any,
+  partyId: string
+) {
+  const burnAmount = BigNumber(getMetaKeyValue(BurnedMetaKey, meta) || "0");
+  const partyHoldingAmountChange = sumHoldingsChange(
+    children,
+    (owner) => owner === partyId
+  );
+  const otherPartiesHoldingAmountChange = sumHoldingsChange(
+    children,
+    (owner) => owner !== partyId
+  );
+  const mintAmount = partyHoldingAmountChange
+    .plus(burnAmount)
+    .plus(otherPartiesHoldingAmountChange);
+  return {
+    burnAmount: burnAmount.toString(),
+    mintAmount: mintAmount.toString(),
+  };
+}
+
+function computeSummary(
+  changes: HoldingsChange,
+  partyId: string
+): HoldingsChangeSummary {
+  const amountChange = sumHoldingsChange(changes, (owner) => owner === partyId);
+  const outputAmount = sumHoldings(changes.creates);
+  const inputAmount = sumHoldings(changes.archives);
+  return {
+    amountChange: amountChange.toString(),
+    numOutputs: changes.creates.length,
+    outputAmount: outputAmount.toString(),
+    numInputs: changes.archives.length,
+    inputAmount: inputAmount.toString(),
+  };
+}
+
+function holdingChangesNonEmpty(event: TokenStandardEvent): boolean {
+  return (
+    event.unlockedHoldingsChange.creates.length > 0 ||
+    event.unlockedHoldingsChange.archives.length > 0 ||
+    event.lockedHoldingsChange.creates.length > 0 ||
+    event.lockedHoldingsChange.archives.length > 0
   );
 }

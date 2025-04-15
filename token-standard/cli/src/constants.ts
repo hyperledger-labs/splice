@@ -16,4 +16,10 @@ const SpliceMetaKeyPrefix = "splice.lfdecentralizedtrust.org/";
 export const TxKindMetaKey = `${SpliceMetaKeyPrefix}tx-kind`;
 export const SenderMetaKey = `${SpliceMetaKeyPrefix}sender`;
 export const ReasonMetaKey = `${SpliceMetaKeyPrefix}reason`;
-export const AllKnownMetaKeys = [TxKindMetaKey, SenderMetaKey, ReasonMetaKey];
+export const BurnedMetaKey = `${SpliceMetaKeyPrefix}burned`;
+export const AllKnownMetaKeys = [
+  TxKindMetaKey,
+  SenderMetaKey,
+  ReasonMetaKey,
+  BurnedMetaKey,
+];

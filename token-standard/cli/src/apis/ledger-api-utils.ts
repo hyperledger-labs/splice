@@ -5,6 +5,8 @@ import { AllKnownMetaKeys } from "../constants";
 import {
   createConfiguration,
   CreatedEvent as LedgerApiCreatedEvent,
+  ExercisedEvent as LedgerApiExercisedEvent,
+  ArchivedEvent as LedgerApiArchivedEvent,
   DefaultApi as LedgerJsonApi,
   HttpAuthAuthentication,
   JsInterfaceView,
@@ -67,9 +69,11 @@ export function filtersByParty(
   };
 }
 
-export function isHoldingInterfaceId(interfaceId: string | undefined): boolean {
-  return (
-    !!interfaceId && interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding")
+export function hasHoldingInterfaceId(
+  event: LedgerApiExercisedEvent | LedgerApiArchivedEvent
+): boolean {
+  return (event.implementedInterfaces || []).some((interfaceId) =>
+    interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding")
   );
 }
 
@@ -109,9 +113,27 @@ export function ensureHoldingViewIsPresent(
 }
 
 type Meta = { values: Array<[string, string]> } | undefined;
-export function getMetaKeyValue(key: string, meta: Meta): string | undefined {
+
+export function mergeMetas(event: LedgerApiExercisedEvent): Meta {
+  const lastWriteWins = [
+    event.choiceArgument?.transfer?.meta,
+    event.choiceArgument?.extraArgs?.meta,
+    event.choiceArgument?.meta,
+    event.exerciseResult?.meta,
+  ];
+  const result = new Map<string, string>();
+  lastWriteWins.forEach((meta) => {
+    const values: Array<[string, string]> = meta?.values || [];
+    values.forEach(([k, v]) => result.set(k, v));
+  });
+  if (result.size === 0) return undefined;
+  // order of keys doesn't matter, but we return it consistent for test purposes (and it's nicer)
+  else return { values: [...result.entries()].sort() };
+}
+
+export function getMetaKeyValue(key: string, meta: Meta): string | null {
   const keyValue = (meta?.values || []).find(([k, _]) => key === k);
-  return keyValue && keyValue[1];
+  return (keyValue && keyValue[1]) || null;
 }
 
 /**

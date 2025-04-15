@@ -10,7 +10,10 @@ export interface Transaction {
 
 export interface TokenStandardEvent {
   label: Label;
-  holdingsChange: HoldingsChange;
+  lockedHoldingsChange: HoldingsChange;
+  lockedHoldingsChangeSummary: HoldingsChangeSummary;
+  unlockedHoldingsChange: HoldingsChange;
+  unlockedHoldingsChangeSummary: HoldingsChangeSummary;
 }
 
 // Same definition as HoldingView in Daml
@@ -23,7 +26,7 @@ export interface Holding {
   meta: any;
 }
 
-interface HoldingLock {
+export interface HoldingLock {
   holders: string[];
   expiresAt?: string;
   expiresAfter?: string;
@@ -35,50 +38,77 @@ export interface HoldingsChange {
   archives: Holding[];
 }
 
+export interface HoldingsChangeSummary {
+  numInputs: number;
+  inputAmount: string;
+  numOutputs: number;
+  outputAmount: string;
+  amountChange: string;
+}
+export const EmptyHoldingsChangeSummary: HoldingsChangeSummary = {
+  numInputs: 0,
+  inputAmount: "0",
+  numOutputs: 0,
+  outputAmount: "0",
+  amountChange: "0",
+};
+
 export type Label =
   | TransferOut
   | TransferIn
-  | Split
-  | CombinedBurnMint
+  | MergeSplit
   | Burn
   | Mint
+  | Unlock
+  | ExpireDust
   | UnknownAction;
 type UnknownAction = RawArchive | RawCreate;
 interface BaseLabel {
   type: string;
   meta: any;
 }
+interface KnownLabel extends BaseLabel {
+  mintAmount: string;
+  burnAmount: string;
+  reason: string | null;
+  tokenStandardChoice: TokenStandardChoice | null;
+}
+export interface TokenStandardChoice {
+  name: string;
+  choiceArgument: any;
+  exerciseResult: any;
+}
 
-interface TransferOut extends BaseLabel {
+interface TransferOut extends KnownLabel {
   type: "TransferOut";
   receiverAmounts: Array<{ receiver: string; amount: string }>;
-  senderAmount: string;
 }
 
-interface TransferIn extends BaseLabel {
+interface TransferIn extends KnownLabel {
   type: "TransferIn";
   sender: string;
-  amount: string;
 }
 
-interface Split extends BaseLabel {
-  type: "Split";
-  // amounts: string[]; This can be derived from the creates/archives
+interface MergeSplit extends KnownLabel {
+  type: "MergeSplit";
 }
 
-interface Burn extends BaseLabel {
+// Same as MergeSplit, but is more precise (tx-kind=burn)
+interface Burn extends KnownLabel {
   type: "Burn";
-  reason: string | null;
 }
 
-interface Mint extends BaseLabel {
+// Same as MergeSplit, but is more precise (tx-kind=mint)
+interface Mint extends KnownLabel {
   type: "Mint";
-  reason: string | null;
 }
 
-interface CombinedBurnMint extends BaseLabel {
-  type: "CombinedBurnMint";
-  reason: string | null;
+interface Unlock extends KnownLabel {
+  type: "Unlock";
+}
+
+interface ExpireDust extends KnownLabel {
+  type: "ExpireDust";
 }
 
 interface RawArchive extends BaseLabel {
@@ -90,7 +120,7 @@ interface RawArchive extends BaseLabel {
   packageName: string;
   actingParties: string[];
   payload: Holding;
-  meta: undefined;
+  meta: any;
 }
 interface RawCreate extends BaseLabel {
   type: "RawCreate";
@@ -100,5 +130,5 @@ interface RawCreate extends BaseLabel {
   templateId: string;
   payload: Holding;
   packageName: string;
-  meta: undefined;
+  meta: any;
 }

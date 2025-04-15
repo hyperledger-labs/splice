@@ -13,6 +13,7 @@ import {
   JsGetUpdatesResponse,
 } from "canton-json-api-v2-openapi";
 
+// TODO (#19063): apply formatting improvements
 export async function listHoldingTransactions(
   partyId: string,
   opts: CommandOptions & { afterOffset?: string }
