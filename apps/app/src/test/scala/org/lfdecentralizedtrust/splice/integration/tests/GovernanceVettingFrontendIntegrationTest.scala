@@ -160,7 +160,7 @@ class GovernanceVettingFrontendIntegrationTest
             sv1Backend.listVoteRequests().loneElement.contractId.contractId
           },
         )
-        actAndCheck(timeUntilSuccess = 2.minutes)(
+        actAndCheck(timeUntilSuccess = 1.minutes)(
           "all other svs accept the request, which triggers the vote request early closing logic", {
             vote(sv2Backend, requestTrackingCid, isAccept = true, "2", finalVote = true)
             vote(sv3Backend, requestTrackingCid, isAccept = true, "3", finalVote = true)

@@ -279,6 +279,7 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -308,6 +309,7 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/infra/Pulumi.infra.mainzrh.yaml",
@@ -353,6 +355,7 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -382,6 +385,7 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-2.mainzrh.yaml",
