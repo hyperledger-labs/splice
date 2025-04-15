@@ -3344,9 +3344,8 @@ jobs:
           cluster: "scratchnetb"
       - cluster_lock_reaper:
           cluster: "scratchnetc"
-# TODO(#16067): Re-enable the reaper for scratchd
-#      - cluster_lock_reaper:
-#          cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnetd"
       - cluster_lock_reaper:
           cluster: "scratchnete"
 
