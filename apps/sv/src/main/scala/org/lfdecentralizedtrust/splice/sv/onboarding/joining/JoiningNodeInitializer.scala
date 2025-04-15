@@ -812,7 +812,10 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
         )
-        _ <- vetting.vetPackages(amuletRules.contract)
+        _ <- vetting.vetPackages(
+          amuletRules.contract,
+          Seq.empty, // We don't bother passing in vote requests here, this just needs to vet the current config.
+        )
         _ = logger.info("Packages vetting completed")
       } yield ()
     }

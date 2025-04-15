@@ -10,11 +10,10 @@ import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerConnection, PackageIdResolver}
-import org.lfdecentralizedtrust.splice.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleMacros,
@@ -22,10 +21,11 @@ import com.digitalasset.canton.console.{
   Help,
   LedgerApiCommandRunner,
 }
-import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -70,9 +70,15 @@ trait LedgerApiExtensions {
             readAs: Seq[PartyId] = Seq.empty,
             applicationId: String = LedgerApiCommands.defaultApplicationId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
+            packageIdResolverCustom: Option[PackageIdResolver] = None,
         ): JavaTransactionTree = {
           val cmds = commands.map(cmd =>
-            Await.result(packageIdResolver.resolvePackageId(cmd)(TraceContext.empty), 1.second)
+            Await.result(
+              packageIdResolverCustom
+                .getOrElse(packageIdResolver)
+                .resolvePackageId(cmd)(TraceContext.empty),
+              1.second,
+            )
           )
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
@@ -107,6 +113,7 @@ trait LedgerApiExtensions {
             commandId: Option[String] = None,
             domainId: Option[DomainId] = None,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
+            packageIdResolverCustom: Option[PackageIdResolver] = None,
         ): T = {
           val tree = submitJava(
             actAs,
@@ -117,6 +124,7 @@ trait LedgerApiExtensions {
             applicationId = userId,
             optTimeout = None,
             disclosedContracts = disclosedContracts,
+            packageIdResolverCustom = packageIdResolverCustom,
           )
           SpliceLedgerConnection.decodeExerciseResult(
             update,

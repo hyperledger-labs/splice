@@ -1,7 +1,4 @@
 infra:
-  ipWhitelisting:
-    extraWhitelistedIngress:
-      - "35.225.102.103/32" # CI GKE cluster for CCI
   prometheus:
     retentionDuration: "30d"
     retentionSize: "200GB"
@@ -20,4 +17,4 @@ validator1:
 synchronizerMigration:
   active:
     id: 0
-    version: "0.3.18-snapshot.20250321.8640.0.v05582b27"
+    version: "0.3.20-snapshot.20250407.8755.0.v4946b1b9"

@@ -97,7 +97,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/cn-docs",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/cn-docs",
       "compat": "true",
       "maxHistory": 10,
       "name": "docs",
@@ -137,7 +137,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "docs-docs",
     "provider": "",
@@ -382,7 +382,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -466,7 +466,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -501,8 +501,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2",
-              "1"
+              "2"
             ]
           }
         },
@@ -518,7 +517,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -528,7 +527,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -569,7 +568,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -579,7 +578,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -645,7 +644,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -655,7 +654,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -875,7 +874,6 @@
         },
         "migration": {
           "id": 2,
-          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -912,7 +910,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -922,7 +920,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-1",
@@ -1027,7 +1025,7 @@
           }
         }
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

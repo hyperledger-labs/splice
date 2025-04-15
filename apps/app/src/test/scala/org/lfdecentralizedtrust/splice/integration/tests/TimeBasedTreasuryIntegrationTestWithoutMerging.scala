@@ -1,7 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
+import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.ShowUtil.*
+import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -11,29 +14,24 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import org.lfdecentralizedtrust.splice.util.{
+  AmuletConfigUtil,
   SpliceUtil,
-  ConfigScheduleUtil,
   TimeTestUtil,
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.AmuletMetricsTrigger
-import com.digitalasset.canton.HasExecutionContext
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.ShowUtil.*
-import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
 import java.time.Instant
+import java.time.Duration
 import scala.annotation.nowarn
-import scala.jdk.CollectionConverters.*
 
 @nowarn("msg=match may not be exhaustive")
 class TimeBasedTreasuryIntegrationTestWithoutMerging
     extends IntegrationTest
-    with ConfigScheduleUtil
     with HasExecutionContext
     with WalletTestUtil
+    with AmuletConfigUtil
     with TimeTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition = {
@@ -178,22 +176,17 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "respect scheduled change of maxNumInputs" in { implicit env =>
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
-    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
-    val configSchedule = new splice.schedule.Schedule(
-      mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 4),
-      List(
-        new Tuple2(
-          now
-            // wait 4 "advanceRoundsByOneTick" (tick + 10s) before changing config
-            .add(tickDurationWithBuffer multipliedBy 4 minusSeconds 10)
-            .toInstant,
-          mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 3),
-        )
-      ).asJava,
+    val amuletRules = sv1ScanBackend.getAmuletRules().contract
+    val updatedConfig = mkUpdatedAmuletConfig(amuletRules, defaultTickDuration, 3)
+    val configs = Seq(
+      (
+        Some(tickDurationWithBuffer multipliedBy 3 plusSeconds 20),
+        updatedConfig,
+        amuletRules.payload.configSchedule.initialValue,
+      )
     )
 
-    setFutureConfigSchedule(configSchedule)
+    setAmuletConfig(configs)
 
     val (alice, _) = onboardAliceAndBob()
 
@@ -206,6 +199,14 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     // by advancing 2 rounds, both round 1 and round 2 are in their issuing phase
     advanceRoundsByOneTick
+
+    // moving beyond when the config change is applied, so that the automation triggers
+    advanceTime(Duration.ofSeconds(60))
+    // wait for real time to pass for the automation to do its work
+    eventually() {
+      updatedConfig should be(sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue)
+    }
+
     advanceRoundsByOneTick
 
     aliceValidatorWalletClient.tap(5)

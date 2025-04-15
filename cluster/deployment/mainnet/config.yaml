@@ -9,15 +9,31 @@ synchronizerMigration:
   active:
     id: 2
     provider: external
-    version: 0.3.15
-    releaseReference: "refs/heads/release-line-0.3.15"
+    version: 0.3.18
+    releaseReference:
+      gitReference: "refs/heads/release-line-0.3.18"
+      repoUrl: https://github.com/DACH-NY/canton-network-node
+      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiBaseDir: "cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "."
 pulumiProjectConfig:
   default:
+    interAppsDependencies: false
     isExternalCluster: true
     cloudSql:
       enabled: true
 monitoring:
   alerting:
     enableNoDataAlerts: true
+    alerts:
+      cloudSql:
+        maintenance: true
 operatorDeployment:
-  reference: refs/heads/main
+  reference:
+    gitReference: refs/heads/main
+    repoUrl: https://github.com/DACH-NY/canton-network-node
+    pulumiStacksDir: "cluster/stacks/prod"
+    pulumiBaseDir: "cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "."

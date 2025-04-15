@@ -19,7 +19,9 @@ tmp_dir=$(mktemp -d)
 mkdir -p "$tmp_dir/artifacts"
 mkdir -p "$tmp_dir/openapi"
 cp "$SPLICE_ROOT/apps/common/src/main/openapi/README.md" "$tmp_dir/openapi";
-find "$SPLICE_ROOT" -ipath '*/openapi/*.yaml' -exec cp '{}' "$tmp_dir/openapi" \;
+
+find "$SPLICE_ROOT" -ipath '*/openapi/*.yaml' -exec bash -c 'redocly bundle "$1" --output "$0"/openapi/$(basename "$1")' "$tmp_dir" {} \;
+
 cd "$tmp_dir/openapi" || exit
 tar -czvf openapi.tar.gz -- *
 mv openapi.tar.gz "$abs_target_dir/$target_file"

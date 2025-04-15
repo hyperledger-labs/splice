@@ -56,6 +56,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -71,7 +77,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace"
+              "value": "/tmp/pulumi-working/operator/canton-network/workspace/."
             },
             "type": "Literal"
           }
@@ -186,6 +192,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -201,7 +213,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace"
+              "value": "/tmp/pulumi-working/operator/infra/workspace/."
             },
             "type": "Literal"
           }
@@ -280,6 +292,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -295,7 +313,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace"
+              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/."
             },
             "type": "Literal"
           }
@@ -332,9 +350,9 @@
       },
       "spec": {
         "interval": "5m",
-        "recurseSubmodules": false,
+        "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.19"
+          "name": "refs/heads/release-line-0.3.20"
         },
         "secretRef": {
           "name": "github"
@@ -414,7 +432,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.19"
+          "name": "refs/heads/release-line-0.3.20"
         },
         "secretRef": {
           "name": "github"
@@ -441,9 +459,9 @@
       },
       "spec": {
         "interval": "5m",
-        "recurseSubmodules": false,
+        "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.19"
+          "name": "refs/heads/release-line-0.3.20"
         },
         "secretRef": {
           "name": "github"
@@ -509,7 +527,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.19"
+          "name": "refs/heads/release-line-0.3.20"
         },
         "secretRef": {
           "name": "github"
@@ -578,6 +596,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/splitwell/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -593,7 +617,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace"
+              "value": "/tmp/pulumi-working/operator/splitwell/workspace/."
             },
             "type": "Literal"
           }
@@ -672,6 +696,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-1/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -693,7 +723,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-1/workspace"
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-1/workspace/."
             },
             "type": "Literal"
           },
@@ -778,6 +808,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-2-migration-1/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -799,7 +835,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-2-migration-1/workspace"
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-2-migration-1/workspace/."
             },
             "type": "Literal"
           },
@@ -884,6 +920,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-3-migration-1/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -905,7 +947,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-3-migration-1/workspace"
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-3-migration-1/workspace/."
             },
             "type": "Literal"
           },
@@ -990,6 +1032,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-4-migration-1/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -1011,7 +1059,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-4-migration-1/workspace"
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-4-migration-1/workspace/."
             },
             "type": "Literal"
           },
@@ -1096,6 +1144,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-1/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -1117,7 +1171,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-1/workspace"
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-1/workspace/."
             },
             "type": "Literal"
           },
@@ -1204,6 +1258,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -1219,7 +1279,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace"
+              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/."
             },
             "type": "Literal"
           }
@@ -1300,6 +1360,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -1315,7 +1381,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace"
+              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/."
             },
             "type": "Literal"
           }
@@ -1396,6 +1462,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/validator1/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "dev"
@@ -1411,7 +1483,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace"
+              "value": "/tmp/pulumi-working/operator/validator1/workspace/."
             },
             "type": "Literal"
           }

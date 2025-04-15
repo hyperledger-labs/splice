@@ -3,16 +3,16 @@
 
 package org.lfdecentralizedtrust.splice.sv.admin.api.client
 
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{HttpAppConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
-import com.digitalasset.canton.tracing.TraceContext
-import org.apache.pekko.stream.Materializer
-import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -86,6 +86,7 @@ final class SvConnection private (
       config.url,
       HttpSvAppClient.GetDsoInfo,
     )
+
 }
 
 object SvConnection {

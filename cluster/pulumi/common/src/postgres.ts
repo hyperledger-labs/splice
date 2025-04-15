@@ -79,7 +79,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
           activationPolicy: 'ALWAYS', // TODO(#15974): set to NEVER when enabling archived instance
-          databaseFlags: [{ name: 'temp_file_limit', value: '100000000' }],
+          databaseFlags: [{ name: 'temp_file_limit', value: '2147483647' }],
           backupConfiguration: {
             enabled: true,
             pointInTimeRecoveryEnabled: true,

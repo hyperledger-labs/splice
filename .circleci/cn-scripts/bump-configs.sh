@@ -75,7 +75,7 @@ git config user.name "DA Automation"
 echo "main" > /tmp/branches
 echo "release-line-$(cat LATEST_RELEASE)" >> /tmp/branches
 for net in devnet testnet mainnet; do
-  yq '.synchronizerMigration.active.releaseReference' < "cluster/deployment/$net/config.yaml" | sed s'/refs\/heads\///' >> /tmp/branches
+  yq '.synchronizerMigration.active.releaseReference.gitReference' < "cluster/deployment/$net/config.yaml" | sed s'/refs\/heads\///' >> /tmp/branches
 done
 
 sort /tmp/branches | uniq | while read -r branch; do

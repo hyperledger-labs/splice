@@ -5,6 +5,7 @@ import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { config, isDevNet, isMainNet } from './config';
+import { spliceConfig } from './config/config';
 import { spliceEnvConfig } from './config/envConfig';
 
 /// Environment variables
@@ -16,9 +17,9 @@ export const PULUMI_STACKS_DIR = config.requireEnv('PULUMI_STACKS_DIR');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const PUBLIC_CONFIGS_PATH = config.optionalEnv('PUBLIC_CONFIGS_PATH');
-export const PRIVATE_CONFIGS_PATH = config.requireEnv('PRIVATE_CONFIGS_PATH');
+export const PRIVATE_CONFIGS_PATH = config.optionalEnv('PRIVATE_CONFIGS_PATH');
 
-export const HELM_REPO = spliceEnvConfig.requireEnv('CACHE_OCI_DEV_HELM_REGISTRY');
+export const HELM_REPO = spliceEnvConfig.requireEnv('OCI_DEV_HELM_REGISTRY');
 export const DOCKER_REPO = spliceEnvConfig.requireEnv('CACHE_DEV_DOCKER_REGISTRY');
 
 export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
@@ -183,6 +184,10 @@ export function approvedSvIdentities(): ApprovedSvIdentity[] {
     return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
       .approvedSvIdentities;
   } else {
+    if (spliceConfig.pulumiProjectConfig.isExternalCluster) {
+      throw new Error('isExternalCluster is true but PUBLIC_CONFIGS_PATH is not set');
+    }
+
     return [];
   }
 }

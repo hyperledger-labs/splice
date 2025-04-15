@@ -23,7 +23,8 @@ declare global {
   }
 }
 
-export const server: SetupServer = buildServer(window.splice_config.services.sv.url);
+export const svUrl: string = window.splice_config.services.sv.url;
+export const server: SetupServer = buildServer(svUrl);
 
 // Start server before all tests
 beforeAll(() => {

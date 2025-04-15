@@ -1,6 +1,10 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.daml.ledger.javaapi
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.sequencing.protocol.TrafficState
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
@@ -13,20 +17,19 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
   WalletAppInstall,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  TestCommon,
   SpliceTestConsoleEnvironment,
+  TestCommon,
 }
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.AmuletPosition
 import org.lfdecentralizedtrust.splice.wallet.util.ExtraTrafficTopupParameters
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.sequencing.protocol.TrafficState
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 
 import java.time.Instant
 import java.util.Optional
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -67,6 +70,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
       validatorApp: ValidatorAppBackendReference,
       memberId: Member,
       domainId: DomainId,
+      packageIdResolverCustom: Option[PackageIdResolver],
   )(implicit env: SpliceTestConsoleEnvironment): ValidatorTopUpState.ContractId = {
     inside(listValidatorContracts(ValidatorTopUpState.COMPANION)(validatorApp)) {
       case Seq(topupState) => topupState.id
@@ -88,6 +92,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
               readAs = Seq(validatorParty),
               update = topupStateCreationCmd,
               domainId = Some(domainId),
+              packageIdResolverCustom = packageIdResolverCustom,
             )
             .contractId
         new ValidatorTopUpState.ContractId(topupStateCid.contractId)
@@ -104,7 +109,21 @@ trait SynchronizerFeesTestUtil extends TestCommon {
       trafficAmount: Long,
       ts: CantonTimestamp,
       inputAmulets: Seq[AmuletPosition] = Seq(),
+      scanConnection: Option[HasAmuletRules] = None,
   )(implicit env: SpliceTestConsoleEnvironment): AmuletOperationOutcome = {
+    implicit val ec: ExecutionContext = env.executionContext
+
+    val packageIdResolverCustom = scanConnection match {
+      case Some(scanConnection) =>
+        Some(
+          PackageIdResolver.inferFromAmuletRules(
+            env.environment.clock,
+            scanConnection,
+            loggerFactory,
+          ): PackageIdResolver
+        )
+      case None => None
+    }
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
     val domainId =
@@ -112,7 +131,8 @@ trait SynchronizerFeesTestUtil extends TestCommon {
         sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.activeSynchronizer
       )
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
-    val topupStateCid = getOrCreateTopupStateCid(validatorApp, memberId, domainId)
+    val topupStateCid =
+      getOrCreateTopupStateCid(validatorApp, memberId, domainId, packageIdResolverCustom)
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(WalletAppInstall.COMPANION)(
@@ -160,6 +180,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
               transferContext.latestOpenMiningRound,
             )
             .toLedgerApiDisclosedContracts,
+          packageIdResolverCustom = packageIdResolverCustom,
         )
         .exerciseResult
         .outcomes

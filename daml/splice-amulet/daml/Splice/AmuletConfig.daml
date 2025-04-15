@@ -8,6 +8,7 @@ import Splice.DecentralizedSynchronizer
 import Splice.Issuance
 import Splice.Schedule
 import DA.Time
+import Splice.Util
 
 -- TODO(#14972): Get rid of the unused Amulet data type
 data Amulet = Amulet deriving (Show, Eq)
@@ -67,3 +68,32 @@ data PackageConfig = PackageConfig
     wallet : Text
     walletPayments : Text
   deriving (Show, Eq)
+
+instance Patchable (AmuletConfig USD) where
+  patch new base current = AmuletConfig with
+    transferConfig = patch new.transferConfig base.transferConfig current.transferConfig
+    issuanceCurve = patch new.issuanceCurve base.issuanceCurve current.issuanceCurve
+    decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
+    tickDuration = patch new.tickDuration base.tickDuration current.tickDuration
+    packageConfig = patch new.packageConfig base.packageConfig current.packageConfig
+    transferPreapprovalFee = patch new.transferPreapprovalFee base.transferPreapprovalFee current.transferPreapprovalFee
+
+instance Patchable (TransferConfig USD) where
+  patch new base current = TransferConfig with
+    createFee = patch new.createFee base.createFee current.createFee
+    holdingFee = patch new.holdingFee base.holdingFee current.holdingFee
+    transferFee = patch new.transferFee base.transferFee current.transferFee
+    lockHolderFee = patch new.lockHolderFee base.lockHolderFee current.lockHolderFee
+    extraFeaturedAppRewardAmount = patch new.extraFeaturedAppRewardAmount base.extraFeaturedAppRewardAmount current.extraFeaturedAppRewardAmount
+    maxNumInputs = patch new.maxNumInputs base.maxNumInputs current.maxNumInputs
+    maxNumOutputs = patch new.maxNumOutputs base.maxNumOutputs current.maxNumOutputs
+    maxNumLockHolders = patch new.maxNumLockHolders base.maxNumLockHolders current.maxNumLockHolders
+
+instance Patchable PackageConfig where
+  patch new base current = PackageConfig with
+    amulet = patch new.amulet base.amulet current.amulet
+    amuletNameService = patch new.amuletNameService base.amuletNameService current.amuletNameService
+    dsoGovernance = patch new.dsoGovernance base.dsoGovernance current.dsoGovernance
+    validatorLifecycle = patch new.validatorLifecycle base.validatorLifecycle current.validatorLifecycle
+    wallet = patch new.wallet base.wallet current.wallet
+    walletPayments = patch new.walletPayments base.walletPayments current.walletPayments

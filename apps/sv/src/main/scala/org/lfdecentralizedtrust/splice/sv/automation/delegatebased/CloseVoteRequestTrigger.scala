@@ -3,15 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.util.AssignedContract
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOption
@@ -21,40 +21,35 @@ class CloseVoteRequestTrigger(
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
-    mat: Materializer,
-    tracer: Tracer,
+    override val tracer: Tracer,
+    materializer: Materializer,
 ) extends MultiDomainExpiredContractTrigger.Template[
       VoteRequest.ContractId,
       VoteRequest,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
-      svTaskContext.dsoStore.listExpiredVoteRequests(),
+      svTaskContext.dsoStore.listVoteRequestsReadyToBeClosed,
       VoteRequest.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      VoteRequest.ContractId,
-      VoteRequest,
-    ]]] {
-  type Task =
-    ScheduledTaskTrigger.ReadyTask[AssignedContract[VoteRequest.ContractId, VoteRequest]]
-
-  private val store = svTaskContext.dsoStore
+    with SvTaskBasedTrigger[CloseVoteRequestTrigger.Task] {
 
   override def completeTaskAsDsoDelegate(
-      task: Task,
+      task: CloseVoteRequestTrigger.Task,
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val store = svTaskContext.dsoStore
+    val request = task.work
     val voteRequestCid = task.work.contractId
     for {
-      dsoRules <- svTaskContext.dsoStore.getDsoRules()
+      dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       supportsSvController <- supportsSvController()
       amuletRulesId = amuletRules.contractId
       res <- for {
         outcome <- svTaskContext.connection
           .submit(
-            Seq(svTaskContext.dsoStore.key.svParty),
-            Seq(svTaskContext.dsoStore.key.dsoParty),
+            Seq(store.key.svParty),
+            Seq(store.key.dsoParty),
             dsoRules.exercise(
               _.exerciseDsoRules_CloseVoteRequest(
                 new DsoRules_CloseVoteRequest(
@@ -75,19 +70,27 @@ class CloseVoteRequestTrigger(
         .map(result => {
           if (result.exerciseResult.outcome.toJson.contains("VRO_AcceptedButActionFailed")) {
             TaskFailed(
-              s"action ${task.work.contract.payload.action.toValue} was accepted but failed with outcome: ${result.exerciseResult.outcome.toJson}."
+              s"request ${request.contractId} was accepted but failed with outcome: ${result.exerciseResult.outcome.toJson}."
             )
           } else {
             TaskSuccess(
-              s"closing VoteRequest for action: ${task.work.contract.payload.action.toValue} and outcome: ${result.exerciseResult.outcome.toJson} after expiration."
+              s"closing VoteRequest (voteRequestCid: ${request.contractId}) and outcome: ${result.exerciseResult.outcome.toJson}."
             )
           }
         })
         .getOrElse(
           TaskFailed(
-            s"failed to close VoteRequest for action: ${task.work.contract.payload.action.toValue} after expiration."
+            s"failed to close VoteRequest. (voteRequestCid: ${request.contractId})"
           )
         )
     }
   }
+
+}
+
+object CloseVoteRequestTrigger {
+  type Task =
+    ScheduledTaskTrigger.ReadyTask[
+      AssignedContract[VoteRequest.ContractId, VoteRequest]
+    ]
 }

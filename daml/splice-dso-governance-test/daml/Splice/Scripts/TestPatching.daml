@@ -1,0 +1,98 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestPatching where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Time
+import DA.List()
+import DA.Set()
+import DA.Set qualified as Set
+import DA.Map()
+import qualified DA.Map as Map
+
+import Splice.Util
+
+
+-- test patching utilities
+--------------------------
+
+data RecordValue = RecordValue with
+    x : Int
+    y : Int
+  deriving (Eq, Show)
+
+instance Patchable RecordValue where
+  patch (RecordValue x1 y1) (RecordValue x2 y2) (RecordValue x3 y3) = RecordValue (patch x1 x2 x3) (patch y1 y2 y3)
+
+testPatchScalar : Script ()
+testPatchScalar = script do
+  now <- getTime
+  test 1 2 3
+  test (days 1) (days 2) (days 3)
+  test "a" "b" "c"
+  test now (addRelTime now (days 1)) (addRelTime now (days 2))
+ where
+  test new base current = do
+    patch base base current === current
+    patch new base current  === new
+
+testPatchListAsScalar : Script ()
+testPatchListAsScalar = script do
+  test [1, 2] [2, 3] [2, 4]
+ where
+  test new base current = do
+    patchListAsScalar base base current === current
+    patchListAsScalar new base current  === new
+
+testPatchListAsSet : Script ()
+testPatchListAsSet = script do
+  -- no change applied
+  patchListAsSet [1] [1] [1, 2] === [1, 2]
+  -- addition of new element
+  patchListAsSet [1, 2] [1] [1] === [1, 2]
+  -- removal of existing element
+  patchListAsSet [] [1] [1, 2] === [2]
+
+testPatchSet : Script ()
+testPatchSet = script do
+  -- no change applied
+  patch (Set.fromList [1]) (Set.fromList [1]) (Set.fromList [1, 2]) === Set.fromList [1, 2]
+  -- addition of new element
+  patch (Set.fromList [1, 2]) (Set.fromList [1]) (Set.fromList [1]) === Set.fromList [1, 2]
+  -- removal of existing element
+  patch (Set.fromList []) (Set.fromList [1]) (Set.fromList [1, 2]) === Set.fromList [2]
+
+testPatchMap : Script ()
+testPatchMap = script do
+    -- no change applied
+    patch (Map.fromList [("a", 1)]) (Map.fromList [("a", 1)]) (Map.fromList [("a", 1), ("b", 2)]) === (Map.fromList [("a", 1), ("b", 2)])
+    -- addition of new (key, value)
+    patch (Map.fromList [("a", 1), ("c", 3)]) (Map.fromList [("a", 1)]) (Map.fromList [("a", 1), ("b", 2)]) === (Map.fromList [("a", 1), ("b", 2), ("c", 3)])
+    -- removal of existing (key, value)
+    patch (Map.fromList []) (Map.fromList [("a", 1)]) (Map.fromList [("a", 1), ("b", 2)]) === (Map.fromList [("b", 2)])
+    -- change of value for existing key
+    test 1 10 2
+    test "a" "b" "c"
+    test (Map.fromList [("a", 1), ("b", 2)]) (Map.fromList [("b", 2), ("c", 3)]) (Map.fromList [("b", 2), ("d", 4)])
+    test (RecordValue 2 2) (RecordValue 2 3) (RecordValue 5 4)
+  where
+    test new base current = do
+      patch (Map.fromList [("a", new)]) (Map.fromList [("a", base)]) (Map.fromList [("a", current), ("b", base)]) === (Map.fromList [("a", patch new base current), ("b", base)])
+
+testPatchOptional : Script ()
+testPatchOptional = script do
+  test 1 2 3
+  test "a" "b" "c"
+  test (Map.fromList [("a", 1), ("b", 2), ("e", 6)]) (Map.fromList [("b", 2), ("c", 3), ("e", 5)]) (Map.fromList [("b", 2), ("d", 4), ("e", 5)])
+  test (RecordValue 1 2) (RecordValue 2 3) (RecordValue 2 4)
+ where
+  test new base current = do
+    patch None None (Some current) === (Some current)
+    patch None (Some base) None === None
+    patch (Some new) None None === (Some new)
+    patch (Some new) (Some base) None === None
+    patch (Some new) (Some base) (Some current) === (Some (patch new base current))
+    patch (Some base) (Some base) (Some current)  === (Some (patch base base current))

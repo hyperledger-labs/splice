@@ -3,7 +3,7 @@ import { config } from 'splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
-import { clusterBaseDomain, clusterBasename } from './config';
+import { clusterBaseDomain, clusterBasename, monitoringConfig } from './config';
 import {
   getNotificationChannel,
   installCloudSQLMaintenanceUpdateAlerts,
@@ -30,7 +30,9 @@ if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();
   installGcpLoggingAlerts(notificationChannel);
   installClusterMaintenanceUpdateAlerts(notificationChannel);
-  installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+  if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
+    installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+  }
 }
 
 configureStorage();

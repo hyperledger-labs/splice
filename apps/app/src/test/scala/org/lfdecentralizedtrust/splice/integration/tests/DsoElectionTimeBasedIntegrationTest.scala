@@ -1,15 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.DomainId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestWithEarlyClosingTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.DomainId
 import org.slf4j.event.Level
 
 import java.time.Duration as JavaDuration
@@ -89,10 +89,11 @@ class DsoElectionTimeBasedIntegrationTest
               "url",
               "remove current delegate",
               sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
             )
           },
         )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-        Seq(sv2Backend, sv3Backend, sv4Backend)
+        Seq(sv2Backend, sv3Backend)
           .filter(
             // current delegate not voting
             _.getDsoInfo().svParty.toProtoPrimitive != currentLeader
@@ -112,7 +113,7 @@ class DsoElectionTimeBasedIntegrationTest
         clue("Leader has changed") {
           loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
             leaderBackend.dsoDelegateBasedAutomation
-              .trigger[CloseVoteRequestWithEarlyClosingTrigger]
+              .trigger[CloseVoteRequestTrigger]
               .resume(),
             entries => {
               forExactly(4, entries) { line =>

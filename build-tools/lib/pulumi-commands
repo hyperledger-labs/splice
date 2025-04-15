@@ -33,7 +33,7 @@ function subcmd_pulumi() {
             ;;
     esac
 
-    local args=(--cwd "${SPLICE_ROOT}/${PULUMI_STACKS_DIR}/${pulumi_project}")
+    local args=(--cwd "${PULUMI_STACKS_DIR}/${pulumi_project}")
 
     case "${pulumi_cmd}" in
         whoami|org)
@@ -76,7 +76,7 @@ function subcmd_pulumi() {
 
 ###
 
-subcommand_whitelist[apply]="Apply the current Pulumi configuration (--preview to preview only)"
+subcommand_whitelist[apply]="Apply the current Pulumi configuration, without the runbooks (--preview to preview only)"
 
 function subcmd_apply() {
     _production_gate
@@ -90,6 +90,14 @@ function subcmd_apply() {
                 shift
                 ;;
             --skip-infra)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+            --sv1-only)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+            --fully-parallel)
                 POSITIONAL_ARGS+=("$1")
                 shift
                 ;;
@@ -127,7 +135,7 @@ function subcmd_apply() {
             _warning "docker-image-reference-exists bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
         fi
 
-        _cluster_apply "${args[@]}"
+        _cluster_apply "$@"
     fi
 }
 
@@ -158,7 +166,7 @@ function subcmd_ci_apply() {
 
     _info "Applying CI deployment: $(get-snapshot-version)"
 
-    _cluster_apply "$@"
+    _cluster_apply "--fully-parallel" "$@"
 }
 
 ###

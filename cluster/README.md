@@ -525,8 +525,12 @@ are stored in the deployment directory for the given cluster.
 `cncluster help` will provide a full list of supported cluster
 subcommands. A few highlights include the following:
 
-* `cncluster apply` - Apply the current working copy's `canton-network`
-  and `infra` Pulumi stacks to a cluster. The presence of all images referenced by that
+* `cncluster apply` - Apply the current working copy's
+  `canton-network`, `infra`, `validator1` and `splitwell` stacks to a cluster,
+  as well as all `sv-canton` stacks required by the SVs that will be deployed out of `canton-network`.
+  Useful flags include `--skip-infra` (to skip the infra stack)
+  and `--sv1-only` (to deploy only SV1 and no other SVs or validators).
+  The presence of all images referenced by that
   configuration is confirmed prior to application of the manifest.
 
   * The tag for the images to be deployed can be overridden with an
@@ -545,9 +549,9 @@ subcommands. A few highlights include the following:
           * `export OPERATOR_IMAGE_VERSION=X.X.X`
           * `export GOOGLE_CREDENTIALS=$(cat "$HOME/.config/gcloud/application_default_credentials.json")`
           * `git checkout -b <some_temp_branch>`
-          * `cncluster update_config active 0 internal <X.X.X> refs/heads/<some_temp_branch>`
-          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch>`
-          * push `config.yaml` and `.envrc.vars` to the temporary branch
+          * `cncluster update_config active 0 <X.X.X> refs/heads/<some_temp_branch> canton-network-node`
+          * `cncluster set_operator_deployment_reference refs/heads/<some_temp_branch> canton-network-node`
+          * push `config.yaml` to the temporary branch
           * `cncluster apply_operator`
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
@@ -1581,7 +1585,6 @@ However, the following steps don't require an action from us:
    * if using `external` as the provider, generate and commit the Pulumi secret provider configuration files for the
      new stacks using the steps outlined in [troubleshooting external stacks](#troubleshooting-external-stacks) to
      ensure the pulumi preview job on your PR succeeds.
-1. If using `external` as the provider, deploy the operator from the deployment branch to create the new stack's k8s Custom Resources.
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
@@ -1592,14 +1595,14 @@ However, the following steps don't require an action from us:
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
    You can optionally disable backups and backup status checks. If you don't, they will just fail with no further consequences,
    at least let people on monitoring rotation know that this is expected until HDM/DR is done.
-1. Take down the `multi-validator` stack if it exists. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
+1. Take down the `multi-validator` stack if it exists (the multi-validator does not support HDMs).
+   Merge a PR to `main` that sets `export SPLICE_DEPLOY_MULTI_VALIDATOR=false` in the target cluster's `.envrc.vars`.
 1. For a disaster recovery, test the `cncluster take_disaster_recovery_dumps` step below, against a timestamp determined from `sv-1` as with below.
 1. Request PAM access some time before the scheduled time.
    Keep in mind a PAM request lasts for 4h, so you want to ensure you'll have PAM for the duration of the meeting.
 1. Wait until the scheduled time has arrived. For hard domain migrations, the domain should be paused and a migration dump should be exported.
    If unsure, check the logs of the SV app (and any validator apps) for an entry such as "Wrote domain migration dump"
    (e.g., via [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Wrote%20domain%20migration%20dump%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-09T13:01:30.491233228Z;duration=PT30M?project=da-cn-devnet)).
-1. Take a screenshot of the amulet balance of our SVs. You'll use this as a reference to check the balance after the migration is complete.
 1. For hard domain migrations: Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
    It's probably easiest to check this via the [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Ingested%20transaction%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:41:04.651869226Z;duration=PT30M?project=da-cn-devnet).
@@ -1628,7 +1631,6 @@ However, the following steps don't require an action from us:
    * in `config.yaml` change `synchronizerMigration.active` to `synchronizerMigration.legacy`
    * in `config.yaml` change `synchronizerMigration.upgrade` to `synchronizerMigration.active`
    * in `config.yaml` set `synchronizerMigration.active.migratingFrom` to the migration ID we're migrating away from
-   * deploy the operator from the deployment branch where you updated the configuration
    * sync the migration config found in `config.yaml` on all the branches referenced in any migrations `releaseReference` (this just ensure that some metrics are labeled as expected for still running migrations, and that it removes all the deployments for archived migrations)
    * Update the `CHARTS_VERSION` and `OVERRIDE_VERSION` in the target cluster env vars to the version we're migrating to.
 1. Wait for the operator to apply your changes from the migrate step.
@@ -2447,7 +2449,7 @@ KMS support (for SVs, validators) is actively being worked on, so expect changes
 Currently we support:
 
 - Deploying `validator1` with participant KMS. You need to set `validator1.kms` in the deployment directory `config.yaml`.
-- Deploying any SV from the main `canton-network` stack with participant KMS. You need to set `svs.sv-X.participant.kms` in the deployment directory `config.yaml` (`sv-X` being your target SV).
+- Deploying an SV with participant KMS. You need to set `svs.sv-X.participant.kms` in the deployment directory `config.yaml` (`sv-X` being your target SV; `sv` also works).
 
 In both cases, the format for `kms` is:
 

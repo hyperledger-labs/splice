@@ -306,7 +306,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-validator1",
@@ -355,7 +355,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -427,7 +427,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -468,7 +468,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -478,7 +478,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-2",
@@ -570,7 +570,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "validator1-participant-2",
     "provider": "",
@@ -612,7 +612,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -644,7 +644,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-splitwell-web-ui",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-splitwell-web-ui",
       "compat": "true",
       "maxHistory": 10,
       "name": "splitwell-web-ui",
@@ -694,7 +694,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -736,7 +736,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -768,7 +768,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-validator1",
@@ -813,7 +813,8 @@
           "splice-node/dars/splitwell-0.1.4.dar",
           "splice-node/dars/splitwell-0.1.5.dar",
           "splice-node/dars/splitwell-0.1.6.dar",
-          "splice-node/dars/splitwell-0.1.7.dar"
+          "splice-node/dars/splitwell-0.1.7.dar",
+          "splice-node/dars/splitwell-0.1.8.dar"
         ],
         "auth": {
           "audience": "https://canton.network.global",
@@ -834,7 +835,6 @@
         },
         "migration": {
           "id": 2,
-          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -895,7 +895,7 @@
           "auth0|63e3d75ff4114d87a2c1e4f5"
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "validator1-validator-validator1",
     "provider": "",
