@@ -63,9 +63,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     with TimeTestUtil
     with HasExecutionContext {
 
-  // TODO(#18823): scan txlog script doesn't support two-step transfer yet
-  override def runUpdateHistorySanityCheck = false
-
   private val sampleHoldingDarPath = Paths
     .get(
       "token-standard/examples/splice-token-test-dummy-holding/.daml/dist/splice-api-token-sample-holding-current.dar"

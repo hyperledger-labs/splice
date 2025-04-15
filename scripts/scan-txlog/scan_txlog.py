@@ -2955,7 +2955,7 @@ class State:
         )
         return HandleTransactionResult.for_open_round(round_number)
 
-    def handle_locked_owner_expire_lock(self, transaction, event):
+    def handle_locked_owner_expire_lock(self, transaction, event, log_prefix="ExpireUnlock"):
         summary = (
             event.exercise_result.get_locked_amulet_owner_expire_lock_result_amulet_sum()
         )
@@ -2967,7 +2967,7 @@ class State:
         formatted_amulet = self.format_amulet(amulet_cid, amulet)
         self._txinfo(
             transaction,
-            "ExpireUnlock",
+            log_prefix,
             f"Amulet {formatted_amulet} was unlocked because lock expired",
         )
         return HandleTransactionResult.for_open_round(round_number)
@@ -3507,37 +3507,98 @@ class State:
                 self.active_contracts[child_event.contract_id] = child_event
         return HandleTransactionResult.for_open_round(round_number)
 
-    def handle_transfer_factory_transfer(self, transaction, event):
-        output = event.exercise_result.get_transferinstructionresult_output()
-        if output["tag"] == "TransferInstructionResult_Completed":
-            # direct transfer
-            for event_id in event.child_event_ids:
-                child_event = transaction.events_by_id[event_id]
-                if (
-                    isinstance(child_event, ExercisedEvent)
-                    and child_event.choice_name == "TransferPreapproval_Send"
-                ):
-                    return self.handle_transfer_preapproval_send(
-                        transaction, child_event
-                    )
-            raise Exception(
-                f"Could not find TransferPreapproval_Send child event for TransferFactory_Transfer: {transaction}"
-            )
-        else:
-            # TODO(#18823) Support two-step transfers
-            raise Exception(
-                f"Unexpected output tag for TransferFactory_Transfer: {output.tag}"
+    def handle_locked_input(self, child_event, transaction):
+        if (
+            isinstance(child_event, ExercisedEvent)
+            and child_event.choice_name == "LockedAmulet_OwnerExpireLock"
+        ):
+            self.handle_locked_owner_expire_lock(
+                transaction, child_event, log_prefix="Unlock transfer inputs with expired locks"
             )
 
-    def handle_allocation_factory_allocate(self, transaction, event):
+    def handle_transfer_factory_transfer(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
+            self.handle_locked_input(child_event, transaction)
+            # There is either a TransferPreapproval_Send
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "TransferPreapproval_Send"
+            ):
+                return self.handle_transfer_preapproval_send(
+                    transaction, child_event
+                )
+            # Or a direct call to AmuletRules_Transfer
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                output = event.exercise_result.get_transferinstructionresult_output()
+                description = "Token standard: offer transfer" if output["tag"] == "TransferInstructionResult_Pending" else "Token standard: self-transfer"
+                return self.handle_transfer(
+                    transaction, child_event, description=description
+                )
+        raise Exception(
+            f"Could not find TransferPreapproval_Send or AmuletRules_Transfer child event for TransferFactory_Transfer: {transaction}"
+        )
+
+    def handle_transfer_instruction_accept(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: unlock funds for accepted transfer"
+                )
             if (
                 isinstance(child_event, ExercisedEvent)
                 and child_event.choice_name == "AmuletRules_Transfer"
             ):
                 return self.handle_transfer(
-                    transaction, child_event, description="Allocation"
+                    transaction, child_event, description="Token standard: accept transfer"
+                )
+        raise Exception(
+            f"Could not find AmuletRules_Transfer child of TransferInstruction_Accept"
+        )
+
+    def handle_transfer_instruction_reject(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: offer rejected - return locked funds"
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
+
+    def handle_transfer_instruction_withdraw(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: offer withdrawn - return locked funds"
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
+
+    def handle_allocation_factory_allocate(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            self.handle_locked_input(child_event, transaction)
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction, child_event, description="Token standard: lock funds for allocation "
                 )
         raise Exception(
             f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
@@ -3551,18 +3612,31 @@ class State:
                 and child_event.choice_name == "LockedAmulet_Unlock"
             ):
                 self.handle_locked_amulet_unlock(
-                    transaction, child_event, log_prefix="Allocation unlock"
+                    transaction, child_event, log_prefix="Token standard: unlock allocated funds"
                 )
             if (
                 isinstance(child_event, ExercisedEvent)
                 and child_event.choice_name == "AmuletRules_Transfer"
             ):
                 return self.handle_transfer(
-                    transaction, child_event, description="Allocation execution"
+                    transaction, child_event, description="Token standard: execute allocated transfer"
                 )
         raise Exception(
             f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
         )
+
+    def handle_allocation_withdraw(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: allocation withdrawn - return locked funds"
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
 
     def handle_root_exercised_event(self, transaction, event):
         LOG.debug(f"Root exercise: {event.choice_name}")
@@ -3716,10 +3790,26 @@ class State:
                 )
             case "TransferFactory_Transfer":
                 return self.handle_transfer_factory_transfer(transaction, event)
+            case "TransferFactory_PublicFetch":
+                return HandleTransactionResult.empty()
+            case "TransferInstruction_Accept":
+                return self.handle_transfer_instruction_accept(transaction, event)
+            case "TransferInstruction_Reject":
+                return self.handle_transfer_instruction_reject(transaction, event)
+            case "TransferInstruction_Withdraw":
+                return self.handle_transfer_instruction_withdraw(transaction, event)
+            # case "TransferInstruction_Update": -- intentionally not handled, as it is not used by Amulet
             case "AllocationFactory_Allocate":
                 return self.handle_allocation_factory_allocate(transaction, event)
+            case "AllocationFactory_PublicFetch":
+                return HandleTransactionResult.empty()
             case "Allocation_ExecuteTransfer":
                 return self.handle_allocation_execute_transfer(transaction, event)
+            case "Allocation_Withdraw":
+                return self.handle_allocation_withdraw(transaction, event)
+            # case "AllocationInstruction_Withdraw": -- intentionally not handled, as it is not used by Amulet
+            # case "AllocationInstruction_Update": -- intentionally not handled, as it is not used by Amulet
+            # no handling of `AllocationRequest` choices as they are not visible to the DSO party
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"
 
