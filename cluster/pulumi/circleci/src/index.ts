@@ -112,14 +112,6 @@ new k8s.helm.v3.Release('container-agent', {
                     name: 'cache',
                     mountPath: '/cache',
                   },
-                  {
-                    name: 'home',
-                    mountPath: '/home',
-                  },
-                  {
-                    name: 'nix',
-                    mountPath: '/nix',
-                  },
                 ],
               },
             ],
@@ -128,40 +120,6 @@ new k8s.helm.v3.Release('container-agent', {
                 name: 'cache',
                 persistentVolumeClaim: {
                   claimName: persistentVolumeClaim.metadata.name,
-                },
-              },
-              {
-                name: 'home',
-                ephemeral: {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ['ReadWriteOnce'],
-                      // only hyperdisks are supported on c4 nodes
-                      storageClassName: 'hyperdisk-balanced-rwo',
-                      resources: {
-                        requests: {
-                          storage: '24Gi',
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-              {
-                name: 'nix',
-                ephemeral: {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ['ReadWriteOnce'],
-                      // only hyperdisks are supported on c4 nodes
-                      storageClassName: 'hyperdisk-balanced-rwo',
-                      resources: {
-                        requests: {
-                          storage: '24Gi',
-                        },
-                      },
-                    },
-                  },
                 },
               },
             ],
@@ -197,14 +155,6 @@ new k8s.helm.v3.Release('container-agent', {
                     name: 'cache',
                     mountPath: '/cache',
                   },
-                  {
-                    name: 'home',
-                    mountPath: '/home',
-                  },
-                  {
-                    name: 'nix',
-                    mountPath: '/nix',
-                  },
                 ],
               },
             ],
@@ -213,40 +163,6 @@ new k8s.helm.v3.Release('container-agent', {
                 name: 'cache',
                 persistentVolumeClaim: {
                   claimName: persistentVolumeClaim.metadata.name,
-                },
-              },
-              {
-                name: 'home',
-                ephemeral: {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ['ReadWriteOnce'],
-                      // only hyperdisks are supported on c4 nodes
-                      storageClassName: 'hyperdisk-balanced-rwo',
-                      resources: {
-                        requests: {
-                          storage: '16Gi',
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-              {
-                name: 'nix',
-                ephemeral: {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ['ReadWriteOnce'],
-                      // only hyperdisks are supported on c4 nodes
-                      storageClassName: 'hyperdisk-balanced-rwo',
-                      resources: {
-                        requests: {
-                          storage: '24Gi',
-                        },
-                      },
-                    },
-                  },
                 },
               },
             ],
