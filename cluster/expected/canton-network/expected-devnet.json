@@ -1407,17 +1407,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -1447,6 +1455,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],
@@ -2101,17 +2114,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2141,6 +2162,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],
@@ -2761,17 +2787,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2801,6 +2835,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],
@@ -3421,17 +3460,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -3461,6 +3508,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],

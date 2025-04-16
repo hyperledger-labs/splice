@@ -1358,7 +1358,7 @@ we don't necessarily need to accept any change pushed to the config repos. Pleas
 all changes that you consume before applying this command.
 
 ```
-git submodule update --remote
+`git submodule update --remote`
 ```
 
 On a daily basis, PRs are created for the production release line branches that bump this submodule.
