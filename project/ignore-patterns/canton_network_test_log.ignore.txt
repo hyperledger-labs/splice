@@ -112,4 +112,7 @@ Splice unsafe shutdown future
 # TODO(#17605) Investigate this and fix it
 SignSynchronizerBootstrappingStateTrigger.*SoftDomainMigrationIntegrationTest.*NOT_FOUND: No SynchronizerParametersState state domain global-domain-new
 
+# TODO(#19057) - Figure out a proper way to fix this
+BootstrapPackageConfigIntegrationTest.*ValidatorLicense_ReceiveFaucetCoupon is deprecated. Please use ValidatorLicense_RecordValidatorLivenessActivity instead.*
+
 # Make sure to have a trailing newline
