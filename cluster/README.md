@@ -2461,8 +2461,13 @@ kms:
   keyRingId: // you must set this to a keyring that already exists
 ```
 
-Current gotcha until we improve this: The keyring is managed manually, so you might need to create it for example [through the UI](https://console.cloud.google.com/security/kms/keyrings).
+We don't create GCP keyrings automatically; if your desired keyring doesn't exist you'll need to create it manually, for example [through the UI](https://console.cloud.google.com/security/kms/keyrings).
 Pick a single-region keyring that matches the region of your deployment.
+[GCP keyrings cannot be deleted](https://www.pulumi.com/registry/packages/gcp/api-docs/kms/keyring/), so create new keyrings carefully.
+
+Independently of the keyring: Each KMS key costs us $1.00-$2.50 per month just for existing ([GCP pricing](https://cloud.google.com/kms/pricing).
+A fresh participants registers 3 keys.
+We have no automatic logic for cleaning up unused keys (yet); until further notice it's the responsibility of whoever registered those keys to make sure that they are destroyed eventually.
 
 The more general gotcha around migrating (a Canton node) to using KMS also applies: [you can't](https://dev.network.canton.global/validator_operator/validator_security.html#migrating-an-existing-validator-to-use-an-external-kms).
 For non-MainNet deployments it's recommended to just `down` the existing deployment, including all databases, and then redeploy (and reonboard) with the fresh KMS-enabled deployment.

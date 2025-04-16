@@ -8,8 +8,13 @@
 Release Notes
 =============
 
-0.3.20
-------
+upcoming
+--------
+
+- Deployments
+
+  - Validator, app and scan support specifying a scope when requesting the token from the participant.
+    This enables use of IAMs that make the scope parameter mandatory.
 
 .. important::
 
@@ -20,6 +25,14 @@ Release Notes
       Please make sure your database has enough disk space available before upgrading, and make sure the
       `temp_file_limit <https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-TEMP-FILE-LIMIT>`_
       PostgreSQL parameter is set to a sufficiently high value.
+
+- Frontends
+
+  - The Wallet and Scan UIs now show the Update ID of every transaction. These IDs are consistent with those
+    used in the `updates` endpoints of the Scan API.
+
+0.3.20
+------
 
 - Performance
 

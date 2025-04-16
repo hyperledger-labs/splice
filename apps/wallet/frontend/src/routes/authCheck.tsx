@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
 import {
+  AuthConfig,
   ErrorDisplay,
   Loading,
   Login,
-  useUserState,
-  AuthConfig,
   TestAuthConfig,
+  useUserState,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Outlet } from 'react-router-dom';
 
+import { BasicLayout } from '../components/Layout';
 import Onboarding from '../components/Onboarding';
 import { useIsOnboarded } from '../hooks';
 import { useWalletConfig } from '../utils/config';
@@ -32,7 +33,11 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
   }
 
   if (isLoading) {
-    return <Loading />;
+    return (
+      <BasicLayout>
+        <Loading />
+      </BasicLayout>
+    );
   }
 
   if (isError) {

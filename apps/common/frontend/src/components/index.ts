@@ -24,6 +24,7 @@ import PartyId from './PartyId';
 import { computeDiff } from './PrettyJsonDiff';
 import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
+import { updateIdFromEventId, UpdateId } from './UpdateId';
 import ValidatorLicenses, { ValidatorLicensesPage } from './ValidatorLicenses';
 import ViewMoreButton from './ViewMoreButton';
 import { TransferButton, SubscriptionButton } from './WalletButtons';
@@ -79,4 +80,6 @@ export {
   ValidatorLicenses,
   ValidatorLicensesPage,
   computeDiff,
+  UpdateId,
+  updateIdFromEventId,
 };

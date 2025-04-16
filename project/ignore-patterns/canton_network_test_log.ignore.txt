@@ -115,4 +115,7 @@ SignSynchronizerBootstrappingStateTrigger.*SoftDomainMigrationIntegrationTest.*N
 # TODO(#19057) - Figure out a proper way to fix this
 BootstrapPackageConfigIntegrationTest.*ValidatorLicense_ReceiveFaucetCoupon is deprecated. Please use ValidatorLicense_RecordValidatorLivenessActivity instead.*
 
+# Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
+.*No data has been made available yet.*
+
 # Make sure to have a trailing newline
