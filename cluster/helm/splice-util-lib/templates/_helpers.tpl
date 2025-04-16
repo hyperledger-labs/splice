@@ -47,6 +47,12 @@
       key: client-secret
       name: "splice-app-{{ $keyName }}-ledger-api-auth"
       optional: false
+- name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_SCOPE"
+  valueFrom:
+    secretKeyRef:
+      key: scope
+      name: "splice-app-{{ $keyName }}-ledger-api-auth"
+      optional: true
 {{- end }}
 {{- end -}}
 {{- define "splice-util-lib.auth0-user-env-var" -}}

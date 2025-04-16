@@ -88,7 +88,7 @@ export const BaseAnsField: React.FC<BaseAnsFieldProps> = ({
       freeSolo
       disablePortal
       id={props.id}
-      sx={{ width: 200 }}
+      sx={{ width: 1000 }}
       className={props.className}
       filterOptions={x => x}
       renderInput={params => (

@@ -85,6 +85,7 @@ case class AuthTokenSourceOAuthClientCredentials(
     clientId: String,
     clientSecret: String,
     audience: String,
+    scope: Option[String],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, ac: ActorSystem)
     extends AuthTokenSource
@@ -94,7 +95,13 @@ case class AuthTokenSourceOAuthClientCredentials(
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] = {
     for {
       wk <- oauth.getWellKnown(wellKnownConfigUrl)
-      tokenResponse <- oauth.requestToken(wk.token_endpoint, clientId, clientSecret, audience)
+      tokenResponse <- oauth.requestToken(
+        wk.token_endpoint,
+        clientId,
+        clientSecret,
+        audience,
+        scope,
+      )
     } yield Some(
       AuthToken(tokenResponse)
     )
@@ -117,6 +124,7 @@ object AuthTokenSource {
           clientId,
           clientSecret,
           audience,
+          scope,
           _,
         ) =>
       new AuthTokenSourceOAuthClientCredentials(
@@ -125,6 +133,7 @@ object AuthTokenSource {
         clientSecret = clientSecret,
         loggerFactory = loggerFactory,
         audience = audience,
+        scope = scope,
       )
   }
 }
