@@ -1068,8 +1068,18 @@
             "rewardWeightBps": 100000
           },
           {
+            "name": "Proof-Group-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvczD+F72UNwVtsqqfY6iBif7q2BAq3EYu+6Gad6Xjxqv2IFVvr7TUzx5PYbu/eG34Q7sceZKnhzBKfi4b2Eclg==",
+            "rewardWeightBps": 0
+          },
+          {
             "name": "Liberty-City-Ventures-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQv53m25mctcprUUt3YKg+yJvqtRI+rxTy5alROf4hqCD1rb/w5G8/XPwOI5jFqAj5RTcDGyRz+LLxn28k63UxQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Five-North-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGe25jhw59y0TXgGkEmWLgCjG9D3yq4GweHzGLQ7cnbNVUqiG/ndXeFLJG1rQy6a+Ky0XfJDdcs8yCvbbsV+qqg==",
             "rewardWeightBps": 0
           }
         ],
