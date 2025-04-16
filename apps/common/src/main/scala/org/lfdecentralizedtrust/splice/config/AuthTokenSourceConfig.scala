@@ -35,6 +35,7 @@ object AuthTokenSourceConfig {
       clientId: String,
       clientSecret: String,
       audience: String,
+      scope: Option[String],
       adminToken: Option[String],
   ) extends AuthTokenSourceConfig
 
@@ -46,8 +47,8 @@ object AuthTokenSourceConfig {
       case Static(_, adminToken) => Static(hidden, hide(adminToken))
       case SelfSigned(audience, user, _, adminToken) =>
         SelfSigned(audience, user, hidden, hide(adminToken))
-      case ClientCredentials(wellKnownConfigUrl, clientId, _, audience, adminToken) =>
-        ClientCredentials(wellKnownConfigUrl, clientId, hidden, audience, hide(adminToken))
+      case ClientCredentials(wellKnownConfigUrl, clientId, _, audience, scope, adminToken) =>
+        ClientCredentials(wellKnownConfigUrl, clientId, hidden, audience, scope, hide(adminToken))
     }
   }
 }

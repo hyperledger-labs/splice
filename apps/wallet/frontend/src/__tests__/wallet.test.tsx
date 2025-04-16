@@ -16,7 +16,7 @@ import {
   nameServiceEntries,
   userLogin,
 } from './mocks/constants';
-import { requestMocks } from './mocks/wallet-api';
+import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;

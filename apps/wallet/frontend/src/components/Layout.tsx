@@ -17,7 +17,7 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
+export const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const config = useWalletConfig();
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
@@ -51,4 +51,24 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
     </Box>
   );
 };
-export default Layout;
+
+export const BasicLayout: React.FC<LayoutProps> = (props: LayoutProps) => {
+  const config = useWalletConfig();
+  return (
+    <Container maxWidth="lg" sx={{ marginTop: 4 }}>
+      <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
+        <Container maxWidth="xl">
+          <Header title={config.spliceInstanceNames.amuletName + ' Wallet'} navLinks={[]}>
+            <Stack direction="row" alignItems="center" spacing={1} paddingLeft={1}>
+              <LogoutButton key="logout-button" />
+            </Stack>
+          </Header>
+        </Container>
+
+        <Box bgcolor="colors.neutral.15" sx={{ flex: 1 }}>
+          <Container maxWidth="lg">{props.children}</Container>
+        </Box>
+      </Box>
+    </Container>
+  );
+};

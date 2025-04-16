@@ -7,7 +7,6 @@ import {
   GetOpenAndIssuingMiningRoundsProxyResponse,
   LookupEntryByPartyResponse,
 } from 'scan-proxy-openapi';
-import { Mock, vi } from 'vitest';
 import { ListTransferOffersResponse } from 'wallet-external-openapi';
 import { GetBalanceResponse, ListTransactionsResponse, UserStatusResponse } from 'wallet-openapi';
 
@@ -18,20 +17,7 @@ import {
   bobTransferPreapproval,
   miningRounds,
   nameServiceEntries,
-} from './constants';
-
-export const requestMocks: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  createTransferOffer: Mock<(request: any) => Promise<any>>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  createTransferPreapproval: Mock<() => Promise<any>>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  transferPreapprovalSend: Mock<(request: any) => Promise<any>>;
-} = {
-  createTransferOffer: vi.fn(),
-  createTransferPreapproval: vi.fn(),
-  transferPreapprovalSend: vi.fn(),
-};
+} from '../constants';
 
 export const buildWalletMock = (walletUrl: string): RestHandler[] => [
   rest.get(`${walletUrl}/v0/wallet/user-status`, (_, res, ctx) => {
@@ -55,7 +41,7 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
     return res(ctx.json<GetOpenAndIssuingMiningRoundsProxyResponse>(miningRounds));
   }),
 
-  rest.get(`${walletUrl}/v0/scan-proxy/ans-entries?name_prefix=&page_size=20`, (_, res, ctx) => {
+  rest.get(`${walletUrl}/v0/scan-proxy/ans-entries`, (_, res, ctx) => {
     return res(
       ctx.json({
         entries: nameServiceEntries,
@@ -121,21 +107,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
 
   rest.get(`${walletUrl}/v0/wallet/transfer-offers`, (_, res, ctx) => {
     return res(ctx.json<ListTransferOffersResponse>({ offers: [] }));
-  }),
-
-  rest.post(`${walletUrl}/v0/wallet/transfer-offers`, async (req, res, ctx) => {
-    requestMocks.createTransferOffer(await req.json());
-    return res(ctx.json({}));
-  }),
-
-  rest.post(`${walletUrl}/v0/wallet/transfer-preapproval`, async (_, res, ctx) => {
-    requestMocks.createTransferPreapproval();
-    return res(ctx.json({}));
-  }),
-
-  rest.post(`${walletUrl}/v0/wallet/transfer-preapproval/send`, async (req, res, ctx) => {
-    requestMocks.transferPreapprovalSend(await req.json());
-    return res(ctx.json({}));
   }),
 
   rest.post(`${walletUrl}/v0/wallet/transactions`, async (_, res, ctx) => {

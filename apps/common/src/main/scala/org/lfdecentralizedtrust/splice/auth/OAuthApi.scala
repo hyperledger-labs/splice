@@ -22,13 +22,17 @@ object OAuthApi {
       client_id: String,
       client_secret: String,
       audience: String,
+      scope: Option[String],
       grant_type: String = "client_credentials",
   ) {
     def toFormData = FormData(
-      "client_id" -> client_id,
-      "client_secret" -> client_secret,
-      "audience" -> audience,
-      "grant_type" -> grant_type,
+      Map(
+        "client_id" -> client_id,
+        "client_secret" -> client_secret,
+        "audience" -> audience,
+        "grant_type" -> grant_type,
+      )
+        ++ scope.filter(_.nonEmpty).map("scope" -> _)
     )
   }
 
@@ -105,10 +109,11 @@ class OAuthApi(
       clientId: String,
       clientSecret: String,
       audience: String,
+      scope: Option[String],
   )(implicit tc: TraceContext): Future[TokenResponse] = {
     logger.debug(s"Using OAuth client credentials flow with clientId='$clientId' at $tokenUrl")
 
-    val payload = ClientCredentialRequest(clientId, clientSecret, audience)
+    val payload = ClientCredentialRequest(clientId, clientSecret, audience, scope)
 
     val responseFuture: Future[HttpResponse] = Http().singleRequest(
       HttpRequest(

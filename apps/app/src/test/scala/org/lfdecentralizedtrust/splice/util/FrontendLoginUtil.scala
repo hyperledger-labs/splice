@@ -30,7 +30,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       currentUrl should startWith(url)
     }
     // We reuse frontends across tests so we might need to log out first.
-    find(id("logout-button")).foreach(click on _)
+    eventually() { find(id("logout-button")).foreach(click on _) }
     click on "user-id-field"
     textField("user-id-field").value = ledgerApiUser
     click on "login-button"
