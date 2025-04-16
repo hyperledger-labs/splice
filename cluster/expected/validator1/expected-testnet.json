@@ -339,7 +339,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "2"
+            "activeMigrationId": "3"
           },
           "splitwell": true
         },
@@ -481,7 +481,7 @@
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-2",
+      "name": "participant-3",
       "namespace": "validator1",
       "timeout": 600,
       "values": {
@@ -546,7 +546,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 2
+            "id": 3
           }
         },
         "participantAdminUserNameFrom": {
@@ -557,7 +557,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_2",
+          "databaseName": "participant_3",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -572,7 +572,7 @@
       },
       "version": "0.3.19"
     },
-    "name": "validator1-participant-2",
+    "name": "validator1-participant-3",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -834,8 +834,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
-          "migrating": false
+          "id": 3,
+          "legacyId": 2,
+          "migrating": true
         },
         "nodeIdentifier": "validator1",
         "onboardingSecretFrom": {
@@ -845,7 +846,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

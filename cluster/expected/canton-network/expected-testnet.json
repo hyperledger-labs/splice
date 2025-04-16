@@ -501,8 +501,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2",
-              "3"
+              "3",
+              "2"
             ]
           }
         },
@@ -617,9 +617,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -628,7 +628,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-2-sequencer",
+        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -823,20 +823,21 @@
           "name": "cn-testzrhnet"
         },
         "cometBFT": {
-          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-2-mediator",
-          "sequencerAddress": "global-domain-2-sequencer",
+          "mediatorAddress": "global-domain-3-mediator",
+          "sequencerAddress": "global-domain-3-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-2.sv-2.test.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-3.sv-2.test.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -873,28 +874,19 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
-        "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
-        "initialSynchronizerFeesConfig": {
-          "baseRateBurstAmount": 200000,
-          "baseRateBurstWindowMins": 20,
-          "extraTrafficPrice": 16.67,
-          "minTopupAmount": 200000,
-          "readVsWriteScalingFactor": 4
-        },
         "isDevNet": false,
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 2,
-          "migrating": false
+          "id": 3,
+          "legacyId": 2,
+          "migrating": true
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "onboardingFoundingSvRewardWeightBps": 150000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingRoundZeroDuration": "2 h",
-        "onboardingType": "found-dso",
-        "participantAddress": "participant-2",
+        "onboardingType": "domain-migration",
+        "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -970,7 +962,7 @@
           "name": "cn-testzrhnet"
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.test.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.test.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -979,10 +971,10 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
