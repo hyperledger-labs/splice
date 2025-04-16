@@ -64,6 +64,18 @@ spec:
               value: {{ .Values.sequencer.persistence.databaseName }}
         {{- end }}
         {{- if eq .Values.sequencer.driver.type "postgres"}}
+            - name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_REFERENCE
+              value: |
+                canton.sequencers.sequencer.sequencer {
+                  config {
+                    storage = ${_storage}
+                    storage.config.properties.serverName = ${?SEQUENCER_DRIVER_DATABASE_ADDRESS}
+                    storage.config.properties.password = ${?SEQUENCER_DRIVER_DATABASE_PASSWORD}
+                    storage.config.properties.currentSchema = "sequencer_driver"
+                    storage.config.properties.databaseName = ${?CANTON_SEQUENCER_POSTGRES_DB}
+                  }
+                  type = "reference"
+                }
             - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
               value: {{ .Values.sequencer.driver.address }}
             - name: SEQUENCER_DRIVER_DATABASE_PASSWORD
@@ -72,10 +84,43 @@ spec:
                   name: {{ .Values.sequencer.persistence.secretName }}
                   key: postgresPassword
         {{- else if eq .Values.sequencer.driver.type "cometbft"}}
-            - name: SEQUENCER_DRIVER_COMETBFT_HOST
-              value: {{ .Values.sequencer.driver.host }}
-            - name: SEQUENCER_DRIVER_COMETBFT_PORT
-              value: "{{ .Values.sequencer.driver.port }}"
+            - name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_COMETBFT
+              value: |
+                canton.sequencers.sequencer.sequencer {
+                  config {
+                    cometbft-node-host = {{ .Values.sequencer.driver.host }}
+                    cometbft-node-port = {{ .Values.sequencer.driver.port }}
+                    health-check-attempts = 20
+                  }
+                  type = "CometBFT"
+                }
+        {{- else if eq .Values.sequencer.driver.type "cantonbft"}}
+            # TODO(#15343) - use a different database for the bft storage
+            # TODO(#15343) - re-enable auth support once it's working in canton with external tls
+            - name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT
+              value: |
+                canton.sequencers.sequencer.sequencer {
+                  config {
+                    storage = ${_storage}
+                    storage.config.properties.serverName = ${?CANTON_DOMAIN_POSTGRES_SERVER}
+                    storage.config.properties.password = ${?CANTON_DOMAIN_POSTGRES_PASSWORD}
+                    storage.config.properties.currentSchema = "sequencer"
+                    storage.config.properties.databaseName = ${?CANTON_SEQUENCER_POSTGRES_DB}
+                    initial-network {
+                      endpoint-authentication {
+                        enabled = false
+                      }
+                      server-endpoint {
+                        address="0.0.0.0"
+                        port=5010
+                        external-address="{{ .Values.sequencer.driver.externalAddress }}"
+                        external-port={{ .Values.sequencer.driver.externalPort }}
+                      }
+                      peer-endpoints = []
+                    }
+                  }
+                  type = "BFT"
+                }
         {{- end}}
             {{- with .Values.sequencer.tokenExpirationTime }}
             - name: SEQUENCER_TOKEN_EXPIRATION_TIME
@@ -184,6 +229,11 @@ spec:
     - name: grpc-cs-adm-api
       port: 5009
       protocol: TCP
+    {{- if eq .Values.sequencer.driver.type "cantonbft"}}
+    - name: grpc-cs-p2p-api
+      port: 5010
+      protocol: TCP
+    {{- end }}
     - name: cs-metrics
       port: 10013
       protocol: TCP

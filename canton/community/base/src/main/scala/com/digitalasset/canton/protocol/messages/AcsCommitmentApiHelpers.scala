@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -7,20 +7,20 @@ import com.digitalasset.canton.ProtoDeserializationError.UnrecognizedEnum
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.messages.AcsCommitment.CommitmentType
+import com.digitalasset.canton.protocol.messages.AcsCommitment.HashedCommitmentType
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.store.IndexedDomain
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.store.IndexedSynchronizer
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import slick.jdbc.{GetResult, SetParameter}
 
-final case class DomainSearchCommitmentPeriod(
-    indexedDomain: IndexedDomain,
+final case class SynchronizerSearchCommitmentPeriod(
+    indexedSynchronizer: IndexedSynchronizer,
     fromExclusive: CantonTimestamp,
     toInclusive: CantonTimestamp,
 ) extends PrettyPrinting {
-  override protected def pretty: Pretty[DomainSearchCommitmentPeriod] =
+  override protected def pretty: Pretty[SynchronizerSearchCommitmentPeriod] =
     prettyOfClass(
-      param("domainId", _.indexedDomain.domainId),
+      param("synchronizerId", _.indexedSynchronizer.synchronizerId),
       param("fromExclusive", _.fromExclusive),
       param("toInclusive", _.toInclusive),
     )
@@ -115,19 +115,19 @@ object CommitmentPeriodState extends {
 }
 
 final case class SentAcsCommitment(
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     interval: CommitmentPeriod,
     counterParticipant: ParticipantId,
-    sentCommitment: Option[CommitmentType],
-    counterCommitment: Option[CommitmentType],
+    sentCommitment: Option[HashedCommitmentType],
+    counterCommitment: Option[HashedCommitmentType],
     state: ValidSentPeriodState,
 )
 
 object SentAcsCommitment {
 
   def compare(
-      domainId: DomainId,
-      computed: Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.CommitmentType)],
+      synchronizerId: SynchronizerId,
+      computed: Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.HashedCommitmentType)],
       received: Iterable[AcsCommitment],
       outstanding: Iterable[(CommitmentPeriod, ParticipantId, ValidSentPeriodState)],
       verbose: Boolean,
@@ -152,7 +152,7 @@ object SentAcsCommitment {
 
     } yield {
       SentAcsCommitment(
-        domainId,
+        synchronizerId,
         period,
         participant,
         receivedCommitment,
@@ -161,10 +161,10 @@ object SentAcsCommitment {
       )
     }
 
-  def toProtoV30(sents: Iterable[SentAcsCommitment]): Seq[v30.SentAcsCommitmentPerDomain] = {
-    sents.groupBy(_.domainId).map { case (domain, commitment) =>
-      v30.SentAcsCommitmentPerDomain(
-        domain.toProtoPrimitive,
+  def toProtoV30(sents: Iterable[SentAcsCommitment]): Seq[v30.SentAcsCommitmentPerSynchronizer] = {
+    sents.groupBy(_.synchronizerId).map { case (synchronizer, commitment) =>
+      v30.SentAcsCommitmentPerSynchronizer(
+        synchronizer.toProtoPrimitive,
         commitment.map { comm =>
           v30.SentAcsCommitment(
             Some(
@@ -174,8 +174,8 @@ object SentAcsCommitment {
               )
             ),
             comm.counterParticipant.toProtoPrimitive,
-            comm.sentCommitment,
-            comm.counterCommitment,
+            comm.sentCommitment.map(AcsCommitment.hashedCommitmentTypeToProto),
+            comm.counterCommitment.map(AcsCommitment.hashedCommitmentTypeToProto),
             comm.state.toSentCommitmentStateProtoV30,
           )
         }.toSeq,
@@ -185,20 +185,20 @@ object SentAcsCommitment {
 }
 
 final case class ReceivedAcsCommitment(
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     interval: CommitmentPeriod,
     originCounterParticipant: ParticipantId,
-    receivedCommitment: Option[CommitmentType],
-    ownCommitment: Option[CommitmentType],
+    receivedCommitment: Option[HashedCommitmentType],
+    ownCommitment: Option[HashedCommitmentType],
     state: CommitmentPeriodState,
 )
 
 object ReceivedAcsCommitment {
 
   def compare(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       received: Iterable[AcsCommitment],
-      computed: Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.CommitmentType)],
+      computed: Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.HashedCommitmentType)],
       buffering: Iterable[AcsCommitment],
       outstanding: Iterable[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)],
       verbose: Boolean,
@@ -234,7 +234,7 @@ object ReceivedAcsCommitment {
         else None
     } yield {
       ReceivedAcsCommitment(
-        domainId,
+        synchronizerId,
         recCmt.period,
         recCmt.sender,
         Option.when(verbose)(recCmt.commitment),
@@ -243,7 +243,7 @@ object ReceivedAcsCommitment {
       )
     }) ++ buffering.map(cmt =>
       ReceivedAcsCommitment(
-        cmt.domainId,
+        cmt.synchronizerId,
         cmt.period,
         cmt.sender,
         Option.when(verbose)(cmt.commitment),
@@ -253,10 +253,10 @@ object ReceivedAcsCommitment {
     )
   def toProtoV30(
       received: Iterable[ReceivedAcsCommitment]
-  ): Seq[v30.ReceivedAcsCommitmentPerDomain] = {
-    received.groupBy(_.domainId).map { case (domain, commitment) =>
-      v30.ReceivedAcsCommitmentPerDomain(
-        domain.toProtoPrimitive,
+  ): Seq[v30.ReceivedAcsCommitmentPerSynchronizer] = {
+    received.groupBy(_.synchronizerId).map { case (synchronizer, commitment) =>
+      v30.ReceivedAcsCommitmentPerSynchronizer(
+        synchronizer.toProtoPrimitive,
         commitment.map { cmt =>
           v30.ReceivedAcsCommitment(
             Some(
@@ -266,8 +266,8 @@ object ReceivedAcsCommitment {
               )
             ),
             cmt.originCounterParticipant.toProtoPrimitive,
-            cmt.receivedCommitment,
-            cmt.ownCommitment,
+            cmt.receivedCommitment.map(AcsCommitment.hashedCommitmentTypeToProto),
+            cmt.ownCommitment.map(AcsCommitment.hashedCommitmentTypeToProto),
             cmt.state.toReceivedCommitmentStateProtoV30,
           )
         }.toSeq,

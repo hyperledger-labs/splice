@@ -1,0 +1,30 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.Expiry where
+
+import DA.Assert
+import DA.Time
+
+import Daml.Script
+
+import Splice.Expiry
+import Splice.Amulet.TokenApiUtils
+
+test_timeLockEncoding : Script ()
+test_timeLockEncoding = do
+    alice <- allocateParty "alice"
+    bob <- allocateParty "bob"
+    now <- getTime
+    let testLock1 = TimeLock with
+          holders = [alice, bob]
+          expiresAt = now `addRelTime` days 1
+          optContext = Some "foobar"
+
+    let testLock2 = TimeLock with
+          holders = [alice, alice, bob]
+          expiresAt = now `addRelTime` days 2
+          optContext = None
+
+    fromAnyValue (toAnyValue testLock1) === Right testLock1
+    fromAnyValue (toAnyValue testLock2) === Right testLock2

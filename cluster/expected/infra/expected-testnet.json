@@ -515,6 +515,7 @@
         },
         "enableGcsProxy": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "publicDocs": false,
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1449,6 +1450,12 @@
               "port": 5008,
               "protocol": "TCP",
               "targetPort": 5008
+            },
+            {
+              "name": "grpc-cs-p2p-api",
+              "port": 5010,
+              "protocol": "TCP",
+              "targetPort": 5010
             },
             {
               "name": "grpc-svcp-adm",

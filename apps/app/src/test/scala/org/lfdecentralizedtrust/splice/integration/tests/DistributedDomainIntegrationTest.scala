@@ -1,22 +1,18 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.parallel.*
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.*
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,14 +20,13 @@ import scala.jdk.OptionConverters.*
 
 class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .withManualStart
 
-  private val decentralizedSynchronizer = DomainAlias.tryCreate("global")
+  private val decentralizedSynchronizer = SynchronizerAlias.tryCreate("global")
 
   "SV onboarding on distributed domain" in { implicit env =>
     initDso()
@@ -45,7 +40,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
     clue("SV participants are connected to their own sequencers") {
       eventually() {
         inside(
-          sv1Backend.participantClient.domains
+          sv1Backend.participantClient.synchronizers
             .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
@@ -57,7 +52,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             .toVector
         }
         inside(
-          sv2Backend.participantClient.domains
+          sv2Backend.participantClient.synchronizers
             .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
@@ -72,7 +67,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               .toVector
         }
         inside(
-          sv3Backend.participantClient.domains
+          sv3Backend.participantClient.synchronizers
             .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
@@ -87,7 +82,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               .toVector
         }
         inside(
-          sv4Backend.participantClient.domains
+          sv4Backend.participantClient.synchronizers
             .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
@@ -113,11 +108,11 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
 
     clue("DSO party is bootstrapped as a decentralized namespace with SVs as owners") {
       val dsoParty = sv1Backend.getDsoInfo().dsoParty
-      val domainId =
-        sv1Backend.participantClient.domains.id_of(decentralizedSynchronizer)
+      val synchronizerId =
+        sv1Backend.participantClient.synchronizers.id_of(decentralizedSynchronizer)
       val decentralizedNamespaces = sv1Backend.participantClient.topology.decentralized_namespaces
         .list(
-          filterStore = domainId.filterString,
+          store = TopologyStoreId.Synchronizer(synchronizerId),
           filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
         )
       inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
@@ -167,10 +162,10 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
     implicit val ec: ExecutionContext = env.executionContext
     initDso()
     val decentralizedSynchronizerId =
-      sv1Backend.participantClient.domains.id_of(decentralizedSynchronizer)
+      sv1Backend.participantClient.synchronizers.id_of(decentralizedSynchronizer)
     eventuallySucceeds() {
-      sv1Backend.participantClientWithAdminToken.topology.domain_parameters
-        .get_dynamic_domain_parameters(decentralizedSynchronizerId)
+      sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
+        .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
         .confirmationRequestsMaxRate should be > NonNegativeInt.zero
     }
 
@@ -198,8 +193,8 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         "decentralizedSynchronizer is paused",
         _ =>
           forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-            sv.participantClientWithAdminToken.topology.domain_parameters
-              .get_dynamic_domain_parameters(decentralizedSynchronizerId)
+            sv.participantClientWithAdminToken.topology.synchronizer_parameters
+              .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
               .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
           },
       )
@@ -215,8 +210,8 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         "decentralizedSynchronizer is un-paused",
         _ =>
           forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-            sv.participantClientWithAdminToken.topology.domain_parameters
-              .get_dynamic_domain_parameters(decentralizedSynchronizerId)
+            sv.participantClientWithAdminToken.topology.synchronizer_parameters
+              .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
               .confirmationRequestsMaxRate should be > NonNegativeInt.zero
           },
       )

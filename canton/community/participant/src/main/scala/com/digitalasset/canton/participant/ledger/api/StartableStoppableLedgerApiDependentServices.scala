@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api
@@ -22,8 +22,9 @@ import com.digitalasset.canton.participant.admin.grpc.{
   GrpcPartyManagementService,
   GrpcPingService,
 }
+import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow
 import com.digitalasset.canton.participant.admin.{AdminWorkflowServices, PackageService}
-import com.digitalasset.canton.participant.config.LocalParticipantConfig
+import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
@@ -34,19 +35,19 @@ import org.apache.pekko.actor.ActorSystem
 
 import scala.concurrent.{ExecutionContextExecutor, blocking}
 
-/** Holds and manages the lifecycle of all Canton services that use the Ledger API
-  * and hence depend on the Ledger API server to be up.
+/** Holds and manages the lifecycle of all Canton services that use the Ledger API and hence depend
+  * on the Ledger API server to be up.
   *
-  * The services are started on participant initialization iff the participant
-  * comes up as an active replica, otherwise they are started when the participant transitions to active.
-  * On transition to passive participant state, these services are shutdown.
+  * The services are started on participant initialization iff the participant comes up as an active
+  * replica, otherwise they are started when the participant transitions to active. On transition to
+  * passive participant state, these services are shutdown.
   *
-  * It is also used to close and restart the services when the Ledger API server
-  * needs to be taken down temporarily (e.g. for ledger pruning).
+  * It is also used to close and restart the services when the Ledger API server needs to be taken
+  * down temporarily (e.g. for ledger pruning).
   */
 class StartableStoppableLedgerApiDependentServices(
-    config: LocalParticipantConfig,
-    testingConfig: ParticipantNodeParameters,
+    config: ParticipantNodeConfig,
+    parameters: ParticipantNodeParameters,
     packageServiceE: Eval[PackageService],
     syncService: CantonSyncService,
     participantId: ParticipantId,
@@ -66,7 +67,7 @@ class StartableStoppableLedgerApiDependentServices(
   private type PackageServiceGrpc = ServerServiceDefinition
   private type PingServiceGrpc = ServerServiceDefinition
   private type ApiInfoServiceGrpc = ServerServiceDefinition
-  private type MaybePartyManagementGrpc = Option[ServerServiceDefinition]
+  private type PartyManagementGrpc = ServerServiceDefinition
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile private var servicesRef =
@@ -76,7 +77,7 @@ class StartableStoppableLedgerApiDependentServices(
           PackageServiceGrpc,
           PingServiceGrpc,
           ApiInfoServiceGrpc,
-          MaybePartyManagementGrpc,
+          PartyManagementGrpc,
       )
     ]
 
@@ -99,7 +100,7 @@ class StartableStoppableLedgerApiDependentServices(
             val adminWorkflowServices =
               new AdminWorkflowServices(
                 config,
-                testingConfig,
+                parameters,
                 packageService,
                 syncService,
                 participantId,
@@ -115,7 +116,7 @@ class StartableStoppableLedgerApiDependentServices(
                 .bindService(
                   new GrpcPackageService(
                     packageService,
-                    syncService.synchronizeVettingOnConnectedDomains,
+                    syncService.synchronizeVettingOnConnectedSynchronizers,
                     loggerFactory,
                   ),
                   ec,
@@ -139,17 +140,25 @@ class StartableStoppableLedgerApiDependentServices(
                   )
                 )
 
-            // Conditionally bind the party management grpc service
-            val (partyManagementGrpc, _) = adminWorkflowServices.partyManagementO.map {
-              case (_, partyReplicationCoordinator) =>
-                registry
-                  .addService(
-                    PartyManagementServiceGrpc.bindService(
-                      new GrpcPartyManagementService(partyReplicationCoordinator, loggerFactory),
-                      ec,
-                    )
+            val (partyManagementGrpc, _) = {
+              // Party replication coordinator is available through a feature flag only!
+              val partyReplicationAdminWorkflowO: Option[PartyReplicationAdminWorkflow] =
+                adminWorkflowServices.partyManagementO.map {
+                  case (_, partyReplicationAdminWorkflow) => partyReplicationAdminWorkflow
+                }
+              registry
+                .addService(
+                  PartyManagementServiceGrpc.bindService(
+                    new GrpcPartyManagementService(
+                      partyReplicationAdminWorkflowO,
+                      parameters.processingTimeouts,
+                      syncService,
+                      loggerFactory,
+                    ),
+                    ec,
                   )
-            }.unzip
+                )
+            }
 
             servicesRef = Some(
               (
@@ -182,7 +191,7 @@ class StartableStoppableLedgerApiDependentServices(
             registry.removeServiceU(pingGrpcService)
             registry.removeServiceU(packageServiceGrpc)
             registry.removeServiceU(apiInfoServiceGrpc)
-            partyManagementGrpc.foreach(registry.removeServiceU)
+            registry.removeServiceU(partyManagementGrpc)
             adminWorkflowServices.close()
           case None =>
             logger.debug("Ledger API-dependent Canton services already stopped")(TraceContext.empty)

@@ -123,7 +123,6 @@ export function createStackCR(
           },
           // Do not resync the stack when the commit hash matches the last one
           continueResyncOnCommitMatch: false,
-          // Do not destroy the stack when the CR is deleted
           destroyOnFinalize: false,
           // Enforce that the stack already exists
           useLocalStackOnly: true,

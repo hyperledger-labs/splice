@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 
-import cats.implicits.catsSyntaxParallelTraverse1
+import cats.implicits.{catsSyntaxOptionId, catsSyntaxParallelTraverse1}
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
@@ -11,9 +11,9 @@ import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, 
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.store.TimeQuery
+import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
@@ -98,7 +98,9 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       tc: TraceContext
   ): Future[Seq[SvOnboardingPromoteParticipantToSubmitterTrigger.Task]] = {
     for {
-      domainParametersState <- participantAdminConnection.getDomainParametersState(dsoRules.domain)
+      synchronizerParametersState <- participantAdminConnection.getSynchronizerParametersState(
+        dsoRules.domain
+      )
       domainTimeLowerBound <-
         participantAdminConnection
           .getDomainTimeLowerBound(
@@ -106,7 +108,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
             maxDomainTimeLag = context.config.pollingInterval,
           )
       dsoHostingParticipants <- participantAdminConnection.listPartyToParticipant(
-        filterStore = dsoRules.domain.filterString,
+        store = TopologyStoreId.SynchronizerStore(dsoRules.domain).some,
         filterParty = dsoParty.filterString,
         proposals = AuthorizedState,
         timeQuery = TimeQuery.Range(None, None),
@@ -117,7 +119,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         .sortBy(
           _.base.validFrom
         ) // redundant sorting to ensure that the last mapping is the most recent one
-      val domainParameters = domainParametersState.mapping.parameters
+      val domainParameters = synchronizerParametersState.mapping.parameters
       val delay = domainParameters.mediatorReactionTimeout.duration
         .plus(domainParameters.confirmationResponseTimeout.duration)
       val observingParticipantIds = orderedDsoHostingParticipants.lastOption match {
@@ -174,7 +176,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     )
     participantAdminConnection
       .ensureHostingParticipantIsPromotedToSubmitter(
-        task.domainId,
+        task.synchronizerId,
         dsoParty,
         task.participantId,
         RetryFor.ClientCalls,
@@ -203,9 +205,13 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
 }
 
 object SvOnboardingPromoteParticipantToSubmitterTrigger {
-  case class Task(domainId: DomainId, participantId: ParticipantId) extends PrettyPrinting {
+  case class Task(synchronizerId: SynchronizerId, participantId: ParticipantId)
+      extends PrettyPrinting {
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     override def pretty: Pretty[this.type] =
-      prettyOfClass(param("domainId", _.domainId), param("participantId", _.participantId))
+      prettyOfClass(
+        param("synchronizerId", _.synchronizerId),
+        param("participantId", _.participantId),
+      )
   }
 }

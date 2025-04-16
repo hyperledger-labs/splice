@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   TxLogRowData,
 }
 import org.lfdecentralizedtrust.splice.util.Contract
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
 import com.digitalasset.canton.data.CantonTimestamp
 import io.circe.Json
 
@@ -54,7 +54,7 @@ object ScanTables extends AcsTables {
       ansEntryName: Option[String] = None,
       ansEntryOwner: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
-      memberTrafficDomain: Option[DomainId] = None,
+      memberTrafficDomain: Option[SynchronizerId] = None,
       totalTrafficPurchased: Option[Long] = None,
       validatorLicenseRoundsCollected: Option[Long] = None,
       svParty: Option[PartyId] = None,

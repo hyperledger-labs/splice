@@ -11,7 +11,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
 import com.daml.ledger.api.v2.state_service
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 
 object IncompleteReassignmentEvent {
   case class Unassign(
@@ -41,9 +41,9 @@ object IncompleteReassignmentEvent {
 sealed trait ReassignmentEvent extends Product with Serializable with PrettyPrinting {
   def submitter: PartyId
 
-  def source: DomainId
+  def source: SynchronizerId
 
-  def target: DomainId
+  def target: SynchronizerId
 
   def counter: Long
 }
@@ -55,8 +55,8 @@ object ReassignmentEvent {
 
   final case class Unassign(
       override val submitter: PartyId,
-      override val source: DomainId,
-      override val target: DomainId,
+      override val source: SynchronizerId,
+      override val target: SynchronizerId,
       unassignId: String,
       contractId: ContractId[_],
       override val counter: Long,
@@ -75,8 +75,8 @@ object ReassignmentEvent {
     private[api] def fromProto(proto: multidomain.UnassignedEvent): Unassign = {
       Unassign(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
-        source = DomainId.tryFromString(proto.source),
-        target = DomainId.tryFromString(proto.target),
+        source = SynchronizerId.tryFromString(proto.source),
+        target = SynchronizerId.tryFromString(proto.target),
         unassignId = proto.unassignId,
         contractId = new ContractId(proto.contractId),
         counter = proto.reassignmentCounter,
@@ -86,8 +86,8 @@ object ReassignmentEvent {
 
   final case class Assign(
       override val submitter: PartyId,
-      override val source: DomainId,
-      override val target: DomainId,
+      override val source: SynchronizerId,
+      override val target: SynchronizerId,
       unassignId: String,
       createdEvent: CreatedEvent,
       override val counter: Long,
@@ -107,8 +107,8 @@ object ReassignmentEvent {
       import com.daml.ledger.api.v2.event as scalaEvent
       Assign(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
-        source = DomainId.tryFromString(proto.source),
-        target = DomainId.tryFromString(proto.target),
+        source = SynchronizerId.tryFromString(proto.source),
+        target = SynchronizerId.tryFromString(proto.target),
         unassignId = proto.unassignId,
         createdEvent =
           CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),

@@ -1,14 +1,14 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.handlers
 
 import cats.instances.either.*
-import com.daml.error.{ContextualizedErrorLogger, Explanation, Resolution}
+import com.digitalasset.base.error.{Alarm, AlarmErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerErrorGroup
-import com.digitalasset.canton.error.{Alarm, AlarmErrorCode}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, Envelope}
 import com.digitalasset.canton.sequencing.{ApplicationHandler, EnvelopeBox, HandlerResult}
@@ -25,7 +25,9 @@ class EnvelopeOpener[Box[+_ <: Envelope[_]]](protocolVersion: ProtocolVersion, h
 
 object EnvelopeOpener {
 
-  /** Opens the envelopes inside the [[EnvelopeBox]] before handing them to the given application handler. */
+  /** Opens the envelopes inside the [[EnvelopeBox]] before handing them to the given application
+    * handler.
+    */
   def apply[Box[+_ <: Envelope[_]]](
       protocolVersion: ProtocolVersion,
       hashOps: HashOps,
@@ -33,7 +35,7 @@ object EnvelopeOpener {
       handler: ApplicationHandler[Box, DefaultOpenEnvelope]
   )(implicit
       Box: EnvelopeBox[Box],
-      logger: ContextualizedErrorLogger,
+      logger: ErrorLoggingContext,
   ): ApplicationHandler[Box, ClosedEnvelope] = handler.replace {
     val opener = new EnvelopeOpener[Box](protocolVersion, hashOps)
     closedEvent =>

@@ -10,9 +10,9 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
-import org.lfdecentralizedtrust.splice.util.Codec
+import org.lfdecentralizedtrust.splice.util.{Codec, EventId}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 
 import scala.collection.SeqView
 import scala.reflect.ClassTag
@@ -58,20 +58,22 @@ object TxLogStore {
   trait Parser[+TXE] {
 
     /** Extract application-specific TxLog entries from the given daml transaction */
-    def tryParse(tx: TransactionTree, domain: DomainId)(implicit tc: TraceContext): Seq[TXE]
+    def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit tc: TraceContext): Seq[TXE]
 
     /** Returns a TxLog entry to be stored in case this parser failed to parse the given daml transaction.
       * Must not throw an error.
       */
-    def error(offset: Long, eventId: String, domainId: DomainId): Option[TXE]
+    def error(offset: Long, eventId: String, synchronizerId: SynchronizerId): Option[TXE]
 
-    final def parse(tx: TransactionTree, domain: DomainId, logger: TracedLogger)(implicit
+    final def parse(tx: TransactionTree, domain: SynchronizerId, logger: TracedLogger)(implicit
         tc: TraceContext
     ): Seq[TXE] =
       Try(tryParse(tx, domain))
         .recoverWith { case e: Throwable =>
           logger.error(s"Failed to parse transaction: ${e.getMessage}", e)
-          val firstRootEventId = tx.getRootEventIds.asScala.headOption.getOrElse("")
+          val firstRootEventId = tx.getRootNodeIds.asScala.headOption
+            .map(EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, _))
+            .getOrElse("")
           Try(
             error(tx.getOffset, firstRootEventId, domain).toList
           )
@@ -87,10 +89,14 @@ object TxLogStore {
 
   object Parser {
     lazy val empty: Parser[Nothing] = new Parser[Nothing] {
-      override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+      override def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit
           tc: TraceContext
       ): Seq[Nothing] = Seq.empty
-      override def error(offset: Long, eventId: String, domainId: DomainId): Option[Nothing] = None
+      override def error(
+          offset: Long,
+          eventId: String,
+          synchronizerId: SynchronizerId,
+      ): Option[Nothing] = None
     }
   }
 
@@ -144,17 +150,17 @@ object TxLogStore {
     // Notes:
     // - Fields with default values are omitted by default in proto3 JSON output
     // - The default value for a string field is the empty string
-    // - The empty string is not a valid PartyId or DomainId
+    // - The empty string is not a valid PartyId or SynchronizerId
     // - It is therefore safe to map the empty string to None
     protected implicit val `TypeMapper[String, Option[PartyId]]`
         : scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.PartyId]] =
       scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.PartyId]](str =>
         if (str.isEmpty) None else Some(PartyId.tryFromProtoPrimitive(str))
       )(_.map(_.toProtoPrimitive).getOrElse(""))
-    protected implicit val `TypeMapper[String, Option[DomainId]]`
-        : scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.DomainId]] =
-      scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.DomainId]](str =>
-        if (str.isEmpty) None else Some(DomainId.tryFromString(str))
+    protected implicit val `TypeMapper[String, Option[SynchronizerId]]`
+        : scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.SynchronizerId]] =
+      scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.SynchronizerId]](str =>
+        if (str.isEmpty) None else Some(SynchronizerId.tryFromString(str))
       )(_.map(_.toProtoPrimitive).getOrElse(""))
 
     protected implicit val `TypeMapper[String, Option[java.math.BigDecimal]]`
@@ -183,9 +189,11 @@ object TxLogStore {
       scalapb.TypeMapper[String, com.digitalasset.canton.topology.PartyId](
         PartyId.tryFromProtoPrimitive
       )(_.toProtoPrimitive)
-    protected implicit val `TypeMapper[String, DomainId]`
-        : scalapb.TypeMapper[String, com.digitalasset.canton.topology.DomainId] =
-      scalapb.TypeMapper[String, com.digitalasset.canton.topology.DomainId](DomainId.tryFromString)(
+    protected implicit val `TypeMapper[String, SynchronizerId]`
+        : scalapb.TypeMapper[String, com.digitalasset.canton.topology.SynchronizerId] =
+      scalapb.TypeMapper[String, com.digitalasset.canton.topology.SynchronizerId](
+        SynchronizerId.tryFromString
+      )(
         _.toProtoPrimitive
       )
 

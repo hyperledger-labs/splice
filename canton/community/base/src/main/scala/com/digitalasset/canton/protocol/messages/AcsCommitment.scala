@@ -1,26 +1,30 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
 import cats.syntax.either.*
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.ProtoDeserializationError.CryptoDeserializationError
+import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.SignedProtocolMessageContent.SignedMessageContentCast
 import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.util.NoCopy
 import com.digitalasset.canton.version.{
-  HasMemoizedProtocolVersionedWrapperCompanion,
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
+  VersionedProtoCodec,
+  VersioningCompanionMemoization,
 }
 import com.google.protobuf.ByteString
 import slick.jdbc.{GetResult, GetTupleResult, SetParameter}
@@ -99,19 +103,22 @@ object CommitmentPeriod {
 
 }
 
-/** A commitment to the active contract set (ACS) that is shared between two participants on a given domain at a given time.
+/** A commitment to the active contract set (ACS) that is shared between two participants on a given
+  * synchronizer at a given time.
   *
-  *  Given a commitment scheme to the ACS, the semantics are as follows: the sender declares that the shared ACS was exactly
-  *  the one committed to, at every commitment tick during the specified period and as determined by the period's interval.
+  * Given a commitment scheme to the ACS, the semantics are as follows: the sender declares that the
+  * shared ACS was exactly the one committed to, at every commitment tick during the specified
+  * period and as determined by the period's interval.
   *
-  *  The interval is assumed to be a round number of seconds. The ticks then start at the Java EPOCH time, and are exactly `interval` apart.
+  * The interval is assumed to be a round number of seconds. The ticks then start at the Java EPOCH
+  * time, and are exactly `interval` apart.
   */
 abstract sealed case class AcsCommitment private (
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     sender: ParticipantId,
     counterParticipant: ParticipantId,
     period: CommitmentPeriod,
-    commitment: AcsCommitment.CommitmentType,
+    commitment: AcsCommitment.HashedCommitmentType,
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[AcsCommitment.type],
     override val deserializedFrom: Option[ByteString],
@@ -125,12 +132,12 @@ abstract sealed case class AcsCommitment private (
 
   protected def toProtoV30: v30.AcsCommitment =
     v30.AcsCommitment(
-      domainId = domainId.toProtoPrimitive,
+      synchronizerId = synchronizerId.toProtoPrimitive,
       sendingParticipantUid = sender.uid.toProtoPrimitive,
       counterParticipantUid = counterParticipant.uid.toProtoPrimitive,
       fromExclusive = period.fromExclusive.toProtoPrimitive,
       toInclusive = period.toInclusive.toProtoPrimitive,
-      commitment = AcsCommitment.commitmentTypeToProto(commitment),
+      commitment = AcsCommitment.hashedCommitmentTypeToProto(commitment),
     )
 
   override protected[this] def toByteStringUnmemoized: ByteString =
@@ -144,7 +151,7 @@ abstract sealed case class AcsCommitment private (
 
   override lazy val pretty: Pretty[AcsCommitment] =
     prettyOfClass(
-      param("domainId", _.domainId),
+      param("synchronizerId", _.synchronizerId),
       param("sender", _.sender),
       param("counterParticipant", _.counterParticipant),
       param("period", _.period),
@@ -152,13 +159,13 @@ abstract sealed case class AcsCommitment private (
     )
 }
 
-object AcsCommitment extends HasMemoizedProtocolVersionedWrapperCompanion[AcsCommitment] {
+object AcsCommitment extends VersioningCompanionMemoization[AcsCommitment] {
   override val name: String = "AcsCommitment"
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.AcsCommitment)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.AcsCommitment)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
@@ -168,18 +175,31 @@ object AcsCommitment extends HasMemoizedProtocolVersionedWrapperCompanion[AcsCom
   implicit val setCommitmentType: SetParameter[CommitmentType] =
     DbStorage.Implicits.setParameterByteString
 
-  def commitmentTypeToProto(commitment: CommitmentType): ByteString = commitment
-  def commitmentTypeFromByteString(bytes: ByteString): CommitmentType = bytes
+  type HashedCommitmentType = Hash
+
+  def hashedCommitmentTypeToProto(commitment: HashedCommitmentType): ByteString =
+    commitment.getCryptographicEvidence
+  def hashedCommitmentTypeFromByteString(
+      bytes: ByteString
+  ): Either[DeserializationError, HashedCommitmentType] = Hash.fromByteString(bytes)
+  def hashCommitment(commitment: CommitmentType): HashedCommitmentType =
+    Hash.digest(HashPurpose.HashedAcsCommitment, commitment, HashAlgorithm.Sha256)
 
   def create(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       sender: ParticipantId,
       counterParticipant: ParticipantId,
       period: CommitmentPeriod,
       commitment: CommitmentType,
       protocolVersion: ProtocolVersion,
   ): AcsCommitment =
-    new AcsCommitment(domainId, sender, counterParticipant, period, commitment)(
+    new AcsCommitment(
+      synchronizerId,
+      sender,
+      counterParticipant,
+      period,
+      hashCommitment(commitment),
+    )(
       protocolVersionRepresentativeFor(protocolVersion),
       None,
     ) {}
@@ -188,7 +208,10 @@ object AcsCommitment extends HasMemoizedProtocolVersionedWrapperCompanion[AcsCom
       bytes: ByteString
   ): ParsingResult[AcsCommitment] =
     for {
-      domainId <- DomainId.fromProtoPrimitive(protoMsg.domainId, "AcsCommitment.domainId")
+      synchronizerId <- SynchronizerId.fromProtoPrimitive(
+        protoMsg.synchronizerId,
+        "AcsCommitment.synchronizerId",
+      )
       sender <- UniqueIdentifier
         .fromProtoPrimitive(
           protoMsg.sendingParticipantUid,
@@ -218,9 +241,11 @@ object AcsCommitment extends HasMemoizedProtocolVersionedWrapperCompanion[AcsCom
 
       period = CommitmentPeriod(fromExclusive, periodLength)
       cmt = protoMsg.commitment
-      commitment = commitmentTypeFromByteString(cmt)
+      commitment <- hashedCommitmentTypeFromByteString(cmt).leftMap(
+        CryptoDeserializationError.apply
+      )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-    } yield new AcsCommitment(domainId, sender, counterParticipant, period, commitment)(
+    } yield new AcsCommitment(synchronizerId, sender, counterParticipant, period, commitment)(
       rpv,
       Some(bytes),
     ) {}
@@ -232,16 +257,16 @@ object AcsCommitment extends HasMemoizedProtocolVersionedWrapperCompanion[AcsCom
     }
 
   def getAcsCommitmentResultReader(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       protocolVersion: ProtocolVersion,
   ): GetResult[AcsCommitment] =
-    new GetTupleResult[(ParticipantId, ParticipantId, CommitmentPeriod, CommitmentType)](
+    new GetTupleResult[(ParticipantId, ParticipantId, CommitmentPeriod, HashedCommitmentType)](
       GetResult[ParticipantId],
       GetResult[ParticipantId],
       GetResult[CommitmentPeriod],
-      GetResult[CommitmentType],
+      GetResult[Hash],
     ).andThen { case (sender, counterParticipant, period, commitment) =>
-      new AcsCommitment(domainId, sender, counterParticipant, period, commitment)(
+      new AcsCommitment(synchronizerId, sender, counterParticipant, period, commitment)(
         protocolVersionRepresentativeFor(protocolVersion),
         None,
       ) {}

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -21,8 +21,8 @@ import org.scalatest.Suite
 
 import java.sql.Connection
 
-/** Creates a database and a [[TestBackend]].
-  * Used by [[StorageBackendSpec]] to run all StorageBackend tests on different databases.
+/** Creates a database and a [[TestBackend]]. Used by [[StorageBackendSpec]] to run all
+  * StorageBackend tests on different databases.
   */
 trait StorageBackendProvider {
   protected def jdbcUrl: String
@@ -45,7 +45,7 @@ trait StorageBackendProvider {
   )(connection: Connection): Unit = {
     backend.parameter.updateLedgerEnd(
       LedgerEnd(
-        ledgerEndOffset.toAbsoluteOffsetO,
+        ledgerEndOffset,
         ledgerEndSequentialId,
         0,
         ledgerEndPublicationTime,
@@ -61,16 +61,8 @@ trait StorageBackendProvider {
     updateLedgerEndCache(connection)
   }
 
-  protected final def updateLedgerEndCache(connection: Connection): Unit = {
-    val ledgerEnd = backend.parameter.ledgerEnd(connection)
-    backend.ledgerEndCache.set(
-      (
-        ledgerEnd.lastOffset,
-        ledgerEnd.lastEventSeqId,
-        ledgerEnd.lastPublicationTime,
-      )
-    )
-  }
+  protected final def updateLedgerEndCache(connection: Connection): Unit =
+    backend.ledgerEndCache.set(backend.parameter.ledgerEnd(connection))
 }
 
 trait StorageBackendProviderPostgres
@@ -95,7 +87,6 @@ trait StorageBackendProviderH2 extends StorageBackendProvider with BaseTest { th
 final case class TestBackend(
     ingestion: IngestionStorageBackend[_],
     parameter: ParameterStorageBackend,
-    meteringParameter: MeteringParameterStorageBackend,
     party: PartyStorageBackend,
     completion: CompletionStorageBackend,
     contract: ContractStorageBackend,
@@ -109,14 +100,8 @@ final case class TestBackend(
     stringInterningSupport: MockStringInterning,
     userManagement: UserManagementStorageBackend,
     participantPartyStorageBackend: PartyRecordStorageBackend,
-    metering: TestMeteringBackend,
     identityProviderStorageBackend: IdentityProviderStorageBackend,
     pruningDtoQueries: PruningDtoQueries = new PruningDtoQueries,
-)
-
-final case class TestMeteringBackend(
-    read: MeteringStorageReadBackend,
-    write: MeteringStorageWriteBackend,
 )
 
 object TestBackend {
@@ -127,21 +112,13 @@ object TestBackend {
     val ledgerEndCache = MutableLedgerEndCache()
     val stringInterning = new MockStringInterning
 
-    def createTestMeteringBackend: TestMeteringBackend =
-      TestMeteringBackend(
-        read = storageBackendFactory.createMeteringStorageReadBackend(ledgerEndCache),
-        write = storageBackendFactory.createMeteringStorageWriteBackend,
-      )
-
     TestBackend(
       ingestion = storageBackendFactory.createIngestionStorageBackend,
       parameter = storageBackendFactory.createParameterStorageBackend(stringInterning),
-      meteringParameter = storageBackendFactory.createMeteringParameterStorageBackend,
       party = storageBackendFactory.createPartyStorageBackend(ledgerEndCache),
       completion =
         storageBackendFactory.createCompletionStorageBackend(stringInterning, loggerFactory),
-      contract =
-        storageBackendFactory.createContractStorageBackend(ledgerEndCache, stringInterning),
+      contract = storageBackendFactory.createContractStorageBackend(stringInterning),
       event = storageBackendFactory
         .createEventStorageBackend(ledgerEndCache, stringInterning, loggerFactory),
       dataSource = storageBackendFactory.createDataSourceStorageBackend,
@@ -153,7 +130,6 @@ object TestBackend {
       stringInterningSupport = stringInterning,
       userManagement = storageBackendFactory.createUserManagementStorageBackend,
       participantPartyStorageBackend = storageBackendFactory.createPartyRecordStorageBackend,
-      metering = createTestMeteringBackend,
       identityProviderStorageBackend =
         storageBackendFactory.createIdentityProviderConfigStorageBackend,
     )

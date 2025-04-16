@@ -1,23 +1,17 @@
 package org.lfdecentralizedtrust.splice.integration.tests.connectivity
 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 
 class WalletAppConnectivityIntegrationTest extends IntegrationTest with WalletTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms(

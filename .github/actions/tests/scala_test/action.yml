@@ -125,7 +125,7 @@ runs:
       id: setup_sbt
       uses: ./.github/actions/sbt/setup_sbt
       with:
-        cache_version: 1
+        cache_version: 4
 
     - name: Prepare list of tests to run for sbt
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -224,7 +224,7 @@ runs:
       if: ${{ !cancelled() }}
       uses: ./.github/actions/sbt/post_sbt
       with:
-        cache_version: 1
+        cache_version: 4
         setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
         # Save caches only from one runner, to reduce conflicts on the save
         save_caches: ${{ inputs.runner-index == 0 && inputs.test_suite_name == 'wall-clock-time' }}

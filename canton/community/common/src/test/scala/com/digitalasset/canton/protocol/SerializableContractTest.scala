@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
 
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, TestHash, TestSalt}
-import com.digitalasset.canton.data.{CantonTimestamp, ProcessedDisclosedContract}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.{
   BaseTest,
@@ -15,6 +15,7 @@ import com.digitalasset.canton.{
   LfVersioned,
 }
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
+import com.digitalasset.daml.lf.transaction.{FatContractInstance, Node}
 import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -71,23 +72,23 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
     val invalidFormatContractId = LfContractId.assertFromString("00" * 34)
 
     val authenticatedContractId =
-      AuthenticatedContractIdVersionV10.fromDiscriminator(contractIdDiscriminator, contractIdSuffix)
+      AuthenticatedContractIdVersionV11.fromDiscriminator(contractIdDiscriminator, contractIdSuffix)
 
     val pkgName = Ref.PackageName.assertFromString("pkgName")
-    val pkgVersion = Some(Ref.PackageVersion.assertFromString("0.1.2"))
-    val disclosedContract = ProcessedDisclosedContract(
+
+    val createNode = Node.Create(
       templateId = templateId,
       packageName = pkgName,
-      packageVersion = pkgVersion,
-      contractId = authenticatedContractId,
-      argument = LfValue.ValueNil,
-      createdAt = createdAt,
-      driverMetadata = driverMetadata,
+      coid = authenticatedContractId,
+      arg = LfValue.ValueInt64(123L),
       signatories = Set(alice),
       stakeholders = Set(alice),
       keyOpt = None,
       version = transactionVersion,
     )
+
+    val disclosedContract =
+      FatContractInstance.fromCreateNode(createNode, createdAt, driverMetadata)
 
     "provided a valid disclosed contract" should {
       "succeed" in {
@@ -103,16 +104,15 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
                 transactionVersion,
                 LfValue.ContractInstance(
                   packageName = pkgName,
-                  packageVersion = pkgVersion,
                   template = templateId,
-                  arg = LfValue.ValueNil,
+                  arg = LfValue.ValueInt64(123L),
                 ),
               )
             )
             .value,
           metadata = ContractMetadata.tryCreate(Set(alice), Set(alice), None),
           ledgerCreateTime = LedgerCreateTime(CantonTimestamp(createdAt)),
-          contractSalt = Some(contractSalt),
+          contractSalt = contractSalt,
         )
       }
     }
@@ -121,19 +121,23 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
       "fail" in {
         SerializableContract
           .fromDisclosedContract(
-            disclosedContract.copy(create =
-              disclosedContract.create.copy(coid = invalidFormatContractId)
+            FatContractInstance.fromCreateNode(
+              createNode.mapCid(_ => invalidFormatContractId),
+              createdAt,
+              driverMetadata,
             )
           )
           .left
-          .value shouldBe s"Invalid disclosed contract id: malformed contract id '${invalidFormatContractId.toString}'. Suffix 00 does not start with one of the supported prefixes: Bytes(ca10)"
+          .value shouldBe s"Invalid disclosed contract id: malformed contract id '${invalidFormatContractId.toString}'. Suffix 00 is not a supported contract-id prefix"
       }
     }
 
     "provided a disclosed contract with missing driver contract metadata" should {
       "fail" in {
         SerializableContract
-          .fromDisclosedContract(disclosedContract.copy(driverMetadata = Bytes.Empty))
+          .fromDisclosedContract(
+            FatContractInstance.fromCreateNode(createNode, createdAt, cantonData = Bytes.Empty)
+          )
           .left
           .value shouldBe "Missing driver contract metadata in provided disclosed contract"
       }

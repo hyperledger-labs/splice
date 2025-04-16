@@ -1,12 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests.reonboard
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.runbook.PreflightIntegrationTestUtil
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.time.{Minutes, Span}
 
 class PrepareSvReonboardPreflightIntegrationTest
@@ -17,8 +14,7 @@ class PrepareSvReonboardPreflightIntegrationTest
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
     )

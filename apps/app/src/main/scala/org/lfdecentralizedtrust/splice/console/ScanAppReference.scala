@@ -34,15 +34,23 @@ import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanAp
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
+  ChoiceContextWithDisclosures,
   Contract,
   ContractWithState,
+  FactoryChoiceWithDisclosures,
   PackageQualifiedName,
   SpliceUtil,
 }
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationinstructionv1,
+  allocationv1,
+  transferinstructionv1,
+}
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
@@ -307,22 +315,22 @@ abstract class ScanAppReference(
     "Get a member's (participant or mediator) traffic status as reported by the sequencer"
   )
   def getMemberTrafficStatus(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       memberId: Member,
   ): definitions.MemberTrafficStatus =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetMemberTrafficStatus(domainId, memberId))
+      httpCommand(HttpScanAppClient.GetMemberTrafficStatus(synchronizerId, memberId))
     }
 
   @Help.Summary(
     "Get the id of the participant hosting a given party"
   )
   def getPartyToParticipant(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       partyId: PartyId,
   ): ParticipantId =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetPartyToParticipant(domainId, partyId))
+      httpCommand(HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId))
     }
 
   @Help.Summary(
@@ -481,6 +489,72 @@ abstract class ScanAppReference(
     }
   }
 
+  def getTransferFactory(
+      choiceArgs: transferinstructionv1.TransferFactory_Transfer
+  ): (
+      FactoryChoiceWithDisclosures,
+      transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+  ) = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferFactory(choiceArgs))
+    }
+  }
+
+  def getTransferInstructionAcceptContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferInstructionAcceptContext(transferInstructionId))
+    }
+  }
+
+  def getTransferInstructionRejectContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferInstructionRejectContext(transferInstructionId))
+    }
+  }
+
+  def getTransferInstructionWithdrawContext(
+      transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTransferInstructionWithdrawContext(transferInstructionId))
+    }
+  }
+
+  def getRegistryInfo() =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRegistryInfo)
+    }
+
+  def lookupInstrument(instrumentId: String) =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupInstrument(instrumentId))
+    }
+
+  def listInstruments() =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.ListInstruments(pageSize = None, pageToken = None))
+    }
+
+  def getAllocationFactory(
+      choiceArgs: allocationinstructionv1.AllocationFactory_Allocate
+  ): FactoryChoiceWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetAllocationFactory(choiceArgs))
+    }
+  }
+
+  def getAllocationTransferContext(
+      allocationId: allocationv1.Allocation.ContractId
+  ): ChoiceContextWithDisclosures = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetAllocationTransferContext(allocationId))
+    }
+  }
+
   @Help.Summary("List vote requests")
   def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
     consoleEnvironment.run {
@@ -534,7 +608,6 @@ abstract class ScanAppReference(
       )
     }
   }
-
 }
 
 final class ScanAppBackendReference(

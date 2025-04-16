@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -8,8 +8,8 @@ import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
 
 object ExtractUsedContractsFromRootViews {
 
-  /** Extract the input contracts for all unblinded [[com.digitalasset.canton.data.ViewParticipantData]] nodes
-    * in the `rootViews`.
+  /** Extract the input contracts for all unblinded
+    * [[com.digitalasset.canton.data.ViewParticipantData]] nodes in the `rootViews`.
     */
   def apply(
       rootViews: List[TransactionView]

@@ -5,10 +5,12 @@ dir := $(call current_dir)
 
 target-driver := $(dir)/target/driver.jar
 
-$(dir)/$(docker-build): $(dir)/app.conf $(target-driver)
+$(dir)/$(docker-build): $(target-driver)
 $(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell get-snapshot-version)
 
 include cluster/images/canton-base-image-dep.mk
 
 $(target-driver): ${COMETBFT_DRIVER}/driver.jar
 	cp $< $@
+
+include cluster/images/canton-sequencer-base-image-dep.mk

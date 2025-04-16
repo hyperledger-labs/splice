@@ -52,9 +52,9 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.syntax.EncoderOps
@@ -500,7 +500,7 @@ class HttpSvAdminHandler(
         decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
         _ <- changeDomainRatePerParticipant(
           decentralizedSynchronizer,
-          DynamicDomainParameters.defaultConfirmationRequestsMaxRate,
+          DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
         )
       } yield v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponseOK
     }
@@ -635,7 +635,7 @@ class HttpSvAdminHandler(
     } { call }
 
   private def changeDomainRatePerParticipant(
-      decentralizedSynchronizerId: DomainId,
+      decentralizedSynchronizerId: SynchronizerId,
       rate: NonNegativeInt,
   )(implicit
       tc: TraceContext

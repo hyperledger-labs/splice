@@ -25,7 +25,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import org.scalatest.wordspec.AnyWordSpec
@@ -503,7 +503,7 @@ class AcsSnapshotTriggerTest
     def now = cantonTimestamp("2007-12-03T10:15:30.00Z")
     clock.advanceTo(now)
 
-    val dummyDomain = DomainId.tryFromString("dummy::domain")
+    val dummyDomain = SynchronizerId.tryFromString("dummy::domain")
     def treeUpdate(recordTime: CantonTimestamp): TreeUpdate = {
       TransactionTreeUpdate(
         new TransactionTree(
@@ -513,7 +513,6 @@ class AcsSnapshotTriggerTest
           recordTime.toInstant,
           0L,
           java.util.Map.of(),
-          java.util.List.of(),
           dummyDomain.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           recordTime.toInstant,

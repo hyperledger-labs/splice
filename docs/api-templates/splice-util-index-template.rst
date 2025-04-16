@@ -6,4 +6,8 @@
 splice-util docs
 ================
 
+.. toctree::
+   :maxdepth: 3
+   :titlesonly:
+
 {{{body}}}

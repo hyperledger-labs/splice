@@ -1,17 +1,17 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.tls
 
-import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
+import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, Port}
 import com.digitalasset.canton.config.{
+  PemFile,
   ServerAuthRequirementConfig,
   TlsClientCertificate,
   TlsClientConfig,
   TlsServerConfig,
 }
-import com.digitalasset.canton.domain.api.v0
 import com.digitalasset.canton.grpc.sampleservice.HelloServiceReferenceImplementation
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
@@ -19,6 +19,8 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.platform.apiserver.{ApiService, ApiServices, LedgerApiService}
+import com.digitalasset.canton.protobuf
+import com.digitalasset.canton.util.JarResourceUtils
 import io.grpc.{BindableService, ManagedChannel}
 import io.netty.handler.ssl.ClientAuth
 
@@ -39,41 +41,42 @@ final case class TlsFixture(
     certRevocationChecking: Boolean = false,
 )(implicit rc: ResourceContext, ec: ExecutionContext) {
 
-  def makeARequest(): Future[v0.Hello.Response] =
+  def makeARequest(): Future[protobuf.Hello.Response] =
     resources().use { channel =>
-      val testRequest = v0.Hello.Request("foo")
-      v0.HelloServiceGrpc
+      val testRequest = protobuf.Hello.Request("foo")
+      protobuf.HelloServiceGrpc
         .stub(channel)
         .hello(testRequest)
     }
 
   private val DefaultMaxInboundMessageSize: Int = 4 * 1024 * 1024 // taken from the Sandbox config
 
-  private final class MockApiServices(apiServices: ApiServices) extends ResourceOwner[ApiServices] {
-    override def acquire()(implicit context: ResourceContext): Resource[ApiServices] =
-      Resource(Future.successful(apiServices))(_ => Future.successful(()))(context)
-  }
-
   private final class EmptyApiServices extends ApiServices {
     override val services: Iterable[BindableService] = List(
       new HelloServiceReferenceImplementation
     )
     override def withServices(otherServices: immutable.Seq[BindableService]): ApiServices = this
+
+    override def close(): Unit = ()
   }
 
   private val serverTlsConfiguration = Option.when(tlsEnabled)(
     TlsServerConfig(
-      certChainFile = ExistingFile.tryCreate(serverCrt),
-      privateKeyFile = ExistingFile.tryCreate(serverKey),
-      trustCollectionFile = Some(ExistingFile.tryCreate(caCrt)),
+      certChainFile = PemFile(ExistingFile.tryCreate(serverCrt)),
+      privateKeyFile = PemFile(ExistingFile.tryCreate(serverKey)),
+      trustCollectionFile = Some(PemFile(ExistingFile.tryCreate(caCrt))),
       clientAuth = clientAuth match {
         case ClientAuth.NONE => ServerAuthRequirementConfig.None
         case ClientAuth.OPTIONAL => ServerAuthRequirementConfig.Optional
         case ClientAuth.REQUIRE =>
           ServerAuthRequirementConfig.Require(
             TlsClientCertificate(
-              certChainFile = clientCrt.getOrElse(new File("unused.txt")),
-              privateKeyFile = clientKey.getOrElse(new File("unused.txt")),
+              certChainFile = PemFile(
+                ExistingFile.tryCreate(clientCrt.getOrElse(TlsFixture.resource("index.txt")))
+              ), // NB: the file is not used
+              privateKeyFile = PemFile(
+                ExistingFile.tryCreate(clientKey.getOrElse(TlsFixture.resource("index.txt")))
+              ), // NB: the file is not used
             )
           )
       },
@@ -83,19 +86,19 @@ final case class TlsFixture(
 
   private def apiServerOwner(): ResourceOwner[ApiService] = {
     val apiServices = new EmptyApiServices
-    val owner = new MockApiServices(apiServices)
 
     ResourceOwner
       .forExecutorService(() => Executors.newCachedThreadPool())
       .flatMap(servicesExecutor =>
-        new LedgerApiService(
-          apiServicesOwner = owner,
+        LedgerApiService(
+          apiServices = apiServices,
           desiredPort = Port.Dynamic,
           maxInboundMessageSize = DefaultMaxInboundMessageSize,
           address = None,
           tlsConfiguration = serverTlsConfiguration,
           servicesExecutor = servicesExecutor,
           metrics = LedgerApiServerMetrics.ForTesting,
+          keepAlive = None,
           loggerFactory = loggerFactory,
         )
       )
@@ -104,10 +107,15 @@ final case class TlsFixture(
   private val clientTlsConfiguration =
     Option.when(tlsEnabled)(
       TlsClientConfig(
-        trustCollectionFile = Some(ExistingFile.tryCreate(caCrt)),
+        trustCollectionFile = Some(PemFile(ExistingFile.tryCreate(caCrt))),
         clientCert = (clientCrt, clientKey) match {
           case (Some(crt), Some(key)) =>
-            Some(TlsClientCertificate(certChainFile = crt, privateKeyFile = key))
+            Some(
+              TlsClientCertificate(
+                certChainFile = PemFile(ExistingFile.tryCreate(crt)),
+                privateKeyFile = PemFile(ExistingFile.tryCreate(key)),
+              )
+            )
           case _ => None
         },
       )
@@ -123,4 +131,9 @@ final case class TlsFixture(
       channel <- new GrpcChannel.Owner(apiServer.port.unwrap, ledgerClientChannelConfiguration)
     } yield channel
 
+}
+
+object TlsFixture {
+  protected def resource(src: String) =
+    JarResourceUtils.resourceFile("test-certificates/" + src)
 }

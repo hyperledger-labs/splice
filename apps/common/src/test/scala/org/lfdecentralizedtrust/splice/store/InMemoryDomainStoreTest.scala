@@ -3,8 +3,8 @@ package org.lfdecentralizedtrust.splice.store
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.{BaseTest, DomainAlias}
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.{BaseTest, SynchronizerAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
@@ -13,24 +13,24 @@ import org.scalatest.wordspec.AsyncWordSpec
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
 
-class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
+class InMemorySynchronizerStoreTest extends AsyncWordSpec with BaseTest {
 
-  implicit val actorSystem: ActorSystem = ActorSystem("InMemoryDomainStoreTest")
+  implicit val actorSystem: ActorSystem = ActorSystem("InMemorySynchronizerStoreTest")
 
-  private def domainId(s: String) = DomainId.tryFromString(s"domain::$s")
-  private def domainAlias(s: String) = DomainAlias.tryCreate(s)
+  private def synchronizerId(s: String) = SynchronizerId.tryFromString(s"domain::$s")
+  private def synchronizerAlias(s: String) = SynchronizerAlias.tryCreate(s)
   private val alice = PartyId.tryFromProtoPrimitive("alice::alice")
 
-  def mkStore(): Future[InMemoryDomainStore] =
+  def mkStore(): Future[InMemorySynchronizerStore] =
     Future.successful(
-      new InMemoryDomainStore(
+      new InMemorySynchronizerStore(
         alice,
         loggerFactory,
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       )
     )
 
-  "InMemoryDomainStore" should {
+  "InMemorySynchronizerStore" should {
 
     "ingest domain updates and allow listing them" in {
       for {
@@ -39,25 +39,25 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
         _ = domains shouldBe Map.empty
         _ <- store.ingestionSink.ingestConnectedDomains(
           Map(
-            domainAlias("a") -> domainId("aId"),
-            domainAlias("b") -> domainId("bId"),
+            synchronizerAlias("a") -> synchronizerId("aId"),
+            synchronizerAlias("b") -> synchronizerId("bId"),
           )
         )
         domains <- store.listConnectedDomains()
         _ = domains shouldBe Map(
-          domainAlias("a") -> domainId("aId"),
-          domainAlias("b") -> domainId("bId"),
+          synchronizerAlias("a") -> synchronizerId("aId"),
+          synchronizerAlias("b") -> synchronizerId("bId"),
         )
         _ <- store.ingestionSink.ingestConnectedDomains(
           Map(
-            domainAlias("a") -> domainId("aId"),
-            domainAlias("c") -> domainId("cId"),
+            synchronizerAlias("a") -> synchronizerId("aId"),
+            synchronizerAlias("c") -> synchronizerId("cId"),
           )
         )
         domains <- store.listConnectedDomains()
         _ = domains shouldBe Map(
-          domainAlias("a") -> domainId("aId"),
-          domainAlias("c") -> domainId("cId"),
+          synchronizerAlias("a") -> synchronizerId("aId"),
+          synchronizerAlias("c") -> synchronizerId("cId"),
         )
       } yield {
         succeed
@@ -69,13 +69,13 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
         store <- mkStore()
         _ <- store.ingestionSink.ingestConnectedDomains(
           Map(
-            domainAlias("a") -> domainId("aId")
+            synchronizerAlias("a") -> synchronizerId("aId")
           )
         )
-        id <- store.getDomainId(domainAlias("a"))
-        _ = id shouldBe domainId("aId")
+        id <- store.getSynchronizerId(synchronizerAlias("a"))
+        _ = id shouldBe synchronizerId("aId")
         ex <- recoverToExceptionIf[StatusRuntimeException] {
-          store.getDomainId(domainAlias("b"))
+          store.getSynchronizerId(synchronizerAlias("b"))
         }
         _ = ex.getStatus().getCode() shouldBe Status.Code.NOT_FOUND
       } yield {
@@ -84,9 +84,9 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
     }
 
     "stream domain updates" in {
-      val eventsFromStart = new AtomicReference(Seq.empty[DomainStore.DomainConnectionEvent])
+      val eventsFromStart = new AtomicReference(Seq.empty[SynchronizerStore.DomainConnectionEvent])
       val eventsAfterFirstIngestion =
-        new AtomicReference(Seq.empty[DomainStore.DomainConnectionEvent])
+        new AtomicReference(Seq.empty[SynchronizerStore.DomainConnectionEvent])
       val fromStartSize1Promise: Promise[Unit] = Promise[Unit]()
       val fromStartSize3Promise: Promise[Unit] = Promise[Unit]()
       val afterFirstSize1Promise: Promise[Unit] = Promise[Unit]()
@@ -107,12 +107,12 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
           })
         _ <- store.ingestionSink.ingestConnectedDomains(
           Map(
-            domainAlias("a") -> domainId("aId")
+            synchronizerAlias("a") -> synchronizerId("aId")
           )
         )
         _ <- fromStartSize1Promise.future
         _ = eventsFromStart.get() shouldBe Seq(
-          DomainStore.DomainAdded(domainAlias("a"), domainId("aId"))
+          SynchronizerStore.DomainAdded(synchronizerAlias("a"), synchronizerId("aId"))
         )
         _ = store
           .streamEvents()
@@ -129,26 +129,26 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
         _ <- afterFirstSize1Promise.future
         _ =
           eventsAfterFirstIngestion.get() shouldBe Seq(
-            DomainStore.DomainAdded(domainAlias("a"), domainId("aId"))
+            SynchronizerStore.DomainAdded(synchronizerAlias("a"), synchronizerId("aId"))
           )
         _ <- store.ingestionSink.ingestConnectedDomains(
           Map(
-            domainAlias("b") -> domainId("bId")
+            synchronizerAlias("b") -> synchronizerId("bId")
           )
         )
         _ <- fromStartSize3Promise.future
         _ =
           eventsFromStart.get() shouldBe Seq(
-            DomainStore.DomainAdded(domainAlias("a"), domainId("aId")),
-            DomainStore.DomainAdded(domainAlias("b"), domainId("bId")),
-            DomainStore.DomainRemoved(domainAlias("a"), domainId("aId")),
+            SynchronizerStore.DomainAdded(synchronizerAlias("a"), synchronizerId("aId")),
+            SynchronizerStore.DomainAdded(synchronizerAlias("b"), synchronizerId("bId")),
+            SynchronizerStore.DomainRemoved(synchronizerAlias("a"), synchronizerId("aId")),
           )
         _ <- afterFirstSize3Promise.future
         _ =
           eventsAfterFirstIngestion.get() shouldBe Seq(
-            DomainStore.DomainAdded(domainAlias("a"), domainId("aId")),
-            DomainStore.DomainAdded(domainAlias("b"), domainId("bId")),
-            DomainStore.DomainRemoved(domainAlias("a"), domainId("aId")),
+            SynchronizerStore.DomainAdded(synchronizerAlias("a"), synchronizerId("aId")),
+            SynchronizerStore.DomainAdded(synchronizerAlias("b"), synchronizerId("bId")),
+            SynchronizerStore.DomainRemoved(synchronizerAlias("a"), synchronizerId("aId")),
           )
       } yield succeed
     }

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -11,6 +11,15 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 
 object MonadUtil {
+
+  object syntax {
+    implicit class IterableSyntax[A](xs: Iterable[A]) {
+      def sequentialTraverse_[M[_], B](step: A => M[B])(implicit
+          monad: Monad[M]
+      ): M[Unit] =
+        MonadUtil.sequentialTraverse_(xs.iterator)(step)
+    }
+  }
 
   /** The caller must ensure that the underlying data structure of the iterator is immutable */
   def foldLeftM[M[_], S, A](initialState: S, iter: Iterator[A])(
@@ -27,23 +36,25 @@ object MonadUtil {
   ): M[S] =
     foldLeftM(initialState, xs.iterator)(step)
 
-  /** The implementation of `traverse` in `cats` is parallel, so this provides a sequential alternative.
-    * The caller must ensure that the Iterable is immutable
+  /** The implementation of `traverse` in `cats` is parallel, so this provides a sequential
+    * alternative. The caller must ensure that the Iterable is immutable
     *
-    * Do not use Cats' .traverse_ methods as Cats does not specify whether the `step` runs sequentially or in parallel
-    * for future-like monads. In fact, this behaviour differs for different versions of Cats.
+    * Do not use Cats' .traverse_ methods as Cats does not specify whether the `step` runs
+    * sequentially or in parallel for future-like monads. In fact, this behaviour differs for
+    * different versions of Cats.
     */
-  def sequentialTraverse_[M[_], A](xs: Iterable[A])(step: A => M[_])(implicit
+  def sequentialTraverse_[M[_], A, B](xs: Iterable[A])(step: A => M[B])(implicit
       monad: Monad[M]
   ): M[Unit] =
     sequentialTraverse_(xs.iterator)(step)
 
   /** The caller must ensure that the underlying data structure of the iterator is immutable
     *
-    * Do not use Cats' .traverse_ methods as Cats does not specify whether the `step` runs sequentially or in parallel
-    * for future-like monads. In fact, this behaviour differs for different versions of Cats.
+    * Do not use Cats' .traverse_ methods as Cats does not specify whether the `step` runs
+    * sequentially or in parallel for future-like monads. In fact, this behaviour differs for
+    * different versions of Cats.
     */
-  def sequentialTraverse_[M[_], A](xs: Iterator[A])(step: A => M[_])(implicit
+  def sequentialTraverse_[M[_], A, B](xs: Iterator[A])(step: A => M[B])(implicit
       monad: Monad[M]
   ): M[Unit] =
     foldLeftM((), xs)((_, x) => monad.void(step(x)))
@@ -67,8 +78,15 @@ object MonadUtil {
     *
     * The effect `falseM` is only executed if `condM` evaluates to false within the effect `M`.
     */
-  def unlessM[M[_], A](condM: M[Boolean])(falseM: => M[A])(implicit monad: Monad[M]): M[Unit] =
-    monad.ifM(condM)(monad.unit, monad.void(falseM))
+  def unlessM[M[_]](condM: M[Boolean])(falseM: => M[Unit])(implicit monad: Monad[M]): M[Unit] =
+    monad.ifM(condM)(monad.unit, falseM)
+
+  /** Monadic version of cats.Applicative.whenA.
+    *
+    * The effect `trueM` is only executed if `condM` evaluates to true within the effect `M`.
+    */
+  def whenM[M[_]](condM: M[Boolean])(trueM: => M[Unit])(implicit monad: Monad[M]): M[Unit] =
+    monad.ifM(condM)(trueM, monad.unit)
 
   def sequentialTraverse[X, M[_], S](
       xs: Seq[X]
@@ -79,9 +97,9 @@ object MonadUtil {
 
   /** Batched version of sequential traverse
     *
-    * Can be used to avoid overloading the database queue. Use e.g. maxDbConnections * 2
-    * as parameter for parallelism to not overload the database queue but to make sufficient use
-    * of the existing resources.
+    * Can be used to avoid overloading the database queue. Use e.g. maxDbConnections * 2 as
+    * parameter for parallelism to not overload the database queue but to make sufficient use of the
+    * existing resources.
     */
   def batchedSequentialTraverse[X, M[_], S](parallelism: PositiveInt, chunkSize: PositiveInt)(
       xs: Seq[X]
@@ -94,20 +112,20 @@ object MonadUtil {
 
   /** Parallel traverse with limited parallelism
     */
-  def parTraverseWithLimit[X, M[_], S](parallelism: Int)(
+  def parTraverseWithLimit[X, M[_], S](parallelism: PositiveInt)(
       xs: Seq[X]
   )(processElement: X => M[S])(implicit M: Parallel[M]): M[Seq[S]] =
     M.monad.map(
-      sequentialTraverse(xs.grouped(parallelism).toSeq)(
+      sequentialTraverse(xs.grouped(parallelism.value).toSeq)(
         _.parTraverse(processElement)
       )(M.monad)
     )(_.flatten)
 
-  def parTraverseWithLimit_[X, M[_], S](parallelism: Int)(
+  def parTraverseWithLimit_[X, M[_], S](parallelism: PositiveInt)(
       xs: Seq[X]
   )(processElement: X => M[S])(implicit M: Parallel[M]): M[Unit] =
     M.monad.void(
-      sequentialTraverse(xs.grouped(parallelism).toSeq)(
+      sequentialTraverse(xs.grouped(parallelism.value).toSeq)(
         _.parTraverse(processElement)
       )(M.monad)
     )
@@ -116,7 +134,7 @@ object MonadUtil {
       xs: Seq[X]
   )(processChunk: Seq[X] => M[Unit])(implicit M: Parallel[M]): M[Unit] =
     sequentialTraverse_(xs.grouped(chunkSize.value).grouped(parallelism.value))(chunk =>
-      chunk.toSeq.parTraverse_(processChunk)
+      chunk.parTraverse_(processChunk)
     )(M.monad)
 
   /** Conceptually equivalent to `sequentialTraverse(xs)(step).map(monoid.combineAll)`.

@@ -5,6 +5,7 @@ import { defaultActiveMigration, SynchronizerMigrationSchema } from './migration
 const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
   isExternalCluster: z.boolean(),
+  hasPublicDocs: z.boolean(),
   interAppsDependencies: z.boolean(),
   cloudSql: z.object({
     enabled: z.boolean(),

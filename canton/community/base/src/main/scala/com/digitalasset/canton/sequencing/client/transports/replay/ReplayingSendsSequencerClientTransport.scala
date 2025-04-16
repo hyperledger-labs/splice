@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.transports.replay
@@ -51,16 +51,18 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.DurationConverters.*
 import scala.util.chaining.*
 
-/** Replays previously recorded sends against the configured sequencer and using a real sequencer client transport.
-  * Records the latencies/rates to complete the send itself, and latencies/rates for an event that was caused by the send to be witnessed.
-  * These metrics are currently printed to stdout.
-  * Sequencers are able to drop sends so to know when all sends have likely been sequenced we simply wait for a period
-  * where no events are received for a configurable duration. This isn't perfect as technically a sequencer could stall,
-  * however the inflight gauge will report a number greater than 0 indicating that these sends have gone missing.
-  * Clients are responsible for interacting with the transport to initiate a replay and wait for observed events to
-  * be idle. A reference can be obtained to this transport component by waiting on the future provided in [[ReplayAction.SequencerSends]].
-  * This testing transport is very stateful and the metrics will only make sense for a single replay,
-  * however currently multiple or even concurrent calls are not prevented (just don't).
+/** Replays previously recorded sends against the configured sequencer and using a real sequencer
+  * client transport. Records the latencies/rates to complete the send itself, and latencies/rates
+  * for an event that was caused by the send to be witnessed. These metrics are currently printed to
+  * stdout. Sequencers are able to drop sends so to know when all sends have likely been sequenced
+  * we simply wait for a period where no events are received for a configurable duration. This isn't
+  * perfect as technically a sequencer could stall, however the inflight gauge will report a number
+  * greater than 0 indicating that these sends have gone missing. Clients are responsible for
+  * interacting with the transport to initiate a replay and wait for observed events to be idle. A
+  * reference can be obtained to this transport component by waiting on the future provided in
+  * [[ReplayAction.SequencerSends]]. This testing transport is very stateful and the metrics will
+  * only make sense for a single replay, however currently multiple or even concurrent calls are not
+  * prevented (just don't).
   */
 trait ReplayingSendsSequencerClientTransport extends SequencerClientTransportCommon {
   import ReplayingSendsSequencerClientTransport.*
@@ -68,10 +70,12 @@ trait ReplayingSendsSequencerClientTransport extends SequencerClientTransportCom
 
   def waitForIdle(
       duration: FiniteDuration,
-      startFromCounter: SequencerCounter = SequencerCounter.Genesis,
+      startFromTimestamp: Option[CantonTimestamp] = None, // start from the beginning
   ): Future[EventsReceivedReport]
 
-  /** Dump the submission related metrics into a string for periodic reporting during the replay test */
+  /** Dump the submission related metrics into a string for periodic reporting during the replay
+    * test
+    */
   def metricReport(snapshot: Seq[MetricData]): String
 }
 
@@ -88,7 +92,7 @@ object ReplayingSendsSequencerClientTransport {
         result: UnlessShutdown[Either[SendAsyncClientError, Unit]]
     ): SendReplayReport =
       result match {
-        case Outcome(Left(SendAsyncClientError.RequestRefused(_: SendAsyncError.Overloaded))) =>
+        case Outcome(Left(SendAsyncClientError.RequestRefused(error))) if error.isOverload =>
           copy(overloaded = overloaded + 1)
         case Outcome(Left(_)) => copy(errors = errors + 1)
         case Outcome(Right(_)) => copy(successful = successful + 1)
@@ -114,9 +118,10 @@ object ReplayingSendsSequencerClientTransport {
       elapsedDuration: FiniteDuration,
       totalEventsReceived: Int,
       finishedAtCounter: SequencerCounter,
+      finishedAtTimestamp: Option[CantonTimestamp],
   ) {
     override def toString: String =
-      s"Received $totalEventsReceived events within ${elapsedDuration.toSeconds}s"
+      s"Received $totalEventsReceived events within ${elapsedDuration.toSeconds}s, finished at counter $finishedAtCounter and timestamp $finishedAtTimestamp"
   }
 
 }
@@ -171,14 +176,14 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     // so instead we pick the biggest point in time that should ensure the sequencer always
     // attempts to sequence valid sends
     def extendMaxSequencingTime(submission: SubmissionRequest): SubmissionRequest =
-      submission.copy(maxSequencingTime = CantonTimestamp.MaxValue)
+      submission.updateMaxSequencingTime(maxSequencingTime = CantonTimestamp.MaxValue)
 
     def handleSendResult(
         result: Either[SendAsyncClientError, Unit]
     ): Either[SendAsyncClientError, Unit] =
       withEmptyMetricsContext { implicit metricsContext =>
         result.tap {
-          case Left(SendAsyncClientError.RequestRefused(_: SendAsyncError.Overloaded)) =>
+          case Left(SendAsyncClientError.RequestRefused(error)) if error.isOverload =>
             logger.warn(
               s"Sequencer is overloaded and rejected our send. Please tune the sequencer to handle more concurrent requests."
             )
@@ -210,10 +215,11 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
       val sendET = for {
         // We need a new signature because we've modified the max sequencing time.
         signedRequest <- requestSigner
-          .signRequest(withExtendedMst, HashPurpose.SubmissionRequestSignature)
-          .leftMap(error =>
-            SendAsyncClientError.RequestRefused(SendAsyncError.RequestRefused(error))
+          .signRequest(
+            withExtendedMst,
+            HashPurpose.SubmissionRequestSignature,
           )
+          .leftMap(error => SendAsyncClientError.RequestFailed(error))
         _ <- underlyingTransport
           .sendAsyncSigned(
             signedRequest,
@@ -235,14 +241,17 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
         .mapAsyncUnordered(sendParallelism)(replaySubmit(_).unwrap)
         .toMat(Sink.fold(SendReplayReport()(sendDuration))(_.update(_)))(Keep.right)
 
-      PekkoUtil.runSupervised(logger.error("Failed to run submission replay", _), submissionReplay)
+      PekkoUtil.runSupervised(
+        submissionReplay,
+        errorLogMessagePrefix = "Failed to run submission replay",
+      )
     }
 
   override def waitForIdle(
       duration: FiniteDuration,
-      startFromCounter: SequencerCounter = SequencerCounter.Genesis,
+      startFromTimestamp: Option[CantonTimestamp] = None, // start from the beginning
   ): Future[EventsReceivedReport] = {
-    val monitor = new SimpleIdlenessMonitor(startFromCounter, duration, timeouts, loggerFactory)
+    val monitor = new SimpleIdlenessMonitor(startFromTimestamp, duration, timeouts, loggerFactory)
 
     monitor.idleF transform { result =>
       monitor.close()
@@ -251,7 +260,9 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     }
   }
 
-  /** Dump the submission related metrics into a string for periodic reporting during the replay test */
+  /** Dump the submission related metrics into a string for periodic reporting during the replay
+    * test
+    */
   override def metricReport(snapshot: Seq[MetricData]): String = {
     val metricName = metrics.submissions.prefix.toString()
     val out = snapshot.flatMap {
@@ -262,16 +273,16 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
   }
 
   protected def subscribe(
-      request: SubscriptionRequest,
+      request: SubscriptionRequestV2,
       handler: SerializedEventHandler[NotUsed],
   ): AutoCloseable
 
-  /** Monitor that when created subscribes the underlying transports and waits for Deliver or DeliverError events
-    * to stop being observed for the given [[idlenessDuration]] (suggesting that there are no more events being
-    * produced for the member).
+  /** Monitor that when created subscribes the underlying transports and waits for Deliver or
+    * DeliverError events to stop being observed for the given [[idlenessDuration]] (suggesting that
+    * there are no more events being produced for the member).
     */
   private class SimpleIdlenessMonitor(
-      readFrom: SequencerCounter,
+      readFrom: Option[CantonTimestamp],
       idlenessDuration: FiniteDuration,
       override protected val timeouts: ProcessingTimeout,
       protected val loggerFactory: NamedLoggerFactory,
@@ -282,6 +293,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
         lastEventAt: Option[CantonTimestamp],
         eventCounter: Int,
         lastCounter: SequencerCounter,
+        lastSequencingTimestamp: Option[CantonTimestamp],
     )
 
     private val stateRef: AtomicReference[State] = new AtomicReference(
@@ -289,7 +301,8 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
         startedAt = CantonTimestamp.now(),
         lastEventAt = None,
         eventCounter = 0,
-        lastCounter = readFrom,
+        lastCounter = SequencerCounter.MinValue,
+        lastSequencingTimestamp = None,
       )
     )
     private val idleP = Promise[EventsReceivedReport]()
@@ -303,12 +316,16 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
 
     scheduleCheck() // kick off checks
 
-    private def updateLastDeliver(counter: SequencerCounter): Unit = {
-      val _ = stateRef.updateAndGet { case state @ State(_, _, eventCounter, _) =>
+    private def updateLastDeliver(
+        counter: SequencerCounter,
+        sequencingTimestamp: CantonTimestamp,
+    ): Unit = {
+      val _ = stateRef.updateAndGet { case state @ State(_, _, eventCounter, _, _) =>
         state.copy(
           lastEventAt = Some(CantonTimestamp.now()),
           lastCounter = counter,
           eventCounter = eventCounter + 1,
+          lastSequencingTimestamp = Some(sequencingTimestamp),
         )
       }
     }
@@ -334,6 +351,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
                 elapsedDuration.toScala,
                 totalEventsReceived = stateSnapshot.eventCounter,
                 finishedAtCounter = stateSnapshot.lastCounter,
+                finishedAtTimestamp = stateSnapshot.lastSequencingTimestamp,
               )
             )
             .discard
@@ -351,8 +369,8 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     private def updateMetrics(event: SequencedEvent[ClosedEnvelope]): Unit =
       withEmptyMetricsContext { implicit metricsContext =>
         val messageIdO: Option[MessageId] = event match {
-          case Deliver(_, _, _, messageId, _, _, _) => messageId
-          case DeliverError(_, _, _, messageId, _, _) => Some(messageId)
+          case Deliver(_, _, _, _, messageId, _, _, _) => messageId
+          case DeliverError(_, _, _, _, messageId, _, _) => Some(messageId)
           case _ => None
         }
 
@@ -363,19 +381,21 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
         }
       }
 
-    private def handle(event: OrdinarySerializedEvent): Future[Either[NotUsed, Unit]] = {
+    private def handle(
+        event: OrdinarySerializedEvent
+    ): FutureUnlessShutdown[Either[NotUsed, Unit]] = {
       val content = event.signedEvent.content
 
       updateMetrics(content)
-      updateLastDeliver(content.counter)
+      updateLastDeliver(content.counter, content.timestamp)
 
-      Future.successful(Either.unit)
+      FutureUnlessShutdown.pure(Either.unit)
     }
 
     val idleF: Future[EventsReceivedReport] = idleP.future
 
     private val subscription =
-      subscribe(SubscriptionRequest(member, readFrom, protocolVersion), handle)
+      subscribe(SubscriptionRequestV2(member, readFrom, protocolVersion), handle)
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
       Seq(
@@ -443,7 +463,7 @@ class ReplayingSendsSequencerClientTransportImpl(
   ): EitherT[FutureUnlessShutdown, Status, Unit] =
     EitherT.pure(())
 
-  override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
+  override def subscribe[E](request: SubscriptionRequestV2, handler: SerializedEventHandler[E])(
       implicit traceContext: TraceContext
   ): SequencerSubscription[E] = new SequencerSubscription[E] {
     override protected def loggerFactory: NamedLoggerFactory =
@@ -461,14 +481,14 @@ class ReplayingSendsSequencerClientTransportImpl(
     SubscriptionErrorRetryPolicy.never
 
   override protected def subscribe(
-      request: SubscriptionRequest,
+      request: SubscriptionRequestV2,
       handler: SerializedEventHandler[NotUsed],
   ): AutoCloseable =
     underlyingTransport.subscribe(request, handler)
 
   override type SubscriptionError = underlyingTransport.SubscriptionError
 
-  override def subscribe(request: SubscriptionRequest)(implicit
+  override def subscribe(request: SubscriptionRequestV2)(implicit
       traceContext: TraceContext
   ): SequencerSubscriptionPekko[SubscriptionError] = underlyingTransport.subscribe(request)
 
@@ -502,13 +522,18 @@ class ReplayingSendsSequencerClientTransportPekko(
     with SequencerClientTransportPekko {
 
   override protected def subscribe(
-      request: SubscriptionRequest,
+      request: SubscriptionRequestV2,
       handler: SerializedEventHandler[NotUsed],
   ): AutoCloseable = {
     val ((killSwitch, _), doneF) = subscribe(request).source
-      .mapAsync(parallelism = 10)(_.value.traverse { event =>
-        handler(event)
-      })
+      .mapAsync(parallelism = 10)(eventKS =>
+        eventKS.value
+          .traverse { event =>
+            handler(event)
+          }
+          .tapOnShutdown(eventKS.killSwitch.shutdown())
+          .onShutdown(Left(SubscriptionCloseReason.Shutdown))
+      )
       .watchTermination()(Keep.both)
       .to(Sink.ignore)
       .run()

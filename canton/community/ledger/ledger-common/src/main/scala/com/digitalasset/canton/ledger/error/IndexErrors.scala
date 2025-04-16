@@ -1,11 +1,19 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error
 
-import com.daml.error.*
-import com.daml.error.ErrorCode.LoggedApiException
+import com.digitalasset.base.error.ErrorCode.LoggedApiException
+import com.digitalasset.base.error.{
+  DamlErrorWithDefiniteAnswer,
+  ErrorCategory,
+  ErrorCode,
+  ErrorGroup,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.IndexErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 @Explanation("Errors raised by the Participant Index persistence layer.")
 object IndexErrors extends IndexErrorGroup {
@@ -20,7 +28,7 @@ object IndexErrors extends IndexErrorGroup {
           ErrorCategory.TransientServerFailure,
         ) {
       final case class Reject(throwable: Throwable)(implicit
-          val loggingContext: ContextualizedErrorLogger
+          val loggingContext: ErrorLoggingContext
       ) extends DbError(
             cause =
               s"Processing the request failed due to a transient database error: ${throwable.getMessage}",
@@ -38,7 +46,7 @@ object IndexErrors extends IndexErrorGroup {
           ErrorCategory.SystemInternalAssumptionViolated,
         ) {
       final case class Reject(throwable: Throwable)(implicit
-          val loggingContext: ContextualizedErrorLogger
+          val loggingContext: ErrorLoggingContext
       ) extends DbError(
             cause =
               s"Processing the request failed due to a non-transient database error: ${throwable.getMessage}",
@@ -56,7 +64,7 @@ object IndexErrors extends IndexErrorGroup {
       override val throwableO: Option[Throwable] = None,
   )(implicit
       code: ErrorCode,
-      loggingContext: ContextualizedErrorLogger,
+      loggingContext: ErrorLoggingContext,
   ) extends DamlErrorWithDefiniteAnswer(cause, throwableO) {
 
     override def asGrpcError: IndexDbException = {

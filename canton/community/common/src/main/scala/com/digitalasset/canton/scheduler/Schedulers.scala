@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.scheduler
@@ -7,8 +7,8 @@ package com.digitalasset.canton.scheduler
   */
 trait Schedulers extends StartStoppable with AutoCloseable {
 
-  /** Accessor for individual scheduler by name
-    * Throws an IllegalStateException if a scheduler is looked up that does not exist
+  /** Accessor for individual scheduler by name Throws an IllegalStateException if a scheduler is
+    * looked up that does not exist
     */
   def get(name: String): Option[Scheduler]
 }

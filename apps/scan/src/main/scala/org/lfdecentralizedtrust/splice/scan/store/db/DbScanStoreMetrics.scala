@@ -5,8 +5,8 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
-import com.daml.metrics.CacheMetrics
 import com.daml.metrics.api.MetricQualification.Latency
+import com.digitalasset.canton.metrics.CacheMetrics
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.store.HistoryMetrics
 

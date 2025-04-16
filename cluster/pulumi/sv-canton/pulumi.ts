@@ -78,7 +78,7 @@ export function runSvCantonForSvs<T>(
   console.log(
     `Running for migration ${JSON.stringify(migrationIds)} and svs ${JSON.stringify(svsToRunFor)}`
   );
-  const migrationsToRunFor = migrations.concat(
+  const migrationsToRunFor: MigrationInfo[] = migrations.concat(
     forceMigrations
       .filter(migration => {
         return !migrationIds.includes(migration);
@@ -88,6 +88,8 @@ export function runSvCantonForSvs<T>(
           id: id,
           version: activeVersion,
           provider: MigrationProvider.EXTERNAL,
+          // This doesn't actually matter, this is only used for down/refresh.
+          sequencer: { enableBftSequencer: false },
         };
       })
   );

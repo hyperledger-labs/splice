@@ -3,7 +3,690 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+INFO: Note that the **"## Until YYYY-MM-DD (Exclusive)" headers**
+below should all be Wednesdays to align with the weekly release
+schedule, i.e. if you add an entry effective at or after the first
+header, prepend the new date header that corresponds to the
+Wednesday after your change.
+
+## Until 2025-04-16 (Exclusive)
+### Offline Root Namespace Initialization Scripts
+Scripts to initialize a participant node's identity using an offline root namespace key have been added to the release artifact
+under `scripts/offline-root-key`. An example usage with locally generated keys is available at `examples/10-offline-root-namespace-init`.
+
+### BREAKING CHANGE: Macro renamed
+The `init_id` repair macro has been renamed to `init_id_from_uid`.
+`init_id` still exists but takes the identifier as a string and namespace optionally instead.
+
+### Removed identifier delegation topology request and `IdentityDelegation` usage
+The `IdentifierDelegation` topology request type and its associated signing key usage, `IdentityDelegation`, have
+been removed. This usage was previously reserved for delegating identity-related capabilities but is no
+longer supported. Any existing keys using the `IdentityDelegation` usage will have it ignored during
+deserialization.
+
+### New ACS export endpoint that takes a topology transaction effective time
+The new endpoint (located in `party_management_service.proto`):
+```
+rpc ExportAcsAtTimestamp(ExportAcsAtTimestampRequest) returns (stream ExportAcsAtTimestampResponse)
+```
+exports the ACS for a topology transaction effective time.
+
+At the server side, such timestamp needs to be converted to a ledger offset (internally). This may fail when:
+1) The topology transaction has become effective and is visible in the topology store, but it is not yet visible
+   in the ledger API store. This endpoint returns a retryable gRPC error code to cope with this possibility.
+2) For the given synchronizer (ID) and/or the given topology transaction effective time, no such ledger offset exists.
+   This may happen when an arbitrary timestamp is passed into this endpoint, or when the effective time originates from
+   a topology transaction other than a PartyToParticipant mapping. (Note that the ledger API does not support all
+   topology transactions).
+
+The timestamp parameter for the topology transaction request parameter is expected to originate from a
+PartyToParticipant mapping. For example, use the gRPC topology endpoint (`topology_manager_read_service.proto`):
+```
+rpc ListPartyToParticipant(ListPartyToParticipantRequest) returns (ListPartyToParticipantResponse)
+```
+where the `ListPartyToParticipantResponse`'s `BaseResult` message field `validFrom` contains the topology transaction
+effective time which can be used for this ACS export endpoint.
+
+This endpoint exports the ACS as LAPI active contracts while each contract gets wrapped in an `ActiveContract` message
+(as defined in the `active_contract.proto`).
+
+The ACS import endpoint (located in `participant_repair_service.proto`):
+```
+rpc ImportAcs(stream ImportAcsRequest) returns (ImportAcsResponse);
+```
+imports an ACS snapshot which has been exported with this endpoint.
+
+In the Canton console, the new command `export_acs_at_timestamp` invokes this new ACS export endpoint.
+
+### Topology-aware package selection enabled
+Topology-aware package selection in command submission is enabled by default.
+To disable, toggle `participant.ledger-api.topology-aware-package-selection.enabled = false`
+
+### `InvalidGivenCurrentSystemStateSeekAfterEnd` error category
+The description of existing error category `InvalidGivenCurrentSystemStateSeekAfterEnd` has been generalized.
+As such this error category now describes a failure due to requesting a resource using a parameter value that
+falls beyond the current upper bound (or 'end') defined by the system's state. For example, a request that asks
+for data at a ledger offset which is past the current ledger's end.
+
+With this change, the error category `InvalidGivenCurrentSystemStateSeekAfterEnd` has also been marked as
+`retryable`. Because, it makes sense to retry a failed request assuming the system has progressed in the meantime.
+For example, new ledger entries have been added; and thus a previously requested ledger offset has become valid.
+
+### Traffic fees
+A base event cost can now be added to every sequenced submission.
+The amount is controlled via a new optional field in the `TrafficControlParameters` called `base_event_cost`.
+If not set, the base event cost is 0.
+
+### Acknowledgements
+Sequencers will now conflate acknowledgements coming from a participant within a time window.
+This means that if 2 or more acknowledgements from a given member get submitted during the window,
+only the first will be sequenced and the others will be discarded, until the window has elapsed.
+The conflate time window can be configured with a key in the sequencer configuration.
+Defaults to 45 seconds.
+
+Example: `sequencers.sequencer1.acknowledgements-conflate-window = "1 minute"`
+
+### BREAKING CHANGE: Automatic Node Initialization and Configuration
+
+The node initialization has been modified to better support root namespace keys and using static identities
+for our documentation. Mainly, while before, we had the ``init.auto-init`` flag, we now support a bit more
+versatile configurations.
+
+The config structure looks like this now:
+```
+canton.participants.participant.init = {
+    identity = {
+        type = auto
+        identifier = {
+            type = config // random // explicit(name)
+        }
+    }
+    generate-intermediate-key = false
+    generate-topology-transactions-and-keys = true
+}
+```
+
+A manual identity can be specified via the GRPC API if the configuration is set to ``manual``.
+```
+identity = {
+    type = manual
+}
+```
+
+Alternatively, the identity can be defined in the configuration file, which is equivalent to an
+API based initialization using the ``external`` config:
+```
+    identity = {
+        type = external
+        identifier = name
+        namespace = "optional namespace"
+        delegations = ["namespace delegation files"]
+    }
+```
+
+The old behaviour of ``auto-init = false`` (or ``init.identity = null``) can be recovered using
+```
+canton.participants.participant1.init = {
+    generate-topology-transactions-and-keys = false
+    identity.type = manual
+}
+```
+
+This means that auto-init is now split into two parts: generating the identity and generating
+the subsequent topology transactions.
+
+Additionally, the console command ``node.topology.init_id`` has been changed slightly too:
+It now supports additional parameters ``delegations`` and ``delegationFiles``. These can be used
+to specify the delegations that are necessary to control the identity of the node, which means that
+the ``init_id`` call combined with ``identity.type = manual`` is equivalent to the
+``identity.type = external`` in the config, except that one is declarative via the config, the
+other is interactive via the console. In addition, on the API level, the ``InitId`` request now expects
+the ``unique_identifier`` as its components, ``identifier`` and ``namespace``.
+
+### Ledger API endpoint to submit-and-wait for reassignments
+- Added new endpoint SubmitAndWaitForReassignment to be able to submit a single composite reassignment command, and wait
+  for the reassignment to be returned.
+- The SubmitAndWaitForReassignmentRequest message was added that contains the reassignment commands to be submitted and
+  the event format that defines how the Reassignment will be presented.
+- The java bindings and the json api were extended accordingly.
+
+### BREAKING CHANGE: NamespaceDelegation can be restricted to a specific set of topology mappings
+- `NamespaceDelegation.is_root_delegation` is deprecated and replaced with the `oneof` `NamespaceDelegation.restriction`. See the 
+  protobuf documentation for more details. Existing `NamespaceDelegation` protobuf values can still be read and the hash of
+  existing topology transactions is also preserved. New `NamespaceDelegation`s will only make use of the `restriction` `oneof`. 
+  transaction is also preserved.
+  - The equivalent of `is_root_delegation=true` is `restriction=CanSignAllMappings`.
+  - The equivalent of `is_root_delegation=false` is `restriction=CanSignAllButNamespaceDelegations`
+- The console command `topology.namespace_delegation.propose_delegation` was changed. The parameter `isRootDelegation: Boolean` is replaced with the parameter
+  `delegationRestriction: DelegationRestriction`, which can be one of the following values:
+    - `CanSignAllMappings`: This is equivalent to the previously known "root delegation", meaning that the target key of the delegation can be used
+      to sign all topology mappings.
+    - `CanSignAllButNamespaceDelegations`: This is equivalent to the previously known "non-root delegation", meaning that the target key of the delegation
+      can be used to sign all topology mappings other than namespace delegations.
+    - `CanSignSpecificMappings(TopologyMapping.Code*)`: The target key of the delegation can only be used to sign the specified mappings.
+
+### BREAKING CHANGE: Removed IdentifierDelegations
+- All console commands and data types on the admin API related to identifier delegations have been removed.
+
+## Until 2025-04-08 (Exclusive)
+- Json API: openapi.yaml generated using 3.0.3 version of specification.
+- Json API: http response status codes are based on the corresponding gRPC errors where applicable.
+- Json API: `/v2/users` and `/v2/parties` now support paging
+- Json API: Updated openapi.yaml to correctly represent Timestamps as strings in the JSON API schema
+- Json API: Fields that are mapped to Option, Seq or Map in gRPC are no longer required (default to empty).
+- The package vetting ledger-effective-time boundaries change to validFrom being inclusive and validUntil being exclusive
+  whereas previously validFrom was exclusive and validUntil was inclusive.
+- Ledger Metering has been removed. This involved
+  - deleting MeteringReportService in the Ledger API
+  - deleting /v2/metering endpoint in the JSON API
+  - deleting the console ledger_api.metering.get_report command
+
+### Ledger API topology transaction to represent addition for (party, participant)
+- The ParticipantAuthorizationAdded message was added to express the inception of a party in a participant.
+- The TopologyEvent message was extended to include the ParticipantAuthorizationAdded.
+- The lapi_events_party_to_participant table was extended by one column the participant_permission_type which holds the
+  state of the participant authorization (Added, Changed, Revoked)
+- The JSON api and the java bindings have changed accordingly to accommodate the changes.
+
+### Ledger API interface query upgrading
+Streaming and pointwise queries support for smart contract upgrading:
+- Dynamic upgrading of interface filters: on a query for interface `iface`, the Ledger API will deliver events
+  for all templates that can be upgraded to a template version that implements `iface`.
+  The interface filter resolution is dynamic throughout a stream's lifetime: it is re-evaluated on each DAR upload.
+  **Note**: No redaction of history: a DAR upload during an ongoing stream does not affect the already scanned ledger for the respective stream.
+  If clients are interested in re-reading the history in light of the upgrades introduced by a DAR upload,
+  the relevant portion of the ACS view of the client should be rebuilt by re-subscribing to the ACS stream
+  and continuing from there with an update subscription for the interesting interface filter.
+- Dynamic upgrading of interface views: rendering of interface view values is adapted to use
+  the latest infinitely-vetted (with no validUntil bound) package version of an interface instance.
+  **Note**: For performance considerations, the selected version to be rendered for an interface instance is memoized
+  per stream subscription and does not change as the vetting state evolves.
+
+## Until 2025-04-05 (Exclusive)
+### Breaking: New External Signing Hashing Scheme
+**BREAKING CHANGE**
+The hashing algorithm for externally signed transactions has been changed in a minor but backward-incompatible way.
+
+- There is a new `interfaceId` field in the `Fetch` node of the transaction that now is part of the hash.
+- The hashing scheme version (now being V2) is now part of the hash
+
+See the [hashing algorithm documentation](https://docs.digitalasset-staging.com/build/3.3/explanations/external-signing/external_signing_hashing_algorithm#fetch) for the updated version.
+The hash provided as part of the `PrepareSubmissionResponse` is updated to the new algorithm as well.
+This updated algorithm is supported under a new `V2` hashing scheme version.
+Support for `V1` has been dropped and will not be supported in Canton 3.3 onward.
+This is relevant for applications that re-compute the hash client-side.
+Such applications must update their implementation in order to use the interactive submission service on Canton 3.3.
+
+
+## Until 2025-04-04 (Exclusive)
+### ACS Export and Import
+The ACS export and import now use an ACS snapshot containing LAPI active contracts, as opposed to the Canton internal
+active contracts. Further, the ACS export now requires a ledger offset for taking the ACS snapshot, instead of an
+optional timestamp. The new ACS export does not feature an offboarding flag anymore; offboarding is not ready for production use and
+will be addressed in a future release.
+
+For party replication, we want to take (export) the ACS snapshot at the ledger offset when the topology transaction
+results in a (to be replicated) party being added (onboarded) on a participant. The new command
+`find_party_max_activation_offset` allows to find such offset. (Analogously, the new `find_party_max_deactivation_offset`
+command allows to find the ledger offset when a party is removed (offboarded) from a participant).
+
+The 3.3 release contains both variants: `export_acs_old`/`import_acs_old` and `export_acs`/`import_acs`.
+A subsequent release is only going to contain the LAPI active contract `export_acs`/`import_acs` commands (and their protobuf
+implementation).
+
+**BREAKING CHANGE**
+- Renamed Canton console commands.
+  - Details: Renaming of the current `{export|import}_acs` to the `{export|import}_acs_old` console commands.
+- Changed protobuf service and message definitions.
+  - Details: Renaming of the `{Export|Import}Acs` rpc together with their `{Export|Import}Acs{Request|Response}`
+    messages to the `{Export|Import}AcsOld` rpc together with their `{Export|Import}AcsOld{Request|Response}` messages
+    in the `participant_repair_service.proto`
+- Deprecation of `{export|import}_acs_old` console commands, its implementation and protobuf representation.
+- New endpoint location for the new `export_acs`.
+  - Details: The new `export_acs` and its protobuf implementation are no longer part of the participant repair
+    administration; but now are located in the participant parties' administration: `party_management_service.proto`.
+    Consequently, the `export_acs` endpoint is accessible without requiring a set repair flag.
+- Same endpoint location for the new `import_acs`.
+  - Details: `import_acs` and its protobuf implementation are still part of the participant repair administration. Thus,
+    using it still requires a set repair flag.
+- No backwards compatibility for ACS snapshots.
+  Details: An ACS snapshot that has been exported with 3.2 needs to be imported with `import_acs_old`.
+- Renamed the current `ActiveContact` to `ActiveContactOld`. And deprecation of `ActiveContactOld`, and in particular
+  its method to `ActiveContactOld#fromFile`
+- Renamed the current `import_acs_from_file` repair macro to `import_acs_old_from_file`. And deprecation of
+  `import_acs_old_from_file`.
+- Authorization service configuration of the ledger api and admin api is validated. No two services can define
+  the same target scope or audience.
+- Ledger API will now give the `DAML_FAILURE` error instead of the `UNHANDLED_EXCEPTION` error when exceptions are
+  thrown from daml.
+    - Details: This new error structure includes an `error_id` in the `ErrorInfoDetail` metadata, of the form
+      `UNHANDLED_EXCEPTION/Module.Name:ExceptionName` for legacy exceptions, and fully user defined for `failWithStatus`
+      exceptions. Please migrate to `failWithStatus` over daml exceptions before Daml 3.4.
+
+## Until 2025-03-27 (Exclusive)
+### Reassignment Batching
+
+**BREAKING CHANGE**
+- SubmitReassignmentRequest now accepts a list of reassignment commands rather than just one.
+- In the update stream, Reassignment now contains a list of events rather than just one.
+- UnassignedEvent messages now additionally contain an offset and a node_id.
+- For the detailed list of changed Ledger API proto messages please see docs-open/src/sphinx/reference/lapi-migration-guide.rst
+
+## Until 2025-03-26 (Exclusive)
+- Added GetUpdateByOffset and GetUpdateById rpc methods in the ledger api that extend and will replace the existing
+GetTransactionByOffset and GetTransactionById so that one will be able to look up an update by its offset or id.
+- Towards this, the GetUpdateByOffsetRequest and GetUpdateByIdRequest messages were added. Both contain the update
+format to shape the update in its final form. Look at docs-open/src/sphinx/reference/lapi-migration-guide.rst on how
+use the added messages over the GetTransactionByOffsetRequest and GetTransactionByIdRequest.
+- The GetUpdateResponse is the response of both methods that contains the update which can be one of:
+  - a transaction
+  - a reassignment
+  - a topology transaction
+- The java bindings and json api were also extended to include the above changes.
+
+## Until 2025-03-25 (Exclusive)
+- `_recordId` removed from Daml records in Json API
+- Removed `default-close-delay` from `ws-config` (websocket config) in `http-service` configuration (close delay is no longer necessary).
+
+## Until 2025-03-20 (Exclusive)
+### Smart-contract upgrading
+- A new query endpoint for supporting topology-aware package selection in command submission construction is added to the Ledger API:
+    - gRPC: `com.daml.ledger.api.v2.interactive.InteractiveSubmissionService.GetPreferredPackageVersion`
+    - JSON: `/v2/interactive-submission/preferred-package-version`
+
+## Until 2025-03-19 (Exclusive)
+### Application ID rename to User ID
+
+- **BREAKING CHANGE** Ledger API, Canton console, Canton, and Ledger API DB schemas changed in a non-backwards compatible manner. This is a pure rename that keeps all the associated semantics intact, with the exception of format, and validation thereof, of the user_id field. (Please see value.proto for the differences)
+- For the detailed list of changed Ledger API proto messages please see docs-open/src/sphinx/reference/lapi-migration-guide.rst
+
+## Until 2025-03-17 (Exclusive)
+### Universal Streams in ledger api (Backwards compatible changes)
+- The `GetActiveContractsRequest` message was extended with the `event_format` field of `EventFormat` type. The
+  `event_format` should not be set simultaneously with the `filter` or `verbose` field. Look at docs-open/src/sphinx/reference/lapi-migration-guide.rst
+on how to achieve the original behaviour.
+- The `GetUpdatesRequest` message was extended with the `update_format` field of `UpdateFormat` type.
+    - For the `GetUpdateTrees` method it must be unset.
+    - For the `GetUpdates` method the `update_format` should not be set simultaneously with the filter or verbose field.
+    Look at docs-open/src/sphinx/reference/lapi-migration-guide.rst on how to achieve the original behaviour.
+- The `GetTransactionByOffsetRequest` and the `GetTransactionByIdRequest` were extended with the `transaction_format`
+  field of the `TransactionFormat` type.
+    - For the `GetTransactionTreeByOffset` or the `GetTransactionTreeById` method it must be unset.
+    - For the `GetTransactionByOffset` or the `GetTransactionById` method it should not be set simultaneously with the
+      `requesting_parties` field. Look at docs-open/src/sphinx/reference/lapi-migration-guide.rst on how to achieve the
+      original behaviour.
+- The `GetEventsByContractIdRequest` was extended with the `event_format` field of the `EventFormat` type. It should not
+  be set simultaneously with the `requesting_parties` field. Look at
+  docs-open/src/sphinx/reference/lapi-migration-guide.rst on how to achieve the original behaviour.
+- The `UpdateFormat` message was added. It specifies what updates to include in the stream and how to render them.
+  ```protobuf
+  message UpdateFormat {
+    TransactionFormat include_transactions = 1;
+    EventFormat include_reassignments = 2;
+    TopologyFormat include_topology_events = 3;
+  }
+  ```
+  All of its fields are optional and define how transactions, reassignments and topology events will be formatted. If
+  a field is not set then the respective updates will not be transmitted.
+- The `TransactionFormat` message was added. It specifies what events to include in the transactions and what data to
+  compute and include for them.
+  ```protobuf
+  message TransactionFormat {
+    EventFormat event_format = 1;
+    TransactionShape transaction_shape = 2;
+  }
+  ```
+- The `TransactionShape` enum defines the event shape for `Transaction`s and can have two different flavors AcsDelta and
+  LedgerEffects.
+  ```protobuf
+  enum TransactionShape {
+    TRANSACTION_SHAPE_ACS_DELTA = 1;
+    TRANSACTION_SHAPE_LEDGER_EFFECTS = 2;
+  }
+  ```
+    - AcsDelta
+
+      The transaction shape that is sufficient to maintain an accurate ACS view. This translates to create and archive
+      events. The field witness_parties in events are populated as stakeholders, transaction filter will apply accordingly.
+
+    - LedgerEffects
+
+      The transaction shape that allows maintaining an ACS and also conveys detailed information about all exercises.
+      This translates to create, consuming exercise and non-consuming exercise. The field witness_parties in events are
+      populated as cumulative informees, transaction filter will apply accordingly.
+- The `EventFormat` message was added. It defines both which events should be included and what data should be computed
+  and included for them.
+  ```protobuf
+  message EventFormat {
+    map<string, Filters> filters_by_party = 1;
+    Filters filters_for_any_party = 2;
+    bool verbose = 3;
+  }
+  ```
+    - The `filters_by_party` field define the filters for specific parties on the participant. Each key must be a valid
+      PartyIdString. The interpretation of the filter depends on the transaction shape being filtered:
+        - For **ledger-effects** create and exercise events are returned, for which the witnesses include at least one
+          of the listed parties and match the per-party filter.
+        - For **transaction and active-contract-set streams** create and archive events are returned for all contracts
+          whose stakeholders include at least one of the listed parties and match the per-party filter.
+    - The `filters_for_any_party` define the filters that apply to all the parties existing on the participant.
+    - The `verbose` flag triggers the ledger to include labels for record fields.
+- The `TopologyFormat` message was added. It specifies which topology transactions to include in the output and how to
+  render them. It currently contains only the `ParticipantAuthorizationTopologyFormat` field. If it is unset no topology
+  events will be emitted in the output stream.
+  ```protobuf
+    message TopologyFormat {
+      ParticipantAuthorizationTopologyFormat include_participant_authorization_events = 1;
+    }
+  ```
+- The added `ParticipantAuthorizationTopologyFormat` message specifies which participant authorization topology
+  transactions to include and how to render them. In particular, it contains the list of parties for which the topology
+  transactions should be transmitted. If the list is empty then the topology transactions for all the parties will be
+  streamed.
+  ```protobuf
+  message ParticipantAuthorizationTopologyFormat {
+    repeated string parties = 1;
+  }
+  ```
+- The `ArchivedEvent` and the `ExercisedEvent` messages were extended with the `implemented_interfaces` field. It holds
+  the interfaces implemented by the target template that have been matched from the interface filter query. They are
+  populated only in case interface filters with `include_interface_view` are set and the event is consuming for
+  exercised events.
+- The `Event` message was extended to include additionally the `ExercisedEvent` that can also be present in the
+  `TreeEvent`. When the transaction shape requested is AcsDelta then only `CreatedEvent`s and `ArchivedEvent`s are returned, while when the
+  LedgerEffects shape is requested only `CreatedEvent`s and `ExercisedEvent`s are returned.
+- The java bindings and the json api data structures have changed accordingly to include the changes described above.
+- For the detailed way on how to migrate to the new Ledger API please see docs-open/src/sphinx/reference/lapi-migration-guide.rst
+
+## Until 2025-03-12 (Exclusive)
+### External Signing
+
+- **BREAKING CHANGE** The `ProcessedDisclosedContract` message in the `Metadata` message of the `interactive_submission_service.proto` file has been renamed to `InputContract`, and the
+  field `disclosed_events` in the same `Metadata` message renamed to `input_contracts` to better represent its content.
+- Input contracts available on the preparing participant can now be used to prepare a command (it was previously required to explicitly disclose all input contracts in the `prepare` request)
+  If some input contracts are missing from both the participant local store and the explicitly disclosed contracts, the `prepare` call will fail.
+- The synchronizer ID is now optional and can be omitted in the prepare request. If left empty, a suitable sychronizer will be selected automatically.
+
+## Until 2025-03-05 (Exclusive)
+- Fixed slow sequencer shapshot query on the aggregate submission tables in the case when sequencer onboarding state
+  is requested much later and there's more data accumulated in the table:
+ - DB schema change: added fields and indexes to the aggregate submission tables to speed up the snapshot query.
+- A new storage parameter is introduced: `storage.parameters.failed-to-fatal-delay`. This parameter, which defaults to 5 minutes, defines the delay after which a database storage that is continously in a Failed state escalates to Fatal.
+  The sequencer liveness health is now changed to use its storage as a fatal dependency, which means that if the storage transitions to Fatal, the sequencer liveness health transitions irrevocably to NOT_SERVING. This allows a monitoring system to detect the situation and restart the node.
+  **NOTE** Currently, this parameter is only used by the `DbStorageSingle` component, which is only used by the sequencer.
+- Addressing a DAR on the admin api is simplified: Instead of the DAR ID concept, we directly use the main package-id, which is synonymous.
+  - Renamed all `darId` arguments to `mainPackageId`
+- Topology-aware package selection has been introduced to enhance package selection for smart contract upgrades during command interpretation.
+  When enabled, the new logic leverages the topology state of connected synchronizers to optimally select packages for transactions, ensuring they pass vetting checks on counter-participants.
+  This feature is disabled by default and can be enabled with the following configuration: `participant.ledger-api.topology-aware-package-selection.enabled = true`
+
+## Until 2025-03-03 (Exclusive)
+- The SubmitAndWaitForTransaction endpoint has been changed to expect a SubmitAndWaitForTransactionRequest instead of a
+  SubmitAndWaitRequest.
+- The SubmitAndWaitForTransactionRequest message was added which additionally to the Commands contains the required
+  transaction_format field that defines the format of the transaction that will be returned. To retain the old
+  behavior, the transaction_format field should be defined with:
+    - transaction_shape set to ACS_DELTA
+    - event_format defined with:
+      - filters_by_party containing wildcard-template filter for all original Commands.act_as parties
+      - verbose flag set
+
+## Until 2025-02-26 (Exclusive)
+- The interactive submission service and external signing authorization logic are now always enabled. The following configuration fields must be removed from the participant's configuration:
+    - `ledger-api.interactive-submission-service.enabled`
+    - `parameters.enable-external-authorization`
+
+## Until 2025-02-19 (Exclusive)
+- Added `SequencerConnectionAdministration` to remote mediator instances, accessible e.g. via `mymediator.sequencer_connection.get`
+
+- **BREAKING CHANGE** Remote console sequencer connection config `canton.remote-sequencers.<sequencer>.public-api`
+now uses the same TLS option for custom trust store as `admin-api` and `ledger-api` sections:
+  - new: `tls.trust-collection-file = <existing-file>` instead of undocumented old: `custom-trust-certificates.pem-file`
+  - new: `tls.enabled = true` to use system's default trust store (old: impossible to configure) for all APIs
+- The sequencer's `SendAsyncVersioned` RPC returns errors as gRPC status codes instead of a dedicated error message with status OK.
+- DarService and Package service on the admin-api have been cleaned up:
+  - Before, a DAR was referred through a hash over the zip file. Now, the DAR ID is the main package ID.
+  - Renamed all `hash` arguments to `darId`.
+  - Added name and version of DAR and package entries to the admin API commands.
+  - Renamed the field `source description` to `description` and stored it with the DAR, not the packages.
+  - Renamed the command `list_contents` to `get_content` to disambiguate with `list` (both for packages and DARs).
+  - Added a new command `packages.list_references` to support listing which DARs are referencing a particular
+    package.
+
+- New sequencer connection validation mode `SEQUENCER_CONNECTION_VALIDATON_THRESHOLD_ACTIVE` behaves like `SEQUENCER_CONNECTION_VALIDATON_ACTIVE` except that it fails when the threshold of sequencers is not reached. In Canton 3.2, `SEQUENCER_CONNECTION_VALIDATON_THRESHOLD_ACTIVE` was called `STRICT_ACTIVE`.
+
+- **BREAKING CHANGE** Renamed the `filter_store` parameter in `TopologyManagerReadService` to `store` because it doesn't act anymore as a string filter like `filter_party`.
+- **BREAKING CHANGE** Console commands changed the parameter `filterStore: String` to `store: TopologyStoreId`. Additionally, there
+  are implicit conversions in `ConsoleEnvironment` to convert `SynchronizerId` to `TopologyStoreId` and variants thereof (`Option`, `Set`, ...).
+  With these implicit conversions, whenever a `TopologyStoreId` is expected, users can pass just the synchronizer id and it will be automatically converted
+  into the correct `TopologyStoreId.Synchronizer`.
+
+- Reduced the payload size of an ACS commitment from 2kB to 34 bytes.
+
+- **BREAKING CHANGE** Changed the endpoint `PackageService.UploadDar` to accept a list of dars that can be uploaded and vetted together.
+  The same change is also represented in the `ParticipantAdminCommands.Package.UploadDar`.
+
+## Until 2025-02-12 (Exclusive)
+- Added the concept of temporary topology stores. A temporary topology store is not connected to any synchronizer store
+  and therefore does not automatically submit transactions to synchronizers. Temporary topology stores can be used
+  for the synchronizer bootstrapping ceremony to not "pollute" the synchronizer owners' authorized stores. Another use
+  case is to upload a topology snapshot and inspect the snapshot via the usual topology read service endpoints.
+  - Temporary topology stores can be managed via the services `TopologyManagerWriteService.CreateTemporaryTopologyStore` and `TopologyManagerWriteService.DropTemporaryTopologyStore`.
+  - **BREAKING CHANGE**: The `string store` parameters in the `TopologyManagerWriteService` have been changed to `StoreId store`.
+
+## Until 2025-01-29 (Exclusive)
+- Added a buffer for serving events that is limited by an upper bound for memory consumption:
+    ```hocon
+        canton.sequencers.<sequencer>.sequencer.block.writer {
+          type = high-throughput // NB: this is required for the writer config to be parsed properly
+
+          // maximum memory the buffered events will occupy
+          buffered-events-max-memory = 2MiB // Default value
+          // batch size for warming up the events buffer at the start of the sequencer until the buffer is full
+          buffered-events-preload-batch-size = 50 // Default value
+        }
+    ```
+  - The previous setting `canton.sequencers.<sequencer>.sequencer.block.writer.max-buffered-events-size` has been removed and has no effect anymore
+- The sequencer's payload cache configuration changed slightly to disambiguate the memory-limit config from a number-of-elements config:
+    ```hocon
+    canton.sequencers.<sequencer>.parameters.caching {
+      sequencer-payload-cache {
+        expire-after-access = "1 minute" // Default value
+        maximum-memory = 200MiB // Default value
+      }
+    }
+    ```
+  - The previous setting `canton.sequencers.<sequencer>.parameters.caching.sequencer-payload-cache.maximum-size` has been removed and has no effect anymore.
+
+## Until 2025-01-22 (Exclusive)
+- Changed the console User.isActive to isDeactivated to align with the Ledger API
+- Added new prototype for declarative api
+- Added metric `daml.mediator.approved-requests.total` to count the number of approved confirmation requests
+- Topology related error codes have been renamed to contain the prefix `TOPOLOGY_`:
+  - Simple additions of prefix
+    - `SECRET_KEY_NOT_IN_STORE` -> `TOPOLOGY_SECRET_KEY_NOT_IN_STORE`
+    - `SERIAL_MISMATCH` -> `TOPOLOGY_SERIAL_MISMATCH`
+    - `INVALID_SYNCHRONIZER` -> `TOPOLOGY_INVALID_SYNCHRONIZER`
+    - `NO_APPROPRIATE_SIGNING_KEY_IN_STORE` -> `TOPOLOGY_NO_APPROPRIATE_SIGNING_KEY_IN_STORE`
+    - `NO_CORRESPONDING_ACTIVE_TX_TO_REVOKE` -> `TOPOLOGY_NO_CORRESPONDING_ACTIVE_TX_TO_REVOKE`
+    - `REMOVING_LAST_KEY_MUST_BE_FORCED` -> `TOPOLOGY_REMOVING_LAST_KEY_MUST_BE_FORCED`
+    - `DANGEROUS_COMMAND_REQUIRES_FORCE_ALIEN_MEMBER` -> `TOPOLOGY_DANGEROUS_COMMAND_REQUIRES_FORCE_ALIEN_MEMBER`
+    - `REMOVING_KEY_DANGLING_TRANSACTIONS_MUST_BE_FORCED` -> `TOPOLOGY_REMOVING_KEY_DANGLING_TRANSACTIONS_MUST_BE_FORCED`
+    - `INCREASE_OF_SUBMISSION_TIME_TOLERANCE` -> `TOPOLOGY_INCREASE_OF_SUBMISSION_TIME_TOLERANCE`
+    - `INSUFFICIENT_KEYS` -> `TOPOLOGY_INSUFFICIENT_KEYS`
+    - `UNKNOWN_MEMBERS` -> `TOPOLOGY_UNKNOWN_MEMBERS`
+    - `UNKNOWN_PARTIES` -> `TOPOLOGY_UNKNOWN_PARTIES`
+    - `ILLEGAL_REMOVAL_OF_SYNCHRONIZER_TRUST_CERTIFICATE` -> `TOPOLOGY_ILLEGAL_REMOVAL_OF_SYNCHRONIZER_TRUST_CERTIFICATE`
+    - `PARTICIPANT_ONBOARDING_REFUSED` -> `TOPOLOGY_PARTICIPANT_ONBOARDING_REFUSED`
+    - `MEDIATORS_ALREADY_IN_OTHER_GROUPS` -> `TOPOLOGY_MEDIATORS_ALREADY_IN_OTHER_GROUPS`
+    - `MEMBER_CANNOT_REJOIN_SYNCHRONIZER` -> `TOPOLOGY_MEMBER_CANNOT_REJOIN_SYNCHRONIZER`
+    - `NAMESPACE_ALREADY_IN_USE` -> `TOPOLOGY_NAMESPACE_ALREADY_IN_USE`
+    - `DANGEROUS_VETTING_COMMAND_REQUIRES_FORCE_FLAG` -> `TOPOLOGY_DANGEROUS_VETTING_COMMAND_REQUIRES_FORCE_FLAG`
+    - `DEPENDENCIES_NOT_VETTED` -> `TOPOLOGY_DEPENDENCIES_NOT_VETTED`
+    - `CANNOT_VET_DUE_TO_MISSING_PACKAGES` -> `TOPOLOGY_CANNOT_VET_DUE_TO_MISSING_PACKAGES`
+  - Additional minor renaming
+    - `INVALID_TOPOLOGY_TX_SIGNATURE_ERROR` -> `TOPOLOGY_INVALID_TOPOLOGY_TX_SIGNATURE`
+    - `DUPLICATE_TOPOLOGY_TRANSACTION` -> `TOPOLOGY_DUPLICATE_TRANSACTION`
+    - `UNAUTHORIZED_TOPOLOGY_TRANSACTION` -> `TOPOLOGY_UNAUTHORIZED_TRANSACTION`
+    - `INVALID_TOPOLOGY_MAPPING` -> `TOPOLOGY_INVALID_MAPPING`
+    - `INCONSISTENT_TOPOLOGY_SNAPSHOT` -> `TOPOLOGY_INCONSISTENT_SNAPSHOT`
+    - `MISSING_TOPOLOGY_MAPPING` -> `TOPOLOGY_MISSING_MAPPING`
+- Added the last_descendant_node_id field in the exercised event of the ledger api. This field specifies the upper
+  boundary of the node ids of the events in the same transaction that appeared as a result of the exercised event.
+- Removed the child_node_ids and the root_node_ids fields from the exercised event of the ledger api. After this change
+  it will be possible to check that an event is child of another or a root event through the descendant relationship
+  using the last_descendant_node_id field.
+
+## Until 2025-01-15 (Exclusive)
+
+- Renamed request/response protobuf messages of the inspection, pruning, resource management services from `Endpoint.Request` to `EndpointRequest` and respectively for the response types.
+- Renamed the node_index field of events in the index db to node_id.
+- Changes to defaults in ResourceLimits:
+  - The fields `max_inflight_validation_requests` and `max_submission_rate` are now declared as `optional uint32`,
+    which also means that absent values are not encoded anymore as negative values, but as absent values.
+    Negative values will result in a parsing error and a rejected request.
+- Moved the `canton.monitoring.log-query-cost` option to `canton.monitoring.logging.query-cost`
+- Changed the `signedBy` parameter of the console command `topology.party_to_participant_mapping.propose` from `Optional`
+  to `Seq`.
+
+## Until 2025-01-10 (Exclusive)
+
+### Initial Topology Snapshot Validation
+The initial topology snapshot, both for initializing a new domain and for onboarding a new member,
+is now validated by the node importing the snapshot.
+
+In case the snapshot might contain legacy OTK topology transactions with missing signatures for newly added signing keys,
+the nodes may permit such transactions by overriding the following setting:
+
+```
+canton.sequencers.mySequencer.topology.insecure-ignore-missing-extra-key-signatures-in-initial-snapshot = true
+
+canton.participants.myParticipant.topology.insecure-ignore-missing-extra-key-signatures-in-initial-snapshot = true
+
+canton.mediators.myMediator.topology.insecure-ignore-missing-extra-key-signatures-in-initial-snapshot = true
+```
+
+## Until 2025-01-04 (Exclusive)
+- The event_id field has been removed from the Event messages of the lapi since now the event id consists of the offset
+  and the node id which are already present in the events.
+- The events_by_id field in the TransactionTree message has been converted from a map<string, TreeEvent> to a
+  map<int32, TreeEvent> with values the node ids of the events.
+- Accordingly, the root_event_ids has been renamed to root_node_ids to hold the node ids of the root events.
+
+## Until 2025-01-03 (Exclusive)
+
+- We introduced contract key prefetching / bulk loading to improve workloads that fetch many contract keys.
+- Domain renaming
+    - domain id -> synchronizer id
+    - domain alias -> synchronizer alias
+    - domain projects (e.g., community-domain) -> synchronizer projects
+
+## Until 2024-12-20 (Exclusive)
+- The GetTransactionByEventId and the GetTransactionTreeByEventId endpoints of the lapi update service have been
+  replaced by the GetTransactionByOffset and the GetTransactionTreeByOffset respectively.
+    - As a consequence, the GetTransactionByEventIdRequest has been replaced by the GetTransactionByOffsetRequest message.
+    - The GetTransactionByOffsetRequest contains the offset of the transaction or the transaction tree to be fetched and
+      the requesting parties.
+    - The json endpoints have been adapted accordingly
+
+## Until 2024-12-17 (Exclusive)
+
+### Refactored domain connectivity service
+Refactored domain connectivity service to have endpoints with limited responsibilities:
+
+- Add: ReconnectDomain to be able to reconnect to a registered domain
+- Add: DisconnectAllDomains to disconnect from all connected domains
+- Change: RegisterDomain does not allow to fully connect to a domain anymore (only registration and potentially handshake): if you want to connect to a domain, use the other endpoint
+- Change: ConnectDomain takes a domain config so that it can be used to connect to a domain for the first time
+- Rename: ListConfiguredDomains to ListRegisteredDomains for consistency (and in general: configure(d) -> register(ed))
+
+### Memory check during node startup
+A memory check has been introduced when starting the node. This check compares the memory allocated to the container with the -Xmx JVM option.
+The goal is to ensure that the container has sufficient memory to run the application.
+To configure the memory check behavior, add one of the following to your configuration:
+
+```
+canton.parameters.startup-memory-check-config.reporting-level = warn  // Default behavior: Logs a warning.
+canton.parameters.startup-memory-check-config.reporting-level = crash // Terminates the node if the check fails.
+canton.parameters.startup-memory-check-config.reporting-level = ignore // Skips the memory check entirely.
+```
+
+## Until 2024-12-03 (Exclusive)
+
+- Removed parameters `sequencer.writer.event-write-batch-max-duration` and `sequencer.writer.payload-write-batch-max-duration` as these are not used anymore.
+- Introduced parameter `sequencer.writer.event-write-max-concurrency` (default: 2) to configure the maximum number of events batches that can be written at a time.
+- [Breaking Change]: `TopologyManagerReadService.ExportTopologySnapshot` and `TopologyManagerWriteService.ImportTopologySnapshot` are now streaming services for exporting and importing a topology snapshot respectively.
+
+## Until 2024-12-02 (Exclusive)
+
+### Integer event ids in ledger api
+- Added offset (int64) and node-id (int32) fields in all the event types in the ledger api.
+  The following messages have the additional fields:
+  - CreatedEvent
+  - ArchivedEvent
+  - ExercisedEvent
+- Accordingly the java bindings and json schema were augmented to include the new fields.
+
+## Until 2024-11-28 (Exclusive)
+- Deduplication Offset extension to accept participant begin
+
+  Before, only absolute offsets were allowed to define the deduplication periods by offset. After the change
+  participant-begin offsets are also supported for defining deduplication periods. The participant-begin deduplication
+  period (defined as zero value in API) is only valid to be used if the participant was not pruned yet. Otherwise, as in
+  the other cases where the deduplication offset is earlier than the last pruned offset, an error informing that
+  deduplication period starts too early will be returned.
+
+## Until 2024-11-27 (Exclusive)
+- Index DB schema changed in a non-backwards compatible fashion.
+
+  The offset-related fields (e.g. ledger_offset, ledger_end) that were previously stored as `VARCHAR(4000)` for H2 and
+    `text` for Postgres are now stored as `BIGINT` (for both db types).
+  - If the offset column can take the value of the participant begin then the column should be null-able and null should
+    be stored as the offset value (i.e. no zero values are used to represent the participant begin).
+  - Only exception to
+    it is the deduplication_offset of the lapi_command_completions which will take the zero value when the participant
+    begin must be stored as deduplication offset, since null is used to signify the absence of this field.
+- Changed DeduplicationPeriod's offset field type to `int64` in participant_transaction.proto in a non-backwards
+  compatible fashion.
+
+  The type of the offset field changed from `bytes` to `int64` to be compatible with the newly introduced intefer offset type.
+
+## Until 2024-11-16 (Exclusive)
+
+- [Breaking Change] renamed configuration parameter `session-key-cache-config` to `session-encryption-key-cache`.
+- `sequencer_authentication_service` RPCs return failures as gRPC errors instead of a dedicated failure message with status OK.
+
+## Until 2024-11-13 (Exclusive)
+- display_name is no longer a part of Party data, so is removed from party allocation and update requests in the ledger api and daml script
+- `PartyNameManagement` service was removed from the ledger api
+
 ## Until 2024-11-09 (Exclusive)
+
+- When a Grpc channel is open or closed on the Ledger API, a message is logged at a debug level:
+```
+[..] DEBUG c.d.c.p.a.GrpcConnectionLogger:participant=participant - Grpc connection open: {io.grpc.Grpc.TRANSPORT_ATTR_LOCAL_ADDR=/127.0.0.1:5001, io.grpc.internal.GrpcAttributes.securityLevel=NONE, io.grpc.Grpc.TRANSPORT_ATTR_REMOTE_ADDR=/127.0.0.1:49944}
+[..] DEBUG c.d.c.p.a.GrpcConnectionLogger:participant=participant - Grpc connection closed: {io.grpc.Grpc.TRANSPORT_ATTR_LOCAL_ADDR=/127.0.0.1:5001, io.grpc.internal.GrpcAttributes.securityLevel=NONE, io.grpc.Grpc.TRANSPORT_ATTR_REMOTE_ADDR=/127.0.0.1:49944}
+```
+- The keep alive behavior of the Ledger API can be configured through
+```
+canton.participants.participant.ledger-api.keep-alive-server.*
+```
+- The default values of the keep alive configuration for the ledger api has been set to
+```
+time: 10m
+timeout: 20s
+permitKeepAliveTime: 10s
+permitKeepAliveWithoutCalls: false
+```
+- The effective settings are reported by the Participant Node at the initialization time with a logline:
+```
+2024-10-31 18:09:34,258 [canton-env-ec-35] INFO  c.d.c.p.a.LedgerApiService:participant=participant - Listening on localhost:5001 over plain text with LedgerApiKeepAliveServerConfig(10m,20s,10s,true).
+```
+- New parameter value for `permitKeepAliveWithoutCalls` has been introduced to all keep alive configurations.
+When set, it allows the clients to send keep alive signals outside any ongoing grpc call.
+- Identical implementations `EnterpriseCantonStatus` and `CommunityCantonStatus` have been merged into a single class `CantonStatus`.
+
+- A participant will now crash in exceptional cases during transaction validation instead of remaining in a failed state
 
 ## Until 2024-10-31 (Exclusive)
 
@@ -460,7 +1143,6 @@ Likely to happen in any replicated participant setup with frequent vetting attem
 ##### Recommendation
 
 Users are advised to upgrade to the next minor release (3.2) during their maintenance window.
-
 
 
 #### (24-015, Minor): Pointwise flat transaction Ledger API queries can unexpectedly return TRANSACTION_NOT_FOUND

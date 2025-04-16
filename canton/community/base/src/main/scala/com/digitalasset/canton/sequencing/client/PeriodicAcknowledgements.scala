@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -22,15 +22,17 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.DurationConverters.*
 
-/** Periodically pull the latest clean timestamp and if it has changed acknowledge it with the sequencer.
-  * This indicates that we have successfully processed all events up to and including this event.
-  * We always acknowledge the current clean timestamp on startup if available to indicate to the sequencer that we are
-  * running. The periodic interval is based on the host clock not in sequencer time, however any drift is likely
-  * insignificant for the purpose of the sequencer acknowledgements (pruning hourly/daily).
-  * Errors are logged at error level - periodic failures are likely not problematic however continuous errors
-  * could eventually be problematic for the sequencer operator.
+/** Periodically pull the latest clean timestamp and if it has changed acknowledge it with the
+  * sequencer. This indicates that we have successfully processed all events up to and including
+  * this event. We always acknowledge the current clean timestamp on startup if available to
+  * indicate to the sequencer that we are running. The periodic interval is based on the host clock
+  * not in sequencer time, however any drift is likely insignificant for the purpose of the
+  * sequencer acknowledgements (pruning hourly/daily). Errors are logged at error level - periodic
+  * failures are likely not problematic however continuous errors could eventually be problematic
+  * for the sequencer operator.
   *
-  * @param isHealthy Ack is sent iff the value is true
+  * @param isHealthy
+  *   Ack is sent iff the value is true
   */
 class PeriodicAcknowledgements(
     isHealthy: => Boolean,
@@ -44,26 +46,15 @@ class PeriodicAcknowledgements(
     extends NamedLogging
     with FlagCloseable
     with HasFlushFuture {
+
   private val priorAckRef = new AtomicReference[Option[CantonTimestamp]](None)
 
-  private def update()(implicit traceContext: TraceContext): Unit = {
-    def ackIfChanged(
-        timestamp: CantonTimestamp
-    ): EitherT[FutureUnlessShutdown, String, Boolean] = {
-      val priorAck = priorAckRef.getAndSet(Some(timestamp))
-      val changed = !priorAck.contains(timestamp)
-      if (changed) {
-        logger.debug(s"Acknowledging clean timestamp: $timestamp")
-        acknowledge(Traced(timestamp))
-      } else EitherT.rightT(true)
-    }
-
+  private def update()(implicit traceContext: TraceContext): Unit =
     if (isHealthy) {
       val updateET: EitherT[Future, String, Boolean] =
         performUnlessClosingEitherUSF(functionFullName) {
           for {
-            latestClean <- EitherT
-              .right(fetchLatestCleanTimestamp(traceContext))
+            latestClean <- EitherT.right(fetchLatestCleanTimestamp(traceContext))
             result <- latestClean.fold(EitherT.rightT[FutureUnlessShutdown, String](true))(
               ackIfChanged
             )
@@ -87,14 +78,32 @@ class PeriodicAcknowledgements(
     } else {
       logger.debug("Skipping periodic acknowledgement because sequencer client is not healthy")
     }
+
+  private def ackIfChanged(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Boolean] = {
+    val priorAck = priorAckRef.getAndSet(Some(timestamp))
+    val changed = !priorAck.contains(timestamp)
+    if (changed) {
+      logger.debug(s"Acknowledging clean timestamp: $timestamp")
+      acknowledge(Traced(timestamp))
+    } else EitherT.rightT(true)
   }
 
   private def scheduleNextUpdate(): Unit =
     withNewTraceContext { implicit traceContext =>
       performUnlessClosing(functionFullName)(
         clock
-          .scheduleAfter(_ => update(), interval.toJava)
-          .map(_ => scheduleNextUpdate())
+          .scheduleAfter(
+            { _ =>
+              // Schedule the next update as soon as possible after the interval has passed;
+              //  for static time tests, this runs synchronously when the time is advanced
+              //  and therefore avoids race conditions.
+              scheduleNextUpdate() // Async-trampolined
+              update()
+            },
+            interval.toJava,
+          )
           .discard[FutureUnlessShutdown[Unit]]
       )
     }.discard[UnlessShutdown[Unit]]
@@ -144,9 +153,7 @@ object PeriodicAcknowledgements {
   )(implicit executionContext: ExecutionContext): FetchCleanTimestamp =
     traceContext =>
       for {
-        cursorO <- FutureUnlessShutdown.outcomeF(
-          counterTrackerStore.preheadSequencerCounter(traceContext)
-        )
+        cursorO <- counterTrackerStore.preheadSequencerCounter(traceContext)
         timestampO = cursorO.map(_.timestamp)
       } yield timestampO
 }

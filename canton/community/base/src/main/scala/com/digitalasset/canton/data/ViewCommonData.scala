@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -21,14 +21,6 @@ import com.google.protobuf.ByteString
 
 /** Information concerning every '''member''' involved in processing the underlying view.
   */
-// This class is a reference example of serialization best practices, demonstrating:
-// - memoized serialization, which is required if we need to compute a signature or cryptographic hash of a class
-// - use of an UntypedVersionedMessage wrapper when serializing to an anonymous binary format
-// Please consult the team if you intend to change the design of serialization.
-//
-// The constructor and `fromProto...` methods are private to ensure that clients cannot create instances with an incorrect `deserializedFrom` field.
-//
-// Optional parameters are strongly discouraged, as each parameter needs to be consciously set in a production context.
 final case class ViewCommonData private (
     viewConfirmationParameters: ViewConfirmationParameters,
     salt: Salt,
@@ -92,16 +84,16 @@ final case class ViewCommonData private (
 }
 
 object ViewCommonData
-    extends HasMemoizedProtocolVersionedWithContextCompanion[
+    extends VersioningCompanionContextMemoization[
       ViewCommonData,
       HashOps,
     ] {
   override val name: String = "ViewCommonData"
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ViewCommonData)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ViewCommonData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
@@ -159,11 +151,12 @@ object ViewCommonData
 
 /** Stores the necessary information necessary to confirm a view.
   *
-  * @param informees list of all members ids that must be informed of this view.
-  * @param quorums multiple lists of confirmers => threshold (i.e., a quorum) that needs
-  *               to be met for the view to be approved. We make sure that the parties listed
-  *               in the quorums are informees of the view during
-  *               deserialization.
+  * @param informees
+  *   list of all members ids that must be informed of this view.
+  * @param quorums
+  *   multiple lists of confirmers => threshold (i.e., a quorum) that needs to be met for the view
+  *   to be approved. We make sure that the parties listed in the quorums are informees of the view
+  *   during deserialization.
   */
 final case class ViewConfirmationParameters private (
     informees: Set[LfPartyId],
@@ -185,14 +178,16 @@ object ViewConfirmationParameters {
   final case class InvalidViewConfirmationParameters(message: String)
       extends RuntimeException(message)
 
-  /** Creates a [[ViewConfirmationParameters]] with a single quorum consisting of all confirming parties and a given threshold.
+  /** Creates a [[ViewConfirmationParameters]] with a single quorum consisting of all confirming
+    * parties and a given threshold.
     *
-    * Informees are parties involved in the view and can have a weight indicating their confirmation role:
-    * - Non-confirming informees have a weight of 0.
-    * - Confirming informees have a positive weight (with a recommended value of 1).
+    * Informees are parties involved in the view and can have a weight indicating their confirmation
+    * role:
+    *   - Non-confirming informees have a weight of 0.
+    *   - Confirming informees have a positive weight (with a recommended value of 1).
     *
-    * The `threshold` parameter determines the minimum number of confirmers required to approve the view.
-    * Currently, only thresholds equal to the total weight of all confirmers are supported
+    * The `threshold` parameter determines the minimum number of confirmers required to approve the
+    * view. Currently, only thresholds equal to the total weight of all confirmers are supported
     * (i.e., threshold == sum of weights of all confirming informees).
     */
   def create(
@@ -211,28 +206,8 @@ object ViewConfirmationParameters {
       ),
     )
 
-  /** Creates a [[ViewConfirmationParameters]] where all informees are confirmers and
-    * includes a single quorum consisting of all confirming parties and a given threshold.
-    *
-    * Confirmers must have a positive weight (with a recommended value of 1). Currently,
-    * only thresholds equal to the sum of all confirmers' weights are supported.
-    */
-  def createOnlyWithConfirmers(
-      confirmers: Map[LfPartyId, PositiveInt],
-      viewThreshold: NonNegativeInt,
-  ): ViewConfirmationParameters =
-    ViewConfirmationParameters(
-      confirmers.keySet,
-      Seq(
-        Quorum(
-          confirmers,
-          viewThreshold,
-        )
-      ),
-    )
-
-  /** There can be multiple quorums/threshold. Therefore, we need to make sure those quorums confirmers
-    * are present in the list of informees.
+  /** There can be multiple quorums/threshold. Therefore, we need to make sure those quorums
+    * confirmers are present in the list of informees.
     */
   def create(
       informees: Set[LfPartyId],

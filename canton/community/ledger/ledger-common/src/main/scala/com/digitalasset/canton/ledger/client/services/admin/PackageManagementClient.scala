@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.client.services.admin
@@ -40,7 +40,12 @@ final class PackageManagementClient(service: PackageManagementServiceStub)(impli
   )(implicit traceContext: TraceContext): Future[Unit] =
     LedgerClient
       .stubWithTracing(service, token)
-      .uploadDarFile(UploadDarFileRequest(darFile))
+      .uploadDarFile(
+        UploadDarFileRequest(
+          darFile = darFile,
+          submissionId = "",
+        )
+      )
       .map(_ => ())
 
   def validateDarFile(
@@ -49,6 +54,11 @@ final class PackageManagementClient(service: PackageManagementServiceStub)(impli
   )(implicit traceContext: TraceContext): Future[Unit] =
     LedgerClient
       .stubWithTracing(service, token)
-      .validateDarFile(ValidateDarFileRequest(darFile))
+      .validateDarFile(
+        ValidateDarFileRequest(
+          darFile = darFile,
+          submissionId = "",
+        )
+      )
       .map(_ => ())
 }

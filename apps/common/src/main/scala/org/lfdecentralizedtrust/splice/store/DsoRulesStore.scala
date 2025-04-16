@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, MediatorId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -189,7 +189,7 @@ object DsoRulesStore {
         .toSeq
     }
 
-    def activeSvParticipantAndMediatorIds(synchronizerId: DomainId): Seq[Member] = {
+    def activeSvParticipantAndMediatorIds(synchronizerId: SynchronizerId): Seq[Member] = {
       val svParticipants = dsoRules.contract.payload.svs
         .values()
         .asScala
@@ -238,7 +238,7 @@ object DsoRulesStore {
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(
-        param("domainId", _.dsoRules.domain),
+        param("synchronizerId", _.dsoRules.domain),
         param("dsoRulesCid", _.dsoRules.contractId),
         param("svParty", _.svParty),
         param("svNodeState", _.svNodeState),
@@ -257,7 +257,7 @@ object DsoRulesStore {
       } yield checkDsoRules.isEmpty || checkSvNodeState.isEmpty
 
     def lookupSequencerConfigFor(
-        decentralizedSynchronizerId: DomainId,
+        decentralizedSynchronizerId: SynchronizerId,
         domainTimeLowerBound: Instant,
         migrationId: Long,
     ): Option[splice.dso.decentralizedsynchronizer.SequencerConfig] = {

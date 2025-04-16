@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.automation
 
 import cats.data.OptionT
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -48,7 +48,7 @@ final class AmuletConfigReassignmentTrigger(
       amuletRules <- OptionT(lookupAmuletRules(tc))
       config = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
       activeSynchronizer <- OptionT.fromOption[Future](
-        DomainId.fromString(config.decentralizedSynchronizer.activeSynchronizer).toOption
+        SynchronizerId.fromString(config.decentralizedSynchronizer.activeSynchronizer).toOption
       )
       contracts <- OptionT.liftF(
         store.multiDomainAcsStore.listAssignedContractsNotOnDomainN(activeSynchronizer, templates)
@@ -81,7 +81,7 @@ final class AmuletConfigReassignmentTrigger(
         val config =
           AmuletConfigSchedule(amuletRules).getConfigAsOf(task.readyAt)
         val activeSynchronizer =
-          DomainId.tryFromString(config.decentralizedSynchronizer.activeSynchronizer)
+          SynchronizerId.tryFromString(config.decentralizedSynchronizer.activeSynchronizer)
         task.work.source != activeSynchronizer ||
         ContractState.Assigned(task.work.source) != contractState
       }

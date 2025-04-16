@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
@@ -44,6 +44,7 @@ final class Rewrite {
   * If testing is set to true, we will include the rewrite rules that are marked as testing only.
   *
   * Usage:
+  * {{{
   * <appender name="REWRITE_LOG_LEVEL" class="com.digitalasset.canton.logging.RewritingAppender">
   *   <testing>true</testing>
   *   <appender-ref ref="CANTON_TEST_LOG" />
@@ -59,6 +60,11 @@ final class Rewrite {
   *     <testing>true</testing>
   *   </rewrite>
   * </appender>
+  * }}}
+  *
+  * Note that the logger name can be specific, including test names and other context info separated
+  * using colons or slashes, but can also just be the base logger name which then applies to all
+  * tests.
   */
 class RewritingAppender()
     extends AppenderBase[ILoggingEvent]

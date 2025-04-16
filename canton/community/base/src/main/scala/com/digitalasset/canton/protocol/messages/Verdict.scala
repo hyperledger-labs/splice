@@ -1,12 +1,12 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
 import cats.syntax.traverse.*
-import com.daml.error.ContextualizedErrorLogger
-import com.daml.error.utils.DecodedCantonError
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.utils.DecodedCantonError
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.ProtoDeserializationError.{InvariantViolation, OtherError}
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -15,13 +15,13 @@ import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.*
-import com.digitalasset.canton.{LfPartyId, protocol}
 import com.google.protobuf.empty
 import pprint.Tree
 
 trait TransactionRejection {
-  def logWithContext(extra: Map[String, String] = Map())(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+
+  def logRejection(extra: Map[String, String] = Map())(implicit
+      errorLoggingContext: ErrorLoggingContext
   ): Unit
 
   def reason(): com.google.rpc.status.Status
@@ -45,16 +45,15 @@ sealed trait Verdict
 }
 
 object Verdict
-    extends HasProtocolVersionedCompanion[Verdict]
+    extends VersioningCompanion[Verdict]
     with ProtocolVersionedCompanionDbHelpers[Verdict] {
 
-  val supportedProtoVersions: protocol.messages.Verdict.SupportedProtoVersions =
-    SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.Verdict)(
-        supportedProtoVersion(_)(fromProtoV30),
-        _.toProtoV30.toByteString,
-      )
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.Verdict)(
+      supportedProtoVersion(_)(fromProtoV30),
+      _.toProtoV30,
     )
+  )
 
   final case class Approve()(
       override val representativeProtocolVersion: RepresentativeProtocolVersion[Verdict.type]
@@ -96,17 +95,18 @@ object Verdict
       param("isMalformed", _.isMalformed),
     )
 
-    override def logWithContext(
+    override def logRejection(
         extra: Map[String, String]
-    )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Unit =
+    )(implicit errorLoggingContext: ErrorLoggingContext): Unit =
       // Log with level INFO, leave it to MediatorError to log the details.
-      contextualizedErrorLogger.withContext(extra) {
+      errorLoggingContext.withContext(extra) {
         lazy val action = if (isMalformed) "malformed" else "rejected"
-        contextualizedErrorLogger.info(show"Request is finalized as $action. $reason")
+        errorLoggingContext.info(show"Request is finalized as $action. $reason")
       }
 
     override def isTimeoutDeterminedByMediator: Boolean =
       DecodedCantonError.fromGrpcStatus(reason).exists(_.code.id == MediatorError.Timeout.id)
+
   }
 
   object MediatorReject {
@@ -129,8 +129,10 @@ object Verdict
     }
   }
 
-  /** @param reasons Mapping from the parties of a [[com.digitalasset.canton.protocol.messages.ConfirmationResponse]]
-    *                to the rejection reason from the [[com.digitalasset.canton.protocol.messages.ConfirmationResponse]]
+  /** @param reasons
+    *   Mapping from the parties of a
+    *   [[com.digitalasset.canton.protocol.messages.ConfirmationResponse]] to the rejection reason
+    *   from the [[com.digitalasset.canton.protocol.messages.ConfirmationResponse]]
     */
   final case class ParticipantReject(
       reasons: NonEmpty[List[(Set[LfPartyId], LocalReject)]]
@@ -157,11 +159,12 @@ object Verdict
       )
     }
 
-    /** Returns the rejection reason with the highest [[com.daml.error.ErrorCategory]] */
+    /** Returns the rejection reason with the highest [[com.digitalasset.base.error.ErrorCategory]]
+      */
     def keyEvent(implicit loggingContext: ErrorLoggingContext): LocalReject = {
       if (reasons.lengthCompare(1) > 0) {
         val message = show"Request was rejected with multiple reasons. $reasons"
-        loggingContext.logger.info(message)(loggingContext.traceContext)
+        loggingContext.info(message)
       }
       reasons.map { case (_, localReject) => localReject }.head1
     }

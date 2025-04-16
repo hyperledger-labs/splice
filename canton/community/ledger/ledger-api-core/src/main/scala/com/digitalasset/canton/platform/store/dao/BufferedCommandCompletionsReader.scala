@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -11,8 +11,7 @@ import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer
 import com.digitalasset.canton.platform.store.dao.BufferedCommandCompletionsReader.CompletionsFilter
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReader.FetchFromPersistence
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
-import com.digitalasset.canton.platform.{ApplicationId, Party}
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.platform.{Party, UserId}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -23,36 +22,38 @@ class BufferedCommandCompletionsReader(
 ) extends LedgerDaoCommandCompletionsReader {
 
   override def getCommandCompletions(
-      startExclusive: Offset,
+      startInclusive: Offset,
       endInclusive: Offset,
-      applicationId: ApplicationId,
+      userId: UserId,
       parties: Set[Party],
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, CompletionStreamResponse), NotUsed] =
-    bufferReader.stream(
-      startExclusive = startExclusive,
-      endInclusive = endInclusive,
-      persistenceFetchArgs = applicationId -> parties,
-      bufferFilter = filterCompletions(_, parties, applicationId),
-      toApiResponse = (response: CompletionStreamResponse) => Future.successful(response),
-    )
+    bufferReader
+      .stream(
+        startInclusive = startInclusive,
+        endInclusive = endInclusive,
+        persistenceFetchArgs = userId -> parties,
+        bufferFilter = filterCompletions(_, parties, userId),
+        toApiResponse = (response: CompletionStreamResponse) => Future.successful(response),
+      )
 
   private def filterCompletions(
-      transactionLogUpdate: Traced[TransactionLogUpdate],
+      transactionLogUpdate: TransactionLogUpdate,
       parties: Set[Party],
-      applicationId: String,
-  ): Option[CompletionStreamResponse] = (transactionLogUpdate.value match {
+      userId: String,
+  ): Option[CompletionStreamResponse] = (transactionLogUpdate match {
     case accepted: TransactionLogUpdate.TransactionAccepted => accepted.completionStreamResponse
     case rejected: TransactionLogUpdate.TransactionRejected =>
       Some(rejected.completionStreamResponse)
     case u: TransactionLogUpdate.ReassignmentAccepted => u.completionStreamResponse
-  }).flatMap(toApiCompletion(_, parties, applicationId))
+    case _: TransactionLogUpdate.TopologyTransactionEffective => None
+  }).flatMap(toApiCompletion(_, parties, userId))
 
   private def toApiCompletion(
       completionStreamResponse: CompletionStreamResponse,
       parties: Set[Party],
-      applicationId: String,
+      userId: String,
   ): Option[CompletionStreamResponse] = {
     val completion = {
       val originalCompletion = completionStreamResponse.completionResponse.completion
@@ -61,7 +62,7 @@ class BufferedCommandCompletionsReader(
     }
 
     val visibilityPredicate =
-      completion.applicationId == applicationId &&
+      completion.userId == userId &&
         completion.actAs.nonEmpty
 
     Option.when(visibilityPredicate)(
@@ -72,7 +73,7 @@ class BufferedCommandCompletionsReader(
 
 object BufferedCommandCompletionsReader {
   private[dao] type Parties = Set[Party]
-  private[dao] type CompletionsFilter = (ApplicationId, Parties)
+  private[dao] type CompletionsFilter = (UserId, Parties)
 
   def apply(
       delegate: LedgerDaoCommandCompletionsReader,
@@ -82,14 +83,20 @@ object BufferedCommandCompletionsReader {
   )(implicit ec: ExecutionContext): BufferedCommandCompletionsReader = {
     val fetchCompletions = new FetchFromPersistence[CompletionsFilter, CompletionStreamResponse] {
       override def apply(
-          startExclusive: Offset,
+          startInclusive: Offset,
           endInclusive: Offset,
-          filter: (ApplicationId, Parties),
+          filter: (UserId, Parties),
       )(implicit
           loggingContext: LoggingContextWithTrace
       ): Source[(Offset, CompletionStreamResponse), NotUsed] = {
-        val (applicationId, parties) = filter
-        delegate.getCommandCompletions(startExclusive, endInclusive, applicationId, parties)
+        val (userId, parties) = filter
+        delegate
+          .getCommandCompletions(
+            startInclusive,
+            endInclusive,
+            userId,
+            parties,
+          )
       }
     }
 

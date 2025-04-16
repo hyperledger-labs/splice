@@ -1,11 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error.groups
 
-import com.daml.error.{
-  ContextualizedErrorLogger,
-  DamlError,
+import com.digitalasset.base.error.{
+  ContextualizedDamlError,
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
   ErrorCode,
@@ -14,6 +13,7 @@ import com.daml.error.{
   Resolution,
 }
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.AdminServicesErrorGroup.UserManagementServiceErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
 
@@ -28,8 +28,8 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
         ErrorCategory.InvalidIndependentOfSystemState,
       ) {
     final case class Reject(userId: String, reason: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = s"Update operation for user id '$userId' failed due to: $reason"
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
@@ -51,8 +51,8 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(userId: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = s"Maximum annotations size for user '$userId' has been exceeded"
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
@@ -76,8 +76,8 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
         ErrorCategory.ContentionOnSharedResources,
       ) {
     final case class Reject(userId: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause =
             s"Update operation for user '$userId' failed due to a concurrent update to the same user"
         ) {
@@ -97,7 +97,7 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
       ) {
     final case class Reject(operation: String, userId: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed for unknown user \"$userId\""
         ) {
@@ -116,7 +116,7 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
       ) {
     final case class Reject(operation: String, userId: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed, as user \"$userId\" already exists"
         ) {
@@ -140,7 +140,7 @@ object UserManagementServiceErrors extends UserManagementServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(operation: String, userId: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed, as user \"$userId\" would have too many rights."
         ) {

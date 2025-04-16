@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interning
 
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.daml.lf.data.Ref
 import org.scalatest.Assertion
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -25,20 +25,17 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templateAbsent(testee, "22:t:a")
     templateAbsent(testee, "22:t:b")
     templateAbsent(testee, "22:same:name")
-    domainIdAbsent(testee, "x::domain1")
-    domainIdAbsent(testee, "x::domain2")
+    synchronizerIdAbsent(testee, "x::synchronizer1")
+    synchronizerIdAbsent(testee, "x::synchronizer2")
     packageNameAbsent(testee, "pkg-1")
     packageNameAbsent(testee, "pkg-2")
-    packageVersionAbsent(testee, "1.0.0")
-    packageVersionAbsent(testee, "2.0.0")
 
     testee.internize(
       new DomainStringIterators(
         parties = List("p1", "p2", "22:same:name").iterator,
         templateIds = List("22:t:a", "22:t:b", "22:same:name").iterator,
-        domainIds = List("x::domain1", "x::domain2").iterator,
+        synchronizerIds = List("x::synchronizer1", "x::synchronizer2").iterator,
         packageNames = List("pkg-1", "pkg-2").iterator,
-        packageVersions = List("1.0.0", "2.0.0").iterator,
       )
     ) shouldBe Vector(
       1 -> "p|p1",
@@ -47,12 +44,10 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
       4 -> "t|22:t:a",
       5 -> "t|22:t:b",
       6 -> "t|22:same:name",
-      7 -> "d|x::domain1",
-      8 -> "d|x::domain2",
+      7 -> "d|x::synchronizer1",
+      8 -> "d|x::synchronizer2",
       9 -> "n|pkg-1",
       10 -> "n|pkg-2",
-      11 -> "v|1.0.0",
-      12 -> "v|2.0.0",
     )
     partyPresent(testee, "p1", 1)
     partyPresent(testee, "p2", 2)
@@ -62,15 +57,12 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templatePresent(testee, "22:t:b", 5)
     templatePresent(testee, "22:same:name", 6)
     templateAbsent(testee, "22:unkno:wn")
-    domainIdPresent(testee, "x::domain1", 7)
-    domainIdPresent(testee, "x::domain2", 8)
-    domainIdAbsent(testee, "x::domainunknown")
+    synchronizerIdPresent(testee, "x::synchronizer1", 7)
+    synchronizerIdPresent(testee, "x::synchronizer2", 8)
+    synchronizerIdAbsent(testee, "x::synchronizerunknown")
     packageNamePresent(testee, "pkg-1", 9)
     packageNamePresent(testee, "pkg-2", 10)
     packageNameAbsent(testee, "pkg-unknown")
-    packageVersionPresent(testee, "1.0.0", 11)
-    packageVersionPresent(testee, "2.0.0", 12)
-    packageVersionAbsent(testee, "1.2.3")
   }
 
   it should "extend working view correctly" in {
@@ -81,29 +73,25 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templateAbsent(testee, "22:t:a")
     templateAbsent(testee, "22:t:b")
     templateAbsent(testee, "22:same:name")
-    domainIdAbsent(testee, "x::domain1")
-    domainIdAbsent(testee, "x::domain2")
+    synchronizerIdAbsent(testee, "x::synchronizer1")
+    synchronizerIdAbsent(testee, "x::synchronizer2")
     packageNameAbsent(testee, "pkg-1")
     packageNameAbsent(testee, "pkg-2")
-    packageVersionAbsent(testee, "1.0.0")
-    packageVersionAbsent(testee, "2.0.0")
     testee.internize(
       new DomainStringIterators(
         parties = List("p1", "p2", "22:same:name").iterator,
         templateIds = List("22:t:a").iterator,
-        domainIds = List("x::domain1", "x::domain2").iterator,
+        synchronizerIds = List("x::synchronizer1", "x::synchronizer2").iterator,
         packageNames = List("pkg-1").iterator,
-        packageVersions = List("1.0.0").iterator,
       )
     ) shouldBe Vector(
       1 -> "p|p1",
       2 -> "p|p2",
       3 -> "p|22:same:name",
       4 -> "t|22:t:a",
-      5 -> "d|x::domain1",
-      6 -> "d|x::domain2",
+      5 -> "d|x::synchronizer1",
+      6 -> "d|x::synchronizer2",
       7 -> "n|pkg-1",
-      8 -> "v|1.0.0",
     )
     partyPresent(testee, "p1", 1)
     partyPresent(testee, "p2", 2)
@@ -113,46 +101,40 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templateAbsent(testee, "22:t:b")
     templateAbsent(testee, "22:same:name")
     templateAbsent(testee, "22:unkno:wn")
-    domainIdPresent(testee, "x::domain1", 5)
-    domainIdPresent(testee, "x::domain2", 6)
-    domainIdAbsent(testee, "x::domainunknown")
+    synchronizerIdPresent(testee, "x::synchronizer1", 5)
+    synchronizerIdPresent(testee, "x::synchronizer2", 6)
+    synchronizerIdAbsent(testee, "x::synchronizerunknown")
     packageNamePresent(testee, "pkg-1", 7)
     packageNameAbsent(testee, "pkg-2")
     packageNameAbsent(testee, "pkg-unknown")
-    packageVersionPresent(testee, "1.0.0", 8)
-    packageVersionAbsent(testee, "2.0.0")
     testee.internize(
       new DomainStringIterators(
         parties = List("p1", "p2").iterator,
         templateIds = List("22:t:a", "22:t:b", "22:same:name").iterator,
-        domainIds = List("x::domain1", "x::domain3").iterator,
+        synchronizerIds = List("x::synchronizer1", "x::synchronizer3").iterator,
         packageNames = List("pkg-1", "pkg-2").iterator,
-        packageVersions = List("1.0.0", "2.0.0").iterator,
       )
     ) shouldBe Vector(
-      9 -> "t|22:t:b",
-      10 -> "t|22:same:name",
-      11 -> "d|x::domain3",
-      12 -> "n|pkg-2",
-      13 -> "v|2.0.0",
+      8 -> "t|22:t:b",
+      9 -> "t|22:same:name",
+      10 -> "d|x::synchronizer3",
+      11 -> "n|pkg-2",
     )
     partyPresent(testee, "p1", 1)
     partyPresent(testee, "p2", 2)
     partyPresent(testee, "22:same:name", 3)
     partyAbsent(testee, "unknown")
     templatePresent(testee, "22:t:a", 4)
-    templatePresent(testee, "22:t:b", 9)
-    templatePresent(testee, "22:same:name", 10)
+    templatePresent(testee, "22:t:b", 8)
+    templatePresent(testee, "22:same:name", 9)
     templateAbsent(testee, "22:unkno:wn")
-    domainIdPresent(testee, "x::domain1", 5)
-    domainIdPresent(testee, "x::domain2", 6)
-    domainIdPresent(testee, "x::domain3", 11)
-    domainIdAbsent(testee, "x::domainunknown")
+    synchronizerIdPresent(testee, "x::synchronizer1", 5)
+    synchronizerIdPresent(testee, "x::synchronizer2", 6)
+    synchronizerIdPresent(testee, "x::synchronizer3", 10)
+    synchronizerIdAbsent(testee, "x::synchronizerunknown")
     packageNamePresent(testee, "pkg-1", 7)
-    packageNamePresent(testee, "pkg-2", 12)
+    packageNamePresent(testee, "pkg-2", 11)
     packageNameAbsent(testee, "pkg-unknown")
-    packageVersionPresent(testee, "1.0.0", 8)
-    packageVersionPresent(testee, "2.0.0", 13)
   }
 
   it should "correctly load prefixing entries in the view on `update`" in {
@@ -164,7 +146,7 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templateAbsent(testee, "22:t:b")
     templateAbsent(testee, "22:same:name")
     testee
-      .update(6) { (from, to) =>
+      .update(Some(6)) { (from, to) =>
         from shouldBe 0
         to shouldBe 6
         Future.successful(
@@ -177,7 +159,6 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
             6 -> "t|22:same:name",
             7 -> "n|pkg-1",
             8 -> "n|pkg-2",
-            9 -> "v|1.0.0",
           )
         )
       }
@@ -193,8 +174,6 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
         packageNamePresent(testee, "pkg-1", 7)
         packageNamePresent(testee, "pkg-2", 8)
         packageNameAbsent(testee, "pkg-unknown")
-        packageVersionPresent(testee, "1.0.0", 9)
-        packageVersionAbsent(testee, "1.2.3")
       }
   }
 
@@ -207,14 +186,12 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templateAbsent(testee, "22:t:b")
     templateAbsent(testee, "22:same:name")
     packageNameAbsent(testee, "pkg-1")
-    packageVersionAbsent(testee, "1.0.0")
     testee.internize(
       new DomainStringIterators(
         parties = List("p1", "p2").iterator,
         templateIds = List().iterator,
-        domainIds = List("x::domain1").iterator,
+        synchronizerIds = List("x::synchronizer1").iterator,
         packageNames = List("pkg-1").iterator,
-        packageVersions = List("1.0.0").iterator,
       )
     )
     partyPresent(testee, "p1", 1)
@@ -225,11 +202,9 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templateAbsent(testee, "22:same:name")
     packageNamePresent(testee, "pkg-1", 4)
     packageNameAbsent(testee, "pkg-2")
-    packageVersionPresent(testee, "1.0.0", 5)
-    packageVersionAbsent(testee, "2.0.0")
     testee
-      .update(11) { (from, to) =>
-        from shouldBe 5
+      .update(Some(11)) { (from, to) =>
+        from shouldBe 4
         to shouldBe 11
         Future.successful(
           Vector(
@@ -238,7 +213,6 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
             8 -> "t|22:t:b",
             9 -> "t|22:same:name",
             10 -> "n|pkg-2",
-            11 -> "v|2.0.0",
           )
         )
       }
@@ -246,7 +220,6 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
         partyPresent(testee, "p1", 1)
         partyPresent(testee, "p2", 2)
         packageNamePresent(testee, "pkg-1", 4)
-        packageVersionPresent(testee, "1.0.0", 5)
         partyPresent(testee, "22:same:name", 6)
         partyAbsent(testee, "unknown")
         templatePresent(testee, "22:t:a", 7)
@@ -255,7 +228,6 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
         packageNamePresent(testee, "pkg-2", 10)
         packageNameAbsent(testee, "pkg-unknown")
         templateAbsent(testee, "22:unk:nown")
-        packageVersionPresent(testee, "2.0.0", 11)
       }
   }
 
@@ -265,9 +237,8 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
       new DomainStringIterators(
         parties = List("p1", "p2", "22:same:name").iterator,
         templateIds = List("22:t:a", "22:t:b", "22:same:name").iterator,
-        domainIds = List("x::domain1", "x::domain2").iterator,
+        synchronizerIds = List("x::synchronizer1", "x::synchronizer2").iterator,
         packageNames = List("pkg-1").iterator,
-        packageVersions = List("1.0.0").iterator,
       )
     ) shouldBe Vector(
       1 -> "p|p1",
@@ -276,10 +247,9 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
       4 -> "t|22:t:a",
       5 -> "t|22:t:b",
       6 -> "t|22:same:name",
-      7 -> "d|x::domain1",
-      8 -> "d|x::domain2",
+      7 -> "d|x::synchronizer1",
+      8 -> "d|x::synchronizer2",
       9 -> "n|pkg-1",
-      10 -> "v|1.0.0",
     )
     partyPresent(testee, "p1", 1)
     partyPresent(testee, "p2", 2)
@@ -289,14 +259,13 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
     templatePresent(testee, "22:t:b", 5)
     templatePresent(testee, "22:same:name", 6)
     templateAbsent(testee, "22:unkno:wn")
-    domainIdPresent(testee, "x::domain1", 7)
-    domainIdPresent(testee, "x::domain2", 8)
+    synchronizerIdPresent(testee, "x::synchronizer1", 7)
+    synchronizerIdPresent(testee, "x::synchronizer2", 8)
     packageNamePresent(testee, "pkg-1", 9)
-    packageVersionPresent(testee, "1.0.0", 10)
     packageNameAbsent(testee, "pkg-unknown")
 
     testee
-      .update(4)((_, _) =>
+      .update(Some(4))((_, _) =>
         fail("should not be called if lastStringInterningId is greater than lastId")
       )
       .map { _ =>
@@ -308,8 +277,8 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
         templateAbsent(testee, "22:t:b")
         templateAbsent(testee, "22:same:name")
         templateAbsent(testee, "22:unkno:wn")
-        domainIdAbsent(testee, "x::domain1")
-        domainIdAbsent(testee, "x::domain2")
+        synchronizerIdAbsent(testee, "x::synchronizer1")
+        synchronizerIdAbsent(testee, "x::synchronizer2")
         packageNameAbsent(testee, "pkg-1")
         packageNameAbsent(testee, "pkg-2")
         packageNameAbsent(testee, "pkg-unknown")
@@ -328,23 +297,17 @@ class StringInterningViewSpec extends AsyncFlatSpec with Matchers with BaseTest 
   private def templateAbsent(view: StringInterning, template: String) =
     interningEntryAbsent(view.templateId, template, Ref.Identifier.assertFromString)
 
-  private def domainIdPresent(view: StringInterning, domainId: String, id: Int) =
-    interningEntryPresent(view.domainId, domainId, id, DomainId.tryFromString)
+  private def synchronizerIdPresent(view: StringInterning, synchronizerId: String, id: Int) =
+    interningEntryPresent(view.synchronizerId, synchronizerId, id, SynchronizerId.tryFromString)
 
-  private def domainIdAbsent(view: StringInterning, domainId: String) =
-    interningEntryAbsent(view.domainId, domainId, DomainId.tryFromString)
+  private def synchronizerIdAbsent(view: StringInterning, synchronizerId: String) =
+    interningEntryAbsent(view.synchronizerId, synchronizerId, SynchronizerId.tryFromString)
 
   private def packageNamePresent(view: StringInterning, packageName: String, id: Int) =
     interningEntryPresent(view.packageName, packageName, id, Ref.PackageName.assertFromString)
 
   private def packageNameAbsent(view: StringInterning, packageName: String) =
     interningEntryAbsent(view.packageName, packageName, Ref.PackageName.assertFromString)
-
-  private def packageVersionPresent(view: StringInterning, pkgVersion: String, id: Int) =
-    interningEntryPresent(view.packageVersion, pkgVersion, id, Ref.PackageVersion.assertFromString)
-
-  private def packageVersionAbsent(view: StringInterning, pkgVersion: String) =
-    interningEntryAbsent(view.packageVersion, pkgVersion, Ref.PackageVersion.assertFromString)
 
   private def interningEntryPresent[T](
       interningDomain: StringInterningDomain[T],

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -22,10 +22,8 @@ trait StorageBackendSuite
     with StorageBackendTestsUserManagement
     with StorageBackendTestsIDPConfig
     with StorageBackendTestsPartyRecord
-    with StorageBackendTestsMeteringParameters
-    with StorageBackendTestsWriteMetering
-    with StorageBackendTestsReadMetering
     with StorageBackendTestsReassignmentEvents
+    with StorageBackendTestsPartyToParticipant
     with StorageBackendTestsQueryValidRange
     with StorageBackendTestsParameters {
   this: AnyFlatSpec =>

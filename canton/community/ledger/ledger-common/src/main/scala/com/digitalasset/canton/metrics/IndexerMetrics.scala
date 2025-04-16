@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -174,13 +174,13 @@ class IndexerMetrics(
   val meteredEventsMeter: MetricHandle.Meter = factory.meter(
     MetricInfo(
       prefix :+ "metered_events",
-      summary = "Number of ledger events that are metered.",
-      description = """Represents the number of events that will be included in the metering report.
-          |This is an estimate of the total number and not a substitute for the metering report.""",
+      summary = "Number of individual ledger events (create, exercise, archive).",
+      description =
+        """Represents the number of individual ledger events constituting a transaction.""",
       qualification = MetricQualification.Debug,
       labelsWithDescription = Map(
         "participant_id" -> "The id of the participant.",
-        "application_id" -> "The application generating the events.",
+        "user_id" -> "The user generating the events.",
       ),
     )
   )
@@ -195,7 +195,7 @@ class IndexerMetrics(
         qualification = MetricQualification.Debug,
         labelsWithDescription = Map(
           "participant_id" -> "The id of the participant.",
-          "application_id" -> "The application generating the events.",
+          "user_id" -> "The user generating the events.",
           "event_type" -> "The type of ledger event processed (transaction, reassignment, party_allocation).",
           "status" -> "Indicates if the event was accepted or not. Possible values accepted|rejected.",
         ),
@@ -206,7 +206,7 @@ class IndexerMetrics(
 object IndexerMetrics {
 
   object Labels {
-    val applicationId = "application_id"
+    val userId = "user_id"
     val grpcCode = "grpc_code"
     object eventType {
 

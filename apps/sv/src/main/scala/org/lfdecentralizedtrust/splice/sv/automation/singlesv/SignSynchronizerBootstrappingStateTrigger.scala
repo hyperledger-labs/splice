@@ -8,14 +8,14 @@ import cats.syntax.traverse.*
 import cats.syntax.traverseFilter.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.{DomainId, ForceFlag, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{
-  DomainParametersState,
-  MediatorDomainState,
-  SequencerDomainState,
+  MediatorSynchronizerState,
+  SequencerSynchronizerState,
+  SynchronizerParametersState,
 }
+import com.digitalasset.canton.topology.{ForceFlag, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -26,16 +26,16 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.config.{Thresholds, UpgradesConfig}
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanSoftDomainMigrationPocAppClient.SynchronizerIdentities
-import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SignSynchronizerBootstrappingState.Task
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import scala.concurrent.{ExecutionContextExecutor, Future}
 
-import SignSynchronizerBootstrappingState.Task
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class SignSynchronizerBootstrappingStateTrigger(
     override val dsoStore: SvDsoStore,
@@ -65,7 +65,7 @@ class SignSynchronizerBootstrappingStateTrigger(
           .map(identities =>
             Some(
               Task(
-                DomainId(
+                SynchronizerId(
                   UniqueIdentifier.tryCreate(
                     prefix,
                     dsoStore.key.dsoParty.uid.namespace,
@@ -89,14 +89,14 @@ class SignSynchronizerBootstrappingStateTrigger(
     for {
       decentralizedSynchronizerId <- dsoStore.getAmuletRulesDomain()(tc)
       // for now we just copy the parameters from the existing domain.
-      parameters <- existingSynchronizer.sequencerAdminConnection.getDomainParametersState(
+      parameters <- existingSynchronizer.sequencerAdminConnection.getSynchronizerParametersState(
         decentralizedSynchronizerId
       )
-      domainParameters = DomainParametersState(
+      domainParameters = SynchronizerParametersState(
         task.synchronizerId,
         parameters.mapping.parameters,
       )
-      sequencerDomainState = SequencerDomainState
+      sequencerDomainState = SequencerSynchronizerState
         .create(
           task.synchronizerId,
           Thresholds.sequencerConnectionsSizeThreshold(task.sequencerIds.size),
@@ -108,7 +108,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .withDescription(s"Failed to construct SequencerDomainState: $err")
             .asRuntimeException
         )
-      mediatorDomainState = MediatorDomainState
+      mediatorDomainState = MediatorSynchronizerState
         .create(
           task.synchronizerId,
           NonNegativeInt.zero,
@@ -137,7 +137,7 @@ class SignSynchronizerBootstrappingStateTrigger(
         "domain parameters are signed",
         for {
           proposalsExist <- participantAdminConnection
-            .listDomainParametersState(
+            .listSynchronizerParametersState(
               TopologyStoreId.AuthorizedStore,
               task.synchronizerId,
               TopologyTransactionType.AllProposals,
@@ -146,7 +146,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .map(_.nonEmpty)
           authorizedExist <-
             participantAdminConnection
-              .listDomainParametersState(
+              .listSynchronizerParametersState(
                 TopologyStoreId.AuthorizedStore,
                 task.synchronizerId,
                 TopologyTransactionType.AuthorizedState,
@@ -175,7 +175,7 @@ class SignSynchronizerBootstrappingStateTrigger(
         "sequencer domain state is signed",
         for {
           proposalsExist <- participantAdminConnection
-            .listSequencerDomainState(
+            .listSequencerSynchronizerState(
               TopologyStoreId.AuthorizedStore,
               task.synchronizerId,
               TimeQuery.HeadState,
@@ -184,7 +184,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .map(_.nonEmpty)
           authorizedExist <-
             participantAdminConnection
-              .listSequencerDomainState(
+              .listSequencerSynchronizerState(
                 TopologyStoreId.AuthorizedStore,
                 task.synchronizerId,
                 TimeQuery.HeadState,
@@ -214,7 +214,7 @@ class SignSynchronizerBootstrappingStateTrigger(
         "mediator domain state is signed",
         for {
           proposalsExist <- participantAdminConnection
-            .listMediatorDomainState(
+            .listMediatorSynchronizerState(
               TopologyStoreId.AuthorizedStore,
               task.synchronizerId,
               true,
@@ -222,7 +222,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .map(_.nonEmpty)
           authorizedExist <-
             participantAdminConnection
-              .listMediatorDomainState(
+              .listMediatorSynchronizerState(
                 TopologyStoreId.AuthorizedStore,
                 task.synchronizerId,
                 false,
@@ -248,7 +248,7 @@ class SignSynchronizerBootstrappingStateTrigger(
 
 object SignSynchronizerBootstrappingState {
   final case class Task(
-      synchronizerId: DomainId,
+      synchronizerId: SynchronizerId,
       synchronizerIdentities: Seq[SynchronizerIdentities],
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = prettyOfClass(

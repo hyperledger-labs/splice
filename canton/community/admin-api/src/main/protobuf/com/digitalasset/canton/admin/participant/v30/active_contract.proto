@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -9,13 +9,14 @@ import "com/digitalasset/canton/admin/crypto/v30/crypto.proto";
 import "google/protobuf/timestamp.proto";
 import "scalapb/scalapb.proto";
 
+// TODO(#24610) – Remove; replaced by the new ActiveContract that uses LAPI active contract
 // Schema definition for the exported ACS snapshot
-message ActiveContract {
+message ActiveContractOld {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
-  // The ID of the domain where the contract was assigned at the time of the export
+  // The ID of the synchronizer where the contract was assigned at the time of the export
   // Required
-  string domain_id = 1;
+  string synchronizer_id = 1;
   // The contract and its associated metadata
   // Required
   Contract contract = 2;
@@ -45,3 +46,11 @@ message Contract {
   com.digitalasset.canton.admin.crypto.v30.Salt contract_salt = 5; // optional
 }
 
+// Schema definition for the exported active contract
+message ActiveContract {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+
+  // Opaque active contract, assumed to be the bytes of a LAPI active contract
+  // Required
+  bytes active_contract = 1;
+}

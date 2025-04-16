@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -43,7 +43,7 @@ trait PrivateKeySerializationTest extends AsyncWordSpec with BaseTest with HasEx
             cryptoPrivateStore = crypto.cryptoPrivateStore.toExtended
               .valueOrFail("crypto private store does not implement all necessary methods")
             publicKey <- crypto.privateCrypto
-              .generateSigningKey(signingKeySpec)
+              .generateSigningKey(signingKeySpec, SigningKeyUsage.ProtocolOnly)
               .valueOrFail("generate signing key")
             privateKey <- cryptoPrivateStore
               .signingKey(publicKey.id)

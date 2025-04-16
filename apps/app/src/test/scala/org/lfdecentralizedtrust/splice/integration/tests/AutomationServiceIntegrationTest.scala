@@ -13,7 +13,8 @@ import java.util.regex.Pattern
 
 class AutomationServiceIntegrationTest extends SvIntegrationTestBase {
   import AutomationServiceIntegrationTest.*
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     super.environmentDefinition.addConfigTransforms((_, config) =>
       updateAutomationConfig(ConfigurableApp.Sv)(
         // deliberately choosing a mismatched trigger to pause

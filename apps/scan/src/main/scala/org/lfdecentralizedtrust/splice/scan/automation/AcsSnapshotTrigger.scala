@@ -180,7 +180,7 @@ class AcsSnapshotTrigger(
               .maxOption
               .getOrElse(
                 throw new IllegalStateException(
-                  s"DomainId with no data in $migrationRecordTimeRange"
+                  s"SynchronizerId with no data in $migrationRecordTimeRange"
                 )
               ) =>
           logger.info(
