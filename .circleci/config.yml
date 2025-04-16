@@ -3344,9 +3344,8 @@ jobs:
           cluster: "scratchnetb"
       - cluster_lock_reaper:
           cluster: "scratchnetc"
-# TODO(#16067): Re-enable the reaper for scratchd
-#      - cluster_lock_reaper:
-#          cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnetd"
       - cluster_lock_reaper:
           cluster: "scratchnete"
 
@@ -4898,6 +4897,43 @@ jobs:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
+  offboard_sv_runbook:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Trigger the votes for offboarding
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+          cmd: |
+            cncluster activate
+            ${SPLICE_ROOT}/cluster/scripts/vote-for-offboard-sv-runbook.sh
+      - print_gcloud_logs_commands:
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+
+
 workflows:
   version: 2
 
@@ -5292,19 +5328,38 @@ workflows:
           cluster: "ciperiodic"
           requires:
             - deploy_cluster
-      - preflight_check:
-          name: "offboard_sv_runbook"
+      - preflight_sv_check:
           <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "ciperiodic"
-          test_names_file: "test-full-class-names-offboard-sv-runbook-preflight.log"
-          wait_for_sv: false
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-only
+          name: "prepare_sv_reonboard"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          test_names_file: "test-full-class-names-prepare-reonbaord-sv-preflight.log"
+          wait_for_sv: true
           requires:
             - deploy_sv_runbook
+      - offboard_sv_runbook:
+          << : *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          requires:
+            - deploy_sv_runbook
+            # offboarding breaks the participant, so we complete the preflight and preparations before offboarding
             - preflight_sv_check
+            - prepare_sv_reonboard
       - deploy_validator_to_recover_sv_amulets:
           <<: *main-branch-only
           context:
@@ -5324,6 +5379,8 @@ workflows:
             - canton-network-vpn
           cluster: "ciperiodic"
           requires:
+            # deploy_validator_to_recover_sv_amulets relies on `identities` endpoint from the SV, so we
+            # reset the SV runbook only after deploying the validator that recovers its amulets.
             - deploy_validator_to_recover_sv_amulets
       - deploy_sv_runbook:
           name: "redeploy_sv_runbook"
@@ -5346,15 +5403,6 @@ workflows:
           wait_for_sv: false
           requires:
             - redeploy_sv_runbook
-      - preflight_sv_check:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          requires:
-            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-only
           cluster: "ciperiodic"

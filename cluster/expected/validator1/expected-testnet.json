@@ -457,7 +457,7 @@
           "name": "cn-testzrhnet"
         },
         "cometbftPorts": {
-          "domains": 3
+          "domains": 4
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
@@ -900,6 +900,18 @@
     "name": "validator1-validator-validator1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test",
+    "inputs": {
+      "location": "us-central1",
+      "name": "validator1_test",
+      "project": "da-cn-devnet"
+    },
+    "name": "validator1_test_keyring",
+    "provider": "",
+    "type": "gcp:kms/keyRing:KeyRing"
   },
   {
     "custom": true,

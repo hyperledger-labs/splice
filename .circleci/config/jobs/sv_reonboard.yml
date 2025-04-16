@@ -105,3 +105,40 @@ jobs:
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
+
+  offboard_sv_runbook:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Trigger the votes for offboarding
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+          cmd: |
+            cncluster activate
+            ${SPLICE_ROOT}/cluster/scripts/vote-for-offboard-sv-runbook.sh
+      - print_gcloud_logs_commands:
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+

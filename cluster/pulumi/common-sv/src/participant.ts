@@ -50,9 +50,9 @@ export function installSvParticipant(
 
   const clusterConfiguration = clusterSvsConfiguration[xns.logicalName]?.participant;
 
-  const { kmsValues, gkeCredentialsSecret } = clusterConfiguration?.kms
+  const { kmsValues, kmsDependencies } = clusterConfiguration?.kms
     ? getParticipantKmsHelmResources(xns, clusterConfiguration.kms)
-    : { kmsValues: {}, gkeCredentialsSecret: [] };
+    : { kmsValues: {}, kmsDependencies: [] };
 
   const participantValuesWithOverwrites: ChartValues = {
     ...participantValues,
@@ -93,7 +93,7 @@ export function installSvParticipant(
     version,
     {
       ...(customOptions || {}),
-      dependsOn: (customOptions?.dependsOn || []).concat([db]).concat(gkeCredentialsSecret),
+      dependsOn: (customOptions?.dependsOn || []).concat([db]).concat(kmsDependencies),
     }
   );
 }
