@@ -694,8 +694,7 @@
           "enable": true
         },
         "migration": {
-          "id": "3",
-          "migrating": true
+          "id": "3"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",

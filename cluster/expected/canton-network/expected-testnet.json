@@ -827,7 +827,6 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-3-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
@@ -874,6 +873,14 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
+        "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
+        "initialSynchronizerFeesConfig": {
+          "baseRateBurstAmount": 200000,
+          "baseRateBurstWindowMins": 20,
+          "extraTrafficPrice": 16.67,
+          "minTopupAmount": 200000,
+          "readVsWriteScalingFactor": 4
+        },
         "isDevNet": false,
         "metrics": {
           "enable": true
@@ -881,11 +888,13 @@
         "migration": {
           "id": 3,
           "legacyId": 2,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
+        "onboardingFoundingSvRewardWeightBps": 150000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingType": "domain-migration",
+        "onboardingRoundZeroDuration": "2 h",
+        "onboardingType": "found-dso",
         "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "sv_sv_1",

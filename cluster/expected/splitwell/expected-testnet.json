@@ -846,7 +846,7 @@
         "migration": {
           "id": 3,
           "legacyId": 2,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "splitwell",
         "onboardingSecretFrom": {

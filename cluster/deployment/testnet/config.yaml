@@ -31,7 +31,6 @@ synchronizerMigration:
     id: 3
     provider: external
     version: 0.3.19
-    migratingFrom: 2
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.19"
       repoUrl: https://github.com/DACH-NY/canton-network-node
