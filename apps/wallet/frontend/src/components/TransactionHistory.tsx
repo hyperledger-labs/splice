@@ -7,6 +7,8 @@ import {
   RateDisplay,
   Loading,
   ViewMoreButton,
+  UpdateId,
+  updateIdFromEventId,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import BigNumber from 'bignumber.js';
 import formatISO from 'date-fns/formatISO';
@@ -79,6 +81,7 @@ const TransactionHistory: React.FC = () => {
                 <TableCell>Sender or Receiver</TableCell>
                 <TableCell>Rewards Created</TableCell>
                 <TableCell>Balance Change</TableCell>
+                <TableCell>Update ID</TableCell>
               </TableRow>
             </TableHead>
 
@@ -123,6 +126,15 @@ const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
   transaction,
   primaryPartyId,
 }) => {
+  const updateId =
+    transaction.transactionType === 'notification' ? (
+      <TableCell className="tx-row-cell-update-id" />
+    ) : (
+      <TableCell className="tx-row-cell-update-id">
+        <UpdateId updateId={updateIdFromEventId(transaction.id)} />
+      </TableCell>
+    );
+
   return (
     <TableRow className={`tx-row tx-row-${transaction.transactionType}`}>
       <TableCell className="tx-row-cell-type">
@@ -140,6 +152,7 @@ const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
       <TableCell className="tx-row-cell-balance-change">
         <TransactionAmount transaction={transaction} primaryPartyId={primaryPartyId} />
       </TableCell>
+      {updateId}
     </TableRow>
   );
 };

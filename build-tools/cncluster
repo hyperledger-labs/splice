@@ -1668,20 +1668,6 @@ function subcmd_restore_node() {
 }
 ###
 
-subcommand_whitelist[offboard_sv_runbook]='Run the sv offboard preflights, preparing the SV runbook being offboarded'
-
-function subcmd_offboard_sv_runbook() {
-    _needs_auth0_management_api_creds
-
-    preflight_tests=$(_get_preflight_test_names "offboard-sv-runbook")
-    _log "Starting sv offboard preparation preflight tests: $preflight_tests"
-    cd "${SPLICE_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
-            sbt "apps-app/testOnly $preflight_tests"
-}
-
-###
-
 subcommand_whitelist[preflight_sv_reonboard]='Run the sv reonboard preflights'
 
 function subcmd_preflight_sv_reonboard() {

@@ -21,6 +21,7 @@ const Loading: React.FC<LoadingProps> = props => {
         justifyContent: 'center',
         alignItems: 'center',
       }}
+      data-testid={'loading-spinner'}
     >
       <CircularProgress sx={{ display: 'flex' }} />
     </Box>

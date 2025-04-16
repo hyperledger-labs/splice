@@ -31,9 +31,9 @@ export function installParticipant(
   logLevel?: LogLevel,
   customOptions?: SpliceCustomResourceOptions
 ): { participantAddress: Output<string> } {
-  const { kmsValues, gkeCredentialsSecret } = kmsConfig
+  const { kmsValues, kmsDependencies } = kmsConfig
     ? getParticipantKmsHelmResources(xns, kmsConfig)
-    : { kmsValues: {}, gkeCredentialsSecret: [] };
+    : { kmsValues: {}, kmsDependencies: [] };
 
   const participantPostgres =
     defaultPostgres ||
@@ -95,7 +95,7 @@ export function installParticipant(
       ...(customOptions || {}),
       dependsOn: (customOptions?.dependsOn || [])
         .concat([participantPostgres])
-        .concat(gkeCredentialsSecret),
+        .concat(kmsDependencies),
     }
   );
   return {

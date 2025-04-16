@@ -40,7 +40,7 @@
           "hostname": "test.global.canton.network.digitalasset.com"
         },
         "cometbftPorts": {
-          "domains": 3
+          "domains": 4
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
