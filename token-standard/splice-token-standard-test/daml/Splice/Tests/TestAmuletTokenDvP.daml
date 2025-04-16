@@ -19,8 +19,8 @@ import DA.Action (unless)
 import DA.Assert
 import DA.Foldable (forA_, foldMap)
 import DA.List (sortOn)
-import DA.Map qualified as Map
 import DA.Optional (isSome)
+import qualified DA.TextMap as TextMap
 import DA.Time
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
@@ -219,5 +219,5 @@ appBackendListAllocations p ref = do
 
 expectBurn : Metadata -> Script ()
 expectBurn meta =
-  unless (isSome $ Map.lookup burnedMetaKey meta.values) $
+  unless (isSome $ TextMap.lookup burnedMetaKey meta.values) $
     fail $ "Expected burned meta key to be present in " <> show meta

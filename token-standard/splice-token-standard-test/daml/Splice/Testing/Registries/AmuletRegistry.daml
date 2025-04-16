@@ -27,7 +27,7 @@ module Splice.Testing.Registries.AmuletRegistry
 
 import DA.Action (unless)
 import DA.Date
-import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
 import DA.Time
@@ -233,7 +233,7 @@ registryApi_getTransferInstruction_abortTwoStepTransferContext registry instrCid
   -- this context communicates whether to unlock the amulet
   let expireLockC = OpenApiChoiceContext with
         disclosures = mempty
-        choiceContext = mkAmuletContext $ Map.fromList [(expireLockKey, AV_Bool lockedAmuletActive)]
+        choiceContext = mkAmuletContext $ TextMap.fromList [(expireLockKey, AV_Bool lockedAmuletActive)]
   if lockedAmuletActive
     then do
       -- disclose the amulet contract, as the caller might not be able to see it
@@ -247,7 +247,7 @@ registryApi_getTransferInstruction_abortTwoStepTransferContext registry instrCid
 -- Internal functions
 ---------------------
 
-mkAmuletContext : Map.Map Text AnyValue -> ChoiceContext
+mkAmuletContext : TextMap.TextMap AnyValue -> ChoiceContext
 mkAmuletContext values = ChoiceContext with
   values
 
@@ -284,7 +284,7 @@ getAmuletRulesContext registry = do
   (amuletRulesCid, _) <- getAmuletRules registry
   amuletRulesD <- queryDisclosure' @AmuletRules registry.dso amuletRulesCid
   pure OpenApiChoiceContext with
-    choiceContext = mkAmuletContext $ Map.fromList
+    choiceContext = mkAmuletContext $ TextMap.fromList
         [(amuletRulesContextKey, AV_ContractId $ coerceContractId amuletRulesCid)]
     disclosures = amuletRulesD
 
@@ -293,7 +293,7 @@ getOpenRoundContext registry = do
   (openRoundCid, _) <- getLatestOpenRound registry
   openRoundD <- queryDisclosure' @OpenMiningRound registry.dso openRoundCid
   pure OpenApiChoiceContext with
-    choiceContext = mkAmuletContext $ Map.fromList
+    choiceContext = mkAmuletContext $ TextMap.fromList
         [(openRoundContextKey, AV_ContractId $ coerceContractId openRoundCid)]
     disclosures = openRoundD
 
@@ -316,7 +316,7 @@ lookupPreapprovalWithContext registry receiver = do
         , OpenApiChoiceContext with
           disclosures = preapprovalD
           choiceContext = mkAmuletContext $
-            Map.fromList [(transferPreapprovalContextKey, AV_ContractId (coerceContractId preapprovalCid))]
+            TextMap.fromList [(transferPreapprovalContextKey, AV_ContractId (coerceContractId preapprovalCid))]
         )
 
 getFeaturedAppRightContext : AmuletRegistry -> Party -> Script OpenApiChoiceContext
@@ -329,12 +329,12 @@ getFeaturedAppRightContext registry provider = do
       pure OpenApiChoiceContext with
         disclosures = rightDisc
         choiceContext = mkAmuletContext $
-          Map.fromList [ (featuredAppRightContextKey, AV_ContractId (coerceContractId rightCid)) ]
+          TextMap.fromList [ (featuredAppRightContextKey, AV_ContractId (coerceContractId rightCid)) ]
 
 emptyOpenApiChoiceContext : OpenApiChoiceContext
 emptyOpenApiChoiceContext = OpenApiChoiceContext with
   disclosures = mempty
-  choiceContext = mkAmuletContext Map.empty
+  choiceContext = mkAmuletContext TextMap.empty
 
 expireLockAsOwner : AmuletRegistry -> ContractId Holding -> Script (ContractId Holding)
 expireLockAsOwner  registry lockedHoldingCid = do

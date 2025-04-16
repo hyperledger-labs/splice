@@ -5,7 +5,7 @@ module Splice.Api.Token.Test.DummyHolding where
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
-import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 
 template DummyHolding
   with
@@ -23,6 +23,6 @@ template DummyHolding
         lock = None
         meta = Api.Token.MetadataV1.Metadata
           with
-            values = Map.fromList [
+            values = TextMap.fromList [
               ("test", "test")
               ]

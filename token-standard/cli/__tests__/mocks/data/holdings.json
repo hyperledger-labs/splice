@@ -32,16 +32,10 @@
                   ]
                 },
                 "meta" : {
-                  "values" : [
-                    [
-                      "amulet.splice.lfdecentralizedtrust.org/created-in-round",
-                      "1"
-                    ],
-                    [
-                      "amulet.splice.lfdecentralizedtrust.org/rate-per-round",
-                      "0.00380518"
-                    ]
-                  ]
+                  "values" : {
+                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                    "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                  }
                 },
                 "owner" : "alice::normalized"
               }
@@ -93,16 +87,10 @@
                 },
                 "lock" : null,
                 "meta" : {
-                  "values" : [
-                    [
-                      "amulet.splice.lfdecentralizedtrust.org/created-in-round",
-                      "1"
-                    ],
-                    [
-                      "amulet.splice.lfdecentralizedtrust.org/rate-per-round",
-                      "0.00380518"
-                    ]
-                  ]
+                  "values" : {
+                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                    "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                  }
                 },
                 "owner" : "alice::normalized"
               }
@@ -154,16 +142,10 @@
                 },
                 "lock" : null,
                 "meta" : {
-                  "values" : [
-                    [
-                      "amulet.splice.lfdecentralizedtrust.org/created-in-round",
-                      "1"
-                    ],
-                    [
-                      "amulet.splice.lfdecentralizedtrust.org/rate-per-round",
-                      "0.00380518"
-                    ]
-                  ]
+                  "values" : {
+                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                    "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                  }
                 },
                 "owner" : "alice::normalized"
               }
@@ -215,12 +197,9 @@
                 },
                 "lock" : null,
                 "meta" : {
-                  "values" : [
-                    [
-                      "test",
-                      "test"
-                    ]
-                  ]
+                  "values" : {
+                    "test" : "test"
+                  }
                 },
                 "owner" : "alice::normalized"
               }
@@ -271,12 +250,9 @@
                 },
                 "lock" : null,
                 "meta" : {
-                  "values" : [
-                    [
-                      "test",
-                      "test"
-                    ]
-                  ]
+                  "values" : {
+                    "test" : "test"
+                  }
                 },
                 "owner" : "alice::normalized"
               }

@@ -14,6 +14,7 @@ import qualified DA.Map as Map
 import DA.Optional (fromOptional, optionalToList)
 import DA.Set (Set)
 import qualified DA.Set as Set
+import qualified DA.TextMap as TextMap
 import DA.Traversable (forA)
 import DA.Time
 
@@ -717,7 +718,7 @@ executeTransfer config context dso t = do
           nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
-          Map.empty
+          TextMap.empty
 
   return TransferResult with
     round = csum.openRound.round

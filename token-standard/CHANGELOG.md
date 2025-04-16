@@ -21,6 +21,8 @@ Polishing changes:
 - Make a polishing pass across the Daml docs of all token standard APIs.
 - Bump the version of the `splice-api-*` packages and the `splice-token-standard-test`
   harness to `1.0.0` in preparation of their first release.
+- Switched Metadata from `Map Text` to `TextMap` to improve the JSON encoding to a normal object instead
+  of an array of key-value pairs.
 
 ## 2025-04-15
 

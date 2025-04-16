@@ -82,11 +82,11 @@ export async function transfer(
       requestedAt: now,
       executeBefore: now.add(24, "hour").toISOString(),
       inputHoldingCids,
-      meta: { values: [] },
+      meta: { values: {} },
     },
     extraArgs: {
-      context: { values: [] },
-      meta: { values: [] },
+      context: { values: {} },
+      meta: { values: {} },
     },
   };
 

@@ -22,6 +22,7 @@ module Splice.Testing.Utils
   ) where
 
 import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 
@@ -30,7 +31,7 @@ import Daml.Script
 -- | Use this to construct an empty 'ExtraArgs' record.
 emptyExtraArgs : ExtraArgs
 emptyExtraArgs = ExtraArgs with
-  context = ChoiceContext with values = Map.empty
+  context = ChoiceContext with values = TextMap.empty
   meta = emptyMetadata
 
 -- | A representation of a ChoiceContext and disclosed contracts as they would be returned by the

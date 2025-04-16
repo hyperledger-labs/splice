@@ -16,6 +16,7 @@ import DA.Assert ((===))
 import DA.Foldable (forA_)
 import DA.List (sortOn)
 import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.Time
 
@@ -73,7 +74,8 @@ setupTest = do
             amount = 25.0
             lock = None
             meta = Metadata with
-              values = Map.fromList
+
+              values = TextMap.fromList
                 [ (createdInRoundMetaKey, "1")
                 , (ratePerRoundMetaKey, "0.00004")
                 ]
@@ -87,7 +89,7 @@ setupTest = do
               holders = [registry.dso]
               context = Some "test expired lock"
             meta = Metadata with
-              values = Map.fromList
+              values = TextMap.fromList
                 [ (createdInRoundMetaKey, "1")
                 , (ratePerRoundMetaKey, "0.00004")
                 ]
@@ -110,7 +112,7 @@ setupTest = do
       executeBefore = now `addRelTime` days 1
       inputHoldingCids = bobHoldingCids
       meta = Metadata with
-        values = Map.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
+        values = TextMap.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
 
   return TestSetup with ..
 
@@ -137,7 +139,7 @@ setupTwoStepTransfer = do
     transfer
     extraArgs = emptyExtraArgs
 
-  Map.size enrichedChoice.arg.extraArgs.context.values === 2
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
   Map.size enrichedChoice.disclosures.disclosures === 3
 
   -- Trigger a two-step transfer
@@ -161,7 +163,7 @@ assertNoFeaturedRewards parties =
 
 expectBurn : Metadata -> Script ()
 expectBurn meta =
-  unless (isSome $ Map.lookup burnedMetaKey meta.values) $
+  unless (isSome $ TextMap.lookup burnedMetaKey meta.values) $
     fail $ "Expected burned meta key to be present in " <> show meta
 
 
@@ -182,7 +184,7 @@ test_happy_path_self = script do
     transfer
     extraArgs = emptyExtraArgs
 
-  Map.size enrichedChoice.arg.extraArgs.context.values === 2
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
   Map.size enrichedChoice.disclosures.disclosures === 3
 
   WalletClient.checkBalanceApprox bob registry.instrumentId 50.0
@@ -212,7 +214,7 @@ test_happy_path_direct = script do
     transfer
     extraArgs = emptyExtraArgs
 
-  Map.size enrichedChoice.arg.extraArgs.context.values === 4
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 4
   Map.size enrichedChoice.disclosures.disclosures === 5
 
   WalletClient.checkBalanceApprox bob registry.instrumentId 50.0

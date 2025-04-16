@@ -7,6 +7,7 @@ module Splice.Amulet where
 import Prelude
 import DA.Action (void)
 import DA.Map as Map
+import DA.TextMap as TextMap
 import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
@@ -113,7 +114,7 @@ template Amulet
 amuletMetadata : Amulet -> Api.Token.MetadataV1.Metadata
 amuletMetadata Amulet{..} =
   Api.Token.MetadataV1.Metadata with
-    values = Map.fromList [
+    values = TextMap.fromList [
       (createdInRoundMetaKey, show amount.createdAt.number),
       (ratePerRoundMetaKey, show amount.ratePerRound.rate)
       ]

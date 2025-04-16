@@ -27,7 +27,7 @@ import Splice.RelRound
 
 import DA.Date
 import DA.Time
-import DA.Map as Map
+import DA.TextMap as TextMap
 
 
 -- Representing sets of values with uppper bounds
@@ -211,7 +211,7 @@ isAmuletExpired round amuletAmount =
 instance ToAnyValue TimeLock where
   toAnyValue lock = AV_Map $
     addOptionalAnyValue lockContextContextKey lock.optContext $
-    Map.fromList
+    TextMap.fromList
       [ (lockExpiresAtContextKey, toAnyValue lock.expiresAt),
         (lockHoldersContextKey, toAnyValue lock.holders)
       ]

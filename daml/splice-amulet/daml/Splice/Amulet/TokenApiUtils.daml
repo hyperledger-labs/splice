@@ -8,7 +8,8 @@ module Splice.Amulet.TokenApiUtils where
 import DA.Optional
 import DA.Monoid ()
 import DA.Time
-import DA.Map qualified as Map
+import DA.TextMap (TextMap)
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
@@ -26,17 +27,17 @@ amuletInstrumentId dso =
   Api.Token.HoldingV1.InstrumentId with admin = dso; id = "Amulet"
 
 -- | Add an optional metadata entry.
-optionalMetadata : Text -> (a -> Text) -> Optional a -> Map.Map Text Text -> Map.Map Text Text
+optionalMetadata : Text -> (a -> Text) -> Optional a -> TextMap Text -> TextMap Text
 optionalMetadata k f optValue m =
   case optValue of
     None -> m
-    Some v -> Map.insert k (f v) m
+    Some v -> TextMap.insert k (f v) m
 
 -- | Add an metadata entry if it is non-zero number.
-nonZeroMetadata : (Eq a, Additive a, Show a) => Text -> a -> Map.Map Text Text -> Map.Map Text Text
+nonZeroMetadata : (Eq a, Additive a, Show a) => Text -> a -> TextMap Text -> TextMap Text
 nonZeroMetadata k n m
   | n == aunit = m
-  | otherwise = Map.insert k (show n) m
+  | otherwise = TextMap.insert k (show n) m
 
 
 -- Amulet Metadata keys
@@ -85,7 +86,7 @@ holdingTxMeta kind reason sender burned =
       nonZeroMetadata burnedMetaKey (fromOptional 0.0 burned) $
       optionalMetadata senderMetaKey partyToText sender $
       optionalMetadata reasonMetaKey identity reason $
-      Map.fromList [(txKindMetaKey, txKindToText kind)]
+      TextMap.fromList [(txKindMetaKey, txKindToText kind)]
 
 -- | Exported for testing only
 txKindToText : TxKind -> Text
@@ -162,10 +163,10 @@ expireLockKey = "expire-lock"
 copyOnlyBurnMeta : Optional Metadata -> Metadata
 copyOnlyBurnMeta optOrigMeta = fromOptional emptyMetadata $ do
   origMeta <- optOrigMeta
-  origValue <- Map.lookup burnedMetaKey origMeta.values
+  origValue <- TextMap.lookup burnedMetaKey origMeta.values
   pure $ Metadata with
     values =
-      Map.singleton burnedMetaKey origValue
+      TextMap.singleton burnedMetaKey origValue
 
 
 -- Choice context creation and parsing
@@ -177,9 +178,9 @@ class ToAnyValue a where
 
 -- | Convenience function to create maps that contain an optional value if it is
 -- set. See its use sites for examples.
-addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> Map.Map Text AnyValue -> Map.Map Text AnyValue
+addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> TextMap AnyValue -> TextMap AnyValue
 addOptionalAnyValue _k None m = m
-addOptionalAnyValue k (Some value) m = Map.insert k (toAnyValue value) m
+addOptionalAnyValue k (Some value) m = TextMap.insert k (toAnyValue value) m
 
 -- | Attempt to parse a value from AnyValue.
 --
@@ -191,7 +192,7 @@ class FromAnyValue a where
 -- | Lookup and decode a value within a choice context.
 lookupFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text (Optional a)
 lookupFromContext context k = do
-  case Map.lookup k context.values of
+  case TextMap.lookup k context.values of
     None -> pure None
     Some av -> case fromAnyValue av of
       Left err -> fail $ "Failed to decode context value for '" <> k <> "': " <> err

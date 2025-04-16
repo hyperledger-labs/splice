@@ -4,7 +4,7 @@
 -- | Types and interfaces for retrieving metadata about tokens.
 module Splice.Api.Token.MetadataV1 where
 
-import DA.Map as Map
+import DA.TextMap as TextMap
 import DA.Time (RelTime)
 
 -- | A generic representation of serializable Daml values.
@@ -22,7 +22,7 @@ data AnyValue =
   | AV_Party Party
   | AV_ContractId AnyContractId
   | AV_List [AnyValue]
-  | AV_Map (Map Text AnyValue)
+  | AV_Map (TextMap.TextMap AnyValue)
   deriving (Show, Eq)
 
 -- | Interface used to represent arbitrary contracts.
@@ -40,7 +40,7 @@ type AnyContractId = ContractId AnyContract
 -- | A type for passing extra data from an app's backends to the choices of that app
 -- exercised in commands submitted by app users.
 data ChoiceContext = ChoiceContext with
-    values : Map Text AnyValue
+    values : TextMap AnyValue
       -- ^ The values passed in by the app backend to the choice.
       -- The keys are considered internal to the app and should not be read by
       -- third-party code.
@@ -48,7 +48,7 @@ data ChoiceContext = ChoiceContext with
 
 -- | Empty choice context.
 emptyChoiceContext : ChoiceContext
-emptyChoiceContext = ChoiceContext Map.empty
+emptyChoiceContext = ChoiceContext TextMap.empty
 
 -- | Machine-readable metadata intended for communicating additional information
 -- using well-known keys between systems. This is mainly used to allow for the post-hoc
@@ -61,7 +61,7 @@ emptyChoiceContext = ChoiceContext Map.empty
 --
 -- Implementors SHOULD keep metadata small, as on-ledger data is costly.
 data Metadata = Metadata with
-    values : Map Text Text
+    values : TextMap Text
       -- ^ Key-value pairs of metadata entries.
   deriving (Eq,Ord, Show)
 
