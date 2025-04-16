@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -6,16 +6,29 @@ package com.digitalasset.canton.sequencing.protocol
 import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.config.CantonRequireTypes.String73
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.crypto.Signature
-import com.digitalasset.canton.data.{CantonTimestamp, GeneratorsData}
+import com.digitalasset.canton.crypto.{AsymmetricEncrypted, Signature}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.protocol.ProtocolSymmetricKey
 import com.digitalasset.canton.protocol.messages.{GeneratorsMessages, ProtocolMessage}
+import com.digitalasset.canton.sequencing.channel.{
+  ConnectToSequencerChannelRequest,
+  ConnectToSequencerChannelResponse,
+}
+import com.digitalasset.canton.sequencing.protocol.channel.{
+  SequencerChannelConnectedToAllEndpoints,
+  SequencerChannelId,
+  SequencerChannelMetadata,
+  SequencerChannelSessionKey,
+  SequencerChannelSessionKeyAck,
+}
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.serialization.{
   BytestringWithCryptographicEvidence,
   HasCryptographicEvidence,
 }
 import com.digitalasset.canton.time.TimeProofTestUtil
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.version.{GeneratorsVersion, ProtocolVersion}
 import com.digitalasset.canton.{Generators, SequencerCounter}
@@ -26,7 +39,6 @@ import org.scalacheck.{Arbitrary, Gen}
 final class GeneratorsProtocol(
     protocolVersion: ProtocolVersion,
     generatorsMessages: GeneratorsMessages,
-    generatorsData: GeneratorsData,
 ) {
   import GeneratorsProtocol.*
   import com.digitalasset.canton.Generators.*
@@ -125,6 +137,13 @@ final class GeneratorsProtocol(
     } yield SubscriptionRequest.apply(member, counter, protocolVersion)
   )
 
+  implicit val subscriptionRequestV2Arb: Arbitrary[SubscriptionRequestV2] = Arbitrary(
+    for {
+      member <- Arbitrary.arbitrary[Member]
+      timestamp <- Arbitrary.arbitrary[Option[CantonTimestamp]]
+    } yield SubscriptionRequestV2.apply(member, timestamp, protocolVersion)
+  )
+
   implicit val sequencerChannelMetadataArb: Arbitrary[SequencerChannelMetadata] =
     Arbitrary(
       for {
@@ -139,11 +158,53 @@ final class GeneratorsProtocol(
       )
     )
 
-  implicit val sequencerChannelConnectedToMembersArb
+  implicit val sequencerChannelConnectedToAllEndpointsArb
       : Arbitrary[SequencerChannelConnectedToAllEndpoints] =
     Arbitrary(
       SequencerChannelConnectedToAllEndpoints.apply(
         protocolVersion
+      )
+    )
+
+  implicit val sequencerChannelSessionKeyArb: Arbitrary[SequencerChannelSessionKey] =
+    Arbitrary(for {
+      encrypted <- Arbitrary.arbitrary[AsymmetricEncrypted[ProtocolSymmetricKey]]
+    } yield SequencerChannelSessionKey.apply(encrypted, protocolVersion))
+
+  implicit val sequencerChannelSessionKeyAckArb: Arbitrary[SequencerChannelSessionKeyAck] =
+    Arbitrary(SequencerChannelSessionKeyAck.apply(protocolVersion))
+
+  implicit val connectToSequencerChannelRequestArb: Arbitrary[ConnectToSequencerChannelRequest] =
+    Arbitrary(
+      for {
+        request <- Gen.oneOf(
+          byteStringArb.arbitrary.map(
+            ConnectToSequencerChannelRequest.Payload(_): ConnectToSequencerChannelRequest.Request
+          ),
+          sequencerChannelMetadataArb.arbitrary.map(ConnectToSequencerChannelRequest.Metadata.apply),
+        )
+      } yield ConnectToSequencerChannelRequest.apply(
+        request,
+        TraceContext.empty,
+        protocolVersion,
+      )
+    )
+
+  implicit val connectToSequencerChannelResponseArb: Arbitrary[ConnectToSequencerChannelResponse] =
+    Arbitrary(
+      for {
+        response <- Gen.oneOf(
+          byteStringArb.arbitrary.map(
+            ConnectToSequencerChannelResponse.Payload(_): ConnectToSequencerChannelResponse.Response
+          ),
+          sequencerChannelConnectedToAllEndpointsArb.arbitrary.map(_ =>
+            ConnectToSequencerChannelResponse.Connected
+          ),
+        )
+      } yield ConnectToSequencerChannelResponse.apply(
+        response,
+        TraceContext.empty,
+        protocolVersion,
       )
     )
 
@@ -160,14 +221,16 @@ final class GeneratorsProtocol(
   private implicit val deliverErrorArb: Arbitrary[DeliverError] = Arbitrary(
     for {
       sequencerCounter <- Arbitrary.arbitrary[SequencerCounter]
+      pts <- Arbitrary.arbitrary[Option[CantonTimestamp]]
       ts <- Arbitrary.arbitrary[CantonTimestamp]
-      domainId <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       messageId <- Arbitrary.arbitrary[MessageId]
       error <- sequencerDeliverErrorArb.arbitrary
     } yield DeliverError.create(
       sequencerCounter,
+      previousTimestamp = pts,
       timestamp = ts,
-      domainId = domainId,
+      synchronizerId = synchronizerId,
       messageId,
       error,
       protocolVersion,
@@ -176,9 +239,9 @@ final class GeneratorsProtocol(
   )
   private implicit val deliverArbitrary: Arbitrary[Deliver[Envelope[?]]] = Arbitrary(
     for {
-      domainId <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       batch <- batchArb.arbitrary
-      deliver <- Arbitrary(deliverGen(domainId, batch, protocolVersion)).arbitrary
+      deliver <- Arbitrary(deliverGen(synchronizerId, batch, protocolVersion)).arbitrary
     } yield deliver
   )
 
@@ -249,10 +312,11 @@ object GeneratorsProtocol {
     }
   }
   def deliverGen[Env <: Envelope[?]](
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       batch: Batch[Env],
       protocolVersion: ProtocolVersion,
   ): Gen[Deliver[Env]] = for {
+    previousTimestamp <- Arbitrary.arbitrary[Option[CantonTimestamp]]
     timestamp <- Arbitrary.arbitrary[CantonTimestamp]
     counter <- Arbitrary.arbitrary[SequencerCounter]
     messageIdO <- Gen.option(Arbitrary.arbitrary[MessageId])
@@ -260,8 +324,9 @@ object GeneratorsProtocol {
     trafficReceipt <- Gen.option(Arbitrary.arbitrary[TrafficReceipt])
   } yield Deliver.create(
     counter,
+    previousTimestamp,
     timestamp,
-    domainId,
+    synchronizerId,
     messageIdO,
     batch,
     topologyTimestampO,
@@ -272,8 +337,15 @@ object GeneratorsProtocol {
   def timeProofArb(protocolVersion: ProtocolVersion): Arbitrary[TimeProof] = Arbitrary(
     for {
       timestamp <- Arbitrary.arbitrary[CantonTimestamp]
+      previousEventTimestamp <- Arbitrary.arbitrary[Option[CantonTimestamp]]
       counter <- nonNegativeLongArb.arbitrary.map(_.unwrap)
-      targetDomain <- Arbitrary.arbitrary[Target[DomainId]]
-    } yield TimeProofTestUtil.mkTimeProof(timestamp, counter, targetDomain, protocolVersion)
+      targetSynchronizerId <- Arbitrary.arbitrary[Target[SynchronizerId]]
+    } yield TimeProofTestUtil.mkTimeProof(
+      timestamp,
+      previousEventTimestamp,
+      counter,
+      targetSynchronizerId,
+      protocolVersion,
+    )
   )
 }

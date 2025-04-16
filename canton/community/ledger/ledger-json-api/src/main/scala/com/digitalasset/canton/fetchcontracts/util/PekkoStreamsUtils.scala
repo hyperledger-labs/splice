@@ -1,12 +1,12 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.fetchcontracts.util
 
+import com.daml.scalautil.Statement.discard
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Broadcast, Flow, GraphDSL, Partition}
 import org.apache.pekko.stream.{FanOutShape2, Graph}
-import com.daml.scalautil.Statement.discard
 import scalaz.syntax.order.*
 import scalaz.{-\/, Order, \/, \/-}
 
@@ -26,8 +26,8 @@ object PekkoStreamsUtils {
       )
       val as = b.add(Flow[A \/ B].collect { case -\/(a) => a })
       val bs = b.add(Flow[A \/ B].collect { case \/-(b) => b })
-      discard { split ~> as }
-      discard { split ~> bs }
+      discard(split ~> as)
+      discard(split ~> bs)
       new FanOutShape2(split.in, as.out, bs.out)
     }
 
@@ -37,8 +37,8 @@ object PekkoStreamsUtils {
       val split = b add Broadcast[(A, B)](2, eagerCancel = true)
       val left = b add Flow.fromFunction((_: (A, B))._1)
       val right = b add Flow.fromFunction((_: (A, B))._2)
-      discard { split ~> left }
-      discard { split ~> right }
+      discard(split ~> left)
+      discard(split ~> right)
       new FanOutShape2(split.in, left.out, right.out)
     }
 

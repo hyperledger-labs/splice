@@ -8,7 +8,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.admin.http.AdminRoutes
-import org.lfdecentralizedtrust.splice.config.{ANStorageFactory, SharedSpliceAppParameters}
+import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.NodeBootstrapBase
 import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellAppBackendConfig
 import org.lfdecentralizedtrust.splice.splitwell.metrics.SplitwellAppMetrics
@@ -36,7 +36,7 @@ class SplitwellAppBootstrap(
     val splitwellAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: SplitwellAppMetrics,
+    override val metrics: SplitwellAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
@@ -112,7 +112,7 @@ object SplitwellAppBootstrap {
           testingConfigInternal,
           clock,
           splitwellMetrics,
-          new ANStorageFactory(splitwellConfig.storage),
+          new CommunityStorageFactory(splitwellConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

@@ -1,25 +1,17 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store
 
 import cats.data.EitherT
-import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.config.CantonRequireTypes.String300
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.store.db.DbCryptoPrivateStore
-import com.digitalasset.canton.crypto.store.memory.InMemoryCryptoPrivateStore
-import com.digitalasset.canton.error.{BaseCantonError, CantonErrorGroups}
+import com.digitalasset.canton.error.{CantonBaseError, CantonErrorGroups}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.version.ReleaseProtocolVersion
-
-import scala.concurrent.ExecutionContext
+import com.digitalasset.canton.tracing.TraceContext
 
 sealed trait PrivateKeyWithName extends Product with Serializable {
   type K <: PrivateKey
@@ -41,7 +33,8 @@ final case class EncryptionPrivateKeyWithName(
   type K = EncryptionPrivateKey
 }
 
-/** A store for cryptographic private material such as signing/encryption private keys and hmac secrets.
+/** A store for cryptographic private material such as signing/encryption private keys and hmac
+  * secrets.
   *
   * It encapsulates only existence checks/delete operations so it can be extendable to an external
   * crypto private store (e.g. an AWS KMS store).
@@ -64,12 +57,14 @@ trait CryptoPrivateStore extends AutoCloseable {
   /** Filter signing keys by checking if their usage intersects with the provided 'filterUsage' set.
     * This ensures that only keys with one or more matching usages are retained.
     *
-    * @param signingKeyIds the fingerprint of the keys to filter
-    * @param filterUsage the key usages to filter for
+    * @param signingKeyIds
+    *   the fingerprint of the keys to filter
+    * @param filterUsage
+    *   the key usages to filter for
     * @return
     */
   def filterSigningKeys(
-      signingKeyIds: Seq[Fingerprint],
+      signingKeyIds: NonEmpty[Seq[Fingerprint]],
       filterUsage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit
       traceContext: TraceContext
@@ -88,55 +83,18 @@ trait CryptoPrivateStore extends AutoCloseable {
     case _ => None
   }
 
-  /** Returns the KMS key id that corresponds to a given private key fingerprint
-    * or None if the private key is not stored in a KMS.
+  /** Returns the KMS key id that corresponds to a given private key fingerprint or None if the
+    * private key is not stored in a KMS.
     *
-    * @param keyId the private key fingerprint
-    * @return the KMS key id that matches the fingerprint, or None if key is not stored in a KMS
+    * @param keyId
+    *   the private key fingerprint
+    * @return
+    *   the KMS key id that matches the fingerprint, or None if key is not stored in a KMS
     */
   def queryKmsKeyId(keyId: Fingerprint)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[String300]]
 
-}
-
-object CryptoPrivateStore {
-
-  trait CryptoPrivateStoreFactory {
-    def create(
-        storage: Storage,
-        releaseProtocolVersion: ReleaseProtocolVersion,
-        timeouts: ProcessingTimeout,
-        loggerFactory: NamedLoggerFactory,
-        tracerProvider: TracerProvider,
-    )(implicit
-        ec: ExecutionContext,
-        traceContext: TraceContext,
-    ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, CryptoPrivateStore]
-  }
-
-  class CommunityCryptoPrivateStoreFactory extends CryptoPrivateStoreFactory {
-    override def create(
-        storage: Storage,
-        releaseProtocolVersion: ReleaseProtocolVersion,
-        timeouts: ProcessingTimeout,
-        loggerFactory: NamedLoggerFactory,
-        tracerProvider: TracerProvider,
-    )(implicit
-        ec: ExecutionContext,
-        traceContext: TraceContext,
-    ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, CryptoPrivateStore] =
-      storage match {
-        case _: MemoryStorage =>
-          EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](
-            new InMemoryCryptoPrivateStore(releaseProtocolVersion, loggerFactory)
-          )
-        case jdbc: DbStorage =>
-          EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](
-            new DbCryptoPrivateStore(jdbc, releaseProtocolVersion, timeouts, loggerFactory)
-          )
-      }
-  }
 }
 
 sealed trait CryptoPrivateStoreError extends Product with Serializable with PrettyPrinting
@@ -150,10 +108,10 @@ object CryptoPrivateStoreError extends CantonErrorGroups.CommandErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Wrap(reason: CryptoPrivateStoreError)
-        extends BaseCantonError.Impl(cause = "An error occurred with the private crypto store")
+        extends CantonBaseError.Impl(cause = "An error occurred with the private crypto store")
 
     final case class WrapStr(reason: String)
-        extends BaseCantonError.Impl(cause = "An error occurred with the private crypto store")
+        extends CantonBaseError.Impl(cause = "An error occurred with the private crypto store")
   }
 
   final case class FailedToGetWrapperKeyId(reason: String) extends CryptoPrivateStoreError {
@@ -182,12 +140,16 @@ object CryptoPrivateStoreError extends CantonErrorGroups.CommandErrorGroup {
       prettyOfClass(param("keyId", _.keyId), param("reason", _.reason.unquoted))
   }
 
-  final case class KeyAlreadyExists(keyId: Fingerprint, existingKeyName: Option[String])
-      extends CryptoPrivateStoreError {
+  final case class KeyAlreadyExists(
+      keyId: Fingerprint,
+      existingKeyName: Option[String],
+      newKeyName: Option[String],
+  ) extends CryptoPrivateStoreError {
     override protected def pretty: Pretty[KeyAlreadyExists] =
       prettyOfClass(
         param("keyId", _.keyId),
         param("existingKeyName", _.existingKeyName.getOrElse("").unquoted),
+        param("newKeyName", _.newKeyName.getOrElse("").unquoted),
       )
   }
 
@@ -199,6 +161,12 @@ object CryptoPrivateStoreError extends CantonErrorGroups.CommandErrorGroup {
 
   final case class EncryptedPrivateStoreError(reason: String) extends CryptoPrivateStoreError {
     override protected def pretty: Pretty[EncryptedPrivateStoreError] = prettyOfClass(
+      unnamedParam(_.reason.unquoted)
+    )
+  }
+
+  final case class KmsPrivateStoreError(reason: String) extends CryptoPrivateStoreError {
+    override protected def pretty: Pretty[KmsPrivateStoreError] = prettyOfClass(
       unnamedParam(_.reason.unquoted)
     )
   }

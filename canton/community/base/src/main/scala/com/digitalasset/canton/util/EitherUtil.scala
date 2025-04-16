@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -8,11 +8,11 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import scala.concurrent.Future
 
 object EitherUtil {
-
   implicit class RichEither[L, R](val either: Either[L, R]) extends AnyVal {
 
     /** @param f
-      * @return this, after evaluation of the side effecting function f if this is a left.
+      * @return
+      *   this, after evaluation of the side effecting function f if this is a left.
       */
     def tapLeft(f: L => Unit): Either[L, R] = either match {
       case Left(value) =>
@@ -23,7 +23,8 @@ object EitherUtil {
     }
 
     /** @param f
-      * @return this, after evaluation of the side effecting function f if this is a right.
+      * @return
+      *   this, after evaluation of the side effecting function f if this is a right.
       */
     def tapRight(f: R => Unit): Either[L, R] = either match {
       case Right(value) =>

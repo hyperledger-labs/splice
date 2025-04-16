@@ -1,25 +1,19 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
 
 import cats.Show.Shown
-import com.daml.error.utils.DecodedCantonError
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.config.RequireTypes.{Port, RefinedNumeric}
-import com.digitalasset.canton.data.DeduplicationPeriod
+import com.digitalasset.canton.data.{DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.HashLength
 import com.digitalasset.canton.util.{ErrorUtil, HexString}
-import com.digitalasset.canton.{
-  LedgerApplicationId,
-  LfPartyId,
-  LfTimestamp,
-  LfVersioned,
-  Uninhabited,
-}
+import com.digitalasset.canton.{LedgerUserId, LfPartyId, LfTimestamp, LfVersioned, Uninhabited}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
 import com.digitalasset.daml.lf.transaction.ContractStateMachine.ActiveLedgerState
@@ -34,10 +28,10 @@ import slick.util.{DumpInfo, Dumpable}
 
 import java.lang.Long as JLong
 import java.net.URI
-import java.time.{Duration as JDuration, Instant}
+import java.time.{Instant, Duration as JDuration}
 import java.util.UUID
 import scala.annotation.nowarn
-import scala.concurrent.duration.{Duration}
+import scala.concurrent.duration.Duration
 
 /** Collects instances of [[Pretty]] for common types.
   */
@@ -55,7 +49,8 @@ trait PrettyInstances {
 
   implicit def prettyTree[T <: Tree]: Pretty[T] = identity
 
-  /** Makes the syntax from [[com.digitalasset.canton.util.ShowUtil]] accessible in places where a Pretty is expected.
+  /** Makes the syntax from [[com.digitalasset.canton.util.ShowUtil]] accessible in places where a
+    * Pretty is expected.
     */
   implicit def prettyShown: Pretty[Shown] = prettyOfString(_.toString)
 
@@ -150,7 +145,7 @@ trait PrettyInstances {
 
   implicit def prettyLfParticipantId: Pretty[Ref.ParticipantId] = prettyOfString(prettyUidString(_))
 
-  implicit def prettyLedgerApplicationId: Pretty[LedgerApplicationId] = prettyOfString(
+  implicit def prettyLedgerUserId: Pretty[LedgerUserId] = prettyOfString(
     prettyUidString(_)
   )
 
@@ -186,20 +181,19 @@ trait PrettyInstances {
     prettyOfString(id => show"${id.packageId}:${id.qualifiedName}")
 
   implicit def prettyLfPackageName: Pretty[com.digitalasset.daml.lf.data.Ref.PackageName] =
-    prettyOfString(packageName => show"${packageName.toString}")
+    prettyOfString(packageName => show"$packageName")
 
   implicit def prettyLfContractId: Pretty[LfContractId] = prettyOfString {
-    case LfContractId.V1(discriminator, suffix)
-        // Shorten only Canton contract ids
-        if suffix.startsWith(AuthenticatedContractIdVersionV10.versionPrefixBytes) =>
-      val prefixBytesSize = CantonContractIdVersion.versionPrefixBytesSize
 
+    case LfContractId.V1(discriminator, suffix)
+        if suffix.length >= CantonContractIdVersion.versionPrefixBytesSize =>
+      val prefixBytesSize = CantonContractIdVersion.versionPrefixBytesSize
       val cantonVersionPrefix = suffix.slice(0, prefixBytesSize)
       val rawSuffix = suffix.slice(prefixBytesSize, suffix.length)
-
       discriminator.toHexString.readableHash.toString +
         cantonVersionPrefix.toHexString +
         rawSuffix.toHexString.readableHash.toString
+
     case lfContractId: LfContractId =>
       // Don't abbreviate anything for unusual contract ids
       lfContractId.toString
@@ -241,7 +235,7 @@ trait PrettyInstances {
     ),
     paramIfNonEmpty(
       "resources",
-      _.resources.map { case (k, v) => s"${k.asString}=>$v".singleQuoted }.toSeq,
+      _.resources.map { case (k, v) => s"${k.asString}=>$v".singleQuoted },
     ),
   )
 
@@ -307,6 +301,12 @@ trait PrettyInstances {
 
   implicit val prettyServingStatus: Pretty[ServingStatus] = prettyOfClass(
     param("status", _.name().singleQuoted)
+  )
+
+  implicit val prettyTimeBoundaries: Pretty[LedgerTimeBoundaries] = prettyOfClass(
+    param("constrained", t => t.minConstraint.isEmpty && t.maxConstraint.isEmpty),
+    paramIfDefined("min", _.minConstraint),
+    paramIfDefined("max", _.maxConstraint),
   )
 
 }

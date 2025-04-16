@@ -1,13 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
   IntegrationTestWithSharedEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.DataExportTestUtil
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 // Integration test for everything from a core deployment that is not part of an SV node
 final class NonDsoNonDevNetPreflightIntegrationTest
@@ -24,8 +22,7 @@ final class NonDsoNonDevNetPreflightIntegrationTest
   )
   def validator1Client(implicit env: SpliceTestConsoleEnvironment) = vc("validator1")
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName()
     )

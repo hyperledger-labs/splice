@@ -1,10 +1,13 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
 
 import com.daml.ledger.api.v2.command_service.*
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc.CommandService as CommandServiceGrpc
+import com.daml.ledger.api.v2.commands.Commands
+import com.daml.ledger.api.v2.reassignment_commands.ReassignmentCommands
+import com.daml.ledger.api.v2.transaction_filter.{EventFormat, Filters}
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.services.CommandService
@@ -42,17 +45,24 @@ class ApiCommandService(
   private[this] val validator = new SubmitAndWaitRequestValidator(commandsValidator)
 
   override def submitAndWait(request: SubmitAndWaitRequest): Future[SubmitAndWaitResponse] =
-    enrichRequestAndSubmit(request)(service.submitAndWait)
+    enrichRequestAndSubmit(request = request)(service.submitAndWait)
 
   override def submitAndWaitForTransaction(
-      request: SubmitAndWaitRequest
+      request: SubmitAndWaitForTransactionRequest
   ): Future[SubmitAndWaitForTransactionResponse] =
-    enrichRequestAndSubmit(request)(service.submitAndWaitForTransaction)
+    enrichRequestAndSubmit(request = request)(service.submitAndWaitForTransaction)
+
+  override def submitAndWaitForReassignment(
+      request: SubmitAndWaitForReassignmentRequest
+  ): Future[SubmitAndWaitForReassignmentResponse] =
+    enrichRequestAndSubmit(request = request)(service.submitAndWaitForReassignment)
 
   override def submitAndWaitForTransactionTree(
       request: SubmitAndWaitRequest
   ): Future[SubmitAndWaitForTransactionTreeResponse] =
-    enrichRequestAndSubmit(request)(service.submitAndWaitForTransactionTree)
+    enrichRequestAndSubmit(request = request)(
+      service.submitAndWaitForTransactionTree
+    )
 
   override def bindService(): ServerServiceDefinition =
     CommandServiceGrpc.bindService(this, executionContext)
@@ -60,17 +70,18 @@ class ApiCommandService(
   private def enrichRequestAndSubmit[T](
       request: SubmitAndWaitRequest
   )(submit: SubmitAndWaitRequest => LoggingContextWithTrace => Future[T]): Future[T] = {
-    val traceContext = getAnnotedCommandTraceContext(request.commands, telemetry)
+    val traceContext = getAnnotatedCommandTraceContext(request.commands, telemetry)
     implicit val loggingContext: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory)(traceContext)
-    val requestWithSubmissionId = generateSubmissionIdIfEmpty(request)
+    val requestWithSubmissionId =
+      request.update(_.optionalCommands.modify(generateSubmissionIdIfEmpty))
     validator
       .validate(
-        requestWithSubmissionId, // it is enough to validate V1 only, since at submission the SubmitRequest will be validated again (and the domainId as well)
+        requestWithSubmissionId,
         currentLedgerTime(),
         currentUtcTime(),
         maxDeduplicationDuration,
-      )(contextualizedErrorLogger(requestWithSubmissionId))
+      )(errorLoggingContext(requestWithSubmissionId))
       .fold(
         t =>
           Future.failed(ValidationLogger.logFailureWithTrace(logger, requestWithSubmissionId, t)),
@@ -78,17 +89,107 @@ class ApiCommandService(
       )
   }
 
-  private def generateSubmissionIdIfEmpty(request: SubmitAndWaitRequest): SubmitAndWaitRequest =
-    if (request.commands.exists(_.submissionId.isEmpty)) {
-      val commandsWithSubmissionId =
-        request.commands.map(_.copy(submissionId = generateSubmissionId.generate()))
-      request.copy(commands = commandsWithSubmissionId)
+  private def enrichRequestAndSubmit(
+      request: SubmitAndWaitForTransactionRequest
+  )(
+      submit: SubmitAndWaitForTransactionRequest => LoggingContextWithTrace => Future[
+        SubmitAndWaitForTransactionResponse
+      ]
+  ): Future[SubmitAndWaitForTransactionResponse] = {
+    val traceContext = getAnnotatedCommandTraceContext(request.commands, telemetry)
+    implicit val loggingContext: LoggingContextWithTrace =
+      LoggingContextWithTrace(loggerFactory)(traceContext)
+    val requestWithSubmissionId =
+      request.update(_.optionalCommands.modify(generateSubmissionIdIfEmpty))
+    validator
+      .validate(
+        requestWithSubmissionId,
+        currentLedgerTime(),
+        currentUtcTime(),
+        maxDeduplicationDuration,
+      )(errorLoggingContext(requestWithSubmissionId))
+      .fold(
+        t =>
+          Future.failed(ValidationLogger.logFailureWithTrace(logger, requestWithSubmissionId, t)),
+        _ => submit(requestWithSubmissionId)(loggingContext),
+      )
+  }
+
+  private def enrichRequestAndSubmit(
+      request: SubmitAndWaitForReassignmentRequest
+  )(
+      submit: SubmitAndWaitForReassignmentRequest => LoggingContextWithTrace => Future[
+        SubmitAndWaitForReassignmentResponse
+      ]
+  ): Future[SubmitAndWaitForReassignmentResponse] = {
+    val traceContext =
+      getAnnotatedReassignmentCommandTraceContext(request.reassignmentCommands, telemetry)
+    implicit val loggingContext: LoggingContextWithTrace =
+      LoggingContextWithTrace(loggerFactory)(traceContext)
+    val requestWithSubmissionId =
+      request.update(_.optionalReassignmentCommands.modify(generateSubmissionIdIfEmptyReassignment))
+    validator
+      .validate(
+        requestWithSubmissionId
+      )(errorLoggingContext(requestWithSubmissionId))
+      .fold(
+        t =>
+          Future.failed(ValidationLogger.logFailureWithTrace(logger, requestWithSubmissionId, t)),
+        _ =>
+          requestWithSubmissionId.eventFormat match {
+            case Some(_) =>
+              submit(requestWithSubmissionId)(loggingContext)
+            case None =>
+              // request reassignment for all parties and remove the events
+              submit(
+                requestWithSubmissionId.copy(eventFormat =
+                  Some(
+                    EventFormat(
+                      filtersByParty = Map.empty,
+                      filtersForAnyParty = Some(Filters(Nil)),
+                      verbose = false,
+                    )
+                  )
+                )
+              )(
+                loggingContext
+              ).map(_.update(_.reassignment.modify(_.clearEvents)))
+          },
+      )
+  }
+
+  private def generateSubmissionIdIfEmpty(commands: Option[Commands]): Option[Commands] =
+    if (commands.exists(_.submissionId.isEmpty)) {
+      commands.map(_.copy(submissionId = generateSubmissionId.generate()))
     } else {
-      request
+      commands
     }
 
-  private def contextualizedErrorLogger(request: SubmitAndWaitRequest)(implicit
+  private def generateSubmissionIdIfEmptyReassignment(
+      commands: Option[ReassignmentCommands]
+  ): Option[ReassignmentCommands] =
+    if (commands.exists(_.submissionId.isEmpty)) {
+      commands.map(_.copy(submissionId = generateSubmissionId.generate()))
+    } else {
+      commands
+    }
+
+  private def errorLoggingContext(request: SubmitAndWaitRequest)(implicit
       loggingContext: LoggingContextWithTrace
   ) =
     ErrorLoggingContext.fromOption(logger, loggingContext, request.commands.map(_.submissionId))
+
+  private def errorLoggingContext(request: SubmitAndWaitForTransactionRequest)(implicit
+      loggingContext: LoggingContextWithTrace
+  ) =
+    ErrorLoggingContext.fromOption(logger, loggingContext, request.commands.map(_.submissionId))
+
+  private def errorLoggingContext(request: SubmitAndWaitForReassignmentRequest)(implicit
+      loggingContext: LoggingContextWithTrace
+  ) =
+    ErrorLoggingContext.fromOption(
+      logger,
+      loggingContext,
+      request.reassignmentCommands.map(_.submissionId),
+    )
 }

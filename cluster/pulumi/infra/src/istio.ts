@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { local } from '@pulumi/command';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
@@ -171,6 +172,7 @@ function configureInternalGatewayService(
     externalIPRanges,
     [
       ingressPort('grpc-cd-pub-api', 5008),
+      ingressPort('grpc-cs-p2p-api', 5010),
       ingressPort('grpc-svcp-adm', 5002),
       ingressPort('grpc-svcp-lg', 5001),
       ingressPort('svcp-metrics', 10013),
@@ -232,31 +234,49 @@ function configurePublicGatewayService(
         },
       },
       action: 'ALLOW',
-      rules: [
-        {
-          from: [
-            {
-              source: {
-                requestPrincipals: ['https://canton-network-ci.example.com/canton-network-ci'],
+      rules: (
+        [
+          {
+            from: [
+              {
+                source: {
+                  requestPrincipals: ['https://canton-network-ci.example.com/canton-network-ci'],
+                },
               },
-            },
-          ],
-        },
-        {
-          to: [
-            {
-              // Paths that do not require authentication at Istio.
-              operation: {
-                paths: [
-                  '/grafana/api/serviceaccounts',
-                  '/grafana/api/serviceaccounts/*',
-                  '/grafana/api/alertmanager/grafana/api/v2/silences',
+            ],
+          },
+          {
+            to: [
+              {
+                // Paths that do not require authentication at Istio.
+                operation: {
+                  paths: [
+                    '/grafana/api/serviceaccounts',
+                    '/grafana/api/serviceaccounts/*',
+                    '/grafana/api/alertmanager/grafana/api/v2/silences',
+                  ],
+                },
+              },
+            ],
+          },
+        ] as unknown[]
+      ).concat(
+        spliceConfig.pulumiProjectConfig.hasPublicDocs
+          ? [
+              {
+                to: [
+                  {
+                    operation: {
+                      hosts: [
+                        ...new Set([getDnsNames().cantonDnsName, getDnsNames().daDnsName]),
+                      ].map(host => `docs.${host}`),
+                    },
+                  },
                 ],
               },
-            },
-          ],
-        },
-      ],
+            ]
+          : []
+      ),
     },
   });
   return configureGatewayService(
@@ -399,6 +419,7 @@ function configureGateway(
         domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
       },
       enableGcsProxy: true,
+      publicDocs: spliceConfig.pulumiProjectConfig.hasPublicDocs,
     },
     activeVersion,
     {

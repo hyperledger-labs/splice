@@ -49,7 +49,7 @@ private[splice] object TransactionTreeExtensions {
         case _: j.CreatedEvent => Iterator.empty
         case ex: j.ExercisedEvent =>
           val evs = self.getEventsById.asScala
-          ex.getChildEventIds.asScala.iterator flatMap { childId =>
+          self.getChildNodeIds(ex).asScala.iterator flatMap { childId =>
             evs
               .get(childId)
               .fold(Iterator.empty[j.TreeEvent])(child =>
@@ -72,7 +72,8 @@ private[splice] object TransactionTreeExtensions {
       choice: jcg.Choice[Marker, ?, Res],
   ): Option[Res] =
     Option.when(
-      QualifiedName(event.getTemplateId) == QualifiedName(tpl.getTemplateIdWithPackageId)
-        && event.getChoice == choice.name
+      QualifiedName(event.getTemplateId) == QualifiedName(
+        tpl.getTemplateIdWithPackageId
+      ) && event.getChoice == choice.name
     )(choice.returnTypeDecoder.decode(event.getExerciseResult))
 }

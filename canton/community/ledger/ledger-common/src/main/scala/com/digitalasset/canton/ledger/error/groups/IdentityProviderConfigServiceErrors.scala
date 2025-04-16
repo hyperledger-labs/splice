@@ -1,10 +1,19 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error.groups
 
-import com.daml.error.{DamlError, DamlErrorWithDefiniteAnswer, *}
+import com.digitalasset.base.error.{
+  ContextualizedDamlError,
+  DamlErrorWithDefiniteAnswer,
+  ErrorCategory,
+  ErrorCode,
+  ErrorResource,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.AdminServicesErrorGroup.IdentityProviderConfigServiceErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 object IdentityProviderConfigServiceErrors extends IdentityProviderConfigServiceErrorGroup {
 
@@ -21,8 +30,8 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
         ErrorCategory.InvalidIndependentOfSystemState,
       ) {
     final case class Reject(identityProviderId: String, reason: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause =
             s"Update operation for identity provider config '$identityProviderId' failed due to: $reason"
         ) {
@@ -42,7 +51,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
         ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
       ) {
     final case class Reject(operation: String, identityProviderId: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed for unknown identity provider id=\"$identityProviderId\""
         ) {
@@ -62,7 +71,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
         ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
       ) {
     final case class Reject(operation: String, issuer: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed for unknown identity provider issuer=\"$issuer\""
         )
@@ -80,7 +89,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
         ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
       ) {
     final case class Reject(operation: String, identityProviderId: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed, as identity provider \"$identityProviderId\" already exists"
         ) {
@@ -102,7 +111,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
         ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
       ) {
     final case class Reject(operation: String, issuer: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed, as identity provider with issuer \"$issuer\" already exists"
         ) {
@@ -126,7 +135,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(operation: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$operation failed."
         ) {}

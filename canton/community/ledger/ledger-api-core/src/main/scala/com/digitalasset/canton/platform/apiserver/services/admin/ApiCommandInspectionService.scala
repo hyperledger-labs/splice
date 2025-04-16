@@ -1,9 +1,8 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.admin.command_inspection_service.*
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
@@ -31,7 +30,7 @@ class ApiCommandInspectionService(
     with StreamingServiceLifecycleManagement
     with NamedLogging {
 
-  protected implicit val contextualizedErrorLogger: ContextualizedErrorLogger =
+  protected implicit val errorLoggingContext: ErrorLoggingContext =
     ErrorLoggingContext(
       logger,
       loggerFactory.properties,

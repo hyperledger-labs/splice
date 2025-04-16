@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -12,9 +12,19 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.{
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{DefaultPorts, TestingConfigInternal}
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.config.{
+  CantonEdition,
+  DefaultPorts,
+  SharedCantonConfig,
+  TestingConfigInternal,
+}
+import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
+import com.digitalasset.canton.integration.plugins.{
+  UseH2,
+  UsePostgres,
+  UseReferenceBlockSequencerBase,
+}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
@@ -22,24 +32,31 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
 import java.util.concurrent.TimeUnit
-import scala.util.Try
 import scala.util.control.{NoStackTrace, NonFatal}
+import scala.util.Try
 
-/** Provides an ability to create a canton environment when needed for test.
-  * Include [[IsolatedEnvironments]] or [[SharedEnvironment]] to determine when this happens.
-  * Uses [[ConcurrentEnvironmentLimiter]] to ensure we limit the number of concurrent environments in a test run.
+/** Provides an ability to create a canton environment when needed for test. Include
+  * [[IsolatedEnvironments]] or [[SharedEnvironment]] to determine when this happens. Uses
+  * [[ConcurrentEnvironmentLimiter]] to ensure we limit the number of concurrent environments in a
+  * test run.
   */
-sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]]
+sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
     extends BeforeAndAfterAll {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with IntegrationTestMetrics with NamedLogging =>
+  this: Suite with IntegrationTestMetrics with NamedLogging =>
 
-  private lazy val envDef = environmentDefinition
+  protected def environmentDefinition: BaseEnvironmentDefinition[C, E]
+
+  private lazy val envDef: BaseEnvironmentDefinition[C, E] = environmentDefinition
+
+  protected def environmentFactory: EnvironmentFactory[C, E]
+
+  val edition: CantonEdition
 
   // plugins are registered during construction from a single thread
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var plugins: Seq[EnvironmentSetupPlugin[E, TCE]] = Seq()
+  private var plugins: Seq[EnvironmentSetupPlugin[C, E]] = Seq()
 
-  protected[integration] def registerPlugin(plugin: EnvironmentSetupPlugin[E, TCE]): Unit =
+  protected[integration] def registerPlugin(plugin: EnvironmentSetupPlugin[C, E]): Unit =
     plugins = plugins :+ plugin
 
   override protected def beforeAll(): Unit = {
@@ -52,15 +69,16 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     finally
       Timed.value(testInfrastructureSuiteMetrics.pluginsAfterTests, plugins.foreach(_.afterTests()))
 
-  /** Provide an environment for an individual test either by reusing an existing one or creating a new one
-    * depending on the approach being used.
+  /** Provide an environment for an individual test either by reusing an existing one or creating a
+    * new one depending on the approach being used.
     */
-  def provideEnvironment(testName: String): TCE
+  def provideEnvironment(testName: String): TestConsoleEnvironment[C, E]
 
-  /** Optional hook for implementors to know when a test has finished and be provided the environment instance.
-    * This is required over a afterEach hook as we need the environment instance passed.
+  /** Optional hook for implementors to know when a test has finished and be provided the
+    * environment instance. This is required over a afterEach hook as we need the environment
+    * instance passed.
     */
-  def testFinished(testName: String, environment: TCE): Unit = {}
+  def testFinished(testName: String, environment: TestConsoleEnvironment[C, E]): Unit = {}
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
@@ -71,23 +89,28 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
       .map(assertion => loggerFactory.assertLoggedWarningsAndErrorsSeq(start, assertion))
       .getOrElse(start)
 
-  /** Creates a new environment manually for a test without concurrent environment limitation and with optional config transformation.
+  /** Creates a new environment manually for a test without concurrent environment limitation and
+    * with optional config transformation.
     *
-    * @param initialConfig specifies which configuration to start from with the default being a NEW one created
-    *                      from the current environment.
-    * @param configTransform a function that applies changes to the initial configuration
-    *                        (with the plugins applied on top)
-    * @param runPlugins a function that expects a plugin reference and returns whether or not it's supposed to be run
-    *                   against the initial configuration
-    * @return a new test console environment
+    * @param initialConfig
+    *   specifies which configuration to start from with the default being a NEW one created from
+    *   the current environment.
+    * @param configTransform
+    *   a function that applies changes to the initial configuration (with the plugins applied on
+    *   top)
+    * @param runPlugins
+    *   a function that expects a plugin reference and returns whether or not it's supposed to be
+    *   run against the initial configuration
+    * @return
+    *   a new test console environment
     */
   protected def manualCreateEnvironment(
-      initialConfig: E#Config = envDef.generateConfig,
-      configTransform: E#Config => E#Config = identity,
-      runPlugins: EnvironmentSetupPlugin[E, TCE] => Boolean = _ => true,
+      initialConfig: C = envDef.generateConfig,
+      configTransform: C => C = identity,
+      runPlugins: EnvironmentSetupPlugin[C, E] => Boolean = _ => true,
       testConfigTransform: TestingConfigInternal => TestingConfigInternal = identity,
       testName: Option[String],
-  ): TCE = TraceContext.withNewTraceContext { tc =>
+  ): TestConsoleEnvironment[C, E] = TraceContext.withNewTraceContext { tc =>
     logger.debug(
       s"Starting creating environment for $suiteName${testName.fold("")(n => s", test '$n'")}:"
     )(tc)
@@ -123,40 +146,42 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     }
 
     // Once all the plugins and config transformation is done apply the defaults
-    val finalConfig = step("Applying config transforms") {
-      configTransform(pluginConfig).withDefaults(new DefaultPorts())
-    }
+    val finalConfig =
+      configTransform(pluginConfig).withDefaults(new DefaultPorts(), edition)
 
     val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
-    val environmentFixture = step("Creating fixture") {
-      Timed.value(
-        metrics.environmentCreateFixture,
-        envDef.environmentFactory.create(
-          finalConfig,
-          loggerFactory,
-          envDef.testingConfig.copy(
-            metricsFactoryType =
-              /* If metrics reporters were configured for the test then it's an externally observed test
-               * therefore actual metrics have to be reported.
-               * The in memory metrics are used when no reporters are configured and the metrics are
-               * observed directly in the test scenarios.
-               *
-               * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
-               * which is accessible using env.environment.metricsRegistry
-               *
-               * */
-              if (finalConfig.monitoring.metrics.reporters.isEmpty)
-                MetricsFactoryType.InMemory(scopedMetricsFactory)
-              else MetricsFactoryType.External,
-            initializeGlobalOpenTelemetry = false,
-            sequencerTransportSeed = Some(1L),
+    val environmentFixture: E =
+      step("Creating fixture") {
+        Timed.value(
+          metrics.environmentCreateFixture,
+          envDef.environmentFactory.create(
+            finalConfig,
+            loggerFactory,
+            testConfigTransform(
+              envDef.testingConfig.copy(
+                metricsFactoryType =
+                  /* If metrics reporters were configured for the test then it's an externally observed test
+                   * therefore actual metrics have to be reported.
+                   * The in memory metrics are used when no reporters are configured and the metrics are
+                   * observed directly in the test scenarios.
+                   *
+                   * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
+                   * which is accessible using env.environment.metricsRegistry
+                   *
+                   * */
+                  if (finalConfig.monitoring.metrics.reporters.isEmpty)
+                    MetricsFactoryType.InMemory(scopedMetricsFactory)
+                  else MetricsFactoryType.External,
+                initializeGlobalOpenTelemetry = false,
+                sequencerTransportSeed = Some(1L),
+              )
+            ),
           ),
-        ),
-      )
-    }
+        )
+      }
 
     try {
-      val testEnvironment: TCE = step("Creating test console") {
+      val testEnvironment: TestConsoleEnvironment[C, E] = step("Creating test console") {
         envDef.createTestConsole(environmentFixture, loggerFactory)
       }
 
@@ -234,7 +259,41 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     }
   }
 
-  protected def createEnvironment(testName: Option[String]): TCE = {
+  /** Creates a new environment manually for a test with the storage plugins disabled, so that we
+    * can keep the persistent state from an old environment.
+    *
+    * @param oldEnvConfig
+    *   the configuration for the reference (old) environment which will serve as the configuration
+    *   to start from
+    * @param configTransform
+    *   a function that applies changes to the oldEnvConfig (with the plugins applied on top)
+    * @param runPlugins
+    *   a function that expects a plugin reference and returns whether or not it's supposed to be
+    *   run against the initial configuration
+    * @return
+    *   a new test console environment that persists the db/state of another 'older' environment
+    */
+  protected def manualCreateEnvironmentWithPreviousState(
+      oldEnvConfig: C,
+      configTransform: C => C = identity,
+      runPlugins: EnvironmentSetupPlugin[C, E] => Boolean = _ => true,
+      testName: Option[String],
+  ): TestConsoleEnvironment[C, E] =
+    manualCreateEnvironment(
+      oldEnvConfig,
+      configTransform,
+      {
+        /* the block sequencer makes use of its own db so we don't want to create a new one here since that would
+         * set a new state and lead to conflicts with the old db.
+         */
+        case _: UseH2 | _: UsePostgres | _: UseReferenceBlockSequencerBase[_] =>
+          false // to prevent creating a new fresh db, the db is only deleted when the old environment is destroyed.
+        case plugin => runPlugins(plugin)
+      },
+      testName = testName,
+    )
+
+  protected def createEnvironment(testName: Option[String]): TestConsoleEnvironment[C, E] = {
     val metrics = testInfrastructureEnvironmentMetrics(testName)
     val waitBegin = System.nanoTime()
     ConcurrentEnvironmentLimiter.create(getClass.getName, numPermits) {
@@ -244,7 +303,7 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     }
   }
 
-  protected def manualDestroyEnvironment(environment: TCE): Unit = {
+  protected def manualDestroyEnvironment(environment: TestConsoleEnvironment[C, E]): Unit = {
     val config = environment.actualConfig
     plugins.foreach(_.beforeEnvironmentDestroyed(config, environment))
     try {
@@ -255,9 +314,15 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     }
   }
 
-  protected def destroyEnvironment(testName: Option[String], environment: TCE): Unit = {
+  protected def destroyEnvironment(
+      testName: Option[String],
+      environment: TestConsoleEnvironment[C, E],
+  ): Unit = {
     val metrics = testInfrastructureEnvironmentMetrics(testName)
-    environment.verifyParticipantLapiIntegrity(plugins)
+    // Run the Ledger API integrity check before destroying the environment
+    val checker = new LedgerApiStoreIntegrityChecker(loggerFactory)
+    checker.verifyParticipantLapiIntegrity(environment, plugins)
+
     ConcurrentEnvironmentLimiter.destroy(getClass.getName, numPermits) {
       Timed.value(metrics.environmentDestroy, manualDestroyEnvironment(environment))
     }
@@ -277,19 +342,19 @@ object EnvironmentSetup {
       with NoStackTrace // Stack trace is just a lot of scalatest and EnvironmentSetup
 }
 
-/** Starts an environment in a beforeAll test and uses it for all tests.
-  * Destroys it in an afterAll hook.
+/** Starts an environment in a beforeAll test and uses it for all tests. Destroys it in an afterAll
+  * hook.
   *
-  * As a result, the environment state at the beginning of a test case
-  * equals the state at the end of the previous test case.
+  * As a result, the environment state at the beginning of a test case equals the state at the end
+  * of the previous test case.
   */
-trait SharedEnvironment[E <: Environment, TCE <: TestConsoleEnvironment[E]]
-    extends EnvironmentSetup[E, TCE]
+trait SharedEnvironment[C <: SharedCantonConfig[C], E <: Environment[C]]
+    extends EnvironmentSetup[C, E]
     with CloseableTest {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with IntegrationTestMetrics with NamedLogging =>
+  this: Suite with IntegrationTestMetrics with NamedLogging =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var sharedEnvironment: Option[TCE] = None
+  private var sharedEnvironment: Option[TestConsoleEnvironment[C, E]] = None
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -301,24 +366,27 @@ trait SharedEnvironment[E <: Environment, TCE <: TestConsoleEnvironment[E]]
       sharedEnvironment.foreach(destroyEnvironment(None, _))
     } finally super.afterAll()
 
-  override def provideEnvironment(testName: String): TCE =
+  override def provideEnvironment(testName: String): TestConsoleEnvironment[C, E] =
     sharedEnvironment.getOrElse(
       sys.error("beforeAll should have run before providing a shared environment")
     )
 }
 
-/** Creates an environment for each test.
-  * As a result, every test case starts with a fresh environment.
+/** Creates an environment for each test. As a result, every test case starts with a fresh
+  * environment.
   *
-  * Try to use SharedEnvironment instead to avoid the cost of frequently creating environments in CI.
+  * Try to use SharedEnvironment instead to avoid the cost of frequently creating environments in
+  * CI.
   */
-trait IsolatedEnvironments[E <: Environment, TCE <: TestConsoleEnvironment[E]]
-    extends EnvironmentSetup[E, TCE] {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with IntegrationTestMetrics with NamedLogging =>
+trait IsolatedEnvironments[C <: SharedCantonConfig[C], E <: Environment[C]]
+    extends EnvironmentSetup[C, E] {
+  this: Suite with IntegrationTestMetrics with NamedLogging =>
 
-  override def provideEnvironment(testName: String): TCE = createEnvironment(Some(testName))
-  override def testFinished(testName: String, environment: TCE): Unit = destroyEnvironment(
-    Some(testName),
-    environment,
-  )
+  override def provideEnvironment(testName: String): TestConsoleEnvironment[C, E] =
+    createEnvironment(Some(testName))
+  override def testFinished(testName: String, environment: TestConsoleEnvironment[C, E]): Unit =
+    destroyEnvironment(
+      Some(testName),
+      environment,
+    )
 }

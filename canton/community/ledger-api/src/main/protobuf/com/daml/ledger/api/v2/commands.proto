@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -26,6 +26,9 @@ message Command {
 // Create a new contract instance based on a template.
 message CreateCommand {
   // The template of contract the client wants to create.
+  // Both package-name and package-id reference identifier formats for the template-id are supported.
+  // Note: The package-id reference identifier format is deprecated. We plan to end support for this format in version 3.4.
+  //
   // Required
   Identifier template_id = 1;
 
@@ -37,6 +40,9 @@ message CreateCommand {
 // Exercise a choice on an existing contract.
 message ExerciseCommand {
   // The template of contract the client wants to exercise.
+  // Both package-name and package-id reference identifier formats for the template-id are supported.
+  // Note: The package-id reference identifier format is deprecated. We plan to end support for this format in version 3.4.
+  //
   // Required
   Identifier template_id = 1;
 
@@ -58,6 +64,9 @@ message ExerciseCommand {
 // Exercise a choice on an existing contract specified by its key.
 message ExerciseByKeyCommand {
   // The template of contract the client wants to exercise.
+  // Both package-name and package-id reference identifier formats for the template-id are supported.
+  // Note: The package-id reference identifier format is deprecated. We plan to end support for this format in version 3.4.
+  //
   // Required
   Identifier template_id = 1;
 
@@ -78,6 +87,9 @@ message ExerciseByKeyCommand {
 // Create a contract and exercise a choice on it in the same transaction.
 message CreateAndExerciseCommand {
   // The template of the contract the client wants to create.
+  // Both package-name and package-id reference identifier formats for the template-id are supported.
+  // Note: The package-id reference identifier format is deprecated. We plan to end support for this format in version 3.4.
+  //
   // Required
   Identifier template_id = 1;
 
@@ -99,8 +111,11 @@ message CreateAndExerciseCommand {
 // contract & contract key lookups.
 message DisclosedContract {
   // The template id of the contract.
+  // The identifier uses the package-id reference format.
+  //
   // Required
   Identifier template_id = 1;
+
   // The contract id
   // Required
   string contract_id = 2;
@@ -110,9 +125,9 @@ message DisclosedContract {
   // Required
   bytes created_event_blob = 3;
 
-  // The ID of the domain where the contract is currently assigned
+  // The ID of the synchronizer where the contract is currently assigned
   // Optional
-  string domain_id = 4;
+  string synchronizer_id = 4;
 }
 
 // A composite command that groups multiple commands together.
@@ -122,14 +137,14 @@ message Commands {
   // Optional
   string workflow_id = 1;
 
-  // Uniquely identifies the application or participant user that issued the command.
-  // Must be a valid ApplicationIdString (as described in ``value.proto``).
-  // Required unless authentication is used with a user token or a custom token specifying an application-id.
-  // In that case, the token's user-id, respectively application-id, will be used for the request's application_id.
-  string application_id = 2;
+  // Uniquely identifies the participant user that issued the command.
+  // Must be a valid UserIdString (as described in ``value.proto``).
+  // Required unless authentication is used with a user token.
+  // In that case, the token's user-id will be used for the request's user_id.
+  string user_id = 2;
 
   // Uniquely identifies the command.
-  // The triple (application_id, act_as, command_id) constitutes the change ID for the intended ledger change,
+  // The triple (user_id, act_as, command_id) constitutes the change ID for the intended ledger change,
   // where act_as is interpreted as a set of party names.
   // The change ID can be used for matching the intended ledger changes with all their completions.
   // Must be a valid LedgerString (as described in ``value.proto``).
@@ -141,17 +156,15 @@ message Commands {
   repeated Command commands = 4;
 
   // Specifies the deduplication period for the change ID.
-  // If omitted, the participant will assume the configured maximum deduplication time (see
-  // ``ledger_configuration_service.proto``).
+  // If omitted, the participant will assume the configured maximum deduplication time.
   oneof deduplication_period {
     // Specifies the length of the deduplication period.
     // It is interpreted relative to the local clock at some point during the submission's processing.
-    // Must be non-negative. Must not exceed the maximum deduplication time (see
-    // ``ledger_configuration_service.proto``).
+    // Must be non-negative. Must not exceed the maximum deduplication time.
     google.protobuf.Duration deduplication_duration = 5;
 
     // Specifies the start of the deduplication period by a completion stream offset (exclusive).
-    // Must be a valid absolute offset (positive integer).
+    // Must be a valid absolute offset (positive integer) or participant begin (zero).
     int64 deduplication_offset = 6;
   }
 
@@ -199,11 +212,32 @@ message Commands {
   // Optional
   repeated DisclosedContract disclosed_contracts = 12;
 
-  // Must be a valid domain ID
+  // Must be a valid synchronizer id
   // Optional
-  string domain_id = 13;
+  string synchronizer_id = 13;
 
   // The package-id selection preference of the client for resolving
   // package names and interface instances in command submission and interpretation
   repeated string package_id_selection_preference = 14;
+
+  // Fetches the contract keys into the caches to speed up the command processing.
+  // Should only contain contract keys that are expected to be resolved during interpretation of the commands.
+  // Keys of disclosed contracts do not need prefetching.
+  //
+  // Optional
+  repeated PrefetchContractKey prefetch_contract_keys = 15;
+}
+
+// Preload contracts
+message PrefetchContractKey {
+  // The template of contract the client wants to prefetch.
+  // Both package-name and package-id reference identifier formats for the template-id are supported.
+  // Note: The package-id reference identifier format is deprecated. We plan to end support for this format in version 3.4.
+  //
+  // Required
+  Identifier template_id = 1;
+
+  // The key of the contract the client wants to prefetch.
+  // Required
+  Value contract_key = 2;
 }

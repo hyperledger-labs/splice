@@ -1,27 +1,27 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
-import com.daml.error.*
 import com.digitalasset.canton.ProtoDeserializationError.{FieldNotSet, OtherError}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.protocol.v30.LocalVerdict.VerdictCode.{
   VERDICT_CODE_LOCAL_APPROVE,
   VERDICT_CODE_LOCAL_MALFORMED,
   VERDICT_CODE_LOCAL_REJECT,
   VERDICT_CODE_UNSPECIFIED,
 }
-import com.digitalasset.canton.protocol.{messages, v30}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.*
 import com.google.rpc.status.Status
 
-/** Possible verdicts on a transaction request from the participant's perspective.
-  * The verdict can be `LocalApprove` or `LocalReject`.
-  * The verdict `LocalReject` includes a `reason` pointing out which checks in Phase 3 have failed, and
-  * a flag `isMalformed` indicating whether the rejection occurs due to malicious behavior.
+/** Possible verdicts on a transaction request from the participant's perspective. The verdict can
+  * be `LocalApprove` or `LocalReject`. The verdict `LocalReject` includes a `reason` pointing out
+  * which checks in Phase 3 have failed, and a flag `isMalformed` indicating whether the rejection
+  * occurs due to malicious behavior.
   */
 sealed trait LocalVerdict
     extends Product
@@ -40,17 +40,16 @@ sealed trait LocalVerdict
   override def representativeProtocolVersion: RepresentativeProtocolVersion[LocalVerdict.type]
 }
 
-object LocalVerdict extends HasProtocolVersionedCompanion[LocalVerdict] {
+object LocalVerdict extends VersioningCompanion[LocalVerdict] {
 
   override def name: String = getClass.getSimpleName
 
-  override def supportedProtoVersions: messages.LocalVerdict.SupportedProtoVersions =
-    SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.LocalVerdict)(
-        supportedProtoVersion(_)(fromProtoV30),
-        _.toProtoV30.toByteString,
-      )
+  override def versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.LocalVerdict)(
+      supportedProtoVersion(_)(fromProtoV30),
+      _.toProtoV30,
     )
+  )
 
   private[messages] def fromProtoV30(
       localVerdictP: v30.LocalVerdict
@@ -106,13 +105,13 @@ final case class LocalReject(reason: com.google.rpc.status.Status, isMalformed: 
     with PrettyPrinting {
   override def isApprove: Boolean = false
 
-  override def logWithContext(
+  override def logRejection(
       extra: Map[String, String]
-  )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Unit =
+  )(implicit errorLoggingContext: ErrorLoggingContext): Unit =
     // Log with level INFO, leave it to LocalRejectError to log the details.
-    contextualizedErrorLogger.withContext(extra) {
+    errorLoggingContext.withContext(extra) {
       lazy val action = if (isMalformed) "malformed" else "rejected"
-      contextualizedErrorLogger.info(show"Request is $action. $reason")
+      errorLoggingContext.info(show"Request is $action. $reason")
     }
 
   override private[messages] def toProtoV30: v30.LocalVerdict = {

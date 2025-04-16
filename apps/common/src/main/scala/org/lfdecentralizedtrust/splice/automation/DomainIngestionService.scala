@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
-import org.lfdecentralizedtrust.splice.store.DomainStore
+import org.lfdecentralizedtrust.splice.store.SynchronizerStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.util.ShowUtil.*
@@ -12,7 +12,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class DomainIngestionService(
-    sink: DomainStore.IngestionSink,
+    sink: SynchronizerStore.IngestionSink,
     connection: SpliceLedgerConnection,
     context: TriggerContext,
 )(implicit ec: ExecutionContext, tracer: Tracer)

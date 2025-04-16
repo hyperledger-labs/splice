@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util.retry
@@ -49,15 +49,14 @@ trait Jitter {
   */
 object Jitter {
 
-  /** Given a lower and upper bound (inclusive) generate a random
-    * number within those bounds
+  /** Given a lower and upper bound (inclusive) generate a random number within those bounds
     */
   type RandomSource = (Long, Long) => Long
 
   val defaultRandomSource: Jitter.RandomSource = Jitter.randomSource(ThreadLocalRandom.current())
 
-  /** Create a RandomSource from an instance of java.util.Random
-    * Please be mindful of the call-by-name semantics
+  /** Create a RandomSource from an instance of java.util.Random Please be mindful of the
+    * call-by-name semantics
     */
   def randomSource(random: => Random): RandomSource = { (l, u) =>
     val (_l, _u) = if (l < u) (l, u) else (u, l)

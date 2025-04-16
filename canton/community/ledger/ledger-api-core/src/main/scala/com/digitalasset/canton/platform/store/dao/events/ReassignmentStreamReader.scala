@@ -1,15 +1,16 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
 
 import com.daml.ledger.api.v2.reassignment.Reassignment
 import com.daml.metrics.{DatabaseMetrics, Timed}
+import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.util.TimestampConversion
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.TemplatePartiesFilter
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   Entry,
@@ -31,11 +32,9 @@ import com.digitalasset.canton.platform.store.utils.{
   ConcurrencyLimiter,
   QueueBasedConcurrencyLimiter,
 }
-import com.digitalasset.canton.platform.{ApiOffset, TemplatePartiesFilter}
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.Party
-import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Attributes
 import org.apache.pekko.stream.scaladsl.Source
@@ -52,7 +51,6 @@ class ReassignmentStreamReader(
     eventStorageBackend: EventStorageBackend,
     lfValueTranslation: LfValueTranslation,
     metrics: LedgerApiServerMetrics,
-    tracer: Tracer,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
@@ -61,12 +59,14 @@ class ReassignmentStreamReader(
 
   private val dbMetrics = metrics.index.db
 
+  private val directEC = DirectExecutionContext(logger)
+
   def streamReassignments(reassignmentStreamQueryParams: ReassignmentStreamQueryParams)(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, Reassignment), NotUsed] = {
     import reassignmentStreamQueryParams.*
     logger.debug(
-      s"streamReassignments(${queryRange.startExclusiveOffset}, ${queryRange.endInclusiveOffset}, $filteringConstraints, $eventProjectionProperties)"
+      s"streamReassignments(${queryRange.startInclusiveOffset}, ${queryRange.endInclusiveOffset}, $filteringConstraints, $eventProjectionProperties)"
     )
 
     val assignedEventIdQueriesLimiter =
@@ -85,7 +85,7 @@ class ReassignmentStreamReader(
           paginatingAsyncStream.streamIdsFromSeekPagination(
             idPageSizing = idPageSizing,
             idPageBufferSize = maxPagesPerIdPagesBuffer,
-            initialFromIdExclusive = queryRange.startExclusiveEventSeqId,
+            initialFromIdExclusive = queryRange.startInclusiveEventSeqId,
           )(
             fetchPage = (state: IdPaginationState) => {
               maxParallelIdQueriesLimiter.execute {
@@ -114,24 +114,25 @@ class ReassignmentStreamReader(
         ids: Source[Iterable[Long], NotUsed],
         maxParallelPayloadQueries: Int,
         dbMetric: DatabaseMetrics,
-        payloadDbQuery: PayloadDbQuery[T],
-        deserialize: T => Future[Reassignment],
+        payloadDbQuery: PayloadDbQuery[Entry[T]],
+        deserialize: Seq[Entry[T]] => Future[Option[Reassignment]],
     ): Source[Reassignment, NotUsed] = {
       // Pekko requires for this buffer's size to be a power of two.
       val inputBufferSize = Utils.largestSmallerOrEqualPowerOfTwo(maxParallelPayloadQueries)
-      ids.async
+      val serializedPayloads = ids.async
         .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))
         .mapAsync(maxParallelPayloadQueries)(ids =>
           payloadQueriesLimiter.execute {
             globalPayloadQueriesLimiter.execute {
               dbDispatcher.executeSql(dbMetric) { implicit connection =>
                 queryValidRange.withRangeNotPruned(
-                  minOffsetExclusive = queryRange.startExclusiveOffset,
+                  minOffsetInclusive = queryRange.startInclusiveOffset,
                   maxOffsetInclusive = queryRange.endInclusiveOffset,
                   errorPruning = (prunedOffset: Offset) =>
-                    s"Reassignment request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} precedes pruned offset ${prunedOffset.toLong}",
-                  errorLedgerEnd = (ledgerEndOffset: Offset) =>
-                    s"Reassignment request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} is beyond ledger end offset ${ledgerEndOffset.toLong}",
+                    s"Reassignment request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} precedes pruned offset ${prunedOffset.unwrap}",
+                  errorLedgerEnd = (ledgerEndOffset: Option[Offset]) =>
+                    s"Reassignment request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} is beyond ledger end offset ${ledgerEndOffset
+                        .fold(0L)(_.unwrap)}",
                 ) {
                   payloadDbQuery.fetchPayloads(
                     eventSequentialIds = ids,
@@ -143,11 +144,14 @@ class ReassignmentStreamReader(
           }
         )
         .mapConcat(identity)
+      UpdateReader
+        .groupContiguous(serializedPayloads)(by = _.updateId)
         .mapAsync(deserializationProcessingParallelism)(t =>
           deserializationQueriesLimiter.execute(
             deserialize(t)
           )
         )
+        .mapConcat(_.toList)
     }
 
     val idsAssign =
@@ -183,51 +187,26 @@ class ReassignmentStreamReader(
 
     payloadsAssign
       .mergeSorted(payloadsUnassign)(Ordering.by(_.offset))
-      .map(response => Offset.fromLong(response.offset) -> response)
+      .map(response => Offset.tryFromLong(response.offset) -> response)
   }
 
-  private def toApiUnassigned(rawUnassignEntry: Entry[RawUnassignEvent]): Future[Reassignment] =
+  private def toApiUnassigned(
+      rawUnassignEntries: Seq[Entry[RawUnassignEvent]]
+  ): Future[Option[Reassignment]] =
     Timed.future(
-      future = Future {
-        Reassignment(
-          updateId = rawUnassignEntry.updateId,
-          commandId = rawUnassignEntry.commandId.getOrElse(""),
-          workflowId = rawUnassignEntry.workflowId.getOrElse(""),
-          offset = ApiOffset.assertFromStringToLong(rawUnassignEntry.offset),
-          event = Reassignment.Event.UnassignedEvent(
-            TransactionsReader.toUnassignedEvent(rawUnassignEntry.event)
-          ),
-          recordTime = Some(TimestampConversion.fromLf(rawUnassignEntry.recordTime)),
-        )
-      },
+      future = Future.successful(UpdateReader.toApiUnassigned(rawUnassignEntries)),
       timer = dbMetrics.reassignmentStream.translationTimer,
     )
 
   private def toApiAssigned(eventProjectionProperties: EventProjectionProperties)(
-      rawAssignEntry: Entry[RawAssignEvent]
-  )(implicit lc: LoggingContextWithTrace): Future[Reassignment] =
+      rawAssignEntries: Seq[Entry[RawAssignEvent]]
+  )(implicit lc: LoggingContextWithTrace): Future[Option[Reassignment]] =
     Timed.future(
-      future = Future.delegate(
-        lfValueTranslation
-          .deserializeRaw(eventProjectionProperties)(
-            rawAssignEntry.event.rawCreatedEvent
-          )
-          .map(createdEvent =>
-            Reassignment(
-              updateId = rawAssignEntry.updateId,
-              commandId = rawAssignEntry.commandId.getOrElse(""),
-              workflowId = rawAssignEntry.workflowId.getOrElse(""),
-              offset = ApiOffset.assertFromStringToLong(rawAssignEntry.offset),
-              event = Reassignment.Event.AssignedEvent(
-                TransactionsReader.toAssignedEvent(
-                  rawAssignEntry.event,
-                  createdEvent,
-                )
-              ),
-              recordTime = Some(TimestampConversion.fromLf(rawAssignEntry.recordTime)),
-            )
-          )
-      ),
+      future = Future.delegate {
+        implicit val executionContext: ExecutionContext =
+          directEC // Scala 2 implicit scope override: shadow the outer scope's implicit by name
+        UpdateReader.toApiAssigned(eventProjectionProperties, lfValueTranslation)(rawAssignEntries)
+      },
       timer = dbMetrics.reassignmentStream.translationTimer,
     )
 

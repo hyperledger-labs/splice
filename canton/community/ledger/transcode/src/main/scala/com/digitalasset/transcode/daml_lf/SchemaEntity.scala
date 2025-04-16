@@ -1,11 +1,12 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.transcode.daml_lf
 
 import com.digitalasset.daml.lf.data.Ref
 
-/** Top-level Ledger Schema entity. This can either be a template/interface or a choice definition. */
+/** Top-level Ledger Schema entity. This can either be a template/interface or a choice definition.
+  */
 sealed trait SchemaEntity[P] { def map[Q](f: P => Q): SchemaEntity[Q] }
 object SchemaEntity {
   final case class PackageInfo(

@@ -4,20 +4,21 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data as javaApi
-import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
-import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
-import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
-import org.lfdecentralizedtrust.splice.util.{Contract, Trees}
+import com.daml.ledger.javaapi.{data, data as javaApi}
+import com.daml.ledger.javaapi.data.TransactionTree
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.platform.ApiOffset
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
+import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
+import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
+import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
 
 import java.time.{Instant, ZoneOffset}
 import scala.jdk.CollectionConverters.*
@@ -32,7 +33,8 @@ import scala.jdk.OptionConverters.*
 sealed trait ScanHttpEncodings {
 
   def lapiToHttpUpdate(
-      updateWithMigrationId: TreeUpdateWithMigrationId
+      updateWithMigrationId: TreeUpdateWithMigrationId,
+      eventIdBuilder: (String, Int) => String,
   )(implicit elc: ErrorLoggingContext): httpApi.UpdateHistoryItem = {
 
     updateWithMigrationId.update.update match {
@@ -44,12 +46,20 @@ sealed trait ScanHttpEncodings {
               updateWithMigrationId.migrationId,
               tree.getWorkflowId,
               tree.getRecordTime.toString,
-              updateWithMigrationId.update.domainId.toProtoPrimitive,
+              updateWithMigrationId.update.synchronizerId.toProtoPrimitive,
               tree.getEffectiveAt.toString,
-              ApiOffset.fromLong(tree.getOffset),
-              tree.getRootEventIds.asScala.toVector,
-              tree.getEventsById.asScala.map { case (eventId, treeEvent) =>
-                eventId -> javaToHttpEvent(treeEvent)
+              LegacyOffset.Api.fromLong(tree.getOffset),
+              tree.getRootNodeIds.asScala
+                .map(eventIdBuilder(tree.getUpdateId, _))
+                .toVector,
+              tree.getEventsById.asScala.map { case (nodeId, treeEvent) =>
+                val eventId = eventIdBuilder(tree.getUpdateId, nodeId)
+                eventId -> javaToHttpEvent(
+                  tree,
+                  eventId,
+                  treeEvent,
+                  eventIdBuilder,
+                )
               }.toMap,
             )
         )
@@ -66,7 +76,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                ApiOffset.fromLong(update.offset),
+                LegacyOffset.Api.fromLong(update.offset),
                 update.recordTime.toString,
                 httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
@@ -74,7 +84,10 @@ sealed trait ScanHttpEncodings {
                   target.toProtoPrimitive,
                   updateWithMigrationId.migrationId,
                   unassignId,
-                  javaToHttpCreatedEvent(createdEvent),
+                  javaToHttpCreatedEvent(
+                    eventIdBuilder(update.updateId, createdEvent.getNodeId),
+                    createdEvent,
+                  ),
                   counter,
                 ),
               )
@@ -90,7 +103,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                ApiOffset.fromLong(update.offset),
+                LegacyOffset.Api.fromLong(update.offset),
                 update.recordTime.toString,
                 httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
@@ -107,26 +120,37 @@ sealed trait ScanHttpEncodings {
     }
   }
 
-  private def javaToHttpEvent(treeEvent: javaApi.TreeEvent)(implicit
+  private def javaToHttpEvent(
+      tree: TransactionTree,
+      eventId: String,
+      treeEvent: javaApi.TreeEvent,
+      eventIdBuild: (String, Int) => String,
+  )(implicit
       elc: ErrorLoggingContext
   ): httpApi.TreeEvent = {
     treeEvent match {
       case event: javaApi.CreatedEvent =>
         httpApi.TreeEvent.fromCreatedEvent(
-          javaToHttpCreatedEvent(event)
+          javaToHttpCreatedEvent(eventId, event)
         )
       case event: javaApi.ExercisedEvent =>
         httpApi.TreeEvent.fromExercisedEvent(
           httpApi
             .ExercisedEvent(
               "exercised_event",
-              event.getEventId,
+              eventId,
               event.getContractId,
               templateIdString(event.getTemplateId),
               event.getPackageName,
               event.getChoice,
               encodeChoiceArgument(event),
-              event.getChildEventIds.asScala.toVector,
+              tree
+                .getChildNodeIds(event)
+                .asScala
+                .map(
+                  eventIdBuild(tree.getUpdateId, _)
+                )
+                .toVector,
               encodeExerciseResult(event),
               event.isConsuming,
               event.getActingParties.asScala.toVector,
@@ -138,7 +162,7 @@ sealed trait ScanHttpEncodings {
     }
   }
 
-  def javaToHttpCreatedEvent(event: javaApi.CreatedEvent)(implicit
+  def javaToHttpCreatedEvent(eventId: String, event: javaApi.CreatedEvent)(implicit
       elc: ErrorLoggingContext
   ): httpApi.CreatedEvent = {
     event.getContractKey.toScala.foreach { _ =>
@@ -149,7 +173,7 @@ sealed trait ScanHttpEncodings {
     httpApi
       .CreatedEvent(
         "created_event",
-        event.getEventId,
+        eventId,
         event.getContractId,
         templateIdString(event.getTemplateId),
         event.getPackageName,
@@ -167,7 +191,17 @@ sealed trait ScanHttpEncodings {
       httpToLapiReassignment(httpReassignment)
   }
 
-  def httpToLapiTransaction(http: httpApi.UpdateHistoryTransaction): TreeUpdateWithMigrationId =
+  private def httpToLapiTransaction(
+      http: httpApi.UpdateHistoryTransaction
+  ): TreeUpdateWithMigrationId = {
+    val nodesWithChildren = http.eventsById.map {
+      case (eventId, _: members.CreatedEvent) =>
+        EventId.nodeIdFromEventId(eventId) -> Seq.empty
+      case (eventId, exercise: members.ExercisedEvent) =>
+        EventId.nodeIdFromEventId(eventId) -> exercise.value.childEventIds.map(
+          EventId.nodeIdFromEventId
+        )
+    }
     TreeUpdateWithMigrationId(
       ledgerApi.LedgerClient.GetTreeUpdatesResponse(
         update = ledgerApi.TransactionTreeUpdate(
@@ -176,20 +210,23 @@ sealed trait ScanHttpEncodings {
             "",
             http.workflowId,
             Instant.parse(http.effectiveAt),
-            ApiOffset.assertFromStringToLong(http.offset),
+            LegacyOffset.Api.assertFromStringToLong(http.offset),
             http.eventsById.map { case (eventId, treeEventHttp) =>
-              eventId -> httpToJavaEvent(treeEventHttp)
+              Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
+                nodesWithChildren,
+                treeEventHttp,
+              )
             }.asJava,
-            http.rootEventIds.asJava,
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
           )
         ),
-        domainId = DomainId.tryFromString(http.synchronizerId),
+        synchronizerId = SynchronizerId.tryFromString(http.synchronizerId),
       ),
       http.migrationId,
     )
+  }
 
   def httpToLapiReassignment(http: httpApi.UpdateHistoryReassignment): TreeUpdateWithMigrationId =
     http.event match {
@@ -199,19 +236,19 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = ApiOffset.assertFromStringToLong(http.offset),
+                offset = LegacyOffset.Api.assertFromStringToLong(http.offset),
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Assign(
                   submitter = PartyId.tryFromProtoPrimitive(assignment.submitter),
-                  source = DomainId.tryFromString(assignment.sourceSynchronizer),
-                  target = DomainId.tryFromString(assignment.targetSynchronizer),
+                  source = SynchronizerId.tryFromString(assignment.sourceSynchronizer),
+                  target = SynchronizerId.tryFromString(assignment.targetSynchronizer),
                   unassignId = assignment.unassignId,
                   createdEvent = httpToJavaCreatedEvent(assignment.createdEvent),
                   counter = assignment.reassignmentCounter,
                 ),
               )
             ),
-            domainId = DomainId.tryFromString(assignment.targetSynchronizer),
+            synchronizerId = SynchronizerId.tryFromString(assignment.targetSynchronizer),
           ),
           assignment.migrationId,
         )
@@ -222,35 +259,39 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = ApiOffset.assertFromStringToLong(http.offset),
+                offset = LegacyOffset.Api.assertFromStringToLong(http.offset),
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Unassign(
                   submitter = PartyId.tryFromProtoPrimitive(unassignment.submitter),
-                  source = DomainId.tryFromString(unassignment.sourceSynchronizer),
-                  target = DomainId.tryFromString(unassignment.targetSynchronizer),
+                  source = SynchronizerId.tryFromString(unassignment.sourceSynchronizer),
+                  target = SynchronizerId.tryFromString(unassignment.targetSynchronizer),
                   unassignId = unassignment.unassignId,
                   counter = unassignment.reassignmentCounter,
                   contractId = new javaApi.codegen.ContractId(unassignment.contractId),
                 ),
               )
             ),
-            domainId = DomainId.tryFromString(unassignment.sourceSynchronizer),
+            synchronizerId = SynchronizerId.tryFromString(unassignment.sourceSynchronizer),
           ),
           unassignment.migrationId,
         )
     }
 
-  def httpToJavaEvent(http: httpApi.TreeEvent): javaApi.TreeEvent = http match {
+  private def httpToJavaEvent(
+      nodesWithChildren: Map[Int, Seq[Int]],
+      http: httpApi.TreeEvent,
+  ): javaApi.TreeEvent = http match {
     case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
     case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
-      httpToJavaExercisedEvent(exercisedHttp)
+      httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
   }
 
-  def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
+  private def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
     val templateId = parseTemplateId(http.templateId)
     new javaApi.CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
-      http.eventId,
+      /*offset = */ 0, // not populated
+      /*nodeId = */ EventId.nodeIdFromEventId(http.eventId),
       templateId,
       http.packageName,
       http.contractId,
@@ -265,28 +306,38 @@ sealed trait ScanHttpEncodings {
     )
   }
 
-  def httpToJavaExercisedEvent(http: httpApi.ExercisedEvent): javaApi.ExercisedEvent = {
+  private def httpToJavaExercisedEvent(
+      nodesWithChildren: Map[Int, Seq[Int]],
+      http: httpApi.ExercisedEvent,
+  ): javaApi.ExercisedEvent = {
     val templateId = parseTemplateId(http.templateId)
+    val interfaceId = http.interfaceId.map(parseTemplateId)
+    val nodeId = EventId.nodeIdFromEventId(http.eventId)
     new javaApi.ExercisedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
-      http.eventId,
+      /*offset = */ 0, // not populated
+      /*nodeId = */ nodeId,
       templateId,
       http.packageName,
-      http.interfaceId.map(parseTemplateId(_)).toJava,
+      interfaceId.toJava,
       http.contractId,
       http.choice,
-      decodeChoiceArgument(templateId, http.choice, http.choiceArgument),
+      decodeChoiceArgument(templateId, interfaceId, http.choice, http.choiceArgument),
       http.actingParties.asJava,
       http.consuming,
-      http.childEventIds.asJava,
-      decodeExerciseResult(templateId, http.choice, http.exerciseResult),
+      EventId.lastDescendedNodeFromChildNodeIds(
+        nodeId,
+        nodesWithChildren,
+      ),
+      decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
+      /*implementedInterfaces = */ java.util.Collections.emptyList(),
     )
   }
 
-  private def templateIdString(templateId: javaApi.Identifier) =
+  def templateIdString(templateId: javaApi.Identifier) =
     s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
 
-  private def parseTemplateId(templateId: String) = {
+  def parseTemplateId(templateId: String) = {
     val pattern = "(.*):(.*):(.*)".r
     val split = pattern
       .findFirstMatchIn(templateId)
@@ -318,6 +369,7 @@ sealed trait ScanHttpEncodings {
 
   def decodeChoiceArgument(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: io.circe.Json,
   ): javaApi.Value
@@ -328,6 +380,7 @@ sealed trait ScanHttpEncodings {
 
   def decodeExerciseResult(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: io.circe.Json,
   ): javaApi.Value
@@ -352,7 +405,39 @@ sealed trait ScanHttpEncodings {
 }
 
 object ScanHttpEncodings {
-  private def formatEventId(updateId: String, eventIndex: Int): String = s"$updateId:$eventIndex"
+
+  sealed trait ApiVersion
+  case object V0 extends ApiVersion
+  case object V1 extends ApiVersion
+
+  def encodeUpdate(
+      update: TreeUpdateWithMigrationId,
+      encoding: definitions.DamlValueEncoding,
+      version: ApiVersion,
+  )(implicit
+      elc: ErrorLoggingContext
+  ): definitions.UpdateHistoryItem = {
+    val update2 = version match {
+      case V0 =>
+        update
+      case V1 =>
+        ScanHttpEncodings.makeConsistentAcrossSvs(update)
+    }
+    val encodings: ScanHttpEncodings = encoding match {
+      case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings
+      case definitions.DamlValueEncoding.members.ProtobufJson => ProtobufJsonScanHttpEncodings
+    }
+    // v0 always returns the update ids as `#` prefixed,as that's the way they were encoded in canton. v1 returns it without the `#`
+    encodings.lapiToHttpUpdate(
+      update2,
+      version match {
+        case V0 =>
+          EventId.prefixedFromUpdateIdAndNodeId
+        case V1 =>
+          EventId.noPrefixFromUpdateIdAndNodeId
+      },
+    )
+  }
 
   /** Returns a copy of the input, modified such that the result is consistent across different SVs:
     * - Offsets are replaced by empty strings
@@ -391,7 +476,8 @@ object ScanHttpEncodings {
                 assign.copy(
                   createdEvent = new javaApi.CreatedEvent(
                     assign.createdEvent.getWitnessParties,
-                    formatEventId(update.updateId, 0),
+                    assign.createdEvent.getOffset,
+                    assign.createdEvent.getNodeId,
                     assign.createdEvent.getTemplateId,
                     assign.createdEvent.getPackageName,
                     assign.createdEvent.getContractId,
@@ -425,15 +511,22 @@ object ScanHttpEncodings {
   ): javaApi.TransactionTree = {
     val mapping = Trees
       .getLocalEventIndices(tree)
-      .view
-      .mapValues(i => formatEventId(tree.getUpdateId, i))
-      .toMap
-
-    val eventsById = tree.getEventsById.asScala.map {
-      case (eventId, created: javaApi.CreatedEvent) =>
-        mapping(eventId) -> new javaApi.CreatedEvent(
+    val nodesWithChildren = tree.getEventsById.asScala.map {
+      case (nodeId, exercised: data.ExercisedEvent) =>
+        mapping(nodeId.intValue()) -> tree
+          .getChildNodeIds(exercised)
+          .asScala
+          .toSeq
+          .map(_.intValue())
+          .map(mapping)
+      case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
+    }
+    val eventsById: Iterable[(Int, javaApi.TreeEvent)] = tree.getEventsById.asScala.map {
+      case (nodeId, created: javaApi.CreatedEvent) =>
+        mapping(nodeId) -> new javaApi.CreatedEvent(
           created.getWitnessParties,
-          mapping(created.getEventId),
+          created.getOffset,
+          mapping(created.getNodeId),
           created.getTemplateId,
           created.getPackageName,
           created.getContractId,
@@ -446,10 +539,12 @@ object ScanHttpEncodings {
           created.getObservers,
           created.createdAt,
         )
-      case (eventId, exercised: javaApi.ExercisedEvent) =>
-        mapping(eventId) -> new javaApi.ExercisedEvent(
+      case (nodeId, exercised: javaApi.ExercisedEvent) =>
+        val newNodeId = mapping(exercised.getNodeId)
+        mapping(nodeId) -> new javaApi.ExercisedEvent(
           exercised.getWitnessParties,
-          mapping(exercised.getEventId),
+          exercised.getOffset,
+          newNodeId,
           exercised.getTemplateId,
           exercised.getPackageName,
           exercised.getInterfaceId,
@@ -458,22 +553,29 @@ object ScanHttpEncodings {
           exercised.getChoiceArgument,
           exercised.getActingParties,
           exercised.isConsuming,
-          exercised.getChildEventIds.asScala.map(mapping).asJava,
+          EventId.lastDescendedNodeFromChildNodeIds(
+            newNodeId,
+            nodesWithChildren.toMap,
+          ),
           exercised.getExerciseResult,
+          exercised.getImplementedInterfaces,
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
-    val rootEventIds = tree.getRootEventIds.asScala.map(mapping)
 
     new javaApi.TransactionTree(
       tree.getUpdateId,
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
-      1L, // tree.getOffset,
-      eventsById.asJava,
-      rootEventIds.asJava,
-      tree.getDomainId,
+      1L, // tree.getOffset not used as the values are participant local and we want consistency across svs
+      eventsById
+        .map { case (key, value) =>
+          Integer.valueOf(key) -> value
+        }
+        .toMap
+        .asJava,
+      tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,
     )
@@ -538,11 +640,12 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeChoiceArgument(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =
     ValueJsonCodecCodegen
-      .deserializeChoiceArgument(templateId, choice, json.noSpaces)
+      .deserializeChoiceArgument(templateId, interfaceId, choice, json.noSpaces)
       .fold(
         error =>
           throw new RuntimeException(
@@ -553,11 +656,12 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeExerciseResult(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =
     ValueJsonCodecCodegen
-      .deserializeChoiceResult(templateId, choice, json.noSpaces)
+      .deserializeChoiceResult(templateId, interfaceId, choice, json.noSpaces)
       .fold(
         error =>
           throw new RuntimeException(s"Failed to decode choice result '${json.noSpaces}': $error"),
@@ -626,6 +730,7 @@ case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeChoiceArgument(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =
@@ -633,6 +738,7 @@ case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeExerciseResult(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =

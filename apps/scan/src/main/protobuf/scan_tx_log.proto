@@ -74,7 +74,7 @@ message BalanceChangeTxLogEntry {
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   int64 round = 3;
   string change_to_initial_amount_as_of_round_zero = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
   string change_to_holding_fees_rate = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -86,7 +86,7 @@ message ExtraTrafficPurchaseTxLogEntry {
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   int64 round = 3;
   string validator = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   int64 traffic_purchased = 5;
@@ -98,7 +98,7 @@ message OpenMiningRoundTxLogEntry {
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   int64 round = 3;
   string amulet_create_fee = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
   string holding_fee = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -111,7 +111,7 @@ message ClosedMiningRoundTxLogEntry {
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   int64 round = 3;
   google.protobuf.Timestamp effective_at = 4 [(scalapb.field).type = "java.time.Instant"];
 }
@@ -122,7 +122,7 @@ message TransferTxLogEntry {
 
   string event_id = 1;
   string offset = 2;
-  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
   string provider = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   SenderAmount sender = 6;
@@ -138,7 +138,7 @@ message TapTxLogEntry {
 
   string event_id = 1;
   string offset = 2;
-  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
   string amulet_owner = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amulet_amount = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -152,7 +152,7 @@ message MintTxLogEntry {
 
   string event_id = 1;
   string offset = 2;
-  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
   string amulet_owner = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amulet_amount = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -165,7 +165,7 @@ message SvRewardTxLogEntry {
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   int64 round = 3;
   string party = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -176,7 +176,7 @@ message AppRewardTxLogEntry {
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   int64 round = 3;
   string party = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -187,7 +187,7 @@ message ValidatorRewardTxLogEntry {
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
+  string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   int64 round = 3;
   string party = 4 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];

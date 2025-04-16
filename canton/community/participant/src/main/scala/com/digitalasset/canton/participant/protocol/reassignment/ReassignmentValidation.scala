@@ -1,90 +1,57 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.protocol.EngineController.GetEngineAbortStatus
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
-import com.digitalasset.canton.participant.util.DAMLe
-import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.participant.protocol.ContractAuthenticator
+import com.digitalasset.canton.protocol.Stakeholders
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.EitherTUtil.condUnitET
 import com.digitalasset.canton.util.{EitherTUtil, ReassignmentTag}
-import com.digitalasset.daml.lf.engine.Error as LfError
-import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-private[reassignment] class ReassignmentValidation(
-    engine: DAMLe,
-    protected val loggerFactory: NamedLoggerFactory,
-)(implicit val ec: ExecutionContext)
-    extends NamedLogging {
+private[reassignment] class ReassignmentValidation(contractAuthenticator: ContractAuthenticator) {
+  def checkMetadata(reassignmentRequest: FullReassignmentViewTree)(implicit
+      ec: ExecutionContext
+  ): EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit] = {
 
-  def checkStakeholders(
-      request: FullReassignmentViewTree,
-      getEngineAbortStatus: GetEngineAbortStatus,
-  )(implicit traceContext: TraceContext): EitherT[Future, ReassignmentProcessorError, Unit] = {
-    val reassignmentId = request.reassignmentId
+    val declaredViewStakeholders = reassignmentRequest.stakeholders
+    val declaredContractStakeholders = Stakeholders(reassignmentRequest.contract.metadata)
 
-    // TODO(#12926) We don't have re-interpretation check in the processing of the unassignment. Do we need it?
-    val declaredContractStakeholders = Stakeholders(request.contract.metadata)
-    val declaredViewStakeholders = request.stakeholders
-
-    for {
-      metadata <- engine
-        .contractMetadata(
-          request.contract.contractInstance,
-          declaredContractStakeholders.all,
-          getEngineAbortStatus,
-        )
-        .leftMap {
-          case DAMLe.EngineError(
-                LfError.Interpretation(
-                  e @ LfError.Interpretation.DamlException(
-                    LfInterpretationError.FailedAuthorization(_, _)
-                  ),
-                  _,
-                )
-              ) =>
-            StakeholdersMismatch(
-              reassignmentId,
-              declaredViewStakeholders = declaredViewStakeholders,
-              declaredContractStakeholders = Some(declaredContractStakeholders),
-              expectedStakeholders = Left(e.message),
-            )
-          case DAMLe.EngineError(error) => MetadataNotFound(error)
-          case DAMLe.EngineAborted(reason) =>
-            ReinterpretationAborted(reassignmentId, reason)
-        }
-
-      recomputedStakeholders = Stakeholders(metadata)
-      _ <- condUnitET[Future](
-        declaredViewStakeholders == recomputedStakeholders && declaredViewStakeholders == declaredContractStakeholders,
-        StakeholdersMismatch(
-          reassignmentId,
+    EitherT.fromEither(for {
+      _ <- Either.cond(
+        declaredViewStakeholders == declaredContractStakeholders,
+        (),
+        ReassignmentValidationError.StakeholdersMismatch(
+          reassignmentRequest.reassignmentRef,
           declaredViewStakeholders = declaredViewStakeholders,
-          declaredContractStakeholders = Some(declaredContractStakeholders),
-          expectedStakeholders = Right(recomputedStakeholders),
+          expectedStakeholders = declaredContractStakeholders,
         ),
-      ).leftWiden[ReassignmentProcessorError]
-    } yield ()
+      )
+      _ <- contractAuthenticator
+        .authenticateSerializable(reassignmentRequest.contract)
+        .leftMap(error =>
+          ReassignmentValidationError.ContractIdAuthenticationFailure(
+            reassignmentRequest.reassignmentRef,
+            error,
+            reassignmentRequest.contractId,
+          )
+        )
+    } yield ())
   }
-
 }
 
 object ReassignmentValidation {
 
-  /** - check if the submitter is a stakeholder
-    * - check if the submitter is hosted on the participant
+  /**   - check if the submitter is a stakeholder
+    *   - check if the submitter is hosted on the participant
     */
   def checkSubmitter(
       reference: ReassignmentRef,
@@ -95,11 +62,11 @@ object ReassignmentValidation {
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, ReassignmentProcessorError, Unit] =
+  ): EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit] =
     for {
-      _ <- EitherTUtil.condUnitET[Future](
+      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
         stakeholders.contains(submitter),
-        SubmitterMustBeStakeholder(
+        ReassignmentValidationError.SubmitterMustBeStakeholder(
           reference,
           submitter,
           stakeholders,
@@ -112,15 +79,15 @@ object ReassignmentValidation {
           .map(_.get(submitter))
           .flatMap {
             case Some(_) =>
-              Future.successful(Either.unit)
+              FutureUnlessShutdown.pure(Either.unit)
             case None =>
-              Future.successful(
+              FutureUnlessShutdown.pure(
                 Left(
-                  NotHostedOnParticipant(
+                  ReassignmentValidationError.NotHostedOnParticipant(
                     reference,
                     submitter,
                     participantId,
-                  ): ReassignmentProcessorError
+                  ): ReassignmentValidationError
                 )
               )
           }

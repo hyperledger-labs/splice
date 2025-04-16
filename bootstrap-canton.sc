@@ -10,25 +10,23 @@ import com.digitalasset.canton.console.{
   LocalMediatorReference,
   LocalSequencerReference,
 }
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.version.ProtocolVersion
 
 println("Running canton bootstrap script...")
 
-val domainParametersConfig = DomainParametersConfig(
+val domainParametersConfig = SynchronizerParametersConfig(
   alphaVersionSupport = true
 )
 
 def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
-    .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v32)
-    .map(StaticDomainParameters(_))
+    .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v33)
+    .map(StaticSynchronizerParameters(_))
     .getOrElse(sys.error("whatever"))
 
 def bootstrapOtherDomain(
@@ -36,26 +34,26 @@ def bootstrapOtherDomain(
     sequencer: LocalSequencerReference,
     mediator: LocalMediatorReference,
 ) = {
-  bootstrap.domain(
+  bootstrap.synchronizer(
     name,
-    domainOwners = Seq(sequencer),
+    synchronizerOwners = Seq(sequencer),
     sequencers = Seq(sequencer),
     mediators = Seq(mediator),
-    domainThreshold = PositiveInt.one,
-    staticDomainParameters = staticParameters(sequencer),
+    synchronizerThreshold = PositiveInt.one,
+    staticSynchronizerParameters = staticParameters(sequencer),
   )
   // For some stupid reason bootstrap.domain does not allow changing the dynamic domain parameters
   // so we overwrite it here.
-  val domainId = sequencer.domain_id
+  val synchronizerId = sequencer.synchronizer_id
   // Align the reconciliation interval and catchup config with what our triggers set.
   // This doesn't really matter for splitwell but it matters for the soft synchronizer upgrade test.
-  sequencer.topology.domain_parameters.propose_update(
-    domainId,
+  sequencer.topology.synchronizer_parameters.propose_update(
+    synchronizerId,
     parameters =>
       parameters.update(
         reconciliationInterval = PositiveDurationSeconds.ofMinutes(30),
-        acsCommitmentsCatchUpConfig = Some(
-          AcsCommitmentsCatchUpConfig(
+        acsCommitmentsCatchUpParameters = Some(
+          AcsCommitmentsCatchUpParameters(
             catchUpIntervalSkip = PositiveInt.tryCreate(24),
             nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
           )

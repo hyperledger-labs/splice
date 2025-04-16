@@ -85,14 +85,19 @@ object DarLockChecker {
     val lastReleaseDarLock =
       s"git show refs/remotes/origin/release-line-$lastReleaseNumber:daml/dars.lock".!!
     val lastReleaseDars = parseDarsLock(lastReleaseDarLock)
-    actual.foreach { case (pkg, currentHash) =>
-      lastReleaseDars.get(pkg).foreach { lastReleaseHash =>
-        if (currentHash != lastReleaseHash) {
-          sys.error(
-            s"Package $pkg changed hash from $currentHash to $lastReleaseHash, did you forget to bump the package version?"
-          )
+    val mismatches = actual.flatMap { case (pkg, currentHash) =>
+      lastReleaseDars
+        .get(pkg)
+        .flatMap { lastReleaseHash =>
+          Option.when(currentHash != lastReleaseHash)((pkg, currentHash, lastReleaseHash))
         }
+        .toList
+    }
+    if (!mismatches.isEmpty) {
+      mismatches.foreach { case (pkg, currentHash, lastReleaseHash) =>
+        System.err.println(s"Package $pkg changed hash from $currentHash to $lastReleaseHash")
       }
+      sys.error("Some packages changed their hash, did you forget to bump the package versions?")
     }
     if (exhaustive) {
       lastReleaseDars.keys.foreach { case pkg @ (pkgName, _) =>

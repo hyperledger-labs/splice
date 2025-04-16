@@ -1,10 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error.groups
 
-import com.daml.error.{
-  ContextualizedErrorLogger,
+import com.digitalasset.base.error.{
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
   ErrorCategoryRetry,
@@ -14,12 +13,14 @@ import com.daml.error.{
   Explanation,
   Resolution,
 }
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.CommandExecutionErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageId}
 import com.digitalasset.daml.lf.engine.Error as LfError
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
-import com.digitalasset.daml.lf.language.{Ast, LanguageVersion}
+import com.digitalasset.daml.lf.language.{Ast, LanguageVersion, Reference}
 import com.digitalasset.daml.lf.transaction.{GlobalKey, TransactionVersion}
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.digitalasset.daml.lf.value.{Value, ValueCoder}
@@ -42,7 +43,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       v: Value
   )(
       f: String => Seq[(ErrorResource, String)]
-  )(implicit loggingContext: ContextualizedErrorLogger): Seq[(ErrorResource, String)] =
+  )(implicit loggingContext: ErrorLoggingContext): Seq[(ErrorResource, String)] =
     encodeValue(v).fold(
       { case ValueCoder.EncodeError(msg) =>
         loggingContext.error(msg)
@@ -50,6 +51,9 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       },
       f,
     )
+
+  def encodeParties(parties: Set[Ref.Party]): Seq[(ErrorResource, String)] =
+    Seq((ErrorResource.Parties, parties.mkString(",")))
 
   @Explanation(
     """This error occurs if the participant fails to execute a transaction via the interactive submission service.
@@ -63,7 +67,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       ) {
 
     final case class Reject(reason: String, throwable: Option[Throwable] = None)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"The participant failed to execute the transaction: $reason",
           throwableO = throwable,
@@ -82,7 +86,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       ) {
 
     final case class Reject(reason: String, throwable: Option[Throwable] = None)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"The participant failed to prepare the transaction: $reason",
           throwableO = throwable,
@@ -103,7 +107,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       ) {
 
     final case class Reject(reason: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
             s"The participant failed to determine the max ledger time for this command: $reason"
@@ -136,7 +140,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
     override def logLevel: Level = Level.WARN
 
     final case class Reject(reason: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(cause = reason) {
       override def retryable: Option[ErrorCategoryRetry] = Some(
         // As we cannot tell whether the command timed out due to running into an infinite loop,
@@ -151,45 +155,45 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
   }
 
   @Explanation(
-    """This error occurs if some of the disclosed contracts attached to the command submission that were also used in command interpretation have specified mismatching domain-ids.
-      |This can happen if the domain-ids of the disclosed contracts are out of sync OR if the originating contracts are assigned to different domains."""
+    """This error occurs if some of the disclosed contracts attached to the command submission that were also used in command interpretation have specified mismatching synchronizer ids.
+      |This can happen if the synchronizer ids of the disclosed contracts are out of sync OR if the originating contracts are assigned to different synchronizers."""
   )
   @Resolution(
-    "Retry the submission with an up-to-date set of attached disclosed contracts or re-create a command submission that only uses disclosed contracts residing on the same domain."
+    "Retry the submission with an up-to-date set of attached disclosed contracts or re-create a command submission that only uses disclosed contracts residing on the same synchronizer."
   )
-  object DisclosedContractsDomainIdMismatch
+  object DisclosedContractsSynchronizerIdMismatch
       extends ErrorCode(
-        id = "DISCLOSED_CONTRACTS_DOMAIN_ID_MISMATCH",
+        id = "DISCLOSED_CONTRACTS_SYNCHRONIZER_ID_MISMATCH",
         ErrorCategory.InvalidIndependentOfSystemState,
       ) {
-    final case class Reject(mismatchingContractIdToDomainIds: Map[ContractId, String])(implicit
-        loggingContext: ContextualizedErrorLogger
+    final case class Reject(mismatchingContractIdToSynchronizerIds: Map[ContractId, String])(
+        implicit loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
-            s"Some disclosed contracts that were used during command interpretation have mismatching domain-ids: $mismatchingContractIdToDomainIds"
+            s"Some disclosed contracts that were used during command interpretation have mismatching synchronizer ids: $mismatchingContractIdToSynchronizerIds"
         )
   }
 
   @Explanation(
-    """This error occurs when the domain-id provided in the command submission mismatches the domain-id specified in one of the disclosed contracts used in command interpretation."""
+    """This error occurs when the synchronizer id provided in the command submission mismatches the synchronizer id specified in one of the disclosed contracts used in command interpretation."""
   )
   @Resolution(
-    "Retry the submission with all disclosed contracts residing on the target submission domain."
+    "Retry the submission with all disclosed contracts residing on the target submission synchronizer."
   )
-  object PrescribedDomainIdMismatch
+  object PrescribedSynchronizerIdMismatch
       extends ErrorCode(
-        id = "PRESCRIBED_DOMAIN_ID_MISMATCH",
+        id = "PRESCRIBED_SYNCHRONIZER_ID_MISMATCH",
         ErrorCategory.InvalidIndependentOfSystemState,
       ) {
     final case class Reject(
-        usedDisclosedContractsSpecifyingADomainId: Set[ContractId],
-        disclosedContractsDomainId: String,
-        prescribedDomainId: String,
+        usedDisclosedContractsSpecifyingASynchronizerId: Set[ContractId],
+        disclosedContractsSynchronizerId: String,
+        prescribedSynchronizerId: String,
     )(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
-            s"The target domain=$prescribedDomainId specified in the command submission mismatches the domain-id=$disclosedContractsDomainId of some attached disclosed contracts that have been used in the submission (used-disclosed-contract-ids=$usedDisclosedContractsSpecifyingADomainId)"
+            s"The target synchronizer=$prescribedSynchronizerId specified in the command submission mismatches the synchronizer id=$disclosedContractsSynchronizerId of some attached disclosed contracts that have been used in the submission (used-disclosed-contract-ids=$usedDisclosedContractsSpecifyingASynchronizerId)"
         )
   }
 
@@ -219,7 +223,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           languageVersion: language.LanguageVersion,
           allowedLanguageVersions: VersionRange[language.LanguageVersion],
       )(implicit
-          val loggingContext: ContextualizedErrorLogger
+          val loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = buildCause(packageId, languageVersion, allowedLanguageVersions)
           )
@@ -235,7 +239,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           ErrorCategory.SecurityAlert,
         ) {
       final case class Reject(validationErrorCause: String)(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = validationErrorCause
           )
@@ -256,7 +260,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       final case class Reject(
           err: LfError.Preprocessing.Error
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = err.message
           )
@@ -276,7 +280,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         ) {
 
       final case class Error(override val cause: String)(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           )
@@ -293,7 +297,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         ) {
 
       final case class Error(override val cause: String)(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           )
@@ -310,18 +314,29 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
 
+      object Reject {
+        def apply(cause: String, err: LfInterpretationError.ContractNotActive)(implicit
+            loggingContext: ErrorLoggingContext
+        ): Reject = Reject(
+          cause,
+          err.coid,
+          Some(err.templateId.toString()),
+        )
+      }
+
       final case class Reject(
           override val cause: String,
-          err: LfInterpretationError.ContractNotActive,
+          coid: ContractId,
+          templateIdO: Option[String],
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
         override def resources: Seq[(ErrorResource, String)] = Seq(
-          (ErrorResource.TemplateId, err.templateId.toString),
-          (ErrorResource.ContractId, err.coid.coid),
-        )
+          templateIdO.map(templateId => (ErrorResource.TemplateId, templateId)),
+          Some((ErrorResource.ContractId, coid.coid)),
+        ).flatten
       }
 
     }
@@ -344,7 +359,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
             override val cause: String,
             key: GlobalKey,
         )(implicit
-            loggingContext: ContextualizedErrorLogger
+            loggingContext: ErrorLoggingContext
         ) extends DamlErrorWithDefiniteAnswer(
               cause = cause
             ) {
@@ -358,8 +373,31 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
             }
         }
       }
-    }
 
+      @Explanation(
+        """This error occurs if the Daml engine interpreter cannot resolve a package name to any vetted package. This
+          |can be caused by a commmand using an explicit disclosure produced by a package that hasn't been vetted yet
+          |by the participant or by a command that uses a contract whose creation package has been force-unvetted."""
+      )
+      @Resolution(
+        "Ensure the command doesn't use a package that has not been yet vetted or has been unvetted."
+      )
+      object UnresolvedPackageName
+          extends ErrorCode(
+            id = "UNRESOLVED_PACKAGE_NAME",
+            ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+          ) {
+
+        final case class Reject(override val cause: String, packageName: Ref.PackageName)(implicit
+            loggingContext: ErrorLoggingContext
+        ) extends DamlErrorWithDefiniteAnswer(
+              cause = cause
+            ) {
+          override def resources: Seq[(ErrorResource, String)] =
+            Seq((ErrorResource.PackageName, packageName))
+        }
+      }
+    }
     @Explanation("""This error occurs if a Daml transaction fails due to an authorization error.
                    |An authorization means that the Daml transaction computed a different set of required submitters than
                    |you have provided during the submission as `actAs` parties.""")
@@ -371,7 +409,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         ) {
 
       final case class Reject(override val cause: String)(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           )
@@ -393,7 +431,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.DisclosedContractKeyHashingError,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -433,7 +471,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.UnhandledException,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -467,7 +505,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.UserError,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -493,7 +531,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       final case class Reject(
           override val cause: String
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           )
@@ -515,7 +553,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.CreateEmptyContractKeyMaintainers,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -546,7 +584,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.FetchEmptyContractKeyMaintainers,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -578,7 +616,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.WronglyTypedContract,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -608,7 +646,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.ContractDoesNotImplementInterface,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -638,7 +676,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.ContractDoesNotImplementRequiringInterface,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -668,7 +706,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       final case class Reject(
           override val cause: String
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           )
@@ -689,7 +727,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       final case class Reject(
           override val cause: String
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           )
@@ -711,7 +749,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.ContractIdComparability,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -729,8 +767,226 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         extends ErrorCode(id = "VALUE_NESTING", ErrorCategory.InvalidIndependentOfSystemState) {
 
       final case class Reject(override val cause: String, err: LfInterpretationError.ValueNesting)(
-          implicit loggingContext: ContextualizedErrorLogger
+          implicit loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(cause = cause) {}
+    }
+
+    @Explanation(
+      "This error is thrown by use of `failWithStatus` in daml code. The Daml code determines the canton error category, and thus the grpc status code."
+    )
+    @Resolution(
+      "Ensure that you are using the contract correctly, and that the choice implementation does not have a bug."
+    )
+    object FailureStatus
+        extends ErrorCode(
+          id = "DAML_FAILURE",
+          ErrorCategory.OverrideDocStringErrorCategory("<determined by daml code>"),
+        ) {
+
+      // Building conveyance string from OverrideDocStringErrorCategory will fail, and would be wrong
+      override def errorConveyanceDocString: Option[String] = Some(
+        "Conveyance is determined by the category, which is selected in daml code. Refer to the documentation of the actual error category encoded in the raised error for details."
+      )
+
+      def Reject(
+          cause: String,
+          err: LfInterpretationError.FailureStatus,
+          trace: Option[String],
+      )(implicit
+          loggingContext: ErrorLoggingContext
+      ) = ErrorCategory.fromInt(err.failureCategory) match {
+        case Some(errorCategory) =>
+          new DamlErrorWithDefiniteAnswer(
+            cause = cause
+          )(
+            code = new ErrorCode(id = FailureStatus.id, errorCategory)(FailureStatus.parent) {},
+            loggingContext = loggingContext,
+          ) {
+            override def context: Map[String, String] =
+              // ++ on maps takes last key, we don't want users to override `error_id`, so we add this last
+              // SerializableErrorCodeComponents also puts `context` first, so fields added by canton cannot be overwritten
+              super.context ++ err.metadata ++ List(("error_id", err.errorId)) ++ trace
+                .map(("exercise_trace", _))
+                .toList
+          }
+        case None =>
+          LedgerApiErrors.InternalError.Generic(
+            s"Error category ordinal ${err.failureCategory} is not a valid error category. "
+              + s"This is likely a programming bug. Please report this error. Original raised error cause: $cause"
+          )
+      }
+    }
+
+    @Explanation("Errors that occur when trying to upgrade a contract")
+    object UpgradeError extends ErrorGroup {
+      @Explanation("Validation fails when trying to upgrade the contract")
+      @Resolution(
+        "Verify that neither the signatories, nor the observers, nor the contract key, nor the key's maintainers have changed"
+      )
+      object ValidationFailed
+          extends ErrorCode(
+            id = "INTERPRETATION_UPGRADE_ERROR_VALIDATION_FAILED",
+            ErrorCategory.InvalidGivenCurrentSystemStateOther,
+          ) {
+        final case class Reject(
+            override val cause: String,
+            err: LfInterpretationError.Upgrade.ValidationFailed,
+        )(implicit
+            loggingContext: ErrorLoggingContext
+        ) extends DamlErrorWithDefiniteAnswer(
+              cause = cause
+            ) {
+
+          override def resources: Seq[(ErrorResource, String)] = {
+            val optKeyResources = err.keyOpt.fold(Seq.empty[(ErrorResource, String)])(key =>
+              withEncodedValue(key.globalKey.key) { encodedKey =>
+                Seq(
+                  (ErrorResource.ContractKey, encodedKey),
+                  (ErrorResource.PackageName, key.globalKey.packageName),
+                ) ++ encodeParties(key.maintainers)
+              }
+            )
+
+            Seq(
+              (ErrorResource.ContractId, err.coid.coid),
+              (ErrorResource.TemplateId, err.srcTemplateId.toString),
+              (ErrorResource.TemplateId, err.dstTemplateId.toString),
+            ) ++ encodeParties(err.signatories) ++ encodeParties(err.observers) ++ optKeyResources
+          }
+        }
+      }
+
+      @Explanation(
+        "An optional contract field with a value of Some may not be dropped during downgrading"
+      )
+      @Resolution(
+        "There is data that is newer than the implementation using it, and thus is not compatible. Ensure new data (i.e. those with additional fields as `Some`) is only used with new/compatible choices"
+      )
+      object DowngradeDropDefinedField
+          extends ErrorCode(
+            id = "INTERPRETATION_UPGRADE_ERROR_DOWNGRADE_DROP_DEFINED_FIELD",
+            ErrorCategory.InvalidGivenCurrentSystemStateOther,
+          ) {
+        final case class Reject(
+            override val cause: String,
+            err: LfInterpretationError.Upgrade.DowngradeDropDefinedField,
+        )(implicit
+            loggingContext: ErrorLoggingContext
+        ) extends DamlErrorWithDefiniteAnswer(
+              cause = cause
+            ) {
+          override def resources: Seq[(ErrorResource, String)] =
+            Seq(
+              (ErrorResource.ExpectedType, err.expectedType.pretty),
+              (ErrorResource.FieldIndex, err.fieldIndex.toString),
+            )
+        }
+      }
+
+      @Explanation(
+        "An optional contract field with a value of Some may not be dropped during downgrading"
+      )
+      @Resolution(
+        "There is data that is newer than the implementation using it, and thus is not compatible. Ensure new data (i.e. those with additional fields as `Some`) is only used with new/compatible choices"
+      )
+      object DowngradeFailed
+          extends ErrorCode(
+            id = "INTERPRETATION_UPGRADE_ERROR_DOWNGRADE_FAILED",
+            ErrorCategory.InvalidGivenCurrentSystemStateOther,
+          ) {
+        final case class Reject(
+            override val cause: String,
+            err: LfInterpretationError.Upgrade.DowngradeFailed,
+        )(implicit
+            loggingContext: ErrorLoggingContext
+        ) extends DamlErrorWithDefiniteAnswer(
+              cause = cause
+            ) {
+          override def resources: Seq[(ErrorResource, String)] =
+            Seq(
+              (ErrorResource.ExpectedType, err.expectedType.pretty)
+            )
+        }
+      }
+    }
+
+    @Explanation("Errors that occur when using cyptography primitives")
+    object CryptoError extends ErrorGroup {
+      @Explanation(
+        "Hex string is malformed"
+      )
+      @Resolution(
+        "Ensure string is non-empty, of even length and only contains hex characters (i.e. matches [0-9a-fA-F]+)"
+      )
+      object MalformedByteEncoding
+          extends ErrorCode(
+            id = "INTERPRETATION_CRYPTO_ERROR_MALFORMED_BYTE_ENCODING",
+            ErrorCategory.InvalidGivenCurrentSystemStateOther,
+          ) {
+        final case class Reject(
+            override val cause: String,
+            err: LfInterpretationError.Crypto.MalformedByteEncoding,
+        )(implicit
+            loggingContext: ErrorLoggingContext
+        ) extends DamlErrorWithDefiniteAnswer(
+              cause = cause
+            ) {
+          override def resources: Seq[(ErrorResource, String)] =
+            Seq(
+              (ErrorResource.CryptoValue, err.value)
+            )
+        }
+      }
+      @Explanation(
+        "Public key hex encoding is malformed"
+      )
+      @Resolution(
+        "Ensure public key is a DER encoded Secp256k1 public key"
+      )
+      object MalformedKey
+          extends ErrorCode(
+            id = "INTERPRETATION_CRYPTO_ERROR_MALFORMED_KEY",
+            ErrorCategory.InvalidGivenCurrentSystemStateOther,
+          ) {
+        final case class Reject(
+            override val cause: String,
+            err: LfInterpretationError.Crypto.MalformedKey,
+        )(implicit
+            loggingContext: ErrorLoggingContext
+        ) extends DamlErrorWithDefiniteAnswer(
+              cause = cause
+            ) {
+          override def resources: Seq[(ErrorResource, String)] =
+            Seq(
+              (ErrorResource.CryptoValue, err.key)
+            )
+        }
+      }
+      @Explanation(
+        "Signature hex encoding is malformed"
+      )
+      @Resolution(
+        "Ensure signature is a DER encoded Keccak256 digest"
+      )
+      object MalformedSignature
+          extends ErrorCode(
+            id = "INTERPRETATION_CRYPTO_ERROR_MALFORMED_SIGNATURE",
+            ErrorCategory.InvalidGivenCurrentSystemStateOther,
+          ) {
+        final case class Reject(
+            override val cause: String,
+            err: LfInterpretationError.Crypto.MalformedSignature,
+        )(implicit
+            loggingContext: ErrorLoggingContext
+        ) extends DamlErrorWithDefiniteAnswer(
+              cause = cause
+            ) {
+          override def resources: Seq[(ErrorResource, String)] =
+            Seq(
+              (ErrorResource.CryptoValue, err.signature)
+            )
+        }
+      }
     }
 
     @Explanation(
@@ -749,7 +1005,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           override val cause: String,
           err: LfInterpretationError.Dev.Error,
       )(implicit
-          loggingContext: ContextualizedErrorLogger
+          loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(
             cause = cause
           ) {
@@ -760,5 +1016,50 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
           )
       }
     }
+  }
+
+  // TODO(#23334): Consider moving in dedicated error group
+  @Explanation(
+    """This error is a catch-all for errors thrown by topology-aware package selection in command processing."""
+  )
+  @Resolution(
+    "Inspect the error message and adjust the topology state to ensure successful submissions"
+  )
+  object PackageSelectionFailed
+      extends ErrorCode(
+        id = "PACKAGE_SELECTION_FAILED",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+
+    final case class Reject(
+        override val cause: String
+    )(implicit
+        loggingContext: ErrorLoggingContext
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause = cause
+        ) {}
+  }
+
+  @Explanation(
+    "A package-name required in command interpretation was discarded in topology-aware package selection due to vetting topology restrictions."
+  )
+  @Resolution(
+    "Revisit the command submission and ensure it conforms with the vetted topology state of the submitters and informees."
+  )
+  object PackageNameDiscardedDueToUnvettedPackages
+      extends ErrorCode(
+        id = "PACKAGE_NAME_DISCARDED_DUE_TO_UNVETTED_PACKAGES",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+      ) {
+
+    final case class Reject(
+        pkgName: Ref.PackageName,
+        reference: Reference,
+    )(implicit
+        loggingContext: ErrorLoggingContext
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause =
+            s"Command interpretation failed: No packages with valid vetting exist that conform to topology restrictions for $pkgName, encountered in $reference."
+        )
   }
 }

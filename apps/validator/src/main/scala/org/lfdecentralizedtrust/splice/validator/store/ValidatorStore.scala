@@ -28,7 +28,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
 
@@ -67,7 +67,7 @@ trait ValidatorStore extends WalletStore with AppStore {
   ]
 
   def lookupValidatorTopUpStateWithOffset(
-      domainId: DomainId
+      synchronizerId: SynchronizerId
   )(implicit traceContext: TraceContext): Future[
     QueryResult[
       Option[
@@ -242,7 +242,8 @@ object ValidatorStore {
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,
-            trafficDomainId = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
+            trafficSynchronizerId =
+              Some(SynchronizerId.tryFromString(contract.payload.synchronizerId)),
           )
         },
         mkFilter(amuletrulesCodegen.ExternalPartySetupProposal.COMPANION)(co =>

@@ -1,19 +1,19 @@
 package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.FullClientConfig
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
-import com.digitalasset.canton.crypto.KeyPurpose.Signing
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
-import com.digitalasset.canton.topology.{Namespace, ParticipantId}
 import com.digitalasset.canton.topology.transaction.{
+  DelegationRestriction,
   NamespaceDelegation,
   OwnerToKeyMapping,
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
+import com.digitalasset.canton.topology.{Namespace, ParticipantId}
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -64,21 +64,21 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
       "SECOND_EXTRA_PARTICIPANT_ADMIN_USER" -> "not_used",
     ) {
 
-      val adminApiConfig = ClientConfig(port = Port.tryCreate(27702))
+      val adminApiConfig = FullClientConfig(port = Port.tryCreate(27702))
       val offlineParticipantClient =
         new ParticipantClientReference(
           env,
           s"remote participant for key generation",
           RemoteParticipantConfig(
             adminApiConfig,
-            ClientConfig(port = Port.tryCreate(27701)),
+            FullClientConfig(port = Port.tryCreate(27701)),
           ),
         )
       offlineParticipantClient.health.wait_for_ready_for_id()
       val offlineRootKey = offlineParticipantClient.keys.secret
         .generate_signing_key("rootSigningKey", SigningKeyUsage.NamespaceOnly)
       val offlineGeneratedNamespace = Namespace(offlineRootKey.fingerprint)
-      offlineParticipantClient.topology.init_id(
+      offlineParticipantClient.topology.init_id_from_uid(
         ParticipantId("offlineKeyGeneration", offlineGeneratedNamespace).uid,
         waitForReady = false,
       )
@@ -86,21 +86,15 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
         offlineParticipantClient.topology.namespace_delegations.propose_delegation(
           offlineGeneratedNamespace,
           offlineRootKey,
-          isRootDelegation = true,
+          delegationRestriction = DelegationRestriction.CanSignAllMappings,
           signedBy = Seq(offlineGeneratedNamespace.fingerprint),
         )
-
-      offlineParticipantClient.topology.owner_to_key_mappings.add_key(
-        offlineRootKey.fingerprint,
-        Signing,
-        signedBy = Seq(offlineGeneratedNamespace.fingerprint),
-      )
 
       val delegationTopologyTransaction =
         offlineParticipantClient.topology.namespace_delegations.propose_delegation(
           offlineGeneratedNamespace,
           delegateKey,
-          isRootDelegation = false,
+          delegationRestriction = DelegationRestriction.CanSignAllButNamespaceDelegations,
           signedBy = Seq(offlineRootKey.fingerprint),
         )
 
@@ -123,17 +117,10 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
 
     val (offlineGeneratedNamespace, rootNamespaceDelegation, delegationTopologyTransaction) =
       setupOfflineNodeWithKey(delegatedNamespaceKey)
-    node.topology.init_id(
+    node.topology.init_id_from_uid(
       ParticipantId(name, offlineGeneratedNamespace).uid,
       waitForReady = false,
-    )
-    node.topology.transactions.load(
-      Seq(rootNamespaceDelegation),
-      "Authorized",
-    )
-    node.topology.transactions.load(
-      Seq(delegationTopologyTransaction),
-      "Authorized",
+      delegations = Seq(rootNamespaceDelegation, delegationTopologyTransaction),
     )
     val encryptionKey =
       node.keys.secret.generate_encryption_key("ecryption")

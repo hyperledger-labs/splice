@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -13,7 +13,7 @@ import com.daml.metrics.api.{
   MetricsContext,
 }
 
-class ServicesHistograms(val prefix: MetricName)(implicit
+private[metrics] final class ServicesHistograms(val prefix: MetricName)(implicit
     inventory: HistogramInventory
 ) {
 
@@ -75,14 +75,22 @@ class ServicesHistograms(val prefix: MetricName)(implicit
 
   private[metrics] val listLfPackages: Item = extend("list_lf_packages", baseInfo)
   private[metrics] val getLfArchive: Item = extend("get_lf_archive", baseInfo)
-  private[metrics] val packageEntries: Item = extend("package_entries", baseInfo)
   private[metrics] val currentLedgerEnd: Item = extend("current_ledger_end", baseInfo)
   private[metrics] val latestPrunedOffsets: Item = extend("latest_pruned_offsets", baseInfo)
   private[metrics] val getCompletions: Item = extend("get_completions", baseInfo)
   private[metrics] val transactions: Item = extend("transactions", baseInfo)
   private[metrics] val transactionTrees: Item = extend("transaction_trees", baseInfo)
+  private[metrics] val getUpdateByOffset: Item = extend("get_update_by_offset", baseInfo)
+  private[metrics] val getUpdateById: Item = extend("get_update_by_id", baseInfo)
+  // TODO(#23504) remove when corresponding grpc method has been removed
   private[metrics] val getTransactionById: Item = extend("get_transaction_by_id", baseInfo)
+  // TODO(#23504) remove when corresponding grpc method has been removed
   private[metrics] val getTransactionTreeById: Item = extend("get_transaction_tree_by_id", baseInfo)
+  // TODO(#23504) remove when corresponding grpc method has been removed
+  private[metrics] val getTransactionByOffset: Item = extend("get_transaction_by_offset", baseInfo)
+  // TODO(#23504) remove when corresponding grpc method has been removed
+  private[metrics] val getTransactionTreeByOffset: Item =
+    extend("get_transaction_tree_by_offset", baseInfo)
   private[metrics] val getActiveContracts: Item = extend("get_active_contracts", baseInfo)
   private[metrics] val lookupActiveContract: Item = extend("lookup_active_contract", baseInfo)
   private[metrics] val lookupContractState: Item = extend("lookup_contract_state", baseInfo)
@@ -96,7 +104,6 @@ class ServicesHistograms(val prefix: MetricName)(implicit
   private[metrics] val partyEntries: Item = extend("party_entries", baseInfo)
   private[metrics] val lookupConfiguration: Item = extend("lookup_configuration", baseInfo)
   private[metrics] val prune: Item = extend("prune", baseInfo)
-  private[metrics] val getTransactionMetering: Item = extend("get_transaction_metering", baseInfo)
 
   private[metrics] val bufferedReaderPrefix: MetricName = indexPrefix :+ "buffer_reader"
 
@@ -145,7 +152,8 @@ class ServicesHistograms(val prefix: MetricName)(implicit
   )
   private[metrics] val readStateUpdates: Item = extend("state_updates", readBaseInfo)
 
-  private[metrics] val readGetConnectedDomains: Item = extend("get_connected_domains", readBaseInfo)
+  private[metrics] val readGetConnectedSynchronizers: Item =
+    extend("get_connected_synchronizers", readBaseInfo)
 
   private[metrics] val readIncompleteReassignmentOffsets: Item =
     extend("incomplete_reassignment_offsets", readBaseInfo)
@@ -175,7 +183,9 @@ class ServicesHistograms(val prefix: MetricName)(implicit
   private[metrics] val writePrune: Item = extend("prune", writeBaseInfo)
 
 }
-class ServicesMetrics(
+
+// Private constructor to avoid being instantiated multiple times by accident
+final class ServicesMetrics private[metrics] (
     inventory: ServicesHistograms,
     openTelemetryMetricsFactory: LabeledMetricsFactory,
 ) {
@@ -183,7 +193,8 @@ class ServicesMetrics(
   private val prefix = inventory.prefix
   private implicit val metricsContext: MetricsContext = MetricsContext.Empty
 
-  object index {
+  // Private constructor to avoid being instantiated multiple times by accident
+  final class IndexMetrics private[ServicesMetrics] {
     private val prefix = inventory.indexPrefix
 
     val listLfPackages: Timer = openTelemetryMetricsFactory.timer(inventory.listLfPackages.info)
@@ -194,10 +205,22 @@ class ServicesMetrics(
     val getCompletions: Timer = openTelemetryMetricsFactory.timer(inventory.getCompletions.info)
     val transactions: Timer = openTelemetryMetricsFactory.timer(inventory.transactions.info)
     val transactionTrees: Timer = openTelemetryMetricsFactory.timer(inventory.transactionTrees.info)
+    // TODO(#23504) remove when corresponding grpc method has been removed
     val getTransactionById: Timer =
       openTelemetryMetricsFactory.timer(inventory.getTransactionById.info)
+    // TODO(#23504) remove when corresponding grpc method has been removed
     val getTransactionTreeById: Timer =
       openTelemetryMetricsFactory.timer(inventory.getTransactionTreeById.info)
+    // TODO(#23504) remove when corresponding grpc method has been removed
+    val getTransactionByOffset: Timer =
+      openTelemetryMetricsFactory.timer(inventory.getTransactionByOffset.info)
+    // TODO(#23504) remove when corresponding grpc method has been removed
+    val getTransactionTreeByOffset: Timer =
+      openTelemetryMetricsFactory.timer(inventory.getTransactionTreeByOffset.info)
+    val getUpdateByOffset: Timer =
+      openTelemetryMetricsFactory.timer(inventory.getUpdateByOffset.info)
+    val getUpdateById: Timer =
+      openTelemetryMetricsFactory.timer(inventory.getUpdateById.info)
     val getActiveContracts: Timer =
       openTelemetryMetricsFactory.timer(inventory.getActiveContracts.info)
     val lookupActiveContract: Timer =
@@ -232,10 +255,8 @@ class ServicesMetrics(
 
     val prune: Timer = openTelemetryMetricsFactory.timer(inventory.prune.info)
 
-    val getTransactionMetering: Timer =
-      openTelemetryMetricsFactory.timer(inventory.getTransactionMetering.info)
-
-    object InMemoryFanoutBuffer {
+    // Private constructor to avoid being instantiated multiple times by accident
+    final class InMemoryFanoutBufferMetrics private[IndexMetrics] {
       val prefix: MetricName = inventory.fanoutPrefix
 
       val push: Timer = openTelemetryMetricsFactory.timer(
@@ -250,6 +271,7 @@ class ServicesMetrics(
         inventory.fanoutBufferSize.info
       )
     }
+    val inMemoryFanoutBuffer: InMemoryFanoutBufferMetrics = new InMemoryFanoutBufferMetrics
 
     case class BufferedReader(streamName: String) {
       implicit val metricsContext: MetricsContext = MetricsContext("stream" -> streamName)
@@ -293,13 +315,15 @@ class ServicesMetrics(
         openTelemetryMetricsFactory.histogram(inventory.bufferedReaderSliceSize.info)
     }
   }
+  val index = new IndexMetrics
 
-  object read {
+  // Private constructor to avoid being instantiated multiple times by accident
+  final class ReadMetrics private[ServicesMetrics] {
 
     val stateUpdates: Timer = openTelemetryMetricsFactory.timer(inventory.readStateUpdates.info)
 
-    val getConnectedDomains: Timer =
-      openTelemetryMetricsFactory.timer(inventory.readGetConnectedDomains.info)
+    val getConnectedSynchronizers: Timer =
+      openTelemetryMetricsFactory.timer(inventory.readGetConnectedSynchronizers.info)
 
     val incompleteReassignmentOffsets: Timer =
       openTelemetryMetricsFactory.timer(inventory.readIncompleteReassignmentOffsets.info)
@@ -309,7 +333,10 @@ class ServicesMetrics(
     val validateDar: Timer = openTelemetryMetricsFactory.timer(inventory.readValidateDar.info)
   }
 
-  object write {
+  val read: ReadMetrics = new ReadMetrics
+
+  // Private constructor to avoid being instantiated multiple times by accident
+  final class WriteMetrics private[ServicesMetrics] {
 
     val submitTransaction: Timer =
       openTelemetryMetricsFactory.timer(inventory.writeSubmitTransaction.info)
@@ -335,5 +362,8 @@ class ServicesMetrics(
     val prune: Timer = openTelemetryMetricsFactory.timer(inventory.writePrune.info)
   }
 
-  object pruning extends PruningMetrics(prefix :+ "pruning", openTelemetryMetricsFactory)
+  val write: WriteMetrics = new WriteMetrics
+
+  val pruning = new PruningMetrics(prefix :+ "pruning", openTelemetryMetricsFactory)
+
 }

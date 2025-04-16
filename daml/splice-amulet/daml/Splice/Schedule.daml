@@ -34,6 +34,17 @@ getValueAsOf time schedule =
       | otherwise ->
           getValueAsOf time Schedule with initialValue = value; futureValues
 
+-- | Variant of `getValueAsOf` that communicates workflow-level bounds.
+getValueAsOfLedgerTime : Schedule Time a -> Update a
+getValueAsOfLedgerTime schedule = do
+  case schedule.futureValues of
+    [] -> pure schedule.initialValue
+    ((effectiveAsOf, value) :: futureValues) -> do
+      notYetEffective <- isLedgerTimeLT effectiveAsOf
+      if notYetEffective
+        then pure schedule.initialValue
+        else getValueAsOfLedgerTime Schedule with initialValue = value; futureValues
+
 -- | Check the validity of a schedule given a function to check the validity of its values
 validSchedule : Ord t => Schedule t a -> (a -> Bool) -> Bool
 validSchedule schedule validateValue =

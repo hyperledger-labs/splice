@@ -1,15 +1,15 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform
 
-import com.daml.error.utils.ErrorDetails
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
+import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.error.CommonErrors
 import com.digitalasset.canton.pekkostreams.dispatcher.{Dispatcher, SubSource}
-import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.canton.util.TryUtil
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.stream.scaladsl.Source
 import org.mockito.MockitoSugar
@@ -27,19 +27,18 @@ class DispatcherStateSpec
     with BaseTest {
   private val className = classOf[DispatcherState].getSimpleName
 
-  private val initialInitializationOffset =
-    Offset.fromHexString(Ref.HexString.assertFromString("abcdef"))
+  private val initializationOffset = Some(Offset.tryFromLong(12345678L))
 
-  private val nextOffset = Offset.fromHexString(Ref.HexString.assertFromString("abcdfe"))
+  private val nextOffset = initializationOffset.map(_.increment)
 
-  private val thirdOffset = Offset.fromHexString(Ref.HexString.assertFromString("abcdff"))
+  private val thirdOffset = nextOffset.map(_.increment)
 
   s"$className.{startDispatcher, stopDispatcher}" should "handle correctly the Dispatcher lifecycle" in {
     for {
       _ <- Future.unit
       dispatcherState = new DispatcherState(Duration.Zero, loggerFactory)
       // Start the initial Dispatcher
-      _ = dispatcherState.startDispatcher(initialInitializationOffset)
+      _ = dispatcherState.startDispatcher(initializationOffset)
 
       // Assert running flag
       _ = dispatcherState.isRunning shouldBe true
@@ -78,7 +77,7 @@ class DispatcherStateSpec
       _ <- Future.unit
       dispatcherState = new DispatcherState(1.second, loggerFactory)
       // Start the initial Dispatcher
-      _ = dispatcherState.startDispatcher(initialInitializationOffset)
+      _ = dispatcherState.startDispatcher(initializationOffset)
 
       // Assert running flag
       _ = dispatcherState.isRunning shouldBe true
@@ -131,8 +130,8 @@ class DispatcherStateSpec
   ): Future[Assertion] =
     initialDispatcher
       .startingAt(
-        Offset.beforeBegin,
-        SubSource.RangeSource((_, _) => Source.empty),
+        startExclusive = None,
+        subSource = SubSource.RangeSource((_, _) => Source.empty),
       )
       .run()
       .transform {
@@ -148,7 +147,10 @@ class DispatcherStateSpec
       _ <- Future.unit
       // Start a subscription
       runF = dispatcherState.getDispatcher
-        .startingAt(Offset.beforeBegin, SubSource.RangeSource((_, _) => Source.empty))
+        .startingAt(
+          startExclusive = None,
+          subSource = SubSource.RangeSource((_, _) => Source.empty),
+        )
         .run()
       // Stop the dispatcher
       _ <- dispatcherState.stopDispatcher()
@@ -156,7 +158,7 @@ class DispatcherStateSpec
       _ <- runF.transform {
         case Failure(e: StatusRuntimeException)
             if ErrorDetails.matches(e, CommonErrors.ServiceNotRunning) =>
-          Success(())
+          TryUtil.unit
         case Failure(other) =>
           fail(
             s"Expected a self-service error exception of ${CommonErrors.ServiceNotRunning.code} but got $other"

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -10,19 +10,23 @@ import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 
 trait SignedProtocolMessageContent
     extends ProtocolVersionedMemoizedEvidence
-    with HasDomainId
+    with HasSynchronizerId
     with PrettyPrinting
     with Product
     with Serializable {
 
-  /** Converts this object into a [[com.google.protobuf.ByteString]] using [[com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence.getCryptographicEvidence]]
-    * and wraps the result in the appropriate [[com.digitalasset.canton.protocol.v30.TypedSignedProtocolMessageContent.SomeSignedProtocolMessage]] constructor.
+  /** Converts this object into a [[com.google.protobuf.ByteString]] using
+    * [[com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence.getCryptographicEvidence]]
+    * and wraps the result in the appropriate
+    * [[com.digitalasset.canton.protocol.v30.TypedSignedProtocolMessageContent.SomeSignedProtocolMessage]]
+    * constructor.
     */
   protected[messages] def toProtoTypedSomeSignedProtocolMessage
       : v30.TypedSignedProtocolMessageContent.SomeSignedProtocolMessage
 
-  /** The timestamp of the [[com.digitalasset.canton.crypto.SyncCryptoApi]] used for signing this message.
-    * If no timestamp is provided, the head snapshot will be used. This is only used for security tests.
+  /** The timestamp of the [[com.digitalasset.canton.crypto.SyncCryptoApi]] used for signing this
+    * message. If no timestamp is provided, the head snapshot will be used. This is only used for
+    * security tests.
     */
   def signingTimestamp: Option[CantonTimestamp]
 

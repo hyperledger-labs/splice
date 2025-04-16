@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -28,7 +28,7 @@ object DbDtoEq extends Matchers {
 
   val DbDtoSeqEq: org.scalactic.Equality[Seq[DbDto]] = {
     case (a: Seq[_], b: Seq[_]) =>
-      a.size == b.size && a.zip(b).forall { case (x, y) => DbDtoEq.areEqual(x, y) }
+      a.sizeCompare(b) == 0 && a.zip(b).forall { case (x, y) => DbDtoEq.areEqual(x, y) }
     case (_, _) => false
   }
 

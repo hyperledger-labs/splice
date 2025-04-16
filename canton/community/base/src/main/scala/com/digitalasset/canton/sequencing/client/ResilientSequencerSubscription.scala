@@ -1,14 +1,14 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.daml.nameof.NameOf.functionFullName
-import com.digitalasset.canton.SequencerCounter
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerSubscriptionErrorGroup
@@ -24,8 +24,8 @@ import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionErro
 }
 import com.digitalasset.canton.sequencing.client.SubscriptionCloseReason.HandlerException
 import com.digitalasset.canton.sequencing.client.transports.SequencerClientTransport
-import com.digitalasset.canton.sequencing.handlers.{CounterCapture, HasReceivedEvent}
-import com.digitalasset.canton.sequencing.protocol.SubscriptionRequest
+import com.digitalasset.canton.sequencing.handlers.{EventTimestampCapture, HasReceivedEvent}
+import com.digitalasset.canton.sequencing.protocol.SubscriptionRequestV2
 import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
@@ -38,23 +38,24 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-/** Attempts to create a resilient [[SequencerSubscription]] for the [[SequencerClient]] by
-  * creating underlying subscriptions using the [[com.digitalasset.canton.sequencing.client.transports.SequencerClientTransport]]
-  * and then recreating them if they fail with a reason that is deemed retryable.
-  * If a subscription is closed or fails with a reason that is not retryable the failure will be passed upstream
-  * from this subscription.
-  * We determine whether an error is retryable by calling the supplied [[SubscriptionErrorRetryPolicy]].
-  * We also will delay recreating subscriptions by an interval determined by the
-  * [[com.digitalasset.canton.sequencing.client.SubscriptionRetryDelayRule]].
-  * As we have to know where to restart a subscription from when it is recreated
-  * we use a [[com.digitalasset.canton.sequencing.handlers.CounterCapture]] handler
-  * wrapper to keep track of the last event that was successfully provided by the provided handler, and use this value
-  * to restart new subscriptions from.
-  * For this subscription [[ResilientSequencerSubscription.start]] must be called for the underlying subscriptions to begin.
+/** Attempts to create a resilient [[SequencerSubscription]] for the [[SequencerClient]] by creating
+  * underlying subscriptions using the
+  * [[com.digitalasset.canton.sequencing.client.transports.SequencerClientTransport]] and then
+  * recreating them if they fail with a reason that is deemed retryable. If a subscription is closed
+  * or fails with a reason that is not retryable the failure will be passed upstream from this
+  * subscription. We determine whether an error is retryable by calling the supplied
+  * [[SubscriptionErrorRetryPolicy]]. We also will delay recreating subscriptions by an interval
+  * determined by the [[com.digitalasset.canton.sequencing.client.SubscriptionRetryDelayRule]]. As
+  * we have to know where to restart a subscription from when it is recreated we use a
+  * [[com.digitalasset.canton.sequencing.handlers.EventTimestampCapture]] handler wrapper to keep
+  * track of the last event that was successfully provided by the provided handler, and use this
+  * value to restart new subscriptions from. For this subscription
+  * [[ResilientSequencerSubscription.start]] must be called for the underlying subscriptions to
+  * begin.
   */
 class ResilientSequencerSubscription[HandlerError](
     sequencerId: SequencerId,
-    startingFrom: SequencerCounter,
+    startingTimestamp: Option[CantonTimestamp],
     handler: SerializedEventHandler[HandlerError],
     subscriptionFactory: SequencerSubscriptionFactory[HandlerError],
     retryDelayRule: SubscriptionRetryDelayRule,
@@ -68,16 +69,18 @@ class ResilientSequencerSubscription[HandlerError](
   override val name: String = SequencerClient.healthName
   override val initialHealthState: ComponentHealthState = ComponentHealthState.Ok()
   override def closingState: ComponentHealthState =
-    ComponentHealthState.failed("Disconnected from domain")
+    ComponentHealthState.failed("Disconnected from synchronizer")
   private val nextSubscriptionRef =
     new AtomicReference[Option[SequencerSubscription[HandlerError]]](None)
-  private val counterCapture = new CounterCapture(startingFrom, loggerFactory)
+  private val timestampCapture = new EventTimestampCapture(startingTimestamp, loggerFactory)
 
   /** Start running the resilient sequencer subscription */
   def start(implicit traceContext: TraceContext): Unit = setupNewSubscription()
 
   /** Start a new subscription to the sequencer.
-    * @param delayOnRestart If this subscription fails with an error that can be retried, how long should we wait before starting a new subscription?
+    * @param delayOnRestart
+    *   If this subscription fails with an error that can be retried, how long should we wait before
+    *   starting a new subscription?
     */
   private def setupNewSubscription(
       delayOnRestart: FiniteDuration = retryDelayRule.initialDelay
@@ -196,11 +199,12 @@ class ResilientSequencerSubscription[HandlerError](
     // successfully resubscribed). the event will subsequently be ignored by the sequencer client.
     // even more, the event will be compared with the previous event received and we'll complain
     // if we observed a fork
-    val nextCounter = counterCapture.counter
-    val (hasReceivedEvent, wrappedHandler) = HasReceivedEvent(counterCapture(handler))
-    logger.debug(s"Starting new sequencer subscription from $nextCounter")
+    val startingTimestamp = timestampCapture.latestEventTimestamp
+    val startingTimestampString = startingTimestamp.map(_.toString).getOrElse("the beginning")
+    val (hasReceivedEvent, wrappedHandler) = HasReceivedEvent(timestampCapture(handler))
+    logger.debug(s"Starting new sequencer subscription from $startingTimestampString")
 
-    val subscriptionE = subscriptionFactory.create(nextCounter, wrappedHandler)(traceContext)
+    val subscriptionE = subscriptionFactory.create(startingTimestamp, wrappedHandler)(traceContext)
     nextSubscriptionRef.set(subscriptionE.map(_._1.some).onShutdown(None))
 
     subscriptionE.map { case (subscription, retryPolicy) =>
@@ -245,10 +249,11 @@ class ResilientSequencerSubscription[HandlerError](
     close()
   }
 
-  /** Closes the current subscription with [[SubscriptionCloseReason.TransportChange]] and resubscribes
-    * using the `subscriptionFactory`, provided that there is currently a subscription.
+  /** Closes the current subscription with [[SubscriptionCloseReason.TransportChange]] and
+    * resubscribes using the `subscriptionFactory`, provided that there is currently a subscription.
     *
-    * @return The future completes after the old subscription has been closed.
+    * @return
+    *   The future completes after the old subscription has been closed.
     */
   def resubscribeOnTransportChange()(implicit traceContext: TraceContext): Future[Unit] =
     nextSubscriptionRef.get() match {
@@ -308,7 +313,7 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
       member: Member,
       getTransport: => UnlessShutdown[SequencerClientTransport],
       handler: SerializedEventHandler[E],
-      startingFrom: SequencerCounter,
+      startingTimestamp: Option[CantonTimestamp],
       initialDelay: FiniteDuration,
       warnDelay: FiniteDuration,
       maxRetryDelay: FiniteDuration,
@@ -317,7 +322,7 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
   )(implicit executionContext: ExecutionContext): ResilientSequencerSubscription[E] =
     new ResilientSequencerSubscription[E](
       sequencerId,
-      startingFrom,
+      startingTimestamp,
       handler,
       createSubscription(member, getTransport, protocolVersion),
       SubscriptionRetryDelayRule(
@@ -336,10 +341,13 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
       protocolVersion: ProtocolVersion,
   ): SequencerSubscriptionFactory[E] =
     new SequencerSubscriptionFactory[E] {
-      override def create(startingCounter: SequencerCounter, handler: SerializedEventHandler[E])(
-          implicit traceContext: TraceContext
+      override def create(
+          startingTimestamp: Option[CantonTimestamp],
+          handler: SerializedEventHandler[E],
+      )(implicit
+          traceContext: TraceContext
       ): UnlessShutdown[(SequencerSubscription[E], SubscriptionErrorRetryPolicy)] = {
-        val request = SubscriptionRequest(member, startingCounter, protocolVersion)
+        val request = SubscriptionRequestV2(member, startingTimestamp, protocolVersion)
         getTransport
           .map { transport =>
             val subscription =
@@ -374,7 +382,7 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
     """This error is logged when a sequencer client determined a ledger fork, where a sequencer node
       |responded with different events for the same timestamp / counter.
       |
-      |Whenever a client reconnects to a domain, it will start with the last message received and compare
+      |Whenever a client reconnects to a synchronizer, it will start with the last message received and compare
       |whether that last message matches the one it received previously. If not, it will report with this error.
       |
       |A ledger fork should not happen in normal operation. It can happen if the backups have been taken
@@ -397,14 +405,15 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
   */
 sealed trait SequencerSubscriptionCreationError extends SubscriptionCloseReason.SubscriptionError
 
-/** When a fatal error occurs on the creation of a sequencer subscription, the [[com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription]]
-  * will not retry the subscription creation. Instead, the subscription will fail.
+/** When a fatal error occurs on the creation of a sequencer subscription, the
+  * [[com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription]] will not retry the
+  * subscription creation. Instead, the subscription will fail.
   */
 final case class Fatal(msg: String) extends SequencerSubscriptionCreationError
 
 trait SequencerSubscriptionFactory[HandlerError] {
   def create(
-      startingCounter: SequencerCounter,
+      startingTimestamp: Option[CantonTimestamp],
       handler: SerializedEventHandler[HandlerError],
   )(implicit
       traceContext: TraceContext

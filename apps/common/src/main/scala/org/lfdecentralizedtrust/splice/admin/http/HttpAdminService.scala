@@ -3,20 +3,20 @@
 
 package org.lfdecentralizedtrust.splice.admin.http
 
-import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
-import org.lfdecentralizedtrust.splice.environment.SpliceStatus
-import org.lfdecentralizedtrust.splice.http.v0.external.common_admin.CommonAdminResource
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.AdminServerConfig
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeParameters}
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
+import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
+import org.lfdecentralizedtrust.splice.environment.SpliceStatus
+import org.lfdecentralizedtrust.splice.http.v0.external.common_admin.CommonAdminResource
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -93,7 +93,7 @@ object HttpAdminService {
       )
 
     override def close(): Unit = {
-      Lifecycle.close(
+      LifeCycle.close(
         AsyncCloseable(
           "http binding admin service",
           bindingF.flatMap {

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -10,9 +10,8 @@ object HexString {
 
   def toHexString(bytes: ByteString): String = toHexString(bytes.toByteArray)
 
-  /** Convert a ByteString to hex-string.
-    * The output size will be equal to the length configured if it's even, or
-    * to the length + 1 if it's odd.
+  /** Convert a ByteString to hex-string. The output size will be equal to the length configured if
+    * it's even, or to the length + 1 if it's odd.
     */
   def toHexString(bytes: ByteString, length: Int): String = {
     // Every byte is 2 Hex characters, this is why we devise by 2

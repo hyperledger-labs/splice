@@ -13,7 +13,8 @@ import { installPostgres, Postgres } from 'splice-pulumi-common/src/postgres';
 
 import {
   DecentralizedSynchronizerNode,
-  InStackDecentralizedSynchronizerNode,
+  InStackCantonBftDecentralizedSynchronizerNode,
+  InStackCometBftDecentralizedSynchronizerNode,
   StaticCometBftConfigWithNodeName,
   SvParticipant,
 } from './index';
@@ -30,6 +31,7 @@ export function installCantonComponents(
   auth0Client: Auth0Client,
   svConfig: {
     onboardingName: string;
+    ingressName: string;
     auth0SvAppName: string;
     isFirstSv: boolean;
     isCoreSv: boolean;
@@ -132,23 +134,39 @@ export function installCantonComponents(
       imagePullServiceAccountName,
       withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
     );
-    const decentralizedSynchronizerNode = new InStackDecentralizedSynchronizerNode(
-      migrationId,
-      xns,
-      {
-        sequencerPostgres: sequencerPostgres,
-        mediatorPostgres: mediatorPostgres,
-        setCoreDbNames: svConfig.isCoreSv,
-      },
-      cometbft,
-      isActiveMigration,
-      migrationConfig.isRunningMigration(),
-      svConfig.onboardingName,
-      logLevel,
-      migrationInfo.version,
-      imagePullServiceAccountName,
-      opts
-    );
+    const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
+      ? new InStackCantonBftDecentralizedSynchronizerNode(
+          migrationId,
+          svConfig.ingressName,
+          xns,
+          {
+            sequencerPostgres: sequencerPostgres,
+            mediatorPostgres: mediatorPostgres,
+            setCoreDbNames: svConfig.isCoreSv,
+          },
+          isActiveMigration,
+          logLevel,
+          migrationInfo.version,
+          imagePullServiceAccountName,
+          opts
+        )
+      : new InStackCometBftDecentralizedSynchronizerNode(
+          cometbft,
+          migrationId,
+          xns,
+          {
+            sequencerPostgres: sequencerPostgres,
+            mediatorPostgres: mediatorPostgres,
+            setCoreDbNames: svConfig.isCoreSv,
+          },
+          isActiveMigration,
+          migrationConfig.isRunningMigration(),
+          svConfig.onboardingName,
+          logLevel,
+          migrationInfo.version,
+          imagePullServiceAccountName,
+          opts
+        );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,
       participant: {

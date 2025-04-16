@@ -51,6 +51,7 @@ testSynchronizerMigration = do
         migrationId = 0
         sequencerId = "sequencer-id-" <> partyToText sv
         url = "sequencer.address:1234"
+        peerUrl = None
         availableAfter = Some now
       mediator = Some MediatorConfig with
         mediatorId = "mediator-id-" <> partyToText sv

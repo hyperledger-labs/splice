@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.networking.grpc
@@ -8,7 +8,8 @@ import com.daml.metrics.grpc.{GrpcMetricsServerInterceptor, GrpcServerMetrics}
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.auth.{
   AdminAuthorizer,
-  AuthorizationInterceptor,
+  AuthInterceptor,
+  AuthServiceWildcard,
   CantonAdminToken,
   CantonAdminTokenAuthService,
 }
@@ -33,7 +34,7 @@ class CantonCommunityServerInterceptors(
     apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
     grpcMetrics: GrpcServerMetrics,
-    authServices: Seq[AuthServiceConfig],
+    authServiceConfigs: Seq[AuthServiceConfig],
     adminToken: Option[CantonAdminToken],
     jwtTimestampLeeway: Option[JwtTimestampLeeway],
     telemetry: Telemetry,
@@ -62,23 +63,24 @@ class CantonCommunityServerInterceptors(
   ): ServerServiceDefinition =
     intercept(service, new GrpcMetricsServerInterceptor(grpcMetrics))
 
-  private def addAuthorizationInterceptor(
+  private def addAuthInterceptor(
       service: ServerServiceDefinition
   ): ServerServiceDefinition = {
-    val authService = new CantonAdminTokenAuthService(
-      adminToken,
-      parent = authServices.map(
-        _.create(
-          jwtTimestampLeeway,
-          loggerFactory,
-        )
-      ),
-    )
-    val interceptor = new AuthorizationInterceptor(
-      authService,
+    val authServices = new CantonAdminTokenAuthService(adminToken) +:
+      (if (authServiceConfigs.isEmpty)
+         List(AuthServiceWildcard)
+       else
+         authServiceConfigs.map(
+           _.create(
+             jwtTimestampLeeway,
+             loggerFactory,
+           )
+         ))
+    val interceptor = new AuthInterceptor(
+      authServices,
       telemetry,
       loggerFactory,
-      DirectExecutionContext(loggerFactory.getLogger(AuthorizationInterceptor.getClass)),
+      DirectExecutionContext(loggerFactory.getLogger(AuthInterceptor.getClass)),
       AdminAuthorizer,
     )
     intercept(service, interceptor)
@@ -92,5 +94,5 @@ class CantonCommunityServerInterceptors(
       .pipe(interceptForLogging(_, withLogging))
       .pipe(addTraceContextInterceptor)
       .pipe(addMetricsInterceptor)
-      .pipe(addAuthorizationInterceptor)
+      .pipe(addAuthInterceptor)
 }

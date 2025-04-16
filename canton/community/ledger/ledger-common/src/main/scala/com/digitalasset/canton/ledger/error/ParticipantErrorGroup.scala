@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error
 
-import com.daml.error.{ErrorClass, ErrorGroup}
+import com.digitalasset.base.error.{ErrorClass, ErrorGroup}
 
 object ParticipantErrorGroup extends ErrorGroup()(ErrorClass.root()) {
   abstract class CommonErrorGroup extends ErrorGroup()
@@ -21,6 +21,8 @@ object ParticipantErrorGroup extends ErrorGroup()(ErrorClass.root()) {
       abstract class IdentityProviderConfigServiceErrorGroup extends ErrorGroup()
     }
 
+    abstract class JsonApiErrorGroup extends ErrorGroup()
+
     abstract class CommandExecutionErrorGroup extends ErrorGroup()
 
     abstract class ConsistencyErrorGroup extends ErrorGroup()
@@ -29,6 +31,6 @@ object ParticipantErrorGroup extends ErrorGroup()(ErrorClass.root()) {
 
     abstract class RequestValidationErrorGroup extends ErrorGroup()
 
-    abstract class WriteServiceRejectionErrorGroup extends ErrorGroup()
+    abstract class SyncServiceRejectionErrorGroup extends ErrorGroup()
   }
 }

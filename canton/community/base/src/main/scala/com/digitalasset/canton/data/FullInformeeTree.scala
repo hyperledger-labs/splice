@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -21,8 +21,9 @@ import java.util.UUID
 
 /** Wraps a [[GenTransactionTree]] that is also a full informee tree.
   *
-  * The `CommonMetadata` is unblinded, the `ParticipantMetadata` and `SubmitterMetadata` are blinded.
-  * Every `TransactionView` and `ViewCommonData` is unblinded, but every `ViewParticipantData` is blinded.
+  * The `CommonMetadata` is unblinded, the `ParticipantMetadata` and `SubmitterMetadata` are
+  * blinded. Every `TransactionView` and `ViewCommonData` is unblinded, but every
+  * `ViewParticipantData` is blinded.
   */
 // private constructor, because object invariants are checked by factory methods
 final case class FullInformeeTree private (tree: GenTransactionTree)(
@@ -40,7 +41,7 @@ final case class FullInformeeTree private (tree: GenTransactionTree)(
   lazy val transactionId: TransactionId = TransactionId.fromRootHash(tree.rootHash)
 
   private lazy val commonMetadata: CommonMetadata = checked(tree.commonMetadata.tryUnwrap)
-  lazy val domainId: DomainId = commonMetadata.domainId
+  lazy val synchronizerId: SynchronizerId = commonMetadata.synchronizerId
   lazy val mediator: MediatorGroupRecipient = commonMetadata.mediator
 
   lazy val informeesAndThresholdByViewPosition: Map[ViewPosition, ViewConfirmationParameters] =
@@ -62,19 +63,19 @@ final case class FullInformeeTree private (tree: GenTransactionTree)(
   override protected def pretty: Pretty[FullInformeeTree] = prettyOfParam(_.tree)
 }
 
-object FullInformeeTree
-    extends HasProtocolVersionedWithContextAndValidationCompanion[FullInformeeTree, HashOps] {
+object FullInformeeTree extends VersioningCompanionContextPVValidation2[FullInformeeTree, HashOps] {
   override val name: String = "FullInformeeTree"
 
-  val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.FullInformeeTree)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.FullInformeeTree)(
       supportedProtoVersion(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
   /** Creates a full informee tree from a [[GenTransactionTree]].
-    * @throws FullInformeeTree$.InvalidInformeeTree if `tree` is not a valid full informee tree (i.e. the wrong nodes are blinded)
+    * @throws FullInformeeTree$.InvalidInformeeTree
+    *   if `tree` is not a valid full informee tree (i.e. the wrong nodes are blinded)
     */
   def tryCreate(tree: GenTransactionTree, protocolVersion: ProtocolVersion): FullInformeeTree =
     create(tree, protocolVersionRepresentativeFor(protocolVersion)).valueOr(err =>
@@ -155,9 +156,9 @@ object FullInformeeTree
   /** Indicates an attempt to create an invalid [[FullInformeeTree]]. */
   final case class InvalidInformeeTree(message: String) extends RuntimeException(message) {}
 
-  /** Lens for modifying the [[GenTransactionTree]] inside of a full informee tree.
-    * It does not check if the new `tree` actually constitutes a valid full informee tree, therefore:
-    * DO NOT USE IN PRODUCTION.
+  /** Lens for modifying the [[GenTransactionTree]] inside of a full informee tree. It does not
+    * check if the new `tree` actually constitutes a valid full informee tree, therefore: DO NOT USE
+    * IN PRODUCTION.
     */
   @VisibleForTesting
   lazy val genTransactionTreeUnsafe: Lens[FullInformeeTree, GenTransactionTree] =

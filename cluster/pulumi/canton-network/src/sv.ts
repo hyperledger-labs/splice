@@ -38,6 +38,8 @@ import {
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
+  CantonBftSynchronizerNode,
+  CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   SvParticipant,
@@ -370,6 +372,7 @@ function installSvApp(
 ) {
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
+  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,
@@ -385,11 +388,15 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
     initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
-    cometBFT: {
-      enabled: true,
-      connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
-      externalGovernanceKey: config.cometBftGovernanceKey ? true : undefined,
-    },
+    ...(useCantonBft
+      ? {}
+      : {
+          cometBFT: {
+            enabled: true,
+            connectionUri: pulumi.interpolate`http://${(decentralizedSynchronizer as unknown as CometbftSynchronizerNode).cometbftRpcServiceName}:26657`,
+            externalGovernanceKey: config.cometBftGovernanceKey ? true : undefined,
+          },
+        }),
     decentralizedSynchronizerUrl:
       config.onboarding.type == 'found-dso'
         ? undefined
@@ -404,6 +411,14 @@ function installSvApp(
         // required to prevent participants from using new nodes when the domain is upgraded
         sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
         sequencerPruningConfig: config.sequencerPruningConfig,
+        ...(useCantonBft
+          ? {
+              enableBftSequencer: true,
+              sequencerBftPublicUrlSuffix: (
+                decentralizedSynchronizer as unknown as CantonBftSynchronizerNode
+              ).externalSequencerAddress,
+            }
+          : {}),
       },
     scan: {
       publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,

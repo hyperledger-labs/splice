@@ -4,13 +4,14 @@
 package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import cats.data.{EitherT, OptionT}
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.applicative.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.transaction.SequencerDomainState
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.ByteString
 import io.circe.parser.*
@@ -58,6 +59,8 @@ class HttpSvHandler(
     dsoPartyMigration: DsoPartyMigration,
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
+    isBftSequencer: Boolean,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContext,
     protected val tracer: Tracer,
@@ -174,7 +177,7 @@ class HttpSvHandler(
             dsoRules <- dsoStore.getDsoRules()
             isCandidatePartyHostedOnParticipant <- participantAdminConnection
               .listPartyToParticipant(
-                dsoRules.domain.filterString,
+                TopologyStoreId.SynchronizerStore(dsoRules.domain).some,
                 filterParty = token.candidateParty.filterString,
                 filterParticipant = token.candidateParticipantId.toProtoPrimitive,
               )
@@ -546,19 +549,22 @@ class HttpSvHandler(
   private def waitForNewSequencerObservedByExistingSequencer(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[CantonTimestamp] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-      sequenced <- retryProvider.getValueWithRetries(
+      _ <- retryProvider.getValueWithRetries(
         RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
         "sequencer_added_to_topology_state",
-        "New sequencer is observed in SequencerDomainState through existing sequencer",
+        "New sequencer is observed in SequencerSynchronizerState through existing sequencer",
         sequencerAdminConnection
-          .listSequencerDomainState(decentralizedSynchronizer, store.TimeQuery.Range(None, None))
+          .listSequencerSynchronizerState(
+            decentralizedSynchronizer,
+            store.TimeQuery.Range(None, None),
+          )
           .map { result =>
             result
               .sortBy(_.base.serial)
-              .foldLeft[Option[TopologyResult[SequencerDomainState]]](None) {
+              .foldLeft[Option[TopologyResult[SequencerSynchronizerState]]](None) {
                 case (_, newMapping) if !newMapping.mapping.allSequencers.contains(sequencerId) =>
                   None
                 case (None, newMapping) if newMapping.mapping.allSequencers.contains(sequencerId) =>
@@ -580,7 +586,27 @@ class HttpSvHandler(
           },
         logger,
       )
-    } yield CantonTimestamp.tryFromInstant(sequenced)
+      _ <-
+        if (isBftSequencer) {
+          retryProvider.waitUntil(
+            RetryFor.WaitingOnInitDependency,
+            "sequencer_ordering_topology",
+            s"Wait for $sequencerId to be in the ordering topology",
+            sequencerAdminConnection
+              .getSequencerOrderingTopology()
+              .map(topology =>
+                if (topology.sequencerIds.contains(sequencerId)) ()
+                else
+                  throw Status.NOT_FOUND
+                    .withDescription(
+                      s"Sequencer $sequencerId is not in the ordering topology $topology"
+                    )
+                    .asRuntimeException()
+              ),
+            logger,
+          )
+        } else Future.unit
+    } yield ()
   }
 
   private def getSequencerOnboardingState(
@@ -722,11 +748,10 @@ class HttpSvHandler(
   )(implicit tc: TraceContext): Future[Unit] =
     for {
       dsoRules <- dsoStore.getDsoRules()
-      amuletRules <- dsoStore.getAmuletRules()
       now = clock.now
-      supportsValidatorLicenseMetadata = PackageIdResolver.supportsValidatorLicenseMetadata(
+      supportsValidatorLicenseMetadata <- packageVersionSupport.supportsValidatorLicenseMetadata(
+        Seq(svParty, candidateParty, dsoParty),
         now,
-        amuletRules.payload,
       )
       cmds = Seq(
         dsoRules.exercise(
@@ -743,7 +768,7 @@ class HttpSvHandler(
       ) map (_.update)
       _ <- dsoStoreWithIngestion.connection
         .submit(Seq(svParty), Seq(dsoParty), cmds)
-        .withDomainId(dsoRules.domain)
+        .withSynchronizerId(dsoRules.domain)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()

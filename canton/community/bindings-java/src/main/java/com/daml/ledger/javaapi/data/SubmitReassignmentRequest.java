@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
 
@@ -9,14 +9,14 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 public final class SubmitReassignmentRequest {
 
   public static CommandSubmissionServiceOuterClass.SubmitReassignmentRequest toProto(
-      @NonNull ReassignmentCommand command) {
+      @NonNull ReassignmentCommands command) {
     return CommandSubmissionServiceOuterClass.SubmitReassignmentRequest.newBuilder()
-        .setReassignmentCommand(command.toProto())
+        .setReassignmentCommands(command.toProto())
         .build();
   }
 
-  public static ReassignmentCommand fromProto(
+  public static ReassignmentCommands fromProto(
       CommandSubmissionServiceOuterClass.@NonNull SubmitReassignmentRequest request) {
-    return ReassignmentCommand.fromProto(request.getReassignmentCommand());
+    return ReassignmentCommands.fromProto(request.getReassignmentCommands());
   }
 }

@@ -43,6 +43,7 @@ data AmuletConfig unit = AmuletConfig with
       -- ^ Configuration determining the version of each package
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
+    featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
   deriving (Eq, Show)
 
 -- $1/year specified as a daily rate
@@ -77,6 +78,7 @@ instance Patchable (AmuletConfig USD) where
     tickDuration = patch new.tickDuration base.tickDuration current.tickDuration
     packageConfig = patch new.packageConfig base.packageConfig current.packageConfig
     transferPreapprovalFee = patch new.transferPreapprovalFee base.transferPreapprovalFee current.transferPreapprovalFee
+    featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with

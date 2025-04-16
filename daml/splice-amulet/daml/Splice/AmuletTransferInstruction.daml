@@ -1,0 +1,79 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.AmuletTransferInstruction (
+  AmuletTransferInstruction(..),
+  standardTransferToTwoStepTransfer,
+) where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1
+
+import Splice.Amulet
+import Splice.Amulet.TwoStepTransfer
+
+-- | A transfer instruction for transferring Amulet tokens pending on receiver
+-- acceptance.
+template AmuletTransferInstruction
+  with
+    lockedAmulet : ContractId LockedAmulet -- ^ Locked amulet that holds the funds for executing the transfer upon acceptance
+    transfer : Splice.Api.Token.TransferInstructionV1.Transfer
+  where
+    signatory transfer.instrumentId.admin, transfer.sender
+    observer transfer.receiver
+
+    interface instance TransferInstruction for AmuletTransferInstruction where
+      view = TransferInstructionView with
+        originalInstructionCid = None
+        transfer
+        status = TransferPendingReceiverAcceptance
+        meta = emptyMetadata
+
+      transferInstruction_acceptImpl _self arg =
+        executeTransferInstr this arg.extraArgs
+
+      transferInstruction_rejectImpl _self arg =
+        abortAmuletTransferInstruction this arg.extraArgs
+
+      transferInstruction_updateImpl _self _arg =
+        fail "AmuletTransferInstruction.updateImpl: not used, and thus not implemented"
+
+      transferInstruction_withdrawImpl _self arg = do
+        abortAmuletTransferInstruction this arg.extraArgs
+
+
+-- Transfer instruction evolution
+---------------------------------
+
+standardTransferToTwoStepTransfer : Splice.Api.Token.TransferInstructionV1.Transfer-> TwoStepTransfer
+standardTransferToTwoStepTransfer transfer =
+  TwoStepTransfer with
+    dso = transfer.instrumentId.admin
+    sender = transfer.sender
+    provider = transfer.sender
+    receiver = transfer.receiver
+    amount = transfer.amount
+    transferBefore = transfer.executeBefore
+    transferBeforeDeadline = "Transfer.executeBefore"
+    allowFeaturing = False -- unfeatured as the sender is serving as its own "app provider"
+    lockContext = "transfer to " <> show transfer.receiver
+
+executeTransferInstr : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
+executeTransferInstr instr extraArgs = do
+  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
+  (senderHoldingCids, receiverHoldingCids, meta) <-
+    executeTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+  pure TransferInstructionResult with
+    senderChangeCids = senderHoldingCids
+    output = TransferInstructionResult_Completed with
+      receiverHoldingCids
+    meta
+
+abortAmuletTransferInstruction : AmuletTransferInstruction -> ExtraArgs -> Update TransferInstructionResult
+abortAmuletTransferInstruction instr extraArgs = do
+  let twoStepTransfer = standardTransferToTwoStepTransfer instr.transfer
+  senderHoldingCids <- abortTwoStepTransfer twoStepTransfer instr.lockedAmulet extraArgs
+  pure TransferInstructionResult with
+    senderChangeCids = senderHoldingCids
+    output = TransferInstructionResult_Failed
+    meta = emptyMetadata

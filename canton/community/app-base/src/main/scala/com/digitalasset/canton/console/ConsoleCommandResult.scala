@@ -1,11 +1,11 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
 
 import cats.Monad
 import cats.syntax.alternative.*
-import com.daml.error.{ErrorCategory, ErrorCode}
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode}
 import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.error.CantonErrorGroups.CommandErrorGroup
@@ -68,11 +68,13 @@ object ConsoleCommandResult {
       forAll(instances)(action)
     }
 
-  /** Call a console command on all instances.
-    * Will run all in sequence and will merge all failures.
+  /** Call a console command on all instances. Will run all in sequence and will merge all failures.
     * If nothing fails, the final CommandSuccessful result will be returned.
-    * @param action Action to perform on instances
-    * @return Successful if the action was successful for all instances, otherwise all the errors encountered merged into one.
+    * @param action
+    *   Action to perform on instances
+    * @return
+    *   Successful if the action was successful for all instances, otherwise all the errors
+    *   encountered merged into one.
     */
   private[console] def forAll[Instance <: InstanceReference, Result](
       instances: Seq[Instance]
@@ -103,7 +105,8 @@ object ConsoleCommandResult {
 }
 
 /** Successful command result
-  * @param value The value returned from the command
+  * @param value
+  *   The value returned from the command
   */
 final case class CommandSuccessful[+A](value: A) extends ConsoleCommandResult[A] {
   override lazy val toEither: Either[String, A] = Right(value)
@@ -125,7 +128,7 @@ object CommandErrors extends CommandErrorGroup {
       override val cause: String,
       override val throwableO: Option[Throwable] = None,
   )(implicit override val code: ErrorCode)
-      extends BaseCantonError
+      extends CantonBaseError
       with CommandError
 
   sealed abstract class CommandErrorCode(id: String, category: ErrorCategory)
