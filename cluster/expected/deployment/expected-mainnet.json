@@ -70,6 +70,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mainzrh"
@@ -85,7 +91,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace"
+              "value": "/tmp/pulumi-working/operator/canton-network/workspace/."
             },
             "type": "Literal"
           }
@@ -216,6 +222,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mainzrh"
@@ -231,7 +243,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace"
+              "value": "/tmp/pulumi-working/operator/infra/workspace/."
             },
             "type": "Literal"
           }
@@ -267,10 +279,11 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "interval": "5m",
-        "recurseSubmodules": false,
+        "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.15"
+          "name": "refs/heads/release-line-0.3.18"
         },
         "secretRef": {
           "name": "github"
@@ -296,6 +309,7 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/infra/Pulumi.infra.mainzrh.yaml",
@@ -315,7 +329,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.15"
+          "name": "refs/heads/release-line-0.3.18"
         },
         "secretRef": {
           "name": "github"
@@ -341,10 +355,11 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "interval": "5m",
-        "recurseSubmodules": false,
+        "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.15"
+          "name": "refs/heads/release-line-0.3.18"
         },
         "secretRef": {
           "name": "github"
@@ -370,6 +385,7 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-2.mainzrh.yaml",
@@ -382,7 +398,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.15"
+          "name": "refs/heads/release-line-0.3.18"
         },
         "secretRef": {
           "name": "github"
@@ -465,6 +481,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mainzrh"
@@ -486,7 +508,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace"
+              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace/."
             },
             "type": "Literal"
           },

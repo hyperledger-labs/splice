@@ -86,6 +86,7 @@ in pkgs.mkShell {
     python3Packages.sphinx-autobuild
     python3Packages.waitress
     python3.pkgs.sphinx-reredirects
+    redocly
     ripgrep
     rsync
     sbt

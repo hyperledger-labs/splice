@@ -90,6 +90,12 @@
             },
             "type": "Secret"
           },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/deployment/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "testzrh"
@@ -105,7 +111,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/deployment/workspace"
+              "value": "/tmp/pulumi-working/operator/deployment/workspace/."
             },
             "type": "Literal"
           }
@@ -572,8 +578,9 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "interval": "5m",
-        "recurseSubmodules": false,
+        "recurseSubmodules": true,
         "ref": {
           "name": "refs/heads/main"
         },
@@ -601,6 +608,7 @@
         "namespace": "operator"
       },
       "spec": {
+        "ignore": "daml/dars\n!daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/deployment/Pulumi.deployment.testzrh.yaml",

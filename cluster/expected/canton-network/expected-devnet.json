@@ -298,7 +298,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/cn-docs",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/cn-docs",
       "compat": "true",
       "maxHistory": 10,
       "name": "docs",
@@ -338,7 +338,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1030,7 +1030,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1114,7 +1114,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -1165,7 +1165,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -1175,7 +1175,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -1216,7 +1216,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -1226,7 +1226,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -1292,7 +1292,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1302,7 +1302,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -1407,17 +1407,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -1447,6 +1455,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],
@@ -1562,7 +1575,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1572,7 +1585,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-1",
@@ -1665,7 +1678,7 @@
           }
         }
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -1724,7 +1737,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -1808,7 +1821,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -1859,7 +1872,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -1869,7 +1882,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -1910,7 +1923,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -1920,7 +1933,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -1986,7 +1999,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -1996,7 +2009,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -2101,17 +2114,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2141,6 +2162,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],
@@ -2229,7 +2255,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -2239,7 +2265,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-2",
@@ -2325,7 +2351,7 @@
           "auth0|64afbc353bbc7ca776e27bf4"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -2384,7 +2410,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -2468,7 +2494,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -2519,7 +2545,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -2529,7 +2555,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -2570,7 +2596,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -2580,7 +2606,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -2646,7 +2672,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -2656,7 +2682,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -2761,17 +2787,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -2801,6 +2835,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],
@@ -2889,7 +2928,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -2899,7 +2938,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-3",
@@ -2985,7 +3024,7 @@
           "auth0|64afbc4431b562edb8995da6"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -3044,7 +3083,7 @@
         "databaseFlags": [
           {
             "name": "temp_file_limit",
-            "value": "100000000"
+            "value": "2147483647"
           }
         ],
         "insightsConfig": {
@@ -3128,7 +3167,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -3179,7 +3218,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -3189,7 +3228,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -3230,7 +3269,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -3240,7 +3279,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -3306,7 +3345,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -3316,7 +3355,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -3421,17 +3460,25 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "Elliptic-validator-1::",
+                "beneficiary": "Elliptic-validator-1::1220947a4507021b651a021e880e5d29fd97df225d7ff5dbee2dae2d06aed8565d0a",
                 "weight": "5000"
               },
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220624505b61dca190227947a52cab4953cc99da4818584a0dffa480164bc23c309",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::1220f00bfb374a0c2ff71034053ef56fd69d8899ce584e08f51fad8344f4f1c43054",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::12206aec43c8c6ceb92a6503a0839788f1f236dea30449d11c0b902b5933745711b3",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -3461,6 +3508,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeSP06KmTXsRJ65JGYwtzKRX9gosW+Gf4IwIquPGT8+XM1ey9La4wdZ+eELNZMPGacQ9fDe2JPFuRJE+fdVsfOQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVpFXAPDcz1WHvXrG35YzF9Fgn5P29oVfFkR+QN7DO4v3b/QzTnH+BsBb01gd3KhkuRg+sLj4vLQo/ZOSSyGO0g==",
             "rewardWeightBps": 0
           }
         ],
@@ -3549,7 +3601,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -3559,7 +3611,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-4",
@@ -3645,7 +3697,7 @@
           "auth0|64afbc720e20777e46fff490"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",

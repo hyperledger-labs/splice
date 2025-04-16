@@ -67,6 +67,9 @@ data AmuletRules_ClaimExpiredRewardsResult = AmuletRules_ClaimExpiredRewardsResu
 data AmuletRules_MergeUnclaimedRewardsResult = AmuletRules_MergeUnclaimedRewardsResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data AmuletRules_SetConfigResult = AmuletRules_SetConfigResult with
+    newAmuletRules : ContractId AmuletRules
+
 data AmuletRules_AddFutureAmuletConfigScheduleResult = AmuletRules_AddFutureAmuletConfigScheduleResult with
     newAmuletRules : ContractId AmuletRules
 
@@ -540,6 +543,20 @@ template AmuletRules
       do
         pure this
 
+    choice AmuletRules_SetConfig: AmuletRules_SetConfigResult
+      with
+        newConfig : AmuletConfig Unit.USD
+        baseConfig : AmuletConfig Unit.USD
+      controller dso
+      do
+        require "futureValues is empty" (null this.configSchedule.futureValues)
+        newAmuletRules <- create this with
+          configSchedule = Schedule with
+            initialValue = patch newConfig baseConfig this.configSchedule.initialValue
+            futureValues = []
+        return AmuletRules_SetConfigResult with ..
+
+    -- TODO(#16139): mark these choices as "deprecated"
     -- This inserts a new AmuletConfig Schedule into the future Schedules
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult
       with

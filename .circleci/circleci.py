@@ -157,9 +157,9 @@ def fetch_previous_pipelines(current_pipeline_number: int, branch_filter: str, b
 
   return pipelines
 
-def _handleHttpErrorResponse(err: requests.exceptions.HTTPError):
+def _handleHttpErrorResponse(err: requests.exceptions.HTTPError, attempt: int, max_retries: int, pipeline_or_workflow_id: str):
   if err.response and err.response.status_code == 404:
-    print(f"Attempt {attempt}/{max_retries}: Workflow not found for pipeline {pipeline_id}.")
+    print(f"Attempt {attempt}/{max_retries}: Workflow not found for {pipeline_or_workflow_id}.")
   elif err.response:
     print(f"HTTP error (status code {err.response.status_code}): {err}")
   else:
@@ -171,7 +171,7 @@ def fetch_workflows(pipeline_id: str, max_retries=3, delay=3) -> list[Workflow]:
     try:
       return fetch_paginated(url, WorkflowsResponse.Schema())
     except requests.exceptions.HTTPError as err:
-      _handleHttpErrorResponse(err)
+      _handleHttpErrorResponse(err, attempt, max_retries, pipeline_id)
     if attempt < max_retries:
       print(f"Retrying in {delay} seconds.")
       time.sleep(delay)
@@ -186,11 +186,11 @@ def fetch_workflow(workflow_id: str, max_retries=3, delay=3) -> Workflow:
       raw_response.raise_for_status()
       return Workflow.Schema().load(raw_response.json())
     except requests.exceptions.HTTPError as err:
-      _handleHttpErrorResponse(err)
+      _handleHttpErrorResponse(err, attempt, max_retries, workflow_id)
     if attempt < max_retries:
       print(f"Retrying in {delay} seconds.")
       time.sleep(delay)
-  print(f"Max retries reached. Unable to fetch workflows for pipeline {pipeline_id}.")
+  print(f"Max retries reached. Unable to fetch workflow {workflow_id}.")
   return None
 
 def gen_recent_workflow_runs(workflow_name: str, branch: str, start_date: datetime, end_date: datetime) -> Iterator[InsightWorkflow]:

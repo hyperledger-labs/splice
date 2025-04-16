@@ -45,7 +45,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-sv",
@@ -77,7 +77,7 @@
           "decentralizedSynchronizer": {
             "migrationIds": [
               "2",
-              "1"
+              "3"
             ]
           }
         },
@@ -92,7 +92,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -167,29 +167,6 @@
   },
   {
     "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy1ub2RlLXByaXZhdGUta2V5In19",
-          "priv_validator_key.json": "eyJhZGRyZXNzIjoiMDY0N0U0RkYyNzkwOEI4Qjg3NEMyNjQ3NTM2QUM5ODZDOUVBMEJBQiIsInB1Yl9rZXkiOnsidHlwZSI6InRlbmRlcm1pbnQvUHViS2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHVibGljLWtleSJ9LCJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoic3YtY29tZXRiZnQta2V5cy12YWxpZGF0b3ItcHJpdmF0ZS1rZXkifX0="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cometbft-keys",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cometbft-keys",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
     "id": "projects/test-project/global/networks/default",
     "inputs": {},
     "name": "default",
@@ -220,7 +197,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -247,7 +224,7 @@
           "hostname": "test.global.canton.network.digitalasset.com"
         },
         "cometbftPorts": {
-          "domains": 3
+          "domains": 4
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "tolerations": [
@@ -258,7 +235,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "loopback",
     "provider": "",
@@ -268,7 +245,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -322,7 +299,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "scan",
     "provider": "",
@@ -468,7 +445,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "apps-pg",
@@ -512,7 +489,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -522,7 +499,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -612,11 +589,19 @@
               {
                 "beneficiary": "ObsidianSystems-validator-1::1220932286cab2eefd313d308dfe049905cd2968becdefd78c49176991b87f2d1017",
                 "weight": "10000"
+              },
+              {
+                "beneficiary": "CoinMetrics-validator-1::12204eb3808b8a646470cbaedbe95811993b4d96df2bd9cd32585802d0365f9c15ed",
+                "weight": "10000"
+              },
+              {
+                "beneficiary": "circle-validator-1::1220dd2293b563c59be746073ad5f5c47b87d2537accc44b407ea07da4548ea15b6e",
+                "weight": "100000"
               }
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 295000
+            "rewardWeightBps": 405000
           },
           {
             "extraBeneficiaries": [
@@ -662,6 +647,11 @@
           {
             "name": "Proof-Group-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEX1G0Gc5kYqisXQk0GZpygZ7cOmo5AHh0+87ZVnwPUXdA9msdGm/XCCTfFz4g7x4QfhgXHEARGSTqvIq5PbUqTQ==",
+            "rewardWeightBps": 0
+          },
+          {
+            "name": "Liberty-City-Ventures-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzPiiGTxeSKO+HBOekWSXKpAziP2hlRvwdYmbvmL8BwdCBsRZGc5UELlo9rS3DOfhg6/W+oundvzqzsNQKVBb4w==",
             "rewardWeightBps": 0
           }
         ],
@@ -734,7 +724,7 @@
           }
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "sv-app",
     "provider": "",
@@ -803,7 +793,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator",
@@ -888,7 +878,7 @@
           "auth0|64553aa683015a9687d9cc2e"
         ]
       },
-      "version": "0.3.17"
+      "version": "0.3.19"
     },
     "name": "validator",
     "provider": "",

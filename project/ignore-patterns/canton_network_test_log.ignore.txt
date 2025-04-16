@@ -15,10 +15,6 @@ LogReporter - Aborted test suite
 Trying to gather entropy from the underlying operating system to initialized the contract ID seeding, but the entropy pool seems empty.
 In CI environments environment consider using the "testing-weak" mode, that may produce insecure contract IDs but does not block on startup.
 
-# Ignore generic http 400/500 response errors as they are often benign.
-# TODO (#1734): consider implementing a more fine-granular ignore
-.*Http response at 400 or 500 level.*
-
 # We use self-signed ledger API tokens for tests
 HMAC256 JWT Validator is NOT recommended for production environments
 
@@ -106,5 +102,8 @@ SoftDomainMigrationIntegrationTest.*The global domain global-domain-new.* is not
 
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
+
+# Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
+.*No data has been made available yet.*
 
 # Make sure to have a trailing newline

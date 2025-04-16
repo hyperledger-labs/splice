@@ -240,6 +240,7 @@ class AppUpgradeIntegrationTest
             ),
             java.util.Optional.empty(),
           )
+          // TODO(#16139): adaptation to this test required
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_AddFutureAmuletConfigSchedule(
               new AmuletRules_AddFutureAmuletConfigSchedule(
@@ -262,6 +263,7 @@ class AppUpgradeIntegrationTest
                     "url",
                     "description",
                     sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                    None,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -325,20 +327,19 @@ class AppUpgradeIntegrationTest
                     "url",
                     "description",
                     sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+                    None,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-              clue(s"sv2-sv3 accept") {
-                Seq(sv2Backend, sv3Backend).map(sv =>
-                  eventuallySucceeds() {
-                    sv.castVote(
-                      voteRequest.contractId,
-                      true,
-                      "url",
-                      "description",
-                    )
-                  }
-                )
+              clue(s"sv2 accepts, resulting in a super-majority approval") {
+                eventuallySucceeds() {
+                  sv2Backend.castVote(
+                    voteRequest.contractId,
+                    isAccepted = true,
+                    "url",
+                    "description",
+                  )
+                }
               }
             },
           )(

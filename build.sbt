@@ -1427,10 +1427,10 @@ printTests := {
     isPreflightIntegrationTest(
       name
     ) && name.contains("DecentralizedSynchronizerUpgradeCluster")
-  def isSvOffboardPreflightIntegrationTest(name: String): Boolean =
+  def isPrepareSvReonboardPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(
       name
-    ) && name.contains("SvOffboard")
+    ) && name.contains("PrepareSvReonboard")
   def isSvReOnboardPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(
       name
@@ -1477,9 +1477,9 @@ printTests := {
       (t: String) => isDamlCiupgradeVote(t),
     ),
     (
-      "SV offboard preflight",
-      "test-full-class-names-offboard-sv-runbook-preflight.log",
-      (t: String) => isSvOffboardPreflightIntegrationTest(t),
+      "Prepare SV reonboard preflight",
+      "test-full-class-names-prepare-reonbaord-sv-preflight.log",
+      (t: String) => isPrepareSvReonboardPreflightIntegrationTest(t),
     ),
     (
       "SV reonboard preflight",

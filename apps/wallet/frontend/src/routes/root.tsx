@@ -4,7 +4,7 @@ import { Copyright } from '@lfdecentralizedtrust/splice-common-frontend';
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 
-import Layout from '../components/Layout';
+import { Layout } from '../components/Layout';
 
 const Root: React.FC = () => {
   return (

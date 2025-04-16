@@ -1,7 +1,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
-import { Resource } from '@pulumi/pulumi';
+import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   CLUSTER_BASENAME,
@@ -17,6 +17,7 @@ import {
   loadYamlFromFile,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
+  svCometBftKeysFromSecret,
   withAddedDependencies,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
@@ -90,6 +91,11 @@ export function installCometBftNode(
   // sv-app we cannot configure state sync until the sv app has migrated
   // if a migration is running we must not configure state sync because that will also add a pulumi dependency and our migrate flow will break (sv2-4 depending on sv1)
   const stateSyncEnabled = !isSv1 && enableStateSync && !isRunningMigration && isActiveDomain;
+  const keysSecret =
+    nodeConfig.privateKey && nodeConfig.validator.privateKey && nodeConfig.validator.publicKey
+      ? undefined
+      : installCometBftKeysSecret(xns, nodeConfig.validator.keyAddress, migrationId);
+
   const cometbftChartValues = _.mergeWith(cometBftValues, {
     sv1: nodeConfigs.sv1,
     istioVirtualService: {
@@ -100,7 +106,7 @@ export function installCometBftNode(
     node: {
       ...cometBftValues.node,
       ...nodeConfig,
-      ...(nodeConfig.validator ? { keysSecret: '' } : {}),
+      keysSecret: keysSecret ? keysSecret.metadata.name : '',
       enableTimeoutCommit,
     },
     logLevel,
@@ -206,10 +212,62 @@ export function installCometBftNode(
     version,
     // support old runbook names, can be removed once the runbooks are all reset and latest release is >= 0.2.x
     {
-      ...withAddedDependencies(opts, volumeDependecies),
+      ...withAddedDependencies(opts, volumeDependecies.concat(keysSecret ? [keysSecret] : [])),
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
     }
   );
   return { rpcServiceName: `${nodeConfig.identifier}-cometbft-rpc`, release };
+}
+
+function installCometBftKeysSecret(
+  xns: ExactNamespace,
+  keyAddress: Output<string> | string,
+  migrationId: DomainMigrationIndex
+): k8s.core.v1.Secret {
+  const { nodeKeyContent, validatorKeyContent } = getKeyContents(xns, keyAddress);
+  return new k8s.core.v1.Secret(
+    `cometbft-keys-${migrationId}`,
+    {
+      metadata: {
+        name: `cometbft-keys-${migrationId}`,
+        namespace: xns.logicalName,
+      },
+      type: 'Opaque',
+      data: {
+        'node_key.json': jsonStringify(nodeKeyContent).apply(s =>
+          Buffer.from(s).toString('base64')
+        ),
+        'priv_validator_key.json': jsonStringify(validatorKeyContent).apply(s =>
+          Buffer.from(s).toString('base64')
+        ),
+      },
+    },
+    { dependsOn: [xns.ns] }
+  );
+}
+
+function getKeyContents(xns: ExactNamespace, keyAddress: Output<string> | string) {
+  const cometBftKeys = svCometBftKeysFromSecret(
+    `${xns.logicalName.replace(/-/g, '')}-cometbft-keys`
+  );
+
+  const nodeKeyContent = {
+    priv_key: {
+      type: 'tendermint/PrivKeyEd25519',
+      value: cometBftKeys.nodePrivateKey,
+    },
+  };
+  const validatorKeyContent = {
+    address: keyAddress,
+    pub_key: {
+      type: 'tendermint/PubKeyEd25519',
+      value: cometBftKeys.validatorPublicKey,
+    },
+    priv_key: {
+      type: 'tendermint/PrivKeyEd25519',
+      value: cometBftKeys.validatorPrivateKey,
+    },
+  };
+  return { nodeKeyContent, validatorKeyContent };
 }

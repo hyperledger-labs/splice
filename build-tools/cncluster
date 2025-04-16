@@ -1668,20 +1668,6 @@ function subcmd_restore_node() {
 }
 ###
 
-subcommand_whitelist[offboard_sv_runbook]='Run the sv offboard preflights, preparing the SV runbook being offboarded'
-
-function subcmd_offboard_sv_runbook() {
-    _needs_auth0_management_api_creds
-
-    preflight_tests=$(_get_preflight_test_names "offboard-sv-runbook")
-    _log "Starting sv offboard preparation preflight tests: $preflight_tests"
-    cd "${SPLICE_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
-            sbt "apps-app/testOnly $preflight_tests"
-}
-
-###
-
 subcommand_whitelist[preflight_sv_reonboard]='Run the sv reonboard preflights'
 
 function subcmd_preflight_sv_reonboard() {
@@ -2031,12 +2017,17 @@ function subcmd_purge_unused_dbs() {
 subcommand_whitelist[set_operator_deployment_reference]="Set the git reference for the operator deployment in the cluster config file"
 function subcmd_set_operator_deployment_reference() {
 
-    if [ "$#" -lt 1 ]; then
-        echo "Usage: $0 <branch>"
+    if [ "$#" -lt 2 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
+        exit 1
+    fi
+    if [ "$#" -gt 2 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
         exit 1
     fi
     deployment_config=$(cat <<EOF
-      reference: $1
+      reference:
+$(_get_flux_reference_config "$1" "$2" "        ")
 EOF
     )
     _update_cluster_config "$deployment_config" "operatorDeployment"

@@ -94,6 +94,7 @@ export function installCanton(
           svConfig.auth0Client,
           {
             onboardingName: svConfig.onboardingName,
+            auth0SvAppName: svConfig.auth0SvAppName,
             isFirstSv: svConfig.isFirstSv,
             isCoreSv: true,
           },

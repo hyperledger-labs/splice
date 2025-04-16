@@ -12,7 +12,7 @@ async function main() {
 
   const installNode = await import('./src/installNode');
   const secrets = new SecretsFixtureMap();
-    // Need to import this directly to avoid initializing any configs before the mocks are initialized
+  // Need to import this directly to avoid initializing any configs before the mocks are initialized
   const { svRunbookConfig } = await import('splice-pulumi-common-sv');
 
   const authOClient = {
@@ -25,6 +25,7 @@ async function main() {
   const svAppConfig = {
     onboardingName: svRunbookConfig.onboardingName,
     disableOnboardingParticipantPromotionDelay: false,
+    externalGovernanceKey: false,
   };
   const validatorAppConfig = {
     // sv runbook wallet user is always defined

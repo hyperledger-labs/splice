@@ -312,6 +312,33 @@ async function auth0Secret(
   }
 }
 
+export async function installLedgerApiUserSecret(
+  auth0Client: Auth0Client,
+  xns: ExactNamespace,
+  secretNameApp: string,
+  clientName: string
+): Promise<k8s.core.v1.Secret> {
+  const secrets = await auth0Client.getSecrets();
+  const secret = await auth0Secret(auth0Client, secrets, clientName);
+  const ledgerApiUserOnly = {
+    'ledger-api-user': secret['ledger-api-user'],
+  };
+
+  return new k8s.core.v1.Secret(
+    `splice-auth0-user-${xns.logicalName}-${secretNameApp}-${clientName}`,
+    {
+      metadata: {
+        name: `splice-app-${secretNameApp}-ledger-api-user`,
+        namespace: xns.ns.metadata.name,
+      },
+      stringData: ledgerApiUserOnly,
+    },
+    {
+      dependsOn: xns.ns,
+    }
+  );
+}
+
 export async function installAuth0Secret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
@@ -391,12 +418,13 @@ export function auth0UserNameEnvVar(
 }
 
 export function auth0UserNameEnvVarSource(
-  secretName: string
+  secretName: string,
+  userOnlySecret: boolean = false
 ): k8s.types.input.core.v1.EnvVarSource {
   return {
     secretKeyRef: {
       key: 'ledger-api-user',
-      name: `splice-app-${secretName.toLowerCase().replaceAll('_', '-')}-ledger-api-auth`,
+      name: `splice-app-${secretName.toLowerCase().replaceAll('_', '-')}-ledger-api-${userOnlySecret ? 'user' : 'auth'}`,
       optional: false,
     },
   };

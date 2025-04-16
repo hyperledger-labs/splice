@@ -1,5 +1,5 @@
 import { Auth0ClientType, getAuth0Config, Auth0Fetch } from 'splice-pulumi-common';
-import { svRunbookConfig } from 'splice-pulumi-common-sv';
+import { clusterSvsConfiguration, svRunbookConfig } from 'splice-pulumi-common-sv';
 
 import { installNode } from './installNode';
 import {
@@ -14,6 +14,9 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
   const svAppConfig = {
     onboardingName: svRunbookConfig.onboardingName,
     disableOnboardingParticipantPromotionDelay: DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY,
+    externalGovernanceKey: clusterSvsConfiguration[svRunbookConfig.nodeName]?.participant?.kms
+      ? true
+      : false,
   };
   const validatorAppConfig = {
     walletUserName: svRunbookConfig.validatorWalletUser!,

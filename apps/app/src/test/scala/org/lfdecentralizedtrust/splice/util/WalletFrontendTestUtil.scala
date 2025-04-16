@@ -160,6 +160,10 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .getOrElse(s"0 $acronym"),
         unit = acronym,
       ),
+      updateId = transactionRow
+        .findChildElement(className("update-id"))
+        .map(seleniumText)
+        .getOrElse(""),
     )
   }
 
@@ -308,6 +312,7 @@ object WalletFrontendTestUtil {
       appRewardsUsed: BigDecimal,
       validatorRewardsUsed: BigDecimal,
       svRewardsUsed: BigDecimal,
+      updateId: String,
   )
 
   val errorDisplayElementClass = "error-display-message"

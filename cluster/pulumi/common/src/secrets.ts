@@ -6,6 +6,7 @@ import { Output } from '@pulumi/pulumi';
 import { ArtifactoryCreds } from './artifactory';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
+import { config } from './config';
 import { artifactories } from './config/consts';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
@@ -83,9 +84,16 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource[] {
   const keys = ArtifactoryCreds.getCreds().creds;
+  const kubecfg = config.optionalEnv('KUBECONFIG');
+  // k8sProvider saves the absolute path to kubeconfig if it's defined in KUBECONFIG env var, which makes
+  // it not portable between machines, so we temporarily remove this env var to avoid that.
+  // eslint-disable-next-line no-process-env
+  kubecfg && delete process.env.KUBECONFIG;
   const k8sProvider = new k8s.Provider(`k8s-imgpull-${ns}-${serviceAccountName}`, {
     enableServerSideApply: true,
   });
+  // eslint-disable-next-line no-process-env
+  kubecfg && (process.env['KUBECONFIG'] = kubecfg);
 
   type DockerConfig = { [key: string]: { auth: string; username: string; password: string } };
 

@@ -14,7 +14,6 @@ import {
   svRunbookConfig,
 } from 'splice-pulumi-common-sv';
 
-import { installCometbftKeys } from './cometbftKeys';
 import { installPostgres } from './postgres';
 
 export function installCanton(
@@ -37,7 +36,6 @@ export function installCanton(
     },
     peers: [],
   };
-  installCometbftKeys(svNamespace);
   const externalActiveMigration = {
     decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
       activeMigrationId,
@@ -72,6 +70,7 @@ export function installCanton(
       decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
     );
 
+    // TODO(#16751) "internal" migrations are likely broken at this point; let's remove them
     const installedMigrations = migrationsContainedInStack.map(migration => {
       return {
         migration,
@@ -81,6 +80,8 @@ export function installCanton(
           auth0Client,
           {
             onboardingName,
+            // TODO(#16751) The hardcoding is not nice but we're getting rid of this code path anyway
+            auth0SvAppName: 'sv',
             isFirstSv: false,
             isCoreSv: false,
           },
