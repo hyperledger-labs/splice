@@ -11,6 +11,11 @@ Release Notes
 upcoming
 --------
 
+- Deployments
+
+  - Validator, app and scan support specifying a scope when requesting the token from the participant.
+    This enables use of IAMs that make the scope parameter mandatory.
+
 .. important::
 
     * This release includes a change to the database schema that will trigger a potentially long database migration
