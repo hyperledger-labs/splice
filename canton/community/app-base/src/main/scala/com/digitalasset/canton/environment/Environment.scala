@@ -29,7 +29,7 @@ import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
 import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, MetricsRegistry}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
-import com.digitalasset.canton.participant.config.LocalParticipantConfig
+import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.resource.DbMigrationsMetaFactory
 import com.digitalasset.canton.synchronizer.mediator.{
   MediatorNodeBootstrap,
@@ -54,6 +54,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.slf4j.bridge.SLF4JBridgeHandler
 
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, blocking}
@@ -62,7 +63,7 @@ import scala.util.control.NonFatal
 /** Holds all significant resources held by this process.
   */
 abstract class Environment[Config <: SharedCantonConfig[Config]](
-    val config: Config,
+    initialConfig: Config,
     edition: CantonEdition,
     val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
@@ -96,7 +97,10 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
       noTracingLogger,
     )
 
-  val histogramInventory = new HistogramInventory()
+  def config: Config = currentConfig.get()
+
+  private val currentConfig = new AtomicReference[Config](initialConfig)
+  private val histogramInventory = new HistogramInventory()
   private val histograms = new CantonHistograms()(histogramInventory)
   val dbStorageHistograms = new DbStorageHistograms(
     MetricName("cn")
@@ -288,6 +292,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
       config.participantsByString,
       config.participantNodeParametersByString,
       apiName => GrpcAdminCommandRunner(this, apiName),
+      config.parameters.enableAlphaStateViaConfig,
       loggerFactory,
     )
 
@@ -313,7 +318,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   // convenient grouping of all node collections for performing operations
   // intentionally defined in the order we'd like to start them
   protected def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(sequencers, mediators, participants)
+    List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]](sequencers, mediators, participants)
 
   private def runningNodes: Seq[CantonNodeBootstrap[CantonNode]] = allNodes.flatMap(_.running)
 
@@ -520,7 +525,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   protected def createParticipant(
       name: String,
-      participantConfig: LocalParticipantConfig,
+      participantConfig: ParticipantNodeConfig,
   ): ParticipantNodeBootstrap =
     participantNodeFactory
       .create(

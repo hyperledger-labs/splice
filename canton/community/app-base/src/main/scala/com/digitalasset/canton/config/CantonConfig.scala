@@ -17,6 +17,7 @@ import com.daml.metrics.{HistogramDefinition, MetricsFilterConfig}
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.auth.{AccessLevel, AuthorizedUser}
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CantonRequireTypes.*
 import com.digitalasset.canton.config.ConfigErrors.{
   CannotParseFilesError,
@@ -302,17 +303,20 @@ object RetentionPeriodDefaults {
   *   A ports file name, where the ports of all participants will be written to after startup
   * @param exitOnFatalFailures
   *   If true the node will exit/stop the process in case of fatal failures
+  * @param enableAlphaStateViaConfig
+  *   If true, we will start the declarative api functionality
+  * @param stateRefreshInterval
+  *   If configured, the config file will be reread in the given interval to allow dynamic
+  *   properties to be picked up immediately
   */
 final case class CantonParameters(
     clock: ClockConfig = ClockConfig.WallClock(),
     enableAdditionalConsistencyChecks: Boolean = false,
     manualStart: Boolean = false,
     startupParallelism: Option[PositiveInt] = None,
-    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
-    nonStandardConfig: Boolean = true,
+    nonStandardConfig: Boolean = false,
     sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
-    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
-    alphaVersionSupport: Boolean = true,
+    alphaVersionSupport: Boolean = false,
     betaVersionSupport: Boolean = false,
     portsFile: Option[String] = None,
     timeouts: TimeoutSettings = TimeoutSettings(),
@@ -322,6 +326,8 @@ final case class CantonParameters(
     startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(
       ReportingLevel.Warn
     ),
+    enableAlphaStateViaConfig: Boolean = false,
+    stateRefreshInterval: Option[config.NonNegativeFiniteDuration] = None,
 ) extends UniformCantonConfigValidation {
   def getStartupParallelism(numThreads: PositiveInt): PositiveInt =
     startupParallelism.getOrElse(numThreads)
@@ -359,17 +365,38 @@ object CantonFeatures {
     CantonConfigValidatorDerivation[CantonFeatures]
 }
 
+/** Root configuration parameters for a single Canton process.
+  *
+  * @param participants
+  *   All locally running participants that this Canton process can connect and operate on.
+  * @param remoteParticipants
+  *   All remotely running participants to which the console can connect and operate on.
+  * @param sequencers
+  *   All locally running sequencers that this Canton process can connect and operate on.
+  * @param remoteSequencers
+  *   All remotely running sequencers that this Canton process can connect and operate on.
+  * @param mediators
+  *   All locally running mediators that this Canton process can connect and operate on.
+  * @param remoteMediators
+  *   All remotely running mediators that this Canton process can connect and operate on.
+  * @param monitoring
+  *   determines how this Canton process can be monitored
+  * @param parameters
+  *   per-environment parameters to control enabled features and set testing parameters
+  * @param features
+  *   control which features are enabled
+  */
 trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self: Self =>
   def name: Option[String]
-  def monitoring: MonitoringConfig
   def portDescription: String
-  def parameters: CantonParameters
   def sequencers: Map[InstanceName, SequencerNodeConfig]
   def mediators: Map[InstanceName, MediatorNodeConfig]
-  def participants: Map[InstanceName, LocalParticipantConfig]
+  def participants: Map[InstanceName, ParticipantNodeConfig]
   def remoteSequencers: Map[InstanceName, RemoteSequencerConfig]
   def remoteMediators: Map[InstanceName, RemoteMediatorConfig]
   def remoteParticipants: Map[InstanceName, RemoteParticipantConfig]
+  def monitoring: MonitoringConfig
+  def parameters: CantonParameters
   def features: CantonFeatures
   def pekkoConfig: Option[Config]
 
@@ -378,7 +405,7 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
 
   /** Use `participants` instead!
     */
-  def participantsByString: Map[String, LocalParticipantConfig] = participants.map { case (n, c) =>
+  def participantsByString: Map[String, ParticipantNodeConfig] = participants.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -546,7 +573,7 @@ final case class CantonConfig(
     name: Option[String] = None,
     sequencers: Map[InstanceName, SequencerNodeConfig] = Map.empty,
     mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty,
-    participants: Map[InstanceName, LocalParticipantConfig] = Map.empty,
+    participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty,
     remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty,
     remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty,
     remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
@@ -581,7 +608,7 @@ final case class CantonConfig(
   lazy val portDescription: String = mkPortDescription
 
   private def mkPortDescription: String = {
-    def participant(config: LocalParticipantConfig): Seq[String] =
+    def participant(config: ParticipantNodeConfig): Seq[String] =
       portDescriptionFromConfig(config)(Seq(("admin-api", _.adminApi), ("ledger-api", _.ledgerApi)))
 
     def sequencer(config: SequencerNodeConfig): Seq[String] =
@@ -626,7 +653,6 @@ final case class CantonConfig(
       .focus(_.mediators)
       .modify(mapWithDefaults)
   }
-
 }
 
 private[canton] object CantonNodeParameterConverter {
@@ -795,8 +821,6 @@ object CantonConfig {
         deriveReader[ServerAuthRequirementConfig]
       deriveReader[TlsServerConfig]
     }
-
-    lazy implicit final val stateConfigReader: ConfigReader[StateConfig] = deriveReader[StateConfig]
 
     implicit val identityConfigReaderAuto: ConfigReader[IdentityConfig.Auto] = {
       implicit val nodeNameReader: ConfigReader[NodeIdentifierConfig] = {
@@ -1258,8 +1282,10 @@ object CantonConfig {
         : ConfigReader[EnterpriseParticipantFeaturesConfig] =
       deriveReader[EnterpriseParticipantFeaturesConfig]
 
-    implicit val localParticipantConfigReader: ConfigReader[LocalParticipantConfig] =
-      deriveReader[LocalParticipantConfig]
+    implicit val localParticipantConfigReader: ConfigReader[ParticipantNodeConfig] = {
+      import DeclarativeParticipantConfig.Readers.*
+      deriveReader[ParticipantNodeConfig]
+    }
     implicit val mediatorNodeConfigReader: ConfigReader[MediatorNodeConfig] =
       deriveReader[MediatorNodeConfig]
 
@@ -1439,7 +1465,6 @@ object CantonConfig {
         deriveWriter[IdentityConfig.External]
       deriveWriter[IdentityConfig]
     }
-    lazy implicit final val stateConfigWriter: ConfigWriter[StateConfig] = deriveWriter[StateConfig]
     lazy implicit final val initConfigWriter: ConfigWriter[InitConfig] = deriveWriter[InitConfig]
 
     lazy implicit final val participantInitConfigWriter: ConfigWriter[ParticipantInitConfig] = {
@@ -1849,8 +1874,11 @@ object CantonConfig {
         : ConfigWriter[EnterpriseParticipantFeaturesConfig] =
       deriveWriter[EnterpriseParticipantFeaturesConfig]
 
-    implicit val localParticipantConfigWriter: ConfigWriter[LocalParticipantConfig] =
-      deriveWriter[LocalParticipantConfig]
+    implicit val localParticipantConfigWriter: ConfigWriter[ParticipantNodeConfig] = {
+      val writers = new DeclarativeParticipantConfig.ConfigWriters(confidential)
+      import writers.*
+      deriveWriter[ParticipantNodeConfig]
+    }
     implicit val mediatorNodeConfigWriter: ConfigWriter[MediatorNodeConfig] =
       deriveWriter[MediatorNodeConfig]
     implicit val sequencerNodeConfigWriter: ConfigWriter[SequencerNodeConfig] =

@@ -49,7 +49,7 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.participant.config.{LocalParticipantConfig, RemoteParticipantConfig}
+import com.digitalasset.canton.participant.config.{ParticipantNodeConfig, RemoteParticipantConfig}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
@@ -107,7 +107,7 @@ case class SpliceConfig(
   override def withDefaults(defaults: DefaultPorts, edition: CantonEdition): SpliceConfig = this
 
   // TODO(#736): we want to remove all of the configurations options below:
-  override val participants: Map[InstanceName, LocalParticipantConfig] = Map.empty
+  override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
   override val remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty
   override val mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty
   override val remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty

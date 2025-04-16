@@ -1643,6 +1643,7 @@ object LedgerApiCommands {
             userId = userId,
             deduplicationPeriod = serializeDeduplicationPeriod(deduplicationPeriod),
             hashingSchemeVersion = hashingSchemeVersion,
+            minLedgerTime = None,
           )
         )
 

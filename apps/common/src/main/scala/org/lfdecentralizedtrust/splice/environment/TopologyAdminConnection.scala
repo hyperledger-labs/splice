@@ -360,7 +360,6 @@ abstract class TopologyAdminConnection(
       includeMappings = Set(
         TopologyMapping.Code.NamespaceDelegation,
         TopologyMapping.Code.OwnerToKeyMapping,
-        TopologyMapping.Code.IdentifierDelegation,
       ),
       filterNamespace = Some(id.namespace),
     ).map(_.map(_.transaction))
@@ -563,7 +562,6 @@ abstract class TopologyAdminConnection(
         Seq(
           TopologyMapping.Code.NamespaceDelegation,
           TopologyMapping.Code.OwnerToKeyMapping,
-          TopologyMapping.Code.IdentifierDelegation,
           // only relevant for participants
           TopologyMapping.Code.VettedPackages,
         )

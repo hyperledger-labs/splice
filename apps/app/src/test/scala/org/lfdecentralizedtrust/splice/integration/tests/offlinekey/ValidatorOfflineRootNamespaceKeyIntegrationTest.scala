@@ -108,7 +108,7 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
       val aliceParticipant = aliceValidatorBackend.participantClientWithAdminToken
       val rootKeyId = aliceParticipant.topology.namespace_delegations
         .list(TopologyStoreId.Authorized)
-        .filter(_.item.restrictedToMappings == DelegationRestriction.CanSignAllMappings)(0)
+        .filter(_.item.restriction == DelegationRestriction.CanSignAllMappings)(0)
         .item
         .target
         .id

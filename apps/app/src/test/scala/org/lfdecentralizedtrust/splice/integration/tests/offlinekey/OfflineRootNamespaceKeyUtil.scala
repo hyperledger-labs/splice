@@ -78,7 +78,7 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
       val offlineRootKey = offlineParticipantClient.keys.secret
         .generate_signing_key("rootSigningKey", SigningKeyUsage.NamespaceOnly)
       val offlineGeneratedNamespace = Namespace(offlineRootKey.fingerprint)
-      offlineParticipantClient.topology.init_id(
+      offlineParticipantClient.topology.init_id_from_uid(
         ParticipantId("offlineKeyGeneration", offlineGeneratedNamespace).uid,
         waitForReady = false,
       )
@@ -117,7 +117,7 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
 
     val (offlineGeneratedNamespace, rootNamespaceDelegation, delegationTopologyTransaction) =
       setupOfflineNodeWithKey(delegatedNamespaceKey)
-    node.topology.init_id(
+    node.topology.init_id_from_uid(
       ParticipantId(name, offlineGeneratedNamespace).uid,
       waitForReady = false,
       delegations = Seq(rootNamespaceDelegation, delegationTopologyTransaction),

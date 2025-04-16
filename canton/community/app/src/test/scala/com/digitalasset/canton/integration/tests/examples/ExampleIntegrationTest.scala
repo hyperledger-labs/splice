@@ -15,14 +15,38 @@ import com.digitalasset.canton.integration.{
   IsolatedEnvironments,
 }
 import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.util.ConcurrentBufferedLogger
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.blocking
 
 abstract class ExampleIntegrationTest(configPaths: File*)
-    extends BaseIntegrationTest[CantonConfig, CantonEnvironment]
-    with IsolatedEnvironments[CantonConfig, CantonEnvironment]
+    extends BaseIntegrationTest
+    with IsolatedEnvironments
     with HasConsoleScriptRunner {
+
+  protected def runAndAssertCommandSuccess(
+      pb: scala.sys.process.ProcessBuilder,
+      processLogger: ConcurrentBufferedLogger,
+  ): Unit = {
+    val exitCode = pb.!(processLogger)
+    if (exitCode != 0) {
+      fail(s"Command failed:\n\n ${processLogger.output()}")
+    }
+  }
+
+  protected def runAndAssertCommandFailure(
+      pb: scala.sys.process.ProcessBuilder,
+      processLogger: ConcurrentBufferedLogger,
+      expectedFailure: String,
+  ): Unit = {
+    val exitCode = pb.!(processLogger)
+    if (exitCode == 0) {
+      fail(s"Expected command failure but it succeeded")
+    } else {
+      processLogger.output() should include(expectedFailure)
+    }
+  }
 
   protected def additionalConfigTransform: Seq[ConfigTransform] =
     Seq.empty

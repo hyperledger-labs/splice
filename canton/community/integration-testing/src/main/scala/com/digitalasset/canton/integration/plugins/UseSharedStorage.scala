@@ -11,7 +11,7 @@ import com.digitalasset.canton.integration.{
   EnvironmentSetupPlugin,
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.config.LocalParticipantConfig
+import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 
@@ -44,8 +44,8 @@ object UseSharedStorage {
       sourceNodeName: String,
       targetNodeNames: Seq[String],
       loggerFactory: NamedLoggerFactory,
-  ): UseSharedStorage[LocalParticipantConfig] =
-    new UseSharedStorage[LocalParticipantConfig](
+  ): UseSharedStorage[ParticipantNodeConfig] =
+    new UseSharedStorage[ParticipantNodeConfig](
       sourceNodeName,
       targetNodeNames,
       config => name => config.participantsByString(name),
