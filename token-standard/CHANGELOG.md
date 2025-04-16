@@ -4,6 +4,28 @@
 
 Major changes:
 
+- Adjusted the `AllocationInstruction` interfaces to follow the structure of `TransferInstruction`, and
+  use a common `AllocationInstructionResult` result type to report on the result of all steps that
+  create or advance the creation of an allocation.
+
+Polishing changes:
+
+- Report the `holdingCids` backing an `Allocation` to enable wallets to correlate them.
+- Report the `inputHoldingCids` that are provided as part of an `AllocationInstruction` to
+  create an allocation. This allows wallets to correlate holdings with pending allocation
+  instructions.
+- Report the `senderHoldingCids` for sender change returned as part of advancing the state
+  of an `AllocationInstruction`.
+- Add a `requestedAt` field to the `AllocationInstructionView` to report the
+  time when the creation of an allocation was requested by a wallet.
+- Make a polishing pass across the Daml docs of all token standard APIs.
+- Bump the version of the `splice-api-*` packages and the `splice-token-standard-test`
+  harness to `1.0.0` in preparation of their first release.
+
+## 2025-04-15
+
+Major changes:
+
 - Extended the lock information on a `Holding` with an optional human-readable context description,
   and optional lock expiry information.
 - Populate this information in the `LockedAmulet` implementation and allow using amulet `Holding`s
@@ -27,6 +49,7 @@ Major changes:
     4. `burn`: a transaction intended to burn some amount of holding
     5. `mint`: a transation for minting some amount of holding
     6. `unlock`: unlock a locked holding
+
   Transfers should additionally be annoted with `splice.lfdecentralizedtrust.org/sender` to denote
   the sender of the transfer. These annotations are only required on the non-standardized choices.
 
@@ -41,10 +64,6 @@ Major changes:
   choices that consume holdings from a single owner and a single instrument only, which we deem
   to be a reasonably assumption. Choices that consume holdings from multiple senders or multiple holding
   types are parsed as a batch of multiple events.
-- Adjusted the `AllocationInstruction` interfaces to follow the structure of `TransferInstruction`, and
-  use a common `AllocationInstructionResult` result type to report on the result of all steps that
-  create or advance the creation of an allocation.
-
 
 Polishing changes
 
@@ -65,15 +84,6 @@ Polishing changes
   transfer instruction steps in a single Daml transaction for high throughput use-cases.
 - Move amulet specific metadata keys under `amulet.splice.lfdecentralizedtrust.org/`
   to distinguish them from keys that are intended for all tokens implementing the token standard.
-- Report the `holdingCids` backing an `Allocation` to enable wallets to correlate them.
-- Report the `inputHoldingCids` that are provided as part of an `AllocationInstruction` to
-  create an allocation. This allows wallets to correlate holdings with pending allocation
-  instructions.
-- Report the `senderHoldingCids` for sender change returned as part of advancing the state
-  of an `AllocationInstruction`.
-- Add a `requestedAt` field to the `AllocationInstructionView` to report the
-  time when the creation of an allocation was requested by a wallet.
-- Make a polishing pass across the Daml docs of all token standard APIs.
 
 ## 2025-03-31
 

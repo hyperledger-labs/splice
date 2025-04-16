@@ -16,31 +16,31 @@ object DarResources {
   object TokenStandard {
     val tokenMetadata = PackageResource(
       DarResource(s"splice-api-token-metadata-v1-current.dar"),
-      Seq(DarResource(s"splice-api-token-metadata-v1-0.0.1.dar")),
+      Seq(DarResource(s"splice-api-token-metadata-v1-1.0.0.dar")),
     )
     val tokenHolding = PackageResource(
       DarResource(s"splice-api-token-holding-v1-current.dar"),
-      Seq(DarResource(s"splice-api-token-holding-v1-0.0.1.dar")),
+      Seq(DarResource(s"splice-api-token-holding-v1-1.0.0.dar")),
     )
     val tokenTransferInstruction = PackageResource(
       DarResource(s"splice-api-token-transfer-instruction-v1-current.dar"),
-      Seq(DarResource(s"splice-api-token-transfer-instruction-v1-0.0.1.dar")),
+      Seq(DarResource(s"splice-api-token-transfer-instruction-v1-1.0.0.dar")),
     )
     val tokenAllocation = PackageResource(
       DarResource(s"splice-api-token-allocation-v1-current.dar"),
-      Seq(DarResource(s"splice-api-token-allocation-v1-0.0.1.dar")),
+      Seq(DarResource(s"splice-api-token-allocation-v1-1.0.0.dar")),
     )
     val tokenAllocationRequest = PackageResource(
       DarResource(s"splice-api-token-allocation-request-v1-current.dar"),
-      Seq(DarResource(s"splice-api-token-allocation-request-v1-0.0.1.dar")),
+      Seq(DarResource(s"splice-api-token-allocation-request-v1-1.0.0.dar")),
     )
     val tokenAllocationInstruction = PackageResource(
       DarResource(s"splice-api-token-allocation-instruction-v1-current.dar"),
-      Seq(DarResource(s"splice-api-token-allocation-instruction-v1-0.0.1.dar")),
+      Seq(DarResource(s"splice-api-token-allocation-instruction-v1-1.0.0.dar")),
     )
     val tokenStandardTest = PackageResource(
       DarResource(s"splice-token-standard-test-current.dar"),
-      Seq(DarResource(s"splice-token-standard-test-0.0.1.dar")),
+      Seq(DarResource(s"splice-token-standard-test-1.0.0.dar")),
     )
     val allPackageResources = Seq(
       tokenMetadata,

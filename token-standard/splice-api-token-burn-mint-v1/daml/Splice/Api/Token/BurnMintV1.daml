@@ -1,6 +1,8 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
+-- | An interface for registries to expose burn/mint operations in a generic way
+-- for bridges to use them, and for wallets to parse their use.
 module Splice.Api.Token.BurnMintV1 where
 
 import Splice.Api.Token.MetadataV1
@@ -14,17 +16,18 @@ interface BurnMintFactory where
   burnMintFactory_publicFetchImpl : ContractId BurnMintFactory -> BurnMintFactory_PublicFetch -> Update BurnMintFactoryView
 
   nonconsuming choice BurnMintFactory_BurnMint : BurnMintFactory_BurnMintResult
-    -- ^ Burn the holdings in inputHoldingCids and create holdings with the owners and amounts specified in
-    -- outputs.
+    -- ^ Burn the holdings in `inputHoldingCids` and create holdings with the
+    -- owners and amounts specified in outputs.
     --
-    -- Note that this is jointly authorized by the admin, all owners of the burnt inputs and all holders of the burnt outputs so it does
-    -- not grant anyone unilateral mint or burn rights. If that is desired, implementation specific delegation contracts can be used.
+    -- Note that this is jointly authorized by the admin and the `extraActors`.
+    -- The `admin` thus controls all calls to this choice, and some implementations might
+    -- required `extraActors` to be present, e.g., the owners of the minted and burnt holdings.
     --
-    -- Implementations are free to restrict the implementation of this choice including failing on all inputs or not
-    -- implement this interface at all.
+    -- Implementations are free to restrict the implementation of this choice
+    -- including failing on all inputs or not implementing this interface at all.
     with
       expectedAdmin : Party
-       -- ^ The expected admin party issuing the factory. Implementations MUST validate that this matches
+       -- ^ The expected `admin` party issuing the factory. Implementations MUST validate that this matches
         -- the admin of the factory.
         -- Callers should ensure they get `expectedAdmin` from a trusted source, e.g., a read against
         -- their own participant. That way they can ensure that it is safe to exercise a choice
@@ -47,8 +50,9 @@ interface BurnMintFactory where
         -- ^ Extra actors, the full actors required are the admin + extraActors. This is often the sender and the receivers
         -- but we allow different sets of actors to support token implementations with different authorization setups.
       extraArgs : ExtraArgs
-        -- ^ Additional context. Implementations SHOULD include a `splice.lfdecentralizedtrust.org/reason` key in the metadata
-        -- to provide a human readable description that can be used by wallets.
+        -- ^ Additional context. Implementations SHOULD include a `splice.lfdecentralizedtrust.org/reason`
+        -- key in the metadata to provide a human readable description for explain why the
+        -- `BurnMintFactory_BurnMint` choice was called, so that generic wallets can display it to the user.
     controller (view this).admin :: extraActors
     do burnMintFactory_burnMintImpl this self arg
 
@@ -63,28 +67,36 @@ interface BurnMintFactory where
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
       actor : Party
+        -- ^ The party fetching the data.
     controller actor
     do burnMintFactory_publicFetchImpl this self arg
 
+-- | The specification of a holding to create as part of the burn/mint operation.
 data BurnMintOutput = BurnMintOutput
   with
     owner : Party
+      -- ^ The owner of the holding to create.
     amount : Decimal
+      -- ^ The amount of the holding to create.
     context : ChoiceContext
-      -- ^ Context specific to this output which can be used to support locking or other implementation specific features.
+      -- ^ Context specific to this output which can be used to support locking
+      -- or other registry-specific features.
   deriving (Show, Eq)
 
+-- | The result of calling the `BurnMintFactory_BurnMint` choice.
 data BurnMintFactory_BurnMintResult = BurnMintFactory_BurnMintResult
   with
     outputCids : [ContractId Holding]
-      -- ^ The holdings created by the choice. Must contain exactly the outputs specified in the choice argument in the same order.
+      -- ^ The holdings created by the choice.
+      -- Must contain exactly the outputs specified in the choice argument in the same order.
   deriving (Show, Eq)
 
+-- | The view of a `BurnMintFactory`.
 data BurnMintFactoryView = BurnMintFactoryView
    with
      admin : Party
        -- ^ The party representing the registry app that administers the instruments
-       -- for which this burnt mint factory can be used.
+       -- for which this burnt-mint factory can be used.
      meta : Metadata
-       -- ^ Additional metadata specific to the burn mint factory, used for extensibility.
+       -- ^ Additional metadata specific to the burn-mint factory, used for extensibility.
    deriving (Show, Eq)
