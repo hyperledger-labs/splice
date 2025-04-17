@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-upcoming
---------
+0.3.21
+------
 
 .. important::
 
@@ -20,6 +20,9 @@ upcoming
       The migration will be triggered the first time an application is started after the version upgrade,
       and will leave the application in an unavailable state until the migration is finished.
       It is expected to take up to 1:30h for SV nodes and less than 10min for validator nodes on MainNet.
+      The migration is expected to take significantly less time on DevNet and TestNet due to the recent resets of these networks.
+      Note that even after the database migration completed,
+      you might observe an additional (shorter) period of downtime for scan (and only scan) due to Postgres autovacuuming.
 
       The following points are essential for a successful migration:
 
@@ -30,12 +33,16 @@ upcoming
         Postgres parameter is set to a sufficiently high number.
         The actual usage is hard to predict, so we recommend setting it to the maximum value for the duration of the migration.
 
-      Additionally, consider the following actions to speed up the migration:
+      Additionally, consider the following actions to reduce your downtime due to the migration:
 
       * For the duration of the migration, pause any non-essential services accessing the database
         (e.g., a postgres exporter pushing database metrics to grafana).
       * For the duration of the migration, increase the hardware configuration
         (upgrading from 2 CPUs / 8GB RAM to 8 CPUs / 32 GB RAM lowered the duration by ~20%).
+      * The first Postgres autovacuum after migration is expected to be significantly slower than usual
+        vacuum runs. In case autovacuum doesn't trigger shortly after the migration, you might want
+        to trigger a vacuum on your app databases manually to have better control over the
+        additional potential downtime for scan.
 
 - Deployments
 
@@ -46,6 +53,8 @@ upcoming
 
   - The Wallet and Scan UIs now show the Update ID of every transaction. These IDs are consistent with those
     used in the `updates` endpoints of the Scan API.
+  - Wallet UI: Add a logout button to the "Loading" and "Logged in but not onboarded" states to enable recovering
+    from all types of login failures.
 
 0.3.20
 ------
