@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.handlers
@@ -18,7 +18,8 @@ class HasReceivedEvent {
   def awaitEvent: Future[Unit] = promise.future
 }
 
-/** Capture whether the handler has been supplied an event (not whether it has been successfully processed)
+/** Capture whether the handler has been supplied an event (not whether it has been successfully
+  * processed)
   */
 object HasReceivedEvent {
   def apply[E](

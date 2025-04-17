@@ -13,6 +13,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
@@ -21,26 +22,24 @@ import com.digitalasset.canton.console.{
   Help,
   LedgerApiCommandRunner,
 }
+import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.DeduplicationPeriod
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
 
 import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Await
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 trait LedgerApiExtensions {
   implicit class LedgerApiSyntax(
       private val ledgerApi: BaseLedgerApiAdministration with LedgerApiCommandRunner
   ) {
-    private val packageIdResolver: PackageIdResolver = PackageIdResolver.staticTesting(
-      ledgerApi.consoleEnvironment.environment.executionContext
-    )
-
     object ledger_api_extensions {
       object commands {
         @Help.Summary(
@@ -61,47 +60,151 @@ trait LedgerApiExtensions {
         def submitJava(
             actAs: Seq[PartyId],
             commands: Seq[javaapi.data.Command],
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             commandId: String = "",
-            optTimeout: Option[NonNegativeDuration] = Some(ledgerApi.timeouts.ledgerCommand),
             deduplicationPeriod: Option[DeduplicationPeriod] = None,
             submissionId: String = "",
             minLedgerTimeAbs: Option[Instant] = None,
             readAs: Seq[PartyId] = Seq.empty,
-            applicationId: String = LedgerApiCommands.defaultApplicationId,
+            userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
-            packageIdResolverCustom: Option[PackageIdResolver] = None,
         ): JavaTransactionTree = {
-          val cmds = commands.map(cmd =>
-            Await.result(
-              packageIdResolverCustom
-                .getOrElse(packageIdResolver)
-                .resolvePackageId(cmd)(TraceContext.empty),
-              1.second,
-            )
-          )
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
               LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
                 actAs.map(_.toLf),
                 readAs.map(_.toLf),
-                cmds.map(c => Command.fromJavaProto(c.toProtoCommand)),
+                commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
                 workflowId = "",
                 commandId = commandId,
                 deduplicationPeriod = deduplicationPeriod,
                 submissionId = submissionId,
                 minLedgerTimeAbs = minLedgerTimeAbs,
-                disclosedContracts = disclosedContracts.map(DisclosedContract.fromJavaProto(_)),
-                domainId = domainId,
-                applicationId = applicationId,
+                disclosedContracts = disclosedContracts
+                  // We often have duplicates when merging choice contexts from multiple off-ledger APIs.
+                  // Cull them here to avoid sending them twice; and because the Ledger API server
+                  // currently errors out on them.
+                  // TODO(#18566): remove the note wrt the error once that's no longer the case
+                  .distinctBy(_.getContractId)
+                  .map(DisclosedContract.fromJavaProto),
+                synchronizerId = synchronizerId,
+                userId = userId,
                 packageIdSelectionPreference = Seq.empty,
               )
             )
           }
           JavaTransactionTree.fromProto(
             TransactionTree.toJavaProto(
-              ledgerApi.optionallyAwait(tx, tx.updateId, tx.domainId, optTimeout)
+              // Never set the timeout, as Canton tries to be too clever and attempts to read the transaction
+              // with an empty 'required_parties' parameter, which then fails.
+              ledgerApi.optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout = None)
             )
+          )
+        }
+        @Help.Summary(
+          "Submit command for an external or a local party.",
+          FeatureFlag.Testing,
+        )
+        def submitJavaExternalOrLocal(
+            actingParty: RichPartyId,
+            commands: Seq[javaapi.data.Command],
+            synchronizerId: Option[SynchronizerId] = None,
+            commandId: String = UUID.randomUUID().toString,
+            deduplicationPeriod: Option[DeduplicationPeriod] = None,
+            submissionId: String = UUID.randomUUID().toString,
+            minLedgerTimeAbs: Option[Instant] = None,
+            userId: String = LedgerApiCommands.defaultUserId,
+            disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
+        )(implicit tc: TraceContext): Unit = {
+          actingParty.externalSigningInfo match {
+            case None =>
+              val _ = submitJava(
+                actAs = Seq(actingParty.partyId),
+                commands = commands,
+                synchronizerId = synchronizerId,
+                commandId = commandId,
+                deduplicationPeriod = deduplicationPeriod,
+                submissionId = submissionId,
+                minLedgerTimeAbs = minLedgerTimeAbs,
+                readAs = Seq(actingParty.partyId),
+                userId = userId,
+                disclosedContracts = disclosedContracts,
+              )
+            case Some((signingPrivateKey, crypto)) =>
+              submitJavaExternal(
+                actingParty = actingParty.partyId,
+                signingKey = signingPrivateKey,
+                crypto = crypto,
+                commands = commands,
+                synchronizerId = synchronizerId,
+                commandId = commandId,
+                deduplicationPeriod = deduplicationPeriod,
+                submissionId = submissionId,
+                minLedgerTimeAbs = minLedgerTimeAbs,
+                userId = userId,
+                disclosedContracts = disclosedContracts,
+              )
+          }
+        }
+
+        @Help.Summary(
+          "Submit command for an external party by preparing and executing it in one go.",
+          FeatureFlag.Testing,
+        )
+        def submitJavaExternal(
+            actingParty: PartyId,
+            signingKey: SigningPrivateKey,
+            crypto: JcePureCrypto,
+            commands: Seq[javaapi.data.Command],
+            synchronizerId: Option[SynchronizerId] = None,
+            commandId: String = UUID.randomUUID().toString,
+            deduplicationPeriod: Option[DeduplicationPeriod] = None,
+            submissionId: String = UUID.randomUUID().toString,
+            minLedgerTimeAbs: Option[Instant] = None,
+            userId: String = LedgerApiCommands.defaultUserId,
+            disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
+        )(implicit tc: TraceContext): Unit = {
+          val preparedTx =
+            ledgerApi.ledger_api.interactive_submission.prepare(
+              actAs = Seq(actingParty),
+              readAs = Seq(actingParty),
+              commands = commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
+              commandId = commandId,
+              minLedgerTimeAbs = minLedgerTimeAbs,
+              disclosedContracts = disclosedContracts
+                // We often have duplicates when merging choice contexts from multiple off-ledger APIs.
+                // Cull them here to avoid sending them twice; and because the Ledger API server
+                // currently errors out on them.
+                // TODO(#18566): remove the note wrt the error once that's no longer the case
+                .distinctBy(_.getContractId)
+                .map(DisclosedContract.fromJavaProto),
+              synchronizerId = synchronizerId,
+              userId = userId,
+              userPackageSelectionPreference = Seq.empty,
+              verboseHashing = true,
+            )
+
+          val _ = ledgerApi.ledger_api.interactive_submission.execute(
+            preparedTransaction = preparedTx.getPreparedTransaction,
+            transactionSignatures = Map(
+              actingParty -> Seq(
+                crypto
+                  .signBytes(
+                    preparedTx.preparedTransactionHash,
+                    signingKey,
+                    usage = SigningKeyUsage.ProtocolOnly,
+                  )
+                  .fold(
+                    err => throw new RuntimeException(s"Failed to sign for $actingParty: $err"),
+                    sig => sig,
+                  )
+              )
+            ),
+            submissionId = submissionId,
+            hashingSchemeVersion = preparedTx.hashingSchemeVersion,
+            userId = userId,
+            deduplicationPeriod = deduplicationPeriod,
+            minLedgerTimeAbs = minLedgerTimeAbs,
           )
         }
 
@@ -111,20 +214,17 @@ trait LedgerApiExtensions {
             readAs: Seq[PartyId],
             update: Update[T],
             commandId: Option[String] = None,
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
-            packageIdResolverCustom: Option[PackageIdResolver] = None,
         ): T = {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            domainId = domainId,
+            synchronizerId = synchronizerId,
             commandId.getOrElse(""),
             readAs = readAs,
-            applicationId = userId,
-            optTimeout = None,
+            userId = userId,
             disclosedContracts = disclosedContracts,
-            packageIdResolverCustom = packageIdResolverCustom,
           )
           SpliceLedgerConnection.decodeExerciseResult(
             update,
@@ -142,17 +242,16 @@ trait LedgerApiExtensions {
             readAs: Seq[PartyId],
             update: Update[Exercised[TCid]],
             commandId: Option[String] = None,
-            domainId: Option[DomainId] = None,
+            synchronizerId: Option[SynchronizerId] = None,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): Contract[TCid, T] = {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            domainId = domainId,
+            synchronizerId = synchronizerId,
             commandId.getOrElse(""),
             readAs = readAs,
-            applicationId = userId,
-            optTimeout = None,
+            userId = userId,
             disclosedContracts = disclosedContracts,
           )
           val cid = SpliceLedgerConnection
@@ -199,7 +298,7 @@ trait LedgerApiExtensions {
         )
         def treesJava(
             partyIds: Set[PartyId],
-            completeAfter: Int,
+            completeAfter: PositiveInt,
             beginOffset: Long,
             endOffset: Option[Long] = None,
             verbose: Boolean = true,
@@ -284,16 +383,55 @@ trait LedgerApiExtensions {
         def lookup_contract_domain(
             partyId: PartyId,
             contractIds: Set[String],
-        ): Map[String, DomainId] = {
+        ): Map[String, SynchronizerId] = {
           val contracts = ledgerApi.ledger_api.state.acs.active_contracts_of_party(partyId)
           contracts.view
-            .map(c => c.getCreatedEvent.contractId -> DomainId.tryFromString(c.domainId))
+            .map(c =>
+              c.getCreatedEvent.contractId -> SynchronizerId.tryFromString(c.synchronizerId)
+            )
             .filter({ case (c, _) => contractIds.contains(c) })
             .toMap
+        }
+
+        def of_party[
+            TC <: javaapi.data.codegen.Contract[TCid, T],
+            TCid <: javaapi.data.codegen.ContractId[T],
+            T <: javaapi.data.Template,
+        ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
+            partyId: PartyId
+        ): Seq[CreatedEvent] = {
+          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
+          val templateId = TemplateId(
+            s"#${filterIdentifier.packageName}",
+            filterIdentifier.qualifiedName.moduleName,
+            filterIdentifier.qualifiedName.entityName,
+          )
+          ledgerApi.ledger_api.state.acs
+            .of_party(partyId, filterTemplates = Seq(templateId))
+            .map(_.event)
         }
       }
     }
   }
 }
 
-object LedgerApiExtensions extends LedgerApiExtensions {}
+object LedgerApiExtensions extends LedgerApiExtensions {
+
+  /** PartyIds that can be used to uniformly submit Ledger API commands for local and external parties. */
+  case class RichPartyId(
+      partyId: PartyId,
+      externalSigningInfo: Option[
+        (SigningPrivateKey, JcePureCrypto)
+      ], // only set for external parties
+  )
+
+  object RichPartyId {
+    def local(partyId: PartyId): RichPartyId = RichPartyId(partyId, None)
+    def external(
+        partyId: PartyId,
+        privateKey: SigningPrivateKey,
+        crypto: JcePureCrypto,
+    ): RichPartyId =
+      RichPartyId(partyId, Some((privateKey, crypto)))
+  }
+}

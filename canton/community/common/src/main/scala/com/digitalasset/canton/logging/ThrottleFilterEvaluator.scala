@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
@@ -13,10 +13,11 @@ import java.util.concurrent.atomic.AtomicLong
 import scala.collection.concurrent
 import scala.concurrent.duration.*
 
-/** Throttles logging events, so that no more than `maxLoggedOverPeriod` unique events are logged over `expiryPeriod`.
-  * De-duplicates logging events over `expiryPeriod.`
-  * Used to ensure that the interactive console remains usable even when the system is in a bad state and logging many errors.
-  * Inspired by https://github.com/RotterdamLogisticsLab/logback-throttle/blob/master/src/main/kotlin/com/portofrotterdam/dbs/public/logback/throttle/Throttle.kt
+/** Throttles logging events, so that no more than `maxLoggedOverPeriod` unique events are logged
+  * over `expiryPeriod`. De-duplicates logging events over `expiryPeriod.` Used to ensure that the
+  * interactive console remains usable even when the system is in a bad state and logging many
+  * errors. Inspired by
+  * https://github.com/RotterdamLogisticsLab/logback-throttle/blob/master/src/main/kotlin/com/portofrotterdam/dbs/public/logback/throttle/Throttle.kt
   */
 class ThrottleFilterEvaluator extends EvaluatorFilter[ILoggingEvent] {
 

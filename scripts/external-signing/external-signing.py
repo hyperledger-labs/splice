@@ -6,11 +6,13 @@
 import aiohttp
 import argparse
 import asyncio
+import base64
 import colorlog
-import datetime
 from Crypto.PublicKey import ECC
 from Crypto.Signature import eddsa
 from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
+import hashlib
 import os
 
 cli_log_handler = colorlog.StreamHandler()
@@ -70,6 +72,15 @@ class ScanClient:
             f"{self.url}/api/scan/v0/transfer-command/status",
             payload
         )
+        return await response.json()
+
+    async def get_transfer_factory(self, choice_arguments):
+        payload={"choiceArguments": choice_arguments}
+        response = await session_post(self.session, f"{self.url}/registry/transfer-instruction/transfer-factory", payload)
+        return await response.json()
+
+    async def get_dso(self):
+        response = await session_get(self.session, f"{self.url}/api/scan/v0/dso", {})
         return await response.json()
 
 
@@ -290,6 +301,11 @@ async def handle_setup_transfer_preapproval(args, validator_client):
     )
 
 
+def signed_by_from_key(public_key):
+    fingerprint = hashlib.sha256(bytes.fromhex(f"0000000C{public_key.export_key(format="raw").hex()}")).hexdigest()
+    return f"1220{fingerprint}"
+
+
 async def handle_transfer_preapproval_send(args, validator_client, scan_client):
     logger.debug(
         f"Exercise choice TransferPreapproval_Send to transfer {args.amount} \
@@ -298,7 +314,7 @@ async def handle_transfer_preapproval_send(args, validator_client, scan_client):
     [private_key, public_key] = read_key_pair(args.key_directory, args.key_name)
     public_key_hex = public_key.export_key(format="raw").hex()
     expires_at = (
-        f"{(datetime.datetime.now() + datetime.timedelta(hours=24)).isoformat()}Z"
+        f"{(datetime.now() + timedelta(hours=24)).isoformat()}Z"
     )
     response = await validator_client.prepare_transfer_preapproval_send(
         args.sender_party_id,
@@ -375,6 +391,7 @@ def parse_cli_args():
         help="Address of Validator API",
         required=True
     )
+
     parser_transfer_preapproval_send.add_argument(
         "--scan-url",
         help="Address of Scan API",

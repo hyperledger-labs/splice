@@ -1,12 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
-  SpliceTestConsoleEnvironment,
-}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import java.net.{InetSocketAddress, Socket}
 import scala.util.Using
 
@@ -16,8 +11,7 @@ class CometBftPreflightIntegrationTest extends IntegrationTestWithSharedEnvironm
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
     )

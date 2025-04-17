@@ -16,7 +16,7 @@ synchronizerMigration:
         pulumiBaseDir: "cluster/pulumi"
         deploymentDir: "cluster/deployment"
         spliceRoot: "."
-  active:
+  legacy:
     id: 2
     provider: external
     version: 0.3.19
@@ -27,7 +27,7 @@ synchronizerMigration:
       pulumiBaseDir: "cluster/pulumi"
       deploymentDir: "cluster/deployment"
       spliceRoot: "."
-  upgrade:
+  active:
     id: 3
     provider: external
     version: 0.3.19

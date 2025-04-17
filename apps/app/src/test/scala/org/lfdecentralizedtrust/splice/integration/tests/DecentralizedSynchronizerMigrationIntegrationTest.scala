@@ -4,18 +4,18 @@ import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.ledger.api.domain.IdentityProviderConfig
+import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -49,11 +49,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  EnvironmentImpl,
-  ParticipantAdminConnection,
-  RetryFor,
-}
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
@@ -122,8 +118,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
@@ -171,7 +166,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
-                      alias = DomainAlias.tryCreate("global"),
+                      alias = SynchronizerAlias.tryCreate("global"),
                       url = Some("http://localhost:27108"),
                     )
                   ),
@@ -184,7 +179,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               bobValidatorConfig
                 .copy(
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(5902)),
+                    FullClientConfig(port = Port.tryCreate(5902)),
                     bobValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -205,12 +200,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
-                      alias = DomainAlias.tryCreate("global"),
+                      alias = SynchronizerAlias.tryCreate("global"),
                       url = None,
                     )
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27502)),
+                    FullClientConfig(port = Port.tryCreate(27502)),
                     aliceValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -244,12 +239,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorSynchronizerConfig(global =
                     ValidatorDecentralizedSynchronizerConfig(
-                      alias = DomainAlias.tryCreate("global"),
+                      alias = SynchronizerAlias.tryCreate("global"),
                       url = Some("http://localhost:27108"),
                     )
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27702)),
+                    FullClientConfig(port = Port.tryCreate(27702)),
                     splitwellValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         splitwellValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -315,7 +310,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     Some(Port.tryCreate(27113))
                   ),
                   participantClient = ParticipantClientConfig(
-                    ClientConfig(port = Port.tryCreate(27702)),
+                    FullClientConfig(port = Port.tryCreate(27702)),
                     splitwellBackendConfig.participantClient.ledgerApi.copy(
                       clientConfig =
                         splitwellBackendConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -326,7 +321,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   domains = SplitwellSynchronizerConfig(
                     splitwell = SplitwellDomains(
                       preferred = SynchronizerConfig(
-                        alias = DomainAlias.tryCreate("global")
+                        alias = SynchronizerAlias.tryCreate("global")
                       ),
                       others = Seq.empty,
                     )
@@ -348,7 +343,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 adminApi =
                   aliceSplitwellAppClientConfig.adminApi.copy(url = Uri("http://127.0.0.1:27113")),
                 participantClient = ParticipantClientConfig(
-                  ClientConfig(port = Port.tryCreate(27502)),
+                  FullClientConfig(port = Port.tryCreate(27502)),
                   aliceSplitwellAppClientConfig.participantClient.ledgerApi.copy(
                     clientConfig =
                       aliceSplitwellAppClientConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -370,8 +365,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           ConfigTransforms.bumpSomeSvAppCantonDomainPortsBy(
             22_000,
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
-          )
-          compose
+          ) compose
           ConfigTransforms
             .bumpSomeScanAppPortsBy(22_000, Seq("sv1ScanLocal")) compose
           ConfigTransforms
@@ -454,8 +448,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     clue("All sequencers are registered") {
       eventually() {
         inside(sv1ScanBackend.listDsoSequencers()) {
-          case Seq(DomainSequencers(domainId, sequencers)) =>
-            domainId shouldBe decentralizedSynchronizerId
+          case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+            synchronizerId shouldBe decentralizedSynchronizerId
             sequencers should have size 4
             sequencers.foreach { sequencer =>
               sequencer.migrationId shouldBe 0
@@ -646,9 +640,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           val testDsoParty = dsoParty(env)
           val dsoPartyDecentralizedNamespace = testDsoParty.uid.namespace
           val domainDynamicParams =
-            sv1Backend.participantClientWithAdminToken.topology.domain_parameters
+            sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
               .list(
-                decentralizedSynchronizerId.filterString
+                store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId)
               )
               .headOption
               .value
@@ -792,7 +786,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               withClueAndLog("domain is unpaused on the new node") {
                 eventuallySucceeds() {
                   upgradeSynchronizerNode1.newParticipantConnection
-                    .getDomainParametersState(
+                    .getSynchronizerParametersState(
                       decentralizedSynchronizerId
                     )
                     .futureValue
@@ -815,7 +809,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .owners
                   .forgetNE should have size 4
                 upgradeSynchronizerNode1.oldParticipantConnection
-                  .getDomainParametersState(
+                  .getSynchronizerParametersState(
                     decentralizedSynchronizerId
                   )
                   .futureValue
@@ -910,11 +904,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       .signBytes(
                         HexString.parseToByteString(prepareSend.txHash).value,
                         externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
+                        usage = SigningKeyUsage.ProtocolOnly,
                       )
                       .value
+                      .toProtoV30
                       .signature
                   ),
-                  HexString.toHexString(externalPartyOnboarding.publicKey.key),
+                  publicKeyAsHexString(externalPartyOnboarding.publicKey),
                 ),
               )(
                 "validator automation completes transfer",
@@ -932,8 +928,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             clue(s"scan should expose sequencers in both pre-upgrade or upgraded domain") {
               eventually() {
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
-                  case Seq(DomainSequencers(domainId, sequencers)) =>
-                    domainId shouldBe decentralizedSynchronizerId
+                  case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+                    synchronizerId shouldBe decentralizedSynchronizerId
                     sequencers.foreach { sequencer =>
                       if (sequencer.migrationId != 0 && sequencer.migrationId != 1)
                         throw new RuntimeException(
@@ -1170,8 +1166,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 clue(s"scan should expose sequencers in upgraded domain only for sv1") {
                   eventually() {
                     inside(sv1ScanLocalBackend.listDsoSequencers()) {
-                      case Seq(DomainSequencers(domainId, sequencers)) =>
-                        domainId shouldBe decentralizedSynchronizerId
+                      case Seq(DomainSequencers(synchronizerId, sequencers)) =>
+                        synchronizerId shouldBe decentralizedSynchronizerId
                         sequencers.map { sequencer =>
                           (sequencer.migrationId, sequencer.url)
                         }.toSet shouldBe Set(
@@ -1246,10 +1242,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private def getSequencerUrlSet(
       participantConnection: ParticipantClientReference,
-      domainAlias: DomainAlias,
+      synchronizerAlias: SynchronizerAlias,
   ): Set[String] = {
-    val sequencerConnections = participantConnection.domains
-      .config(domainAlias)
+    val sequencerConnections = participantConnection.synchronizers
+      .config(synchronizerAlias)
       .value
       .sequencerConnections
     (for {
@@ -1390,7 +1386,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           // more than just users state, but allocating fresh parties makes it easier to create interesting users
           Seq(someExistingParty) ++ {
             for (i <- 0 to 2)
-              yield participant.ledger_api.parties.allocate(s"fake-party-${i}-${suffix}", "").party
+              yield participant.ledger_api.parties.allocate(s"fake-party-${i}-${suffix}").party
           }
         }
       } else {

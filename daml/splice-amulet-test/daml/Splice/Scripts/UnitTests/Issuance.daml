@@ -1,0 +1,215 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.Issuance where
+
+import DA.Assert
+import DA.Time
+
+import Daml.Script
+
+import Splice.Issuance
+import Splice.Schedule
+import Splice.Testing.Registries.AmuletRegistry.Parameters
+
+-- Shared parameters
+--------------------
+
+tickDuration : RelTime
+tickDuration = defaultAmuletConfig.tickDuration
+
+amuletPrice : Decimal
+amuletPrice = 0.005
+
+-- Issuance curve retrieval
+---------------------------
+
+testIssuanceCurve : Script ()
+testIssuanceCurve = script do
+    test t0 t0p5 issuanceConfig_0_0p5
+    test t0p5 t1p5 issuanceConfig_0p5_1p5
+    test t1p5 t5 issuanceConfig_1p5_5
+    test t5 t10 issuanceConfig_5_10
+    test t10 t100 issuanceConfig_10plus
+  where
+    oneMicro = convertMicrosecondsToRelTime 1
+    t0 = hours 0
+    t0p5 = hours (365 * 12)
+    t1p5 = hours (365 * 36)
+    t5 = days (5 * 365)
+    t10 = days (10 * 365)
+    t100 = days (100 * 365)
+
+    test from to config = do
+      getValueAsOf from defaultIssuanceCurve === config
+      getValueAsOf (from + days 1) defaultIssuanceCurve === config
+      getValueAsOf (to - oneMicro) defaultIssuanceCurve === config
+
+-- Example 1: medium activity
+-----------------------------
+
+summaryExample1 : OpenMiningRoundSummary
+summaryExample1 = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 10000.0
+  totalFeaturedAppRewardCoupons = 400.0
+  totalUnfeaturedAppRewardCoupons = 9600.0
+  optTotalValidatorFaucetCoupons = Some 50
+  totalSvRewardWeight = 100
+
+expectedParameters_E1_0_0p5 : IssuingRoundParameters
+expectedParameters_E1_0_0p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 100.00
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 6088.2800608828
+  unclaimedValidatorRewards = 7551.7503805175
+  unclaimedAppRewards = 68395.2511415525
+  unclaimedSvRewards = 0.0000000001
+
+expectedParameters_E1_0p5_1p5 : IssuingRoundParameters
+expectedParameters_E1_0p5_1p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 100.00
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 1826.4840182648
+  unclaimedValidatorRewards = 15162.1004566210
+  unclaimedAppRewards = 106447.0015220700
+  unclaimedSvRewards = 0.000000004
+
+expectedParameters_E1_1p5_5 : IssuingRoundParameters
+expectedParameters_E1_1p5_5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 100.00
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 380.5175038052
+  unclaimedValidatorRewards = 3746.5753424658
+  unclaimedAppRewards = 72200.4261796042
+  unclaimedSvRewards = 0.0
+
+expectedParameters_E1_5_10 : IssuingRoundParameters
+expectedParameters_E1_5_10 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 100.0
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  issuancePerValidatorFaucetCoupon = 359.5433789954
+  issuancePerSvRewardCoupon = 95.1293759513
+  unclaimedValidatorRewards = 0.0000000017
+  unclaimedAppRewards = 19879.2694063927
+  unclaimedSvRewards = 0.0
+
+expectedParameters_E1_10plus : IssuingRoundParameters
+expectedParameters_E1_10plus = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 74.7837899543
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  issuancePerValidatorFaucetCoupon = 150.2587519026
+  issuancePerSvRewardCoupon = 23.7823439878
+  unclaimedValidatorRewards = 0.0
+  unclaimedAppRewards = 0.0000000152
+  unclaimedSvRewards = 0.0000000023
+
+testE1 : Script ()
+testE1 = script do
+  validateOpenMiningRoundSummary summaryExample1
+
+  expectedParameters_E1_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExample1
+  expectedParameters_E1_0p5_1p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0p5_1p5 summaryExample1
+  expectedParameters_E1_1p5_5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_1p5_5 summaryExample1
+  expectedParameters_E1_5_10 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_5_10 summaryExample1
+  expectedParameters_E1_10plus === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExample1
+
+
+-- Example 2: all zeros
+-----------------------
+
+summaryExamplNoActivity : OpenMiningRoundSummary
+summaryExamplNoActivity = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 0.0
+  totalFeaturedAppRewardCoupons = 0.0
+  totalUnfeaturedAppRewardCoupons = 0.0
+  optTotalValidatorFaucetCoupons = Some 0
+  totalSvRewardWeight = 0
+
+expectedParameters_NoActivity_0_0p5 : IssuingRoundParameters
+expectedParameters_NoActivity_0_0p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.2000000000
+  issuancePerFeaturedAppRewardCoupon = 100.0000000000
+  issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
+  issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 608828.0060882801
+  unclaimedValidatorRewards = 38051.7503805175
+  unclaimedAppRewards = 114155.2511415525
+  unclaimedSvRewards = 608828.0060882801
+
+testNoActivity : Script ()
+testNoActivity = script do
+  validateOpenMiningRoundSummary summaryExamplNoActivity
+
+  expectedParameters_NoActivity_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExamplNoActivity
+
+
+-- Example 3: low activity
+--------------------------
+
+summaryExample3 : OpenMiningRoundSummary
+summaryExample3 = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 200.0
+  totalFeaturedAppRewardCoupons = 100.0
+  totalUnfeaturedAppRewardCoupons = 100.0
+  optTotalValidatorFaucetCoupons = Some 50
+  totalSvRewardWeight = 2
+
+
+expectedParameters_E3_0_0p5 : IssuingRoundParameters
+expectedParameters_E3_0_0p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.2000000000
+  issuancePerFeaturedAppRewardCoupon = 100.0000000000
+  issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
+  issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 304414.0030441400
+  unclaimedValidatorRewards = 9511.7503805175
+  unclaimedAppRewards = 104095.2511415525
+  unclaimedSvRewards = 0.0000000001
+
+testE4 : Script ()
+testE4 = script do
+  validateOpenMiningRoundSummary summaryExample3
+
+  expectedParameters_E3_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExample3
+
+
+-- Example 4: millions of SV reward weight
+-------------------------------------------
+
+
+summaryExampleLargeSvRewardWeight : OpenMiningRoundSummary
+summaryExampleLargeSvRewardWeight = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 0.0
+  totalFeaturedAppRewardCoupons = 0.0
+  totalUnfeaturedAppRewardCoupons = 0.0
+  optTotalValidatorFaucetCoupons = Some 0
+  totalSvRewardWeight = 240 * 10000  -- total weight is 240 and it is represented in basis points
+
+expectedParameters_LargeSvRewardWeight_10plus : IssuingRoundParameters
+expectedParameters_LargeSvRewardWeight_10plus = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.2000000000
+  issuancePerFeaturedAppRewardCoupon = 100.0000000000
+  issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
+  issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 0.000990931
+  unclaimedAppRewards = 35673.5159817352
+  unclaimedValidatorRewards = 9512.9375951294
+  unclaimedSvRewards = 0.0
+
+testLargeSvRewardWeight : Script ()
+testLargeSvRewardWeight = script do
+  validateOpenMiningRoundSummary summaryExamplNoActivity
+
+  let actual = computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExampleLargeSvRewardWeight
+  expectedParameters_LargeSvRewardWeight_10plus === actual
+
+
+

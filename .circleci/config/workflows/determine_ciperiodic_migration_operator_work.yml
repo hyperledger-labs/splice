@@ -1,8 +1,0 @@
-workflow:
-  determine_ciperiodic_migration_operator_work:
-    when:
-      equal: [ determine-ciperiodic-migration-operator-work, << pipeline.parameters.run-job >> ]
-    jobs:
-      - launch_ciperiodic_migration_operator_workflow:
-          <<: *main-branch-only
-          context: slack-context

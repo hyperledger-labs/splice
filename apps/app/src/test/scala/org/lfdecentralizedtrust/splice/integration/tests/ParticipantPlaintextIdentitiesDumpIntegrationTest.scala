@@ -1,12 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
+import com.digitalasset.canton.crypto.{CryptoKeyPair, Fingerprint}
 import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.config.{
-  ConfigTransforms,
-  ParticipantBootstrapDumpConfig,
-  SpliceConfig,
-}
+import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ensureNovelDamlNames,
   selfSignedTokenAuthSourceTransform,
@@ -14,6 +12,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAllSvAppConfigs,
   updateAllValidatorConfigs,
 }
+import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -81,6 +80,15 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
 
   override def dbsSuffix = "identities_plaintext"
 
+  // The key encoding can change across versions even if the key stays the same so we only compare fingerprints.
+  def toKeyFingerprints(dump: NodeIdentitiesDump): Seq[(Fingerprint, Option[String])] =
+    dump.keys.map { key =>
+      inside(key) { case NodeIdentitiesDump.NodeKey.KeyPair(bytes, name) =>
+        val pair = CryptoKeyPair.fromTrustedByteString(ByteString.copyFrom(bytes.toArray)).value
+        (pair.publicKey.fingerprint, name)
+      }
+    }
+
   "We can import and export Canton participant identities dumps with plaintext keys in them" in {
     implicit env =>
       startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
@@ -124,7 +132,9 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
           }
 
         clue("Checking exported keys for Alice's validator") {
-          validatorParticipantDump.keys.toSet shouldBe predefinedDump.keys.toSet
+          toKeyFingerprints(validatorParticipantDump).toSet shouldBe toKeyFingerprints(
+            predefinedDump
+          ).toSet
         }
       }
   }

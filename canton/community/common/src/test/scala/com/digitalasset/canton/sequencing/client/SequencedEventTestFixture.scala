@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -53,13 +53,19 @@ class SequencedEventTestFixture(
     traceContext,
   )
 
-  lazy val defaultDomainId: DomainId = DefaultTestIdentities.domainId
+  lazy val defaultSynchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId
   lazy val subscriberId: ParticipantId = ParticipantId("participant1-id")
   lazy val sequencerAlice: SequencerId = DefaultTestIdentities.sequencerId
-  lazy val subscriberCryptoApi: DomainSyncCryptoClient =
-    TestingIdentityFactory(loggerFactory).forOwnerAndDomain(subscriberId, defaultDomainId)
-  private lazy val sequencerCryptoApi: DomainSyncCryptoClient =
-    TestingIdentityFactory(loggerFactory).forOwnerAndDomain(sequencerAlice, defaultDomainId)
+  lazy val subscriberCryptoApi: SynchronizerCryptoClient =
+    TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(
+      subscriberId,
+      defaultSynchronizerId,
+    )
+  private lazy val sequencerCryptoApi: SynchronizerCryptoClient =
+    TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(
+      sequencerAlice,
+      defaultSynchronizerId,
+    )
   lazy val updatedCounter: Long = 42L
   val sequencerBob: SequencerId = SequencerId(
     UniqueIdentifier.tryCreate("da2", namespace)
@@ -90,6 +96,7 @@ class SequencedEventTestFixture(
   lazy val aliceEvents: Seq[OrdinarySerializedEvent] = (1 to 5).map(s =>
     createEvent(
       timestamp = CantonTimestamp.Epoch.plusSeconds(s.toLong),
+      previousTimestamp = Option.when(s > 1)(CantonTimestamp.Epoch.plusSeconds(s.toLong - 1)),
       counter = updatedCounter + s.toLong,
       signatureOverride = Some(signatureAlice),
     ).onShutdown(throw new RuntimeException("failed to create alice event")).futureValue
@@ -97,6 +104,8 @@ class SequencedEventTestFixture(
   lazy val bobEvents: Seq[OrdinarySerializedEvent] = (1 to 5).map(s =>
     createEvent(
       timestamp = CantonTimestamp.Epoch.plusSeconds(s.toLong),
+      previousTimestamp =
+        if (s > 1) Some(CantonTimestamp.Epoch.plusSeconds(s.toLong - 1)) else None,
       counter = updatedCounter + s.toLong,
       signatureOverride = Some(signatureBob),
     ).onShutdown(throw new RuntimeException("failed to create bob event")).futureValue
@@ -104,6 +113,8 @@ class SequencedEventTestFixture(
   lazy val carlosEvents: Seq[OrdinarySerializedEvent] = (1 to 5).map(s =>
     createEvent(
       timestamp = CantonTimestamp.Epoch.plusSeconds(s.toLong),
+      previousTimestamp =
+        if (s > 1) Some(CantonTimestamp.Epoch.plusSeconds(s.toLong - 1)) else None,
       counter = updatedCounter + s.toLong,
       signatureOverride = Some(signatureCarlos),
     ).onShutdown(throw new RuntimeException("failed to create carlos event")).futureValue
@@ -134,10 +145,10 @@ class SequencedEventTestFixture(
     )
 
   def mkValidator(
-      syncCryptoApi: DomainSyncCryptoClient = subscriberCryptoApi
+      syncCryptoApi: SynchronizerCryptoClient = subscriberCryptoApi
   )(implicit executionContext: ExecutionContext): SequencedEventValidatorImpl =
     new SequencedEventValidatorImpl(
-      defaultDomainId,
+      defaultSynchronizerId,
       testedProtocolVersion,
       syncCryptoApi,
       loggerFactory,
@@ -145,11 +156,12 @@ class SequencedEventTestFixture(
     )(executionContext)
 
   def createEvent(
-      domainId: DomainId = defaultDomainId,
+      synchronizerId: SynchronizerId = defaultSynchronizerId,
       signatureOverride: Option[Signature] = None,
       serializedOverride: Option[ByteString] = None,
       counter: Long = updatedCounter,
       timestamp: CantonTimestamp = CantonTimestamp.Epoch,
+      previousTimestamp: Option[CantonTimestamp] = None,
       topologyTimestamp: Option[CantonTimestamp] = None,
   ): FutureUnlessShutdown[OrdinarySerializedEvent] = {
     import cats.syntax.option.*
@@ -167,8 +179,9 @@ class SequencedEventTestFixture(
     )
     val deliver: Deliver[ClosedEnvelope] = Deliver.create[ClosedEnvelope](
       SequencerCounter(counter),
+      previousTimestamp = previousTimestamp,
       timestamp,
-      domainId,
+      synchronizerId,
       MessageId.tryCreate("test").some,
       Batch(List(envelope), testedProtocolVersion),
       topologyTimestamp,
@@ -216,9 +229,9 @@ class SequencedEventTestFixture(
       executionContext: ExecutionContext
   ): FutureUnlessShutdown[Signature] =
     for {
-      cryptoApi <- FutureUnlessShutdown.outcomeF(sequencerCryptoApi.snapshot(timestamp))
+      cryptoApi <- sequencerCryptoApi.snapshot(timestamp)
       signature <- cryptoApi
-        .sign(hash(bytes))
+        .sign(hash(bytes), SigningKeyUsage.ProtocolOnly)
         .value
         .map(_.valueOr(err => fail(s"Failed to sign: $err")))(executionContext)
     } yield signature

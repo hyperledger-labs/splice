@@ -4,12 +4,12 @@
 package org.lfdecentralizedtrust.splice.wallet.config
 
 import org.lfdecentralizedtrust.splice.config.{HttpClientConfig, NetworkAppClientConfig}
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.topology.PartyId
 
 case class WalletSynchronizerConfig(
-    global: DomainAlias
+    global: SynchronizerAlias
 )
 
 // Inlined to avoid a dependency

@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 import cats.implicits.showInterpolator
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, SequencerId}
+import com.digitalasset.canton.topology.{SynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -29,12 +29,13 @@ class SequencerOnboarding(
     participantAdminConnection: ParticipantAdminConnection,
     logger: TracedLogger,
 ) extends DsoRulesTopologyStateReconciler[SequencerToOnboard] {
+
   override def diffDsoRulesWithTopology(
       dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[SequencerToOnboard]] = {
     val dsoRules = dsoRulesAndState.dsoRules
-    participantAdminConnection.getSequencerDomainState(dsoRules.domain).map {
-      sequencerDomainState =>
+    participantAdminConnection.getSequencerSynchronizerState(dsoRules.domain).map {
+      SequencerSynchronizerState =>
         val currentSynchronizerConfigs = dsoRulesAndState.currentSynchronizerNodeConfigs()
         val configuredSequencers =
           currentSynchronizerConfigs
@@ -53,7 +54,7 @@ class SequencerOnboarding(
             )
         val sequencersToAdd =
           configuredSequencers
-            .filterNot(sequencerDomainState.mapping.active.contains)
+            .filterNot(SequencerSynchronizerState.mapping.active.contains)
             .map(SequencerToOnboard(dsoRules.domain, _))
         val thresholdToSet =
           Thresholds.sequencerConnectionsSizeThreshold(configuredSequencers.size)
@@ -63,13 +64,13 @@ class SequencerOnboarding(
             show"Planning to add sequencers $sequencersToAdd to match $dsoRulesAndState"
           }
           sequencersToAdd
-        } else if (thresholdToSet != sequencerDomainState.mapping.threshold) {
-          // This case can occur because we reset the threshold at the end of our tests (see ResetSequencerDomainState)
+        } else if (thresholdToSet != SequencerSynchronizerState.mapping.threshold) {
+          // This case can occur because we reset the threshold at the end of our tests (see ResetSequencerSynchronizerState)
           // We try to add an already onboarded sequencer once more to force a topology tx that would reset the threshold.
           logger.info(
-            s"Planning to change sequencer threshold from ${sequencerDomainState.mapping.threshold} to ${thresholdToSet}"
+            s"Planning to change sequencer threshold from ${SequencerSynchronizerState.mapping.threshold} to ${thresholdToSet}"
           )
-          sequencerDomainState.mapping.active
+          SequencerSynchronizerState.mapping.active
             .take(1)
             .map(SequencerToOnboard(dsoRules.domain, _))
         } else Seq()
@@ -84,8 +85,8 @@ class SequencerOnboarding(
   ): Future[TaskOutcome] = {
     logger.info(show"Adding sequencer $task")
     participantAdminConnection
-      .ensureSequencerDomainStateAddition(
-        task.domainId,
+      .ensureSequencerSynchronizerStateAddition(
+        task.synchronizerId,
         task.sequencerId,
         RetryFor.Automation,
       )
@@ -95,12 +96,12 @@ class SequencerOnboarding(
 
 object SequencerOnboarding {
   case class SequencerToOnboard(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       sequencerId: SequencerId,
   ) extends PrettyPrinting {
 
     override def pretty: Pretty[SequencerToOnboard.this.type] = prettyOfClass(
-      param("domainId", _.domainId),
+      param("synchronizerId", _.synchronizerId),
       param("sequencerId", _.sequencerId),
     )
   }

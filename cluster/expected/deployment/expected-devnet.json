@@ -349,11 +349,11 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"
@@ -379,7 +379,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-runbook/Pulumi.sv-runbook.dev.yaml",
@@ -434,7 +434,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"
@@ -460,11 +460,11 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"
@@ -490,7 +490,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-1.dev.yaml",
@@ -531,7 +531,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"

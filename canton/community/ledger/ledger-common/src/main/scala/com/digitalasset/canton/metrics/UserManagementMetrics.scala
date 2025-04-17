@@ -1,13 +1,14 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
 
+import com.daml.metrics.DatabaseMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricName
-import com.daml.metrics.{CacheMetrics, DatabaseMetrics}
 
-class UserManagementMetrics(
+// Private constructor to avoid being instantiated multiple times by accident
+class UserManagementMetrics private[metrics] (
     prefix: MetricName,
     labeledFactory: LabeledMetricsFactory,
 ) extends DatabaseMetricsFactory(prefix, labeledFactory) {

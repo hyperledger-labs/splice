@@ -1,24 +1,33 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.InteractiveSubmissionServiceGrpc.InteractiveSubmissionService as InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionRequest,
   ExecuteSubmissionResponse,
+  GetPreferredPackageVersionRequest,
+  GetPreferredPackageVersionResponse,
+  PackagePreference,
   PrepareSubmissionRequest as PrepareRequestP,
   PrepareSubmissionResponse as PrepareResponseP,
 }
+import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.daml.metrics.Timed
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.PrepareRequest
-import com.digitalasset.canton.ledger.api.validation.{CommandsValidator, SubmitRequestValidator}
+import com.digitalasset.canton.ledger.api.validation.{
+  CommandsValidator,
+  GetPreferredPackageVersionRequestValidator,
+  SubmitRequestValidator,
+}
 import com.digitalasset.canton.ledger.api.{SubmissionIdGenerator, ValidationLogger}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.TimerAndTrackOnShutdownSyntax
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   LoggingContextWithTrace,
@@ -26,6 +35,7 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcFUSExtended
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.OptionUtil
 import io.grpc.ServerServiceDefinition
@@ -52,27 +62,27 @@ class ApiInteractiveSubmissionService(
 
   override def prepareSubmission(request: PrepareRequestP): Future[PrepareResponseP] = {
     implicit val traceContext = getPrepareRequestTraceContext(
-      request.applicationId,
+      request.userId,
       request.commandId,
       request.actAs,
       telemetry,
     )
-    prepareWithTraceContext(Traced(request))
+    prepareWithTraceContext(Traced(request)).asGrpcResponse
   }
 
   def prepareWithTraceContext(
       request: Traced[PrepareRequestP]
-  ): Future[PrepareResponseP] = {
+  ): FutureUnlessShutdown[PrepareResponseP] = {
     implicit val loggingContextWithTrace: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory)(request.traceContext)
-    val errorLogger: ContextualizedErrorLogger =
+    val errorLogger: ErrorLoggingContext =
       ErrorLoggingContext.fromOption(
         logger,
         loggingContextWithTrace,
         None,
       )
 
-    Timed.timedAndTrackedFuture(
+    Timed.timedAndTrackedFutureUS(
       metrics.commands.interactivePrepares,
       metrics.commands.preparesRunning,
       Timed
@@ -89,7 +99,8 @@ class ApiInteractiveSubmissionService(
           PrepareRequest(commands, request.value.verboseHashing)
         }
         .fold(
-          t => Future.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
+          t =>
+            FutureUnlessShutdown.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
           interactiveSubmissionService.prepare(_),
         ),
     )
@@ -100,14 +111,14 @@ class ApiInteractiveSubmissionService(
   ): Future[ExecuteSubmissionResponse] = {
     val submitterInfo = request.preparedTransaction.flatMap(_.metadata.flatMap(_.submitterInfo))
     implicit val traceContext: TraceContext = getExecuteRequestTraceContext(
-      request.applicationId,
+      request.userId,
       submitterInfo.map(_.commandId),
       submitterInfo.map(_.actAs).toList.flatten,
       telemetry,
     )
     implicit val loggingContextWithTrace: LoggingContextWithTrace =
-      LoggingContextWithTrace(loggerFactory)(traceContext)
-    val errorLogger: ContextualizedErrorLogger =
+      LoggingContextWithTrace(loggerFactory)
+    val errorLogger: ErrorLoggingContext =
       ErrorLoggingContext.fromOption(
         logger,
         loggingContextWithTrace,
@@ -121,9 +132,46 @@ class ApiInteractiveSubmissionService(
         maxDeduplicationDuration,
       )(errorLogger)
       .fold(
-        t => Future.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
+        t => FutureUnlessShutdown.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
         interactiveSubmissionService.execute(_),
       )
+      .asGrpcResponse
+  }
+
+  override def getPreferredPackageVersion(
+      request: GetPreferredPackageVersionRequest
+  ): Future[GetPreferredPackageVersionResponse] = {
+    implicit val loggingContextWithTrace: LoggingContextWithTrace =
+      LoggingContextWithTrace(loggerFactory, telemetry)
+
+    implicit val traceContext: TraceContext = loggingContextWithTrace.traceContext
+
+    val responseFUS = for {
+      (parties, packageName, synchronizerIdO, vettingValidAtO) <-
+        FutureUnlessShutdown.fromTry(
+          GetPreferredPackageVersionRequestValidator.validate(request).toTry
+        )
+      preferenceO <- interactiveSubmissionService.getPreferredPackageVersion(
+        parties = parties,
+        packageName = packageName,
+        synchronizerId = synchronizerIdO,
+        vettingValidAt = vettingValidAtO,
+      )
+      protoPreference = preferenceO.map { case (packageReference, synchronizerId) =>
+        PackagePreference(
+          packageReference = Some(
+            PackageReference(
+              packageId = packageReference.pkdId,
+              packageName = packageReference.packageName,
+              packageVersion = packageReference.version.toString(),
+            )
+          ),
+          synchronizerId = synchronizerId.toProtoPrimitive,
+        )
+      }
+    } yield GetPreferredPackageVersionResponse(protoPreference)
+
+    responseFUS.asGrpcResponse
   }
 
   override def close(): Unit = {}

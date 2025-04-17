@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset
@@ -10,6 +10,7 @@ import com.digitalasset.daml.lf.data.{IdString, Ref, Time}
 import com.digitalasset.daml.lf.transaction.{ContractStateMachine, Versioned}
 import com.digitalasset.daml.lf.value.Value
 import com.google.protobuf.ByteString
+import scalapb.GeneratedMessage
 
 package object canton {
 
@@ -36,13 +37,21 @@ package object canton {
   type LedgerCommandId = Ref.CommandId
   val LedgerCommandId: Ref.CommandId.type = Ref.CommandId
 
-  // Ledger application id
-  type LedgerApplicationId = Ref.ApplicationId
-  val LedgerApplicationId: Ref.ApplicationId.type = Ref.ApplicationId
+  // Ledger user id
+  type LedgerUserId = Ref.UserId
+  val LedgerUserId: Ref.UserId.type = Ref.UserId
 
   // Ledger transaction id
   type LedgerTransactionId = Ref.TransactionId
   val LedgerTransactionId: Ref.TransactionId.type = Ref.TransactionId
+
+  // Command Id
+  type LfCommandId = Ref.CommandId
+  val LfCommandId: Ref.CommandId.type = Ref.CommandId
+
+  // Submission Id
+  type LfSubmissionId = Ref.SubmissionId
+  val LfSubmissionId: Ref.SubmissionId.type = Ref.SubmissionId
 
   // Exercise choice name
   type LfChoiceName = Ref.ChoiceName
@@ -100,17 +109,20 @@ package object canton {
 
   type LfKeyResolver = ContractStateMachine.KeyResolver
 
-  /** The counter assigned by the sequencer to messages sent to the participant.
-    * The counter is specific to every participant.
+  /** The counter assigned by the sequencer to messages sent to the participant. The counter is
+    * specific to every participant.
     */
   type SequencerCounterDiscriminator
   type SequencerCounter = Counter[SequencerCounterDiscriminator]
 
   val SequencerCounter = new CounterCompanion[SequencerCounterDiscriminator] {}
 
-  /** The counter assigned by the transaction processor to confirmation and reassignment requests. */
+  /** The counter assigned by the transaction processor to confirmation and reassignment requests.
+    */
   type RequestCounterDiscriminator
   type RequestCounter = Counter[RequestCounterDiscriminator]
+
+  object RequestCounter extends CounterCompanion[RequestCounterDiscriminator]
 
   /** The counter assigned to a contract to count the number of its reassignments */
   type ReassignmentDiscriminator
@@ -122,16 +134,36 @@ package object canton {
     )
   }
 
-  object RequestCounter extends CounterCompanion[RequestCounterDiscriminator]
+  /** The counter assigned to a contract to track different repair changes. The counter is relative
+    * to a sequenced request timestamp.
+    */
+  type RepairCounterDiscriminator
+  type RepairCounter = Counter[RepairCounterDiscriminator]
 
-  /** Wrap a method call with this method to document that the caller is sure that the callee's preconditions are met. */
+  object RepairCounter extends CounterCompanion[RepairCounterDiscriminator]
+
+  /** Wrap a method call with this method to document that the caller is sure that the callee's
+    * preconditions are met.
+    */
   def checked[A](x: => A): A = x
+
+  /** We should not call `toByteString` directly on a proto message. Rather, we should use the
+    * versioning tooling which ensures that the correct version of the proto message is used (based
+    * on the protocol version). However, in some cases (e.g., when we are sure that the message is
+    * not versioned), we can invoke this method directly.
+    */
+  @SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
+  def checkedToByteString(proto: GeneratedMessage): ByteString = proto.toByteString
+
+  implicit class RichGeneratedMessage(val message: GeneratedMessage) extends AnyVal {
+    @SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
+    def checkedToByteString: ByteString = message.toByteString
+  }
 
   implicit val lfPartyOrdering: Ordering[LfPartyId] =
     IdString.`Party order instance`.toScalaOrdering
 
-  /** Use this type when scalac struggles to infer `Nothing`
-    * due to it being treated specially.
+  /** Use this type when scalac struggles to infer `Nothing` due to it being treated specially.
     *
     * see https://www.reddit.com/r/scala/comments/73791p/nothings_twin_brother_the_better_one/
     */

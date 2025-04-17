@@ -24,7 +24,10 @@ import org.lfdecentralizedtrust.splice.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
+import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import monocle.macros.syntax.lens.*
+import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
@@ -211,8 +214,8 @@ class AppUpgradeIntegrationTest
             startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend)
           }
 
-          // SV1 does not upload DAR before the vote goes through
-          val sv1Packages = sv1Backend.participantClientWithAdminToken.packages.list()
+          // SV1 does not vet DAR before the vote goes through
+          val sv1Packages = vettedPackages(sv1Backend.participantClientWithAdminToken)
           forAll(sv1Packages) { pkg =>
             pkg.packageId should not be DarResources.amulet.bootstrap.packageId
           }
@@ -238,6 +241,7 @@ class AppUpgradeIntegrationTest
               DarResources.wallet.bootstrap.metadata.version.toString(),
               DarResources.walletPayments.bootstrap.metadata.version.toString(),
             ),
+            java.util.Optional.empty(),
             java.util.Optional.empty(),
           )
           // TODO(#16139): adaptation to this test required
@@ -268,17 +272,15 @@ class AppUpgradeIntegrationTest
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
-              clue(s"sv2-3 accept") {
-                Seq(sv2Backend, sv3Backend).map(sv =>
-                  eventuallySucceeds() {
-                    sv.castVote(
-                      voteRequest.contractId,
-                      true,
-                      "url",
-                      "description",
-                    )
-                  }
-                )
+              clue(s"sv2 accepts, resulting in a super-majority approval") {
+                eventuallySucceeds() {
+                  sv2Backend.castVote(
+                    voteRequest.contractId,
+                    isAccepted = true,
+                    "url",
+                    "description",
+                  )
+                }
               }
             },
           )(
@@ -351,14 +353,16 @@ class AppUpgradeIntegrationTest
           )
 
           val sv1PackagesAfterUpgrade =
-            sv1Backend.participantClientWithAdminToken.packages.list()
+            vettedPackages(sv1Backend.participantClientWithAdminToken)
           forExactly(1, sv1PackagesAfterUpgrade) { pkg =>
-            pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
+            withClue(s"Package ${pkg.packageId}") {
+              pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
+            }
           }
 
           actAndCheck(
             "Bob taps after upgrade",
-            eventuallySucceeds() {
+            eventually() {
               bobWalletClient.tap(20)
             },
           )(
@@ -510,6 +514,17 @@ class AppUpgradeIntegrationTest
         })
       }
     }
+  }
+
+  private def vettedPackages(participant: ParticipantClientReference) = {
+    participant.topology.vetted_packages
+      .list(
+        filterParticipant = participant.id.filterString,
+        timeQuery = HeadState,
+        store = Some(Authorized),
+      )
+      .flatMap(_.item.packages)
+      .filter(_.validFrom.forall(_.isBefore(CantonTimestamp.now())))
   }
 }
 

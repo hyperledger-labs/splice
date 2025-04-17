@@ -1,11 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration.*
 import scala.sys.process.*
@@ -16,8 +13,7 @@ class DockerComposeValidatorPreflightIntegrationTest
     with WalletFrontendTestUtil {
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(this.getClass.getSimpleName)
 
   "docker-compose based validator works against the deployed cluster" in { implicit env =>

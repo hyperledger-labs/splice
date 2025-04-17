@@ -3,7 +3,8 @@
 import { setupServer, SetupServer } from 'msw/node';
 
 import { Services } from '../setup/setup';
-import { buildWalletMock } from './wallet-api';
+import { buildTransferOfferMock } from './handlers/transfers-api';
+import { buildWalletMock } from './handlers/wallet-api';
 
 export const buildServer = ({ validator }: Services): SetupServer =>
-  setupServer(...buildWalletMock(validator.url));
+  setupServer(...buildWalletMock(validator.url).concat(buildTransferOfferMock(validator.url)));

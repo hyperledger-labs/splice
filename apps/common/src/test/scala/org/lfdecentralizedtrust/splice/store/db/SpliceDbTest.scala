@@ -1,8 +1,9 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import org.lfdecentralizedtrust.splice.config.SpliceDbConfig
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.DbConfig.Postgres
 import com.digitalasset.canton.config.DbParametersConfig
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.store.db.{DbStorageSetup, DbTest}
@@ -13,9 +14,8 @@ import slick.dbio.SuccessAction
 import slick.lifted.{Rep, TableQuery}
 
 import java.net.ServerSocket
-import scala.concurrent.Future
-import scala.util.Try
 import scala.concurrent.duration.DurationInt
+import scala.util.Try
 
 trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
@@ -54,7 +54,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
   protected def resetAllAppTables(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     import storage.api.jdbcProfile.api.*
     logger.info("Resetting all Splice app database tables")
     for {
@@ -140,8 +140,10 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 /** Run db test for running against postgres */
 trait SplicePostgresTest extends SpliceDbTest { this: Suite =>
 
-  override protected def mkDbConfig(basicConfig: DbBasicConfig): SpliceDbConfig.Postgres =
-    SpliceDbConfig.Postgres(
+  override protected def mkDbConfig(
+      basicConfig: DbBasicConfig
+  ): com.digitalasset.canton.config.DbConfig.Postgres =
+    Postgres(
       basicConfig.toPostgresConfig,
       parameters = DbParametersConfig(unsafeCleanOnValidationError = true),
     )

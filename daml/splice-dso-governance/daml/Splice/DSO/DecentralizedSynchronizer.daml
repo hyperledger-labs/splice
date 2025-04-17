@@ -75,6 +75,8 @@ data SequencerConfig = SequencerConfig with
     availableAfter : Optional Time
       -- ^ Any participant should subscribe this sequencer after this time.
       -- ^ If not set the sequencer is not yet accessible
+    peerUrl : Optional Text
+      -- ^ The public url for the BFT ordering peer endpoint used by other SVs to talk to this node
   deriving (Eq, Show)
 
 -- | Config for a legacy sequencer, i.e., a migration id that is still up but paused. This is useful to allow validators to catch up.
@@ -171,6 +173,7 @@ instance Patchable SequencerConfig where
     sequencerId = patch new.sequencerId base.sequencerId current.sequencerId
     url = patch new.url base.url current.url
     availableAfter = patch new.availableAfter base.availableAfter current.availableAfter
+    peerUrl = patch new.peerUrl base.peerUrl current.peerUrl
 
 instance Patchable LegacySequencerConfig where
   patch new base current = LegacySequencerConfig with

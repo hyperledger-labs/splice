@@ -32,7 +32,7 @@ import {
   UpdateAmuletPriceVoteRequest,
 } from 'sv-openapi';
 
-import { RelTime } from '@daml.js/b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946/lib/DA/Time/Types';
+import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Types/module';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);
@@ -83,6 +83,7 @@ export interface SvAdminClient {
   getCometBftNodeDebug: () => Promise<openapi.CometBftNodeDumpOrErrorResponse>;
   getSequencerNodeStatus: () => Promise<openapi.NodeStatus>;
   getMediatorNodeStatus: () => Promise<openapi.NodeStatus>;
+  featureSupport: () => Promise<openapi.FeatureSupportResponse>;
 }
 
 class ApiMiddleware
@@ -216,6 +217,9 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       },
       getMediatorNodeStatus: async (): Promise<openapi.NodeStatus> => {
         return await svAdminClient.getMediatorNodeStatus();
+      },
+      featureSupport: async (): Promise<openapi.FeatureSupportResponse> => {
+        return await svAdminClient.featureSupport();
       },
     };
   }, [url, userAccessToken]);

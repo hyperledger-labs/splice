@@ -501,8 +501,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2",
-              "3"
+              "3",
+              "2"
             ]
           }
         },
@@ -617,9 +617,9 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -628,7 +628,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-2-sequencer",
+        "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -823,21 +823,21 @@
           "name": "cn-testzrhnet"
         },
         "cometBFT": {
-          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
         "delegatelessAutomation": false,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-2-mediator",
-          "sequencerAddress": "global-domain-2-sequencer",
+          "mediatorAddress": "global-domain-3-mediator",
+          "sequencerAddress": "global-domain-3-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-2.sv-2.test.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-3.sv-2.test.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -887,7 +887,8 @@
           "enable": true
         },
         "migration": {
-          "id": 2,
+          "id": 3,
+          "legacyId": 2,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -895,7 +896,7 @@
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -971,7 +972,7 @@
           "name": "cn-testzrhnet"
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.test.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.test.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -980,10 +981,10 @@
           "enable": true
         },
         "migration": {
-          "id": 2
+          "id": 3
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-2",
+        "participantAddress": "participant-3",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

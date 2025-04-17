@@ -12,6 +12,7 @@ import {
   isDevNet,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 
 import { gcpDnsProject } from './config';
 
@@ -69,7 +70,24 @@ function clusterDnsEntries(
       },
       opts
     ),
-  ];
+  ].concat(
+    spliceConfig.pulumiProjectConfig.hasPublicDocs
+      ? [
+          new gcp.dns.RecordSet(
+            dnsName + '-public-docs',
+            {
+              name: `docs.${dnsName}.`,
+              ttl: 60,
+              type: 'A',
+              project: gcpDnsProject,
+              managedZone: managedZone,
+              rrdatas: [publicIngressIp.address],
+            },
+            opts
+          ),
+        ]
+      : []
+  );
 }
 
 function certManager(certManagerNamespaceName: string): certmanager.CertManager {

@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import Contract.Companion
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -56,7 +56,7 @@ object ContractWithState {
         cachedValue map (_.contract),
         MaybeCachedContract(maybeCached.contract),
       )
-      state <- maybeCached.domainId.traverse(d => DomainId fromString d map Assigned.apply)
+      state <- maybeCached.domainId.traverse(d => SynchronizerId fromString d map Assigned.apply)
     } yield ContractWithState(contract, state getOrElse InFlight)
   }
 
@@ -68,7 +68,7 @@ object ContractWithState {
     for {
       contract <- Contract.fromHttp(companion)(http.contract)
       state <- http.domainId
-        .traverse(d => DomainId.fromString(d).map(ContractState.Assigned.apply))
+        .traverse(d => SynchronizerId.fromString(d).map(ContractState.Assigned.apply))
         .left
         .map(err => ProtoDeserializationError.ValueConversionError("domainId", err))
     } yield ContractWithState(

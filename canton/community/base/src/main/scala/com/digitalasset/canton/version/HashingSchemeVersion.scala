@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -19,14 +19,14 @@ sealed abstract class HashingSchemeVersion(val index: Int) {
 }
 
 object HashingSchemeVersion {
-  final case object V1 extends HashingSchemeVersion(1)
+  final case object V2 extends HashingSchemeVersion(2)
   implicit val hashingSchemeVersionOrdering: Ordering[HashingSchemeVersion] =
     Ordering.by(_.index)
 
   private val ProtocolVersionToHashingVersion =
     SortedMap[ProtocolVersion, NonEmpty[SortedSet[HashingSchemeVersion]]](
-      ProtocolVersion.v32 -> NonEmpty.mk(SortedSet, V1),
-      ProtocolVersion.dev -> NonEmpty.mk(SortedSet, V1),
+      ProtocolVersion.v33 -> NonEmpty.mk(SortedSet, V2),
+      ProtocolVersion.dev -> NonEmpty.mk(SortedSet, V2),
     )
 
   def minProtocolVersionForHSV(version: HashingSchemeVersion): Option[ProtocolVersion] =
@@ -38,8 +38,8 @@ object HashingSchemeVersion {
       protocolVersion: ProtocolVersion
   ): NonEmpty[SortedSet[HashingSchemeVersion]] = {
     assert(
-      protocolVersion >= ProtocolVersion.v32,
-      s"Canton only supports external signing from ProtocolVersions >= ${ProtocolVersion.v32}",
+      protocolVersion >= ProtocolVersion.v33,
+      s"Canton only supports external signing from ProtocolVersions >= ${ProtocolVersion.v33}",
     )
     ProtocolVersionToHashingVersion(protocolVersion)
   }
@@ -47,7 +47,7 @@ object HashingSchemeVersion {
   def fromProtoV30(
       version: v30.ExternalAuthorization.HashingSchemeVersion
   ): ParsingResult[HashingSchemeVersion] = version match {
-    case v30.ExternalAuthorization.HashingSchemeVersion.HASHING_SCHEME_VERSION_V1 => Right(V1)
+    case v30.ExternalAuthorization.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2 => Right(V2)
     case v30.ExternalAuthorization.HashingSchemeVersion.HASHING_SCHEME_VERSION_UNSPECIFIED =>
       Left(FieldNotSet("hashing_scheme_version"))
     case v30.ExternalAuthorization.HashingSchemeVersion.Unrecognized(unrecognizedValue) =>

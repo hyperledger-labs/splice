@@ -1,46 +1,52 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command
 
-import com.digitalasset.canton.data.DeduplicationPeriod
+import cats.data.EitherT
 import com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationDuration
-import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands, DisclosedContract}
+import com.digitalasset.canton.data.{DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
 import com.digitalasset.canton.ledger.api.util.TimeProvider
+import com.digitalasset.canton.ledger.api.{CommandId, Commands, DisclosedContract}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.{
+  RoutingSynchronizerState,
   SubmissionResult,
   SubmitterInfo,
+  SynchronizerRank,
   TransactionMeta,
 }
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.platform.apiserver.SeedService
 import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutionResult,
   CommandExecutor,
+  CommandInterpretationResult,
 }
 import com.digitalasset.canton.platform.apiserver.services.{ErrorCause, TimeProviderType}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.platform.apiserver.{FatContractInstanceHelper, SeedService}
+import com.digitalasset.canton.protocol.LfTransactionVersion
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName, PackageVersion}
+import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.engine.Error as LfError
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
-import com.digitalasset.daml.lf.language.{LanguageVersion, LookupError, Reference}
+import com.digitalasset.daml.lf.language.{LookupError, Reference}
 import com.digitalasset.daml.lf.transaction.test.TreeTransactionBuilder.*
 import com.digitalasset.daml.lf.transaction.test.{
   TestNodeBuilder,
   TransactionBuilder,
   TreeTransactionBuilder,
 }
-import com.digitalasset.daml.lf.transaction.{Node as LfNode, *}
+import com.digitalasset.daml.lf.transaction.{Node as _, *}
 import com.digitalasset.daml.lf.value.Value
 import com.google.rpc.status.Status as RpcStatus
 import io.grpc.{Status, StatusRuntimeException}
@@ -52,7 +58,6 @@ import org.scalatest.matchers.should.Matchers
 
 import java.time.{Duration, Instant}
 import java.util.concurrent.CompletableFuture
-import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 class CommandSubmissionServiceImplSpec
@@ -100,7 +105,7 @@ class CommandSubmissionServiceImplSpec
       .submit(SubmitRequest(commands))(
         LoggingContextWithTrace(TraceContext.empty)
       )
-      .futureValue
+      .futureValueUS
   }
 
   behavior of "submit"
@@ -166,17 +171,23 @@ class CommandSubmissionServiceImplSpec
               commandExecutor.execute(
                 eqTo(commands),
                 any[Hash],
+                eqTo(routingSynchronizerState),
+                anyBoolean,
               )(any[LoggingContextWithTrace])
-            ).thenReturn(Future.successful(Left(error)))
+            ).thenReturn(
+              EitherT[FutureUnlessShutdown, ErrorCause, CommandExecutionResult](
+                FutureUnlessShutdown.pure(Left(error))
+              )
+            )
 
             apiSubmissionService()
               .submit(SubmitRequest(commands))
-              .transform(result => Success(expectedStatus -> result))
-              .futureValue
+              .transform(result => Success(UnlessShutdown.Outcome(expectedStatus -> result)))
+              .futureValueUS
           }
 
         // then
-        results.foreach { case (expectedStatus: Status, result: Try[Unit]) =>
+        results.foreach { case (expectedStatus: Status, result: Try[UnlessShutdown[Unit]]) =>
           inside(result) { case Failure(exception) =>
             exception.getMessage should startWith(expectedStatus.getCode.toString)
           }
@@ -197,58 +208,46 @@ class CommandSubmissionServiceImplSpec
       .transform {
         case Failure(e: StatusRuntimeException)
             if e.getStatus.getCode.value == grpcError.code && e.getStatus.getDescription == grpcError.message =>
-          Success(succeed)
+          Success(UnlessShutdown.Outcome(succeed))
         case result =>
           fail(s"Expected submission to be aborted, but got $result")
       }
-      .futureValue
+      .futureValueUS
   }
 
   private trait TestContext {
-    val writeService = mock[state.WriteService]
+    val syncService = mock[state.SyncService]
     val timeProvider = TimeProvider.Constant(Instant.now)
     val timeProviderType = TimeProviderType.Static
     val seedService = SeedService.WeakRandom
     val commandExecutor = mock[CommandExecutor]
     val metrics = LedgerApiServerMetrics.ForTesting
+    val alice = Ref.Party.assertFromString("alice")
 
-    val domainId: DomainId = DomainId.tryFromString("x::domainId")
+    val synchronizerId: SynchronizerId = SynchronizerId.tryFromString("x::synchronizerId")
+
+    val processedDisclosedContract =
+      FatContractInstanceHelper.buildFatContractInstance(
+        templateId = Identifier.assertFromString("some:pkg:identifier"),
+        packageName = PackageName.assertFromString("pkg-name"),
+        contractId = TransactionBuilder.newCid,
+        argument = Value.ValueNil,
+        createdAt = Timestamp.Epoch,
+        driverMetadata = Bytes.Empty,
+        signatories = Set(alice),
+        stakeholders = Set(alice),
+        keyOpt = None,
+        version = LfTransactionVersion.minVersion,
+      )
+
     val disclosedContract = DisclosedContract(
-      FatContractInstance.fromCreateNode(
-        LfNode.Create(
-          coid = TransactionBuilder.newCid,
-          packageName = PackageName.assertFromString("pkg-name"),
-          packageVersion = Some(PackageVersion.assertFromString("0.1.2")),
-          templateId = Identifier.assertFromString("some:pkg:identifier"),
-          arg = Value.ValueNil,
-          signatories = Set(Ref.Party.assertFromString("alice")),
-          stakeholders = Set(Ref.Party.assertFromString("alice")),
-          keyOpt = None,
-          version = LanguageVersion.v2_dev,
-        ),
-        createTime = Timestamp.Epoch,
-        cantonData = Bytes.Empty,
-      ),
-      domainIdO = Some(domainId),
+      fatContractInstance = processedDisclosedContract,
+      synchronizerIdO = Some(synchronizerId),
     )
 
-    val processedDisclosedContract = com.digitalasset.canton.data.ProcessedDisclosedContract(
-      templateId = Identifier.assertFromString("some:pkg:identifier"),
-      packageName = PackageName.assertFromString("pkg-name"),
-      packageVersion = Some(PackageVersion.assertFromString("0.1.2")),
-      contractId = TransactionBuilder.newCid,
-      argument = Value.ValueNil,
-      createdAt = Timestamp.Epoch,
-      driverMetadata = Bytes.Empty,
-      signatories = Set.empty,
-      stakeholders = Set.empty,
-      keyOpt = None,
-      // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
-      version = LanguageVersion.v2_dev,
-    )
     val commands = Commands(
       workflowId = None,
-      applicationId = Ref.ApplicationId.assertFromString("app"),
+      userId = Ref.UserId.assertFromString("app"),
       commandId = CommandId(Ref.CommandId.assertFromString("cmd")),
       submissionId = None,
       actAs = Set.empty,
@@ -261,13 +260,14 @@ class CommandSubmissionServiceImplSpec
         commandsReference = "",
       ),
       disclosedContracts = ImmArray(disclosedContract),
-      domainId = None,
+      synchronizerId = None,
+      prefetchKeys = Seq.empty,
     )
 
     val submitterInfo = SubmitterInfo(
       actAs = Nil,
       readAs = Nil,
-      applicationId = Ref.ApplicationId.assertFromString("foobar"),
+      userId = Ref.UserId.assertFromString("foobar"),
       commandId = Ref.CommandId.assertFromString("foobar"),
       deduplicationPeriod = DeduplicationDuration(Duration.ofMinutes(1)),
       submissionId = None,
@@ -278,15 +278,16 @@ class CommandSubmissionServiceImplSpec
       workflowId = None,
       submissionTime = Time.Timestamp.Epoch,
       submissionSeed = Hash.hashPrivateKey("SomeHash"),
+      timeBoundaries = LedgerTimeBoundaries.unconstrained,
       optUsedPackages = None,
       optNodeSeeds = None,
       optByKeyNodes = None,
     )
     val estimatedInterpretationCost = 5L
     val processedDisclosedContracts = ImmArray(processedDisclosedContract)
-    val commandExecutionResult = CommandExecutionResult(
+    val commandInterpretationResult = CommandInterpretationResult(
       submitterInfo = submitterInfo,
-      optDomainId = None,
+      optSynchronizerId = None,
       transactionMeta = transactionMeta,
       transaction = transaction,
       dependsOnLedgerTime = false,
@@ -294,19 +295,38 @@ class CommandSubmissionServiceImplSpec
       globalKeyMapping = Map.empty,
       processedDisclosedContracts = processedDisclosedContracts,
     )
+    val synchronizerRank = SynchronizerRank.single(SynchronizerId.tryFromString("da::test"))
+    val routingSynchronizerState = mock[RoutingSynchronizerState]
+    val commandExecutionResult = CommandExecutionResult(
+      commandInterpretationResult = commandInterpretationResult,
+      synchronizerRank = synchronizerRank,
+      routingSynchronizerState = routingSynchronizerState,
+    )
+
+    when(syncService.getRoutingSynchronizerState(traceContext)).thenReturn(routingSynchronizerState)
 
     when(
-      commandExecutor.execute(eqTo(commands), any[Hash])(
+      commandExecutor.execute(
+        eqTo(commands),
+        any[Hash],
+        eqTo(routingSynchronizerState),
+        anyBoolean,
+      )(
         any[LoggingContextWithTrace]
       )
     )
-      .thenReturn(Future.successful(Right(commandExecutionResult)))
+      .thenReturn(
+        EitherT[FutureUnlessShutdown, ErrorCause, CommandExecutionResult](
+          FutureUnlessShutdown.pure(Right(commandExecutionResult))
+        )
+      )
     when(
-      writeService.submitTransaction(
-        eqTo(submitterInfo),
-        eqTo(None),
-        eqTo(transactionMeta),
+      syncService.submitTransaction(
         eqTo(transaction),
+        eqTo(synchronizerRank),
+        eqTo(routingSynchronizerState),
+        eqTo(submitterInfo),
+        eqTo(transactionMeta),
         eqTo(estimatedInterpretationCost),
         eqTo(Map.empty),
         eqTo(processedDisclosedContracts),
@@ -316,7 +336,7 @@ class CommandSubmissionServiceImplSpec
     def apiSubmissionService(
         checkOverloaded: TraceContext => Option[state.SubmissionResult] = _ => None
     ) = new CommandSubmissionServiceImpl(
-      writeService = writeService,
+      syncService = syncService,
       timeProviderType = timeProviderType,
       timeProvider = timeProvider,
       seedService = seedService,

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -13,6 +13,7 @@ import com.digitalasset.canton.lifecycle.{CloseContext, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage.RetryConfig
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryEither
@@ -21,12 +22,20 @@ import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.FlywayException
 import slick.jdbc.JdbcBackend.Database
 import slick.jdbc.hikaricp.HikariCPJdbcDataSource
-import slick.jdbc.{DataSourceJdbcDataSource, JdbcBackend, JdbcDataSource}
+import slick.jdbc.{DataSourceJdbcDataSource, JdbcDataSource}
 
 import java.sql.SQLException
 import javax.sql.DataSource
-import scala.concurrent.blocking
 import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, blocking}
+
+trait DbMigrationsMetaFactory {
+
+  type Factory <: DbMigrationsFactory
+
+  def create(clock: Clock)(implicit ec: ExecutionContext): Factory
+
+}
 
 trait DbMigrationsFactory {
 
@@ -46,13 +55,14 @@ trait DbMigrations { this: NamedLogging =>
 
   /** Whether we want to add the schema files found in the dev folder to the migration
     *
-    * A user that does that, won't be able to upgrade to new Canton versions, as we reserve our right to just
-    * modify the dev version files in any way we like.
+    * A user that does that, won't be able to upgrade to new Canton versions, as we reserve our
+    * right to just modify the dev version files in any way we like.
     */
   protected def alphaVersionSupport: Boolean
 
   /** Database is migrated using Flyway, which looks at the migration files at
-    * src/main/resources/db/migration/canton as explained at https://flywaydb.org/documentation/getstarted/firststeps/api
+    * src/main/resources/db/migration/canton as explained at
+    * https://flywaydb.org/documentation/getstarted/firststeps/api
     */
   protected def createFlyway(dataSource: DataSource): Flyway =
     Flyway.configure
@@ -89,7 +99,7 @@ trait DbMigrations { this: NamedLogging =>
       flyway: Flyway
   )(implicit traceContext: TraceContext): EitherT[UnlessShutdown, DbMigrations.Error, Unit] =
     // Retry the migration in case of failures, which may happen due to a race condition in concurrent migrations
-    RetryEither.retry[DbMigrations.Error, Unit](10, 100, functionFullName, logger) {
+    RetryEither.retry[DbMigrations.Error, Unit](10, 100, functionFullName) {
       Either
         .catchOnly[FlywayException](flyway.migrate())
         .map(r => logger.info(s"Applied ${r.migrationsExecuted} migrations successfully"))
@@ -122,8 +132,8 @@ trait DbMigrations { this: NamedLogging =>
       }
     }
 
-  /** Repair the database in case the migrations files changed (e.g. due to comment changes).
-    * To quote the Flyway documentation:
+  /** Repair the database in case the migrations files changed (e.g. due to comment changes). To
+    * quote the Flyway documentation:
     * {{{
     * Repair is your tool to fix issues with the schema history table. It has a few main uses:
     *
@@ -186,7 +196,8 @@ trait DbMigrations { this: NamedLogging =>
         val flyway = createFlyway(DbMigrations.createDataSource(db.source))
         for {
           _ <- connectionCheck(db.source, params.processingTimeouts)
-          _ <- checkDbVersion(db, params.processingTimeouts, standardConfig)
+          _ <- DbVersionCheck(params.processingTimeouts, standardConfig, dbConfig, db)
+          _ <- DbStringEncodingCheck(params.processingTimeouts, dbConfig, db)
           _ <-
             if (params.dbMigrateAndStart)
               migrateAndStartInternal(flyway)
@@ -238,16 +249,6 @@ trait DbMigrations { this: NamedLogging =>
       } yield ()
     }
 
-  private def checkDbVersion(
-      db: JdbcBackend.Database,
-      timeouts: ProcessingTimeout,
-      standardConfig: Boolean,
-  )(implicit tc: TraceContext): EitherT[UnlessShutdown, DbMigrations.Error, Unit] = {
-    val check = DbVersionCheck
-      .dbVersionCheck(timeouts, standardConfig, dbConfig)
-    check(db).toEitherT[UnlessShutdown]
-  }
-
   private def checkPendingMigrationInternal(
       flyway: Flyway
   ): Either[DbMigrations.Error, Unit] =
@@ -271,6 +272,15 @@ trait DbMigrations { this: NamedLogging =>
         }
     } yield ()
 
+}
+
+class CommunityDbMigrationsMetaFactory(loggerFactory: NamedLoggerFactory)
+    extends DbMigrationsMetaFactory {
+
+  override type Factory = CommunityDbMigrationsFactory
+
+  override def create(clock: Clock)(implicit ec: ExecutionContext): CommunityDbMigrationsFactory =
+    new CommunityDbMigrationsFactory(loggerFactory)
 }
 
 class CommunityDbMigrationsFactory(loggerFactory: NamedLoggerFactory) extends DbMigrationsFactory {

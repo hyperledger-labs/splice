@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api.client
@@ -7,6 +7,7 @@ import com.daml.ledger.api.v2.commands.Commands
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.ledger.client.LedgerClientUtils
 import com.digitalasset.canton.ledger.client.services.commands.CommandServiceClient
 import com.digitalasset.canton.lifecycle.*
@@ -24,7 +25,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.DurationConverters.ScalaDurationOps
 import scala.util.Failure
 
-/** Wraps a synchronous command client with the ability to retry commands that failed with retryable errors */
+/** Wraps a synchronous command client with the ability to retry commands that failed with retryable
+  * errors
+  */
 class CommandSubmitterWithRetry(
     commandServiceClient: CommandServiceClient,
     clock: Clock,
@@ -44,9 +47,11 @@ class CommandSubmitterWithRetry(
 
   /** Submits commands and retries timed out ones (at most the amount given by `maxRetries`)
     *
-    * @param commands to be submitted
-    * @return Future with the result of the submission. The result can signal success, failure, max retries reached
-    *         or aborted due to shutdown.
+    * @param commands
+    *   to be submitted
+    * @return
+    *   Future with the result of the submission. The result can signal success, failure, max
+    *   retries reached or aborted due to shutdown.
     */
   def submitCommands(
       commands: Commands,
@@ -65,8 +70,8 @@ class CommandSubmitterWithRetry(
 
   /** Aborts a future immediately if this object is closing.
     *
-    * For very long running futures where you don't want to wait for it to complete in case of
-    * an abort, you can wrap it here into a future unless shutdown.
+    * For very long running futures where you don't want to wait for it to complete in case of an
+    * abort, you can wrap it here into a future unless shutdown.
     */
   def abortIfClosing[R](name: String, futureSupervisor: FutureSupervisor)(
       future: => Future[R]
@@ -74,13 +79,13 @@ class CommandSubmitterWithRetry(
     if (isClosing) FutureUnlessShutdown.abortedDueToShutdown
     else {
       implicit val ec: ExecutionContext = directEc
-      val promise = new PromiseUnlessShutdown[R](
+      val promise = PromiseUnlessShutdown.abortOnShutdown[R](
         description = name,
+        hasRunOnClosing = this,
         futureSupervisor = futureSupervisor,
       )
-      val taskId = runOnShutdown(promise)
-      promise.completeWith(FutureUnlessShutdown.outcomeF(future))
-      promise.futureUS.thereafter(_ => cancelShutdownTask(taskId))
+      promise.completeWithUS(FutureUnlessShutdown.outcomeF(future)).discard
+      promise.futureUS
     }
 
   private def submitCommandsInternal(commands: Commands, timeout: FiniteDuration)(implicit

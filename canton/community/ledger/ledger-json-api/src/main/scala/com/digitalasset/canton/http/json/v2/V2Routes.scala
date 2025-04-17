@@ -1,21 +1,18 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.jwt.Jwt
-import com.digitalasset.canton.http.{PackageService, WebsocketConfig}
-import com.digitalasset.canton.http.util.Logging.instanceUUIDLogCtx
+import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.DamlDefinitionsView
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.ledger.client.services.version.VersionClient
-import com.digitalasset.canton.ledger.participant.state.WriteService
+import com.digitalasset.canton.ledger.participant.state.PackageSyncService
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.stream.Materializer
 import sttp.tapir.server.pekkohttp.PekkoHttpServerInterpreter
-import com.digitalasset.daml.lf.data.Ref.IdString
 
 import scala.concurrent.ExecutionContext
 
@@ -23,7 +20,7 @@ class V2Routes(
     commandService: JsCommandService,
     eventService: JsEventService,
     identityProviderService: JsIdentityProviderService,
-    meteringService: JsMeteringService,
+    interactiveSubmissionService: JsInteractiveSubmissionService,
     packageService: JsPackageService,
     partyManagementService: JsPartyManagementService,
     stateService: JsStateService,
@@ -36,11 +33,13 @@ class V2Routes(
 )(implicit ec: ExecutionContext)
     extends Endpoints
     with NamedLogging {
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   private val serverEndpoints =
     commandService.endpoints() ++ eventService.endpoints() ++ versionService
       .endpoints() ++ packageService.endpoints() ++ partyManagementService
       .endpoints() ++ stateService.endpoints() ++ updateService.endpoints() ++ userManagementService
-      .endpoints() ++ identityProviderService.endpoints() ++ meteringService
+      .endpoints() ++ identityProviderService
+      .endpoints() ++ interactiveSubmissionService
       .endpoints() ++ metadataServiceIfEnabled.toList.flatMap(_.endpoints())
 
   private val docs =
@@ -55,30 +54,20 @@ class V2Routes(
 object V2Routes {
   def apply(
       ledgerClient: LedgerClient,
-      packageService: PackageService,
       metadataServiceEnabled: Boolean,
-      writeService: WriteService,
+      packageSyncService: PackageSyncService,
       executionContext: ExecutionContext,
-      materializer: Materializer,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       esf: ExecutionSequencerFactory,
       ws: WebsocketConfig,
+      materializer: Materializer,
   ): V2Routes = {
     implicit val ec: ExecutionContext = executionContext
 
-    def fetchSignatures(token: Option[String]) = for {
-      _ <- instanceUUIDLogCtx { implicit lc =>
-        packageService.reload(
-          Jwt(token.getOrElse(""))
-        )
-      }
-    } yield packageService.packageStore
-      .map { case (k, v) =>
-        (IdString.PackageId.assertFromString(k), v.pack)
-      }
-
-    val schemaProcessors = new SchemaProcessors(fetchSignatures)
+    val schemaProcessors = new SchemaProcessors(
+      packageSyncService.getPackageMetadataSnapshot(_).packages
+    )
     val protocolConverters = new ProtocolConverters(schemaProcessors)
     val commandService =
       new JsCommandService(ledgerClient, protocolConverters, loggerFactory)
@@ -107,16 +96,15 @@ object V2Routes {
 
     val userManagementService =
       new JsUserManagementService(ledgerClient.userManagementClient, loggerFactory)
-    val meteringService = new JsMeteringService(ledgerClient.meteringReportClient, loggerFactory)
-
     val identityProviderService = new JsIdentityProviderService(
       ledgerClient.identityProviderConfigClient,
       loggerFactory,
     )
-
+    val interactiveSubmissionService =
+      new JsInteractiveSubmissionService(ledgerClient, protocolConverters, loggerFactory)
     val damlDefinitionsServiceIfEnabled = Option.when(metadataServiceEnabled) {
       val damlDefinitionsService =
-        new DamlDefinitionsView(writeService.getPackageMetadataSnapshot(_))
+        new DamlDefinitionsView(packageSyncService.getPackageMetadataSnapshot(_))
       new JsDamlDefinitionsService(damlDefinitionsService, loggerFactory)
     }
 
@@ -124,7 +112,7 @@ object V2Routes {
       commandService,
       eventService,
       identityProviderService,
-      meteringService,
+      interactiveSubmissionService,
       jsPackageService,
       partyManagementService,
       stateService,

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -8,7 +8,7 @@ import com.digitalasset.canton.serialization.{
   DeserializationError,
   HasCryptographicEvidence,
 }
-import com.digitalasset.canton.version.{HasVersionedToByteString, ProtocolVersion}
+import com.digitalasset.canton.version.HasToByteString
 import com.google.protobuf.ByteString
 
 import scala.util.Random
@@ -31,8 +31,8 @@ trait RandomOps {
   */
 final case class SecureRandomness private[crypto] (unwrap: ByteString)
     extends HasCryptographicEvidence
-    with HasVersionedToByteString {
-  override def toByteString(version: ProtocolVersion): ByteString = getCryptographicEvidence
+    with HasToByteString {
+  override def toByteString: ByteString = getCryptographicEvidence
 
   override def getCryptographicEvidence: ByteString = unwrap
 }
@@ -40,8 +40,8 @@ final case class SecureRandomness private[crypto] (unwrap: ByteString)
 /** Cryptographically-secure randomness */
 object SecureRandomness {
 
-  /** Recover secure randomness from a byte string. Use for deserialization only. Fails if the provided byte string
-    * is not of the expected length.
+  /** Recover secure randomness from a byte string. Use for deserialization only. Fails if the
+    * provided byte string is not of the expected length.
     */
   def fromByteString(
       expectedLength: Int

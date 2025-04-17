@@ -1,19 +1,19 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.execution
 
-import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.data.ProcessedDisclosedContract
 import com.digitalasset.canton.ledger.participant.state.index.{
   MaximumLedgerTime,
   MaximumLedgerTimeService,
 }
 import com.digitalasset.canton.logging.LoggingContextWithTrace
+import com.digitalasset.canton.platform.apiserver.FatContractInstanceHelper
+import com.digitalasset.canton.protocol.LfTransactionVersion
+import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName, PackageVersion}
-import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Time}
-import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName}
+import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
 import org.mockito.captor.{ArgCaptor, Captor}
@@ -32,6 +32,7 @@ class ResolveMaximumLedgerTimeSpec
     with MockitoSugar
     with ScalaFutures
     with ArgumentMatchersSugar
+    with HasExecutionContext
     with BaseTest {
 
   private implicit val loggingContext: LoggingContextWithTrace = LoggingContextWithTrace.ForTesting
@@ -47,7 +48,7 @@ class ResolveMaximumLedgerTimeSpec
     resolveMaximumLedgerTime(
       processedDisclosedContracts,
       Set(cId_2, cId_3, cId_4),
-    ).futureValue shouldBe MaximumLedgerTime.Max(t4)
+    ).futureValueUS shouldBe MaximumLedgerTime.Max(t4)
   }
 
   it should "resolve maximum ledger time when all contracts are provided as explicitly disclosed" in new TestScope {
@@ -59,37 +60,37 @@ class ResolveMaximumLedgerTimeSpec
     resolveMaximumLedgerTime(
       processedDisclosedContracts,
       Set(cId_1, cId_2),
-    ).futureValue shouldBe MaximumLedgerTime.Max(t2)
+    ).futureValueUS shouldBe MaximumLedgerTime.Max(t2)
   }
 
   it should "resolve maximum ledger time when no disclosed contracts are provided" in new TestScope {
     resolveMaximumLedgerTime(
       ImmArray.empty,
       Set(cId_1, cId_2),
-    ).futureValue shouldBe MaximumLedgerTime.Max(t2)
+    ).futureValueUS shouldBe MaximumLedgerTime.Max(t2)
   }
 
   it should "forward contract store lookup result on archived contracts" in new TestScope {
     resolveMaximumLedgerTime(
       ImmArray.empty,
       archived.contracts + cId_1,
-    ).futureValue shouldBe archived
+    ).futureValueUS shouldBe archived
   }
 
+  val alice = Ref.Party.assertFromString("alice")
+
   private def buildProcessedDisclosedContract(cId: ContractId, createdAt: Time.Timestamp) =
-    ProcessedDisclosedContract(
+    FatContractInstanceHelper.buildFatContractInstance(
       templateId = Identifier.assertFromString("some:pkg:identifier"),
       packageName = PackageName.assertFromString("pkg-name"),
-      packageVersion = Some(PackageVersion.assertFromString("0.1.2")),
       contractId = cId,
       argument = Value.ValueNil,
       createdAt = createdAt,
       driverMetadata = Bytes.Empty,
-      signatories = Set.empty,
-      stakeholders = Set.empty,
+      signatories = Set(alice),
+      stakeholders = Set(alice),
       keyOpt = None,
-      // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
-      version = LanguageVersion.v2_dev,
+      version = LfTransactionVersion.minVersion,
     )
 
   private def contractId(id: Int): ContractId =

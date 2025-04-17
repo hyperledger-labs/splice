@@ -1,28 +1,48 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.v2.command_service.{CommandServiceGrpc, SubmitAndWaitRequest}
-import com.google.protobuf
-import com.daml.ledger.api.v2.{command_completion_service, command_submission_service, completion, reassignment_command}
+import com.daml.ledger.api.v2.command_service.{
+  CommandServiceGrpc,
+  SubmitAndWaitRequest,
+  SubmitAndWaitResponse,
+}
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
+import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
+import com.daml.ledger.api.v2.{
+  command_completion_service,
+  command_service,
+  command_submission_service,
+  commands,
+  completion,
+  reassignment_commands,
+}
 import com.digitalasset.canton.http.WebsocketConfig
+import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput, v2Endpoint}
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
-import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsTransaction, JsTransactionTree}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import sttp.tapir.generic.auto.*
-import sttp.tapir.json.circe.*
+import com.digitalasset.canton.http.json.v2.JsSchema.{
+  JsCantonError,
+  JsReassignment,
+  JsTransaction,
+  JsTransactionTree,
+}
+import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.*
 import com.digitalasset.canton.ledger.client.LedgerClient
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf
 import io.circe.*
-import io.circe.generic.semiauto.deriveCodec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Flow
 import sttp.capabilities.pekko.PekkoStreams
-import sttp.tapir.{CodecFormat, webSocketBody}
+import sttp.tapir.generic.auto.*
+import sttp.tapir.json.circe.*
+import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, webSocketBody}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,23 +53,22 @@ class JsCommandService(
 )(implicit
     val executionContext: ExecutionContext,
     esf: ExecutionSequencerFactory,
-  wsConfig: WebsocketConfig,
+    materializer: Materializer,
+    wsConfig: WebsocketConfig,
 ) extends Endpoints
     with NamedLogging {
 
-  import JsCommandServiceCodecs.*
-
-  private def commandServiceClient(token: Option[String] = None)(implicit
+  private def commandServiceClient(token: Option[String])(implicit
       traceContext: TraceContext
   ): CommandServiceGrpc.CommandServiceStub =
     ledgerClient.serviceClient(CommandServiceGrpc.stub, token)
 
-  private def commandSubmissionServiceClient(token: Option[String] = None)(implicit
+  private def commandSubmissionServiceClient(token: Option[String])(implicit
       traceContext: TraceContext
   ): command_submission_service.CommandSubmissionServiceGrpc.CommandSubmissionServiceStub =
     ledgerClient.serviceClient(command_submission_service.CommandSubmissionServiceGrpc.stub, token)
 
-  private def commandCompletionServiceClient(token: Option[String] = None)(implicit
+  private def commandCompletionServiceClient(token: Option[String])(implicit
       traceContext: TraceContext
   ): command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
     ledgerClient.serviceClient(command_completion_service.CommandCompletionServiceGrpc.stub, token)
@@ -62,6 +81,10 @@ class JsCommandService(
     withServerLogic(
       JsCommandService.submitAndWaitForTransactionEndpoint,
       submitAndWaitForTransaction,
+    ),
+    withServerLogic(
+      JsCommandService.submitAndWaitForReassignmentEndpoint,
+      submitAndWaitForReassignment,
     ),
     withServerLogic(
       JsCommandService.submitAndWaitForTransactionTree,
@@ -78,6 +101,11 @@ class JsCommandService(
     websocket(
       JsCommandService.completionStreamEndpoint,
       commandCompletionStream,
+    ),
+    asList(
+      JsCommandService.completionListEndpoint,
+      commandCompletionStream,
+      timeoutOpenEndedStream = true,
     ),
   )
 
@@ -96,9 +124,8 @@ class JsCommandService(
   }
 
   def submitAndWait(callerContext: CallerContext): TracedInput[JsCommands] => Future[
-    Either[JsCantonError, JsSubmitAndWaitResponse]
+    Either[JsCantonError, SubmitAndWaitResponse]
   ] = req => {
-    implicit val token: Option[String] = callerContext.token()
     implicit val tc: TraceContext = req.traceContext
     for {
       commands <- protocolConverters.Commands.fromJson(req.in)
@@ -106,9 +133,6 @@ class JsCommandService(
         SubmitAndWaitRequest(commands = Some(commands))
       result <- commandServiceClient(callerContext.token())
         .submitAndWait(submitAndWaitRequest)
-        .map(protocolConverters.SubmitAndWaitResponse.toJson)(
-          ExecutionContext.parasitic
-        )
         .resultToRight
     } yield result
   }
@@ -118,7 +142,6 @@ class JsCommandService(
   ): TracedInput[JsCommands] => Future[
     Either[JsCantonError, JsSubmitAndWaitForTransactionTreeResponse]
   ] = req => {
-    implicit val token: Option[String] = callerContext.token()
     implicit val tc: TraceContext = req.traceContext
     for {
 
@@ -132,15 +155,14 @@ class JsCommandService(
     } yield result
   }
 
-  def submitAndWaitForTransaction(callerContext: CallerContext): TracedInput[JsCommands] => Future[
+  def submitAndWaitForTransaction(
+      callerContext: CallerContext
+  ): TracedInput[JsSubmitAndWaitForTransactionRequest] => Future[
     Either[JsCantonError, JsSubmitAndWaitForTransactionResponse]
   ] = req => {
-    implicit val token: Option[String] = callerContext.token()
     implicit val tc: TraceContext = req.traceContext
     for {
-      commands <- protocolConverters.Commands.fromJson(req.in)
-      submitAndWaitRequest =
-        SubmitAndWaitRequest(commands = Some(commands))
+      submitAndWaitRequest <- protocolConverters.SubmitAndWaitForTransactionRequest.fromJson(req.in)
       result <- commandServiceClient(callerContext.token())
         .submitAndWaitForTransaction(submitAndWaitRequest)
         .flatMap(r => protocolConverters.SubmitAndWaitTransactionResponse.toJson(r))
@@ -148,10 +170,23 @@ class JsCommandService(
     } yield result
   }
 
+  def submitAndWaitForReassignment(
+      callerContext: CallerContext
+  ): TracedInput[command_service.SubmitAndWaitForReassignmentRequest] => Future[
+    Either[JsCantonError, JsSubmitAndWaitForReassignmentResponse]
+  ] = req => {
+    implicit val tc: TraceContext = req.traceContext
+    for {
+      result <- commandServiceClient(callerContext.token())
+        .submitAndWaitForReassignment(req.in)
+        .flatMap(r => protocolConverters.SubmitAndWaitForReassignmentResponse.toJson(r))
+        .resultToRight
+    } yield result
+  }
+
   private def submitAsync(callerContext: CallerContext): TracedInput[JsCommands] => Future[
     Either[JsCantonError, command_submission_service.SubmitResponse]
   ] = req => {
-    implicit val token: Option[String] = callerContext.token()
     implicit val tc: TraceContext = req.traceContext
     for {
       commands <- protocolConverters.Commands.fromJson(req.in)
@@ -174,78 +209,83 @@ class JsCommandService(
   }
 }
 
+final case class JsSubmitAndWaitForTransactionRequest(
+    commands: JsCommands,
+    transactionFormat: TransactionFormat,
+)
+
 final case class JsSubmitAndWaitForTransactionTreeResponse(
-    transaction_tree: JsTransactionTree
+    transactionTree: JsTransactionTree
 )
 
 final case class JsSubmitAndWaitForTransactionResponse(
     transaction: JsTransaction
 )
 
-final case class JsSubmitAndWaitResponse(
-    update_id: String,
-    completion_offset: Long,
+final case class JsSubmitAndWaitForReassignmentResponse(
+    reassignment: JsReassignment
 )
 
 object JsCommand {
   sealed trait Command
   final case class CreateCommand(
-      template_id: String,
-      create_arguments: Json,
+      templateId: String,
+      createArguments: Json,
   ) extends Command
 
   final case class ExerciseCommand(
-      template_id: String,
-      contract_id: String,
+      templateId: String,
+      contractId: String,
       choice: String,
-      choice_argument: Json,
+      choiceArgument: Json,
   ) extends Command
 
   final case class CreateAndExerciseCommand(
-      template_id: String,
-      create_arguments: Json,
+      templateId: String,
+      createArguments: Json,
       choice: String,
-      choice_argument: Json,
+      choiceArgument: Json,
   ) extends Command
 
   final case class ExerciseByKeyCommand(
-      template_id: String,
-      contract_key: Json,
+      templateId: String,
+      contractKey: Json,
       choice: String,
-      choice_argument: Json,
+      choiceArgument: Json,
   ) extends Command
 }
 
 final case class JsCommands(
     commands: Seq[JsCommand.Command],
-    workflow_id: String,
-    application_id: String,
-    command_id: String,
-    deduplication_period: DeduplicationPeriod,
-    min_ledger_time_abs: Option[protobuf.timestamp.Timestamp],
-    min_ledger_time_rel: Option[protobuf.duration.Duration],
-    act_as: Seq[String],
-    read_as: Seq[String],
-    submission_id: String,
-    disclosed_contracts: Seq[JsDisclosedContract],
-    domain_id: String,
-    package_id_selection_preference: Seq[String],
-)
-final case class JsDisclosedContract(
-    template_id: String,
-    contract_id: String,
-    created_event_blob: com.google.protobuf.ByteString,
+    commandId: String,
+    actAs: Seq[String],
+    userId: Option[String] = None,
+    readAs: Seq[String] = Seq.empty,
+    workflowId: Option[String] = None,
+    deduplicationPeriod: Option[DeduplicationPeriod] = None,
+    minLedgerTimeAbs: Option[protobuf.timestamp.Timestamp] = None,
+    minLedgerTimeRel: Option[protobuf.duration.Duration] = None,
+    submissionId: Option[String] = None,
+    disclosedContracts: Seq[com.daml.ledger.api.v2.commands.DisclosedContract] = Seq.empty,
+    synchronizerId: Option[String] = None,
+    packageIdSelectionPreference: Seq[String] = Seq.empty,
 )
 
-object JsCommandService {
+object JsCommandService extends DocumentationEndpoints {
   import JsCommandServiceCodecs.*
   private lazy val commands = v2Endpoint.in(sttp.tapir.stringToPath("commands"))
 
   val submitAndWaitForTransactionEndpoint = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction"))
-    .in(jsonBody[JsCommands])
+    .in(jsonBody[JsSubmitAndWaitForTransactionRequest])
     .out(jsonBody[JsSubmitAndWaitForTransactionResponse])
-    .description("Submit a batch of commands and wait for the flat transactions response")
+    .description("Submit a batch of commands and wait for the transaction response")
+
+  val submitAndWaitForReassignmentEndpoint = commands.post
+    .in(sttp.tapir.stringToPath("submit-and-wait-for-reassignment"))
+    .in(jsonBody[command_service.SubmitAndWaitForReassignmentRequest])
+    .out(jsonBody[JsSubmitAndWaitForReassignmentResponse])
+    .description("Submit a batch of reassignment commands and wait for the reassignment response")
 
   val submitAndWaitForTransactionTree = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction-tree"))
@@ -256,7 +296,7 @@ object JsCommandService {
   val submitAndWait = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait"))
     .in(jsonBody[JsCommands])
-    .out(jsonBody[JsSubmitAndWaitResponse])
+    .out(jsonBody[SubmitAndWaitResponse])
     .description("Submit a batch of commands and wait for the completion details")
 
   val submitAsyncEndpoint = commands.post
@@ -274,7 +314,6 @@ object JsCommandService {
       .out(jsonBody[command_submission_service.SubmitReassignmentResponse])
       .description("Submit reassignment command asynchronously")
 
-  // TODO (i21030) add test for this
   val completionStreamEndpoint =
     commands.get
       .in(sttp.tapir.stringToPath("completions"))
@@ -287,83 +326,139 @@ object JsCommandService {
         ](PekkoStreams)
       )
       .description("Get completions stream")
+
+  val completionListEndpoint =
+    commands.post
+      .in(sttp.tapir.stringToPath("completions"))
+      .in(jsonBody[command_completion_service.CompletionStreamRequest])
+      .out(jsonBody[Seq[command_completion_service.CompletionStreamResponse]])
+      .inStreamListParams()
+      .description("Query completions list (blocking call)")
+
+  override def documentation: Seq[AnyEndpoint] = Seq(
+    submitAndWait,
+    submitAndWaitForTransactionEndpoint,
+    submitAndWaitForReassignmentEndpoint,
+    submitAndWaitForTransactionTree,
+    submitAsyncEndpoint,
+    submitReassignmentAsyncEndpoint,
+    completionStreamEndpoint,
+    completionListEndpoint,
+  )
 }
 
 object JsCommandServiceCodecs {
+  import JsSchema.config
+  import JsSchema.JsServicesCommonCodecs.*
+  import io.circe.generic.extras.auto.*
 
-  implicit val deduplicationPeriodRW: Codec[DeduplicationPeriod] = deriveCodec
+  implicit val deduplicationPeriodRW: Codec[DeduplicationPeriod] = deriveConfiguredCodec // ADT
+
   implicit val deduplicationPeriodDeduplicationDurationRW
-      : Codec[DeduplicationPeriod.DeduplicationDuration] = deriveCodec
+      : Codec[DeduplicationPeriod.DeduplicationDuration] = deriveRelaxedCodec
   implicit val deduplicationPeriodDeduplicationOffsetRW
-      : Codec[DeduplicationPeriod.DeduplicationOffset] = deriveCodec
+      : Codec[DeduplicationPeriod.DeduplicationOffset] = deriveRelaxedCodec
 
-  implicit val durationRW: Codec[protobuf.duration.Duration] = deriveCodec
+  implicit val durationRW: Codec[protobuf.duration.Duration] = deriveRelaxedCodec
 
-  implicit val jsTransactionRW: Codec[JsTransaction] =
-    deriveCodec
+  implicit val jsSubmitAndWaitRequestRW: Codec[JsSubmitAndWaitForTransactionRequest] =
+    deriveConfiguredCodec
 
   implicit val jsSubmitAndWaitForTransactionResponseRW
-      : Codec[JsSubmitAndWaitForTransactionResponse] =
-    deriveCodec
+      : Codec[JsSubmitAndWaitForTransactionResponse] = deriveConfiguredCodec
+
+  implicit val submitAndWaitForReassignmentRequestRW
+      : Codec[command_service.SubmitAndWaitForReassignmentRequest] = deriveRelaxedCodec
+
+  implicit val jsSubmitAndWaitForReassignmentResponseRW
+      : Codec[JsSubmitAndWaitForReassignmentResponse] = deriveConfiguredCodec
 
   implicit val submitResponseRW: Codec[command_submission_service.SubmitResponse] =
-    deriveCodec
+    deriveRelaxedCodec
+
+  implicit val submitAndWaitResponseRW: Codec[SubmitAndWaitResponse] =
+    deriveRelaxedCodec
 
   implicit val submitReassignmentResponseRW
       : Codec[command_submission_service.SubmitReassignmentResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
-  implicit val jsCommandsRW: Codec[JsCommands] = deriveCodec
+  implicit val jsCommandsRW: Codec[JsCommands] = deriveConfiguredCodec
 
-  implicit val jsCommandCommandRW: Codec[JsCommand.Command] = deriveCodec
-  implicit val jsCommandCreateRW: Codec[JsCommand.CreateCommand] = deriveCodec
-  implicit val jsCommandExerciseRW: Codec[JsCommand.ExerciseCommand] = deriveCodec
-
-  implicit val jsDisclosedContractRW: Codec[JsDisclosedContract] = deriveCodec
-
-  implicit val jsSubmitAndWaitResponseRW: Codec[JsSubmitAndWaitResponse] =
-    deriveCodec
+  implicit val jsCommandCommandRW: Codec[JsCommand.Command] = deriveConfiguredCodec
+  implicit val jsCommandCreateRW: Codec[JsCommand.CreateCommand] = deriveConfiguredCodec
+  implicit val jsCommandExerciseRW: Codec[JsCommand.ExerciseCommand] = deriveConfiguredCodec
 
   implicit val commandCompletionRW: Codec[command_completion_service.CompletionStreamRequest] =
-    deriveCodec
+    deriveRelaxedCodec
 
-  implicit val reassignmentCommandRW: Codec[reassignment_command.ReassignmentCommand] = deriveCodec
+  implicit val reassignmentCommandsRW: Codec[reassignment_commands.ReassignmentCommands] =
+    deriveRelaxedCodec
+
+  implicit val reassignmentCommandRW: Codec[reassignment_commands.ReassignmentCommand] =
+    deriveRelaxedCodec
 
   implicit val reassignmentCommandCommandRW
-      : Codec[reassignment_command.ReassignmentCommand.Command] = deriveCodec
+      : Codec[reassignment_commands.ReassignmentCommand.Command] = deriveConfiguredCodec // ADT
 
-  implicit val reassignmentUnassignCommandRW: Codec[reassignment_command.UnassignCommand] =
-    deriveCodec
+  implicit val reassignmentUnassignCommandRW: Codec[reassignment_commands.UnassignCommand] =
+    deriveRelaxedCodec
 
-  implicit val reassignmentAssignCommandRW: Codec[reassignment_command.AssignCommand] = deriveCodec
+  implicit val reassignmentAssignCommandRW: Codec[reassignment_commands.AssignCommand] =
+    deriveRelaxedCodec
 
   implicit val reassignmentCommandUnassignCommandRW
-      : Codec[reassignment_command.ReassignmentCommand.Command.UnassignCommand] = deriveCodec
+      : Codec[reassignment_commands.ReassignmentCommand.Command.UnassignCommand] =
+    deriveRelaxedCodec
 
   implicit val reassignmentCommandAssignCommandRW
-      : Codec[reassignment_command.ReassignmentCommand.Command.AssignCommand] = deriveCodec
+      : Codec[reassignment_commands.ReassignmentCommand.Command.AssignCommand] = deriveRelaxedCodec
 
   implicit val submitReassignmentRequestRW: Codec[
     command_submission_service.SubmitReassignmentRequest
-  ] = deriveCodec
+  ] = deriveRelaxedCodec
 
   implicit val completionStreamResponseRW
-      : Codec[command_completion_service.CompletionStreamResponse] = deriveCodec
+      : Codec[command_completion_service.CompletionStreamResponse] = deriveRelaxedCodec
   implicit val completionResponseRW
-      : Codec[command_completion_service.CompletionStreamResponse.CompletionResponse] = deriveCodec
+      : Codec[command_completion_service.CompletionStreamResponse.CompletionResponse] =
+    deriveConfiguredCodec // ADT
   implicit val completionResponseOffsetCheckpointRW: Codec[
     command_completion_service.CompletionStreamResponse.CompletionResponse.OffsetCheckpoint
-  ] = deriveCodec
+  ] = deriveRelaxedCodec
   implicit val completionResponseOffsetCompletionRW: Codec[
     command_completion_service.CompletionStreamResponse.CompletionResponse.Completion
-  ] = deriveCodec
+  ] = deriveRelaxedCodec
 
   implicit val completionRW: Codec[
     completion.Completion
-  ] = deriveCodec
+  ] = deriveRelaxedCodec
 
   implicit val completionDeduplicationPeriodRW: Codec[
     completion.Completion.DeduplicationPeriod
-  ] = deriveCodec
+  ] = deriveConfiguredCodec // ADT
+
+  implicit val disclosedContractRW: Codec[
+    commands.DisclosedContract
+  ] = deriveRelaxedCodec
+
+  // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
+  implicit val reassignmentCommandCommandSchema
+      : Schema[reassignment_commands.ReassignmentCommand.Command] = Schema.oneOfWrapped
+
+  implicit val deduplicationPeriodSchema: Schema[DeduplicationPeriod] =
+    Schema.oneOfWrapped
+
+  implicit val completionDeduplicationPeriodSchema
+      : Schema[completion.Completion.DeduplicationPeriod] =
+    Schema.oneOfWrapped
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+  implicit val jsCommandSchema: Schema[JsCommand.Command] =
+    Schema.oneOfWrapped
+
+  implicit val completionStreamResponseSchema
+      : Schema[command_completion_service.CompletionStreamResponse.CompletionResponse] =
+    Schema.oneOfWrapped
 
 }

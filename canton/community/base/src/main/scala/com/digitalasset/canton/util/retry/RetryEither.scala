@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util.retry
@@ -8,19 +8,18 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.lifecycle.{CloseContext, UnlessShutdown}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.LoggerUtil
 import org.slf4j.event.Level
 
-/** Simple form of the retry policies that operate on Either and not Future[T].
-  * Only provides a Pause-based retry.
+/** Simple form of the retry policies that operate on Either and not Future[T]. Only provides a
+  * Pause-based retry.
   */
 object RetryEither {
   def retry[A, B](
       maxRetries: Int,
       waitInMs: Long,
       operationName: String,
-      logger: TracedLogger,
       stopOnLeft: Option[A => Boolean] = None,
       retryLogLevel: Level = Level.INFO,
       failLogLevel: Level = Level.WARN,
@@ -34,7 +33,6 @@ object RetryEither {
       maxRetries,
       waitInMs,
       operationName,
-      logger,
       stopOnLeft,
       retryLogLevel,
       failLogLevel,
@@ -46,7 +44,6 @@ object RetryEither {
       maxRetries: Int,
       waitInMs: Long,
       operationName: String,
-      logger: TracedLogger,
       stopOnLeft: Option[A => Boolean] = None,
       retryLogLevel: Level = Level.INFO,
       failLogLevel: Level = Level.WARN,

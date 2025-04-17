@@ -289,7 +289,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -409,7 +409,7 @@
           }
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -484,7 +484,7 @@
           }
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "splitwell-participant-1",
     "provider": "",
@@ -612,7 +612,7 @@
           }
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -757,7 +757,7 @@
       "namespace": "splitwell",
       "timeout": 600,
       "values": {
-        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\"]\n}",
+        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\", \"splice-node/dars/splitwell-0.1.9.dar\"]\n}",
         "additionalEnvVars": [
           {
             "name": "ONBOARDING_SECRET_ONLY_FOR_TESTING",
@@ -871,7 +871,7 @@
           "auth0|65de04b385816c4a38cc044f"
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

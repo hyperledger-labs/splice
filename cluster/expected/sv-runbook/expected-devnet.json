@@ -91,7 +91,7 @@
           }
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -212,7 +212,7 @@
           }
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "loopback",
     "provider": "",
@@ -275,7 +275,7 @@
           }
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "scan",
     "provider": "",
@@ -637,9 +637,11 @@
         "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
+          "enableBftSequencer": false,
           "mediatorAddress": "global-domain-1-mediator",
           "sequencerAddress": "global-domain-1-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
+          "sequencerBftPublicUrlSuffix": "sv.dev.global.canton.network.digitalasset.com",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
@@ -693,7 +695,7 @@
           }
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "sv-app",
     "provider": "",
@@ -858,7 +860,7 @@
           "auth0|64b16b9ff7a0dfd00ea3704e"
         ]
       },
-      "version": "0.3.20"
+      "version": "0.3.21"
     },
     "name": "validator",
     "provider": "",

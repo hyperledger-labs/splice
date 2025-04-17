@@ -9,7 +9,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
@@ -28,12 +28,13 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
   protected def enableAutomaticDsoDelegateElection: Boolean = false
 
   private val store = svTaskContext.dsoStore
+  private val packageVersionSupport = svTaskContext.packageVersionSupport
 
-  final protected def supportsSvController()(implicit tc: TraceContext): Future[Boolean] = {
-    for {
-      amuletRules <- store.getAmuletRules()
-    } yield PackageIdResolver.supportsSvController(context.clock.now, amuletRules.payload)
-  }
+  final protected def supportsSvController()(implicit tc: TraceContext): Future[Boolean] =
+    packageVersionSupport.supportsSvController(
+      Seq(store.key.svParty, store.key.dsoParty),
+      context.clock.now,
+    )
 
   final protected override def completeTask(
       task: T
@@ -209,5 +210,6 @@ object SvTaskBasedTrigger {
       dsoDelegate: PartyId,
       epoch: Long,
       delegatelessAutomation: Boolean,
+      packageVersionSupport: PackageVersionSupport,
   )
 }

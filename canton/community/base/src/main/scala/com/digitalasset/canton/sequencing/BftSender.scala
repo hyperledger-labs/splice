@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -16,7 +16,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
-import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
+import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil}
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
@@ -28,32 +28,51 @@ import scala.util.{Failure, Success, Try}
 object BftSender {
 
   /** Returned when the request fails to reach the required threshold
-    * @param successes The operators that successfully performed the request, grouped by hash of the result
-    * @param failures The operators that failed to perform the request
-    * @tparam K type of the value hash
-    * @tparam I type of the identity of operators
-    * @tparam E error type of the operation performed
+    * @param successes
+    *   The operators that successfully performed the request, grouped by hash of the result
+    * @param failures
+    *   The operators that failed to perform the request
+    * @tparam K
+    *   type of the value hash
+    * @tparam I
+    *   type of the identity of operators
+    * @tparam E
+    *   error type of the operation performed
     */
   final case class FailedToReachThreshold[K, I, E](
       successes: Map[K, Set[I]],
       failures: Map[I, Either[Throwable, E]],
   )
 
-  /** Make a request to multiple operators and aggregate the responses such as the final result will be successful
-    * only if "threshold" responses were identical.
-    * As soon as the threshold is reached, this method returns. It will also return with an error as soon as it is guaranteed that
-    * it cannot possibly gather sufficiently identical requests to meet the threshold.
-    * @param description description of the request
-    * @param threshold minimum value of identical results that need to be received for the request to be successful (inclusive)
-    * @param operators operators to use for the request. The request will be performed via every operator.
-    * @param performRequest request to be performed.
-    * @param resultHashKey function to provide a hash from a result. This is what determine whether 2 responses are identical.
-    * @tparam I key of the operator, typically and ID
-    * @tparam E Error type of performRequest
-    * @tparam O operator type: object with which the performRequest function will be called
-    * @tparam A type of the result
-    * @tparam K type of the result hash
-    * @return The result of performRequest if sufficiently many responses were identical from the operators.
+  /** Make a request to multiple operators and aggregate the responses such as the final result will
+    * be successful only if "threshold" responses were identical. As soon as the threshold is
+    * reached, this method returns. It will also return with an error as soon as it is guaranteed
+    * that it cannot possibly gather sufficiently identical requests to meet the threshold.
+    * @param description
+    *   description of the request
+    * @param threshold
+    *   minimum value of identical results that need to be received for the request to be successful
+    *   (inclusive)
+    * @param operators
+    *   operators to use for the request. The request will be performed via every operator.
+    * @param performRequest
+    *   request to be performed.
+    * @param resultHashKey
+    *   function to provide a hash from a result. This is what determine whether 2 responses are
+    *   identical.
+    * @tparam I
+    *   key of the operator, typically and ID
+    * @tparam E
+    *   Error type of performRequest
+    * @tparam O
+    *   operator type: object with which the performRequest function will be called
+    * @tparam A
+    *   type of the result
+    * @tparam K
+    *   type of the result hash
+    * @return
+    *   The result of performRequest if sufficiently many responses were identical from the
+    *   operators.
     */
   def makeRequest[I, E, O, A, K](
       description: String,
@@ -75,7 +94,7 @@ object BftSender {
     // We don't technically need the failures, but keep them around so we can log and return them if we never reach the threshold
     val failedResults = TrieMap.empty[I, Either[Throwable, E]]
     // Promise that provide the result for this method
-    val promise = new PromiseUnlessShutdown[Either[FailedToReachThreshold[K, I, E], A]](
+    val promise = PromiseUnlessShutdown.supervised[Either[FailedToReachThreshold[K, I, E], A]](
       description,
       futureSupervisor,
     )
@@ -134,7 +153,7 @@ object BftSender {
     }
 
     operators.foreach { case (operatorId, operator) =>
-      FutureUtil.doNotAwaitUnlessShutdown(
+      FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
         performRequest(operator).value
           .thereafter(addResult(operatorId, _))
           .map(_ => ()),

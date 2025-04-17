@@ -1,8 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
 
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 import org.slf4j.event.Level
@@ -16,7 +17,9 @@ object LoggerUtil {
 
   /** Log a `message` at a given `level`.
     *
-    * @param message The message to be logged. Call-by-name so that the message is computed only if the message is really logged.
+    * @param message
+    *   The message to be logged. Call-by-name so that the message is computed only if the message
+    *   is really logged.
     */
   def logAtLevel(level: Level, message: => String)(implicit
       loggingContext: ErrorLoggingContext
@@ -78,13 +81,29 @@ object LoggerUtil {
     ret
   }
 
+  def clueUSF[T](message: => String, logNonFatalThrowable: Boolean = false)(
+      run: => FutureUnlessShutdown[T]
+  )(implicit loggingContext: ErrorLoggingContext, ec: ExecutionContext): FutureUnlessShutdown[T] = {
+    val logger = loggingContext.logger
+    implicit val traceContext: TraceContext = loggingContext.traceContext
+    logger.debug(s"Starting $message")
+    val st = System.nanoTime()
+    val ret = if (logNonFatalThrowable) logOnThrow(run) else run
+    ret.onComplete { _ =>
+      val end = roundDurationForHumans(Duration(System.nanoTime() - st, TimeUnit.NANOSECONDS))
+      logger.debug(s"Finished $message after $end")
+
+    }
+    ret
+  }
+
   /** Round a duration such that humans can easier graps the numbers
     *
-    * Duration offers a method .toCoarsest that will figure out the coarsest
-    * time unit. However, this method doesn't really do anything if we have nanoseconds
-    * as it only truncates 0.
+    * Duration offers a method .toCoarsest that will figure out the coarsest time unit. However,
+    * this method doesn't really do anything if we have nanoseconds as it only truncates 0.
     *
-    * Therefore, this method allows to set lower digits to 0 and only keep the leading digits as nonzeros.
+    * Therefore, this method allows to set lower digits to 0 and only keep the leading digits as
+    * nonzeros.
     */
   def roundDurationForHumans(duration: Duration, keep: Int = 2): Duration =
     if (duration.isFinite && duration.length != 0) {
@@ -108,13 +127,15 @@ object LoggerUtil {
       task
     } catch {
       case NonFatal(e) =>
-        loggingContext.logger.error("Unhandled exception thrown!", e)(loggingContext.traceContext)
+        loggingContext.error("Unhandled exception thrown!", e)
     }
 
   /** truncates a string
     *
-    * @param maxLines truncate after observing the given number of newline characters
-    * @param maxSize truncate after observing the given number of characters
+    * @param maxLines
+    *   truncate after observing the given number of newline characters
+    * @param maxSize
+    *   truncate after observing the given number of characters
     */
   def truncateString(maxLines: Int, maxSize: Int)(str: String): String = {
     val builder = new StringBuilder()

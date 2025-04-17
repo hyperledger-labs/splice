@@ -578,7 +578,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -608,7 +608,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/deployment/Pulumi.deployment.testzrh.yaml",

@@ -59,7 +59,8 @@
     "type:check": "tsc --noEmit",
     "start": "vite --force",
     "test": "PORT=0 vitest",
-    "dev": "vite --mode testing"
+    "copy-msw": "cp ../../common/frontend/public/mockServiceWorker.js public/",
+    "dev": "npm run copy-msw && vite --mode testing --force"
   },
   "msw": {
     "workerDirectory": "public"

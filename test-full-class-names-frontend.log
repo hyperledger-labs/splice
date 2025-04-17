@@ -1,6 +1,5 @@
 org.lfdecentralizedtrust.splice.integration.tests.AnsAuth0FrontendIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.AnsFrontendIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.GovernanceVettingFrontendIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SplitwellFrontendIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SplitwellUpgradeFrontendIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SvFrontendIntegrationTest

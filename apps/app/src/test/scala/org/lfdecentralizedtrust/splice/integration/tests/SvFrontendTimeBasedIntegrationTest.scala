@@ -1,13 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import org.openqa.selenium.WebDriver
 import org.slf4j.event.Level
 
@@ -19,10 +16,9 @@ class SvFrontendTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  private val dummyDsoDomainId = DomainId.tryFromString("domain1::domain")
+  private val dummyDsoSynchronizerId = SynchronizerId.tryFromString("domain1::domain")
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4SvsWithSimTime(
         this.getClass.getSimpleName
@@ -82,7 +78,9 @@ class SvFrontendTimeBasedIntegrationTest
       clue("stop the delegate sv1 long enough for an election to occur") {
         val automationConfig = sv2Backend.config.automation
         val effectiveTimeoutPlusBuffer = SvUtil
-          .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).dsoDelegateInactiveTimeout)
+          .fromRelTime(
+            SvUtil.defaultDsoRulesConfig(dummyDsoSynchronizerId).dsoDelegateInactiveTimeout
+          )
           .plus(automationConfig.pollingInterval.asJava)
           .plus(JavaDuration.ofSeconds(5))
         sv1Backend.stop()

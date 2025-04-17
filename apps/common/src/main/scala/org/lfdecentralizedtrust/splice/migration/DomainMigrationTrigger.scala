@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.migration
 import org.lfdecentralizedtrust.splice.util.BackupDump
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Codec
@@ -39,7 +39,7 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
       tc: TraceContext
   ): OptionT[Future, DomainMigrationTrigger.ScheduledMigration]
 
-  protected def getDomainId()(implicit tc: TraceContext): Future[DomainId]
+  protected def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId]
 
   protected def existingDumpFileMigrationId(dump: T): Long
 
@@ -50,10 +50,13 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
   ): Future[Seq[migration.DomainMigrationTrigger.Task]] = {
     (for {
       schedule <- getSchedule
-      domainId <- OptionT.liftF(getDomainId()(tc))
+      synchronizerId <- OptionT.liftF(getSynchronizerId()(tc))
       domainTimeLowerBound <- OptionT.liftF(
         participantAdminConnection
-          .getDomainTimeLowerBound(domainId, maxDomainTimeLag = context.config.pollingInterval)
+          .getDomainTimeLowerBound(
+            synchronizerId,
+            maxDomainTimeLag = context.config.pollingInterval,
+          )
       )
       domainTimeIsAfterTheScheduledTime = domainTimeLowerBound.timestamp.toInstant.isAfter(
         schedule.time
@@ -64,7 +67,7 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
             schedule
           )
         )
-          OptionT.pure[Future](DomainMigrationTrigger.Task(domainId, schedule.migrationId))
+          OptionT.pure[Future](DomainMigrationTrigger.Task(synchronizerId, schedule.migrationId))
         else OptionT.none[Future, DomainMigrationTrigger.Task]
     } yield task).value.map(_.toList)
   }
@@ -128,7 +131,7 @@ object DomainMigrationTrigger {
 
   case class ScheduledMigration(time: Instant, migrationId: Long)
 
-  case class Task(domainId: DomainId, migrationId: Long) extends PrettyPrinting {
+  case class Task(synchronizerId: SynchronizerId, migrationId: Long) extends PrettyPrinting {
 
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 

@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.identities.{NodeIdentitiesDump, NodeIdent
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.Codec
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -22,8 +22,8 @@ import scala.concurrent.{ExecutionContext, Future}
 case class SynchronizerNodeIdentities(
     svPartyId: PartyId,
     dsoPartyId: PartyId,
-    domainAlias: DomainAlias,
-    domainId: DomainId,
+    synchronizerAlias: SynchronizerAlias,
+    synchronizerId: SynchronizerId,
     participant: NodeIdentitiesDump,
     sequencer: NodeIdentitiesDump,
     mediator: NodeIdentitiesDump,
@@ -31,8 +31,8 @@ case class SynchronizerNodeIdentities(
   def toHttp(): http.SynchronizerNodeIdentities = http.SynchronizerNodeIdentities(
     svPartyId.toProtoPrimitive,
     dsoPartyId.toProtoPrimitive,
-    domainAlias.toProtoPrimitive,
-    domainId.toProtoPrimitive,
+    synchronizerAlias.toProtoPrimitive,
+    synchronizerId.toProtoPrimitive,
     participant.toHttp,
     sequencer.toHttp,
     mediator.toHttp,
@@ -45,8 +45,8 @@ object SynchronizerNodeIdentities {
   ): Either[String, SynchronizerNodeIdentities] = for {
     svPartyId <- Codec.decode(Codec.Party)(src.svPartyId)
     dsoPartyId <- Codec.decode(Codec.Party)(src.dsoPartyId)
-    domainAlias <- DomainAlias.create(src.domainAlias)
-    domainId <- Codec.decode(Codec.DomainId)(src.domainId)
+    synchronizerAlias <- SynchronizerAlias.create(src.domainAlias)
+    synchronizerId <- Codec.decode(Codec.SynchronizerId)(src.domainId)
     participant <- NodeIdentitiesDump.fromHttp(
       ParticipantId.tryFromProtoPrimitive,
       src.participant,
@@ -63,8 +63,8 @@ object SynchronizerNodeIdentities {
     SynchronizerNodeIdentities(
       svPartyId,
       dsoPartyId,
-      domainAlias,
-      domainId,
+      synchronizerAlias,
+      synchronizerId,
       participant,
       sequencer,
       mediator,
@@ -75,7 +75,7 @@ object SynchronizerNodeIdentities {
       participantAdminConnection: ParticipantAdminConnection,
       synchronizerNode: LocalSynchronizerNode,
       dsoStore: SvDsoStore,
-      domainAlias: DomainAlias,
+      synchronizerAlias: SynchronizerAlias,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[SynchronizerNodeIdentities] = {
     def getNodeIdentitiesDump(adminConnection: TopologyAdminConnection) =
@@ -86,15 +86,15 @@ object SynchronizerNodeIdentities {
       ).getNodeIdentitiesDump()
 
     for {
-      domainId <- dsoStore.getDsoRules().map(_.domain)
+      synchronizerId <- dsoStore.getDsoRules().map(_.domain)
       participant <- getNodeIdentitiesDump(participantAdminConnection)
       sequencer <- getNodeIdentitiesDump(synchronizerNode.sequencerAdminConnection)
       mediator <- getNodeIdentitiesDump(synchronizerNode.mediatorAdminConnection)
     } yield SynchronizerNodeIdentities(
       dsoStore.key.svParty,
       dsoStore.key.dsoParty,
-      domainAlias,
-      domainId,
+      synchronizerAlias,
+      synchronizerId,
       participant,
       sequencer,
       mediator,

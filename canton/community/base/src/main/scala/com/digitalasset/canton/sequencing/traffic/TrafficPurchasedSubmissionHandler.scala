@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.traffic
@@ -9,7 +9,7 @@ import cats.syntax.parallel.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.crypto.{DomainSnapshotSyncCryptoApi, DomainSyncCryptoClient}
+import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -22,18 +22,18 @@ import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult, SequencerClientSend}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
-import com.digitalasset.canton.time.{Clock, DomainTimeTracker}
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
+import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
+import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 import scala.math.Ordered.orderingToOrdered
 
-/** Utility class to send traffic purchased entry requests protocol messages to be sequenced.
-  * This is abstracted out so that it can be re-used in any node's Admin API.
+/** Utility class to send traffic purchased entry requests protocol messages to be sequenced. This
+  * is abstracted out so that it can be re-used in any node's Admin API.
   */
 class TrafficPurchasedSubmissionHandler(
     clock: Clock,
@@ -41,28 +41,35 @@ class TrafficPurchasedSubmissionHandler(
 ) extends NamedLogging {
 
   /** Send a signed traffic purchased entry request.
-    * @param member recipient of the new balance
-    * @param domainId domainId of the domain where the top up is being sent to
-    * @param protocolVersion protocol version used
-    * @param serial monotonically increasing serial number for the request
-    * @param totalTrafficPurchased new total traffic purchased entry
-    * @param sequencerClient sequencer client to use to send the balance request
-    * @param cryptoApi crypto api used to access topology
+    * @param member
+    *   recipient of the new balance
+    * @param synchronizerId
+    *   synchronizerId of the synchronizer where the top up is being sent to
+    * @param protocolVersion
+    *   protocol version used
+    * @param serial
+    *   monotonically increasing serial number for the request
+    * @param totalTrafficPurchased
+    *   new total traffic purchased entry
+    * @param sequencerClient
+    *   sequencer client to use to send the balance request
+    * @param cryptoApi
+    *   crypto api used to access topology
     */
   def sendTrafficPurchasedRequest(
       member: Member,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       protocolVersion: ProtocolVersion,
       serial: PositiveInt,
       totalTrafficPurchased: NonNegativeLong,
       sequencerClient: SequencerClientSend,
-      domainTimeTracker: DomainTimeTracker,
-      cryptoApi: DomainSyncCryptoClient,
+      synchronizerTimeTracker: SynchronizerTimeTracker,
+      cryptoApi: SynchronizerCryptoClient,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, TrafficControlError, Unit] = {
-    val topology: DomainSnapshotSyncCryptoApi = cryptoApi.currentSnapshotApproximation
+    val topology: SynchronizerSnapshotSyncCryptoApi = cryptoApi.currentSnapshotApproximation
     val snapshot = topology.ipsSnapshot
 
     def send(
@@ -80,7 +87,7 @@ class TrafficPurchasedSubmissionHandler(
           )
           sendRequest(
             sequencerClient,
-            domainTimeTracker,
+            synchronizerTimeTracker,
             batch,
             aggregationRule,
             maxSequencingTime,
@@ -115,17 +122,16 @@ class TrafficPurchasedSubmissionHandler(
             .map(
               _.getOrElse(
                 ErrorUtil.invalidState(
-                  "No sequencer group was found on the domain. There should at least be one sequencer (this one)."
+                  "No sequencer group was found on the synchronizer. There should at least be one sequencer (this one)."
                 )
               )
             )
         )
-        .mapK(FutureUnlessShutdown.outcomeK)
       activeSequencers <- EitherT.fromOption[FutureUnlessShutdown](
         NonEmpty
           .from(sequencerGroup.active.map(_.member)),
         ErrorUtil.invalidState(
-          "No active sequencers found on the domain. There should at least be one sequencer."
+          "No active sequencers found on the synchronizer. There should at least be one sequencer."
         ),
       )
       aggregationRule = AggregationRule(
@@ -137,7 +143,7 @@ class TrafficPurchasedSubmissionHandler(
         member,
         serial,
         totalTrafficPurchased,
-        domainId,
+        synchronizerId,
         protocolVersion,
       )
       signedTrafficPurchasedMessage <- EitherT
@@ -157,10 +163,10 @@ class TrafficPurchasedSubmissionHandler(
             RecipientsTree.ofMembers(
               NonEmpty.mk(Set, member), // Root of recipient tree: recipient of the top up
               Seq(
-                RecipientsTree.recipientsLeaf( // Leaf of the tree: sequencers of domain group
+                RecipientsTree.recipientsLeaf( // Leaf of the tree: sequencers of synchronizer group
                   NonEmpty.mk(
                     Set,
-                    SequencersOfDomain: Recipient,
+                    SequencersOfSynchronizer: Recipient,
                   )
                 )
               ),
@@ -175,7 +181,7 @@ class TrafficPurchasedSubmissionHandler(
 
   private def sendRequest(
       sequencerClient: SequencerClientSend,
-      domainTimeTracker: DomainTimeTracker,
+      synchronizerTimeTracker: SynchronizerTimeTracker,
       batch: Batch[DefaultOpenEnvelope],
       aggregationRule: AggregationRule,
       maxSequencingTime: CantonTimestamp,
@@ -186,7 +192,7 @@ class TrafficPurchasedSubmissionHandler(
     val callback = SendCallback.future
     implicit val metricsContext: MetricsContext = MetricsContext("type" -> "traffic-purchase")
     // Make sure that the sequencer will ask for a time proof if it doesn't observe the sequencing in time
-    domainTimeTracker.requestTick(maxSequencingTime)
+    synchronizerTimeTracker.requestTick(maxSequencingTime)
     for {
       _ <- sequencerClient
         .sendAsync(
@@ -211,6 +217,7 @@ class TrafficPurchasedSubmissionHandler(
                 _,
                 _,
                 _,
+                _,
                 SequencerErrors.AggregateSubmissionAlreadySent(message),
                 _,
               )
@@ -219,11 +226,14 @@ class TrafficPurchasedSubmissionHandler(
         case SendResult.Error(err) =>
           logger.info(show"The traffic balance request submission failed: $err")
         case SendResult.Timeout(time) =>
-          logger.warn(
+          logger.info(
             show"The traffic balance request submission timed out after sequencing time $time has elapsed"
           )
       }
-      FutureUtil.doNotAwaitUnlessShutdown(logOutcomeF, "Traffic balance request submission failed")
+      FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
+        logOutcomeF,
+        "Traffic balance request submission failed",
+      )
     }
   }
 

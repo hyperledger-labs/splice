@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
@@ -6,6 +6,7 @@ package com.digitalasset.canton.protocol.hash
 import com.daml.crypto.MessageDigestPrototype
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
+import com.digitalasset.canton.data.LedgerTimeBoundaries
 import com.digitalasset.canton.protocol.LfHash
 import com.digitalasset.canton.protocol.hash.HashTracer.StringHashTracer
 import com.digitalasset.daml.lf.data.Ref.IdString
@@ -48,8 +49,13 @@ trait HashUtilsTest { this: Matchers =>
     commandId = Ref.CommandId.assertFromString("command-id"),
     transactionUUID = transactionUUID,
     mediatorGroup = 0,
-    domainId = "domainId",
-    ledgerEffectiveTime = Some(Time.Timestamp.Epoch),
+    synchronizerId = "synchronizerId",
+    timeBoundaries = LedgerTimeBoundaries(
+      Time.Range(
+        Time.Timestamp.assertFromLong(0xaaaa),
+        Time.Timestamp.assertFromLong(0xbbbb),
+      )
+    ),
     submissionTime = Time.Timestamp.Epoch,
     disclosedContracts = SortedMap(
       cid1 -> node1,
@@ -73,7 +79,6 @@ trait HashUtilsTest { this: Matchers =>
     Node.Create(
       coid = createCid,
       packageName = Ref.PackageName.assertFromString("PkgName"),
-      packageVersion = None,
       templateId = Ref.Identifier.assertFromString("-dummyPkg-:DummyModule:dummyName"),
       arg = V.ValueContractId(cid("#dummyCid")),
       signatories = signatories,

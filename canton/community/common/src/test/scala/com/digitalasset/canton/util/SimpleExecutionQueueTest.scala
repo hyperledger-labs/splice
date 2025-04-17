@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -53,8 +53,10 @@ class SimpleExecutionQueueTest
   private def shutdownTask(task: MockTask, notRunTasks: Seq[String]): Unit =
     terminateTask(task, shutdown = true, notRunTasks)
 
-  /** @param shutdown True if shutdown, false if failure
-    * @param notRunTasks Task which is not run because of the shutdown/failure
+  /** @param shutdown
+    *   True if shutdown, false if failure
+    * @param notRunTasks
+    *   Task which is not run because of the shutdown/failure
     */
   private def terminateTask(task: MockTask, shutdown: Boolean, notRunTasks: Seq[String]): Unit =
     if (shutdown) {

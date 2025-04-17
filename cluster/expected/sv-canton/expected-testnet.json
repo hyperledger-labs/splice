@@ -340,11 +340,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 2
           }
         },
@@ -440,11 +440,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": false
+              "value": true
             }
           ],
           "migration": {
-            "active": false,
+            "active": true,
             "id": 3
           }
         },

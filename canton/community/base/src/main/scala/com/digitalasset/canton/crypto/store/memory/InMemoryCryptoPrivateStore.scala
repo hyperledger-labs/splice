@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store.memory
@@ -6,6 +6,7 @@ package com.digitalasset.canton.crypto.store.memory
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.parallel.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.crypto.KeyPurpose.{Encryption, Signing}
 import com.digitalasset.canton.crypto.store.db.StoredPrivateKey
@@ -35,7 +36,8 @@ import com.google.common.annotations.VisibleForTesting
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
-/** The in-memory store does not provide any persistence and keys during runtime are stored in the generic caching layer.
+/** The in-memory store does not provide any persistence and keys during runtime are stored in the
+  * generic caching layer.
   */
 class InMemoryCryptoPrivateStore(
     override protected val releaseProtocolVersion: ReleaseProtocolVersion,
@@ -66,29 +68,34 @@ class InMemoryCryptoPrivateStore(
       oldKey: K,
       newKey: K,
   ): CryptoPrivateStoreError =
-    CryptoPrivateStoreError.KeyAlreadyExists(keyId, oldKey.name.map(_.unwrap))
+    CryptoPrivateStoreError.KeyAlreadyExists(
+      keyId,
+      oldKey.name.map(_.unwrap),
+      newKey.name.map(_.unwrap),
+    )
 
   private[crypto] def readPrivateKey(keyId: Fingerprint, purpose: KeyPurpose)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[StoredPrivateKey]] =
-    purpose match {
-      case Signing =>
-        storedSigningKeyMap
-          .get(keyId)
-          .parTraverse(pk =>
-            EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](
-              wrapPrivateKeyInToStored(pk.privateKey, pk.name)
-            )
-          )
-      case Encryption =>
-        storedDecryptionKeyMap
-          .get(keyId)
-          .parTraverse(pk =>
-            EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](
-              wrapPrivateKeyInToStored(pk.privateKey, pk.name)
-            )
-          )
+    readPrivateKeys(NonEmpty.mk(Seq, keyId), purpose).map(_.headOption)
+
+  override private[crypto] def readPrivateKeys(
+      keyIds: NonEmpty[Seq[Fingerprint]],
+      purpose: KeyPurpose,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] = {
+    val keyMap = purpose match {
+      case Signing => storedSigningKeyMap
+      case Encryption => storedDecryptionKeyMap
     }
+    val keys = keyIds.collect {
+      case key if keyMap.contains(key) =>
+        val pk = keyMap(key)
+        wrapPrivateKeyInToStored(pk.privateKey, pk.name)
+    }
+    EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](keys.toSet)
+  }
 
   private[crypto] def writePrivateKey(
       key: StoredPrivateKey
@@ -151,6 +158,12 @@ class InMemoryCryptoPrivateStore(
 
   @VisibleForTesting
   private[canton] def listPrivateKeys(purpose: KeyPurpose, encrypted: Boolean)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] =
+    listPrivateKeys(purpose)
+
+  @VisibleForTesting
+  private[canton] def listPrivateKeys(purpose: KeyPurpose)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] =
     (purpose match {

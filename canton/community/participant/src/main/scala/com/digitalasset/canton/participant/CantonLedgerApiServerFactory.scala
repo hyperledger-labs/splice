@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -12,7 +12,7 @@ import com.digitalasset.canton.concurrent.{
   FutureSupervisor,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{DbConfig, H2DbConfig}
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.http.metrics.HttpApiMetrics
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -22,7 +22,6 @@ import com.digitalasset.canton.participant.ledger.api.*
 import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.IndexerLockIds
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.*
-import com.digitalasset.canton.platform.apiserver.meteringreport.MeteringReportKey
 import com.digitalasset.canton.platform.indexer.ha.HaConfig
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -34,15 +33,14 @@ class CantonLedgerApiServerFactory(
     clock: Clock,
     testingTimeService: TestingTimeService,
     allocateIndexerLockIds: DbConfig => Either[String, Option[IndexerLockIds]],
-    meteringReportKey: MeteringReportKey,
     futureSupervisor: FutureSupervisor,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
-  def createHaConfig(config: LocalParticipantConfig)(implicit
+  def createHaConfig(config: ParticipantNodeConfig)(implicit
       traceContext: TraceContext
   ): HaConfig =
     config.storage match {
-      case _: H2DbConfig =>
+      case _: DbConfig.H2 =>
         // For H2 the non-unique indexer lock ids are sufficient.
         logger.debug("Not allocating indexer lock IDs on H2 config")
         HaConfig()
@@ -66,7 +64,7 @@ class CantonLedgerApiServerFactory(
       sync: CantonSyncService,
       participantNodePersistentState: Eval[ParticipantNodePersistentState],
       ledgerApiIndexer: Eval[LedgerApiIndexer],
-      config: LocalParticipantConfig,
+      config: ParticipantNodeConfig,
       parameters: ParticipantNodeParameters,
       metrics: LedgerApiServerMetrics,
       httpApiMetrics: HttpApiMetrics,
@@ -92,7 +90,7 @@ class CantonLedgerApiServerFactory(
         .initialize(
           CantonLedgerApiServerWrapper.Config(
             serverConfig = config.ledgerApi,
-            jsonApiConfig = config.httpLedgerApiExperimental,
+            jsonApiConfig = config.httpLedgerApi,
             participantId = participantId,
             engine = engine,
             syncService = sync,
@@ -104,7 +102,6 @@ class CantonLedgerApiServerFactory(
             tracerProvider = tracerProvider,
             metrics = metrics,
             jsonApiMetrics = httpApiMetrics,
-            meteringReportKey = meteringReportKey,
             maxDeduplicationDuration = participantNodePersistentState
               .map(_.settingsStore.settings.maxDeduplicationDuration)
               .value

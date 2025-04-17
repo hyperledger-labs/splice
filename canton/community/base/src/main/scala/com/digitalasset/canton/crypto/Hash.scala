@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -8,6 +8,8 @@ import cats.syntax.either.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.CryptoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.String68
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
@@ -16,26 +18,32 @@ import com.digitalasset.canton.serialization.{
   DeterministicEncoding,
   HasCryptographicEvidence,
 }
+import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.util.HexString
 import com.google.protobuf.ByteString
 import slick.jdbc.{GetResult, SetParameter}
 
 /** A Multi-hash compatible description of a hash algorithm
   *
-  * @param name Human readable name, must align with JCE hash algorithm names
-  * @param index Multi-hash index
-  * @param length Length of the hash in bytes
+  * @param name
+  *   Human readable name, must align with JCE hash algorithm names
+  * @param index
+  *   Multi-hash index
+  * @param length
+  *   Length of the hash in bytes
   *
-  * NOTE: There exists an upper limit on the supported lengths due to serialization constraints on LF ledger strings.
-  * The total length of a multi-hash hash (including the var-int index and length encoding, plus the actual length of
-  * the hash) must not exceed 46 bytes.
+  * NOTE: There exists an upper limit on the supported lengths due to serialization constraints on
+  * LF ledger strings. The total length of a multi-hash hash (including the var-int index and length
+  * encoding, plus the actual length of the hash) must not exceed 46 bytes.
   *
-  * NOTE: there exists a similar, soft upper limit, on the supported lengths due to string length constraints in the
-  * database. The total amount of bytes produced by `digest` should not exceed 512 bytes (this will lead to a HexString of
-  * length 1024). If needed, this limit can be increased by increasing the allowed characters for varchar's in the DBs.
+  * NOTE: there exists a similar, soft upper limit, on the supported lengths due to string length
+  * constraints in the database. The total amount of bytes produced by `digest` should not exceed
+  * 512 bytes (this will lead to a HexString of length 1024). If needed, this limit can be increased
+  * by increasing the allowed characters for varchar's in the DBs.
   */
 sealed abstract class HashAlgorithm(val name: String, val index: Long, val length: Long)
-    extends PrettyPrinting {
+    extends PrettyPrinting
+    with UniformCantonConfigValidation {
   def toProtoEnum: v30.HashAlgorithm
 
   override protected def pretty: Pretty[HashAlgorithm] = prettyOfString(_.name)
@@ -44,6 +52,9 @@ sealed abstract class HashAlgorithm(val name: String, val index: Long, val lengt
 object HashAlgorithm {
 
   implicit val hashAlgorithmOrder: Order[HashAlgorithm] = Order.by[HashAlgorithm, Long](_.index)
+
+  implicit val hashAlgorithmCantonConfigValidator: CantonConfigValidator[HashAlgorithm] =
+    CantonConfigValidatorDerivation[HashAlgorithm]
 
   val algorithms: Map[Long, HashAlgorithm] = Map {
     0x12L -> Sha256
@@ -95,10 +106,10 @@ final case class Hash private (private val hash: ByteString, private val algorit
       .concat(hash)
 
   // A serialization of the entire multi-hash to a hex string
-  val toHexString: String = HexString.toHexString(getCryptographicEvidence)
+  lazy val toHexString: String = HexString.toHexString(getCryptographicEvidence)
   // We assume/require that the HexString of a hash has at most 68 characters (for reference: outputs of our SHA256 algorithm have
   // exactly 68 HexString characters). If you want to increase this limit, please consult the team, see also documentation at `LengthLimitedString` for more details
-  val toLengthLimitedHexString: String68 =
+  lazy val toLengthLimitedHexString: String68 =
     String68.tryCreate(toHexString, Some("HexString of hash"))
 
   def compare(that: Hash): Int =
@@ -132,7 +143,13 @@ object Hash {
   implicit val getResultOptionHash: GetResult[Option[Hash]] = GetResult { r =>
     import com.digitalasset.canton.resource.DbStorage.Implicits.getResultByteStringOption
     (r.<<[Option[ByteString]]).map(bytes => tryFromByteString(bytes))
+  }
 
+  val getResultHashFromHexString = GetResult[Hash] { r =>
+    val hexString = r.<<[String]
+    Hash.fromHexString(hexString).valueOr { err =>
+      throw new DbDeserializationException(s"Failed to parse Hash from hex string: $err")
+    }
   }
 
   private[crypto] def tryCreate(hash: ByteString, algorithm: HashAlgorithm): Hash =
@@ -177,8 +194,8 @@ object Hash {
       hash <- create(hashBytes, algorithm).leftMap(err => DefaultDeserializationError(err))
     } yield hash
 
-  /** Decode a serialized [[Hash]] using [[fromByteString]] except for the empty [[com.google.protobuf.ByteString]],
-    * which maps to [[scala.None$]].
+  /** Decode a serialized [[Hash]] using [[fromByteString]] except for the empty
+    * [[com.google.protobuf.ByteString]], which maps to [[scala.None$]].
     */
   def fromByteStringOption(bytes: ByteString): Either[DeserializationError, Option[Hash]] =
     if (bytes.isEmpty) Right(None) else fromByteString(bytes).map(Some(_))
@@ -191,7 +208,8 @@ object Hash {
       .flatMap(fromByteString)
 
   /** Use ONLY when the ByteString represents a raw bytearray of the algorithm specified.
-    * i.e. when it has NOT be serialized for multi-hash support using [[Hash.getCryptographicEvidence]]
+    * i.e. when it has NOT be serialized for multi-hash support using
+    * [[Hash.getCryptographicEvidence]]
     */
   private[canton] def tryFromByteStringRaw(
       byteString: ByteString,
@@ -202,7 +220,8 @@ object Hash {
     )
 
   /** Use ONLY when the hexString represents a raw hexadecimal value for the algorithm specified.
-    * i.e. when it has NOT be serialized for multi-hash support using [[Hash.getCryptographicEvidence]]
+    * i.e. when it has NOT be serialized for multi-hash support using
+    * [[Hash.getCryptographicEvidence]]
     */
   private[canton] def fromHexStringRaw(
       hexString: String,
@@ -231,12 +250,11 @@ trait HashOps {
 
   def defaultHashAlgorithm: HashAlgorithm
 
-  /** Creates a [[HashBuilder]] for computing a hash with the given purpose.
-    * For different purposes `purpose1` and `purpose2`, all implementations must ensure
-    * that it is computationally infeasible to find a sequence `bs` of [[com.google.protobuf.ByteString]]s
-    * such that `bs.foldLeft(hashBuilder(purpose1))((b, hb) => hb.add(b)).finish`
-    * and `bs.foldLeft(hashBuilder(purpose2))((b, hb) => hb.add(b)).finish`
-    * yield the same hash.
+  /** Creates a [[HashBuilder]] for computing a hash with the given purpose. For different purposes
+    * `purpose1` and `purpose2`, all implementations must ensure that it is computationally
+    * infeasible to find a sequence `bs` of [[com.google.protobuf.ByteString]]s such that
+    * `bs.foldLeft(hashBuilder(purpose1))((b, hb) => hb.add(b)).finish` and
+    * `bs.foldLeft(hashBuilder(purpose2))((b, hb) => hb.add(b)).finish` yield the same hash.
     */
   def build(purpose: HashPurpose, algorithm: HashAlgorithm = defaultHashAlgorithm): HashBuilder =
     Hash.build(purpose, algorithm)
