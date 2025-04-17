@@ -244,8 +244,7 @@ class SvTimeBasedRewardCouponIntegrationTest
     }
   }
 
-  // TODO(#18569) Remove `ignore` once Canton fixes the warnings
-  "filter out beneficiaries that did not vet the latest packages" ignore { implicit env =>
+  "filter out beneficiaries that did not vet the latest packages" in { implicit env =>
     val dso = sv1Backend.getDsoInfo().dsoParty
 
     def getSvRewardCoupon(party: String) =

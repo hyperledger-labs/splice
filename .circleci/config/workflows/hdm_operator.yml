@@ -13,6 +13,7 @@ workflow:
           wait_type: "wait_workflow"
           branch_filter: << pipeline.git.branch >>
       - artifacts_push:
+          checkout-branch: << pipeline.parameters.upgrade-version >>
           <<: *notify-fail
           context:
             - artifactory

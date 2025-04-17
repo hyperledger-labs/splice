@@ -131,9 +131,14 @@ class PackageVetting(
       (effectiveAt, config)
     } ++ amuletConfigSchedule.futureConfigs :+ (createdAt -> amuletConfigSchedule.initialConfig))
       .flatMap { case (time, config) =>
-        packages.map(pkg =>
-          time -> (pkg -> PackageIdResolver.readPackageVersion(config.packageConfig, pkg))
-        )
+        packages.flatMap { pkg =>
+          val allPackageVersions =
+            DarResources.lookupAllPackageVersions(pkg.packageName).map(_.metadata.version)
+          val configPackageVersion = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
+          allPackageVersions
+            .filter(_ <= configPackageVersion)
+            .map(version => time -> (pkg -> version))
+        }
       }
       .groupMapReduce(_._2)(_._1) { case (time1, time2) =>
         if (time1.isBefore(time2)) time1 else time2

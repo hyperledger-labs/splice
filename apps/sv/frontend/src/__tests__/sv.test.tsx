@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { dsoInfo } from '@lfdecentralizedtrust/splice-common-test-handlers';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
-import { GetDsoInfoResponse, ListDsoRulesVoteRequestsResponse } from 'sv-openapi';
+import { FeatureSupportResponse } from 'scan-openapi';
+import { ListDsoRulesVoteRequestsResponse } from 'sv-openapi';
 import { test, expect, describe, vitest } from 'vitest';
 
 import App from '../App';
@@ -242,36 +242,11 @@ describe(
   'UI adjusts to new vetting flow',
   () => {
     test('actions change based on vetted version', async () => {
-      const oldPackageConfig = {
-        amulet: '0.1.0',
-        amuletNameService: '0.1.0',
-        dsoGovernance: '0.1.0',
-        validatorLifecycle: '0.1.0',
-        wallet: '0.1.0',
-        walletPayments: '0.1.0',
-      };
-      const oldSchedule = {
-        initialValue: {
-          ...dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue,
-          packageConfig: oldPackageConfig,
-        },
-        futureValues: [],
-      };
       server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
           return res(
-            ctx.json<GetDsoInfoResponse>({
-              ...dsoInfo,
-              amulet_rules: {
-                ...dsoInfo.amulet_rules,
-                contract: {
-                  ...dsoInfo.amulet_rules.contract,
-                  payload: {
-                    ...dsoInfo.amulet_rules.contract.payload,
-                    configSchedule: oldSchedule,
-                  },
-                },
-              },
+            ctx.json<FeatureSupportResponse>({
+              new_governance_flow: false,
             })
           );
         })
@@ -284,37 +259,11 @@ describe(
       await user.click(screen.getByText('Governance'));
 
       expect(await screen.findByText('Add DSO App Configuration Schedule')).toBeDefined();
-
-      const newPackageConfig = {
-        amulet: '0.1.9',
-        amuletNameService: '0.1.9',
-        dsoGovernance: '0.1.12',
-        validatorLifecycle: '0.1.9',
-        wallet: '0.1.9',
-        walletPayments: '0.1.9',
-      };
-      const newSchedule = {
-        initialValue: {
-          ...dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue,
-          packageConfig: newPackageConfig,
-        },
-        futureValues: [],
-      };
       server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
           return res(
-            ctx.json<GetDsoInfoResponse>({
-              ...dsoInfo,
-              amulet_rules: {
-                ...dsoInfo.amulet_rules,
-                contract: {
-                  ...dsoInfo.amulet_rules.contract,
-                  payload: {
-                    ...dsoInfo.amulet_rules.contract.payload,
-                    configSchedule: newSchedule,
-                  },
-                },
-              },
+            ctx.json<FeatureSupportResponse>({
+              new_governance_flow: true,
             })
           );
         })

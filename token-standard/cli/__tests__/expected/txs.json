@@ -1775,7 +1775,7 @@
             "contractId": "4",
             "offset": 26,
             "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
-            "packageName": "splice-api-token-sample-holding",
+            "packageName": "splice-token-test-dummy-holding",
             "payload": {
               "contractId": "4",
               "owner": "alice::normalized",
@@ -1849,7 +1849,7 @@
             "contractId": "5",
             "offset": 27,
             "templateId": "#package-name:Splice.Api.Token.Test.DummyHolding:DummyHolding",
-            "packageName": "splice-api-token-sample-holding",
+            "packageName": "splice-token-test-dummy-holding",
             "payload": {
               "contractId": "5",
               "owner": "alice::normalized",

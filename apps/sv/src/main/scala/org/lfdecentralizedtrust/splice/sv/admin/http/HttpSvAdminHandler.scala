@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
+  PackageVersionSupport,
   ParticipantAdminConnection,
   RetryProvider,
   SequencerAdminConnection,
@@ -17,6 +18,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.{
   HttpClient,
+  HttpFeatureSupportHandler,
   HttpValidatorLicensesHandler,
   HttpVotesHandler,
 }
@@ -24,7 +26,6 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_admin as v0}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.store.{ActiveVotesStore, AppStore, AppStoreWithIngestion}
-// import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.migration.{
@@ -36,12 +37,7 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
-// import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, TemplateJsonDecoder}
-
-// import java.nio.file.Path
-// import java.time.Instant
 import java.util.Optional
-// import scala.concurrent.{ExecutionContextExecutor, Future}
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.{
   NonNegativeDuration,
@@ -82,6 +78,7 @@ class HttpSvAdminHandler(
     domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
     clock: Clock,
     retryProvider: RetryProvider,
+    override protected val packageVersionSupport: PackageVersionSupport,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -93,7 +90,8 @@ class HttpSvAdminHandler(
 ) extends v0.SvAdminHandler[TracedUser]
     with FlagCloseableAsync
     with HttpVotesHandler
-    with HttpValidatorLicensesHandler {
+    with HttpValidatorLicensesHandler
+    with HttpFeatureSupportHandler {
 
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
@@ -694,6 +692,12 @@ class HttpSvAdminHandler(
       }
     }(extracted.traceContext, tracer)
   }
+
+  override def featureSupport(respond: SvAdminResource.FeatureSupportResponse.type)()(
+      extracted: TracedUser
+  ): Future[SvAdminResource.FeatureSupportResponse] =
+    readFeatureSupport(dsoStore.key.dsoParty)(extracted.traceContext, ec, tracer)
+      .map(SvAdminResource.FeatureSupportResponseOK(_))
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
     this.synchronized {

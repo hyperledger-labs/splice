@@ -6,6 +6,7 @@ import {
 } from '@lfdecentralizedtrust/splice-common-test-handlers';
 import dayjs from 'dayjs';
 import { rest, RestHandler } from 'msw';
+import { FeatureSupportResponse } from 'scan-openapi';
 import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
@@ -138,6 +139,13 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       ctx.status(404),
       ctx.json<ErrorResponse>({
         error: `No domain nodes in this test.`,
+      })
+    );
+  }),
+  rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
+    return res(
+      ctx.json<FeatureSupportResponse>({
+        new_governance_flow: true,
       })
     );
   }),

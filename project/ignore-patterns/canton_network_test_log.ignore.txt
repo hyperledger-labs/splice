@@ -119,3 +119,6 @@ BootstrapPackageConfigIntegrationTest.*ValidatorLicense_ReceiveFaucetCoupon is d
 .*No data has been made available yet.*
 
 # Make sure to have a trailing newline
+
+# TODO(#19139): Remove it once BoostrapPackageConfigIntegrationTest is fixed
+.*INVALID_ARGUMENT: COMMAND_PREPROCESSING_FAILED.*unknown constructor SRARC_CreateExternalPartyAmuletRules.*

@@ -116,13 +116,6 @@ Previous channel ManagedChannelImpl.* was garbage collected without being shut d
 # TODO(#2423) Figure out what causes this
 The sequencer clock timestamp .* is already past the max sequencing time
 
-# TODO(#18569) Remove the ignores once Canton fixes the warnings
-LF internal error.*cannot resolve package
-root cause: CRASH.*cannot resolve package
-LEDGER_API_INTERNAL_ERROR.*Daml-Engine interpretation failed with internal.*cannot resolve package
-Unhandled internal error.*c.d.c.p.a.s.c.CommandSubmissionServiceImpl
-SubmitAndWaitForTransactionTree.*failed with INTERNAL
-
 # TODO(#18866) Remove once CantonBFT does no longer raise this spurious warning
 failed to ping endpoint PlainTextP2PEndpoint.*UNAVAILABLE
 

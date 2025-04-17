@@ -20,18 +20,21 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupda
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.{
+  ParticipantClientReference,
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageIdResolver}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SplitwellTestUtil, StandaloneCanton}
+import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.scalatest.time.{Minute, Span}
 
 import java.time.Instant
@@ -83,7 +86,7 @@ class BootstrapPackageConfigIntegrationTest
       )
       .withSequencerConnectionsFromScanDisabled() // The direct ledger API submissions for splitwell interact poorly with domain disconnects
 
-  def splitwellPaymentRequest(
+  private def splitwellPaymentRequest(
       senderSplitwell: SplitwellAppClientReference,
       senderWallet: WalletAppClientReference,
       key: HttpSplitwellAppClient.GroupKey,
@@ -130,18 +133,14 @@ class BootstrapPackageConfigIntegrationTest
   }
 
   "Bootstrap with specific versions and then upgrade to latest" in { implicit env =>
+    val initialAmuletPackageId = DarResources.amulet
+      .getPackageIdWithVersion(
+        initialPackageConfig.amuletVersion
+      )
+      .value
+
     clue("alice taps amulet with initial package") {
-      val tapContractId = aliceValidatorWalletClient.tap(10)
-      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-        .of_party(Amulet.COMPANION)(dsoParty)
-        .filter(_.contractId == tapContractId.contractId)
-        .loneElement
-        .getTemplateId
-        .packageId shouldBe DarResources.amulet
-        .getPackageIdWithVersion(
-          initialPackageConfig.amuletVersion
-        )
-        .value
+      alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
     assertThrowsAndLogsCommandFailures(
@@ -157,14 +156,13 @@ class BootstrapPackageConfigIntegrationTest
         p.participantClient.dars.upload_many(
           DarResources.splitwell.all
             .map(_.metadata.version)
-            .toSet
-            .toSeq
-            .map((v: PackageVersion) => s"daml/dars/splitwell-${v}.dar")
+            .distinct
+            .map((v: PackageVersion) => s"daml/dars/splitwell-$v.dar")
         )
       }
     }
 
-    val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
+    val (_, bobUserParty, _, _, key, _) = initSplitwellTest()
 
     aliceWalletClient.tap(50)
 
@@ -172,10 +170,21 @@ class BootstrapPackageConfigIntegrationTest
       splitwellPaymentRequest(aliceSplitwellClient, aliceWalletClient, key, bobUserParty, 42.0)
     }
 
+    val sv2PackageVettingTrigger =
+      sv2Backend.appState.dsoAutomation.trigger[SvPackageVettingTrigger]
+    val sv2ValidatorPackageVettingTrigger =
+      sv2ValidatorBackend.appState.automation.trigger[ValidatorPackageVettingTrigger]
+
+    // 20s picked empirically to be far enough in the future that the voting can go through before that date.
+    // it must also leave enough time for the dars to be uploaded and vetting to happen to prevent command failures
+    val scheduledTime = Instant.now().plus(20, ChronoUnit.SECONDS)
+    sv2PackageVettingTrigger.pause().futureValue
+    sv2ValidatorPackageVettingTrigger.pause().futureValue
+
     clue("Change AmuletConfig to latest packages") {
-      // 20s picked empirically to be far enough in the future that the voting can go through before that date.
-      // it must also leave enough time for the dars to be uploaded and vetting to happen to prevent command failures
-      val scheduledTime = Instant.now().plus(20, ChronoUnit.SECONDS)
+      val vettingScheduledTime = CantonTimestamp.assertFromInstant(
+        scheduledTime
+      )
       val amuletRules = sv2ScanBackend.getAmuletRules()
       val amuletConfig = amuletRules.payload.configSchedule.initialValue
       val newAmuletConfig = new AmuletConfig(
@@ -258,48 +267,44 @@ class BootstrapPackageConfigIntegrationTest
         .unwrap
         .futureValue
 
-      clue("vetting topology is updated to the new config") {
-        val scheduledTimestamp = CantonTimestamp.assertFromInstant(
-          scheduledTime
-        )
-        eventually() {
-          Seq(
-            (sv1Backend.participantClient, Some(scheduledTimestamp)),
-            (sv2Backend.participantClient, Some(scheduledTimestamp)),
-            (sv3Backend.participantClient, Some(scheduledTimestamp)),
-            (sv4Backend.participantClient, Some(scheduledTimestamp)),
-            (
-              aliceValidatorBackend.participantClient,
-              None,
-            ), // due to the early splitwell dar upload this is vetted without a timestamp
-          ).foreach { case (participantClient, scheduledTimeO) =>
-            clue(s"Vetting state for ${participantClient.id}") {
-              val vettingTopologyState = participantClient.topology.vetted_packages.list(
-                store = Some(
-                  TopologyStoreId.Synchronizer(
-                    decentralizedSynchronizerId
-                  )
-                ),
-                filterParticipant = participantClient.id.filterString,
-              )
-              val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
-                .find(_.packageId == DarResources.amulet.bootstrap.packageId)
-                .value
-              newAmuletVettedPackage.validFrom shouldBe scheduledTimeO
+      clue("vetting topology is updated to the new config for nodes with enabled vetting trigger") {
+        Seq(
+          (sv1Backend.participantClient, Some(vettingScheduledTime)),
+          (sv3Backend.participantClient, Some(vettingScheduledTime)),
+          (sv4Backend.participantClient, Some(vettingScheduledTime)),
+          (
+            aliceValidatorBackend.participantClient,
+            None,
+          ), // due to the early splitwell dar upload this is vetted without a timestamp
+        ).foreach { case (participantClient, scheduledTimeO) =>
+          clue(s"Vetting state for ${participantClient.id}") {
+            eventually() {
+              vettingIsUpdatedForTheNewConfig(participantClient, scheduledTimeO)
             }
           }
         }
       }
     }
 
-    clue("alice taps amulet with new package") {
-      val tapContractId = aliceWalletClient.tap(10)
-      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-        .of_party(Amulet.COMPANION)(dsoParty)
-        .filter(_.contractId == tapContractId.contractId)
-        .loneElement
-        .getTemplateId
-        .packageId shouldBe DarResources.amulet.bootstrap.packageId
+    clue("alice taps amulet with old package because sv2 hasn't vetted yet") {
+      alicesTapsWithPackageId(initialAmuletPackageId)
+    }
+
+    sv2PackageVettingTrigger.runOnce().futureValue
+
+    clue(s"Vetting state for slow sv is updated after the trigger runs") {
+      eventually() {
+        vettingIsUpdatedForTheNewConfig(
+          sv2Backend.participantClient,
+          Some(
+            CantonTimestamp.tryFromInstant(sv2ScanBackend.getAmuletRules().contract.createdAt)
+          ),
+        )
+      }
+    }
+
+    clue("alice taps amulet with new package after all the svs vet the new packages") {
+      alicesTapsWithPackageId(DarResources.amulet.bootstrap.packageId)
     }
 
     clue("ExternalPartyAmuletRules gets created") {
@@ -311,5 +316,48 @@ class BootstrapPackageConfigIntegrationTest
     clue("Splitwell can complete payment request on new DAR versions") {
       splitwellPaymentRequest(aliceSplitwellClient, aliceWalletClient, key, bobUserParty, 23.0)
     }
+  }
+
+  private def vettingIsUpdatedForTheNewConfig(
+      participantClient: ParticipantClientReference,
+      scheduledTimeO: Option[CantonTimestamp],
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    val vettingTopologyState = participantClient.topology.vetted_packages.list(
+      store = Some(
+        TopologyStoreId.Synchronizer(
+          decentralizedSynchronizerId
+        )
+      ),
+      filterParticipant = participantClient.id.filterString,
+    )
+    val vettingState = vettingTopologyState.loneElement.item
+    val amuletPackageName = DarResources.amulet.bootstrap.metadata.name
+    val allAmuletVersion = DarResources.lookupAllPackageVersions(amuletPackageName)
+    val expectedToBeVettedAmuletVersions = allAmuletVersion
+      .filter(
+        _.metadata.version > PackageIdResolver.readPackageVersion(
+          initialPackageConfig.toPackageConfig,
+          PackageIdResolver.Package.SpliceAmulet,
+        )
+      )
+      .filter(_.metadata.version <= DarResources.amulet.bootstrap.metadata.version)
+    expectedToBeVettedAmuletVersions.foreach { expectedVettedVersion =>
+      val newAmuletVettedPackage = vettingState.packages
+        .find(_.packageId == expectedVettedVersion.packageId)
+        .value
+      newAmuletVettedPackage.validFrom shouldBe scheduledTimeO
+    }
+  }
+
+  private def alicesTapsWithPackageId(
+      packageId: String
+  )(implicit env: SpliceTestConsoleEnvironment) = {
+    val tapContractId = aliceValidatorWalletClient.tap(10)
+    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+      .of_party(Amulet.COMPANION)(dsoParty)
+      .filter(_.contractId == tapContractId.contractId)
+      .loneElement
+      .getTemplateId
+      .packageId shouldBe packageId
   }
 }

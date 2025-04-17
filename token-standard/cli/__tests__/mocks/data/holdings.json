@@ -209,7 +209,7 @@
           "observers" : [
           ],
           "offset" : 1,
-          "packageName" : "splice-api-token-sample-holding",
+          "packageName" : "splice-token-test-dummy-holding",
           "signatories" : [
             "alice::normalized"
           ],
@@ -262,7 +262,7 @@
           "observers" : [
           ],
           "offset" : 1,
-          "packageName" : "splice-api-token-sample-holding",
+          "packageName" : "splice-token-test-dummy-holding",
           "signatories" : [
             "alice::normalized"
           ],

@@ -84,6 +84,17 @@ trait PackageVersionSupport {
     isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_6)
   }
 
+  def supportsNewGovernanceFlow(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Boolean] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance_0_1_11,
+    )
+  }
+
   private def isDarSupported(
       parties: Seq[PartyId],
       packageId: PackageIdResolver.Package,
@@ -148,7 +159,7 @@ class TopologyAwarePackageVersionSupport private[environment] (
       .getSupportedPackageVersion(
         synchronizerId,
         parties,
-        packageId,
+        packageId.packageName,
         at,
       )
       .map(

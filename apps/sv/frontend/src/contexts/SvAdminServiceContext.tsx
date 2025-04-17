@@ -83,6 +83,7 @@ export interface SvAdminClient {
   getCometBftNodeDebug: () => Promise<openapi.CometBftNodeDumpOrErrorResponse>;
   getSequencerNodeStatus: () => Promise<openapi.NodeStatus>;
   getMediatorNodeStatus: () => Promise<openapi.NodeStatus>;
+  featureSupport: () => Promise<openapi.FeatureSupportResponse>;
 }
 
 class ApiMiddleware
@@ -216,6 +217,9 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       },
       getMediatorNodeStatus: async (): Promise<openapi.NodeStatus> => {
         return await svAdminClient.getMediatorNodeStatus();
+      },
+      featureSupport: async (): Promise<openapi.FeatureSupportResponse> => {
+        return await svAdminClient.featureSupport();
       },
     };
   }, [url, userAccessToken]);

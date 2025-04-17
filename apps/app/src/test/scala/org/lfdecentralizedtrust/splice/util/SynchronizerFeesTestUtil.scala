@@ -18,8 +18,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
-import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
-import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
   TestCommon,
@@ -29,7 +27,6 @@ import org.lfdecentralizedtrust.splice.wallet.util.ExtraTrafficTopupParameters
 
 import java.time.Instant
 import java.util.Optional
-import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -71,7 +68,6 @@ trait SynchronizerFeesTestUtil extends TestCommon {
       validatorApp: ValidatorAppBackendReference,
       memberId: Member,
       synchronizerId: SynchronizerId,
-      packageIdResolverCustom: Option[PackageIdResolver],
   )(implicit env: SpliceTestConsoleEnvironment): ValidatorTopUpState.ContractId = {
     inside(listValidatorContracts(ValidatorTopUpState.COMPANION)(validatorApp)) {
       case Seq(topupState) => topupState.id
@@ -93,7 +89,6 @@ trait SynchronizerFeesTestUtil extends TestCommon {
               readAs = Seq(validatorParty),
               update = topupStateCreationCmd,
               synchronizerId = Some(synchronizerId),
-              packageIdResolverCustom = packageIdResolverCustom,
             )
             .contractId
         new ValidatorTopUpState.ContractId(topupStateCid.contractId)
@@ -110,22 +105,8 @@ trait SynchronizerFeesTestUtil extends TestCommon {
       trafficAmount: Long,
       ts: CantonTimestamp,
       inputAmulets: Seq[AmuletPosition] = Seq(),
-      scanConnection: Option[HasAmuletRules] = None,
   )(implicit env: SpliceTestConsoleEnvironment): AmuletOperationOutcome = {
-    implicit val ec: ExecutionContext = env.executionContext
 
-    val packageIdResolverCustom = scanConnection match {
-      case Some(scanConnection) =>
-        Some(
-          PackageIdResolver.inferFromAmuletRulesIfEnabled(
-            false,
-            env.environment.clock,
-            scanConnection,
-            loggerFactory,
-          ): PackageIdResolver
-        )
-      case None => None
-    }
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
     val synchronizerId =
@@ -133,8 +114,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
         sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.activeSynchronizer
       )
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
-    val topupStateCid =
-      getOrCreateTopupStateCid(validatorApp, memberId, synchronizerId, packageIdResolverCustom)
+    val topupStateCid = getOrCreateTopupStateCid(validatorApp, memberId, synchronizerId)
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(WalletAppInstall.COMPANION)(
@@ -182,7 +162,6 @@ trait SynchronizerFeesTestUtil extends TestCommon {
               transferContext.latestOpenMiningRound,
             )
             .toLedgerApiDisclosedContracts,
-          packageIdResolverCustom = packageIdResolverCustom,
         )
         .exerciseResult
         .outcomes

@@ -78,7 +78,7 @@ trait ParticipantAdminDarsConnection {
     ensureTopologyMapping[VettedPackages](
       // we publish to the authorized store so that it pushed on all the domains and the console commands are still useful when dealing with dars
       AuthorizedStore,
-      s"dars ${dars.map(_.packageId)} are vetted in the authorized store",
+      s"dars ${dars.map(_.packageId)} are vetted in the authorized store with from $fromDate",
       EitherT(
         getVettingState(None).map { vettedPackages =>
           if (
