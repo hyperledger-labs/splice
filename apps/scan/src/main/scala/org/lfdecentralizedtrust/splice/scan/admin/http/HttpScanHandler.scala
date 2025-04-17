@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
   ParticipantAdminConnection,
   SequencerAdminConnection,
 }
@@ -48,7 +49,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.{ActiveContractOld as ActiveContract}
+import com.digitalasset.canton.participant.admin.data.ActiveContractOld as ActiveContract
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -69,6 +70,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRes
   Transfer,
 }
 import org.lfdecentralizedtrust.splice.http.{
+  HttpFeatureSupportHandler,
   HttpValidatorLicensesHandler,
   HttpVotesHandler,
   UrlValidator,
@@ -93,12 +95,14 @@ class HttpScanHandler(
     enableForcedAcsSnapshots: Boolean,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
+    protected val packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
 ) extends v0.ScanHandler[TraceContext]
     with HttpVotesHandler
-    with HttpValidatorLicensesHandler {
+    with HttpValidatorLicensesHandler
+    with HttpFeatureSupportHandler {
 
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
@@ -1861,6 +1865,13 @@ class HttpScanHandler(
         )
     }
   }
+
+  override def featureSupport(respond: ScanResource.FeatureSupportResponse.type)()(
+      extracted: TraceContext
+  ): Future[ScanResource.FeatureSupportResponse] = readFeatureSupport(
+    store.key.dsoParty
+  )(extracted, ec, tracer).map(ScanResource.FeatureSupportResponseOK(_))
+
 }
 
 object HttpScanHandler {

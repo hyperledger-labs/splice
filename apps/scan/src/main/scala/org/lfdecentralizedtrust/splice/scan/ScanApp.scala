@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   DarResources,
   Node,
+  PackageVersionSupport,
   ParticipantAdminConnection,
   RetryFor,
   SequencerAdminConnection,
@@ -29,9 +30,9 @@ import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
   HttpScanSoftDomainMigrationPocHandler,
-  HttpTokenStandardMetadataHandler,
   HttpTokenStandardAllocationHandler,
   HttpTokenStandardAllocationInstructionHandler,
+  HttpTokenStandardMetadataHandler,
   HttpTokenStandardTransferInstructionHandler,
 }
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
@@ -213,6 +214,30 @@ class ScanApp(
         dsoParty,
         config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase(),
       )
+      synchronizerId <- appInitStep("Get synchronizer id") {
+        store
+          .lookupAmuletRules()
+          .map(
+            _.fold(
+              throw Status.NOT_FOUND
+                .withDescription("Amulet rules not yet available")
+                .asRuntimeException()
+            )(
+              _.state.fold(
+                identity,
+                throw Status.NOT_FOUND
+                  .withDescription("Amulet rules in fllight")
+                  .asRuntimeException(),
+              )
+            )
+          )
+      }
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        config.parameters.enableCantonPackageSelection,
+        store,
+        synchronizerId,
+        appInitConnection,
+      )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
         config.svUser,
@@ -226,6 +251,7 @@ class ScanApp(
         config.enableForcedAcsSnapshots,
         clock,
         loggerFactory,
+        packageVersionSupport,
       )
 
       tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(

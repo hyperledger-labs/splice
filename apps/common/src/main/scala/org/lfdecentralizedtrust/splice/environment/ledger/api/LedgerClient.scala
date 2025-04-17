@@ -46,7 +46,6 @@ import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
 
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
@@ -661,7 +660,7 @@ private[environment] class LedgerClient(
   def getSupportedPackageVersion(
       synchronizerId: SynchronizerId,
       involvedParties: Seq[PartyId],
-      packageName: PackageIdResolver.Package,
+      packageName: String,
       vettingAsOfTime: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Option[PackageReference]] = {
     for {
@@ -669,7 +668,7 @@ private[environment] class LedgerClient(
       response <- stub.getPreferredPackageVersion(
         lapi.interactive.interactive_submission_service.GetPreferredPackageVersionRequest(
           parties = involvedParties.map(_.toProtoPrimitive),
-          packageName = packageName.packageName,
+          packageName = packageName,
           synchronizerId = synchronizerId.toProtoPrimitive,
           vettingValidAt = Some(vettingAsOfTime.toProtoTimestamp),
         )

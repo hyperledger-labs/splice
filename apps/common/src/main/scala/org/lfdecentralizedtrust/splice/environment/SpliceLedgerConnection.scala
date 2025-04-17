@@ -605,7 +605,7 @@ class BaseLedgerConnection(
   def getSupportedPackageVersion(
       synchronizerId: SynchronizerId,
       parties: Seq[PartyId],
-      packageName: PackageIdResolver.Package,
+      packageName: String,
       vettingAsOfTime: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Option[PackageReference]] = {
     retryProvider.retryForClientCalls(

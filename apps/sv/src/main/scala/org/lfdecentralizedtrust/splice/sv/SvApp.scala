@@ -575,6 +575,7 @@ class SvApp(
         ),
         clock,
         retryProvider,
+        packageVersionSupport,
         timeouts,
         loggerFactory,
       )
