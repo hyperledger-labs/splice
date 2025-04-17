@@ -291,6 +291,7 @@ class BootstrapPackageConfigIntegrationTest
     }
 
     sv2PackageVettingTrigger.runOnce().futureValue
+    sv2ValidatorPackageVettingTrigger.runOnce().futureValue
 
     clue(s"Vetting state for slow sv is updated after the trigger runs") {
       eventually() {
