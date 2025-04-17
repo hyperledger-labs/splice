@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageIdResolver}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -83,7 +83,7 @@ class BootstrapPackageConfigIntegrationTest
       )
       .withSequencerConnectionsFromScanDisabled() // The direct ledger API submissions for splitwell interact poorly with domain disconnects
 
-  def splitwellPaymentRequest(
+  private def splitwellPaymentRequest(
       senderSplitwell: SplitwellAppClientReference,
       senderWallet: WalletAppClientReference,
       key: HttpSplitwellAppClient.GroupKey,
@@ -157,14 +157,13 @@ class BootstrapPackageConfigIntegrationTest
         p.participantClient.dars.upload_many(
           DarResources.splitwell.all
             .map(_.metadata.version)
-            .toSet
-            .toSeq
-            .map((v: PackageVersion) => s"daml/dars/splitwell-${v}.dar")
+            .distinct
+            .map((v: PackageVersion) => s"daml/dars/splitwell-$v.dar")
         )
       }
     }
 
-    val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
+    val (_, bobUserParty, _, _, key, _) = initSplitwellTest()
 
     aliceWalletClient.tap(50)
 
@@ -262,18 +261,18 @@ class BootstrapPackageConfigIntegrationTest
         val scheduledTimestamp = CantonTimestamp.assertFromInstant(
           scheduledTime
         )
-        eventually() {
-          Seq(
-            (sv1Backend.participantClient, Some(scheduledTimestamp)),
-            (sv2Backend.participantClient, Some(scheduledTimestamp)),
-            (sv3Backend.participantClient, Some(scheduledTimestamp)),
-            (sv4Backend.participantClient, Some(scheduledTimestamp)),
-            (
-              aliceValidatorBackend.participantClient,
-              None,
-            ), // due to the early splitwell dar upload this is vetted without a timestamp
-          ).foreach { case (participantClient, scheduledTimeO) =>
-            clue(s"Vetting state for ${participantClient.id}") {
+        Seq(
+          (sv1Backend.participantClient, Some(scheduledTimestamp)),
+          (sv2Backend.participantClient, Some(scheduledTimestamp)),
+          (sv3Backend.participantClient, Some(scheduledTimestamp)),
+          (sv4Backend.participantClient, Some(scheduledTimestamp)),
+          (
+            aliceValidatorBackend.participantClient,
+            None,
+          ), // due to the early splitwell dar upload this is vetted without a timestamp
+        ).foreach { case (participantClient, scheduledTimeO) =>
+          clue(s"Vetting state for ${participantClient.id}") {
+            eventually() {
               val vettingTopologyState = participantClient.topology.vetted_packages.list(
                 store = Some(
                   TopologyStoreId.Synchronizer(
@@ -282,10 +281,23 @@ class BootstrapPackageConfigIntegrationTest
                 ),
                 filterParticipant = participantClient.id.filterString,
               )
-              val newAmuletVettedPackage = vettingTopologyState.loneElement.item.packages
-                .find(_.packageId == DarResources.amulet.bootstrap.packageId)
-                .value
-              newAmuletVettedPackage.validFrom shouldBe scheduledTimeO
+              val vettingState = vettingTopologyState.loneElement.item
+              val amuletPackageName = DarResources.amulet.bootstrap.metadata.name
+              val allAmuletVersion = DarResources.lookupAllPackageVersions(amuletPackageName)
+              val expectedToBeVettedAmuletVersions = allAmuletVersion
+                .filter(
+                  _.metadata.version > PackageIdResolver.readPackageVersion(
+                    initialPackageConfig.toPackageConfig,
+                    PackageIdResolver.Package.SpliceAmulet,
+                  )
+                )
+                .filter(_.metadata.version <= DarResources.amulet.bootstrap.metadata.version)
+              expectedToBeVettedAmuletVersions.foreach { expectedVettedVersion =>
+                val newAmuletVettedPackage = vettingState.packages
+                  .find(_.packageId == expectedVettedVersion.packageId)
+                  .value
+                newAmuletVettedPackage.validFrom shouldBe scheduledTimeO
+              }
             }
           }
         }
