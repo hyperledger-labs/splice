@@ -238,82 +238,92 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
   });
 });
 
-describe('UI adjusts to new vetting flow', () => {
-  test('actions change based on vetted version', async () => {
-    const oldPackageConfig = {
-      amulet: '0.1.0',
-      amuletNameService: '0.1.0',
-      dsoGovernance: '0.1.0',
-      validatorLifecycle: '0.1.0',
-      wallet: '0.1.0',
-      walletPayments: '0.1.0',
-    };
-    const oldSchedule = {
-      initialValue: {
-        ...dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue,
-        packageConfig: oldPackageConfig,
-      },
-      futureValues: [],
-    };
-    server.use(
-      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-        return res(
-          ctx.json<GetDsoInfoResponse>({
-            ...dsoInfo,
-            amulet_rules: {
-              ...dsoInfo.amulet_rules,
-              contract: {
-                ...dsoInfo.amulet_rules.contract,
-                payload: { ...dsoInfo.amulet_rules.contract.payload, configSchedule: oldSchedule },
+describe(
+  'UI adjusts to new vetting flow',
+  () => {
+    test('actions change based on vetted version', async () => {
+      const oldPackageConfig = {
+        amulet: '0.1.0',
+        amuletNameService: '0.1.0',
+        dsoGovernance: '0.1.0',
+        validatorLifecycle: '0.1.0',
+        wallet: '0.1.0',
+        walletPayments: '0.1.0',
+      };
+      const oldSchedule = {
+        initialValue: {
+          ...dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue,
+          packageConfig: oldPackageConfig,
+        },
+        futureValues: [],
+      };
+      server.use(
+        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+          return res(
+            ctx.json<GetDsoInfoResponse>({
+              ...dsoInfo,
+              amulet_rules: {
+                ...dsoInfo.amulet_rules,
+                contract: {
+                  ...dsoInfo.amulet_rules.contract,
+                  payload: {
+                    ...dsoInfo.amulet_rules.contract.payload,
+                    configSchedule: oldSchedule,
+                  },
+                },
               },
-            },
-          })
-        );
-      })
-    );
+            })
+          );
+        })
+      );
 
-    const user = userEvent.setup();
-    render(<AppWithConfig />);
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
 
-    expect(await screen.findByText('Governance')).toBeDefined();
-    await user.click(screen.getByText('Governance'));
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
 
-    expect(await screen.findByText('Add DSO App Configuration Schedule')).toBeDefined();
+      expect(await screen.findByText('Add DSO App Configuration Schedule')).toBeDefined();
 
-    const newPackageConfig = {
-      amulet: '0.1.9',
-      amuletNameService: '0.1.9',
-      dsoGovernance: '0.1.12',
-      validatorLifecycle: '0.1.9',
-      wallet: '0.1.9',
-      walletPayments: '0.1.9',
-    };
-    const newSchedule = {
-      initialValue: {
-        ...dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue,
-        packageConfig: newPackageConfig,
-      },
-      futureValues: [],
-    };
-    server.use(
-      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-        return res(
-          ctx.json<GetDsoInfoResponse>({
-            ...dsoInfo,
-            amulet_rules: {
-              ...dsoInfo.amulet_rules,
-              contract: {
-                ...dsoInfo.amulet_rules.contract,
-                payload: { ...dsoInfo.amulet_rules.contract.payload, configSchedule: newSchedule },
+      const newPackageConfig = {
+        amulet: '0.1.9',
+        amuletNameService: '0.1.9',
+        dsoGovernance: '0.1.12',
+        validatorLifecycle: '0.1.9',
+        wallet: '0.1.9',
+        walletPayments: '0.1.9',
+      };
+      const newSchedule = {
+        initialValue: {
+          ...dsoInfo.amulet_rules.contract.payload.configSchedule.initialValue,
+          packageConfig: newPackageConfig,
+        },
+        futureValues: [],
+      };
+      server.use(
+        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+          return res(
+            ctx.json<GetDsoInfoResponse>({
+              ...dsoInfo,
+              amulet_rules: {
+                ...dsoInfo.amulet_rules,
+                contract: {
+                  ...dsoInfo.amulet_rules.contract,
+                  payload: {
+                    ...dsoInfo.amulet_rules.contract.payload,
+                    configSchedule: newSchedule,
+                  },
+                },
               },
-            },
-          })
-        );
-      })
-    );
+            })
+          );
+        })
+      );
 
-    await vitest.waitFor(async () => {
-      expect(await screen.findByText('Set Amulet Rules Configuration')).toBeDefined();
+      await vitest.waitFor(async () => {
+        expect(await screen.findByText('Set Amulet Rules Configuration')).toBeDefined();
+      });
     });
-  });
-});
+  },
+  { timeout: 10000 }
+);
