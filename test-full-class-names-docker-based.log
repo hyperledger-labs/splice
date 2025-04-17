@@ -1,0 +1,2 @@
+org.lfdecentralizedtrust.splice.integration.tests.DockerComposeFullNetworkFrontendIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.DockerComposeValidatorFrontendIntegrationTest
