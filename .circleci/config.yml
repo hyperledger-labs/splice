@@ -3437,8 +3437,12 @@ jobs:
       is_public:
         type: boolean
         default: false
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     steps:
-      - checkout_with_retry
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - restore_frontend_builds
       - setup_nix
       - setup_sbt_test_job:
@@ -6017,6 +6021,7 @@ workflows:
           wait_type: "wait_workflow"
           branch_filter: << pipeline.git.branch >>
       - artifacts_push:
+          checkout-branch: << pipeline.parameters.upgrade-version >>
           <<: *notify-fail
           context:
             - artifactory
