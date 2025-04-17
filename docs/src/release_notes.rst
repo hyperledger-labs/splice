@@ -8,28 +8,53 @@
 Release Notes
 =============
 
-upcoming
---------
+0.3.21
+------
+
+.. important::
+
+    * This release includes a change to the database schema that will trigger a long database migration
+      of the scan and validator app databases, resulting in increased downtime of SV nodes,
+      and to a much lesser extent the validator nodes.
+
+      The migration will be triggered the first time an application is started after the version upgrade,
+      and will leave the application in an unavailable state until the migration is finished.
+      It is expected to take up to 1:30h for SV nodes and less than 10min for validator nodes on MainNet.
+      The migration is expected to take significantly less time on DevNet and TestNet due to the recent resets of these networks.
+      Note that even after the database migration completed,
+      you might observe an additional (shorter) period of downtime for scan (and only scan) due to Postgres autovacuuming.
+
+      The following points are essential for a successful migration:
+
+      * Make sure to upgrade all apps in parallel (i.e., the scan app, validator app, and sv app for SV nodes)
+      * Make sure you have at least 50% free disk space on the database volume, or set it to expand automatically
+        (the migration will consume a significant amount of temporary disk space).
+      * Make sure you the `temp_file_limit <https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-TEMP-FILE-LIMIT>`_
+        Postgres parameter is set to a sufficiently high number.
+        The actual usage is hard to predict, so we recommend setting it to the maximum value for the duration of the migration.
+
+      Additionally, consider the following actions to reduce your downtime due to the migration:
+
+      * For the duration of the migration, pause any non-essential services accessing the database
+        (e.g., a postgres exporter pushing database metrics to grafana).
+      * For the duration of the migration, increase the hardware configuration
+        (upgrading from 2 CPUs / 8GB RAM to 8 CPUs / 32 GB RAM lowered the duration by ~20%).
+      * The first Postgres autovacuum after migration is expected to be significantly slower than usual
+        vacuum runs. In case autovacuum doesn't trigger shortly after the migration, you might want
+        to trigger a vacuum on your app databases manually to have better control over the
+        additional potential downtime for scan.
 
 - Deployments
 
   - Validator, app and scan support specifying a scope when requesting the token from the participant.
     This enables use of IAMs that make the scope parameter mandatory.
 
-.. important::
-
-    * This release includes a change to the database schema that will trigger a potentially long database migration
-      of the scan and validator app databases, resulting in increased downtime of SV nodes,
-      and to a much lesser extent the validator nodes.
-      This migration will also use a significant amount of temporary disk space (around 30% of current database size).
-      Please make sure your database has enough disk space available before upgrading, and make sure the
-      `temp_file_limit <https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-TEMP-FILE-LIMIT>`_
-      PostgreSQL parameter is set to a sufficiently high value.
-
 - Frontends
 
   - The Wallet and Scan UIs now show the Update ID of every transaction. These IDs are consistent with those
     used in the `updates` endpoints of the Scan API.
+  - Wallet UI: Add a logout button to the "Loading" and "Logged in but not onboarded" states to enable recovering
+    from all types of login failures.
 
 0.3.20
 ------
