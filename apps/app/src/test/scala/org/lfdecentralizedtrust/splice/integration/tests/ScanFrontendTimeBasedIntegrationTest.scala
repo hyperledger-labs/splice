@@ -377,20 +377,17 @@ class ScanFrontendTimeBasedIntegrationTest
             aliceValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
-            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           advanceRoundsByOneTick
           buyMemberTraffic(
             aliceValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
-            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           buyMemberTraffic(
             bobValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
-            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           (1 to 5).foreach(_ => advanceRoundsByOneTick)
         },

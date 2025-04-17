@@ -113,53 +113,6 @@ object PackageIdResolver {
     ): Future[Contract[AmuletRules.ContractId, AmuletRules]]
   }
 
-  /** Package id resolver for direct command submissions in tests.
-    * This statically picks a package id.
-    */
-  def staticTesting(implicit ec: ExecutionContext): PackageIdResolver =
-    new PackageIdResolver {
-      override def resolvePackageId(
-          templateId: QualifiedName
-      )(implicit tc: TraceContext): Future[String] =
-        Future {
-          resolvePackageResource(templateId).bootstrap.packageId
-        }
-
-      def resolvePackageResource(templateId: QualifiedName): PackageResource =
-        modulePackages.get(templateId.moduleName) match {
-          case None =>
-            templateId.moduleName match {
-              case "Splice.Splitwell" => DarResources.splitwell
-              case _ => throw new IllegalArgumentException(s"Unknown template $templateId")
-            }
-          case Some(pkg) =>
-            pkg match {
-              case Package.SpliceAmulet => DarResources.amulet
-              case Package.SpliceAmuletNameService => DarResources.amuletNameService
-              case Package.SpliceDsoGovernance => DarResources.dsoGovernance
-              case Package.SpliceValidatorLifecycle => DarResources.validatorLifecycle
-              case Package.SpliceWallet => DarResources.wallet
-              case Package.SpliceWalletPayments => DarResources.walletPayments
-              case Package.TokenStandard.TokenMetadata =>
-                DarResources.TokenStandard.tokenMetadata
-              case Package.TokenStandard.TokenHolding =>
-                DarResources.TokenStandard.tokenHolding
-              case Package.TokenStandard.TokenTransferInstruction =>
-                DarResources.TokenStandard.tokenTransferInstruction
-              case Package.TokenStandard.TokenAllocation =>
-                DarResources.TokenStandard.tokenAllocation
-              case Package.TokenStandard.TokenAllocationRequest =>
-                DarResources.TokenStandard.tokenAllocationRequest
-              case Package.TokenStandard.TokenAllocationInstruction =>
-                DarResources.TokenStandard.tokenAllocationInstruction
-              case Package.TokenStandard.TokenStandardTest =>
-                DarResources.TokenStandard.tokenStandardTest
-              case Package.FeaturedApp =>
-                DarResources.featuredApp
-            }
-        }
-    }
-
   /** Infer the package ids based on the current config in AmuletRules.
     * Templates not covered by AmuletRules can be specified in `extraPackageIdResolver`
     * which takes precedence over AmuletRules.

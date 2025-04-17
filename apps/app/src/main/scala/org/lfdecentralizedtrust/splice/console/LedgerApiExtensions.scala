@@ -24,24 +24,17 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Await
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 trait LedgerApiExtensions {
   implicit class LedgerApiSyntax(
       private val ledgerApi: BaseLedgerApiAdministration with LedgerApiCommandRunner
   ) {
-    private val packageIdResolver: PackageIdResolver = PackageIdResolver.staticTesting(
-      ledgerApi.consoleEnvironment.environment.executionContext
-    )
-
     object ledger_api_extensions {
       object commands {
         @Help.Summary(
@@ -70,22 +63,13 @@ trait LedgerApiExtensions {
             readAs: Seq[PartyId] = Seq.empty,
             userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
-            packageIdResolverCustom: Option[PackageIdResolver] = None,
         ): JavaTransactionTree = {
-          val cmds = commands.map(cmd =>
-            Await.result(
-              packageIdResolverCustom
-                .getOrElse(packageIdResolver)
-                .resolvePackageId(cmd)(TraceContext.empty),
-              1.second,
-            )
-          )
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
               LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
                 actAs.map(_.toLf),
                 readAs.map(_.toLf),
-                cmds.map(c => Command.fromJavaProto(c.toProtoCommand)),
+                commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
                 workflowId = "",
                 commandId = commandId,
                 deduplicationPeriod = deduplicationPeriod,
@@ -121,7 +105,6 @@ trait LedgerApiExtensions {
             commandId: Option[String] = None,
             synchronizerId: Option[SynchronizerId] = None,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
-            packageIdResolverCustom: Option[PackageIdResolver] = None,
         ): T = {
           val tree = submitJava(
             actAs,
@@ -131,7 +114,6 @@ trait LedgerApiExtensions {
             readAs = readAs,
             userId = userId,
             disclosedContracts = disclosedContracts,
-            packageIdResolverCustom = packageIdResolverCustom,
           )
           SpliceLedgerConnection.decodeExerciseResult(
             update,
