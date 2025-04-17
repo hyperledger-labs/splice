@@ -18,7 +18,8 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
     extends SvIntegrationTestBase
     with TriggerTestUtil {
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
 
@@ -52,7 +53,6 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
         "Create a duplicate Validator License Contract",
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
           Seq(dso),
-          optTimeout = None,
           commands = validatorLicense.data.create().commands.asScala.toSeq,
         ),
       )(

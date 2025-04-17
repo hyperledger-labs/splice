@@ -20,9 +20,9 @@ import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.W
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningPublicKey, v30}
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
 import io.grpc.Status
@@ -38,7 +38,7 @@ private[validator] object ValidatorUtil {
       endUserName: String,
       dsoParty: PartyId,
       storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
       priority: CommandPriority,
@@ -79,7 +79,7 @@ private[validator] object ValidatorUtil {
                   ),
                 deduplicationOffset = offset,
               )
-              .withDomainId(domainId)
+              .withSynchronizerId(synchronizerId)
               .yieldUnit()
           case QueryResult(_, Some(_)) =>
             logger.info(s"WalletAppInstall for $endUserName already exists, skipping")
@@ -134,14 +134,14 @@ private[validator] object ValidatorUtil {
         ),
         logger,
       )
-      domainId <- getAmuletRulesDomain()(traceContext)
+      synchronizerId <- getAmuletRulesDomain()(traceContext)
       _ <- installWalletForUser(
         endUserParty = userPartyId,
         endUserName = endUserName,
         validatorServiceParty = store.key.validatorParty,
         dsoParty = store.key.dsoParty,
         storeWithIngestion = storeWithIngestion,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
         retryProvider = retryProvider,
         logger = logger,
         priority = priority,
@@ -155,7 +155,7 @@ private[validator] object ValidatorUtil {
         connection = storeWithIngestion.connection,
         lookupValidatorRightByParty =
           storeWithIngestion.store.lookupValidatorRightByPartyWithOffset,
-        domainId = domainId,
+        synchronizerId = synchronizerId,
         retryProvider = retryProvider,
         logger = logger,
         priority = priority,
@@ -179,7 +179,7 @@ private[validator] object ValidatorUtil {
         .create(
           namespace = partyId.uid.namespace,
           target = publicKey,
-          isRootDelegation = true,
+          restriction = DelegationRestriction.CanSignAllMappings,
         )
         .valueOr(error =>
           throw Status.INVALID_ARGUMENT
@@ -203,7 +203,6 @@ private[validator] object ValidatorUtil {
       partyToKeyMapping = PartyToKeyMapping
         .create(
           partyId,
-          None,
           PositiveInt.one,
           NonEmpty.mk(Seq, publicKey),
         )
@@ -217,7 +216,7 @@ private[validator] object ValidatorUtil {
           .map(mapping =>
             Proposal(
               mapping = mapping,
-              store = TopologyStoreId.AuthorizedStore.filterName,
+              store = TopologyStoreId.Authorized,
               serial = Some(PositiveInt.one),
             )
           )
@@ -278,10 +277,10 @@ private[validator] object ValidatorUtil {
               }
               .flatMap(_.collect { case Some(archive) => archive } match {
                 case archives @ (headArchive +: tailArchives) =>
-                  val domainId = headArchive.origin.state match {
-                    case assigned @ ContractState.Assigned(domainId)
+                  val synchronizerId = headArchive.origin.state match {
+                    case assigned @ ContractState.Assigned(synchronizerId)
                         if tailArchives forall (_.origin.state == assigned) =>
-                      domainId
+                      synchronizerId
                     case _ =>
                       throw Status.FAILED_PRECONDITION
                         .withDescription(
@@ -299,7 +298,7 @@ private[validator] object ValidatorUtil {
                       readAs = Seq.empty,
                       archives.map(_.update),
                     )
-                    .withDomainId(domainId)
+                    .withSynchronizerId(synchronizerId)
                     .noDedup
                     .yieldUnit()
                 case _ => Future.unit

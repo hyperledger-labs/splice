@@ -1,25 +1,25 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 
 object DefaultTestIdentities {
 
   private def createParticipantAndParty(counter: Int): (ParticipantId, PartyId) = {
-    val namespace = Namespace(Fingerprint.tryCreate(s"participant$counter-identity"))
+    val namespace = Namespace(Fingerprint.tryFromString(s"participant$counter-identity"))
     val id = ParticipantId(UniqueIdentifier.tryCreate(s"participant$counter", namespace))
     val party = PartyId(UniqueIdentifier.tryCreate(s"party$counter", namespace))
     (id, party)
   }
 
-  val namespace = Namespace(Fingerprint.tryCreate("default"))
+  val namespace = Namespace(Fingerprint.tryFromString("default"))
   val uid = UniqueIdentifier.tryCreate("da", namespace)
-  val domainId = DomainId(uid)
+  val synchronizerId = SynchronizerId(uid)
 
   val daSequencerId = SequencerId(uid)
   val daMediator = MediatorId(uid)
@@ -31,8 +31,8 @@ object DefaultTestIdentities {
   val (participant2, party2) = createParticipantAndParty(2)
   val (participant3, party3) = createParticipantAndParty(3)
 
-  val defaultDynamicDomainParameters =
-    DynamicDomainParameters.initialValues(
+  val defaultDynamicSynchronizerParameters =
+    DynamicSynchronizerParameters.initialValues(
       NonNegativeFiniteDuration.Zero,
       BaseTest.testedProtocolVersion,
     )

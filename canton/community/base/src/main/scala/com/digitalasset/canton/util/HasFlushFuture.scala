@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -7,17 +7,16 @@ import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.SyncCloseable
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.Success
 
-/** Provides a single flush [[scala.concurrent.Future]] that runs asynchronously. Tasks can be chained onto the flush
-  *  future, although they will not run sequentially.
+/** Provides a single flush [[scala.concurrent.Future]] that runs asynchronously. Tasks can be
+  * chained onto the flush future, although they will not run sequentially.
   */
 trait HasFlushFuture
     extends
@@ -25,16 +24,23 @@ trait HasFlushFuture
     // with NamedLogging.logger. We therefore explicitly extend NamedLogging and do not declare it as a self type.
     NamedLogging {
 
-  /** Adds the task `future` to the flush future so that [[doFlush]] completes only after `future` has completed.
-    * Logs an error if the `future` fails with an exception.
+  /** Adds the task `future` to the flush future so that [[doFlush]] completes only after `future`
+    * has completed. Logs an error if the `future` fails with an exception.
     */
   protected def addToFlushAndLogError(
       name: String
   )(future: Future[_])(implicit loggingContext: ErrorLoggingContext): Unit =
     addToFlushWithoutLogging(name)(FutureUtil.logOnFailure(future, s"$name failed"))
 
-  /** Adds the task `future` to the flush future so that [[doFlush]] completes only after `future` has completed.
-    * The caller is responsible for logging any exceptions thrown inside the future.
+  protected def addToFlushAndLogErrorUS(
+      name: String
+  )(future: FutureUnlessShutdown[_])(implicit loggingContext: ErrorLoggingContext): Unit =
+    addToFlushWithoutLogging(name)(
+      FutureUnlessShutdownUtil.logOnFailureUnlessShutdown(future, s"$name failed").unwrap
+    )
+
+  /** Adds the task `future` to the flush future so that [[doFlush]] completes only after `future`
+    * has completed. The caller is responsible for logging any exceptions thrown inside the future.
     */
   protected def addToFlushWithoutLogging(name: String)(future: Future[_]): Unit =
     if (future.isCompleted) ()
@@ -47,12 +53,14 @@ trait HasFlushFuture
       // so that we don't have to worry about execution contexts being closed here.
       val removeF = future.transform { _ =>
         tasks.remove(newTask).discard
-        Success(())
+        TryUtil.unit
       }(directExecutionContext)
       promise.completeWith(removeF)
     }
 
-  /** Returns a future that completes after all added futures have completed. The returned future never fails. */
+  /** Returns a future that completes after all added futures have completed. The returned future
+    * never fails.
+    */
   protected def doFlush(): Future[Unit] = {
     val snapshot = tasks.readOnlySnapshot().keys
     flushFutureForSnapshot(snapshot)
@@ -64,8 +72,7 @@ trait HasFlushFuture
 
   private val directExecutionContext: ExecutionContext = DirectExecutionContext(noTracingLogger)
 
-  /** Returns the list of currently incomplete tasks.
-    * Use only for inspection and debugging.
+  /** Returns the list of currently incomplete tasks. Use only for inspection and debugging.
     */
   def snapshotIncomplete: Seq[String] =
     tasks.readOnlySnapshot().keys.filterNot(_.future.isCompleted).map(_.name).toSeq

@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
 
@@ -12,6 +12,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/** Filter used in the state and update service stream queries. Class will be removed in 3.4.0. */
 public final class TransactionFilter {
 
   private Map<String, Filter> partyToFilters;
@@ -105,7 +106,7 @@ public final class TransactionFilter {
     return "TransactionFilter{"
         + "partyToFilters="
         + partyToFilters
-        + ",anyPartyFilterO="
+        + ", anyPartyFilterO="
         + anyPartyFilterO
         + '}';
   }

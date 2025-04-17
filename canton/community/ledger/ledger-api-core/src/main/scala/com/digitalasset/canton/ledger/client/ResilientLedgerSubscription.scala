@@ -1,17 +1,17 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.client
 
-import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse.Update
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.{NoTracing, Spanning}
+import com.digitalasset.canton.tracing.{NoTracing, Spanning, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.util.TryUtil.ForFailedOps
 import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
@@ -27,12 +27,12 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
-/** Resilient ledger subscriber, which keeps continuously
-  * re-subscribing (on failure) to the Ledger API transaction stream
-  * and applies the received transactions to the `processTransaction` function.
+/** Resilient ledger subscriber, which keeps continuously re-subscribing (on failure) to the Ledger
+  * API transaction stream and applies the received transactions to the `processTransaction`
+  * function.
   *
-  * `processTransaction` must not throw. If it does, it must be idempotent
-  * (i.e. allow re-processing the same transaction twice).
+  * `processTransaction` must not throw. If it does, it must be idempotent (i.e. allow re-processing
+  * the same transaction twice).
   */
 class ResilientLedgerSubscription[S, T](
     makeSource: Long => Source[S, NotUsed],
@@ -64,15 +64,15 @@ class ResilientLedgerSubscription[S, T](
     )
     .apply(resilientSubscription(), AllExceptionRetryPolicy)
 
-  runOnShutdown_(new RunOnShutdown {
+  runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"$subscriptionName-shutdown"
 
     override def done: Boolean =
       // Use isClosing to avoid task eviction at the beginning (see runOnShutdown)
       isClosing && ledgerSubscriptionRef.get().forall(_.completed.isCompleted)
 
-    override def run(): Unit =
-      ledgerSubscriptionRef.getAndSet(None).foreach(Lifecycle.close(_)(logger))
+    override def run()(implicit traceContext: TraceContext): Unit =
+      ledgerSubscriptionRef.getAndSet(None).foreach(LifeCycle.close(_)(logger))
   })
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
@@ -185,6 +185,8 @@ object ResilientLedgerSubscription {
       case Update.Reassignment(value) =>
         Some(value.offset)
       case Update.OffsetCheckpoint(value) =>
+        Some(value.offset)
+      case Update.TopologyTransaction(value) =>
         Some(value.offset)
       case Update.Empty => None
     }

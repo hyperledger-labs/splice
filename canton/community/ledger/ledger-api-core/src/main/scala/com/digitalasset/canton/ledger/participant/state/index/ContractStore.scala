@@ -1,13 +1,18 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state.index
 
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.Party
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.daml.lf.transaction.GlobalKey
+import com.digitalasset.daml.lf.data.{Bytes, Ref}
+import com.digitalasset.daml.lf.transaction.{
+  FatContractInstance,
+  GlobalKey,
+  GlobalKeyWithMaintainers,
+  Node,
+}
 import com.digitalasset.daml.lf.value.Value.{ContractId, VersionedContractInstance}
 
 import scala.concurrent.Future
@@ -51,5 +56,28 @@ object ContractState {
       globalKey: Option[GlobalKey],
       maintainers: Option[Set[Party]],
       driverMetadata: Array[Byte],
-  ) extends ContractState
+  ) extends ContractState {
+    def toFatContractInstance(coid: ContractId): FatContractInstance = {
+      val ci = contractInstance.unversioned
+      val globalKeyWithMaintainers = for {
+        gk <- globalKey
+        m <- maintainers
+      } yield GlobalKeyWithMaintainers(gk, m)
+
+      FatContractInstance.fromCreateNode(
+        Node.Create(
+          coid = coid,
+          packageName = ci.packageName,
+          templateId = ci.template,
+          arg = ci.arg,
+          signatories = signatories,
+          stakeholders = stakeholders,
+          keyOpt = globalKeyWithMaintainers,
+          version = contractInstance.version,
+        ),
+        createTime = ledgerEffectiveTime,
+        cantonData = Bytes.fromByteArray(driverMetadata),
+      )
+    }
+  }
 }

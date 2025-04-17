@@ -1,10 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error.groups
 
-import com.daml.error.{
-  ContextualizedErrorLogger,
+import com.digitalasset.base.error.{
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
   ErrorCode,
@@ -12,6 +11,7 @@ import com.daml.error.{
   Resolution,
 }
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.AdminServicesErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 @Explanation("Errors raised by Ledger API admin services.")
 object AdminServiceErrors extends AdminServicesErrorGroup {
@@ -32,7 +32,7 @@ object AdminServiceErrors extends AdminServicesErrorGroup {
       ) {
 
     final case class Reject(_message: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = _message
         )
@@ -48,7 +48,7 @@ object AdminServiceErrors extends AdminServicesErrorGroup {
       ) {
 
     final case class Reject(_message: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = _message
         )
@@ -65,7 +65,7 @@ object AdminServiceErrors extends AdminServicesErrorGroup {
         ErrorCategory.SystemInternalAssumptionViolated, // Should have been caught by the participant
       ) {
     final case class Reject(_message: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = _message
         )

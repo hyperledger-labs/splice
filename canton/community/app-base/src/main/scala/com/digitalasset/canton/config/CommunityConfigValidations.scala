@@ -1,14 +1,16 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import cats.data.Validated
+import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
+import com.digitalasset.canton.crypto.CryptoSchemes
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
@@ -16,11 +18,19 @@ import com.digitalasset.canton.version.ProtocolVersion
 
 import java.net.URI
 
-private[config] trait ConfigValidations[C <: CantonConfig] {
-  final def validate(config: C): Validated[NonEmpty[Seq[String]], Unit] =
-    validations.traverse_(_(config))
+private[config] trait ConfigValidations {
+  final def validate[T >: CantonConfig](config: CantonConfig, edition: CantonEdition)(implicit
+      validator: CantonConfigValidator[T]
+  ): Validated[NonEmpty[Seq[String]], Unit] =
+    config
+      .validate[T](edition)
+      .toValidated
+      .leftMap(_.map(_.toString))
+      .combine(validations.traverse_(_(config)))
 
-  protected val validations: List[C => Validated[NonEmpty[Seq[String]], Unit]]
+  type Validation = CantonConfig => Validated[NonEmpty[Seq[String]], Unit]
+
+  protected val validations: List[Validation]
 
   protected def toValidated(errors: Seq[String]): Validated[NonEmpty[Seq[String]], Unit] = NonEmpty
     .from(errors)
@@ -28,9 +38,7 @@ private[config] trait ConfigValidations[C <: CantonConfig] {
     .getOrElse(Validated.Valid(()))
 }
 
-object CommunityConfigValidations
-    extends ConfigValidations[CantonCommunityConfig]
-    with NamedLogging {
+object CommunityConfigValidations extends ConfigValidations with NamedLogging {
   import TraceContext.Implicits.Empty.*
   override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
 
@@ -54,11 +62,9 @@ object CommunityConfigValidations
       s"DbAccess($urlNoPassword, $user)"
   }
 
-  type Validation = CantonCommunityConfig => Validated[NonEmpty[Seq[String]], Unit]
-
   override protected val validations: List[Validation] =
     List[Validation](noDuplicateStorage, atLeastOneNode) ++
-      genericValidations[CantonCommunityConfig]
+      genericValidations[CantonConfig]
 
   /** Validations applied to all community and enterprise Canton configurations. */
   private[config] def genericValidations[C <: CantonConfig]
@@ -68,10 +74,13 @@ object CommunityConfigValidations
       warnIfUnsafeMinProtocolVersion,
       adminTokenSafetyCheckParticipants,
       adminTokensMatchOnParticipants,
+      eitherUserListsOrPrivilegedTokensOnParticipants,
+      sessionSigningKeysOnlyWithKms,
+      distinctScopesAndAudiencesOnAuthServices,
     )
 
-  /** Group node configs by db access to find matching db storage configs.
-    * Overcomplicated types used are to work around that at this point nodes could have conflicting names so we can't just
+  /** Group node configs by db access to find matching db storage configs. Overcomplicated types
+    * used are to work around that at this point nodes could have conflicting names so we can't just
     * throw them all in a single map.
     */
   private[config] def extractNormalizedDbAccess[C <: CantonConfig](
@@ -99,8 +108,8 @@ object CommunityConfigValidations
           port <- getPropInt("portNumber")
           dbName <- getPropStr("databaseName")
           url <- dbConfig match {
-            case _: H2DbConfig => Some(DbConfig.h2Url(dbName))
-            case _: PostgresDbConfig => Some(DbConfig.postgresUrl(server, port, dbName))
+            case _: DbConfig.H2 => Some(DbConfig.h2Url(dbName))
+            case _: DbConfig.Postgres => Some(DbConfig.postgresUrl(server, port, dbName))
             case other => throw new IllegalArgumentException(s"Unsupported DbConfig: $other")
           }
         } yield url
@@ -131,7 +140,7 @@ object CommunityConfigValidations
 
   /** Validate the config that the storage configuration is not shared between nodes. */
   private def noDuplicateStorage(
-      config: CantonCommunityConfig
+      config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
     val dbAccessToNodes =
       extractNormalizedDbAccess(
@@ -151,15 +160,17 @@ object CommunityConfigValidations
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   private def atLeastOneNode(
-      config: CantonCommunityConfig
+      config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
-    val CantonCommunityConfig(
+    val CantonConfig(
+      _,
       participants,
       sequencers,
       mediators,
       remoteParticipants,
       remoteSequencers,
       remoteMediators,
+      _,
       _,
       _,
       _,
@@ -237,5 +248,103 @@ object CommunityConfigValidations
       )
     }
     toValidated(errors)
+  }
+
+  private def sessionSigningKeysOnlyWithKms(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = config.allNodes.toSeq.mapFilter { case (name, nodeConfig) =>
+      val cryptoConfig = nodeConfig.crypto
+      val sessionSigningKeysConfig = nodeConfig.parameters.sessionSigningKeys
+
+      cryptoConfig.provider match {
+        case CryptoProvider.Jce if !sessionSigningKeysConfig.enabled => None
+        case CryptoProvider.Jce =>
+          Some(
+            s"Session signing keys should not be enabled with the JCE crypto provider on node ${name.unwrap}"
+          )
+        case CryptoProvider.Kms if !sessionSigningKeysConfig.enabled => None
+        case CryptoProvider.Kms =>
+          val schemesE = CryptoSchemes.fromConfig(cryptoConfig)
+          val supportedAlgoSpecs =
+            schemesE.map(_.signingAlgoSpecs.allowed.forgetNE).getOrElse(Set.empty)
+          val supportedKeySpecs =
+            schemesE.map(_.signingKeySpecs.allowed.forgetNE).getOrElse(Set.empty)
+
+          // the signing algorithm spec configured for session keys is not supported
+          if (!supportedAlgoSpecs.contains(sessionSigningKeysConfig.signingAlgorithmSpec))
+            Some(
+              s"The selected signing algorithm specification, ${sessionSigningKeysConfig.signingAlgorithmSpec}, " +
+                s"for session signing keys is not supported. Supported algorithms " +
+                s"are: ${cryptoConfig.signing.algorithms.allowed}."
+            )
+          // the signing key spec configured for session keys is not supported
+          else if (!supportedKeySpecs.contains(sessionSigningKeysConfig.signingKeySpec))
+            Some(
+              s"The selected signing key specification, ${sessionSigningKeysConfig.signingKeySpec}, " +
+                s"for session signing keys is not supported. Supported algorithms " +
+                s"are: ${cryptoConfig.signing.keys.allowed}."
+            )
+          else None
+      }
+    }
+
+    toValidated(errors)
+  }
+
+  private def eitherUserListsOrPrivilegedTokensOnParticipants(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = config.participants.toSeq
+      .flatMap { case (name, participantConfig) =>
+        participantConfig.adminApi.authServices.map(name -> _) ++
+          participantConfig.ledgerApi.authServices.map(name -> _)
+      }
+      .mapFilter { case (name, authService) =>
+        Option.when(
+          authService.privileged && authService.users.nonEmpty
+        )(
+          s"Authorization service cannot be configured to accept both privileged tokens and tokens for user-lists in ${name.unwrap}"
+        )
+      }
+    NonEmpty
+      .from(errors)
+      .map(Validated.invalid[NonEmpty[Seq[String]], Unit])
+      .getOrElse(Validated.Valid(()))
+  }
+
+  private def distinctScopesAndAudiencesOnAuthServices(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    def checkDuplicates(
+        name: String,
+        attrName: String,
+        extract: AuthServiceConfig => Option[String],
+        authServices: Seq[AuthServiceConfig],
+    ) = {
+      val attributes = authServices.flatMap(extract)
+      Option
+        .when(
+          attributes.sizeIs != attributes.distinct.sizeIs
+        )(
+          s"Multiple authorization service configured with the same $attrName in $name"
+        )
+        .toList
+    }
+    val errors = config.participants.toSeq
+      .flatMap { case (name, participantConfig) =>
+        List(
+          name -> participantConfig.adminApi.authServices,
+          name -> participantConfig.ledgerApi.authServices,
+        )
+      }
+      .flatMap { case (name, authServices) =>
+        checkDuplicates(name.unwrap, "scope", _.targetScope, authServices) ++
+          checkDuplicates(name.unwrap, "audience", _.targetAudience, authServices)
+      }
+    NonEmpty
+      .from(errors)
+      .map(Validated.invalid[NonEmpty[Seq[String]], Unit])
+      .getOrElse(Validated.Valid(()))
   }
 }

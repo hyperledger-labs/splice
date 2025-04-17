@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
@@ -6,46 +6,44 @@ package com.digitalasset.canton.topology.processing
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.topology.processing.AuthorizedTopologyTransaction.AuthorizedIdentifierDelegation
+import com.digitalasset.canton.topology.Namespace
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.GenericTopologyTransaction
-import com.digitalasset.canton.topology.{Namespace, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** cache for working with topology transaction authorization */
 trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
   this: NamedLogging =>
 
   /** Invariants:
-    * - If it stores ns -> graph, then graph consists of all active namespace delegations for ns.
-    * - If it stores ns -> graph and graph is non-empty, then there is no decentralized namespace delegation active for ns.
+    *   - If it stores ns -> graph, then graph consists of all active namespace delegations for ns.
+    *   - If it stores ns -> graph and graph is non-empty, then there is no decentralized namespace
+    *     delegation active for ns.
     */
   protected val namespaceCache = new TrieMap[Namespace, AuthorizationGraph]()
 
   /** Invariants:
-    * - If it stores ns -> Some(graph), then the graph corresponds to the active decentralized namespace delegation for ns.
-    *   Moreover, for each owner o, the owner graph is namespaceCache(o).
-    * - If it stores ns -> None, then there is no decentralized namespace delegation active for ns.
-    * - If it stores ns -> Some(graph), then there is no direct namespace delegation active for ns.
+    *   - If it stores ns -> Some(graph), then the graph corresponds to the active decentralized
+    *     namespace delegation for ns. Moreover, for each owner o, the owner graph is
+    *     namespaceCache(o).
+    *   - If it stores ns -> None, then there is no decentralized namespace delegation active for
+    *     ns.
+    *   - If it stores ns -> Some(graph), then there is no direct namespace delegation active for
+    *     ns.
     */
   protected val decentralizedNamespaceCache =
     new TrieMap[
       Namespace,
       Option[DecentralizedNamespaceAuthorizationGraph],
     ]()
-
-  /** Invariants:
-    * - If it stores id -> ids, then ids consists of all active identifier delegations for id.
-    */
-  protected val identifierDelegationCache =
-    new TrieMap[UniqueIdentifier, Set[AuthorizedIdentifierDelegation]]()
 
   protected def store: TopologyStore[TopologyStoreId]
 
@@ -55,7 +53,6 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
 
   final def reset(): Unit = {
     namespaceCache.clear()
-    identifierDelegationCache.clear()
     decentralizedNamespaceCache.clear()
   }
 
@@ -63,20 +60,10 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
       asOfExclusive: CantonTimestamp,
       toProcess: GenericTopologyTransaction,
       inStore: Option[GenericTopologyTransaction],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val requiredKeys = AuthorizationKeys.required(toProcess, inStore)
-    val loadNsdF = loadNamespaceCaches(asOfExclusive, requiredKeys.namespaces)
-    val loadIddF = loadIdentifierDelegationCaches(asOfExclusive, requiredKeys.uids)
-    loadNsdF.flatMap(_ => loadIddF)
+    loadNamespaceCaches(asOfExclusive, requiredKeys.namespaces)
   }
-
-  protected def tryGetIdentifierDelegationsForUid(
-      uid: UniqueIdentifier
-  )(implicit traceContext: TraceContext): Set[AuthorizedIdentifierDelegation] =
-    identifierDelegationCache.getOrElse(
-      uid,
-      ErrorUtil.invalidState(s"Cache miss for identifier $uid"),
-    )
 
   protected def tryGetAuthorizationCheckForNamespace(
       namespace: Namespace
@@ -110,7 +97,7 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
   protected def loadNamespaceCaches(
       asOfExclusive: CantonTimestamp,
       namespaces: Set[Namespace],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
 
     // only load the ones we don't already hold in memory
     val decentralizedNamespacesToLoad = namespaces -- decentralizedNamespaceCache.keys
@@ -212,43 +199,6 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
       decentralizedNamespacesToLoad.foreach(
         decentralizedNamespaceCache.putIfAbsent(_, None).discard
       )
-    }
-  }
-
-  protected def loadIdentifierDelegationCaches(
-      asOfExclusive: CantonTimestamp,
-      uids: Set[UniqueIdentifier],
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    val identifierDelegationsToLoad = uids -- identifierDelegationCache.keySet
-    for {
-      stored <- store
-        .findPositiveTransactions(
-          asOfExclusive,
-          asOfInclusive = false,
-          isProposal = false,
-          types = Seq(IdentifierDelegation.code),
-          filterUid = Some(identifierDelegationsToLoad.toSeq),
-          filterNamespace = None,
-        )
-    } yield {
-      val identifierDelegations = stored
-        .collectOfMapping[IdentifierDelegation]
-        .collectLatestByUniqueKey
-        .result
-        .map(identifierDelegation =>
-          AuthorizedTopologyTransaction(identifierDelegation.transaction)
-        )
-
-      identifierDelegations.groupBy(_.mapping.identifier).foreach { case (uid, delegations) =>
-        val previous = identifierDelegationCache.put(uid, delegations.toSet)
-        ErrorUtil.requireState(
-          previous.isEmpty,
-          s"Unexpected cache hit for identiefier $uid: $previous",
-        )
-      }
-      identifierDelegationsToLoad.foreach(identifierDelegationCache.putIfAbsent(_, Set()).discard)
     }
   }
 }

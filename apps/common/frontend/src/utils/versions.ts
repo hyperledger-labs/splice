@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as semver from 'semver';
 
-import { AmuletConfig, USD } from '../../daml.js/splice-amulet-0.1.8/lib/Splice/AmuletConfig';
+import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 
 export function supportsVoteEffectivityAndSetConfig(config: AmuletConfig<USD>): boolean {
   const governanceDarsVersion = config.packageConfig.dsoGovernance;

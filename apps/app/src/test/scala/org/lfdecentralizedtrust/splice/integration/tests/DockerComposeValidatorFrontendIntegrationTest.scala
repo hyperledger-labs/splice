@@ -1,14 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.Get
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.model.headers.Host
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
   AnsFrontendTestUtil,
   FrontendLoginUtil,
@@ -26,8 +23,7 @@ class DockerComposeValidatorFrontendIntegrationTest
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with AnsFrontendTestUtil {
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")

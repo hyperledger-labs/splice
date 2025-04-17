@@ -1,13 +1,13 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api
 
-import com.daml.error.NoLogging
 import com.daml.ledger.api.v2.value as api
 import com.daml.ledger.api.v2.value.Value.Sum
 import com.digitalasset.canton.ledger.api.util.LfEngineToApi
 import com.digitalasset.canton.ledger.api.validation.{ValidatorTestUtils, ValueValidator}
+import com.digitalasset.canton.logging.NoLogging
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Time
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -39,7 +39,7 @@ class ValueConversionRoundTripTest
       val testCases: TableFor1[Sum] = Table(
         "values",
         Sum.ContractId(ContractId.V1(Hash.hashPrivateKey("#coid")).coid),
-        DomainMocks.values.validApiParty.sum,
+        ApiMocks.values.validApiParty.sum,
         Sum.Int64(Long.MinValue),
         Sum.Int64(0),
         Sum.Int64(Long.MaxValue),
@@ -58,7 +58,7 @@ class ValueConversionRoundTripTest
         Sum.List(api.List(List.empty)),
         Sum.List(api.List((0 to 10).map(i => api.Value(Sum.Int64(i.toLong))))),
         Sum.Optional(api.Optional(None)),
-        Sum.Optional(api.Optional(Some(DomainMocks.values.validApiParty))),
+        Sum.Optional(api.Optional(Some(ApiMocks.values.validApiParty))),
         Sum.TextMap(api.TextMap(List.empty)),
         Sum.GenMap(api.GenMap(List.empty)),
         Sum.GenMap(
@@ -82,7 +82,7 @@ class ValueConversionRoundTripTest
           )
         ),
         Sum.Variant(
-          api.Variant(Some(recordId), constructor, Some(DomainMocks.values.validApiParty))
+          api.Variant(Some(recordId), constructor, Some(ApiMocks.values.validApiParty))
         ),
       )
 

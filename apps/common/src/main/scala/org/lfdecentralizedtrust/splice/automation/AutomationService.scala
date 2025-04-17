@@ -128,7 +128,7 @@ abstract class AutomationService(
     Seq[AsyncOrSyncCloseable](
       SyncCloseable(
         "Orchestrated services",
-        Lifecycle.close(backgroundServices.get()*)(logger),
+        LifeCycle.close(backgroundServices.get()*)(logger),
       )
     )
 }

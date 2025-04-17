@@ -72,7 +72,7 @@ class WalletMetricsTest
         BigDecimal(time.toEpochMilli) + recordTimeLedgerTimeTolerance,
       )
       val synchronizerId =
-        sv1Backend.participantClient.domains.list_connected().loneElement.domainId
+        sv1Backend.participantClient.synchronizers.list_connected().loneElement.synchronizerId
       metrics.attributes("synchronizer_id") shouldBe synchronizerId.toString
     }
   }

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -16,11 +16,14 @@ class SingleUseCellTest extends AnyWordSpec with BaseTest {
       val cell = mk[Int]()
       assert(cell.isEmpty)
       assert(cell.get.isEmpty)
+      assert(!cell.isDefined)
     }
 
     "return the written value" in {
       val cell = mk[Int]()
       assert(cell.putIfAbsent(7).isEmpty)
+      assert(cell.isDefined)
+      assert(!cell.isEmpty)
       assert(cell.get.contains(7))
     }
 

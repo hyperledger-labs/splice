@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -10,7 +10,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{DeserializationError, HasCryptographicEvidence}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ByteStringUtil
 import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{LedgerTransactionId, ProtoDeserializationError}
@@ -20,21 +20,24 @@ import slick.jdbc.{GetResult, SetParameter}
 
 /** The root hash of a Merkle tree used as an identifier for requests.
   *
-  * Extends [[com.digitalasset.canton.serialization.HasCryptographicEvidence]] so that [[RootHash]]'s serialization
-  * can be used to compute the hash of an inner Merkle node from its children using [[RootHash.getCryptographicEvidence]].
-  * Serialization to Protobuf fields can be done with [[RootHash.toProtoPrimitive]]
+  * Extends [[com.digitalasset.canton.serialization.HasCryptographicEvidence]] so that
+  * [[RootHash]]'s serialization can be used to compute the hash of an inner Merkle node from its
+  * children using [[RootHash.getCryptographicEvidence]]. Serialization to Protobuf fields can be
+  * done with [[RootHash.toProtoPrimitive]]
   *
   * Here is how we use it:
-  * (1) Every participant gets a “partially blinded” Merkle tree, defining the locations of the views they are privy to.
-  * (2) That Merkle tree has a root. That root has a hash. That’s the root hash.
-  * (3) The mediator receives a fully blinded Merkle tree, with the same hash.
-  * (4) The submitting participant will send for each receiving participant an additional “root hash message” in the
-  *     same batch. That message will contain the same hash, with recipients (participant, mediator).
-  * (5) The mediator will check that all participants mentioned in the tree received a root hash message and that all
-  *     hashes are equal.
-  * (6) Once the mediator sends out the verdict, the verdict will include the tree structure and thus the root hash.
-  *     Hence, the participant will now have certainty about the mediator having checked all root hash messages
-  *     and having observed the same tree structure.
+  *   1. Every participant gets a “partially blinded” Merkle tree, defining the locations of the
+  *      views they are privy to.
+  *   1. That Merkle tree has a root. That root has a hash. That’s the root hash.
+  *   1. The mediator receives a fully blinded Merkle tree, with the same hash.
+  *   1. The submitting participant will send for each receiving participant an additional “root
+  *      hash message” in the same batch. That message will contain the same hash, with recipients
+  *      (participant, mediator).
+  *   1. The mediator will check that all participants mentioned in the tree received a root hash
+  *      message and that all hashes are equal.
+  *   1. Once the mediator sends out the verdict, the verdict will include the tree structure and
+  *      thus the root hash. Hence, the participant will now have certainty about the mediator
+  *      having checked all root hash messages and having observed the same tree structure.
   */
 @SuppressWarnings(Array("org.wartremover.warts.FinalCaseClass")) // This class is mocked in tests
 case class RootHash(private val hash: Hash) extends PrettyPrinting with HasCryptographicEvidence {
@@ -181,34 +184,41 @@ object RequestId {
     CantonTimestamp.fromProtoPrimitive(requestIdP).map(RequestId(_))
 }
 
-/** A reassignment is identified by the source domain and the sequencer timestamp on the unassignment request. */
-final case class ReassignmentId(sourceDomain: Source[DomainId], unassignmentTs: CantonTimestamp)
-    extends PrettyPrinting {
+/** A reassignment is identified by the source synchronizer and the sequencer timestamp on the
+  * unassignment request.
+  */
+final case class ReassignmentId(
+    sourceSynchronizer: Source[SynchronizerId],
+    unassignmentTs: CantonTimestamp,
+) extends PrettyPrinting {
   def toProtoV30: v30.ReassignmentId =
     v30.ReassignmentId(
-      sourceDomain = sourceDomain.unwrap.toProtoPrimitive,
+      sourceSynchronizerId = sourceSynchronizer.unwrap.toProtoPrimitive,
       timestamp = unassignmentTs.toProtoPrimitive,
     )
 
   def toAdminProto: com.digitalasset.canton.admin.participant.v30.ReassignmentId =
     com.digitalasset.canton.admin.participant.v30.ReassignmentId(
-      sourceDomain = sourceDomain.unwrap.toProtoPrimitive,
+      sourceSynchronizerId = sourceSynchronizer.unwrap.toProtoPrimitive,
       timestamp = Some(unassignmentTs.toProtoTimestamp),
     )
 
   override protected def pretty: Pretty[ReassignmentId] = prettyOfClass(
     param("ts", _.unassignmentTs),
-    param("source", _.sourceDomain),
+    param("source", _.sourceSynchronizer),
   )
 }
 
 object ReassignmentId {
   def fromProtoV30(reassignmentIdP: v30.ReassignmentId): ParsingResult[ReassignmentId] =
     reassignmentIdP match {
-      case v30.ReassignmentId(originDomainP, requestTimestampP) =>
+      case v30.ReassignmentId(sourceSynchronizerP, requestTimestampP) =>
         for {
-          sourceDomain <- DomainId.fromProtoPrimitive(originDomainP, "ReassignmentId.origin_domain")
+          sourceSynchronizerId <- SynchronizerId.fromProtoPrimitive(
+            sourceSynchronizerP,
+            "ReassignmentId.source_synchronizer_id",
+          )
           requestTimestamp <- CantonTimestamp.fromProtoPrimitive(requestTimestampP)
-        } yield ReassignmentId(Source(sourceDomain), requestTimestamp)
+        } yield ReassignmentId(Source(sourceSynchronizerId), requestTimestamp)
     }
 }

@@ -2,14 +2,11 @@ package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.SigningKeyUsage
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.DelegationRestriction
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{PostgresAroundEach, ProcessTestUtil, WalletTestUtil}
 
 // TODO(#17027) use KMS for this test; whoever goes through the trouble of offline root namespace keys probably also uses KMS
@@ -30,8 +27,7 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
   // Runs against a temporary Canton instance.
   override lazy val resetRequiredTopologyState = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // we start the participants during the test so we cannot pre-allocate
@@ -111,8 +107,8 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
       }
       val aliceParticipant = aliceValidatorBackend.participantClientWithAdminToken
       val rootKeyId = aliceParticipant.topology.namespace_delegations
-        .list("authorized")
-        .filter(_.item.isRootDelegation)(0)
+        .list(TopologyStoreId.Authorized)
+        .filter(_.item.restriction == DelegationRestriction.CanSignAllMappings)(0)
         .item
         .target
         .id
@@ -127,14 +123,14 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
           aliceParticipant.topology.namespace_delegations.propose_delegation(
             aliceParticipant.id.namespace,
             delegateKey,
-            isRootDelegation = false,
+            delegationRestriction = DelegationRestriction.CanSignAllButNamespaceDelegations,
           )
         },
       )(
         "the delegation is set up",
         { _ =>
           aliceParticipant.topology.namespace_delegations
-            .list("authorized")
+            .list(TopologyStoreId.Authorized)
             .map(_.item.target.id) should contain(delegateKey.id)
         },
       )
@@ -154,7 +150,8 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
         aliceUserParty
       }
       clue(s"The party mapping for $aliceUserParty was signed with the delegate key") {
-        val domainId = aliceValidatorBackend.participantClient.domains.list_connected()(0).domainId
+        val domainId =
+          aliceValidatorBackend.participantClient.synchronizers.list_connected()(0).synchronizerId
         aliceParticipant.topology.party_to_participant_mappings
           .list(domainId, filterParty = aliceUserParty.toProtoPrimitive)(0)
           .context

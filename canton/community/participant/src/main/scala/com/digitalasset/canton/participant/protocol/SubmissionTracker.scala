@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -7,7 +7,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.SubmissionTrackerData
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
@@ -17,14 +17,12 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.protocol.SubmissionTracker.SubmissionData
 import com.digitalasset.canton.participant.store.SubmissionTrackerStore
 import com.digitalasset.canton.protocol.{RequestId, RootHash}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
@@ -32,40 +30,40 @@ import scala.concurrent.ExecutionContext
 
 /** Tracker for submission, backed by a `SubmissionTrackerStore`.
   *
-  * The purpose of this tracker is to detect replayed requests, and allow the participant to emit
-  * a command completion only for genuine requests that it has submitted.
+  * The purpose of this tracker is to detect replayed requests, and allow the participant to emit a
+  * command completion only for genuine requests that it has submitted.
   *
-  * A request R1 is considered fresh iff
-  * it has the minimal requestId among all requests that have the same root hash,
-  * for which SubmissionData has been provided.
-  * In particular, for a given root hash there is at most one fresh request.
+  * A request R1 is considered fresh iff it has the minimal requestId among all requests that have
+  * the same root hash, for which SubmissionData has been provided. In particular, for a given root
+  * hash there is at most one fresh request.
   *
-  * The ScalaDocs of the individual methods prescribe when to call the methods.
-  * Calling the methods in a different order will result in undefined behavior.
-  * Failure to call either `cancelRegistration()` or `provideSubmissionData()` after calling `register()` for a request
-  * may result in a deadlock.
+  * The ScalaDocs of the individual methods prescribe when to call the methods. Calling the methods
+  * in a different order will result in undefined behavior. Failure to call either
+  * `cancelRegistration()` or `provideSubmissionData()` after calling `register()` for a request may
+  * result in a deadlock.
   */
 trait SubmissionTracker extends AutoCloseable {
 
-  /** Register an ongoing transaction in the tracker.
-    * This method must be called for every request id and with monotonically increasing request ids, i.e.,
-    * in the synchronous part of Phase 3.
+  /** Register an ongoing transaction in the tracker. This method must be called for every request
+    * id and with monotonically increasing request ids, i.e., in the synchronous part of Phase 3.
     * The return value should be used to determine whether to emit a command completion in Phase 7.
-    * If the return value is `false`, the submitting participant of the underlying request should reject in Phase 3.
+    * If the return value is `false`, the submitting participant of the underlying request should
+    * reject in Phase 3.
     *
-    * @return a `Future` that represents the conditions:
-    *         * the transaction is fresh, i.e. it is not a replay;
-    *         * the transaction was submitted by this participant;
-    *         * the transaction is timely, i.e. it was sequenced within its max sequencing time.
+    * @return
+    *   a `Future` that represents the conditions: * the transaction is fresh, i.e. it is not a
+    *   replay; * the transaction was submitted by this participant; * the transaction is timely,
+    * i.e. it was sequenced within its max sequencing time.
     */
   def register(rootHash: RootHash, requestId: RequestId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean]
 
-  /** Cancel a previously registered submission and perform the necessary cleanup.
-    * This method must be called for a request if and only if `provideSubmissionData` cannot be called.
+  /** Cancel a previously registered submission and perform the necessary cleanup. This method must
+    * be called for a request if and only if `provideSubmissionData` cannot be called.
     *
-    * As a consequence, the associated `Future` returned by `register()` will be completed with `false`.
+    * As a consequence, the associated `Future` returned by `register()` will be completed with
+    * `false`.
     */
   def cancelRegistration(rootHash: RootHash, requestId: RequestId)(implicit
       traceContext: TraceContext
@@ -76,24 +74,20 @@ trait SubmissionTracker extends AutoCloseable {
   def provideSubmissionData(
       rootHash: RootHash,
       requestId: RequestId,
-      submissionData: SubmissionData,
+      submissionData: SubmissionTrackerData,
   )(implicit traceContext: TraceContext): Unit
 }
 
 object SubmissionTracker {
-  final case class SubmissionData(
-      submittingParticipant: ParticipantId,
-      maxSequencingTime: CantonTimestamp,
-  )
 
-  def apply(protocolVersion: ProtocolVersion)(
+  def apply(
       participantId: ParticipantId,
       store: SubmissionTrackerStore,
       futureSupervisor: FutureSupervisor,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): SubmissionTracker =
-    new SubmissionTrackerImpl(protocolVersion)(
+    new SubmissionTrackerImpl(
       participantId,
       store,
       futureSupervisor,
@@ -102,7 +96,7 @@ object SubmissionTracker {
     )
 }
 
-class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)(
+class SubmissionTrackerImpl private[protocol] (
     participantId: ParticipantId,
     store: SubmissionTrackerStore,
     futureSupervisor: FutureSupervisor,
@@ -149,12 +143,15 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
   //  * Repair requests do not modify request IDs or root hashes, only request counters. Therefore they cannot interfere
   //    with this logic here.
 
-  /** Information about a registered request. These entries are linked together in order of registration on
-    * the same root hash.
+  /** Information about a registered request. These entries are linked together in order of
+    * registration on the same root hash.
     *
-    * @param prevFUS   Future that results in the availability status from the previous request
-    * @param nextPUS   Promise that gives availability status for the next request when completed
-    * @param resultPUS Promise that says whether this request requires a command completion when completed
+    * @param prevFUS
+    *   Future that results in the availability status from the previous request
+    * @param nextPUS
+    *   Promise that gives availability status for the next request when completed
+    * @param resultPUS
+    *   Promise that says whether this request requires a command completion when completed
     */
   private case class Entry(
       prevFUS: FutureUnlessShutdown[Boolean],
@@ -164,10 +161,13 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
 
   /** Data structure associated to a given root hash.
     *
-    * @param tailFUS Future that results in the availability status from the tail request, i.e. the latest request
-    *                that was registered. This is NOT equivalent to the request in `reqMap` with the highest
-    *                request ID, because the tail request could already have been completed and been removed from `reqMap`.
-    * @param reqMap  Map of request entries currently registered with this root hash (for quick retrieval)
+    * @param tailFUS
+    *   Future that results in the availability status from the tail request, i.e. the latest
+    *   request that was registered. This is NOT equivalent to the request in `reqMap` with the
+    *   highest request ID, because the tail request could already have been completed and been
+    *   removed from `reqMap`.
+    * @param reqMap
+    *   Map of request entries currently registered with this root hash (for quick retrieval)
     */
   private case class RequestList(
       tailFUS: FutureUnlessShutdown[Boolean],
@@ -197,12 +197,12 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
     performUnlessClosing(functionFullName) {
-      val nextPUS = new PromiseUnlessShutdown[Boolean](
+      val nextPUS = PromiseUnlessShutdown.supervised[Boolean](
         s"available-for-next-$rootHash-$requestId",
         futureSupervisor,
       )
       val resultPUS =
-        new PromiseUnlessShutdown[Boolean](s"result-$rootHash-$requestId", futureSupervisor)
+        PromiseUnlessShutdown.supervised[Boolean](s"result-$rootHash-$requestId", futureSupervisor)
 
       pendingRequests
         .updateWith(rootHash) {
@@ -237,7 +237,7 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
   ): Unit =
     pendingRequests
       .updateWith(rootHash) {
-        case Some(RequestList(_, reqMap)) if reqMap.size == 1 =>
+        case Some(RequestList(_, reqMap)) if reqMap.sizeIs == 1 =>
           // We are the last request for this root hash
           // Consistency check
           if (!reqMap.contains(requestId)) {
@@ -275,13 +275,13 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
     resultPUS.outcome(false)
 
     // Propagate current availability
-    nextPUS.completeWith(prevFUS.thereafter(_ => cleanup(rootHash, requestId)))
+    nextPUS.completeWithUS(prevFUS.thereafter(_ => cleanup(rootHash, requestId))).discard
   }
 
   override def provideSubmissionData(
       rootHash: RootHash,
       requestId: RequestId,
-      submissionData: SubmissionData,
+      submissionData: SubmissionTrackerData,
   )(implicit traceContext: TraceContext): Unit = {
     val Entry(prevFUS, nextPUS, resultPUS) = tryGetEntry(rootHash, requestId)
 
@@ -303,7 +303,7 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
             }
           }
 
-          resultPUS.completeWith(requestIsValidFUS.thereafter { _ =>
+          resultPUS.completeWithUS(requestIsValidFUS.thereafter { _ =>
             // We can remove the tail of the chain if we are the last request, because at this point it
             // is guaranteed that the store has been updated. All further requests on this root hash which
             // are not cancelled will be blocked by the maxSequencingTime or the store.

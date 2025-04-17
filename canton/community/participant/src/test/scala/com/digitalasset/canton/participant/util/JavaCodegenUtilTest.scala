@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.util
@@ -7,7 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, TestHash}
 import com.digitalasset.canton.protocol.{
-  AuthenticatedContractIdVersionV10,
+  AuthenticatedContractIdVersionV11,
   ExampleTransactionFactory,
   Unicum,
 }
@@ -22,7 +22,7 @@ class JavaCodegenUtilTest extends AsyncWordSpec with BaseTest {
         val hash =
           Hash.build(TestHash.testHashPurpose, HashAlgorithm.Sha256).add(0).finish()
         val unicum = Unicum(hash)
-        val lfCid = AuthenticatedContractIdVersionV10.fromDiscriminator(discriminator, unicum)
+        val lfCid = AuthenticatedContractIdVersionV11.fromDiscriminator(discriminator, unicum)
 
         val apiCid = new ContractId(lfCid.coid)
         val lfCid2 = apiCid.toLf

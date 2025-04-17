@@ -1,37 +1,35 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
 
-import com.daml.error.{ContextualizedErrorLogger, NoLogging}
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamRequest as GrpcCompletionStreamRequest
-import com.digitalasset.canton.ledger.api.domain.ParticipantOffset
 import com.digitalasset.canton.ledger.api.messages.command.completion.CompletionStreamRequest
-import com.digitalasset.canton.platform.ApiOffset
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import com.digitalasset.daml.lf.data.Ref
 import io.grpc.Status.Code.*
 import org.mockito.MockitoSugar
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.Duration
+
 class CompletionServiceRequestValidatorTest
     extends AnyWordSpec
     with ValidatorTestUtils
     with MockitoSugar {
-  private implicit val noLogging: ContextualizedErrorLogger = NoLogging
+  private implicit val noLogging: ErrorLoggingContext = NoLogging
   private val grpcCompletionReq = GrpcCompletionStreamRequest(
-    expectedApplicationId,
+    expectedUserId,
     List(party),
     offsetLong,
   )
   private val completionReq = CompletionStreamRequest(
-    Ref.ApplicationId.assertFromString(expectedApplicationId),
+    Ref.UserId.assertFromString(expectedUserId),
     List(party).toSet,
     offset,
   )
 
-  private val validator = new CompletionServiceRequestValidator(
-    PartyNameChecker.AllowAllParties
-  )
+  private val validator = CompletionServiceRequestValidator
 
   "CompletionRequestValidation" when {
 
@@ -45,14 +43,14 @@ class CompletionServiceRequestValidatorTest
         }
       }
 
-      "return the correct error on missing application ID" in {
+      "return the correct error on missing user ID" in {
         requestMustFailWith(
           request = validator.validateGrpcCompletionStreamRequest(
-            grpcCompletionReq.withApplicationId("")
+            grpcCompletionReq.withUserId("")
           ),
           code = INVALID_ARGUMENT,
           description =
-            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: application_id",
+            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: user_id",
           metadata = Map.empty,
         )
       }
@@ -61,7 +59,7 @@ class CompletionServiceRequestValidatorTest
         inside(
           validator.validateGrpcCompletionStreamRequest(grpcCompletionReq.withBeginExclusive(0))
         ) { case Right(req) =>
-          req shouldBe completionReq.copy(offset = ParticipantOffset.fromString(""))
+          req shouldBe completionReq.copy(offset = None)
         }
       }
 
@@ -91,15 +89,15 @@ class CompletionServiceRequestValidatorTest
             grpcCompletionReq.withBeginExclusive(0L)
           )
         ) { case Right(req) =>
-          req.applicationId shouldEqual expectedApplicationId
+          req.userId shouldEqual expectedUserId
           req.parties shouldEqual Set(party)
-          req.offset shouldEqual ""
+          req.offset shouldBe empty
         }
       }
 
     }
 
-    "validate domain completion requests" should {
+    "validate api completion requests" should {
 
       "accept simple requests" in {
         inside(
@@ -126,63 +124,28 @@ class CompletionServiceRequestValidatorTest
       "return the correct error when offset is after ledger end" in {
         requestMustFailWith(
           request = validator.validateCompletionStreamRequest(
-            completionReq.copy(offset =
-              ParticipantOffset.fromString(
-                ApiOffset.fromLong(ApiOffset.assertFromStringToLong(ledgerEnd) + 1)
-              )
-            ),
+            completionReq.copy(offset = ledgerEnd.map(_.increment)),
             ledgerEnd,
           ),
           code = OUT_OF_RANGE,
-          description = s"OFFSET_AFTER_LEDGER_END(12,0): Begin offset (${ApiOffset
-              .assertFromStringToLong(ledgerEnd) + 1}) is after ledger end (${ApiOffset
-              .assertFromStringToLong(ledgerEnd)})",
-          metadata = Map.empty,
+          description =
+            s"OFFSET_AFTER_LEDGER_END(12,0): Begin offset (${ledgerEnd.value.unwrap + 1}) is after ledger end (${ledgerEnd.value.unwrap})",
+          metadata = Map("definite_answer" -> "false", "category" -> "12"),
+          retryDelay = Seq(Duration.ofSeconds(1L)),
         )
       }
 
       "tolerate empty offset (participant begin)" in {
         inside(
           validator.validateCompletionStreamRequest(
-            completionReq.copy(offset = ParticipantOffset.ParticipantBegin),
+            completionReq.copy(offset = None),
             ledgerEnd,
           )
         ) { case Right(req) =>
-          req.applicationId shouldEqual expectedApplicationId
+          req.userId shouldEqual expectedUserId
           req.parties shouldEqual Set(party)
-          req.offset shouldEqual ""
+          req.offset shouldBe empty
         }
-      }
-    }
-
-    "applying party name checks" should {
-      val partyRestrictiveValidator = new CompletionServiceRequestValidator(
-        PartyNameChecker.AllowPartySet(Set(party))
-      )
-
-      val unknownParties = List("party", "Alice", "Bob").map(Ref.Party.assertFromString).toSet
-      val knownParties = List("party").map(Ref.Party.assertFromString)
-
-      "reject completion requests for unknown parties" in {
-        requestMustFailWith(
-          request = partyRestrictiveValidator.validateCompletionStreamRequest(
-            completionReq.copy(parties = unknownParties),
-            ledgerEnd,
-          ),
-          code = INVALID_ARGUMENT,
-          description =
-            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Unknown parties: [Alice, Bob]",
-          metadata = Map.empty,
-        )
-      }
-
-      "accept transaction requests for known parties" in {
-        partyRestrictiveValidator.validateGrpcCompletionStreamRequest(
-          grpcCompletionReq.withParties(knownParties)
-        ) shouldBe a[Right[_, _]]
-        partyRestrictiveValidator.validateGrpcCompletionStreamRequest(
-          grpcCompletionReq.withParties(knownParties)
-        ) shouldBe a[Right[_, _]]
       }
     }
   }

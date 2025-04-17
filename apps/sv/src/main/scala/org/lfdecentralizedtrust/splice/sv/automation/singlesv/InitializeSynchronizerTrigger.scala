@@ -7,11 +7,11 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import cats.syntax.traverseFilter.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.{CommunityCryptoConfig, CommunityCryptoProvider}
+import com.digitalasset.canton.config.{CryptoConfig, CryptoProvider}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
@@ -40,8 +40,8 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanSo
 import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import scala.concurrent.{ExecutionContextExecutor, Future}
 
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import InitializeSynchronizerTrigger.Task
 
 class InitializeSynchronizerTrigger(
@@ -93,7 +93,7 @@ class InitializeSynchronizerTrigger(
           .map { case (identities, bootstrapTransactions) =>
             Some(
               Task(
-                DomainId(
+                SynchronizerId(
                   UniqueIdentifier.tryCreate(
                     prefix,
                     dsoStore.key.dsoParty.uid.namespace,
@@ -122,7 +122,6 @@ class InitializeSynchronizerTrigger(
 
   protected def completeTask(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      scanUrls <- getScanUrls()
       decentralizedNamespaceTxs <- getDecentralizedNamespaceDefinitionTransactions(
         participantAdminConnection
       )
@@ -130,13 +129,13 @@ class InitializeSynchronizerTrigger(
       bootstrappingStates = task.bootstrappingTransactions
       domainParameters = bootstrappingStates
         .map(_.domainParameters)
-        .reduceLeft((a, b) => a.addSignatures(b.signatures.toSeq))
+        .reduceLeft((a, b) => a.addSignatures(b.signatures))
       sequencerDomainState = bootstrappingStates
-        .map(_.sequencerDomainState)
-        .reduceLeft((a, b) => a.addSignatures(b.signatures.toSeq))
+        .map(_.sequencerSynchronizerState)
+        .reduceLeft((a, b) => a.addSignatures(b.signatures))
       mediatorDomainState = bootstrappingStates
         .map(_.mediatorDomainState)
-        .reduceLeft((a, b) => a.addSignatures(b.signatures.toSeq))
+        .reduceLeft((a, b) => a.addSignatures(b.signatures))
       node = synchronizerNodes(task.synchronizerId.identifier.unwrap)
       bootstrapTransactions = toStoredTopologyBootstrapTransactions(
         decentralizedNamespaceTxs ++
@@ -149,9 +148,9 @@ class InitializeSynchronizerTrigger(
           )
       )
       staticDomainParameters = node.parameters
-        .toStaticDomainParameters(
-          CommunityCryptoConfig(provider = CommunityCryptoProvider.Jce),
-          ProtocolVersion.v32,
+        .toStaticSynchronizerParameters(
+          CryptoConfig(provider = CryptoProvider.Jce),
+          ProtocolVersion.v33,
         )
         .valueOr(err =>
           throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
@@ -217,6 +216,7 @@ class InitializeSynchronizerTrigger(
             EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor)
           ),
           tx.copy(isProposal = false),
+          None,
         ) +: acc,
       )
     }._2
@@ -224,7 +224,7 @@ class InitializeSynchronizerTrigger(
 
 object InitializeSynchronizerTrigger {
   final case class Task(
-      synchronizerId: DomainId,
+      synchronizerId: SynchronizerId,
       synchronizerIdentities: Seq[SynchronizerIdentities],
       bootstrappingTransactions: NonEmpty[Seq[SynchronizerBootstrappingTransactions]],
   ) extends PrettyPrinting {

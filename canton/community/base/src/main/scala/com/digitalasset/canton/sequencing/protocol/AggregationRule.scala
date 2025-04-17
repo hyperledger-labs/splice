@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -11,25 +11,29 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.version.{
-  HasProtocolVersionedCompanion,
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
   ProtocolVersionedCompanionDbHelpers,
   RepresentativeProtocolVersion,
+  VersionedProtoCodec,
+  VersioningCompanion,
 }
 
-/** Encodes the conditions on when an aggregatable submission request's envelopes are sequenced and delivered.
+/** Encodes the conditions on when an aggregatable submission request's envelopes are sequenced and
+  * delivered.
   *
-  * Aggregatable submissions are grouped by their [[SubmissionRequest.aggregationId]].
-  * An aggregatable submission's envelopes are delivered to their recipients when the [[threshold]]'s
-  * submission request in its group has been sequenced. The aggregatable submission request that triggers the threshold
-  * defines the sequencing timestamp (and thus the sequencer counters) for all delivered envelopes.
-  * The sender of an aggregatable submission request receives a receipt of delivery immediately when its request was sequenced,
-  * not when its envelopes were delivered. When the envelopes are actually delivered, no further delivery receipt is sent.
+  * Aggregatable submissions are grouped by their [[SubmissionRequest.aggregationId]]. An
+  * aggregatable submission's envelopes are delivered to their recipients when the [[threshold]]'s
+  * submission request in its group has been sequenced. The aggregatable submission request that
+  * triggers the threshold defines the sequencing timestamp (and thus the sequencer counters) for
+  * all delivered envelopes. The sender of an aggregatable submission request receives a receipt of
+  * delivery immediately when its request was sequenced, not when its envelopes were delivered. When
+  * the envelopes are actually delivered, no further delivery receipt is sent.
   *
-  * So a threshold of 1 means that no aggregation takes place and the event is sequenced immediately.
-  * In this case, one can completely omit the aggregation rule in the submission request.
+  * So a threshold of 1 means that no aggregation takes place and the event is sequenced
+  * immediately. In this case, one can completely omit the aggregation rule in the submission
+  * request.
   */
 final case class AggregationRule(
     // TODO(#12075) This is a `Seq` rather than a `Set` just because we then have to worry less about deterministic serialization.
@@ -60,7 +64,7 @@ final case class AggregationRule(
 }
 
 object AggregationRule
-    extends HasProtocolVersionedCompanion[AggregationRule]
+    extends VersioningCompanion[AggregationRule]
     with ProtocolVersionedCompanionDbHelpers[AggregationRule] {
   def apply(
       eligibleMembers: NonEmpty[Seq[Member]],
@@ -71,10 +75,10 @@ object AggregationRule
 
   override def name: String = "AggregationRule"
 
-  override def supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.AggregationRule)(
+  override def versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.AggregationRule)(
       supportedProtoVersion(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 

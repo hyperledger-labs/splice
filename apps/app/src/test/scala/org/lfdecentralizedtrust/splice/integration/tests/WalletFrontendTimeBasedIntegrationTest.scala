@@ -1,15 +1,12 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
   FrontendLoginUtil,
   TimeTestUtil,
   WalletFrontendTestUtil,
   WalletTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.openqa.selenium.StaleElementReferenceException
 
 import java.time.Duration
@@ -22,8 +19,7 @@ class WalletFrontendTimeBasedIntegrationTest
     with TimeTestUtil {
 
   val amuletPrice = 2
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)

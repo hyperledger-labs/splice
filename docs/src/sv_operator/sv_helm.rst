@@ -186,6 +186,14 @@ OIDC_AUTHORITY_VALIDATOR_AUDIENCE    The audience for the validator backend API.
 OIDC_AUTHORITY_SV_AUDIENCE           The audience for the SV backend API. e.g. ``https://sv.example.com/api``
 ==================================== ===========================================================================
 
+Your IAM may also require a scope to be specified when the SV, validator and scan backend request a token for the ledger API. We will refer to that using the following configuration value:
+
+==================================== ===========================================================================
+Name                                 Value
+------------------------------------ ---------------------------------------------------------------------------
+OIDC_AUTHORITY_LEDGER_API_SCOPE      The scope for the participant ledger API. Optional
+==================================== ===========================================================================
+
 In case you are facing trouble with setting up your (non-Auth0) OIDC provider,
 it can be beneficial to skim the instructions in :ref:`helm-sv-auth0` as well, to check for functionality or configuration details that your OIDC provider setup might be missing.
 
@@ -286,7 +294,7 @@ Configuring Authentication on your SV Node
 We are now going to configure your SV node software based on the OIDC provider configuration values your exported to environment variables at the end of either :ref:`helm-sv-auth-requirements` or :ref:`helm-sv-auth0`.
 (Note that some authentication-related configuration steps are also included in :ref:`helm-sv-install`.)
 
-The following kubernetes secret will instruct the participant to create a service user for your SV app:
+The following kubernetes secret will instruct the participant to create a service user for your SV app (omit the scope if it is not needed in your setup).
 
 .. code-block:: bash
 
@@ -296,8 +304,9 @@ The following kubernetes secret will instruct the participant to create a servic
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}" \
         "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
+        "--from-literal=scope=${OIDC_AUTHORITY_LEDGER_API_SCOPE}"
 
-The validator app backend requires the following secret.
+The validator app backend requires the following secret (omit the scope if it is not needed in your setup).
 
 .. code-block:: bash
 
@@ -306,7 +315,8 @@ The validator app backend requires the following secret.
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}" \
-        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
+        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}" \
+        "--from-literal=scope=${OIDC_AUTHORITY_LEDGER_API_SCOPE}"
 
 To setup the wallet, CNS and SV UI, create the following two secrets.
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.traffic
@@ -14,10 +14,14 @@ import slick.jdbc.{GetResult, SetParameter}
 
 /** Total traffic purchased for a member valid at a specific timestamp
   *
-  * @param member              Member to which the balance belongs
-  * @param serial              Serial number of the balance
-  * @param extraTrafficPurchased             Traffic purchased value
-  * @param sequencingTimestamp Timestamp at which the purchase event was sequenced
+  * @param member
+  *   Member to which the balance belongs
+  * @param serial
+  *   Serial number of the balance
+  * @param extraTrafficPurchased
+  *   Traffic purchased value
+  * @param sequencingTimestamp
+  *   Timestamp at which the purchase event was sequenced
   */
 final case class TrafficPurchased(
     member: Member,

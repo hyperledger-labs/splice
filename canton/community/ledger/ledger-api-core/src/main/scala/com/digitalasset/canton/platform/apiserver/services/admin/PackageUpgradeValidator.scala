@@ -1,32 +1,32 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
 import cats.data.EitherT
-import com.daml.error.DamlError
+import cats.implicits.toTraverseOps
 import com.daml.logging.entries.LoggingValue.OfString
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.ledger.error.PackageServiceErrors.{InternalError, Validation}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.apiserver.services.admin.ApiPackageManagementService.ErrorValidations
 import com.digitalasset.canton.platform.apiserver.services.admin.PackageUpgradeValidator.PackageMap
+import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.archive.Decode
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName}
 import com.digitalasset.daml.lf.language.Ast
 import com.digitalasset.daml.lf.language.Util.{
   PkgIdWithNameAndVersion,
   dependenciesInTopologicalOrder,
 }
 import com.digitalasset.daml.lf.validation.{TypecheckUpgrades, UpgradeError}
-import scalaz.std.either.*
-import scalaz.std.option.*
-import scalaz.std.scalaFuture.futureInstance
-import scalaz.syntax.traverse.*
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 object PackageUpgradeValidator {
   type PackageMap = Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)]
@@ -35,27 +35,28 @@ object PackageUpgradeValidator {
 // TODO(i16362): Should have unit tests on canton-side for this code as per discussion in https://github.com/DACH-NY/canton/pull/21040#discussion_r1734646573
 // https://github.com/DACH-NY/canton/issues/16362
 class PackageUpgradeValidator(
-    getPackageMap: LoggingContextWithTrace => PackageMap,
-    getLfArchive: LoggingContextWithTrace => Ref.PackageId => Future[Option[Archive]],
+    getLfArchive: LoggingContextWithTrace => Ref.PackageId => FutureUnlessShutdown[Option[Archive]],
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
 
   def validateUpgrade(
-      upgradingPackages: List[(Ref.PackageId, Ast.Package)]
+      upgradingPackages: List[(Ref.PackageId, Ast.Package)],
+      packageMetadataSnapshot: PackageMetadata,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): EitherT[Future, DamlError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, RpcError, Unit] = {
     val upgradingPackagesMap = upgradingPackages.toMap
     val packagesInTopologicalOrder =
       dependenciesInTopologicalOrder(upgradingPackages.map(_._1), upgradingPackagesMap)
-    val packageMap = getPackageMap(loggingContext)
+
+    val packageMap = getUpgradablePackageIdVersionMap(packageMetadataSnapshot)
 
     def go(
         packageMap: PackageMap,
         deps: List[Ref.PackageId],
-    ): EitherT[Future, DamlError, PackageMap] = deps match {
-      case Nil => EitherT.pure[Future, DamlError](packageMap)
+    ): EitherT[FutureUnlessShutdown, RpcError, PackageMap] = deps match {
+      case Nil => EitherT.pure[FutureUnlessShutdown, RpcError](packageMap)
       case pkgId :: rest =>
         val pkg = upgradingPackagesMap(pkgId)
         val supportsUpgrades = pkg.supportsUpgrades(pkgId)
@@ -73,13 +74,26 @@ class PackageUpgradeValidator(
     go(packageMap, packagesInTopologicalOrder).map(_ => ())
   }
 
+  private def getUpgradablePackageIdVersionMap(
+      packageMetadataSnapshot: PackageMetadata
+  ): Map[PackageId, (PackageName, Ref.PackageVersion)] =
+    packageMetadataSnapshot.packageIdVersionMap.view.filterKeys { packageId =>
+      packageMetadataSnapshot.packageUpgradabilityMap
+        .getOrElse(
+          packageId,
+          throw new IllegalStateException(
+            s"Inconsistent package metadata: package-id $packageId present in packageIdVersion map, missing from the package upgradability map $packageId"
+          ),
+        )
+    }.toMap
+
   private def validatePackageUpgrade(
       uploadedPackage: (Ref.PackageId, Ast.Package),
       packageMap: PackageMap,
       upgradingPackagesMap: Map[Ref.PackageId, Ast.Package],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): EitherT[Future, DamlError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, RpcError, Unit] = {
     val (uploadedPackageId, uploadedPackageAst) = uploadedPackage
     val optUpgradingDar = Some(uploadedPackage)
     val uploadedPackageIdWithMeta: PkgIdWithNameAndVersion = PkgIdWithNameAndVersion(
@@ -88,12 +102,12 @@ class PackageUpgradeValidator(
     logger.info(
       s"Uploading DAR file for $uploadedPackageIdWithMeta in submission ID ${loggingContext.serializeFiltered("submissionId")}."
     )
-    if (uploadedPackageAst.isInvalidDamlPrim(uploadedPackageId)) {
-      EitherT.leftT[Future, Unit](
+    if (uploadedPackageAst.isInvalidDamlPrimOrStdlib(uploadedPackageId)) {
+      EitherT.leftT[FutureUnlessShutdown, Unit](
         Validation.UpgradeDamlPrimIsNotAUtilityPackage
           .Error(
             uploadedPackage = uploadedPackageIdWithMeta
-          ): DamlError
+          ): RpcError
       )
     } else {
       existingVersionedPackageId(uploadedPackageAst, packageMap) match {
@@ -102,21 +116,21 @@ class PackageUpgradeValidator(
             logger.info(
               s"Ignoring upload of package $uploadedPackageIdWithMeta as it has been previously uploaded"
             )
-            EitherT.rightT[Future, DamlError](())
+            EitherT.rightT[FutureUnlessShutdown, RpcError](())
           } else {
-            EitherT.leftT[Future, Unit](
+            EitherT.leftT[FutureUnlessShutdown, Unit](
               Validation.UpgradeVersion
                 .Error(
                   uploadedPackage = uploadedPackageIdWithMeta,
                   existingPackage = existingPackageId,
                   packageVersion = uploadedPackageAst.metadata.version,
-                ): DamlError
+                ): RpcError
             )
           }
 
         case None =>
           for {
-            optMaximalDar <- EitherT.right[DamlError](
+            optMaximalDar <- EitherT.right[RpcError](
               maximalVersionedDar(
                 uploadedPackageAst,
                 packageMap,
@@ -129,7 +143,7 @@ class PackageUpgradeValidator(
               optUpgradingDar,
               optMaximalDar,
             )
-            optMinimalDar <- EitherT.right[DamlError](
+            optMinimalDar <- EitherT.right[RpcError](
               minimalVersionedDar(uploadedPackageAst, packageMap, upgradingPackagesMap)
             )
             _ <- typecheckUpgrades(
@@ -151,13 +165,13 @@ class PackageUpgradeValidator(
       upgradingPackagesMap: Map[Ref.PackageId, Ast.Package],
   )(implicit
       loggingContextWithTrace: LoggingContextWithTrace
-  ): Future[Option[(Ref.PackageId, Ast.Package)]] =
+  ): FutureUnlessShutdown[Option[(Ref.PackageId, Ast.Package)]] =
     upgradingPackagesMap.get(pkgId) match {
-      case Some(pkg) => Future.successful(Some((pkgId, pkg)))
+      case Some(pkg) => FutureUnlessShutdown.pure(Some((pkgId, pkg)))
       case None =>
         for {
           optArchive <- getLfArchive(loggingContextWithTrace)(pkgId)
-          optPackage <- Future.fromTry {
+          optPackage <- FutureUnlessShutdown.fromTry {
             optArchive
               .traverse(Decode.decodeArchive(_))
               .handleError(Validation.handleLfArchiveError)
@@ -180,7 +194,7 @@ class PackageUpgradeValidator(
       upgradingPackagesMap: Map[Ref.PackageId, Ast.Package],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Option[(Ref.PackageId, Ast.Package)]] = {
+  ): FutureUnlessShutdown[Option[(Ref.PackageId, Ast.Package)]] = {
     val pkgName = pkg.metadata.name
     packageMap
       .collect { case (pkgId, (`pkgName`, pkgVersion)) =>
@@ -205,7 +219,7 @@ class PackageUpgradeValidator(
       upgradingPackagesMap: Map[Ref.PackageId, Ast.Package],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Option[(Ref.PackageId, Ast.Package)]] = {
+  ): FutureUnlessShutdown[Option[(Ref.PackageId, Ast.Package)]] = {
     val pkgName = pkg.metadata.name
     packageMap
       .collect { case (pkgId, (`pkgName`, pkgVersion)) =>
@@ -231,7 +245,7 @@ class PackageUpgradeValidator(
       oldDar2: (Ref.PackageId, Ast.Package),
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): EitherT[Future, DamlError, Unit] =
+  ): EitherT[FutureUnlessShutdown, RpcError, Unit] =
     LoggingContextWithTrace
       .withEnrichedLoggingContext("upgradeTypecheckPhase" -> OfString(phase.toString)) {
         implicit loggingContext =>
@@ -241,12 +255,12 @@ class PackageUpgradeValidator(
           val oldPkgId2WithMeta: PkgIdWithNameAndVersion = PkgIdWithNameAndVersion(oldDar2)
           logger.info(s"Package $newPkgId1WithMeta claims to upgrade package id $oldPkgId2WithMeta")
           EitherT(
-            Future(
+            FutureUnlessShutdown.pure(
               TypecheckUpgrades
                 .typecheckUpgrades(packageMap, (newPkgId1, newPkg1), oldPkgId2, Some(oldPkg2))
                 .toEither
             )
-          ).leftMap[DamlError] {
+          ).leftMap[RpcError] {
             case err: UpgradeError =>
               Validation.Upgradeability.Error(
                 newPackage = newPkgId1WithMeta,
@@ -269,10 +283,10 @@ class PackageUpgradeValidator(
       optOldDar2: Option[(Ref.PackageId, Ast.Package)],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): EitherT[Future, DamlError, Unit] =
+  ): EitherT[FutureUnlessShutdown, RpcError, Unit] =
     (optNewDar1, optOldDar2) match {
       case (None, _) | (_, None) =>
-        EitherT.rightT[Future, DamlError](())
+        EitherT.rightT[FutureUnlessShutdown, RpcError](())
 
       case (Some((newPkgId1, newPkg1)), Some((oldPkgId2, oldPkg2))) =>
         strictTypecheckUpgrades(

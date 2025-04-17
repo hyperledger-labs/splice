@@ -41,6 +41,11 @@ jobs:
         with:
           cmd: ./scripts/check-daml-return-types.sh
 
+      - name: Run Daml interface implementations check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-daml-interface-impls.sh
+
       - name: Checking TODOs
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:

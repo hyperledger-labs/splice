@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -25,13 +25,12 @@ import scala.annotation.tailrec
 /** Defines which exceptions should be retryable when thrown by the database. */
 object DbExceptionRetryPolicy extends ExceptionRetryPolicy {
 
-  /** Max number of retries for spurious transient errors.
-    * Main use case is a transient unique constraint violation due to racy merge statements.
-    * Should go away after a very limited amount of retries.
+  /** Max number of retries for spurious transient errors. Main use case is a transient unique
+    * constraint violation due to racy merge statements. Should go away after a very limited amount
+    * of retries.
     *
-    * Value determined empirically in the now removed UpsertTestOracle.
-    * For single row inserts, 1 is sufficient.
-    * For batched inserts, 3 was more than sufficient in the test.
+    * Value determined empirically in the now removed UpsertTestOracle. For single row inserts, 1 is
+    * sufficient. For batched inserts, 3 was more than sufficient in the test.
     */
   private val spuriousTransientErrorMaxRetries = 10
 
@@ -44,7 +43,7 @@ object DbExceptionRetryPolicy extends ExceptionRetryPolicy {
     case exn: java.util.concurrent.RejectedExecutionException =>
       // This occurs when slick's task queue is full
 
-      // Create a CantonError so that the error code gets logged.
+      // Create a RpcError so that the error code gets logged.
       DatabaseTaskRejected(exn.toString)(
         ErrorLoggingContext.fromTracedLogger(logger)
       ).discard
@@ -116,6 +115,16 @@ object DbExceptionRetryPolicy extends ExceptionRetryPolicy {
     case _: NoConnectionAvailable =>
       // Avoid log noise if no connection is available either due to contention or a temporary network problem
       Some(Level.DEBUG)
+
+    case exception: PSQLException =>
+      // Error codes documented here: https://www.postgresql.org/docs/9.6/errcodes-appendix.html
+      val error = exception.getSQLState
+      if (error == "40001") {
+        // Class 40 — Transaction Rollback: 40001	serialization_failure
+        // Failure to serialize db accesses, happens due to contention
+        Some(Level.INFO)
+      } else None
+
     case _ => None
   }
 }

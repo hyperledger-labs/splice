@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -19,8 +19,8 @@ import com.digitalasset.canton.sequencing.protocol.{
 import com.digitalasset.canton.util.ReassignmentTag.Source
 
 /** Invariants:
-  * - Deliver event contains exactly one protocol message with viewType == UnassignmentViewType
-  * - Verdict of this event is Approve
+  *   - Deliver event contains exactly one protocol message with viewType == UnassignmentViewType
+  *   - Verdict of this event is Approve
   */
 final case class DeliveredUnassignmentResult private (
     result: SignedContent[Deliver[DefaultOpenEnvelope]]
@@ -33,7 +33,7 @@ final case class DeliveredUnassignmentResult private (
   val unwrap: ConfirmationResultMessage = signedConfirmationResult.message
 
   def reassignmentId: ReassignmentId =
-    ReassignmentId(Source(unwrap.domainId), unwrap.requestId.unwrap)
+    ReassignmentId(Source(unwrap.synchronizerId), unwrap.requestId.unwrap)
 
   override protected def pretty: Pretty[DeliveredUnassignmentResult] = prettyOfParam(_.unwrap)
 }
@@ -49,7 +49,7 @@ object DeliveredUnassignmentResult {
       content: Deliver[DefaultOpenEnvelope]
   ): Either[InvalidUnassignmentResult, SignedProtocolMessage[ConfirmationResultMessage]] =
     content match {
-      case Deliver(_, _, _, _, Batch(envelopes), _, _) =>
+      case Deliver(_, _, _, _, _, Batch(envelopes), _, _) =>
         val unassignmentResults =
           envelopes
             .mapFilter(
@@ -81,8 +81,8 @@ object DeliveredUnassignmentResult {
         } yield unassignmentResults(0).protocolMessage
     }
 
-  /** - Deliver event contains exactly one protocol message with viewType == UnassignmentViewType
-    * - Verdict of this event is Approve
+  /**   - Deliver event contains exactly one protocol message with viewType == UnassignmentViewType
+    *   - Verdict of this event is Approve
     */
   private def checkInvariants(
       result: SignedContent[Deliver[DefaultOpenEnvelope]]

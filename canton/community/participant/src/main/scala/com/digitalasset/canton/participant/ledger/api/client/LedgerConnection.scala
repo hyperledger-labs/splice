@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api.client
@@ -14,7 +14,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
 import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi
 import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.ledger.api.refinements.ApiTypes.ApplicationId
+import com.digitalasset.canton.ledger.api.refinements.ApiTypes.UserId
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.ledger.client.configuration.{
   CommandClientConfiguration,
@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContextExecutor
 
 object LedgerConnection {
   def createLedgerClient(
-      applicationId: ApplicationId,
+      userId: UserId,
       config: ClientConfig,
       commandClientConfiguration: CommandClientConfiguration,
       tracerProvider: TracerProvider,
@@ -42,15 +42,15 @@ object LedgerConnection {
       executionSequencerFactory: ExecutionSequencerFactory,
   ): LedgerClient = {
     val clientConfig = LedgerClientConfiguration(
-      applicationId = ApplicationId.unwrap(applicationId),
+      userId = UserId.unwrap(userId),
       commandClient = commandClientConfiguration,
       token = token,
     )
     val clientChannelConfig = LedgerClientChannelConfiguration(
-      sslContext = config.tls.map(x => ClientChannelBuilder.sslContext(x)),
+      sslContext = config.tlsConfig.map(x => ClientChannelBuilder.sslContext(x)),
       // Hard-coding the maximum value (= 2GB).
       // If a limit is needed, because an application can't handle transactions at that size,
-      // the participants should agree on a lower limit and enforce that through domain parameters.
+      // the participants should agree on a lower limit and enforce that through synchronizer parameters.
       maxInboundMessageSize = Int.MaxValue,
     )
 
@@ -64,15 +64,18 @@ object LedgerConnection {
   }
 
   def transactionFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
-    TransactionFilter(filter.map {
-      case (p, Nil) => p.toProtoPrimitive -> Filters.defaultInstance
-      case (p, ts) =>
-        p.toProtoPrimitive -> Filters(
-          ts.map(tf =>
-            CumulativeFilter(IdentifierFilter.TemplateFilter(TemplateFilter(Some(tf), false)))
+    TransactionFilter(
+      filter.map {
+        case (p, Nil) => p.toProtoPrimitive -> Filters.defaultInstance
+        case (p, ts) =>
+          p.toProtoPrimitive -> Filters(
+            ts.map(tf =>
+              CumulativeFilter(IdentifierFilter.TemplateFilter(TemplateFilter(Some(tf), false)))
+            )
           )
-        )
-    })
+      },
+      None,
+    )
 
   def mapTemplateIds(id: javaapi.data.Identifier): Identifier =
     Identifier(

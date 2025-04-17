@@ -42,11 +42,12 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
 import org.scalatest.{Assertion, Succeeded}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll as scForAll
 
@@ -1082,7 +1083,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
   private def buyTrafficRequest(
       buyer: PartyId,
       memberId: Member,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       trafficAmount: Long,
       expiresAt: CantonTimestamp,
       trackingId: String,
@@ -1096,7 +1097,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
       trackingId,
       trafficAmount,
       memberId.toProtoPrimitive,
-      domainId.toProtoPrimitive,
+      synchronizerId.toProtoPrimitive,
       domainMigrationId,
     )
     contract(
@@ -1422,7 +1423,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
       trackingId: String,
       buyer: PartyId,
       memberId: Member,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       trafficRequestCid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
       trafficAmount: Long = 1_000_000L,
   ) = {
@@ -1438,7 +1439,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
         consuming = false,
         new WalletAppInstall_CreateBuyTrafficRequest(
           memberId.toProtoPrimitive,
-          domainId.toProtoPrimitive,
+          synchronizerId.toProtoPrimitive,
           domainMigrationId,
           trafficAmount,
           Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(60),
@@ -1453,7 +1454,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           buyTrafficRequest(
             buyer,
             memberId,
-            domainId,
+            synchronizerId,
             trafficAmount,
             CantonTimestamp.now().plusSeconds(60),
             trackingId,
@@ -1462,7 +1463,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           Seq(buyer),
         )
       ),
-      domainId,
+      synchronizerId,
     )
   }
 
@@ -1503,7 +1504,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
 
   protected lazy val acsOffset: Long = nextOffset()
   protected lazy val domain: String = dummyDomain.toProtoPrimitive
-  protected lazy val domainAlias: DomainAlias = DomainAlias.tryCreate(domain)
+  protected lazy val synchronizerAlias: SynchronizerAlias = SynchronizerAlias.tryCreate(domain)
 }
 
 class DbUserWalletStoreTest
@@ -1543,15 +1544,12 @@ class DbUserWalletStoreTest
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(domainAlias -> dummyDomain)
+        Map(synchronizerAlias -> dummyDomain)
       )
     } yield store
   }
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[?] =
-    for {
-      _ <- resetAllAppTables(storage)
-    } yield ()
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
 }

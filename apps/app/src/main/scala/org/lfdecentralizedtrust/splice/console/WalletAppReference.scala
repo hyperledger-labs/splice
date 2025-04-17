@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.Help
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 
 abstract class WalletAppReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
@@ -343,7 +343,7 @@ abstract class WalletAppReference(
   )
   def createBuyTrafficRequest(
       receivingValidator: PartyId,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       trafficAmount: Long,
       trackingId: String,
       expiresAt: CantonTimestamp,
@@ -353,7 +353,7 @@ abstract class WalletAppReference(
         HttpWalletAppClient
           .CreateBuyTrafficRequest(
             receivingValidator,
-            domainId,
+            synchronizerId,
             trafficAmount,
             expiresAt,
             trackingId,

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.transaction
@@ -11,7 +11,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
-import com.digitalasset.canton.topology.transaction
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
@@ -88,16 +87,16 @@ trait DelegatedTopologyTransactionLike[+Op <: TopologyChangeOp, +M <: TopologyMa
   override final def hash: TxHash = transactionLikeDelegate.hash
 }
 
-/** Change to the distributed domain topology
+/** Change to the distributed synchronizer topology
   *
-  * A topology transaction is a state change to the domain topology. There are different
-  * types of topology states (so called mappings, because they map some id to some value).
+  * A topology transaction is a state change to the synchronizer topology. There are different types
+  * of topology states (so called mappings, because they map some id to some value).
   *
-  * Each mapping has some variables and some combination of these variables makes a
-  * "unique key". Subsequent changes to that key need to have an incremental serial number.
+  * Each mapping has some variables and some combination of these variables makes a "unique key".
+  * Subsequent changes to that key need to have an incremental serial number.
   *
-  * Topology changes always affect certain identities. Therefore, these topology
-  * transactions need to be authorized through signatures.
+  * Topology changes always affect certain identities. Therefore, these topology transactions need
+  * to be authorized through signatures.
   *
   * An authorized transaction is called a [[SignedTopologyTransaction]]
   */
@@ -145,7 +144,6 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
     TxHash(
       Hash.digest(
         HashPurpose.TopologyTransactionSignature,
-        // TODO(#14048) use digest directly to avoid protobuf serialization for hashing
         this.getCryptographicEvidence,
         HashAlgorithm.Sha256,
       )
@@ -166,8 +164,8 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
       TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
     )
 
-  /** Indicates how to pretty print this instance.
-    * See `PrettyPrintingTest` for examples on how to implement this method.
+  /** Indicates how to pretty print this instance. See `PrettyPrintingTest` for examples on how to
+    * implement this method.
     */
   override protected def pretty: Pretty[TopologyTransaction.this.type] =
     prettyOfClass(
@@ -181,7 +179,7 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
 }
 
 object TopologyTransaction
-    extends HasMemoizedProtocolVersionedWrapperCompanion[
+    extends VersioningCompanionMemoization[
       TopologyTransaction[TopologyChangeOp, TopologyMapping]
     ] {
 
@@ -191,11 +189,11 @@ object TopologyTransaction
 
   type GenericTopologyTransaction = TopologyTransaction[TopologyChangeOp, TopologyMapping]
 
-  val supportedProtoVersions: transaction.TopologyTransaction.SupportedProtoVersions =
-    SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.TopologyTransaction)(
+  val versioningTable: VersioningTable =
+    VersioningTable(
+      ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.TopologyTransaction)(
         supportedProtoVersionMemoized(_)(fromProtoV30),
-        _.toProtoV30.toByteString,
+        _.toProtoV30,
       )
     )
 

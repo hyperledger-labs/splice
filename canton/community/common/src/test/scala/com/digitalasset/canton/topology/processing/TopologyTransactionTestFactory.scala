@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
@@ -7,21 +7,28 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SigningPublicKey
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.TestDomainParameters
+import com.digitalasset.canton.protocol.TestSynchronizerParameters
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.DefaultTestIdentities.sequencerId
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.DelegationRestriction.{
+  CanSignAllButNamespaceDelegations,
+  CanSignAllMappings,
+}
 
 import scala.concurrent.ExecutionContext
 
-class TopologyTransactionTestFactory(loggerFactory: NamedLoggerFactory, initEc: ExecutionContext)
-    extends TestingOwnerWithKeys(sequencerId, loggerFactory, initEc) {
+class TopologyTransactionTestFactory(
+    loggerFactory: NamedLoggerFactory,
+    initEc: ExecutionContext,
+    multiHash: Boolean = false,
+) extends TestingOwnerWithKeys(sequencerId, loggerFactory, initEc, multiHash) {
 
   import SigningKeys.*
 
-  def createNs(ns: Namespace, key: SigningPublicKey, isRootDelegation: Boolean) =
-    NamespaceDelegation.tryCreate(ns, key, isRootDelegation)
+  def createNs(ns: Namespace, key: SigningPublicKey, delegationRestriction: DelegationRestriction) =
+    NamespaceDelegation.tryCreate(ns, key, delegationRestriction)
 
   val ns1 = Namespace(key1.fingerprint)
   val ns1_unsupportedSpec = Namespace(key1_unsupportedSpec.fingerprint)
@@ -35,31 +42,26 @@ class TopologyTransactionTestFactory(loggerFactory: NamedLoggerFactory, initEc: 
   val uid1a = UniqueIdentifier.tryCreate("one", ns1)
   val uid1b = UniqueIdentifier.tryCreate("two", ns1)
   val uid6 = UniqueIdentifier.tryCreate("other", ns6)
-  val domainId1 = DomainId(UniqueIdentifier.tryCreate("domain", ns1))
-  val domainId1a = DomainId(uid1a)
+  val synchronizerId1 = SynchronizerId(UniqueIdentifier.tryCreate("synchronizer", ns1))
+  val synchronizerId1a = SynchronizerId(uid1a)
   val party1b = PartyId(uid1b)
   val party6 = PartyId(uid6)
   val participant1 = ParticipantId(uid1a)
   val participant6 = ParticipantId(uid6)
-  val ns1k1_k1 = mkAdd(createNs(ns1, key1, isRootDelegation = true), key1)
+  val ns1k1_k1 = mkAdd(createNs(ns1, key1, CanSignAllMappings), key1)
   val ns1k1_k1_unsupportedScheme =
     mkAdd(
-      createNs(ns1_unsupportedSpec, key1_unsupportedSpec, isRootDelegation = true),
+      createNs(ns1_unsupportedSpec, key1_unsupportedSpec, CanSignAllMappings),
       key1_unsupportedSpec,
     )
-  val ns1k2_k1 = mkAdd(createNs(ns1, key2, isRootDelegation = true), key1)
-  val ns1k2_k1p = mkAdd(createNs(ns1, key2, isRootDelegation = true), key1)
-  val ns1k3_k2 = mkAdd(createNs(ns1, key3, isRootDelegation = false), key2)
-  val ns1k8_k3_fail = mkAdd(createNs(ns1, key8, isRootDelegation = false), key3)
-  val ns2k2_k2 = mkAdd(createNs(ns2, key2, isRootDelegation = true), key2)
-  val ns3k3_k3 = mkAdd(createNs(ns3, key3, isRootDelegation = true), key3)
-  val ns6k3_k6 = mkAdd(createNs(ns6, key3, isRootDelegation = false), key6)
-  val ns6k6_k6 = mkAdd(createNs(ns6, key6, isRootDelegation = true), key6)
-  val id1ak4_k1 = mkAdd(IdentifierDelegation(uid1a, key4), key1)
-  val id1ak4_k2 = mkAdd(IdentifierDelegation(uid1a, key4), key2)
-  val id1ak6_k4 = mkAdd(IdentifierDelegation(uid1a, key6), key4)
-
-  val id6k4_k1 = mkAdd(IdentifierDelegation(uid6, key4), key1)
+  val ns1k2_k1 = mkAdd(createNs(ns1, key2, CanSignAllMappings), key1)
+  val ns1k2_k1p = mkAdd(createNs(ns1, key2, CanSignAllMappings), key1)
+  val ns1k3_k2 = mkAdd(createNs(ns1, key3, CanSignAllButNamespaceDelegations), key2)
+  val ns1k8_k3_fail = mkAdd(createNs(ns1, key8, CanSignAllButNamespaceDelegations), key3)
+  val ns2k2_k2 = mkAdd(createNs(ns2, key2, CanSignAllMappings), key2)
+  val ns3k3_k3 = mkAdd(createNs(ns3, key3, CanSignAllMappings), key3)
+  val ns6k3_k6 = mkAdd(createNs(ns6, key3, CanSignAllButNamespaceDelegations), key6)
+  val ns6k6_k6 = mkAdd(createNs(ns6, key6, CanSignAllMappings), key6)
 
   val okm1ak5k1E_k2 =
     mkAddMultiKey(
@@ -71,10 +73,10 @@ class TopologyTransactionTestFactory(loggerFactory: NamedLoggerFactory, initEc: 
       OwnerToKeyMapping(participant1, NonEmpty(Seq, key5, EncryptionKeys.key1)),
       NonEmpty(Set, key1, key5),
     )
-  val okm1bk5k1E_k4 =
+  val okm1bk5k1E_k2 =
     mkAddMultiKey(
       OwnerToKeyMapping(participant1, NonEmpty(Seq, key5, EncryptionKeys.key1)),
-      NonEmpty(Set, key4, key5),
+      NonEmpty(Set, key2, key5),
     )
 
   val sequencer1 = SequencerId(UniqueIdentifier.tryCreate("sequencer1", ns1))
@@ -85,23 +87,16 @@ class TopologyTransactionTestFactory(loggerFactory: NamedLoggerFactory, initEc: 
     )
   val sdmS1_k1 =
     mkAdd(
-      SequencerDomainState
-        .create(domainId1, PositiveInt.one, Seq(sequencer1), Seq.empty)
-        .getOrElse(sys.error("Failed to create SequencerDomainState")),
+      SequencerSynchronizerState
+        .create(synchronizerId1, PositiveInt.one, Seq(sequencer1), Seq.empty)
+        .getOrElse(sys.error("Failed to create SequencerSynchronizerState")),
       key1,
     )
-  def add_OkmS1k9_k1(otk: OwnerToKeyMapping, serial: PositiveInt) =
-    mkAddMultiKey(otk.copy(keys = otk.keys :+ key9), NonEmpty(Set, key1, key9))
-  def remove_okmS1k7_k1(otk: OwnerToKeyMapping, serial: PositiveInt) =
-    NonEmpty
-      .from(otk.keys.forgetNE.toSet - key7)
-      .map(keys => mkAdd(otk.copy(keys = keys.toSeq)))
-      .getOrElse(sys.error(s"tried to remove the last key of $otk"))
 
   val dtcp1_k1 =
-    mkAdd(DomainTrustCertificate(participant1, DomainId(uid1a)), key1)
+    mkAdd(SynchronizerTrustCertificate(participant1, SynchronizerId(uid1a)), key1)
 
-  val defaultDomainParameters = TestDomainParameters.defaultDynamic
+  val defaultSynchronizerParameters = TestSynchronizerParameters.defaultDynamic
 
   val p1p1B_k2 =
     mkAdd(
@@ -153,31 +148,31 @@ class TopologyTransactionTestFactory(loggerFactory: NamedLoggerFactory, initEc: 
     )
 
   val dmp1_k2 = mkAdd(
-    DomainParametersState(DomainId(uid1a), defaultDomainParameters),
+    SynchronizerParametersState(SynchronizerId(uid1a), defaultSynchronizerParameters),
     key2,
   )
 
   val dmp1_k1 = mkAdd(
-    DomainParametersState(
-      DomainId(uid1a),
-      defaultDomainParameters
+    SynchronizerParametersState(
+      SynchronizerId(uid1a),
+      defaultSynchronizerParameters
         .tryUpdate(confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfSeconds(1)),
     ),
     key1,
   )
 
   val dmp1_k1_bis = mkAdd(
-    DomainParametersState(
-      DomainId(uid1a),
-      defaultDomainParameters
+    SynchronizerParametersState(
+      SynchronizerId(uid1a),
+      defaultSynchronizerParameters
         .tryUpdate(confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfSeconds(2)),
     ),
     key1,
   )
 
-  val ns7k7_k7 = mkAdd(createNs(ns7, key7, isRootDelegation = true), key7)
-  val ns8k8_k8 = mkAdd(createNs(ns8, key8, isRootDelegation = true), key8)
-  val ns9k9_k9 = mkAdd(createNs(ns9, key9, isRootDelegation = true), key9)
+  val ns7k7_k7 = mkAdd(createNs(ns7, key7, CanSignAllMappings), key7)
+  val ns8k8_k8 = mkAdd(createNs(ns8, key8, CanSignAllMappings), key8)
+  val ns9k9_k9 = mkAdd(createNs(ns9, key9, CanSignAllMappings), key9)
 
   val dns1 = mkAddMultiKey(
     DecentralizedNamespaceDefinition
@@ -194,8 +189,11 @@ class TopologyTransactionTestFactory(loggerFactory: NamedLoggerFactory, initEc: 
     NonEmpty(Set, key1, key8, key9),
     serial = PositiveInt.two,
   )
-  val dns1Idd = mkAddMultiKey(
-    IdentifierDelegation(UniqueIdentifier.tryCreate("test", dns1.mapping.namespace), key4),
+  val dns1trustCert = mkAddMultiKey(
+    SynchronizerTrustCertificate(
+      ParticipantId(UniqueIdentifier.tryCreate("test", dns1.mapping.namespace)),
+      synchronizerId1,
+    ),
     NonEmpty(Set, key1, key8, key9),
   )
   val dns2 = mkAdd(

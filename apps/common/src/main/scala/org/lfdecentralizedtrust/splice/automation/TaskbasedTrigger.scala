@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
-import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
@@ -14,7 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider.{
   RetryableConditions,
 }
 import com.daml.metrics.api.MetricsContext
-
+import com.digitalasset.base.error.utils.ErrorDetails
 import io.grpc.protobuf.StatusProto
 import io.opentelemetry.api.trace.Tracer
 

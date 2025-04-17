@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -27,7 +27,7 @@ import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
@@ -53,14 +53,16 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Factory class that can create the [[com.digitalasset.canton.data.GenTransactionTree]]s from a
   * [[com.digitalasset.canton.protocol.WellFormedTransaction]].
   *
-  * @param contractSerializer used to serialize contract instances for contract ids
-  *                           Will only be used to serialize contract instances contained in well-formed transactions.
-  * @param cryptoOps is used to derive Merkle hashes and contract ids [[com.digitalasset.canton.crypto.HashOps]]
-  *                  as well as salts and contract ids [[com.digitalasset.canton.crypto.HmacOps]]
+  * @param contractSerializer
+  *   used to serialize contract instances for contract ids Will only be used to serialize contract
+  *   instances contained in well-formed transactions.
+  * @param cryptoOps
+  *   is used to derive Merkle hashes and contract ids [[com.digitalasset.canton.crypto.HashOps]] as
+  *   well as salts and contract ids [[com.digitalasset.canton.crypto.HmacOps]]
   */
 class TransactionTreeFactoryImpl(
     participantId: ParticipantId,
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     protocolVersion: ProtocolVersion,
     contractSerializer: LfContractInst => SerializableRawContractInstance,
     cryptoOps: HashOps & HmacOps,
@@ -70,7 +72,7 @@ class TransactionTreeFactoryImpl(
     with NamedLogging {
 
   private val unicumGenerator = new UnicumGenerator(cryptoOps)
-  private val cantonContractIdVersion = AuthenticatedContractIdVersionV10
+  private val cantonContractIdVersion = AuthenticatedContractIdVersionV11
   private val transactionViewDecompositionFactory = TransactionViewDecompositionFactory
 
   override def createTransactionTree(
@@ -121,7 +123,7 @@ class TransactionTreeFactoryImpl(
 
     val commonMetadata = CommonMetadata
       .create(cryptoOps, protocolVersion)(
-        domainId,
+        synchronizerId,
         mediator,
         commonMetadataSalt,
         transactionUuid,
@@ -131,7 +133,7 @@ class TransactionTreeFactoryImpl(
       submitterMetadata <- SubmitterMetadata
         .fromSubmitterInfo(cryptoOps)(
           submitterActAs = submitterInfo.actAs,
-          submitterApplicationId = submitterInfo.applicationId,
+          submitterUserId = submitterInfo.userId,
           submitterCommandId = submitterInfo.commandId,
           submitterSubmissionId = submitterInfo.submissionId,
           submitterDeduplicationPeriod = submitterInfo.deduplicationPeriod,
@@ -148,7 +150,6 @@ class TransactionTreeFactoryImpl(
 
       rootViewDecompositions <- EitherT
         .liftF(rootViewDecompositionsF)
-        .mapK(FutureUnlessShutdown.outcomeK)
 
       _ = if (logger.underlying.isDebugEnabled) {
         val numRootViews = rootViewDecompositions.length
@@ -160,9 +161,9 @@ class TransactionTreeFactoryImpl(
 
       _ <-
         if (validatePackageVettings)
-          UsableDomain
+          UsableSynchronizers
             .checkPackagesVetted(
-              domainId = domainId,
+              synchronizerId = synchronizerId,
               snapshot = topologySnapshot,
               requiredPackagesByParty = requiredPackagesByParty(rootViewDecompositions),
               metadata.ledgerTime,
@@ -501,7 +502,7 @@ class TransactionTreeFactoryImpl(
     }
     val contractMetadata = LfTransactionUtil.metadataFromCreate(createNode)
     val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
-      domainId,
+      synchronizerId,
       state.mediator,
       state.transactionUUID,
       viewPosition,
@@ -522,7 +523,7 @@ class TransactionTreeFactoryImpl(
       rawContractInstance = serializedCantonContractInst,
       metadata = contractMetadata,
       ledgerCreateTime = LedgerCreateTime(state.ledgerTime),
-      contractSalt = Some(contractSalt.unwrap),
+      contractSalt = contractSalt.unwrap,
     )
     state.setCreatedContractInfo(contractId, createdInfo)
 
@@ -601,36 +602,38 @@ class TransactionTreeFactoryImpl(
       protocolVersion,
     )
 
-  /** The difference between `viewKeyInputs: Map[LfGlobalKey, KeyInput]` and
-    * `subviewKeyResolutions: Map[LfGlobalKey, SerializableKeyResolution]`, computed as follows:
-    * <ul>
-    * <li>First, `keyVersionAndMaintainers` is used to compute
-    *     `viewKeyResolutions: Map[LfGlobalKey, SerializableKeyResolution]` from `viewKeyInputs`.</li>
-    * <li>Second, the result consists of all key-resolution pairs that are in `viewKeyResolutions`,
-    *     but not in `subviewKeyResolutions`.</li>
-    * </ul>
+  /** The difference between `viewKeyInputs: Map[LfGlobalKey, KeyInput]` and `subviewKeyResolutions:
+    * Map[LfGlobalKey, SerializableKeyResolution]`, computed as follows:
+    *   - First, `keyVersionAndMaintainers` is used to compute `viewKeyResolutions: Map[LfGlobalKey,
+    *     SerializableKeyResolution]` from `viewKeyInputs`.
+    *   - Second, the result consists of all key-resolution pairs that are in `viewKeyResolutions`,
+    *     but not in `subviewKeyResolutions`.
     *
-    * Note: The following argument depends on how this method is used.
-    * It just sits here because we can then use scaladoc referencing.
+    * Note: The following argument depends on how this method is used. It just sits here because we
+    * can then use scaladoc referencing.
     *
-    * All resolved contract IDs in the map difference are core input contracts by the following argument:
-    * Suppose that the map difference resolves a key `k` to a contract ID `cid`.
-    * - In mode [[com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode.Strict]],
-    *   the first node (in execution order) involving the key `k` determines the key's resolution for the view.
-    *   So the first node `n` in execution order involving `k` is an Exercise, Fetch, or positive LookupByKey node.
-    * - In mode [[com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode.Off]],
-    *   the first by-key node (in execution order, including Creates) determines the global key input of the view.
-    *   So the first by-key node `n` is an ExerciseByKey, FetchByKey, or positive LookupByKey node.
-    * In particular, `n` cannot be a Create node because then the resolution for the view
-    * would be [[com.digitalasset.daml.lf.transaction.ContractStateMachine.KeyInactive]].
-    * If this node `n` is in the core of the view, then `cid` is a core input and we are done.
-    * If this node `n` is in a proper subview, then the aggregated global key inputs
-    * [[com.digitalasset.canton.data.TransactionView.globalKeyInputs]]
-    * of the subviews resolve `k` to `cid` (as resolutions from earlier subviews are preferred)
-    * and therefore the map difference does not resolve `k` at all.
+    * All resolved contract IDs in the map difference are core input contracts by the following
+    * argument: Suppose that the map difference resolves a key `k` to a contract ID `cid`.
+    *   - In mode [[com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode.Strict]], the
+    *     first node (in execution order) involving the key `k` determines the key's resolution for
+    *     the view. So the first node `n` in execution order involving `k` is an Exercise, Fetch, or
+    *     positive LookupByKey node.
+    *   - In mode [[com.digitalasset.daml.lf.transaction.ContractKeyUniquenessMode.Off]], the first
+    *     by-key node (in execution order, including Creates) determines the global key input of the
+    *     view. So the first by-key node `n` is an ExerciseByKey, FetchByKey, or positive
+    *     LookupByKey node. In particular, `n` cannot be a Create node because then the resolution
+    *     for the view would be
+    *     [[com.digitalasset.daml.lf.transaction.ContractStateMachine.KeyInactive]]. If this node
+    *     `n` is in the core of the view, then `cid` is a core input and we are done. If this node
+    *     `n` is in a proper subview, then the aggregated global key inputs
+    *     [[com.digitalasset.canton.data.TransactionView.globalKeyInputs]] of the subviews resolve
+    *     `k` to `cid` (as resolutions from earlier subviews are preferred) and therefore the map
+    *     difference does not resolve `k` at all.
     *
-    * @return `Left(...)` if `viewKeyInputs` contains a key not in the `keyVersionAndMaintainers.keySet`
-    * @throws java.lang.IllegalArgumentException if `subviewKeyResolutions.keySet` is not a subset of `viewKeyInputs.keySet`
+    * @return
+    *   `Left(...)` if `viewKeyInputs` contains a key not in the `keyVersionAndMaintainers.keySet`
+    * @throws java.lang.IllegalArgumentException
+    *   if `subviewKeyResolutions.keySet` is not a subset of `viewKeyInputs.keySet`
     */
   private def resolvedKeys(
       viewKeyInputs: Map[LfGlobalKey, KeyInput],
@@ -754,8 +757,8 @@ class TransactionTreeFactoryImpl(
     } yield viewParticipantData
   }
 
-  /** Check that we correctly reconstruct the csm state machine
-    * Canton does not distinguish between the different com.digitalasset.daml.lf.transaction.Transaction.KeyInactive forms right now
+  /** Check that we correctly reconstruct the csm state machine Canton does not distinguish between
+    * the different com.digitalasset.daml.lf.transaction.Transaction.KeyInactive forms right now
     */
   private def checkCsmStateMatchesView(
       csmState: ContractStateMachine.State[Unit],
@@ -797,7 +800,7 @@ class TransactionTreeFactoryImpl(
       rbContext: RollbackContext,
       keyResolver: LfKeyResolver,
   )(implicit traceContext: TraceContext): EitherT[
-    Future,
+    FutureUnlessShutdown,
     TransactionTreeConversionError,
     (TransactionView, WellFormedTransaction[WithSuffixes]),
   ] = {
@@ -835,6 +838,7 @@ class TransactionTreeFactoryImpl(
       decompositions <- EitherT.right(decompositionsF)
       decomposition = checked(decompositions.head)
       view <- createView(decomposition, rootPosition, state, contractOfId)
+        .mapK(FutureUnlessShutdown.outcomeK)
     } yield {
       val suffixedNodes = state.suffixedNodes() transform {
         // Recover the children
@@ -904,14 +908,14 @@ object TransactionTreeFactoryImpl {
   /** Creates a `TransactionTreeFactory`. */
   def apply(
       submittingParticipant: ParticipantId,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       protocolVersion: ProtocolVersion,
       cryptoOps: HashOps & HmacOps,
       loggerFactory: NamedLoggerFactory,
   )(implicit ex: ExecutionContext): TransactionTreeFactoryImpl =
     new TransactionTreeFactoryImpl(
       submittingParticipant,
-      domainId,
+      synchronizerId,
       protocolVersion,
       contractSerializer,
       cryptoOps,
@@ -994,26 +998,28 @@ object TransactionTreeFactoryImpl {
     var createdContractsInView: collection.Set[LfContractId] = Set.empty
 
     /** An [[com.digitalasset.canton.protocol.LfGlobalKey]] stores neither the
-      * [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used during serialization
-      * nor the maintainers, which we need to cache in case no contract is found.
+      * [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used during serialization nor
+      * the maintainers, which we need to cache in case no contract is found.
       *
-      * Out parameter that stores version and maintainers for all keys
-      * that have been referenced by an already-processed node.
+      * Out parameter that stores version and maintainers for all keys that have been referenced by
+      * an already-processed node.
       */
     val keyVersionAndMaintainers: mutable.Map[LfGlobalKey, (LfLanguageVersion, Set[LfPartyId])] =
       mutable.Map.empty
 
     /** Out parameter for the [[com.digitalasset.daml.lf.transaction.ContractStateMachine.State]]
       *
-      * The state of the [[com.digitalasset.daml.lf.transaction.ContractStateMachine]]
-      * after iterating over the following nodes in execution order:
-      * 1. The iteration starts at the root node of the current view.
-      * 2. The iteration includes all processed nodes of the view. This includes the nodes of fully processed subviews.
+      * The state of the [[com.digitalasset.daml.lf.transaction.ContractStateMachine]] after
+      * iterating over the following nodes in execution order:
+      *   1. The iteration starts at the root node of the current view.
+      *   1. The iteration includes all processed nodes of the view. This includes the nodes of
+      *      fully processed subviews.
       */
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var csmState: ContractStateMachine.State[Unit] = initialCsmState
 
-    /** This resolver is used to feed [[com.digitalasset.daml.lf.transaction.ContractStateMachine.State.handleLookupWith]].
+    /** This resolver is used to feed
+      * [[com.digitalasset.daml.lf.transaction.ContractStateMachine.State.handleLookupWith]].
       */
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var currentResolver: LfKeyResolver = initialResolver

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
@@ -9,14 +9,16 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.spi.AppenderAttachable
 import ch.qos.logback.core.{Appender, AppenderBase}
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.github.blemale.scaffeine.Scaffeine
+import com.typesafe.scalalogging.Logger
 
 import java.util
 import scala.collection.mutable
 
-/** Logback appender that keeps a bounded queue of errors/warnings that have been logged and associated log entries with
-  * the same trace-id.
+/** Logback appender that keeps a bounded queue of errors/warnings that have been logged and
+  * associated log entries with the same trace-id.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
 class LastErrorsAppender()
@@ -25,7 +27,9 @@ class LastErrorsAppender()
 
   private val appenders = mutable.ListBuffer[Appender[ILoggingEvent]]()
 
-  /** Treat the last errors file appender separately because we only write there when we encounter an error */
+  /** Treat the last errors file appender separately because we only write there when we encounter
+    * an error
+    */
   private var lastErrorsFileAppender: Option[Appender[ILoggingEvent]] = None
 
   private var maxTraces = 128
@@ -33,13 +37,23 @@ class LastErrorsAppender()
   private var maxErrors = 128
   private var lastErrorsFileAppenderName = ""
 
+  /** Separate executor for scaffeine - to avoid using ForkJoin common pool */
+  private val scaffeineExecutor =
+    Threading.singleThreadedExecutor("last_err_appender", Logger(getClass))
+
   /** An error/warn event with previous events of the same trace-id */
   private case class ErrorWithEvents(error: ILoggingEvent, events: Seq[ILoggingEvent])
 
   private val eventsCache =
-    Scaffeine().maximumSize(maxTraces.toLong).build[String, BoundedQueue[ILoggingEvent]]()
+    Scaffeine()
+      .maximumSize(maxTraces.toLong)
+      .executor(scaffeineExecutor)
+      .build[String, BoundedQueue[ILoggingEvent]]()
   private val errorsCache =
-    Scaffeine().maximumSize(maxErrors.toLong).build[String, ErrorWithEvents]()
+    Scaffeine()
+      .maximumSize(maxErrors.toLong)
+      .executor(scaffeineExecutor)
+      .build[String, ErrorWithEvents]()
 
   private def isLastErrorsFileAppender(appender: Appender[ILoggingEvent]): Boolean =
     appender.getName == lastErrorsFileAppenderName
@@ -160,7 +174,7 @@ class LastErrorsAppender()
 class BoundedQueue[A](maxQueueSize: Int) extends mutable.Queue[A] {
 
   private def trim(): Unit =
-    while (size > maxQueueSize) dequeue().discard
+    while (sizeIs > maxQueueSize) dequeue().discard
 
   override def addOne(elem: A): BoundedQueue.this.type = {
     val ret = super.addOne(elem)

@@ -1,14 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class TimeBasedTestNetPreviewIntegrationTest
     extends IntegrationTest
@@ -16,8 +11,7 @@ class TimeBasedTestNetPreviewIntegrationTest
     with TimeTestUtil
     with WalletTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => ConfigTransforms.noDevNet(config))

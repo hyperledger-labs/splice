@@ -254,6 +254,7 @@ val todoStyleExcludePrefixes =
     "experiments/",
     "README.md",
     ".github/actions/tests/split_tests/dist/",
+    "token-standard/dependencies",
   )
 val todoStyleExcludeSuffixes =
   Seq("/checkTodos.sc", "/build.static_tests.yml")

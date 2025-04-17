@@ -1,11 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error.groups
 
-import com.daml.error.{
-  ContextualizedErrorLogger,
-  DamlError,
+import com.digitalasset.base.error.{
+  ContextualizedDamlError,
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
   ErrorCode,
@@ -14,6 +13,7 @@ import com.daml.error.{
   Resolution,
 }
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.AdminServicesErrorGroup.PartyManagementServiceErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 object PartyManagementServiceErrors extends PartyManagementServiceErrorGroup {
 
@@ -28,8 +28,8 @@ object PartyManagementServiceErrors extends PartyManagementServiceErrorGroup {
         ErrorCategory.InvalidIndependentOfSystemState,
       ) {
     final case class Reject(party: String, reason: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = s"Update operation for party '$party' failed due to: $reason"
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
@@ -51,8 +51,8 @@ object PartyManagementServiceErrors extends PartyManagementServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Reject(party: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = s"Maximum annotations size for party '$party' has been exceeded"
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
@@ -76,8 +76,8 @@ object PartyManagementServiceErrors extends PartyManagementServiceErrorGroup {
         ErrorCategory.ContentionOnSharedResources,
       ) {
     final case class Reject(party: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause =
             s"Update operation for party '$party' failed due to a concurrent update to the same party"
         ) {
@@ -97,7 +97,7 @@ object PartyManagementServiceErrors extends PartyManagementServiceErrorGroup {
         ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
       ) {
     final case class Reject(operation: String, party: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"Party: '$party' was not found when $operation"
         ) {
@@ -120,7 +120,7 @@ object PartyManagementServiceErrors extends PartyManagementServiceErrorGroup {
         ErrorCategory.SystemInternalAssumptionViolated,
       ) {
     final case class Reject(operation: String, party: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"Party record for party: '$party' was not found when $operation"
         ) {
@@ -143,7 +143,7 @@ object PartyManagementServiceErrors extends PartyManagementServiceErrorGroup {
         ErrorCategory.SystemInternalAssumptionViolated,
       ) {
     final case class Reject(operation: String, party: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"Party record for party: '$party' already exists when $operation"
         ) {

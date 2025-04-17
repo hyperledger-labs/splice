@@ -133,8 +133,6 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-      # Commit hash that will become the active version.
-      # If left empty then the latest commit on the branch will be used.
       upgrade_version:
         type: string
         default: ""
@@ -145,15 +143,8 @@ jobs:
         type: boolean
         default: true
     steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.upgrade_version >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.upgrade_version >>
-                command: |
-                  echo "Checking out commit << parameters.upgrade_version >>"
-                  git checkout << parameters.upgrade_version >>
+      - checkout_with_retry:
+          checkout-branch: << parameters.upgrade_version >>
       - setup_nix
       - setup_vpn
       - setup_vpn_routes:
@@ -175,11 +166,7 @@ jobs:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            if [ -z "<< parameters.upgrade_version >>" ]; then
-              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -p "da-composeValidator-1"
-            else
-              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -p "da-composeValidator-1" -t << parameters.upgrade_version >>
-            fi
+            build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -p "da-composeValidator-1"
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:
           cmd_name: Run post-migration steps

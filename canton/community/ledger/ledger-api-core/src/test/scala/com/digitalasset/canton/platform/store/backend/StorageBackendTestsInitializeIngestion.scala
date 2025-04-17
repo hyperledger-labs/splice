@@ -1,14 +1,13 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.TransactionMetering
 import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.platform.store.backend.common.EventIdSourceForInformees
+import com.digitalasset.canton.platform.store.backend.common.EventIdSource
+import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.scalatest.Inside
 import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AnyFlatSpec
@@ -23,11 +22,6 @@ private[backend] trait StorageBackendTestsInitializeIngestion
   behavior of "StorageBackend (initializeIngestion)"
 
   import StorageBackendTestValues.*
-
-  private def dtoMetering(app: String, offset: Offset) =
-    dtoTransactionMetering(
-      TransactionMetering(Ref.ApplicationId.assertFromString(app), 1, someTime, offset)
-    )
 
   private val signatory = Ref.Party.assertFromString("signatory")
 
@@ -73,54 +67,10 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   {
     val dtos = Vector(
-      dtoMetering("AppA", offset(1)),
-      dtoMetering("AppB", offset(4)),
-    )
-    it should "delete overspill entries - metering" in {
-      fixture(
-        dtos1 = dtos,
-        lastOffset1 = 4L,
-        lastEventSeqId1 = 0L,
-        dtos2 = Vector(
-          dtoMetering("AppC", offset(6))
-        ),
-        lastOffset2 = 6L,
-        lastEventSeqId2 = 0L,
-        checkContentsBefore = () => {
-          val metering =
-            executeSql(backend.metering.read.reportData(Timestamp.Epoch, None, None))
-          // Metering report can include partially ingested data in non-final reports
-          metering.applicationData should have size 3
-          metering.isFinal shouldBe false
-        },
-        checkContentsAfter = () => {
-          val metering =
-            executeSql(backend.metering.read.reportData(Timestamp.Epoch, None, None))
-          metering.applicationData should have size 2 // Partially ingested data removed
-        },
-      )
-    }
-
-    it should "delete overspill entries written before first ledger end update - metering" in {
-      fixtureOverspillEntriesPriorToFirstLedgerEndUpdate(
-        dtos = dtos,
-        lastOffset = 4,
-        lastEventSeqId = 0L,
-        checkContentsAfter = () => {
-          val metering2 =
-            executeSql(backend.metering.read.reportData(Timestamp.Epoch, None, None))
-          metering2.applicationData shouldBe empty
-        },
-      )
-    }
-  }
-
-  {
-    val dtos = Vector(
       // 1: transaction with a create node
       dtoCreate(offset(1), 1L, hashCid("#101"), signatory = signatory),
       DbDto.IdFilterCreateStakeholder(1L, someTemplateId.toString, someParty),
-      DbDto.IdFilterCreateNonStakeholderInformee(1L, someParty),
+      DbDto.IdFilterCreateNonStakeholderInformee(1L, someTemplateId.toString, someParty),
       dtoTransactionMeta(
         offset(1),
         event_sequential_id_first = 1L,
@@ -129,10 +79,10 @@ private[backend] trait StorageBackendTestsInitializeIngestion
       dtoCompletion(offset(41)),
       // 2: transaction with exercise node
       dtoExercise(offset(2), 2L, false, hashCid("#101")),
-      DbDto.IdFilterNonConsumingInformee(2L, someParty),
+      DbDto.IdFilterNonConsumingInformee(2L, someTemplateId.toString, someParty),
       dtoExercise(offset(2), 3L, true, hashCid("#102")),
       DbDto.IdFilterConsumingStakeholder(3L, someTemplateId.toString, someParty),
-      DbDto.IdFilterConsumingNonStakeholderInformee(3L, someParty),
+      DbDto.IdFilterConsumingNonStakeholderInformee(3L, someTemplateId.toString, someParty),
       dtoTransactionMeta(
         offset(2),
         event_sequential_id_first = 2L,
@@ -155,54 +105,80 @@ private[backend] trait StorageBackendTestsInitializeIngestion
       ),
       DbDto.IdFilterUnassignStakeholder(5, someTemplateId.toString, someParty),
       DbDto.IdFilterUnassignStakeholder(5, someTemplateId.toString, someParty2),
+      // 5: topology transactions
+      dtoPartyToParticipant(
+        offset(5),
+        eventSequentialId = 6,
+        party = someParty,
+        participant = "someParticipant",
+      ),
+      dtoPartyToParticipant(
+        offset(5),
+        eventSequentialId = 7,
+        party = someParty2,
+        participant = "someParticipant",
+      ),
     )
 
     it should "delete overspill entries - events, transaction meta, completions" in {
       val dtos2 = Vector(
-        // 5: transaction with create node
-        dtoCreate(offset(5), 6L, hashCid("#201"), signatory = signatory),
-        DbDto.IdFilterCreateStakeholder(6L, someTemplateId.toString, someParty),
-        DbDto.IdFilterCreateNonStakeholderInformee(6L, someParty),
-        dtoTransactionMeta(
-          offset(5),
-          event_sequential_id_first = 6L,
-          event_sequential_id_last = 6L,
-        ),
-        dtoCompletion(offset(5)),
-        // 6: transaction with exercise node
-        dtoExercise(offset(6), 7L, false, hashCid("#201")),
-        DbDto.IdFilterNonConsumingInformee(7L, someParty),
-        dtoExercise(offset(6), 8L, true, hashCid("#202")),
-        DbDto.IdFilterConsumingStakeholder(8L, someTemplateId.toString, someParty),
-        DbDto.IdFilterConsumingNonStakeholderInformee(8L, someParty),
+        // 6: transaction with create node
+        dtoCreate(offset(6), 8L, hashCid("#201"), signatory = signatory),
+        DbDto.IdFilterCreateStakeholder(8L, someTemplateId.toString, someParty),
+        DbDto.IdFilterCreateNonStakeholderInformee(8L, someTemplateId.toString, someParty),
         dtoTransactionMeta(
           offset(6),
-          event_sequential_id_first = 7L,
+          event_sequential_id_first = 8L,
           event_sequential_id_last = 8L,
         ),
         dtoCompletion(offset(6)),
-        // 7: assign
-        dtoAssign(
+        // 7: transaction with exercise node
+        dtoExercise(offset(7), 9L, false, hashCid("#201")),
+        DbDto.IdFilterNonConsumingInformee(9L, someTemplateId.toString, someParty),
+        dtoExercise(offset(7), 10L, true, hashCid("#202")),
+        DbDto.IdFilterConsumingStakeholder(10L, someTemplateId.toString, someParty),
+        DbDto.IdFilterConsumingNonStakeholderInformee(10L, someTemplateId.toString, someParty),
+        dtoTransactionMeta(
           offset(7),
-          eventSequentialId = 9,
-          contractId = hashCid("#203"),
+          event_sequential_id_first = 9L,
+          event_sequential_id_last = 10L,
         ),
-        DbDto.IdFilterAssignStakeholder(9, someTemplateId.toString, someParty),
-        DbDto.IdFilterAssignStakeholder(9, someTemplateId.toString, someParty2),
-        // 8: unassign
-        dtoUnassign(
+        dtoCompletion(offset(7)),
+        // 8: assign
+        dtoAssign(
           offset(8),
-          eventSequentialId = 10,
+          eventSequentialId = 11,
           contractId = hashCid("#203"),
         ),
-        DbDto.IdFilterUnassignStakeholder(10, someTemplateId.toString, someParty),
-        DbDto.IdFilterUnassignStakeholder(10, someTemplateId.toString, someParty2),
+        DbDto.IdFilterAssignStakeholder(11, someTemplateId.toString, someParty),
+        DbDto.IdFilterAssignStakeholder(11, someTemplateId.toString, someParty2),
+        // 9: unassign
+        dtoUnassign(
+          offset(9),
+          eventSequentialId = 12,
+          contractId = hashCid("#203"),
+        ),
+        DbDto.IdFilterUnassignStakeholder(12, someTemplateId.toString, someParty),
+        DbDto.IdFilterUnassignStakeholder(12, someTemplateId.toString, someParty2),
+        // 10: topology transactions
+        dtoPartyToParticipant(
+          offset(10),
+          eventSequentialId = 13,
+          party = someParty,
+          participant = "someParticipant",
+        ),
+        dtoPartyToParticipant(
+          offset(10),
+          eventSequentialId = 14,
+          party = someParty3,
+          participant = "someParticipant",
+        ),
       )
       val allDtos = dtos ++ dtos2
       fixture(
         dtos1 = dtos,
-        lastOffset1 = 4L,
-        lastEventSeqId1 = 5L,
+        lastOffset1 = 5L,
+        lastEventSeqId1 = 7L,
         dtos2 = dtos2,
         lastOffset2 = 12L,
         lastEventSeqId2 = 15L,
@@ -220,7 +196,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           val contractsAssigned =
             executeSql(
               backend.contract
-                .assignedContracts(List(hashCid("#103"), hashCid("#203")))
+                .assignedContracts(List(hashCid("#103"), hashCid("#203")), offset(1000))
             )
           val assignedEvents =
             executeSql(
@@ -230,31 +206,50 @@ private[backend] trait StorageBackendTestsInitializeIngestion
             executeSql(
               backend.event.unassignEventBatch(1L to 100L, Some(Set.empty))
             ).map(_.event.contractId)
+          val topologyPartyEvents =
+            executeSql(
+              backend.event.topologyPartyEventBatch(1L to 100L)
+            ).map(_.partyId)
           contractsCreated.get(hashCid("#101")) should not be empty
           contractsCreated.get(hashCid("#201")) should not be empty
           contractsArchived.get(hashCid("#101")) shouldBe empty
           contractsArchived.get(hashCid("#201")) shouldBe empty
           contractsAssigned.get(hashCid("#103")) should not be empty
-          contractsAssigned.get(hashCid("#203")) shouldBe empty // constrained by ledger end
-          assignedEvents shouldBe List(hashCid("#103"), hashCid("#203")).map(
-            _.coid
+          contractsAssigned.get(hashCid("#203")) should not be empty
+          assignedEvents shouldBe List(
+            hashCid("#103"),
+            hashCid("#203"),
           ) // not constrained by ledger end
-          unassignedEvents shouldBe List(hashCid("#103"), hashCid("#203")).map(
-            _.coid
+          unassignedEvents shouldBe List(
+            hashCid("#103"),
+            hashCid("#203"),
           ) // not constrained by ledger end
-          fetchIdsFromTransactionMeta(allDtos.collect { case meta: DbDto.TransactionMeta =>
+          topologyPartyEvents shouldBe List(
+            someParty,
+            someParty2,
+            someParty,
+            someParty3,
+          ) // not constrained by ledger end
+          fetchIdsFromTransactionMetaUpdateIds(allDtos.collect { case meta: DbDto.TransactionMeta =>
             meta.update_id
           }) shouldBe Set((1, 1), (2, 4))
+          fetchIdsFromTransactionMetaUpdateIds(allDtos.collect { case meta: DbDto.TransactionMeta =>
+            meta.update_id
+          }) shouldBe fetchIdsFromTransactionMetaOffsets(allDtos.collect {
+            case meta: DbDto.TransactionMeta =>
+              meta.event_offset
+          })
           fetchIdsCreateStakeholder() shouldBe List(
             1L,
-            6L,
+            8L,
           ) // since ledger-end does not limit the range query
-          fetchIdsCreateNonStakeholder() shouldBe List(1L, 6L)
-          fetchIdsConsumingStakeholder() shouldBe List(3L, 8L)
-          fetchIdsConsumingNonStakeholder() shouldBe List(3L, 8L)
-          fetchIdsNonConsuming() shouldBe List(2L, 7L)
-          fetchIdsAssignStakeholder() shouldBe List(4L, 9L)
-          fetchIdsUnassignStakeholder() shouldBe List(5L, 10L)
+          fetchIdsCreateNonStakeholder() shouldBe List(1L, 8L)
+          fetchIdsConsumingStakeholder() shouldBe List(3L, 10L)
+          fetchIdsConsumingNonStakeholder() shouldBe List(3L, 10L)
+          fetchIdsNonConsuming() shouldBe List(2L, 9L)
+          fetchIdsAssignStakeholder() shouldBe List(4L, 11L)
+          fetchIdsUnassignStakeholder() shouldBe List(5L, 12L)
+          fetchTopologyParty() shouldBe List(6, 13)
         },
         checkContentsAfter = () => {
           val contractsCreated =
@@ -270,7 +265,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           val contractsAssigned =
             executeSql(
               backend.contract
-                .assignedContracts(List(hashCid("#103"), hashCid("#203")))
+                .assignedContracts(List(hashCid("#103"), hashCid("#203")), offset(1000))
             )
           val assignedEvents =
             executeSql(
@@ -280,19 +275,31 @@ private[backend] trait StorageBackendTestsInitializeIngestion
             executeSql(
               backend.event.unassignEventBatch(1L to 100L, Some(Set.empty))
             ).map(_.event.contractId)
+          val topologyPartyEvents =
+            executeSql(
+              backend.event.topologyPartyEventBatch(1L to 100L)
+            ).map(_.partyId)
           contractsCreated.get(hashCid("#101")) should not be empty
           contractsCreated.get(hashCid("#201")) shouldBe empty
           contractsArchived.get(hashCid("#101")) shouldBe empty
           contractsArchived.get(hashCid("#201")) shouldBe empty
           contractsAssigned.get(hashCid("#103")) should not be empty
           contractsAssigned.get(hashCid("#203")) shouldBe empty
-          assignedEvents shouldBe List(hashCid("#103")).map(_.coid) // not constrained by ledger end
-          unassignedEvents shouldBe List(hashCid("#103")).map(
-            _.coid
+          assignedEvents shouldBe List(hashCid("#103")) // not constrained by ledger end
+          unassignedEvents shouldBe List(hashCid("#103")) // not constrained by ledger end
+          topologyPartyEvents shouldBe List(
+            someParty,
+            someParty2,
           ) // not constrained by ledger end
-          fetchIdsFromTransactionMeta(allDtos.collect { case meta: DbDto.TransactionMeta =>
+          fetchIdsFromTransactionMetaUpdateIds(allDtos.collect { case meta: DbDto.TransactionMeta =>
             meta.update_id
           }) shouldBe Set((1, 1), (2, 4))
+          fetchIdsFromTransactionMetaUpdateIds(allDtos.collect { case meta: DbDto.TransactionMeta =>
+            meta.update_id
+          }) shouldBe fetchIdsFromTransactionMetaOffsets(allDtos.collect {
+            case meta: DbDto.TransactionMeta =>
+              meta.event_offset
+          })
           fetchIdsCreateStakeholder() shouldBe List(1L)
           fetchIdsCreateNonStakeholder() shouldBe List(1L)
           fetchIdsConsumingStakeholder() shouldBe List(3L)
@@ -300,6 +307,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           fetchIdsNonConsuming() shouldBe List(2L)
           fetchIdsAssignStakeholder() shouldBe List(4L)
           fetchIdsUnassignStakeholder() shouldBe List(5L)
+          fetchTopologyParty() shouldBe List(6)
         },
       )
     }
@@ -307,8 +315,8 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     it should "delete overspill entries written before first ledger end update - events, transaction meta, completions" in {
       fixtureOverspillEntriesPriorToFirstLedgerEndUpdate(
         dtos = dtos,
-        lastOffset = 4,
-        lastEventSeqId = 5L,
+        lastOffset = 5,
+        lastEventSeqId = 7L,
         checkContentsAfter = () => {
           val contractsCreated =
             executeSql(
@@ -318,7 +326,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           val contractsAssigned =
             executeSql(
               backend.contract
-                .assignedContracts(List(hashCid("#103"), hashCid("#203")))
+                .assignedContracts(List(hashCid("#103"), hashCid("#203")), offset(1000))
             )
           val assignedEvents =
             executeSql(
@@ -328,13 +336,21 @@ private[backend] trait StorageBackendTestsInitializeIngestion
             executeSql(
               backend.event.unassignEventBatch(1L to 100L, Some(Set.empty))
             ).map(_.event.contractId)
+          val topologyPartyEvents =
+            executeSql(
+              backend.event.topologyPartyEventBatch(1L to 100L)
+            ).map(_.partyId)
           contractsCreated.get(hashCid("#101")) shouldBe None
           contractsAssigned.get(hashCid("#103")) shouldBe empty
           contractsAssigned.get(hashCid("#203")) shouldBe empty
           assignedEvents shouldBe empty
           unassignedEvents shouldBe empty
-          fetchIdsFromTransactionMeta(dtos.collect { case meta: DbDto.TransactionMeta =>
+          topologyPartyEvents shouldBe empty
+          fetchIdsFromTransactionMetaUpdateIds(dtos.collect { case meta: DbDto.TransactionMeta =>
             meta.update_id
+          }) shouldBe empty
+          fetchIdsFromTransactionMetaOffsets(dtos.collect { case meta: DbDto.TransactionMeta =>
+            meta.event_offset
           }) shouldBe empty
           fetchIdsCreateStakeholder() shouldBe empty
           fetchIdsCreateNonStakeholder() shouldBe empty
@@ -343,25 +359,31 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           fetchIdsNonConsuming() shouldBe empty
           fetchIdsAssignStakeholder() shouldBe empty
           fetchIdsUnassignStakeholder() shouldBe empty
+          fetchTopologyParty() shouldBe empty
         },
       )
     }
   }
 
-  // TODO(i21346) Implement initialization tests for topology events
-
   private def fetchIdsNonConsuming(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries.fetchEventIdsForInformee(
-        EventIdSourceForInformees.NonConsumingInformee
-      )(informeeO = Some(someParty), startExclusive = 0, endInclusive = 1000, limit = 1000)
+      backend.event.updateStreamingQueries.fetchEventIds(
+        EventIdSource.NonConsumingInformee
+      )(
+        stakeholderO = Some(someParty),
+        templateIdO = None,
+        startExclusive = 0,
+        endInclusive = 1000,
+        limit = 1000,
+      )
     )
 
   private def fetchIdsConsumingNonStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
-        .fetchEventIdsForInformee(EventIdSourceForInformees.ConsumingNonStakeholder)(
-          informeeO = Some(someParty),
+      backend.event.updateStreamingQueries
+        .fetchEventIds(EventIdSource.ConsumingNonStakeholder)(
+          stakeholderO = Some(someParty),
+          templateIdO = None,
           startExclusive = 0,
           endInclusive = 1000,
           limit = 1000,
@@ -370,9 +392,10 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsConsumingStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
-        .fetchEventIdsForInformee(EventIdSourceForInformees.ConsumingStakeholder)(
-          informeeO = Some(someParty),
+      backend.event.updateStreamingQueries
+        .fetchEventIds(EventIdSource.ConsumingStakeholder)(
+          stakeholderO = Some(someParty),
+          templateIdO = None,
           startExclusive = 0,
           endInclusive = 1000,
           limit = 1000,
@@ -381,9 +404,10 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsCreateNonStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
-        .fetchEventIdsForInformee(EventIdSourceForInformees.CreateNonStakeholder)(
-          informeeO = Some(someParty),
+      backend.event.updateStreamingQueries
+        .fetchEventIds(EventIdSource.CreateNonStakeholder)(
+          stakeholderO = Some(someParty),
+          templateIdO = None,
           startExclusive = 0,
           endInclusive = 1000,
           limit = 1000,
@@ -392,9 +416,10 @@ private[backend] trait StorageBackendTestsInitializeIngestion
 
   private def fetchIdsCreateStakeholder(): Vector[Long] =
     executeSql(
-      backend.event.transactionStreamingQueries
-        .fetchEventIdsForInformee(EventIdSourceForInformees.CreateStakeholder)(
-          informeeO = Some(someParty),
+      backend.event.updateStreamingQueries
+        .fetchEventIds(EventIdSource.CreateStakeholder)(
+          stakeholderO = Some(someParty),
+          templateIdO = None,
           startExclusive = 0,
           endInclusive = 1000,
           limit = 1000,
@@ -423,12 +448,41 @@ private[backend] trait StorageBackendTestsInitializeIngestion
       )
     )
 
-  private def fetchIdsFromTransactionMeta(udpateIds: Seq[String]): Set[(Long, Long)] = {
-    val txPointwiseQueries = backend.event.transactionPointwiseQueries
+  private def fetchTopologyParty(): Vector[Long] =
+    executeSql(
+      backend.event.fetchTopologyPartyEventIds(
+        party = Some(someParty),
+        startExclusive = 0,
+        endInclusive = 1000,
+        limit = 1000,
+      )
+    )
+
+  private def fetchIdsFromTransactionMetaUpdateIds(udpateIds: Seq[String]): Set[(Long, Long)] = {
+    val txPointwiseQueries = backend.event.updatePointwiseQueries
     udpateIds
       .map(Ref.TransactionId.assertFromString)
       .map { updateId =>
-        executeSql(txPointwiseQueries.fetchIdsFromTransactionMeta(updateId))
+        executeSql(
+          txPointwiseQueries.fetchIdsFromTransactionMeta(
+            lookupKey = LookupKey.UpdateId(updateId)
+          )
+        )
+      }
+      .flatMap(_.toList)
+      .toSet
+  }
+
+  private def fetchIdsFromTransactionMetaOffsets(offsets: Seq[Long]): Set[(Long, Long)] = {
+    val txPointwiseQueries = backend.event.updatePointwiseQueries
+    offsets
+      .map(Offset.tryFromLong)
+      .map { offset =>
+        executeSql(
+          txPointwiseQueries.fetchIdsFromTransactionMeta(
+            lookupKey = LookupKey.Offset(offset)
+          )
+        )
       }
       .flatMap(_.toList)
       .toSet
@@ -447,9 +501,6 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     val loggerFactory = SuppressingLogger(getClass)
     // Initialize
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(
-      backend.meteringParameter.initializeLedgerMeteringEnd(someLedgerMeteringEnd, loggerFactory)
-    )
     // Start the indexer (a no-op in this case)
     val end1 = executeSql(backend.parameter.ledgerEnd)
     executeSql(backend.ingestion.deletePartiallyIngestedData(end1))
@@ -478,9 +529,6 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     val loggerFactory = SuppressingLogger(getClass)
     // Initialize
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(
-      backend.meteringParameter.initializeLedgerMeteringEnd(someLedgerMeteringEnd, loggerFactory)
-    )
     // Start the indexer (a no-op in this case)
     val end1 = executeSql(backend.parameter.ledgerEnd)
     executeSql(backend.ingestion.deletePartiallyIngestedData(end1))

@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -143,15 +143,15 @@ class SvNamespaceMembershipTrigger(
 object SvNamespaceMembershipTrigger {
 
   sealed trait NamespaceDiff extends PrettyPrinting {
-    def domain: DomainId
+    def domain: SynchronizerId
   }
 
-  case class AddToNamespace(domain: DomainId, partyId: PartyId) extends NamespaceDiff {
+  case class AddToNamespace(domain: SynchronizerId, partyId: PartyId) extends NamespaceDiff {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("domain", _.domain), param("partyId", _.partyId))
   }
 
-  case class RemoveFromNamespace(domain: DomainId, partyId: PartyId) extends NamespaceDiff {
+  case class RemoveFromNamespace(domain: SynchronizerId, partyId: PartyId) extends NamespaceDiff {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("domain", _.domain), param("partyId", _.partyId))
   }

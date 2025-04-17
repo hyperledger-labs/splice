@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store
@@ -6,15 +6,8 @@ package com.digitalasset.canton.crypto.store
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.crypto.{
-  EncryptionPrivateKey,
-  Fingerprint,
-  KeyName,
-  PrivateKey,
-  SigningKeyUsage,
-  SigningPrivateKey,
-}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -66,13 +59,7 @@ trait CryptoPrivateStoreTest extends BaseTest { this: AsyncWordSpec =>
 
       val sigKey2: SigningPrivateKey =
         crypto
-          .newSymbolicSigningKeyPair(
-            NonEmpty.mk(
-              Set,
-              SigningKeyUsage.Namespace,
-              SigningKeyUsage.IdentityDelegation,
-            )
-          )
+          .newSymbolicSigningKeyPair(SigningKeyUsage.NamespaceOnly)
           .privateKey
       val sigKey2WithName: SigningPrivateKeyWithName =
         SigningPrivateKeyWithName(sigKey2, Some(KeyName.tryCreate(uniqueKeyName("sigKey2_"))))
@@ -90,13 +77,13 @@ trait CryptoPrivateStoreTest extends BaseTest { this: AsyncWordSpec =>
         _ <- storePrivateKey(store, sigKey2, sigKey2.id, sigKey2WithName.name).failOnShutdown
         protocolKeys <- store
           .filterSigningKeys(
-            Seq(sigKey1.id, sigKey2.id),
+            NonEmpty.mk(Seq, sigKey1.id, sigKey2.id),
             SigningKeyUsage.ProtocolOnly,
           )
           .failOnShutdown
         authenticationKeys <- store
           .filterSigningKeys(
-            Seq(sigKey1.id, sigKey2.id),
+            NonEmpty.mk(Seq, sigKey1.id, sigKey2.id),
             SigningKeyUsage.SequencerAuthenticationOnly,
           )
           .failOnShutdown
@@ -109,14 +96,14 @@ trait CryptoPrivateStoreTest extends BaseTest { this: AsyncWordSpec =>
         ).failOnShutdown
         filterProtocolWithOldAndNewKeys <- store
           .filterSigningKeys(
-            Seq(sigKey1.id, sigKey2.id, sigKeyAllUsage.id),
+            NonEmpty.mk(Seq, sigKey1.id, sigKey2.id, sigKeyAllUsage.id),
             SigningKeyUsage.ProtocolOnly,
           )
           .failOnShutdown
         filterAuthenticationWithOldAndNewKeys <- store
           .filterSigningKeys(
-            Seq(sigKey1.id, sigKey2.id, sigKeyAllUsage.id),
-            SigningKeyUsage.IdentityDelegationOnly,
+            NonEmpty.mk(Seq, sigKey1.id, sigKey2.id, sigKeyAllUsage.id),
+            SigningKeyUsage.NamespaceOnly,
           )
           .failOnShutdown
 
@@ -124,7 +111,7 @@ trait CryptoPrivateStoreTest extends BaseTest { this: AsyncWordSpec =>
         _ <- store.removePrivateKey(sigKey1.id).failOnShutdown
         _ <- store.removePrivateKey(sigKey2.id).failOnShutdown
         filterWithOldKeys <- store
-          .filterSigningKeys(Seq(sigKeyAllUsage.id), SigningKeyUsage.ProtocolOnly)
+          .filterSigningKeys(NonEmpty.mk(Seq, sigKeyAllUsage.id), SigningKeyUsage.ProtocolOnly)
           .failOnShutdown
       } yield {
         protocolKeys.loneElement shouldBe sigKey1.id

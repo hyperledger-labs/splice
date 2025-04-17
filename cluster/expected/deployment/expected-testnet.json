@@ -249,7 +249,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -279,7 +279,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/validator1/Pulumi.validator1.testzrh.yaml",
@@ -339,7 +339,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -369,7 +369,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-1.testzrh.yaml",
@@ -408,7 +408,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -438,7 +438,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-2.testzrh.yaml",
@@ -477,7 +477,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
@@ -507,7 +507,7 @@
         "namespace": "operator"
       },
       "spec": {
-        "ignore": "daml/dars\n!daml/dars/splitwell*",
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
         "include": [
           {
             "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-3.testzrh.yaml",

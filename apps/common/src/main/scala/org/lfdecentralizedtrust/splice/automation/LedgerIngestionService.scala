@@ -47,11 +47,11 @@ abstract class LedgerIngestionService(
   private val currentSubscription = new AtomicReference[Option[SpliceLedgerSubscription[?]]](None)
   private val ingestionLoopTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
-  retryProvider.runOnShutdown_(new RunOnShutdown {
+  retryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"terminate subscription"
     // this is not perfectly precise, but SpliceLedgerSubscription.initiateShutdown is idempotent
     override def done: Boolean = false
-    override def run(): Unit = currentSubscription
+    override def run()(implicit tc: TraceContext): Unit = currentSubscription
       .get()
       .foreach(subscription => {
         logger

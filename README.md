@@ -622,14 +622,19 @@ Update the version in the `nix/cometbft-driver-sources.json` file
 
 #### Bumping Canton
 
-1. Update the Canton Enterprise `version` in `nix/canton-sources.json`. The currently published versions on
+1. Generate a patch file of the JSON API v2 OpenAPI definition by running `diff-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
+2. Update the Canton Enterprise `version` in `nix/canton-sources.json`. The currently published versions on
    Artifactory can be found [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
-2. Update the `sha256` hash in the same file by first running `direnv reload` to make the hash validation fail
+3. Update the `sha256` hash in the same file by first running `direnv reload` to make the hash validation fail
    and using the 'got' hash printed by nix. This is usually easier and more accurate than copying the sha256 hash
    displayed for the release version in Artifactory.
-3. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
+4. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
    to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
    changes on scratchnet first.
+5. Update the OpenAPI definitions from step 1 by running `update-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
+6. Cleanup the `openapi.patch` file.
+   Check `token-standard/dependencies/canton-json-api-v2/openapi/CHANGES.md` and apply any changes manually if CI breaks due to
+   token standard CLI issues that look caused by bad OpenAPI definitions.
 
 #### Bumping Daml Compiler version
 
@@ -650,7 +655,7 @@ Initial setup:
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
 2. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`. This can be added to your private env vars.
 
-Current Canton commit: `7613b111d4d2a6d60b9ef59d204781b99774094c`
+Current Canton commit: `3a6a59bba9de020d0d774f50c58cb1dcb0510125`
 
 1. Checkout the **current Canton commit listed above** in the Canton open source repo from above, so we can diff our current fork against this checkout.
 2. Change to your checkout of the canton coin repo and execute the following steps:

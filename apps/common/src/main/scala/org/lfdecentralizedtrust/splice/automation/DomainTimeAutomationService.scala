@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -20,7 +20,7 @@ import scala.concurrent.ExecutionContext
 
 // This is a dedicated service because we want to run this once per app whereas apps often have multiple stores and automation services.
 final class DomainTimeAutomationService(
-    domainAlias: DomainAlias,
+    synchronizerAlias: SynchronizerAlias,
     participantAdminConnection: ParticipantAdminConnection,
     config: AutomationConfig,
     clock: Clock,
@@ -43,11 +43,16 @@ final class DomainTimeAutomationService(
   def domainTimeSync: DomainTimeSynchronization = store
 
   registerTrigger(
-    new DomainTimeIngestionTrigger(domainAlias, store, participantAdminConnection, triggerContext)
+    new DomainTimeIngestionTrigger(
+      synchronizerAlias,
+      store,
+      participantAdminConnection,
+      triggerContext,
+    )
   )
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    super.closeAsync() :+ SyncCloseable("Domain Time Store", Lifecycle.close(store)(logger))
+    super.closeAsync() :+ SyncCloseable("Domain Time Store", LifeCycle.close(store)(logger))
 }
 
 object DomainTimeAutomationService extends AutomationServiceCompanion {

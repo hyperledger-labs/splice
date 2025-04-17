@@ -1,10 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive
 
 import cats.syntax.traverse.*
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.DamlTransaction.Node.VersionedNode
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{DamlTransaction, Metadata}
 import com.daml.ledger.api.v2.interactive.transaction.v1.interactive_submission_data as isdv1
@@ -13,19 +12,29 @@ import com.daml.ledger.api.v2.interactive.{
   interactive_submission_service as iss,
 }
 import com.daml.ledger.api.v2.value as lapiValue
-import com.digitalasset.canton.data.ProcessedDisclosedContract
+import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.TransactionData
 import com.digitalasset.canton.ledger.api.util.LfEngineToApi
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
-import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.apiserver.execution.CommandExecutionResult
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  LoggingContextWithTrace,
+  NamedLoggerFactory,
+  NamedLogging,
+}
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.PreparedTransactionCodec.*
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray}
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{GlobalKey, Node, NodeId, TransactionVersion}
+import com.digitalasset.daml.lf.transaction.{
+  FatContractInstance,
+  GlobalKey,
+  Node,
+  NodeId,
+  TransactionVersion,
+}
 import com.digitalasset.daml.lf.value.Value
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -36,15 +45,15 @@ import io.scalaland.chimney.{PartialTransformer, Transformer}
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
-/** Class to encode an LF Transaction and its metadata to a PreparedTransaction.
-  * Uses chimney to define Transformers and PartialTransformer for all conversions.
+/** Class to encode an LF Transaction and its metadata to a PreparedTransaction. Uses chimney to
+  * define Transformers and PartialTransformer for all conversions.
   */
 final class PreparedTransactionEncoder(
     override val loggerFactory: NamedLoggerFactory
 ) extends NamedLogging {
 
-  /** Defines the mapping between LF version and Encoding versions.
-    * An encoding version can be used for several LF Versions.
+  /** Defines the mapping between LF version and Encoding versions. An encoding version can be used
+    * for several LF Versions.
     */
   private val nodeTransformers = Map(
     LanguageVersion.v2_1 -> v1.nodeTransformer(LanguageVersion.v2_1),
@@ -87,11 +96,6 @@ final class PreparedTransactionEncoder(
   ): Transformer[Option[ImmArray[A]], Seq[B]] =
     _.map(_.transformInto[Seq[B]]).getOrElse(Seq.empty)
 
-  private implicit def optSetToSeq[A, B](implicit
-      aToB: Transformer[A, B]
-  ): Transformer[Option[Set[A]], Seq[B]] =
-    _.toList.flatMap(_.map(_.transformInto[B]))
-
   /*
    * Straightforward encoders for simple LF classes
    */
@@ -101,17 +105,12 @@ final class PreparedTransactionEncoder(
   private implicit val hashTransformer: Transformer[lf.crypto.Hash, ByteString] =
     _.bytes.toByteString
 
-  private implicit val packageVersionTransformer: Transformer[lf.data.Ref.PackageVersion, String] =
-    _.toString()
-
   private implicit val partyVersionTransformer: Transformer[lf.data.Ref.Party, String] =
     Transformer.derive
 
   private implicit val languageVersionTransformer
       : Transformer[lf.language.LanguageVersion, String] =
     TransactionVersion.toProtoValue(_)
-
-  private implicit val packageIdTransformer: Transformer[lf.data.Ref.PackageId, String] = _.toString
 
   private implicit val nodeIdTransformer: Transformer[lf.transaction.NodeId, String] =
     _.index.toString
@@ -120,7 +119,8 @@ final class PreparedTransactionEncoder(
 
   private implicit val timestampTransformer: Transformer[lf.data.Time.Timestamp, Long] = _.micros
 
-  private implicit val domainIdTransformer: Transformer[DomainId, String] = _.toProtoPrimitive
+  private implicit val synchronizerIdTransformer: Transformer[SynchronizerId, String] =
+    _.toProtoPrimitive
 
   private implicit val nodeIdHashTransformer: Transformer[
     (lf.transaction.NodeId, lf.crypto.Hash),
@@ -146,23 +146,31 @@ final class PreparedTransactionEncoder(
       .definePartial[lf.transaction.Node.Create, isdv1.Create]
       .withFieldRenamed(_.coid, _.contractId)
       .withFieldRenamed(_.arg, _.argument)
+      .withFieldComputed(_.signatories, _.signatories.toSeq.sorted)
+      .withFieldComputed(_.stakeholders, _.stakeholders.toSeq.sorted)
       .withFieldConst(_.lfVersion, languageVersion.transformInto[String])
       .buildTransformer
 
-    private implicit def exerciseTransformer(implicit
+    private[interactive] implicit def exerciseTransformer(implicit
         languageVersion: LanguageVersion
     ): PartialTransformer[lf.transaction.Node.Exercise, isdv1.Exercise] = Transformer
       .definePartial[lf.transaction.Node.Exercise, isdv1.Exercise]
       .withFieldRenamed(_.targetCoid, _.contractId)
-      .withFieldComputed(_.choiceObservers, _.choiceObservers.toSeq)
+      .withFieldComputed(_.signatories, _.signatories.toSeq.sorted)
+      .withFieldComputed(_.stakeholders, _.stakeholders.toSeq.sorted)
+      .withFieldComputed(_.actingParties, _.actingParties.toSeq.sorted)
+      .withFieldComputed(_.choiceObservers, _.choiceObservers.toSeq.sorted)
       .withFieldConst(_.lfVersion, languageVersion.transformInto[String])
       .buildTransformer
 
-    private implicit def fetchTransformer(implicit
+    private[interactive] implicit def fetchTransformer(implicit
         languageVersion: LanguageVersion
     ): PartialTransformer[lf.transaction.Node.Fetch, isdv1.Fetch] = Transformer
       .definePartial[lf.transaction.Node.Fetch, isdv1.Fetch]
       .withFieldRenamed(_.coid, _.contractId)
+      .withFieldComputed(_.signatories, _.signatories.toSeq.sorted)
+      .withFieldComputed(_.stakeholders, _.stakeholders.toSeq.sorted)
+      .withFieldComputed(_.actingParties, _.actingParties.toSeq.sorted)
       .withFieldConst(_.lfVersion, languageVersion.transformInto[String])
       .buildTransformer
 
@@ -264,14 +272,14 @@ final class PreparedTransactionEncoder(
     }
   }
 
-  private implicit val processedDisclosedContractTransformer
-      : PartialTransformer[ProcessedDisclosedContract, Metadata.ProcessedDisclosedContract] =
+  private implicit val inputContractTransformer
+      : PartialTransformer[FatContractInstance, Metadata.InputContract] =
     Transformer
-      .definePartial[ProcessedDisclosedContract, Metadata.ProcessedDisclosedContract]
+      .definePartial[FatContractInstance, Metadata.InputContract]
       .withFieldComputedPartial(
         _.contract,
         { contract =>
-          val lfCreate = contract.create
+          val lfCreate = contract.toCreateNode
 
           // Encode the disclosed contract with the matching version
           getEncoderForVersion(lfCreate.version)
@@ -279,12 +287,14 @@ final class PreparedTransactionEncoder(
             .flatMap {
               // The encoding should have produced a create node, anything else is an error
               case VersionedNode.V1(isdv1.Node(create: isdv1.Node.NodeType.Create)) =>
-                Result.fromValue(iss.Metadata.ProcessedDisclosedContract.Contract.V1(create.value))
+                Result.fromValue(iss.Metadata.InputContract.Contract.V1(create.value))
               case _ =>
                 Result.fromErrorString("Failed to encode disclosed contract to create contract")
             }
         },
       )
+      .withFieldComputed(_.createdAt, _.createdAt.transformInto[Long])
+      .withFieldComputed(_.driverMetadata, _.cantonData.transformInto[ByteString])
       .buildTransformer
 
   private implicit val submitterInfoTransformer
@@ -297,32 +307,34 @@ final class PreparedTransactionEncoder(
 
   // Transformer for the transaction metadata
   private def resultToMetadataTransformer(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       transactionUUID: UUID,
       mediatorGroup: Int,
-  ): PartialTransformer[CommandExecutionResult, iss.Metadata] =
+      inputContracts: Seq[FatContractInstance],
+  ): PartialTransformer[TransactionData, iss.Metadata] =
     Transformer
-      .definePartial[CommandExecutionResult, iss.Metadata]
+      .definePartial[TransactionData, iss.Metadata]
       .withFieldComputed(_.submissionTime, _.transactionMeta.submissionTime.transformInto[Long])
-      .withFieldComputed(
-        _.ledgerEffectiveTime,
-        r =>
-          Option.when(r.dependsOnLedgerTime)(
-            r.transactionMeta.ledgerEffectiveTime.transformInto[Long]
-          ),
-      )
-      .withFieldComputedPartial(
-        _.disclosedEvents,
+      .withFieldConstPartial(
+        _.inputContracts,
         // The hashing algorithm expects disclosed contracts to be sorted by contract ID, so pre-sort them for the client
-        _.processedDisclosedContracts.toList
-          .sortBy(_.create.coid.coid)
+        inputContracts.toList
+          .sortBy(_.contractId.coid)
           .traverse(
-            _.transformIntoPartial[iss.Metadata.ProcessedDisclosedContract]
+            _.transformIntoPartial[iss.Metadata.InputContract]
           ),
       )
-      .withFieldConst(_.domainId, domainId.transformInto[String])
+      .withFieldConst(_.synchronizerId, synchronizerId.transformInto[String])
       .withFieldConst(_.transactionUuid, transactionUUID.toString)
       .withFieldConst(_.mediatorGroup, mediatorGroup)
+      .withFieldComputed(
+        _.minLedgerEffectiveTime,
+        _.transactionMeta.timeBoundaries.minConstraint.map(_.transformInto[Long]),
+      )
+      .withFieldComputed(
+        _.maxLedgerEffectiveTime,
+        _.transactionMeta.timeBoundaries.maxConstraint.map(_.transformInto[Long]),
+      )
       .buildTransformer
 
   @VisibleForTesting
@@ -331,7 +343,7 @@ final class PreparedTransactionEncoder(
       nodeSeeds: Option[ImmArray[(NodeId, crypto.Hash)]],
   )(implicit
       loggingContext: LoggingContextWithTrace,
-      errorLoggingContext: ContextualizedErrorLogger,
+      errorLoggingContext: ErrorLoggingContext,
   ): Future[DamlTransaction] = {
     implicit val traceContext: TraceContext = loggingContext.traceContext
     implicit val implicitTransactionTransformer
@@ -345,30 +357,35 @@ final class PreparedTransactionEncoder(
       .toFutureWithLoggedFailures("Failed to serialize prepared transaction", logger)
   }
 
-  def serializeCommandExecutionResult(
-      result: CommandExecutionResult,
-      domainId: DomainId,
+  def serializeCommandInterpretationResult(
+      preparedTransactionData: TransactionData,
+      synchronizerId: SynchronizerId,
       transactionUUID: UUID,
       mediatorGroup: Int,
   )(implicit
       executionContext: ExecutionContext,
       loggingContext: LoggingContextWithTrace,
-      errorLoggingContext: ContextualizedErrorLogger,
+      errorLoggingContext: ErrorLoggingContext,
   ): Future[iss.PreparedTransaction] = {
     implicit val traceContext: TraceContext = loggingContext.traceContext
-    implicit val metadataTransformer: PartialTransformer[CommandExecutionResult, Metadata] =
-      resultToMetadataTransformer(domainId, transactionUUID, mediatorGroup)
+    implicit val metadataTransformer: PartialTransformer[TransactionData, Metadata] =
+      resultToMetadataTransformer(
+        synchronizerId,
+        transactionUUID,
+        mediatorGroup,
+        preparedTransactionData.inputContracts.values.toSeq,
+      )
     val versionedTransaction = lf.transaction.VersionedTransaction(
-      result.transaction.version,
-      result.transaction.nodes,
-      result.transaction.roots,
+      preparedTransactionData.transaction.version,
+      preparedTransactionData.transaction.nodes,
+      preparedTransactionData.transaction.roots,
     )
     for {
       serializedTransaction <- serializeTransaction(
         versionedTransaction,
-        result.transactionMeta.optNodeSeeds,
+        preparedTransactionData.transactionMeta.optNodeSeeds,
       )
-      metadata <- result
+      metadata <- preparedTransactionData
         .transformIntoPartial[iss.Metadata]
         .toFutureWithLoggedFailures("Failed to serialize metadata", logger)
     } yield {

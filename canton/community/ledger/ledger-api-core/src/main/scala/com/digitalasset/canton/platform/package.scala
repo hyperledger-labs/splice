@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -45,8 +45,6 @@ package object platform {
   private[platform] val WorkflowId = lfdata.Ref.LedgerString
   private[platform] type SubmissionId = lfdata.Ref.SubmissionId
   private[platform] val SubmissionId = lfdata.Ref.SubmissionId
-  private[platform] type ApplicationId = lfdata.Ref.ApplicationId
-  private[platform] val ApplicationId = lfdata.Ref.ApplicationId
   private[platform] type CommandId = lfdata.Ref.CommandId
   private[platform] val CommandId = lfdata.Ref.CommandId
   private[platform] type ParticipantId = lfdata.Ref.ParticipantId

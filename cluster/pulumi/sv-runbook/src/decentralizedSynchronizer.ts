@@ -7,6 +7,7 @@ import {
 } from 'splice-pulumi-common';
 import {
   CometBftNodeConfigs,
+  CrossStackCometBftDecentralizedSynchronizerNode,
   CrossStackDecentralizedSynchronizerNode,
   installCantonComponents,
   InstalledMigrationSpecificSv,
@@ -37,10 +38,14 @@ export function installCanton(
     peers: [],
   };
   const externalActiveMigration = {
-    decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
-      activeMigrationId,
-      new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier
-    ),
+    decentralizedSynchronizer: decentralizedSynchronizerMigrationConfig.active.sequencer
+      .enableBftSequencer
+      ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId, svRunbookConfig.ingressName)
+      : new CrossStackCometBftDecentralizedSynchronizerNode(
+          activeMigrationId,
+          new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier,
+          svRunbookConfig.ingressName
+        ),
     participant: {
       asDependencies: [],
       internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
@@ -80,6 +85,7 @@ export function installCanton(
           auth0Client,
           {
             onboardingName,
+            ingressName: svRunbookConfig.ingressName,
             // TODO(#16751) The hardcoding is not nice but we're getting rid of this code path anyway
             auth0SvAppName: 'sv',
             isFirstSv: false,

@@ -1,0 +1,28 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Api.Token.Test.DummyHolding where
+
+import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import DA.TextMap qualified as TextMap
+
+template DummyHolding
+  with
+    owner : Party
+    issuer : Party
+    amount : Decimal
+  where
+    signatory owner, issuer
+
+    interface instance Api.Token.HoldingV1.Holding for DummyHolding where
+      view = Api.Token.HoldingV1.HoldingView with
+        owner
+        instrumentId = Api.Token.HoldingV1.InstrumentId with admin = issuer; id = "DummyHolding"
+        amount = amount
+        lock = None
+        meta = Api.Token.MetadataV1.Metadata
+          with
+            values = TextMap.fromList [
+              ("test", "test")
+              ]
