@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.crypto.SigningPrivateKey
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
+import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.io.FileOutputStream
@@ -62,7 +63,7 @@ class TokenStandardCliIntegrationTest
         "Transfer 2000.0 to Alice via Token Standard", {
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
-            aliceValidatorBackend.getValidatorPartyId(),
+            RichPartyId.local(aliceValidatorBackend.getValidatorPartyId()),
             aliceParty,
             BigDecimal(2000.0),
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,

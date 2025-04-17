@@ -106,6 +106,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
       ts: CantonTimestamp,
       inputAmulets: Seq[AmuletPosition] = Seq(),
   )(implicit env: SpliceTestConsoleEnvironment): AmuletOperationOutcome = {
+
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
     val synchronizerId =
@@ -113,8 +114,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
         sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.activeSynchronizer
       )
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
-    val topupStateCid =
-      getOrCreateTopupStateCid(validatorApp, memberId, synchronizerId)
+    val topupStateCid = getOrCreateTopupStateCid(validatorApp, memberId, synchronizerId)
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(WalletAppInstall.COMPANION)(

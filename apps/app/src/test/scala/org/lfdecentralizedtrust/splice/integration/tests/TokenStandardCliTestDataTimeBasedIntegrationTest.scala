@@ -1,7 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.commands.Command.Command.Create
-import com.daml.ledger.api.v2.commands.{Command, CreateCommand}
 import com.daml.ledger.api.v2.event_query_service
 import com.daml.ledger.api.v2.state_service.GetActiveContractsRequest
 import com.daml.ledger.api.v2.update_service.GetUpdatesRequest
@@ -45,9 +43,11 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
@@ -63,9 +63,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     with TimeTestUtil
     with HasExecutionContext {
 
-  private val sampleHoldingDarPath = Paths
+  private val dummyHoldingDarPath = Paths
     .get(
-      "token-standard/examples/splice-token-test-dummy-holding/.daml/dist/splice-api-token-sample-holding-current.dar"
+      "token-standard/examples/splice-token-test-dummy-holding/.daml/dist/splice-token-test-dummy-holding-current.dar"
     )
     .toAbsolutePath
     .toString
@@ -79,7 +79,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       .withoutAutomaticRewardsCollectionAndAmuletMerging // we need a deterministic amount of amulets
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClientWithAdminToken
-          .upload_dar_unless_exists(sampleHoldingDarPath)
+          .upload_dar_unless_exists(dummyHoldingDarPath)
       })
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
@@ -111,15 +111,70 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     "have up-to-date test data" in { implicit env =>
       advanceTime(java.time.Duration.ofMinutes(1L))
 
-      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      // Onboard and Create/Accept ExternalPartySetupProposal for Bob
+      val (bob, _) = actAndCheck(
+        "Onboard bob as an external party on bobValidator", {
+          // Ensure bob's validator has enough funds to onboard bob
+          bobValidatorWalletClient.tap(100)
+          val onboardingBob = onboardExternalParty(bobValidatorBackend, Some("bobExternal"))
+          clue("Create and accept onboarding proposal for bob") {
+            val proposalBob = createExternalPartySetupProposal(bobValidatorBackend, onboardingBob)
+            val preparePartySetupBob =
+              prepareAcceptExternalPartySetupProposal(
+                bobValidatorBackend,
+                onboardingBob,
+                proposalBob,
+              )
+            submitExternalPartySetupProposal(
+              bobValidatorBackend,
+              onboardingBob,
+              preparePartySetupBob,
+            )
+            onboardingBob.richPartyId
+          }
+        },
+      )(
+        "Bob's preapproval is visible",
+        bob => {
+          bobValidatorBackend.lookupTransferPreapprovalByParty(bob.partyId) should not be empty
+          bobValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
+            bob.partyId
+          ) should not be empty
+        },
+      )
+
+      // Check that Bob's balance is empty
+      def getBobPartyBalance(): HttpWalletAppClient.Balance = {
+        val extBalance = bobValidatorBackend.getExternalPartyBalance(bob.partyId)
+        HttpWalletAppClient.Balance(
+          round = extBalance.computedAsOfRound,
+          unlockedQty = BigDecimal(extBalance.totalUnlockedCoin),
+          lockedQty = BigDecimal(extBalance.totalLockedCoin),
+          holdingFees = BigDecimal(extBalance.accumulatedHoldingFeesTotal),
+        )
+      }
+      getBobPartyBalance().unlockedQty shouldBe BigDecimal("0.0")
+
+      actAndCheck(
+        "Cancel Bob's pre-approval, as we want to test it with two-step transfers",
+        bobValidatorBackend.cancelTransferPreapprovalByParty(bob.partyId),
+      )(
+        "Bob's preapproval is no longer visible",
+        _ => bobValidatorBackend.lookupTransferPreapprovalByParty(bob.partyId) shouldBe empty,
+      )
+
+      // Onboard alice as a local party
+      val alice = RichPartyId.local(onboardWalletUser(aliceWalletClient, aliceValidatorBackend))
+      val aliceValidator = RichPartyId.local(aliceValidatorBackend.getValidatorPartyId())
+
       aliceValidatorWalletClient.tap(BigDecimal(1000))
       aliceWalletClient.createTransferPreapproval()
       aliceValidatorWalletClient.createTransferPreapproval()
 
       logger.info(
         s"Generating CLI data for" +
-          s" alice: ${alice.toProtoPrimitive}" +
+          s" alice: ${alice.partyId.toProtoPrimitive}" +
+          s" bob: ${bob.partyId.toProtoPrimitive}" +
           s" validator: ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"
       )
 
@@ -129,8 +184,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           // TransferIn
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
-            aliceValidatorBackend.getValidatorPartyId(),
-            alice,
+            aliceValidator,
+            alice.partyId,
             BigDecimal("200.0"),
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
           )
@@ -141,7 +196,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           executeTransferViaTokenStandard(
             aliceValidatorBackend.participantClientWithAdminToken,
             alice,
-            aliceValidatorBackend.getValidatorPartyId(),
+            aliceValidator.partyId,
             BigDecimal("100.0"),
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
           )
@@ -150,7 +205,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           }
           // Deliberately using a non-token-standard transfer so that this shows up as a Transfer still (tx-kind-based)
           aliceWalletClient.transferPreapprovalSend(
-            aliceValidatorBackend.getValidatorPartyId(),
+            aliceValidator.partyId,
             BigDecimal("10.0"),
             UUID.randomUUID().toString,
           )
@@ -164,7 +219,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 executeTransferViaTokenStandard(
                   aliceValidatorBackend.participantClientWithAdminToken,
                   alice,
-                  bob,
+                  bob.partyId,
                   BigDecimal("1000.0"),
                   transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
                   timeToLife = java.time.Duration.ofMinutes(1),
@@ -174,7 +229,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               executeTransferViaTokenStandard(
                 aliceValidatorBackend.participantClientWithAdminToken,
                 alice,
-                bob,
+                bob.partyId,
                 BigDecimal("1000.0"),
                 transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
                 timeToLife = java.time.Duration.ofMinutes(20),
@@ -185,7 +240,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             _ => {
               val instructions = listTransferInstructions(
                 bobValidatorBackend.participantClientWithAdminToken,
-                bob,
+                bob.partyId,
               )
               instructions should have size 5
               instructions.map(_._1)
@@ -200,7 +255,10 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             ),
           )(
             "Bob sees the funds",
-            _ => bobWalletClient.balance().unlockedQty should beAround(BigDecimal("1000.0")),
+            _ =>
+              getBobPartyBalance().unlockedQty should beAround(
+                BigDecimal("1000.0")
+              ),
           )
           actAndCheck(
             "Bob rejects transfer instruction #2 and Alice withdraws #3", {
@@ -220,10 +278,10 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             _ => {
               val instructions = listTransferInstructions(
                 bobValidatorBackend.participantClientWithAdminToken,
-                bob,
+                bob.partyId,
               )
               instructions should have size 2
-              bobWalletClient.balance().unlockedQty should beAround(BigDecimal("1000.0"))
+              getBobPartyBalance().unlockedQty should beAround(BigDecimal("1000.0"))
               inside(aliceWalletClient.balance()) { aliceBalance =>
                 aliceBalance.unlockedQty should beWithin(BigDecimal("2800.0"), BigDecimal("3000.0"))
                 aliceBalance.lockedQty should beWithin(BigDecimal("2000.0"), BigDecimal("2150.0"))
@@ -233,12 +291,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           clue("Test receiving two-step transfers") {
             actAndCheck(
               "Alice validator cancels TransferPreapproval for alice",
-              aliceValidatorBackend.cancelTransferPreapprovalByParty(alice),
+              aliceValidatorBackend.cancelTransferPreapprovalByParty(alice.partyId),
             )(
               "See that TransferPreapproval for alice has been cancelled",
               _ => {
-                aliceValidatorBackend.lookupTransferPreapprovalByParty(alice) shouldBe None
-                sv1ScanBackend.lookupTransferPreapprovalByParty(alice) shouldBe None
+                aliceValidatorBackend.lookupTransferPreapprovalByParty(alice.partyId) shouldBe None
+                sv1ScanBackend.lookupTransferPreapprovalByParty(alice.partyId) shouldBe None
               },
             )
             val (_, aliceInstructionCids) = actAndCheck(
@@ -247,7 +305,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 executeTransferViaTokenStandard(
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob,
-                  alice,
+                  alice.partyId,
                   BigDecimal("200.0"),
                   transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
                 )
@@ -257,11 +315,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               _ => {
                 val instructions = listTransferInstructions(
                   aliceValidatorBackend.participantClientWithAdminToken,
-                  alice,
+                  alice.partyId,
                 )
-                instructions should have size 6 // two outstanding ones from alice to bob, and four new ones form bob to alice
+                instructions should have size 6 // two outstanding ones from alice to bob, and four new ones from bob to alice
                 instructions.collect {
-                  case instr if instr._2.transfer.receiver == alice.toProtoPrimitive =>
+                  case instr if instr._2.transfer.receiver == alice.partyId.toProtoPrimitive =>
                     instr._1
                 }
               },
@@ -295,7 +353,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               _ => {
                 val instructions = listTransferInstructions(
                   aliceValidatorBackend.participantClientWithAdminToken,
-                  alice,
+                  alice.partyId,
                 )
                 instructions should have size 3
               },
@@ -308,7 +366,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             executeTransferViaTokenStandard(
               bobValidatorBackend.participantClientWithAdminToken,
               bob,
-              bob,
+              bob.partyId,
               BigDecimal("250.0"),
               transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
             ),
@@ -317,9 +375,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             _ => {
               listHoldings(
                 bobValidatorBackend.participantClientWithAdminToken,
-                bob,
+                bob.partyId,
               ) should have size 3
-              inside(bobWalletClient.balance()) { balance =>
+              inside(getBobPartyBalance()) { balance =>
                 balance.unlockedQty should beWithin(
                   BigDecimal("450.0"),
                   BigDecimal("600.0"),
@@ -338,7 +396,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             inside(
               listHoldings(
                 aliceValidatorBackend.participantClientWithAdminToken,
-                alice,
+                alice.partyId,
               )
             ) { holdings =>
               holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 2
@@ -350,7 +408,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             executeTransferViaTokenStandard(
               aliceValidatorBackend.participantClientWithAdminToken,
               alice,
-              alice,
+              alice.partyId,
               BigDecimal("1.0"),
               transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
             ),
@@ -359,7 +417,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             _ => {
               listHoldings(
                 aliceValidatorBackend.participantClientWithAdminToken,
-                alice,
+                alice.partyId,
               ) should have size 3
               inside(aliceWalletClient.balance()) { aliceBalance =>
                 aliceBalance.unlockedQty should beWithin(BigDecimal("4100.0"), BigDecimal("4200.0"))
@@ -372,7 +430,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             inside(
               listHoldings(
                 aliceValidatorBackend.participantClientWithAdminToken,
-                alice,
+                alice.partyId,
               )
             ) { holdings =>
               holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
@@ -391,39 +449,26 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             _ => {
               val instructions = listTransferInstructions(
                 aliceValidatorBackend.participantClientWithAdminToken,
-                alice,
+                alice.partyId,
               )
               instructions should have size 2
             },
           )
 
-          // SampleHolding holdings
+          // DummyHolding holdings
           Seq("30.0", "40.0").foreach { amount =>
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.commands
-              .submit(
-                actAs = Seq(alice),
-                readAs = Seq(alice),
-                optTimeout = None,
-                commands = Seq(
-                  Command(
-                    Create(
-                      CreateCommand.fromJavaProto(
-                        new DummyHolding(
-                          alice.toProtoPrimitive,
-                          alice.toProtoPrimitive,
-                          BigDecimal(amount).bigDecimal,
-                        )
-                          .create()
-                          .commands()
-                          .asScala
-                          .toSeq
-                          .head
-                          .toProtoCommand
-                          .getCreate
-                      )
-                    )
-                  )
-                ),
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+              .submitJavaExternalOrLocal(
+                alice,
+                commands = new DummyHolding(
+                  alice.partyId.toProtoPrimitive,
+                  alice.partyId.toProtoPrimitive,
+                  BigDecimal(amount).bigDecimal,
+                )
+                  .create()
+                  .commands()
+                  .asScala
+                  .toSeq,
               )
           }
         },
@@ -433,7 +478,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
             GetActiveContractsRequest(
               filter = Some(
-                TransactionFilter(filtersByParty(alice, includeWildcard = false))
+                TransactionFilter(filtersByParty(alice.partyId, includeWildcard = false))
               ),
               activeAtOffset =
                 aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end(),
@@ -456,7 +501,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   Some(
                     TransactionFormat(
                       transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
-                      eventFormat = Some(EventFormat(filtersByParty(alice, includeWildcard = true))),
+                      eventFormat =
+                        Some(EventFormat(filtersByParty(alice.partyId, includeWildcard = true))),
                     )
                   )
                 )
@@ -496,12 +542,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       }
 
       val expectedParties = Map(
-        alice.toProtoPrimitive -> "alice::normalized",
+        alice.partyId.toProtoPrimitive -> "alice::normalized",
         dsoParty.toProtoPrimitive -> "dso::normalized",
         aliceValidatorBackend
           .getValidatorPartyId()
           .toProtoPrimitive -> "aliceValidator::normalized",
-        bob.toProtoPrimitive -> "bob::normalized",
+        bob.partyId.toProtoPrimitive -> "bob::normalized",
       )
       val dateFields =
         Seq(
@@ -687,7 +733,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             event_query_service.GetEventsByContractIdRequest(
               cid,
               Seq.empty,
-              Some(EventFormat(filtersByParty(alice, includeWildcard = true))),
+              Some(EventFormat(filtersByParty(alice.partyId, includeWildcard = true))),
             )
           ),
           JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,

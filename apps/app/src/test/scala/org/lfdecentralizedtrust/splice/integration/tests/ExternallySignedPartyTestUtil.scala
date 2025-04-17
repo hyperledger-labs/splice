@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   ExternalPartySetupProposal,
   TransferPreapproval,
 }
-import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
+import org.lfdecentralizedtrust.splice.console.{LedgerApiExtensions, ValidatorAppBackendReference}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   PrepareAcceptExternalPartySetupProposalResponse,
   SignedTopologyTx,
@@ -119,7 +119,14 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       party: PartyId,
       publicKey: SigningPublicKey,
       privateKey: PrivateKey,
-  )
+  ) {
+    def richPartyId: LedgerApiExtensions.RichPartyId =
+      LedgerApiExtensions.RichPartyId.external(
+        party,
+        privateKey.asInstanceOf[SigningPrivateKey],
+        crypto,
+      )
+  }
 
   protected def createAndAcceptExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
