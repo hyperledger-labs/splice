@@ -1,0 +1,32 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.Amulet.TokenApiUtils where
+
+import DA.Assert
+
+import Daml.Script
+
+import Splice.Api.FeaturedAppRightV1
+import Splice.Amulet.TokenApiUtils
+import Splice.Testing.Registries.AmuletRegistry (beneficiariesToMetadata)
+
+
+test_beneficiariesToFromMetadata : Script ()
+test_beneficiariesToFromMetadata = do
+    test []
+    test [(alice, 0.5), (bob, 0.5)]
+    test [(alice, 0.5), (bob, 0.5), (alice, 0.5)]
+    test [(alice, 0.0000000001), (bob, 1.0), (charlie, 0.0)]
+  where
+    Some alice = partyFromText "alice"
+    Some bob = partyFromText "bob"
+    Some charlie = partyFromText "charlie"
+    test : [(Party, Decimal)] -> Script ()
+    test bs = do
+      let expectedBs
+            | null bs = None
+            | otherwise = Some [ AppRewardBeneficiary b w | (b, w) <- bs ]
+      let meta = beneficiariesToMetadata bs
+      debug ("test_beneficiariesToFromMetadata: ", bs, meta)
+      Right expectedBs === beneficiariesFromMetadata meta

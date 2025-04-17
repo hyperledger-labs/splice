@@ -118,10 +118,16 @@ executeTwoStepTransfer
   -> Update ([ContractId Holding], [ContractId Holding], Metadata)
 executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
   assertWithinDeadline transferBeforeDeadline transferBefore
-  paymentContext <-
+  (paymentContext, beneficiaries) <-
     if allowFeaturing
-      then paymentFromChoiceContext dso extraArgs.context
-      else unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
+      then do
+        beneficiaries <- either fail pure $ beneficiariesFromMetadata extraArgs.meta
+        context <- paymentFromChoiceContext dso extraArgs.context
+        pure (context, beneficiaries)
+      else do
+        -- ignore beneficiaries in case we are not allowing featuring
+        context <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
+        pure (context, None)
   let openRoundCid = paymentContext.context.openMiningRound
   -- unlock amulet
   unlockResult <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
@@ -137,7 +143,7 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         provider
         inputs = [InputAmulet amuletCid]
         outputs = [receiverOutput]
-        beneficiaries = None  -- not featured and thus no beneficiaries
+        beneficiaries
   result <- exerciseCheckedPaymentTransfer dso paymentContext amuletRulesTransfer
   pure
     ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)
