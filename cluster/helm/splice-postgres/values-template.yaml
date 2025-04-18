@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+
+# -- Annotations and labels for the participant pod
+pod:
+  annotations: {}
+  labels: {}
+
 resources:
   limits:
     cpu: "4"
