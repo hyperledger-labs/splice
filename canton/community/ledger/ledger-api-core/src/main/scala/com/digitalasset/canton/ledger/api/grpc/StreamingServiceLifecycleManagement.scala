@@ -1,16 +1,16 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.grpc
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.server.pekko.ServerAdapter
 import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.ledger.error.CommonErrors
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.TryUtil
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.StreamObserver
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
@@ -20,7 +20,6 @@ import org.apache.pekko.{Done, NotUsed}
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, blocking}
-import scala.util.Success
 
 trait StreamingServiceLifecycleManagement extends AutoCloseable with NamedLogging {
 
@@ -51,7 +50,7 @@ trait StreamingServiceLifecycleManagement extends AutoCloseable with NamedLoggin
         awaitable = Future.sequence(
           completions.map(
             // we don't care about failures after abort
-            _.transform(_ => Success(()))
+            _.transform(_ => TryUtil.unit)
           )
         ),
         atMost = StreamAbortTimeout,
@@ -107,6 +106,6 @@ trait StreamingServiceLifecycleManagement extends AutoCloseable with NamedLoggin
     }
   }
 
-  private def closingError(errorLogger: ContextualizedErrorLogger): StatusRuntimeException =
+  private def closingError(errorLogger: ErrorLoggingContext): StatusRuntimeException =
     CommonErrors.ServerIsShuttingDown.Reject()(errorLogger).asGrpcError
 }

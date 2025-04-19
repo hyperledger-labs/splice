@@ -1,11 +1,14 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
 
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.protocol.ExampleTransactionFactory.transactionVersion
 import com.digitalasset.canton.serialization.HasCryptographicEvidenceTest
-import com.digitalasset.daml.lf.value.ValueCoder
+import com.digitalasset.daml.lf.data.ImmArray
+import com.digitalasset.daml.lf.transaction.Versioned
+import com.digitalasset.daml.lf.value.{Value, ValueCoder}
 import com.google.protobuf.ByteString
 import org.scalatest.prop.TableFor3
 import org.scalatest.wordspec.AnyWordSpec
@@ -67,6 +70,46 @@ class SerializableRawContractInstanceTest
         )
       }
     }
+
+    "hashing" should {
+
+      def inst(arg: Value): SerializableRawContractInstance =
+        SerializableRawContractInstance.createWithSerialization(
+          LfContractInst(
+            packageName = ExampleTransactionFactory.packageName,
+            template = ExampleTransactionFactory.templateId,
+            arg = Versioned(transactionVersion, arg),
+          )
+        )(ByteString.EMPTY)
+
+      val unNormalizedArg = Value.ValueRecord(
+        None,
+        ImmArray(
+          (None, Value.ValueOptional(Some(Value.ValueTrue))),
+          (None, Value.ValueOptional(None)),
+        ),
+      )
+
+      val normalizedArg = Value.ValueRecord(
+        None,
+        ImmArray(
+          (None, Value.ValueOptional(Some(Value.ValueTrue)))
+        ),
+      )
+
+      val unNormalizedInst = inst(unNormalizedArg)
+      val normalizedInst = inst(normalizedArg)
+
+      "create different hashes for normalized and un-normalized values when not using upgrade friendly hashing" in {
+        unNormalizedInst.contractHash(false) != normalizedInst.contractHash(false)
+      }
+
+      "create identical hashes for normalized and un-normalized values when using upgrade friendly hashing" in {
+        unNormalizedInst.contractHash(true) == normalizedInst.contractHash(true)
+      }
+
+    }
+
   }
 }
 

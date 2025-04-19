@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
@@ -38,10 +38,9 @@ class ExecutionContextMonitorTest extends AnyWordSpec with BaseTest {
     // As we are setting min num threads in fork join pool, we also need to
     // set this here as otherwise this test becomes flaky when running in the
     // sequential test
-    val numThreads = Math.max(
-      Threading.minParallelismForForkJoinPool,
-      Threading.detectNumberOfThreads(noTracingLogger),
-    )
+    val numThreads = Threading.minParallelismForForkJoinPool
+      .max(Threading.detectNumberOfThreads(noTracingLogger))
+      .value
 
     loggerFactory.assertLoggedWarningsAndErrorsSeq(
       {

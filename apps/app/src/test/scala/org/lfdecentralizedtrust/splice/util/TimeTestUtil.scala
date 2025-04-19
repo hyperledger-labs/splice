@@ -110,7 +110,7 @@ trait TimeTestUtil extends TestCommon {
     val disclosure = DisclosedContracts.forTesting(amuletRules, openRound)
 
     userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-      applicationId = userId,
+      userId = userId,
       actAs = authorizers.distinct,
       readAs = Seq.empty,
       commands = transferContext.amuletRules
@@ -124,6 +124,7 @@ trait TimeTestUtil extends TestCommon {
               )
             ).asJava,
             outputs.asJava,
+            java.util.Optional.empty(),
           ),
           new splice.amuletrules.TransferContext(
             transferContext.openMiningRound,
@@ -136,9 +137,8 @@ trait TimeTestUtil extends TestCommon {
         .commands
         .asScala
         .toSeq,
-      domainId = Some(disclosure.assignedDomain),
+      synchronizerId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
-      optTimeout = None,
     )
   }
 

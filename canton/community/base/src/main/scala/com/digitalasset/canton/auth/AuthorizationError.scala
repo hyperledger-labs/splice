@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.auth
@@ -17,16 +17,17 @@ object AuthorizationError {
       s"Claims were valid until $authorizedUntil, current time is $currentTime"
   }
 
+  final case class MissingUserId(reason: String) extends AuthorizationError
+
   final case class InvalidParticipant(authorized: String, actual: String)
       extends AuthorizationError {
     override val reason =
       s"Claims are only valid for participantId '$authorized', actual participantId is '$actual'"
   }
 
-  final case class InvalidApplication(authorized: String, actual: String)
-      extends AuthorizationError {
+  final case class InvalidUser(authorized: String, actual: String) extends AuthorizationError {
     override val reason =
-      s"Claims are only valid for applicationId '$authorized', actual applicationId is '$actual'"
+      s"Claims are only valid for userId '$authorized', actual userId is '$actual'"
   }
 
   case object MissingPublicClaim extends AuthorizationError {
@@ -57,4 +58,7 @@ object AuthorizationError {
   }
 
   final case class InvalidField(fieldName: String, reason: String) extends AuthorizationError
+
+  final case class InternalAuthorizationError(reason: String, throwable: Throwable)
+      extends AuthorizationError
 }

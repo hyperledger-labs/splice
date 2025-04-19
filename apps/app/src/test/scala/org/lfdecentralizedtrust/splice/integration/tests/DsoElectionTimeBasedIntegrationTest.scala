@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
@@ -18,7 +18,7 @@ import scala.concurrent.duration.DurationInt
 class DsoElectionTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
 
-  private val dummyDsoDomainId = DomainId.tryFromString("domain1::domain")
+  private val dummyDsoSynchronizerId = SynchronizerId.tryFromString("domain1::domain")
 
   // TODO(#7649): once flow is fixed add test to check that SVs can elect a new delegate (currently locked contract issue)
   "SVs can elect a new delegate and if a delegate gets offboarded a new delegate is chosen while current ElectionRequests are archived" in {
@@ -214,7 +214,9 @@ class DsoElectionTimeBasedIntegrationTest
         "A new delegate is elected and delegate-based triggers resume operating normally"
       ) {
         val effectiveTimeout = SvUtil
-          .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).dsoDelegateInactiveTimeout)
+          .fromRelTime(
+            SvUtil.defaultDsoRulesConfig(dummyDsoSynchronizerId).dsoDelegateInactiveTimeout
+          )
           .plus(pollingIntervalDuration)
 
         val bufferDuration = JavaDuration.ofSeconds(5)

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
 import com.digitalasset.canton.protocol.{RootHash, TransactionId, ViewHash}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{LfPartyId, WorkflowId}
 
 import java.util.UUID
@@ -48,9 +48,9 @@ trait TransactionViewTree extends ViewTree {
 
   override def toBeSigned: Option[RootHash] = if (isTopLevel) Some(rootHash) else None
 
-  /** Returns the hashes of the direct subviews of the view represented by this tree.
-    * By definition, all subviews are unblinded, therefore this will also work when the subviews
-    * are stored in a MerkleSeq.
+  /** Returns the hashes of the direct subviews of the view represented by this tree. By definition,
+    * all subviews are unblinded, therefore this will also work when the subviews are stored in a
+    * MerkleSeq.
     */
   def subviewHashes: Seq[ViewHash] = view.subviews.trySubviewHashes
 
@@ -67,7 +67,7 @@ trait TransactionViewTree extends ViewTree {
 
   lazy val transactionUuid: UUID = commonMetadata.uuid
 
-  override def domainId: DomainId = commonMetadata.domainId
+  override def synchronizerId: SynchronizerId = commonMetadata.synchronizerId
 
   override def mediator: MediatorGroupRecipient = commonMetadata.mediator
 

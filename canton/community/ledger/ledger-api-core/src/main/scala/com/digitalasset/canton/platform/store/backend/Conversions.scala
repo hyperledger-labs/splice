@@ -1,15 +1,30 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
 import anorm.*
 import anorm.Column.nonNull
-import com.digitalasset.canton.data.{AbsoluteOffset, Offset}
+import anorm.SqlParser.int
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.{
+  Added,
+  ChangedTo,
+  Revoked,
+}
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel.{
+  Confirmation,
+  Observation,
+  Submission,
+}
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.{
+  AuthorizationEvent,
+  AuthorizationLevel,
+}
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.value.Value
 import com.typesafe.scalalogging.Logger
 
@@ -20,6 +35,11 @@ private[backend] object Conversions {
   private def stringColumnToX[X](f: String => Either[String, X]): Column[X] =
     Column.nonNull((value: Any, meta) =>
       Column.columnToString(value, meta).flatMap(x => f(x).left.map(SqlMappingError.apply))
+    )
+
+  private def binaryColumnToX[X](f: Array[Byte] => Either[String, X]): Column[X] =
+    Column.nonNull((value: Any, meta) =>
+      Column.columnToByteArray(value, meta).flatMap(x => f(x).left.map(SqlMappingError.apply))
     )
 
   private final class SubTypeOfStringToStatement[S <: String] extends ToStatement[S] {
@@ -60,16 +80,16 @@ private[backend] object Conversions {
   def ledgerString(columnName: String): RowParser[Ref.LedgerString] =
     SqlParser.get[Ref.LedgerString](columnName)(columnToLedgerString)
 
-  // ApplicationId
+  // UserId
 
-  private implicit val columnToApplicationId: Column[Ref.ApplicationId] =
-    stringColumnToX(Ref.ApplicationId.fromString)
+  private implicit val columnToUserId: Column[Ref.UserId] =
+    stringColumnToX(Ref.UserId.fromString)
 
-  implicit val applicationIdToStatement: ToStatement[Ref.ApplicationId] =
-    new SubTypeOfStringToStatement[Ref.ApplicationId]
+  implicit val userIdToStatement: ToStatement[Ref.UserId] =
+    new SubTypeOfStringToStatement[Ref.UserId]
 
-  def applicationId(columnName: String): RowParser[Ref.ApplicationId] =
-    SqlParser.get[Ref.ApplicationId](columnName)(columnToApplicationId)
+  def userId(columnName: String): RowParser[Ref.UserId] =
+    SqlParser.get[Ref.UserId](columnName)(columnToUserId)
 
   // ParticipantId
 
@@ -79,14 +99,14 @@ private[backend] object Conversions {
   def participantId(columnName: String): RowParser[Ref.ParticipantId] =
     SqlParser.get[Ref.ParticipantId](columnName)(columnToParticipantId)
 
-  // ContractIdString
+  // ContractId
 
   private implicit val columnToContractId: Column[Value.ContractId] =
-    stringColumnToX(Value.ContractId.fromString)
+    binaryColumnToX(byteArray => Value.ContractId.fromBytes(Bytes.fromByteArray(byteArray)))
 
   implicit object ContractIdToStatement extends ToStatement[Value.ContractId] {
     override def set(s: PreparedStatement, index: Int, v: Value.ContractId): Unit =
-      ToStatement.stringToStatement.set(s, index, v.coid)
+      ToStatement.byteArrayToStatement.set(s, index, v.toBytes.toByteArray)
   }
 
   def contractId(columnName: String): RowParser[Value.ContractId] =
@@ -96,23 +116,18 @@ private[backend] object Conversions {
 
   implicit object OffsetToStatement extends ToStatement[Offset] {
     override def set(s: PreparedStatement, index: Int, v: Offset): Unit =
-      s.setString(index, v.toHexString)
+      s.setLong(index, v.unwrap)
   }
 
   def offset(name: String): RowParser[Offset] =
-    SqlParser.get[String](name).map(v => Offset.fromHexString(Ref.HexString.assertFromString(v)))
+    SqlParser
+      .get[Long](name)
+      .map(Offset.tryFromLong)
 
   def offset(position: Int): RowParser[Offset] =
     SqlParser
-      .get[String](position)
-      .map(v => Offset.fromHexString(Ref.HexString.assertFromString(v)))
-
-  // AbsoluteOffset
-
-  implicit object AbsoluteOffsetToStatement extends ToStatement[AbsoluteOffset] {
-    override def set(s: PreparedStatement, index: Int, v: AbsoluteOffset): Unit =
-      s.setString(index, v.toHexString)
-  }
+      .get[Long](position)
+      .map(Offset.tryFromLong)
 
   // Timestamp
 
@@ -153,4 +168,60 @@ private[backend] object Conversions {
       .?
       .map(_.getOrElse(TraceContext.empty))
   }
+
+  // AuthorizationEvent
+
+  private lazy val authorizationLevelToIntMapping: Map[AuthorizationLevel, Int] = Map(
+    Submission -> 0,
+    Confirmation -> 1,
+    Observation -> 2,
+  )
+
+  private def authorizationLevel(n: Int): AuthorizationLevel =
+    authorizationLevelToIntMapping
+      .map(_.swap)
+      .getOrElse(
+        n,
+        throw new RuntimeException(
+          s"Integer $n was not expected as an authorization level serialized value."
+        ),
+      )
+
+  def participantPermissionInt(authorizationEvent: AuthorizationEvent): Int =
+    authorizationEvent match {
+      case active: AuthorizationEvent.ActiveAuthorization =>
+        authorizationLevelToIntMapping.getOrElse(
+          active.level,
+          throw new RuntimeException(
+            s"Unexpectedly level ${active.level} could not be serialized."
+          ),
+        )
+      case Revoked => 0 // we do not care about the permission level if the mapping is revoked
+    }
+
+  def authorizationEventInt(state: AuthorizationEvent): Int = state match {
+    case Added(_) => 0
+    case ChangedTo(_) => 1
+    case Revoked => 2
+  }
+
+  def authorizationEvent(t: Int, l: Int): AuthorizationEvent = t match {
+    case 0 => Added(authorizationLevel(l))
+    case 1 => ChangedTo(authorizationLevel(l))
+    case 2 => Revoked
+    case other =>
+      throw new RuntimeException(
+        s"Integer $other was not expected as an authorization event serialized value."
+      )
+  }
+
+  def authorizationEventParser(
+      authorizationLevelColumnName: String,
+      authorizationEventTypeColumnName: String,
+  ): RowParser[AuthorizationEvent] =
+    int(authorizationLevelColumnName) ~
+      int(authorizationEventTypeColumnName) map { case level ~ eventType =>
+        authorizationEvent(eventType, level)
+      }
+
 }

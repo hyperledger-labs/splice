@@ -6,20 +6,15 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.*
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.{SynchronizerAlias, HasActorSystem, HasExecutionContext}
 
 import scala.concurrent.duration.*
 
@@ -34,8 +29,7 @@ class UpdateHistoryIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
@@ -145,15 +139,15 @@ class UpdateHistoryIntegrationTest
       "alice sees balance update on splitwell domain",
       _ =>
         inside(aliceSplitwellClient.listBalanceUpdates(key)) { case Seq(update) =>
-          val domainId = aliceValidatorBackend.participantClient.domains.id_of(
-            DomainAlias.tryCreate("splitwell")
+          val synchronizerId = aliceValidatorBackend.participantClient.synchronizers.id_of(
+            SynchronizerAlias.tryCreate("splitwell")
           )
           aliceValidatorBackend.participantClient.ledger_api_extensions.acs
             .lookup_contract_domain(
               aliceUserParty,
               Set(update.contractId.contractId),
             ) shouldBe Map(
-            update.contractId.contractId -> domainId
+            update.contractId.contractId -> synchronizerId
           )
         },
     )

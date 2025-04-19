@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api
 
 import com.digitalasset.canton.LedgerParticipantId
-import com.digitalasset.canton.config.{DbConfig, MemoryStorageConfig, StorageConfig}
+import com.digitalasset.canton.config.{DbConfig, StorageConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.LedgerApiServerError
 import com.digitalasset.canton.util.ResourceUtil.withResource
@@ -14,9 +14,10 @@ import java.util.UUID.randomUUID
 import scala.concurrent.blocking
 import scala.util.Try
 
-/** Configuration and actions for the ledger-api persistence,
-  * Actions are synchronous as they use the underlying jdbc driver directly and there is no simple version of async calls available.
-  * Given these are only used for one off rare actions this is currently sufficient. Just be aware these operations will block.
+/** Configuration and actions for the ledger-api persistence, Actions are synchronous as they use
+  * the underlying jdbc driver directly and there is no simple version of async calls available.
+  * Given these are only used for one off rare actions this is currently sufficient. Just be aware
+  * these operations will block.
   */
 class LedgerApiStorage private[api] (
     val jdbcUrl: String,
@@ -65,7 +66,7 @@ object LedgerApiStorage {
   ): Either[LedgerApiServerError, LedgerApiStorage] =
     (config: @unchecked) match {
       // although canton is running using in-memory data structures, ledger-api still needs a sql database so allocate its own h2 instance
-      case _: MemoryStorageConfig => allocateInMemoryH2Database(participantId)
+      case _: StorageConfig.Memory => allocateInMemoryH2Database(participantId)
       // reuse the configured database
       case dbConfig: DbConfig => fromDbConfig(dbConfig)
     }

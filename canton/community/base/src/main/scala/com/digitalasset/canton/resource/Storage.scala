@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -18,7 +18,7 @@ import com.digitalasset.canton.health.{
   CloseableHealthComponent,
   ComponentHealthState,
 }
-import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, *}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -27,7 +27,6 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.metrics.{DbQueueMetrics, DbStorageMetrics}
-import com.digitalasset.canton.protocol.ContractIdSyntax.*
 import com.digitalasset.canton.protocol.{LfContractId, LfGlobalKey, LfHash}
 import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Postgres}
 import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile}
@@ -35,12 +34,12 @@ import com.digitalasset.canton.resource.StorageFactory.StorageCreationException
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.store.db.{DbDeserializationException, DbSerializationException}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryEither
-import com.digitalasset.canton.{LfPackageId, LfPartyId}
+import com.digitalasset.canton.{LfPackageId, LfPartyId, RichGeneratedMessage}
+import com.digitalasset.daml.lf.data.Bytes
 import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigValueFactory}
 import com.typesafe.scalalogging.Logger
@@ -56,7 +55,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import slick.jdbc.hikaricp.HikariCPJdbcDataSource
 import slick.jdbc.{ActionBasedSQLInterpolation as _, SQLActionBuilder as _, *}
 import slick.lifted.Aliases
-import slick.util.{AsyncExecutor, AsyncExecutorWithMetrics, ClassLoaderUtil}
+import slick.util.{AsyncExecutor, AsyncExecutorWithMetrics, ClassLoaderUtil, QueryCostTrackerImpl}
 
 import java.sql.{Blob, SQLException, SQLTransientException, Statement}
 import java.util.UUID
@@ -64,14 +63,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
 import javax.sql.rowset.serial.SerialBlob
 import scala.collection.immutable
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
 /** Storage resources (e.g., a database connection pool) that must be released on shutdown.
   *
-  * The only common functionality defined is the shutdown through AutoCloseable.
-  * Using storage objects after shutdown is unsafe; thus, they should only be closed when they're ready for
+  * The only common functionality defined is the shutdown through AutoCloseable. Using storage
+  * objects after shutdown is unsafe; thus, they should only be closed when they're ready for
   * garbage collection.
   */
 sealed trait Storage extends CloseableHealthComponent with AtomicHealthComponent {
@@ -130,7 +129,7 @@ object StorageFactory {
   class StorageCreationException(message: String) extends RuntimeException(message)
 }
 
-class CommunityStorageFactory(val config: CommunityStorageConfig) extends StorageFactory {
+class CommunityStorageFactory(val config: StorageConfig) extends StorageFactory {
   override def create(
       connectionPoolForParticipant: Boolean,
       logQueryCost: Option[QueryCostMonitoringConfig],
@@ -145,9 +144,9 @@ class CommunityStorageFactory(val config: CommunityStorageConfig) extends Storag
       closeContext: CloseContext,
   ): EitherT[UnlessShutdown, String, Storage] =
     config match {
-      case CommunityStorageConfig.Memory(_, _) =>
+      case StorageConfig.Memory(_, _) =>
         EitherT.rightT(new MemoryStorage(loggerFactory, timeouts))
-      case db: CommunityDbConfig =>
+      case db: DbConfig =>
         DbStorageSingle
           .create(
             db,
@@ -163,7 +162,7 @@ class CommunityStorageFactory(val config: CommunityStorageConfig) extends Storag
     }
 }
 
-class MemoryStorage(
+final class MemoryStorage(
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 ) extends Storage
@@ -192,10 +191,9 @@ trait DbStorage extends Storage { self: NamedLogging =>
 
   object DbStorageConverters {
 
-    /** We use `bytea` in Postgres and `binary large object` in H2.
-      * The reason is that starting from version 2.0, H2 imposes a limit of 1M
-      * for the size of a `bytea`. Hence, depending on the profile, SetParameter
-      * and GetResult for `Array[Byte]` are different for H2 and Postgres.
+    /** We use `bytea` in Postgres and `binary large object` in H2. The reason is that starting from
+      * version 2.0, H2 imposes a limit of 1M for the size of a `bytea`. Hence, depending on the
+      * profile, SetParameter and GetResult for `Array[Byte]` are different for H2 and Postgres.
       */
     private lazy val byteArraysAreBlobs = profile match {
       case _: H2 => true
@@ -230,8 +228,8 @@ trait DbStorage extends Storage { self: NamedLogging =>
       if (bytes != null) new SerialBlob(bytes) else null
   }
 
-  /** Returns database specific limit [offset] clause.
-    * Safe to use in a select slick query with #$... interpolation
+  /** Returns database specific limit [offset] clause. Safe to use in a select slick query with
+    * #$... interpolation
     */
   def limit(numberOfItems: Int, skipItems: Long = 0L): String = profile match {
     case _ => s"limit $numberOfItems" + (if (skipItems != 0L) s" offset $skipItems" else "")
@@ -241,8 +239,8 @@ trait DbStorage extends Storage { self: NamedLogging =>
   def limitSql(numberOfItems: Int, skipItems: Long = 0L): SQLActionBuilder =
     sql" #${limit(numberOfItems, skipItems)} "
 
-  /** Runs the given `query` transactionally with synchronous commit replication if
-    * the database provides the ability to configure synchronous commits per transaction.
+  /** Runs the given `query` transactionally with synchronous commit replication if the database
+    * provides the ability to configure synchronous commits per transaction.
     *
     * Currently only Postgres supports this.
     */
@@ -274,9 +272,7 @@ trait DbStorage extends Storage { self: NamedLogging =>
 
   private val defaultMaxRetries = retry.Forever
 
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[run]] has been deprecated */
-  protected def runUnlessShutdown[A](action: String, operationName: String, maxRetries: Int)(
+  protected def run[A](action: String, operationName: String, maxRetries: Int)(
       body: => FutureUnlessShutdown[A]
   )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] = {
     if (logOperations) {
@@ -305,49 +301,26 @@ trait DbStorage extends Storage { self: NamedLogging =>
       }
   }
 
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[runRead]] has been deprecated */
-  protected[canton] def runReadUnlessShutdown[A](
+  protected[canton] def runRead[A](
       action: DbAction.ReadTransactional[A],
       operationName: String,
       maxRetries: Int,
   )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A]
 
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[runWrite]] has been deprecated */
-  protected[canton] def runWriteUnlessShutdown[A](
+  protected[canton] def runWrite[A](
       action: DbAction.All[A],
       operationName: String,
       maxRetries: Int,
   )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A]
 
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[query]] has been deprecated */
-  def queryUnlessShutdown[A](
+  def query[A](
       action: DbAction.ReadTransactional[A],
       operationName: String,
       maxRetries: Int = defaultMaxRetries,
   )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] =
-    runReadUnlessShutdown(action, operationName, maxRetries)
+    runRead(action, operationName, maxRetries)
 
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[sequentialQueryAndCombine]] has been deprecated */
-  def sequentialQueryAndCombineUnlessShutdown[A](
-      actions: immutable.Iterable[DbAction.ReadOnly[immutable.Iterable[A]]],
-      operationName: String,
-  )(implicit
-      traceContext: TraceContext,
-      closeContext: CloseContext,
-  ): FutureUnlessShutdown[immutable.Iterable[A]] =
-    if (actions.nonEmpty) {
-      MonadUtil.foldLeftM(actions.iterableFactory.empty[A], actions) { case (acc, action) =>
-        queryUnlessShutdown(action, operationName)(traceContext, closeContext).map(acc ++ _)
-      }
-    } else FutureUnlessShutdown.pure(immutable.Iterable.empty[A])
-
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[querySingleUnlessShutdown]] has been deprecated */
-  def querySingleUnlessShutdown[A](
+  def querySingle[A](
       action: DBIOAction[Option[A], NoStream, Effect.Read with Effect.Transactional],
       operationName: String,
       maxRetries: Int = defaultMaxRetries,
@@ -355,168 +328,47 @@ trait DbStorage extends Storage { self: NamedLogging =>
       traceContext: TraceContext,
       closeContext: CloseContext,
   ): OptionT[FutureUnlessShutdown, A] =
-    OptionT(queryUnlessShutdown(action, operationName, maxRetries))
-
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[update]] has been deprecated */
-  def updateUnlessShutdown[A](
-      action: DBIOAction[A, NoStream, Effect.Write with Effect.Transactional],
-      operationName: String,
-      maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] =
-    runWriteUnlessShutdown(action, operationName, maxRetries)
-
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[update_]] has been deprecated */
-  def updateUnlessShutdown_(
-      action: DBIOAction[_, NoStream, Effect.Write with Effect.Transactional],
-      operationName: String,
-      maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[Unit] =
-    runWriteUnlessShutdown(action, operationName, maxRetries).map(_ => ())
-
-  // TODO(#18629) Rename this method
-  /** this will be renamed once all instances of [[queryAndUpdate]] has been deprecated */
-  def queryAndUpdateUnlessShutdown[A](
-      action: DBIOAction[A, NoStream, Effect.All],
-      operationName: String,
-      maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] =
-    runWriteUnlessShutdown(action, operationName, maxRetries)
-
-  /** Related issue is #18629 (Ongoing)
-    * These are the legacy methods that needs to be changed to use the [[FutureUnlessShutdown]] version, they will be removed once their dependencies are gone
-    * (and UnlessShutdown versions will be renamed to take over their name).
-    */
-
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[runUnlessShutdown]] instead */
-  protected def run[A](action: String, operationName: String, maxRetries: Int)(
-      body: => Future[A]
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[A] = {
-    if (logOperations) {
-      logger.debug(s"started $action: $operationName")
-    }
-    import Thereafter.syntax.*
-    implicit val success: retry.Success[A] = retry.Success.always
-    retry
-      .Backoff(
-        logger,
-        closeContext.context,
-        maxRetries = maxRetries,
-        initialDelay = 50.milliseconds,
-        maxDelay = timeouts.storageMaxRetryInterval.unwrap,
-        operationName = operationName,
-        suspendRetries = Eval.always(
-          if (isActive) Duration.Zero
-          else dbConfig.parameters.connectionTimeout.asFiniteApproximation
-        ),
-      )
-      .apply(body, DbExceptionRetryPolicy)
-      .thereafter { _ =>
-        if (logOperations) {
-          logger.debug(s"completed $action: $operationName")
-        }
-      }
-
-  }
-
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[runReadUnlessShutdown]] instead */
-  protected[canton] def runRead[A](
-      action: DbAction.ReadTransactional[A],
-      operationName: String,
-      maxRetries: Int,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[A]
-
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[runWriteUnlessShutdown]] instead */
-  protected[canton] def runWrite[A](
-      action: DbAction.All[A],
-      operationName: String,
-      maxRetries: Int,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[A]
-
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[queryUnlessShutdown]] instead */
-  def query[A](
-      action: DbAction.ReadTransactional[A],
-      operationName: String,
-      maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[A] =
-    runRead(action, operationName, maxRetries)
-
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[sequentialQueryAndCombineUnlessShutdown]] instead */
-  def sequentialQueryAndCombine[A](
-      actions: immutable.Iterable[DbAction.ReadOnly[immutable.Iterable[A]]],
-      operationName: String,
-  )(implicit
-      traceContext: TraceContext,
-      closeContext: CloseContext,
-  ): Future[immutable.Iterable[A]] =
-    if (actions.nonEmpty) {
-      MonadUtil.foldLeftM(actions.iterableFactory.empty[A], actions) { case (acc, action) =>
-        query(action, operationName)(traceContext, closeContext).map(acc ++ _)
-      }
-    } else Future.successful(immutable.Iterable.empty[A])
-
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[querySingleUnlessShutdown]] instead */
-  def querySingle[A](
-      action: DBIOAction[Option[A], NoStream, Effect.Read with Effect.Transactional],
-      operationName: String,
-      maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): OptionT[Future, A] =
     OptionT(query(action, operationName, maxRetries))
 
   /** Write-only action, possibly transactional
     *
-    * The action must be idempotent because it may be retried multiple times.
-    * Only the result of the last retry will be reported.
-    * If the action reports the number of rows changed,
-    * this number may be lower than actual number of affected rows
-    * because updates from earlier retries are not accounted.
+    * The action must be idempotent because it may be retried multiple times. Only the result of the
+    * last retry will be reported. If the action reports the number of rows changed, this number may
+    * be lower than actual number of affected rows because updates from earlier retries are not
+    * accounted.
     */
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[updateUnlessShutdown]] instead */
   def update[A](
       action: DBIOAction[A, NoStream, Effect.Write with Effect.Transactional],
       operationName: String,
       maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[A] =
+  )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] =
     runWrite(action, operationName, maxRetries)
 
-  /** Write-only action, possibly transactional
-    * The action must be idempotent because it may be retried multiple times.
+  /** Write-only action, possibly transactional The action must be idempotent because it may be
+    * retried multiple times.
     */
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[updateUnlessShutdown_]] instead */
   def update_(
       action: DBIOAction[_, NoStream, Effect.Write with Effect.Transactional],
       operationName: String,
       maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[Unit] =
+  )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[Unit] =
     runWrite(action, operationName, maxRetries).map(_ => ())
 
   /** Query and update in a single action.
     *
-    * Note that the action is not transactional by default, but can be made so
-    * via using `queryAndUpdate(action.transactionally..withTransactionIsolation(Serializable), "name")`
+    * Note that the action is not transactional by default, but can be made so via using
+    * `queryAndUpdate(action.transactionally..withTransactionIsolation(Serializable), "name")`
     *
-    * The action must be idempotent because it may be retried multiple times.
-    * Only the result of the last retry will be reported.
-    * If the action reports the number of rows changed,
-    * this number may be lower than actual number of affected rows
-    * because updates from earlier retries are not accounted.
+    * The action must be idempotent because it may be retried multiple times. Only the result of the
+    * last retry will be reported. If the action reports the number of rows changed, this number may
+    * be lower than actual number of affected rows because updates from earlier retries are not
+    * accounted.
     */
-  // TODO(#18629) Remove this method
-  /** this will be removed, use [[queryAndUpdateUnlessShutdown]] instead */
   def queryAndUpdate[A](
       action: DBIOAction[A, NoStream, Effect.All],
       operationName: String,
       maxRetries: Int = defaultMaxRetries,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[A] =
+  )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] =
     runWrite(action, operationName, maxRetries)
 }
 
@@ -565,9 +417,9 @@ object DbStorage {
     type WriteOnly[+A] = DBIOAction[A, NoStream, Effect.Write]
     type All[+A] = DBIOAction[A, NoStream, Effect.All]
 
-    /** Use `.andThen(unit)` instead of `.map(_ => ())` for DBIOActions
-      * because `andThen` doesn't need an execution context and can thus be executed more efficiently
-      * according to the slick documentation https://scala-slick.org/doc/3.3.3/dbio.html#sequential-execution
+    /** Use `.andThen(unit)` instead of `.map(_ => ())` for DBIOActions because `andThen` doesn't
+      * need an execution context and can thus be executed more efficiently according to the slick
+      * documentation https://scala-slick.org/doc/3.3.3/dbio.html#sequential-execution
       */
     val unit: DBIOAction[Unit, NoStream, Effect] = DBIOAction.successful(())
   }
@@ -610,12 +462,12 @@ object DbStorage {
     }
 
     implicit val absCoidGetResult: GetResult[LfContractId] = GetResult(r =>
-      ProtoConverter
-        .parseLfContractId(r.nextString())
-        .fold(err => throw new DbDeserializationException(err.toString), Predef.identity)
+      LfContractId
+        .fromBytes(Bytes.fromByteArray(r.nextBytes()))
+        .fold(err => throw new DbDeserializationException(err), Predef.identity)
     )
     implicit val absCoidSetParameter: SetParameter[LfContractId] =
-      (c, pp) => pp >> c.toLengthLimitedString
+      (c, pp) => pp.setBytes(c.toBytes.toByteArray)
 
     // We assume that the HexString of the hash of the global key will fit into 255 characters
     // Please consult the team, if you want to increase this limit
@@ -653,26 +505,32 @@ object DbStorage {
     implicit val getResultByteStringOption: GetResult[Option[ByteString]] =
       GetResult(r => r.nextBytesOption().map(ByteString.copyFrom))
 
-    implicit val setContractSalt: SetParameter[Option[Salt]] =
-      (c, pp) => pp >> c.map(_.toProtoV30.toByteString)
-    implicit val getContractSalt: GetResult[Option[Salt]] =
-      implicitly[GetResult[Option[ByteString]]] andThen {
-        _.map(byteString =>
-          ProtoConverter
-            .parse(
-              // Even though it is versioned, the Salt is considered static
-              // as it's used for authenticating contract ids which are immutable
-              com.digitalasset.canton.crypto.v30.Salt.parseFrom,
-              Salt.fromProtoV30,
-              byteString,
-            )
-            .valueOr(err =>
-              throw new DbDeserializationException(
-                s"Failed to deserialize contract salt: $err"
-              )
-            )
+    implicit val setContractSaltOption: SetParameter[Option[Salt]] =
+      (c, pp) => pp >> c.map(_.toProtoV30.checkedToByteString)
+
+    implicit val setContractSalt: SetParameter[Salt] =
+      (c, pp) => pp >> c.toProtoV30.checkedToByteString
+
+    private val parseSalt: ByteString => Salt = bytes =>
+      ProtoConverter
+        .parse(
+          // Even though it is versioned, the Salt is considered static
+          // as it's used for authenticating contract ids which are immutable
+          com.digitalasset.canton.crypto.v30.Salt.parseFrom,
+          Salt.fromProtoV30,
+          bytes,
         )
-      }
+        .valueOr(err =>
+          throw new DbDeserializationException(
+            s"Failed to deserialize contract salt: $err"
+          )
+        )
+
+    implicit val getContractSaltOption: GetResult[Option[Salt]] =
+      implicitly[GetResult[Option[ByteString]]] andThen { _.map(parseSalt) }
+
+    implicit val getContractSalt: GetResult[Salt] =
+      implicitly[GetResult[ByteString]] andThen { parseSalt }
 
     object BuilderChain {
 
@@ -732,9 +590,8 @@ object DbStorage {
 
   def profile(config: DbConfig): Profile =
     config match {
-      case _: H2DbConfig => H2(H2Profile)
-      case _: PostgresDbConfig => Postgres(PostgresProfile)
-      case other => throw new IllegalArgumentException(s"Unsupported DbConfig: $other")
+      case _: DbConfig.H2 => H2(H2Profile)
+      case _: DbConfig.Postgres => Postgres(PostgresProfile)
     }
 
   def createDatabase(
@@ -796,7 +653,6 @@ object DbStorage {
         maxRetries = retryConfig.maxRetries,
         waitInMs = retryConfig.retryWaitingTime.toMillis,
         operationName = functionFullName,
-        logger = logger,
         retryLogLevel = retryConfig.retryLogLevel,
         failLogLevel = Level.ERROR,
       ) {
@@ -835,7 +691,6 @@ object DbStorage {
       val numThreads = config.getIntOr("numThreads", 20)
       val maxConnections = source.maxConnections.getOrElse(numThreads)
       val registerMbeans = config.getBooleanOr("registerMbeans", false)
-
       val executor = metrics match {
         // inject our own Canton Async executor with metrics
         case Some(m) =>
@@ -853,19 +708,24 @@ object DbStorage {
               }
             case _ =>
           }
+          val tracker = new QueryCostTrackerImpl(
+            logQueryCost,
+            m,
+            scheduler,
+            warnOnSlowQueryO = parameters.warnOnSlowQuery.map(_.toInternal),
+            warnInterval = parameters.warnOnSlowQueryInterval.toInternal,
+            numThreads,
+            logger,
+          )
           new AsyncExecutorWithMetrics(
             poolName,
             numThreads,
             numThreads,
             queueSize = config.getIntOr("queueSize", 2000),
+            logger,
+            tracker,
             maxConnections = maxConnections,
             registerMbeans = registerMbeans,
-            logQueryCost = logQueryCost,
-            metrics = m,
-            scheduler = scheduler,
-            warnOnSlowQueryO = parameters.warnOnSlowQuery.map(_.toInternal),
-            warnInterval = parameters.warnOnSlowQueryInterval.toInternal,
-            logger = logger,
           )
         case None =>
           AsyncExecutor(
@@ -886,16 +746,17 @@ object DbStorage {
 
   }
 
-  /** Construct a bulk operation (e.g., insertion, deletion).
-    * The operation must not return a result set!
+  /** Construct a bulk operation (e.g., insertion, deletion). The operation must not return a result
+    * set!
     *
-    * The returned action will run as a single big database transaction. If the execution of the transaction results
-    * in deadlocks, you should order `values` according to some consistent order.
+    * The returned action will run as a single big database transaction. If the execution of the
+    * transaction results in deadlocks, you should order `values` according to some consistent
+    * order.
     *
-    * The returned update counts are merely lower bounds to the number of affected rows
-    * or SUCCESS_NO_INFO, because `Statement.executeBatch`
-    * reports partial execution of a batch as a `BatchUpdateException` with
-    * partial update counts therein and those update counts are not taken into consideration.
+    * The returned update counts are merely lower bounds to the number of affected rows or
+    * SUCCESS_NO_INFO, because `Statement.executeBatch` reports partial execution of a batch as a
+    * `BatchUpdateException` with partial update counts therein and those update counts are not
+    * taken into consideration.
     *
     * This operation is idempotent if the statement is idempotent for each value.
     */
@@ -967,7 +828,8 @@ object DbStorage {
 
   /** Construct an in clause for a given field.
     *
-    * @return An iterable of the grouped values and the in clause for the grouped values
+    * @return
+    *   An iterable of the grouped values and the in clause for the grouped values
     */
   def toInClause[T](
       field: String,

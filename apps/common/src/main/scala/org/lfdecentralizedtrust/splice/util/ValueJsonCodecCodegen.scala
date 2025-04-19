@@ -7,6 +7,8 @@ import com.daml.ledger.javaapi.data as JavaApi
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.DefinedDataType
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import cats.implicits.*
+import scala.jdk.OptionConverters.*
 
 import scala.util.Try
 
@@ -54,7 +56,12 @@ object ValueJsonCodecCodegen {
       event: ExercisedEvent
   ): Either[String, String] = for {
     companion <- ContractCompanions.lookup(event.getTemplateId)
-    choiceCompanion <- ContractCompanions.lookupChoice(companion, event.getChoice)
+    interfaceCompanion <- event.getInterfaceId.toScala.traverse(ContractCompanions.lookupInterface)
+    choiceCompanion <- ContractCompanions.lookupChoice(
+      companion,
+      interfaceCompanion,
+      event.getChoice,
+    )
     arg <- Try(choiceCompanion.argTypeDecoder.decode(event.getChoiceArgument)).toEither.left
       .map(_.getMessage)
     json = choiceCompanion.argJsonEncoder(arg).intoString()
@@ -62,11 +69,13 @@ object ValueJsonCodecCodegen {
 
   def deserializeChoiceArgument(
       templateId: Identifier,
+      interfaceId: Option[Identifier],
       choice: String,
       argument: String,
   ): Either[String, JavaApi.DamlRecord] = for {
     companion <- ContractCompanions.lookup(templateId)
-    choiceCompanion <- ContractCompanions.lookupChoice(companion, choice)
+    interfaceCompanion <- interfaceId.traverse(ContractCompanions.lookupInterface)
+    choiceCompanion <- ContractCompanions.lookupChoice(companion, interfaceCompanion, choice)
     arg <- Try(choiceCompanion.argJsonDecoder.decode(new JsonLfReader(argument))).toEither.left
       .map(_.getMessage)
   } yield arg.toValue
@@ -75,7 +84,12 @@ object ValueJsonCodecCodegen {
       event: ExercisedEvent
   ): Either[String, String] = for {
     companion <- ContractCompanions.lookup(event.getTemplateId)
-    choiceCompanion <- ContractCompanions.lookupChoice(companion, event.getChoice)
+    interfaceCompanion <- event.getInterfaceId.toScala.traverse(ContractCompanions.lookupInterface)
+    choiceCompanion <- ContractCompanions.lookupChoice(
+      companion,
+      interfaceCompanion,
+      event.getChoice,
+    )
     ret <- Try(choiceCompanion.returnTypeDecoder.decode(event.getExerciseResult)).toEither.left
       .map(_.getMessage)
     json = choiceCompanion.resultJsonEncoder(ret).intoString()
@@ -83,11 +97,13 @@ object ValueJsonCodecCodegen {
 
   def deserializeChoiceResult(
       templateId: Identifier,
+      interfaceId: Option[Identifier],
       choice: String,
       result: String,
   ): Either[String, JavaApi.Value] = for {
     companion <- ContractCompanions.lookup(templateId)
-    choiceCompanion <- ContractCompanions.lookupChoice(companion, choice)
+    interfaceCompanion <- interfaceId.traverse(ContractCompanions.lookupInterface)
+    choiceCompanion <- ContractCompanions.lookupChoice(companion, interfaceCompanion, choice)
     res <- Try(choiceCompanion.resultJsonDecoder.decode(new JsonLfReader(result))).toEither.left
       .map(_.getMessage)
     value <- choiceResultToValue(res)

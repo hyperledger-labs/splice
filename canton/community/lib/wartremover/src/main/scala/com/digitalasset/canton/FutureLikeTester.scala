@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -11,12 +11,12 @@ import scala.concurrent.Future
 
 object FutureLikeTester {
 
-  /** The returned predicate tests whether the given type is future-like.
-    * A type `T` is considered future-like if one of the following holds:
-    * - The type constructor of `T` is [[scala.concurrent.Future]]
-    * - The type constructor of `T` is [[cats.data.EitherT]] or [[cats.data.OptionT]]
-    *   and its first type argument is future-like.
-    * - The type constructor of `T` is annotated with the annotation `futureLikeType`
+  /** The returned predicate tests whether the given type is future-like. A type `T` is considered
+    * future-like if one of the following holds:
+    *   - The type constructor of `T` is [[scala.concurrent.Future]]
+    *   - The type constructor of `T` is [[cats.data.EitherT]] or [[cats.data.OptionT]] and its
+    *     first type argument is future-like.
+    *   - The type constructor of `T` is annotated with the annotation `futureLikeType`
     */
   def tester(
       u: WartUniverse
@@ -62,9 +62,10 @@ object FutureLikeTester {
   }
 }
 
-/** Annotation for computation transformer type constructors (e.g., a monad transformer)
-  * so that if it will be treated future-like when applied to a future-like computation type.
+/** Annotation for computation transformer type constructors (e.g., a monad transformer) so that if
+  * it will be treated future-like when applied to a future-like computation type.
   *
-  * @param transformedTypeArgumentPosition The type argument position for the computation type that is transformed
+  * @param transformedTypeArgumentPosition
+  *   The type argument position for the computation type that is transformed
   */
 final case class FutureTransformer(transformedTypeArgumentPosition: Int) extends StaticAnnotation

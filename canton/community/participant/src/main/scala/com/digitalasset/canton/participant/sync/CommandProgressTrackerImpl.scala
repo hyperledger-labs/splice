@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -12,6 +12,8 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
 import com.daml.ledger.api.v2.commands.Command
 import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.semiauto.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.util.LfEngineToApi
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -29,7 +31,7 @@ import com.digitalasset.canton.platform.store.CompletionFromTransaction
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
 import com.digitalasset.canton.protocol.LfSubmittedTransaction
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.TypeConName
 import com.digitalasset.daml.lf.transaction.Node.LeafOnlyAction
 import com.digitalasset.daml.lf.transaction.Transaction.ChildrenRecursion
@@ -46,9 +48,15 @@ final case class CommandProgressTrackerConfig(
     maxFailed: NonNegativeInt = defaultMaxFailed,
     maxPending: NonNegativeInt = defaultMaxPending,
     maxSucceeded: NonNegativeInt = defaultMaxSucceeded,
-)
+) extends UniformCantonConfigValidation
 
 object CommandProgressTrackerConfig {
+  implicit val commandProgressTrackerConfigCantonConfigValidator
+      : CantonConfigValidator[CommandProgressTrackerConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[CommandProgressTrackerConfig]
+  }
+
   lazy val defaultMaxFailed: NonNegativeInt = NonNegativeInt.tryCreate(100)
   lazy val defaultMaxPending: NonNegativeInt = NonNegativeInt.tryCreate(1000)
   lazy val defaultMaxSucceeded: NonNegativeInt = NonNegativeInt.tryCreate(100)
@@ -196,7 +204,7 @@ class CommandProgressTrackerImpl(
 
   }
 
-  // command key is (commandId, applicationId, actAs, submissionId)
+  // command key is (commandId, userId, actAs, submissionId)
   private type CommandKey = (String, String, Set[String], Option[String])
 
   private val pending = new mutable.LinkedHashMap[CommandKey, MyCommandResultHandle]()
@@ -234,15 +242,15 @@ class CommandProgressTrackerImpl(
   override def registerCommand(
       commandId: String,
       submissionId: Option[String],
-      applicationId: String,
+      userId: String,
       commands: Seq[Command],
       actAs: Set[String],
   )(implicit traceContext: TraceContext): CommandResultHandle = if (
-    pending.size >= config.maxPending.value
+    pending.sizeIs >= config.maxPending.value
   ) {
     CommandResultHandle.NoOp
   } else {
-    val key = (commandId, applicationId, actAs, submissionId)
+    val key = (commandId, userId, actAs, submissionId)
     logger.debug(s"Registering handle for $key")
     val status = CommandStatus(
       started = clock.now,
@@ -251,7 +259,7 @@ class CommandProgressTrackerImpl(
         submitters = Set.empty,
         commandId = commandId,
         updateId = "",
-        applicationId = applicationId,
+        userId = userId,
         traceContext = traceContext,
         optStatus = None,
         optSubmissionId = submissionId,
@@ -259,12 +267,12 @@ class CommandProgressTrackerImpl(
         optDeduplicationDurationSeconds = None,
         optDeduplicationDurationNanos = None,
         offset = 0L,
-        domainTime = None,
+        synchronizerTime = None,
       ),
       state = CommandState.COMMAND_STATE_PENDING,
       commands = commands,
-      requestStatistics = RequestStatistics(),
-      updates = CommandUpdates(),
+      requestStatistics = RequestStatistics.defaultInstance,
+      updates = CommandUpdates.defaultInstance,
     )
     val handle = MyCommandResultHandle(key, status)
     val existing = lock.synchronized {
@@ -280,13 +288,13 @@ class CommandProgressTrackerImpl(
 
   override def findHandle(
       commandId: String,
-      applicationId: String,
+      userId: String,
       actAs: Seq[String],
       submissionId: Option[String],
   ): CommandResultHandle =
     lock.synchronized {
       pending.getOrElse(
-        (commandId, applicationId, actAs.toSet, submissionId),
+        (commandId, userId, actAs.toSet, submissionId),
         CommandResultHandle.NoOp,
       )
     }
@@ -298,18 +306,18 @@ class CommandProgressTrackerImpl(
   ): Unit =
     lock.synchronized {
       collection.prepend(commandStatus)
-      if (collection.size > maxSize) {
+      if (collection.sizeIs > maxSize) {
         collection.removeLast().discard
       }
     }
 
-  override def processLedgerUpdate(update: Traced[TransactionLogUpdate]): Unit =
-    update.value match {
+  override def processLedgerUpdate(update: TransactionLogUpdate): Unit =
+    update match {
       case rejected: TransactionLogUpdate.TransactionRejected =>
         rejected.completionStreamResponse.completionResponse.completion.foreach { completionInfo =>
           val key = (
             completionInfo.commandId,
-            completionInfo.applicationId,
+            completionInfo.userId,
             completionInfo.actAs.toSet,
             Option.when(completionInfo.submissionId.nonEmpty)(completionInfo.submissionId),
           )
@@ -328,7 +336,7 @@ class CommandProgressTrackerImpl(
           .foreach { completion =>
             val key = (
               completion.commandId,
-              completion.applicationId,
+              completion.userId,
               completion.actAs.toSet,
               Option.when(completion.submissionId.nonEmpty)(completion.submissionId),
             )

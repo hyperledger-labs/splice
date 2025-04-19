@@ -6,9 +6,7 @@ import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
   ParticipantClientConfig,
-  SpliceDbConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -21,10 +19,9 @@ import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorCantonIdentifierConfig,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -68,8 +65,7 @@ class ValidatorReonboardingIntegrationTest
   private def charlieLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("charlieWalletLocal")
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
@@ -92,7 +88,7 @@ class ValidatorReonboardingIntegrationTest
                 )
               ),
               participantClient = ParticipantClientConfig(
-                ClientConfig(port = Port.tryCreate(27502)),
+                FullClientConfig(port = Port.tryCreate(27502)),
                 defaultAliceValidatorConfig.participantClient.ledgerApi.copy(
                   clientConfig =
                     defaultAliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -108,7 +104,7 @@ class ValidatorReonboardingIntegrationTest
             adminApi =
               aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
             storage = aliceValidatorConfig.storage match {
-              case c: SpliceDbConfig.Postgres =>
+              case c: DbConfig.Postgres =>
                 c.copy(
                   config = c.config
                     .withValue(

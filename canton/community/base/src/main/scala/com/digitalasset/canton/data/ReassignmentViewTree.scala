@@ -1,9 +1,8 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
 
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{HashOps, Salt}
 import com.digitalasset.canton.protocol.{LfTemplateId, SerializableContract, Stakeholders}
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
@@ -12,8 +11,8 @@ import com.digitalasset.canton.{LfPartyId, ReassignmentCounter}
 
 import java.util.UUID
 
-/** A reassignment (unassignment or assignment) request embedded in a Merkle tree.
-  * The view may or may not be blinded.
+/** A reassignment (unassignment or assignment) request embedded in a Merkle tree. The view may or
+  * may not be blinded.
   */
 trait ReassignmentViewTree {
   def commonData: MerkleTreeLeaf[ReassignmentCommonData]
@@ -26,19 +25,21 @@ trait ReassignmentViewTree {
     commonData.tryUnwrap.submitterMetadata.submittingParticipant
 }
 
-/** Aggregates the data of an assignment request that is sent to the mediator and the involved participants.
+/** Aggregates the data of an assignment request that is sent to the mediator and the involved
+  * participants.
   */
 trait ReassignmentCommonData extends ProtocolVersionedMemoizedEvidence {
   def salt: Salt
   def stakeholders: Stakeholders
   def uuid: UUID
   def submitterMetadata: ReassignmentSubmitterMetadata
-  def reassigningParticipants: ReassigningParticipants
+  def reassigningParticipants: Set[ParticipantId]
 
   def hashOps: HashOps
 
-  def confirmingParties: Map[LfPartyId, PositiveInt] =
-    stakeholders.signatories.map(_ -> PositiveInt.one).toMap
+  // The admin party of the submitting participant is passed as an extra confirming party to guarantee proper authorization.
+  def confirmingParties: Set[LfPartyId] =
+    stakeholders.signatories + submitterMetadata.submittingAdminParty
 }
 
 trait ReassignmentView extends ProtocolVersionedMemoizedEvidence {

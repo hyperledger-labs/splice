@@ -1,31 +1,40 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
 
+import cats.Id
 import cats.data.{EitherT, OptionT}
+import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.util.Thereafter.EitherTThereafterContent
 import com.digitalasset.canton.util.TryUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-/** Typeclass for computations with an operation that can run a side effect after the computation has finished.
+/** Typeclass for computations with an operation that can run a side effect after the computation
+  * has finished.
   *
-  * The typeclass abstracts the following patterns so that it can be used for types other than [[scala.concurrent.Future]].
+  * The typeclass abstracts the following patterns so that it can be used for types other than
+  * [[scala.concurrent.Future]].
   * {{{
   * future.transform { result => val () = body(result); result } // synchronous body
   * future.transform { result => body(result).transform(_ => result) } // asynchronous body
   * }}}
   *
   * Usage:
-  * <pre>
+  * {{{
   * import com.digitalasset.canton.util.Thereafter.syntax.*
   *
   * myAsyncComputation.thereafter(result => ...)
-  * </pre>
+  * }}}
   *
-  * @tparam F The computation's type functor.
+  * It is preferred to similar functions such as [[scala.concurrent.Future.andThen]] because it
+  * properly chains exceptions from the side-effecting computation back into the original
+  * computation.
+  *
+  * @tparam F
+  *   The computation's type functor.
   */
 trait Thereafter[F[_]] {
 
@@ -33,11 +42,15 @@ trait Thereafter[F[_]] {
   type Content[_]
 
   /** Runs `body` after the computation `f` has completed.
-    * @return The computation that results from chaining `f` before `body`. Completes only after `body` has run.
-    *         If `body` completes normally, the result of the computation is the same as `f`'s result.
-    *         If `body` throws, the result includes the thrown exception.
+    * @return
+    *   The computation that results from chaining `f` before `body`. Completes only after `body`
+    *   has run. If `body` completes normally, the result of the computation is the same as `f`'s
+    *   result. If `body` throws, the result includes the thrown exception.
     */
   def thereafter[A](f: F[A])(body: Content[A] => Unit): F[A]
+
+  def thereafterP[A](f: F[A])(body: PartialFunction[Content[A], Unit]): F[A] =
+    thereafter(f)(body.lift(_).discard[Option[Unit]])
 
   /** Returns the single `A` in `content` if any. */
   def maybeContent[A](content: Content[A]): Option[A]
@@ -47,17 +60,18 @@ trait Thereafter[F[_]] {
 
 }
 
-/** Extension of [[Thereafter]] that adds the possibility to run an asynchronous piece of code afterwards
-  * with proper synchronization and exception propagation.
+/** Extension of [[Thereafter]] that adds the possibility to run an asynchronous piece of code
+  * afterwards with proper synchronization and exception propagation.
   */
 trait ThereafterAsync[F[_]] extends Thereafter[F] {
 
   /** runs `body` after the computation `f` has completed
     *
-    * @return The computation that results from chaining `f` before `body`. Completes only after `body` has run.
-    *         If `body` completes normally, the result of the computation is the same as `f`'s result.
-    *         If `body` throws, the result includes the thrown exception.
-    *         If `body` produces a failed computation, the result includes the thrown exception.
+    * @return
+    *   The computation that results from chaining `f` before `body`. Completes only after `body`
+    *   has run. If `body` completes normally, the result of the computation is the same as `f`'s
+    *   result. If `body` throws, the result includes the thrown exception. If `body` produces a
+    *   failed computation, the result includes the thrown exception.
     */
   def thereafterF[A](f: F[A])(body: Content[A] => Future[Unit]): F[A]
 
@@ -71,9 +85,8 @@ object Thereafter {
 
   /** Make the dependent Content type explicit as a type argument to help with type inference.
     *
-    * The construction is the same as in shapeless.
-    * [The Type Astronaut's Guide to Shapeless Book](https://underscore.io/books/shapeless-guide/)
-    * explains the idea in Chapter 4.2.
+    * The construction is the same as in shapeless. [The Type Astronaut's Guide to Shapeless
+    * Book](https://underscore.io/books/shapeless-guide/) explains the idea in Chapter 4.2.
     */
   type Aux[F[_], C[_]] = Thereafter[F] { type Content[A] = C[A] }
   def apply[F[_]](implicit F: Thereafter[F]): Thereafter.Aux[F, F.Content] = F
@@ -83,6 +96,8 @@ object Thereafter {
     protected val typeClassInstance: Thereafter.Aux[F, C]
     def thereafter(body: C[A] => Unit): F[A] =
       typeClassInstance.thereafter(self)(body)
+    def thereafterP(body: PartialFunction[C[A], Unit]): F[A] =
+      typeClassInstance.thereafterP(self)(body)
     def thereafterSuccessOrFailure(success: A => Unit, failure: => Unit): F[A] =
       typeClassInstance.thereafterSuccessOrFailure(self)(success, failure)
   }
@@ -98,7 +113,19 @@ object Thereafter {
     }
   }
 
-  object TryTherafter extends Thereafter[Try] {
+  object IdThereafter extends Thereafter[Id] {
+    override type Content[A] = A
+
+    override def thereafter[A](f: Id[A])(body: Id[A] => Unit): Id[A] = {
+      body(f)
+      f
+    }
+
+    override def maybeContent[A](content: Id[A]): Option[A] = Some(content)
+  }
+  implicit val idThereafter: Thereafter[Id] = IdThereafter
+
+  object TryThereafter extends Thereafter[Try] {
     override type Content[A] = Try[A]
     override def thereafter[A](f: Try[A])(body: Try[A] => Unit): Try[A] = f match {
       case result: Success[?] =>
@@ -115,7 +142,7 @@ object Thereafter {
 
     override def maybeContent[A](content: Try[A]): Option[A] = content.toOption
   }
-  implicit def TryThereafter: Thereafter.Aux[Try, Try] = TryTherafter
+  implicit def tryThereafter: Thereafter.Aux[Try, Try] = TryThereafter
 
   /** [[Thereafter]] instance for [[scala.concurrent.Future]]s */
   class FutureThereafter(implicit ec: ExecutionContext) extends Thereafter[Future] {
@@ -131,8 +158,8 @@ object Thereafter {
   implicit def futureThereafter(implicit ec: ExecutionContext): Thereafter.Aux[Future, Try] =
     new FutureThereafter
 
-  /** Use a type synonym instead of a type lambda so that the Scala compiler does not get confused during implicit resolution,
-    * at least for simple cases.
+  /** Use a type synonym instead of a type lambda so that the Scala compiler does not get confused
+    * during implicit resolution, at least for simple cases.
     */
   type EitherTThereafterContent[Content[_], E, A] = Content[Either[E, A]]
 
@@ -153,8 +180,8 @@ object Thereafter {
       override def F: Thereafter.Aux[F, FF.Content] = FF
     }
 
-  /** Use a type synonym instead of a type lambda so that the Scala compiler does not get confused during implicit resolution,
-    * at least for simple cases.
+  /** Use a type synonym instead of a type lambda so that the Scala compiler does not get confused
+    * during implicit resolution, at least for simple cases.
     */
   type OptionTThereafterContent[Content[_], A] = Content[Option[A]]
 
@@ -190,9 +217,8 @@ object ThereafterAsync {
 
   /** Make the dependent Content type explicit as a type argument to help with type inference.
     *
-    * The construction is the same as in shapeless.
-    * [The Type Astronaut's Guide to Shapeless Book](https://underscore.io/books/shapeless-guide/)
-    * explains the idea in Chapter 4.2.
+    * The construction is the same as in shapeless. [The Type Astronaut's Guide to Shapeless
+    * Book](https://underscore.io/books/shapeless-guide/) explains the idea in Chapter 4.2.
     */
   type Aux[F[_], C[_]] = ThereafterAsync[F] { type Content[A] = C[A] }
   def apply[F[_]](implicit F: ThereafterAsync[F]): ThereafterAsync.Aux[F, F.Content] = F

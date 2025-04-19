@@ -45,7 +45,7 @@ class SvOffboardingSequencerTrigger(
   ): Future[Seq[SequencerId]] = {
     for {
       rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
-      currentSequencerState <- participantAdminConnection.getSequencerDomainState(
+      currentSequencerState <- participantAdminConnection.getSequencerSynchronizerState(
         rulesAndStates.dsoRules.domain
       )
     } yield {
@@ -80,7 +80,7 @@ class SvOffboardingSequencerTrigger(
     // TODO(tech-debt): pass through the domain id from the task, and double-check task completion for races
     for {
       dsoRules <- dsoStore.getDsoRules()
-      _ <- participantAdminConnection.ensureSequencerDomainStateRemoval(
+      _ <- participantAdminConnection.ensureSequencerSynchronizerStateRemoval(
         dsoRules.domain,
         task,
         RetryFor.Automation,
@@ -96,11 +96,11 @@ class SvOffboardingSequencerTrigger(
     for {
       // TODO(tech-debt): pass through the domain id from the task, and double-check staleness check for races
       dsoRules <- dsoStore.getDsoRules()
-      sequencerDomainState <- participantAdminConnection.getSequencerDomainState(
+      SequencerSynchronizerState <- participantAdminConnection.getSequencerSynchronizerState(
         dsoRules.domain
       )
     } yield {
-      !sequencerDomainState.mapping.active.contains(task)
+      !SequencerSynchronizerState.mapping.active.contains(task)
     }
   }
 

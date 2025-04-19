@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwel
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.ReassignmentCommand
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -49,26 +49,30 @@ private[automation] class UpgradeGroupTrigger(
   ): Future[Seq[Task]] = {
     store
       .listTransferrableGroups()
-      .map(_.view.flatMap { case (domainId, groupIds) => groupIds.view.map((_, domainId)) }.toSeq)
+      .map(
+        _.view
+          .flatMap { case (synchronizerId, groupIds) => groupIds.view.map((_, synchronizerId)) }
+          .toSeq
+      )
   }
 
   override protected def completeTask(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val (groupId, domainId) = task
+    val (groupId, synchronizerId) = task
     for {
-      preferredDomain <- store.defaultAcsDomainIdF
+      preferredDomain <- store.defaultAcsSynchronizerIdF
       _ <- connection.submitReassignmentAndWaitNoDedup(
         submitter = store.key.providerParty,
         command = ReassignmentCommand.Unassign(
           contractId = groupId,
-          source = domainId,
+          source = synchronizerId,
           target = preferredDomain,
         ),
       )
     } yield {
       TaskSuccess(
-        show"Successfully unassigned group $groupId from $domainId"
+        show"Successfully unassigned group $groupId from $synchronizerId"
       )
     }
   }
@@ -76,13 +80,13 @@ private[automation] class UpgradeGroupTrigger(
   override protected def isStaleTask(
       task: Task
   )(implicit tc: TraceContext): Future[Boolean] = {
-    val (groupId, domainId) = task
+    val (groupId, synchronizerId) = task
     for {
       // lookup group once again in the source domain to check if it is assigned there;
       // as reassignment is the purpose of this trigger, we need a new task even
-      // if domainId is wrong for any reason but success of this trigger
+      // if synchronizerId is wrong for any reason but success of this trigger
       groupExists <- store.multiDomainAcsStore
-        .lookupContractByIdOnDomain(splitwellCodegen.Group.COMPANION)(domainId, groupId)
+        .lookupContractByIdOnDomain(splitwellCodegen.Group.COMPANION)(synchronizerId, groupId)
         .map(_.isDefined)
       isStale = !groupExists
     } yield isStale
@@ -90,5 +94,5 @@ private[automation] class UpgradeGroupTrigger(
 }
 
 private[automation] object UpgradeGroupTrigger {
-  private type Task = (splitwellCodegen.Group.ContractId, DomainId)
+  private type Task = (splitwellCodegen.Group.ContractId, SynchronizerId)
 }

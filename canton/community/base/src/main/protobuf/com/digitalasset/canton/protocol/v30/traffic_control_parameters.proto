@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -28,6 +28,10 @@ message TrafficControlParameters {
 
   // If true, submission requests without enough traffic credit will not be delivered
   bool enforce_rate_limiting = 6;
+
+  // In bytes, base event cost added to all sequenced events.
+  // Optional
+  optional uint64 base_event_cost = 7;
 }
 
 // Message representing a traffic receipt included in SequencedEvent receipts to update sender about
@@ -95,6 +99,5 @@ message SetTrafficPurchasedMessage {
   uint32 serial = 2;
   // New total traffic purchased entry
   uint64 total_traffic_purchased = 4;
-  // Domain Id
-  string domain_id = 5;
+  string synchronizer_id = 5;
 }

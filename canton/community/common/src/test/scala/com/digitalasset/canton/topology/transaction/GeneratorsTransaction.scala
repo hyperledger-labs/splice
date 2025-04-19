@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.transaction
@@ -6,17 +6,30 @@ package com.digitalasset.canton.topology.transaction
 import cats.syntax.apply.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.{GeneratorsCrypto, PublicKey, Signature, SigningPublicKey}
+import com.digitalasset.canton.crypto.{
+  GeneratorsCrypto,
+  Hash,
+  PublicKey,
+  Signature,
+  SigningKeyUsage,
+  SigningPublicKey,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.GeneratorsProtocol
+import com.digitalasset.canton.topology.transaction.DelegationRestriction.{
+  CanSignAllButNamespaceDelegations,
+  CanSignAllMappings,
+  CanSignSpecificMappings,
+}
+import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.topology.{
-  DomainId,
   GeneratorsTopology,
   MediatorId,
   Namespace,
   ParticipantId,
   PartyId,
   SequencerId,
+  SynchronizerId,
 }
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{Generators, GeneratorsLf, LfPackageId}
@@ -93,31 +106,62 @@ final class GeneratorsTransaction(
       } yield DecentralizedNamespaceDefinition.create(namespace, threshold, owners).value
     )
 
-  implicit val mediatorDomainStateArb: Arbitrary[MediatorDomainState] = Arbitrary(
+  implicit val mediatorSynchronizerStateArb: Arbitrary[MediatorSynchronizerState] = Arbitrary(
     for {
-      domainId <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       group <- Arbitrary.arbitrary[NonNegativeInt]
       active <- Arbitrary.arbitrary[NonEmpty[Seq[MediatorId]]]
       // Not using Arbitrary.arbitrary[PositiveInt] for threshold to honor constraint
       threshold <- Gen.choose(1, active.size).map(PositiveInt.tryCreate)
       observers <- Arbitrary.arbitrary[NonEmpty[Seq[MediatorId]]]
-    } yield MediatorDomainState.create(domainId, group, threshold, active, observers).value
+    } yield MediatorSynchronizerState
+      .create(synchronizerId, group, threshold, active, observers)
+      .value
+  )
+
+  val restrictionWithNamespaceDelegation = Gen.oneOf(
+    Gen.const(CanSignAllMappings),
+    Generators
+      // generate a random sequence of codes,
+      .nonEmptySetGen[TopologyMapping.Code]
+      // but always add the namespace delegation code, so that the result can always sign namespace delegations
+      .map(_ incl TopologyMapping.Code.NamespaceDelegation)
+      .map(CanSignSpecificMappings(_)),
+  )
+
+  val restrictionWithoutNamespaceDelegation = Gen.oneOf(
+    Gen.const(CanSignAllButNamespaceDelegations),
+    Generators
+      .nonEmptySetGen(
+        Arbitrary(
+          // generate a random set of codes but don't allow for NamespaceDelegation to be included
+          Gen.oneOf(TopologyMapping.Code.all.toSet - TopologyMapping.Code.NamespaceDelegation)
+        )
+      )
+      .map(CanSignSpecificMappings(_)),
   )
 
   implicit val namespaceDelegationArb: Arbitrary[NamespaceDelegation] = Arbitrary(
     for {
       namespace <- Arbitrary.arbitrary[Namespace]
-      target <- Arbitrary.arbitrary[SigningPublicKey]
-      isRootDelegation <- // honor constraint that root delegation must be true if fingerprints match
-        if (namespace.fingerprint == target.fingerprint) Gen.const(true) else Gen.oneOf(true, false)
-    } yield NamespaceDelegation.create(namespace, target, isRootDelegation).value
+      // target key must include the `Namespace` usage
+      target <- Arbitrary
+        .arbitrary[SigningPublicKey]
+        .retryUntil(key =>
+          SigningKeyUsage.matchesRelevantUsages(key.usage, SigningKeyUsage.NamespaceOnly)
+        )
+      delegationRestriction <- // honor constraint that the delegation must be able to sign namespace delegations if fingerprints match
+        if (namespace.fingerprint == target.fingerprint)
+          restrictionWithNamespaceDelegation
+        else restrictionWithoutNamespaceDelegation
+    } yield NamespaceDelegation.tryCreate(namespace, target, delegationRestriction)
   )
 
   implicit val purgeTopologyTransactionArb: Arbitrary[PurgeTopologyTransaction] = Arbitrary(
     for {
-      domain <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       mappings <- Arbitrary.arbitrary[NonEmpty[Seq[TopologyMapping]]]
-    } yield PurgeTopologyTransaction.create(domain, mappings).value
+    } yield PurgeTopologyTransaction.create(synchronizerId, mappings).value
   )
 
   implicit val partyToParticipantTopologyTransactionArb: Arbitrary[PartyToParticipant] = Arbitrary(
@@ -143,25 +187,24 @@ final class GeneratorsTransaction(
   implicit val partyToKeyTopologyTransactionArb: Arbitrary[PartyToKeyMapping] = Arbitrary(
     for {
       partyId <- Arbitrary.arbitrary[PartyId]
-      domain <- Arbitrary.arbitrary[Option[DomainId]]
       signingKeys <- Arbitrary.arbitrary[NonEmpty[Seq[SigningPublicKey]]]
       // Not using Arbitrary.arbitrary[PositiveInt] for threshold to honor constraint
       threshold <- Gen
         .choose(1, signingKeys.size)
         .map(PositiveInt.tryCreate)
     } yield PartyToKeyMapping
-      .create(partyId, domain, threshold, signingKeys)
+      .create(partyId, threshold, signingKeys)
       .value
   )
 
-  implicit val sequencerDomainStateArb: Arbitrary[SequencerDomainState] = Arbitrary(
+  implicit val sequencerSynchronizerStateArb: Arbitrary[SequencerSynchronizerState] = Arbitrary(
     for {
-      domain <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       active <- Arbitrary.arbitrary[NonEmpty[Seq[SequencerId]]]
       // Not using Arbitrary.arbitrary[PositiveInt] for threshold to honor constraint
       threshold <- Gen.choose(1, active.size).map(PositiveInt.tryCreate)
       observers <- Arbitrary.arbitrary[NonEmpty[Seq[SequencerId]]]
-    } yield SequencerDomainState.create(domain, threshold, active, observers).value
+    } yield SequencerSynchronizerState.create(synchronizerId, threshold, active, observers).value
   )
 
   implicit val topologyTransactionArb
@@ -176,15 +219,45 @@ final class GeneratorsTransaction(
   implicit val topologyTransactionSignaturesArb: Arbitrary[NonEmpty[Set[Signature]]] =
     Generators.nonEmptySet[Signature]
 
+  implicit val txHashArb: Arbitrary[NonEmpty[Set[TxHash]]] = Arbitrary(
+    Generators.nonEmptySet[Hash].arbitrary.map(_.map(TxHash(_)))
+  )
+
+  def multiTransactionSignaturesGen(transactionHash: TxHash) = for {
+    hashes <- Arbitrary.arbitrary[NonEmpty[Set[TxHash]]]
+    signatures <- Arbitrary.arbitrary[Signature]
+  } yield MultiTransactionSignature(
+    // Guarantees that the transaction hash is in the multi hash set
+    NonEmpty.mk(Set, transactionHash, hashes.toSeq*),
+    signatures,
+  )
+
+  def topologyTransactionSignatureArb(
+      transactionHash: TxHash
+  ): Arbitrary[TopologyTransactionSignature] = Arbitrary {
+    Gen.frequency(
+      (1, Arbitrary.arbitrary[Signature].map(SingleTransactionSignature(transactionHash, _))),
+      (1, multiTransactionSignaturesGen(transactionHash)),
+    )
+  }
+
   implicit val signedTopologyTransactionArb
       : Arbitrary[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] = Arbitrary(
     for {
       transaction <- Arbitrary.arbitrary[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-      signatures <- Arbitrary.arbitrary[NonEmpty[Set[Signature]]]
       proposal <- Arbitrary.arbBool.arbitrary
-    } yield SignedTopologyTransaction(transaction, signatures, proposal)(
-      SignedTopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
-    )
+      topologyTransactionSignatures <- {
+        implicit val localSignatureArb = topologyTransactionSignatureArb(transaction.hash)
+        Generators.nonEmptySetGen[TopologyTransactionSignature]
+      }
+    } yield SignedTopologyTransaction
+      .create(transaction, topologyTransactionSignatures, proposal, protocolVersion)
   )
 
+  implicit val signedTopologyTransactionsArb
+      : Arbitrary[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]] = Arbitrary(
+    for {
+      transactions <- Gen.listOf(signedTopologyTransactionArb.arbitrary)
+    } yield SignedTopologyTransactions(transactions, protocolVersion)
+  )
 }

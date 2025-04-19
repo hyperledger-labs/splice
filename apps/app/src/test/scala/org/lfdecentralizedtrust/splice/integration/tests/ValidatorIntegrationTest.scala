@@ -6,21 +6,13 @@ import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
-  DarResources,
-  EnvironmentImpl,
-}
+import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResources}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.PartyId
@@ -40,8 +32,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
   private val invalidValidator = "aliceValidatorInvalid"
   private val validatorPartyHint = s"imnotvalid_${(new scala.util.Random).nextInt(10000)}"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
@@ -138,7 +129,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     // check that alice's validator connects to all DSO sequencers.
     // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
     eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.seconds) {
-      val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.domains
+      val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.synchronizers
         .config(
           aliceValidatorBackend.config.domains.global.alias
         )

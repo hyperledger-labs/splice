@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
 
-import com.daml.error.ErrorCode
+import com.digitalasset.base.error.ErrorCode
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
@@ -16,6 +16,8 @@ import org.slf4j.MDC
 import org.slf4j.event.Level
 import org.slf4j.event.Level.*
 import org.slf4j.helpers.FormattingTuple
+
+import scala.annotation.unused
 
 final case class LogEntry(
     level: Level,
@@ -59,10 +61,13 @@ final case class LogEntry(
 
   /** test if a log message corresponds to a particular canton error
     *
-    * @param errorCode         the error code that should be checked
-    * @param messageAssertion  a check on the log entry's message text; this function receives the log entry's message
-    *                          text only, stripped of the error code
-    * @param contextAssertion  a check on the log entry's context map; the default is to not check anything
+    * @param errorCode
+    *   the error code that should be checked
+    * @param messageAssertion
+    *   a check on the log entry's message text; this function receives the log entry's message text
+    *   only, stripped of the error code
+    * @param contextAssertion
+    *   a check on the log entry's context map; the default is to not check anything
     */
   def shouldBeCantonError(
       errorCode: ErrorCode,
@@ -71,7 +76,7 @@ final case class LogEntry(
       loggerAssertion: String => Assertion = _ => succeed,
   )(implicit pos: source.Position): Assertion = {
     // Decompose the log entry's message
-    // NOTE: The format is defined by code in `com.daml.error.ErrorCode`
+    // NOTE: The format is defined by code in `ErrorCode`
     val (msgCode, msgDesc) = message match {
       case s"$a: $b" => (a, b)
       case _ => fail("Malformed log entry message")
@@ -94,8 +99,8 @@ final case class LogEntry(
 
   val CommandFailureLoggerNames: Seq[String] =
     Seq(
-      "com.digitalasset.canton.integration.CommunityEnvironmentDefinition",
-      "com.digitalasset.canton.integration.EnterpriseEnvironmentDefinition",
+      "com.digitalasset.canton.integration.EnvironmentDefinition",
+      "com.digitalasset.canton.integration.EnvironmentDefinition",
       // TODO(M1-90): add as parameter for Canton library-isation
       "org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition",
     )
@@ -173,10 +178,13 @@ object LogEntry {
 
   /** Verifies a sequence of log entries.
     *
-    * @param mustContainWithClue describes entries that must occur inside of `entries`;
-    *                            the string component is a clue that will be output in case of failure
-    * @param mayContain describes entries that may optionally occur inside of `entries`
-    * @param entries the log entries to be checked
+    * @param mustContainWithClue
+    *   describes entries that must occur inside of `entries`; the string component is a clue that
+    *   will be output in case of failure
+    * @param mayContain
+    *   describes entries that may optionally occur inside of `entries`
+    * @param entries
+    *   the log entries to be checked
     * @return
     */
   def assertLogSeq(
@@ -197,6 +205,15 @@ object LogEntry {
       }
     }
   } withClue s"\n\nAll log entries:${LogEntry.format(entries)}"
+
+  /** Helper to pprint logs to help with debugging Usage is to LogEntry.pprintLogs andThen
+    * LogEntry.assertLogSeq(...
+    */
+  @unused def pprintLogSeq(entries: Iterable[LogEntry]): Iterable[LogEntry] = {
+    println("=== Log Entries ===")
+    entries.foreach(pprint.pprintln(_))
+    entries
+  }
 
   val SECURITY_SENSITIVE_MESSAGE_ON_API =
     "An error occurred. Please contact the operator and inquire about the request"

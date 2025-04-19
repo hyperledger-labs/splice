@@ -1,9 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
 
 import cats.syntax.functor.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.store.ActiveContractStore.{
@@ -22,12 +23,13 @@ import com.digitalasset.canton.participant.store.{
   ReassignmentStore,
   ReassignmentStoreTest,
 }
-import com.digitalasset.canton.participant.util.TimeOfChange
+import com.digitalasset.canton.participant.util.{TimeOfChange, TimeOfRequest}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.{
   BaseTest,
@@ -38,7 +40,7 @@ import com.digitalasset.canton.{
 }
 import org.scalatest.AsyncTestSuite
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 private[protocol] trait ConflictDetectionHelpers {
   this: AsyncTestSuite & BaseTest & HasExecutorService =>
@@ -55,37 +57,39 @@ private[protocol] trait ConflictDetectionHelpers {
     )
 
   def mkAcs(
-      entries: (LfContractId, TimeOfChange, ActiveContractStore.Status)*
-  )(implicit traceContext: TraceContext): Future[ActiveContractStore] = {
+      entries: (LfContractId, TimeOfRequest, ActiveContractStore.Status)*
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ActiveContractStore] = {
     val acs = mkEmptyAcs()
-    insertEntriesAcs(acs, entries).map(_ => acs)
+    insertEntriesAcs(
+      acs,
+      entries.map { case (cid, tor, status) => (cid, TimeOfChange(tor.timestamp), status) },
+    ).map(_ => acs)
   }
 
   def mkReassignmentCache(
       loggerFactory: NamedLoggerFactory,
       store: ReassignmentStore = new InMemoryReassignmentStore(
-        ReassignmentStoreTest.targetDomainId,
+        ReassignmentStoreTest.targetSynchronizerId,
         loggerFactory,
       ),
   )(
       entries: (ReassignmentId, MediatorGroupRecipient)*
-  )(implicit traceContext: TraceContext): Future[ReassignmentCache] =
-    Future
-      .traverse(entries) { case (reassignmentId, sourceMediator) =>
-        val reassignmentData = ReassignmentStoreTest.mkReassignmentDataForDomain(
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ReassignmentCache] =
+    MonadUtil
+      .sequentialTraverse(entries) { case (reassignmentId, sourceMediator) =>
+        val unassignmentData = ReassignmentStoreTest.mkUnassignmentDataForSynchronizer(
           reassignmentId,
           sourceMediator,
-          targetDomainId = ReassignmentStoreTest.targetDomainId,
+          targetSynchronizerId = ReassignmentStoreTest.targetSynchronizerId,
         )
 
-        for {
-          result <- store
-            .addReassignment(reassignmentData)
-            .value
-            .failOnShutdown
-        } yield result
+        store.addUnassignmentData(unassignmentData).value
       }
-      .map(_ => new ReassignmentCache(store, loggerFactory)(parallelExecutionContext))
+      .map(_ =>
+        new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)(
+          parallelExecutionContext
+        )
+      )
 }
 
 private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatience {
@@ -95,19 +99,20 @@ private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatien
   def insertEntriesAcs(
       acs: ActiveContractStore,
       entries: Seq[(LfContractId, TimeOfChange, ActiveContractStore.Status)],
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
-    Future
-      .traverse(entries) {
-        case (coid, toc, Active(_reassignmentCounter)) =>
-          acs
-            .markContractCreated(coid -> initialReassignmentCounter, toc)
-            .value
-        case (coid, toc, Archived) => acs.archiveContract(coid, toc).value
-        case (coid, toc, Purged) => acs.purgeContracts(Seq((coid, toc))).value
-        case (coid, toc, ReassignedAway(targetDomain, reassignmentCounter)) =>
-          acs.unassignContracts(coid, toc, targetDomain, reassignmentCounter).value
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+    MonadUtil
+      .sequentialTraverse(entries) {
+        case (coid, tor, Active(_reassignmentCounter)) =>
+          acs.markContractCreated(coid -> initialReassignmentCounter, tor)
+        case (coid, tor, Archived) =>
+          acs.archiveContract(coid, tor)
+        case (coid, tor, Purged) =>
+          acs.purgeContracts(Seq((coid, tor)))
+        case (coid, tor, ReassignedAway(targetSynchronizer, reassignmentCounter)) =>
+          acs.unassignContracts(coid, tor, targetSynchronizer, reassignmentCounter)
       }
-      .void
+      .value
+      .map(_.void)
 
   def mkActivenessCheck[Key: Pretty](
       fresh: Set[Key] = Set.empty[Key],
@@ -188,7 +193,7 @@ private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatien
   def mkCommitSet(
       arch: Set[LfContractId] = Set.empty,
       create: Set[LfContractId] = Set.empty,
-      unassign: Map[LfContractId, (DomainId, ReassignmentCounter)] = Map.empty,
+      unassign: Map[LfContractId, (SynchronizerId, ReassignmentCounter)] = Map.empty,
       assign: Map[LfContractId, ReassignmentId] = Map.empty,
   ): CommitSet =
     CommitSet(

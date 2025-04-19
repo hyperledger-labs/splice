@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.time.EnrichedDurations.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, JavaDecodeUtil as DecodeUtil}
@@ -55,7 +55,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(
             Set(dsoParty),
-            completeAfter = Int.MaxValue,
+            completeAfter = PositiveInt.MaxValue,
             beginOffset = offsetBefore,
             endOffset = Some(ledgerEnd),
           )

@@ -1,17 +1,17 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.cache
 
 import com.daml.metrics.Timed
 import com.daml.metrics.api.MetricHandle.Timer
-import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.caching.Cache
-import com.digitalasset.canton.data.Offset.fromAbsoluteOffsetO
-import com.digitalasset.canton.data.{AbsoluteOffset, Offset}
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.store.cache.StateCache.PendingUpdatesState
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future, blocking}
@@ -19,15 +19,16 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 /** This class is a wrapper around a Caffeine cache designed to handle correct resolution of
   * concurrent updates for the same key.
   *
-  * The [[StateCache]] tracks its own notion of logical time with the `cacheIndex`
-  * which evolves monotonically based on the index DB's offset (updated by [[putBatch]]).
+  * The [[StateCache]] tracks its own notion of logical time with the `cacheIndex` which evolves
+  * monotonically based on the index DB's offset (updated by [[putBatch]]).
   *
-  * The cache's logical time (i.e. the `cacheIndex`) is used for establishing precedence of cache updates
-  * stemming from read-throughs triggered from command interpretation on cache misses.
+  * The cache's logical time (i.e. the `cacheIndex`) is used for establishing precedence of cache
+  * updates stemming from read-throughs triggered from command interpretation on cache misses.
   */
 @SuppressWarnings(Array("org.wartremover.warts.FinalCaseClass")) // This class is mocked in tests
 private[platform] case class StateCache[K, V](
-    initialCacheIndex: Option[AbsoluteOffset],
+    initialCacheIndex: Option[Offset],
+    emptyLedgerState: V,
     cache: Cache[K, V],
     registerUpdateTimer: Timer,
     loggerFactory: NamedLoggerFactory,
@@ -39,8 +40,10 @@ private[platform] case class StateCache[K, V](
 
   /** Fetch the corresponding value for an input key, if present.
     *
-    * @param key the key to query for
-    * @return optionally [[V]]
+    * @param key
+    *   the key to query for
+    * @return
+    *   optionally [[V]]
     */
   def get(key: K)(implicit traceContext: TraceContext): Option[V] =
     cache.getIfPresent(key) match {
@@ -52,26 +55,28 @@ private[platform] case class StateCache[K, V](
         None
     }
 
-  /** Synchronous cache updates evolve the cache ahead with the most recent Index DB entries.
-    * This method increases the `cacheIndex` monotonically.
+  /** Synchronous cache updates evolve the cache ahead with the most recent Index DB entries. This
+    * method increases the `cacheIndex` monotonically.
     *
-    * @param validAt ordering discriminator for pending updates for the same key
-    * @param batch the batch of events updating the cache at `validAt`
+    * @param validAt
+    *   ordering discriminator for pending updates for the same key
+    * @param batch
+    *   the batch of events updating the cache at `validAt`
     */
-  def putBatch(validAt: Offset, batch: Map[K, V])(implicit traceContext: TraceContext): Unit =
+  def putBatch(validAt: Offset, batch: Map[K, V])(implicit
+      traceContext: TraceContext
+  ): Unit =
     Timed.value(
       registerUpdateTimer,
       blocking(pendingUpdates.synchronized {
         // The mutable contract state cache update stream should generally increase the cacheIndex strictly monotonically.
         // However, the most recent updates can be replayed in case of failure of the mutable contract state cache update stream.
         // In this case, we must ignore the already seen updates (i.e. that have `validAt` before or at the cacheIndex).
-        if (validAt.toAbsoluteOffsetO > cacheIndex) {
+        if (Option(validAt) > cacheIndex) {
           batch.keySet.foreach { key =>
-            pendingUpdates
-              .get(key)
-              .foreach(_.latestValidAt = validAt.toAbsoluteOffsetO)
+            pendingUpdates.updateWith(key)(_.map(_.withValidAt(validAt))).discard
           }
-          cacheIndex = validAt.toAbsoluteOffsetO
+          cacheIndex = Some(validAt)
           cache.putAll(batch)
           logger.debug(
             s"Updated cache with a batch of ${batch
@@ -80,7 +85,7 @@ private[platform] case class StateCache[K, V](
           )
         } else
           logger.warn(
-            s"Ignoring incoming synchronous update at an index (${validAt.toLong}) equal to or before the cache index (${cacheIndex
+            s"Ignoring incoming synchronous update at an index (${validAt.unwrap}) equal to or before the cache index (${cacheIndex
                 .fold(0L)(_.unwrap)})"
           )
       }),
@@ -88,37 +93,60 @@ private[platform] case class StateCache[K, V](
 
   /** Update the cache asynchronously.
     *
-    * In face of multiple in-flight updates competing for the `key`,
-    * this method registers an async update to the cache
-    * only if the to-be-inserted tuple is the most recent
-    * (i.e. it has `validAt` highest amongst the competing updates).
+    * In face of multiple in-flight updates competing for the `key`, this method registers an async
+    * update to the cache only if the to-be-inserted tuple is the most recent (i.e. it has `validAt`
+    * highest amongst the competing updates).
     *
-    * @param key the key at which to update the cache
-    * @param fetchAsync fetches asynchronously the value for key `key` at the current cache index
+    * @param key
+    *   the key at which to update the cache
+    * @param fetchAsync
+    *   fetches asynchronously the value for key `key` at the current cache index
     */
   @SuppressWarnings(Array("com.digitalasset.canton.SynchronizedFuture"))
   def putAsync(key: K, fetchAsync: Offset => Future[V])(implicit
       traceContext: TraceContext
-  ): Future[V] = Timed.value(
-    registerUpdateTimer,
-    blocking(pendingUpdates.synchronized {
-      val validAt = cacheIndex
-      val eventualValue = Future.delegate(fetchAsync(fromAbsoluteOffsetO(validAt)))
-      val pendingUpdatesForKey = pendingUpdates.getOrElseUpdate(key, PendingUpdatesState.empty)
-      if (pendingUpdatesForKey.latestValidAt < validAt) {
-        pendingUpdatesForKey.latestValidAt = validAt
-        pendingUpdatesForKey.pendingCount += 1
-        registerEventualCacheUpdate(key, eventualValue, validAt)
-          .flatMap(_ => eventualValue)
-      } else eventualValue
-    }),
-  )
+  ): Future[V] =
+    Timed.value(
+      registerUpdateTimer,
+      blocking(pendingUpdates.synchronized {
+        cacheIndex match {
+          case Some(validAt) =>
+            val eventualValue = Future.delegate(fetchAsync(validAt))
+            pendingUpdates.get(key) match {
+              case Some(freshPendingUpdate) if freshPendingUpdate.latestValidAt == validAt =>
+                eventualValue
+
+              case Some(freshPendingUpdate) if freshPendingUpdate.latestValidAt > validAt =>
+                ErrorUtil.invalidState(
+                  s"Pending update ($freshPendingUpdate) should never be later than the cacheIndex ($validAt)."
+                )
+
+              case outdatedOrNew =>
+                pendingUpdates
+                  .put(
+                    key,
+                    PendingUpdatesState(
+                      outdatedOrNew.map(_.pendingCount).getOrElse(0L) + 1L,
+                      validAt,
+                    ),
+                  )
+                  .discard
+                registerEventualCacheUpdate(key, eventualValue, validAt)
+                  .flatMap(_ => eventualValue)
+            }
+
+          case None =>
+            Future.successful(emptyLedgerState)
+        }
+      }),
+    )
 
   /** Resets the cache and cancels are pending asynchronous updates.
     *
-    * @param resetAtOffset The cache re-initialization offset
+    * @param resetAtOffset
+    *   The cache re-initialization offset
     */
-  def reset(resetAtOffset: Option[AbsoluteOffset]): Unit =
+  def reset(resetAtOffset: Option[Offset]): Unit =
     blocking(pendingUpdates.synchronized {
       cacheIndex = resetAtOffset
       pendingUpdates.clear()
@@ -128,7 +156,7 @@ private[platform] case class StateCache[K, V](
   private def registerEventualCacheUpdate(
       key: K,
       eventualUpdate: Future[V],
-      validAt: Option[AbsoluteOffset],
+      validAt: Offset,
   )(implicit traceContext: TraceContext): Future[Unit] =
     eventualUpdate
       .map { (value: V) =>
@@ -162,23 +190,23 @@ private[platform] case class StateCache[K, V](
             removeFromPending(key)
           )
         )
-        logger.warn(s"Failure in pending cache update for key $key", err)
+        logger.info(s"Failure in pending cache update for key $key", err)
       }
 
   private def removeFromPending(key: K)(implicit traceContext: TraceContext): Unit =
-    discard(
-      pendingUpdates
-        .get(key)
-        .map { pendingForKey =>
-          pendingForKey.pendingCount -= 1
-          if (pendingForKey.pendingCount == 0L) {
-            pendingUpdates -= key
-          }
-        }
-        .getOrElse {
+    pendingUpdates
+      .updateWith(key) {
+        case Some(stillPending) if stillPending.pendingCount > 1 =>
+          Some(stillPending.decPendingCount)
+
+        case Some(lastPending) =>
+          None
+
+        case None =>
           logger.error(s"Expected pending updates tracker for key $key is missing")
-        }
-    )
+          None
+      }
+      .discard
 
   private def truncateValueForLogging(value: V) = {
     val stringValueRepr = value.toString
@@ -192,18 +220,17 @@ private[platform] case class StateCache[K, V](
 object StateCache {
 
   /** Used to track competing updates to the cache for a specific key.
-    * @param pendingCount The number of in-progress updates.
-    * @param latestValidAt Highest version of any pending update.
+    * @param pendingCount
+    *   The number of in-progress updates.
+    * @param latestValidAt
+    *   Highest version of any pending update.
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private[cache] final case class PendingUpdatesState(
-      var pendingCount: Long,
-      var latestValidAt: Option[AbsoluteOffset],
-  )
-  private[cache] object PendingUpdatesState {
-    def empty: PendingUpdatesState = PendingUpdatesState(
-      pendingCount = 0L,
-      latestValidAt = None,
-    )
+      pendingCount: Long,
+      latestValidAt: Offset,
+  ) {
+    def withValidAt(validAt: Offset): PendingUpdatesState =
+      this.copy(latestValidAt = validAt)
+    def decPendingCount: PendingUpdatesState = this.copy(pendingCount = pendingCount - 1)
   }
 }

@@ -1,10 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.BatchAggregatorConfig
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{
@@ -13,8 +12,8 @@ import com.digitalasset.canton.lifecycle.{
   PromiseUnlessShutdown,
   UnlessShutdown,
 }
+import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -27,24 +26,24 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 
-/** This batch aggregator exposes a [[BatchAggregatorUS.run]] method
-  * that allows for batching [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] computations,
-  * defined by a [[BatchAggregatorUS.ProcessorUS]].
+/** This batch aggregator exposes a [[BatchAggregatorUS.run]] method that allows for batching
+  * [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] computations, defined by a
+  * [[BatchAggregatorUS.ProcessorUS]].
   *
-  * Note: it is required that `getter` and `batchGetter` do not throw an exception.
-  * If they do, the number of in-flight requests could fail to be decremented which
-  * would result in degraded performance or even prevent calls to the getters.
+  * Note: it is required that `getter` and `batchGetter` do not throw an exception. If they do, the
+  * number of in-flight requests could fail to be decremented which would result in degraded
+  * performance or even prevent calls to the getters.
   */
 
 trait BatchAggregatorUS[A, B] {
 
-  /** Runs the processor of this aggregator for the given item,
-    * possibly batching several items.
+  /** Runs the processor of this aggregator for the given item, possibly batching several items.
     *
-    * @return The [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] completes with the processor's response to this item,
-    *         after the batch of items has finished. If the processor fails with an exception for
-    *         some item in a batch, the exception may propagate to the [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]]s
-    *         of all items in the batch.
+    * @return
+    *   The [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] completes with the
+    *   processor's response to this item, after the batch of items has finished. If the processor
+    *   fails with an exception for some item in a batch, the exception may propagate to the
+    *   [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]]s of all items in the batch.
     */
   def run(item: A)(implicit
       ec: ExecutionContext,
@@ -78,8 +77,7 @@ object BatchAggregatorUS {
     /** Logger to be used by the [[com.digitalasset.canton.util.BatchAggregatorUS]] */
     def logger: TracedLogger
 
-    /** Computation for a single item.
-      * Should be equivalent to
+    /** Computation for a single item. Should be equivalent to
       * {{{
       *   executeBatch(NonEmpty.from(Seq(Traced(item)))).map(_.head)
       * }}}
@@ -101,8 +99,8 @@ object BatchAggregatorUS {
 
     /** Computation for a batch of items.
       *
-      * @return The responses for the items in the correct order.
-      *         Must have the same length
+      * @return
+      *   The responses for the items in the correct order. Must have the same length
       */
     def executeBatch(items: NonEmpty[Seq[Traced[A]]])(implicit
         traceContext: TraceContext,
@@ -154,9 +152,7 @@ class BatchAggregatorUSImpl[A, B](
       if (oldInFlight < maximumInFlight) { // issue single request
         runSingleWithoutIncrement(item)
       } else { // add to the queue
-        val promise = new PromiseUnlessShutdown[B]("run-batch", FutureSupervisor.Noop)(
-          ErrorLoggingContext.fromTracedLogger(processor.logger)
-        )
+        val promise = PromiseUnlessShutdown.unsupervised[B]()
         queuedRequests.add((Traced(item), promise)).discard[Boolean]
         maybeRunQueuedQueries()
         promise.futureUS
@@ -201,7 +197,7 @@ class BatchAggregatorUSImpl[A, B](
             val (tracedItem, promise) = queueItemsNE.head1
             tracedItem.withTraceContext { implicit traceContext => item =>
               promise
-                .completeWith(runSingleWithoutIncrement(item))
+                .completeWithUS(runSingleWithoutIncrement(item))
                 .discard[PromiseUnlessShutdown[B]]
             }
           } else {

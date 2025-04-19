@@ -2,11 +2,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
 import better.files.File.apply
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import io.circe.syntax.EncoderOps
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -23,7 +22,6 @@ import org.lfdecentralizedtrust.splice.console.{
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -87,8 +85,7 @@ class DisasterRecoveryIntegrationTest
   override lazy val resetRequiredTopologyState = false
 
   // Any app with port starting with 28 or with name suffixed by 'Local' is an app started after the disaster
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation
@@ -124,7 +121,7 @@ class DisasterRecoveryIntegrationTest
                         ),
                         domains = SvSynchronizerConfig(global =
                           SvDecentralizedSynchronizerConfig(
-                            alias = DomainAlias.tryCreate("global"),
+                            alias = SynchronizerAlias.tryCreate("global"),
                             // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
                             url = Some(s"http://localhost:28${sv}08"),
                           )
@@ -147,7 +144,7 @@ class DisasterRecoveryIntegrationTest
                     scanClient = TrustSingle(url = "http://127.0.0.1:28012"),
                     domains = ValidatorSynchronizerConfig(global =
                       ValidatorDecentralizedSynchronizerConfig(
-                        alias = DomainAlias.tryCreate("global"),
+                        alias = SynchronizerAlias.tryCreate("global"),
                         url = Some("http://localhost:28108"),
                       )
                     ),
@@ -160,7 +157,7 @@ class DisasterRecoveryIntegrationTest
                 aliceValidatorConf
                   .copy(
                     participantClient = ParticipantClientConfig(
-                      ClientConfig(port = Port.tryCreate(28502)),
+                      FullClientConfig(port = Port.tryCreate(28502)),
                       aliceValidatorConf.participantClient.ledgerApi.copy(
                         clientConfig =
                           aliceValidatorConf.participantClient.ledgerApi.clientConfig.copy(
@@ -171,7 +168,7 @@ class DisasterRecoveryIntegrationTest
                     scanClient = TrustSingle(url = "http://127.0.0.1:28012"),
                     domains = ValidatorSynchronizerConfig(global =
                       ValidatorDecentralizedSynchronizerConfig(
-                        alias = DomainAlias.tryCreate("global"),
+                        alias = SynchronizerAlias.tryCreate("global"),
                         url = Some("http://localhost:28108"),
                       )
                     ),
@@ -213,7 +210,7 @@ class DisasterRecoveryIntegrationTest
             val newConfig = validatorConfig.copy(
               domains = ValidatorSynchronizerConfig(global =
                 ValidatorDecentralizedSynchronizerConfig(
-                  alias = DomainAlias.tryCreate("global"),
+                  alias = SynchronizerAlias.tryCreate("global"),
                   url = Some("http://localhost:27108"),
                 )
               )

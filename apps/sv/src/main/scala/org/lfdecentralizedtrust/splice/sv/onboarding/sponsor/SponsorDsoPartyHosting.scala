@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.{EitherT, OptionT}
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
@@ -12,13 +13,14 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.{
-  RequiredProposalNotFound,
   DsoPartyMigrationFailure,
+  RequiredProposalNotFound,
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.PartyToParticipant
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -34,7 +36,7 @@ class SponsorDsoPartyHosting(
 ) extends NamedLogging {
 
   def authorizeDsoPartyToParticipant(
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Instant] =
     for {
@@ -58,20 +60,20 @@ class SponsorDsoPartyHosting(
     }
 
   private def proposePartyHostingAndEnsureAuthorized(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       party: PartyId,
       newParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, DsoPartyMigrationFailure, TopologyResult[PartyToParticipant]] = {
-    validateProposalForNewSv(domainId, newParticipant).flatMap {
+    validateProposalForNewSv(synchronizerId, newParticipant).flatMap {
       case SponsorDsoPartyHosting.ValidAcceptedState(accepted) =>
         EitherT.right(Future.successful(accepted))
       case SponsorDsoPartyHosting.ValidProposal(proposal) =>
         EitherT(
           participantAdminConnection
             .ensurePartyToParticipantAdditionProposalWithSerial(
-              domainId,
+              synchronizerId,
               party,
               newParticipant,
               PositiveInt.tryCreate(proposal.base.serial.value - 1),
@@ -88,7 +90,7 @@ class SponsorDsoPartyHosting(
   }
 
   private def validateProposalForNewSv(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
   )(implicit tc: TraceContext): EitherT[
     Future,
@@ -96,11 +98,11 @@ class SponsorDsoPartyHosting(
     SponsorDsoPartyHosting.ValidProposalOrAcceptedState,
   ] = {
     val partyToParticipantAcceptedState =
-      participantAdminConnection.getPartyToParticipant(domainId, dsoParty)
+      participantAdminConnection.getPartyToParticipant(synchronizerId, dsoParty)
     OptionT(
       participantAdminConnection
         .listPartyToParticipant(
-          domainId.filterString,
+          TopologyStoreId.SynchronizerStore(synchronizerId).some,
           filterParty = dsoParty.filterString,
           proposals = AllProposals,
         )

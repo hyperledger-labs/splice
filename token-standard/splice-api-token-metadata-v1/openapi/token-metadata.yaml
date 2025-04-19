@@ -1,0 +1,185 @@
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+openapi: 3.0.0
+info:
+  title: token metadata service
+  description: |
+    Implemented by token registries for the purpose of serving metadata about
+    their tokens and the standards supported by the registry.
+  version: 1.0.0
+paths:
+
+  /registry/info:
+    get:
+      operationId: "getRegistryInfo"
+      description: |
+        Get information about the registry.
+        The response includes the standards supported by the registry.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRegistryInfoResponse"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /registry/instruments:
+    get:
+      operationId: "listInstruments"
+      description:
+        List all instruments managed by this instrument admin.
+      parameters:
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 25
+          description: "Number of instruments per page."
+        - name: pageToken
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "The `nextPageToken` received from the response for the previous page."
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListInstrumentsResponse"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /registry/instruments/{instrumentId}:
+    get:
+      operationId: "getInstrument"
+      description:
+        Retrieve an instrument's metadata.
+      parameters:
+        - name: instrumentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Instrument"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+
+components:
+  responses:
+    "400":
+      description: "bad request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "404":
+      description: "not found"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "409":
+      description: "conflict"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "500":
+      description: "Internal server error"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    GetRegistryInfoResponse:
+      type: object
+      properties:
+        adminId:
+          description: "The Daml party representing the registry app"
+          type: string
+        supportedApis:
+          description: "The token standard APIs supported by the registry. Note that this only includes the registry-wide APIs. Use the instrument lookup endpoints to see which APIs are supported for a given instrument"
+          $ref: "#/components/schemas/SupportedApis"
+      required:
+        - adminId
+        - supportedApis
+
+    Instrument:
+      type: object
+      properties:
+        id:
+          description: "The unique identifier assigned by the admin to the instrument."
+          type: string
+        name:
+          description: "The display name for the instrument recommended by the instrument admin. This is not necessarily unique."
+          type: string
+        symbol:
+          description: "The symbol for the instrument recommended by the instrument admin. This is not necessarily unique."
+          type: string
+        totalSupply:
+          description: "Decimal encoded current total supply of the instrument."
+          type: string
+        totalSupplyAsOf:
+          description: "The timestamp when the total supply was last computed."
+          type: string
+          format: date-time
+        supportedApis:
+          $ref: "#/components/schemas/SupportedApis"
+      required:
+        [
+          "id",
+          "name",
+          "symbol",
+          "supportedApis"
+        ]
+
+    ListInstrumentsResponse:
+      type: object
+      properties:
+        instruments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Instrument"
+        nextPageToken:
+          type: string
+          description: "The token for the next page of results, to be used as the lastInstrumentId for the next page."
+      required:
+        - instruments
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+
+    SupportedApis:
+      description: |
+        Map from token standard API name to the minor version of the API supported, e.g.,
+        splice-api-token-metadata-v1 -> 1 where the `1` corresponds to the minor version.
+      type: object
+      additionalProperties:
+        type: integer
+        format: int32

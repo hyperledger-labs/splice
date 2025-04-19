@@ -5,28 +5,28 @@ package org.lfdecentralizedtrust.splice.migration
 
 import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.topology.transaction.DomainParametersState
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-class DomainParametersStateTopologyConnection(connection: TopologyAdminConnection) {
+class SynchronizerParametersStateTopologyConnection(connection: TopologyAdminConnection) {
 
   // Selects the topology transaction that has the highest serial number and the smallest number of signatories.
   // This ensures that everyone will choose the same timestamp as to when the domain was paused.
-  def firstAuthorizedStateForTheLatestDomainParametersState(
-      domain: DomainId
+  def firstAuthorizedStateForTheLatestSynchronizerParametersState(
+      domain: SynchronizerId
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): OptionT[Future, TopologyAdminConnection.TopologyResult[
-    DomainParametersState
+    SynchronizerParametersState
   ]] = {
     OptionT(
       connection
-        .listDomainParametersState(domain)
+        .listSynchronizerParametersState(domain)
         .map { domainParamsHistory =>
           val latestState = domainParamsHistory.map(_.base.serial).maxOption
           domainParamsHistory

@@ -16,9 +16,9 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.apache.pekko.stream.Materializer
@@ -41,8 +41,8 @@ class JoiningNodeDsoPartyHosting(
 ) extends NamedLogging {
 
   def hostPartyOnOwnParticipant(
-      domainAlias: DomainAlias,
-      domainId: DomainId,
+      synchronizerAlias: SynchronizerAlias,
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
       svParty: PartyId,
   )(implicit
@@ -65,7 +65,7 @@ class JoiningNodeDsoPartyHosting(
               (for {
                 partyToParticipantProposal <- participantAdminConnection
                   .ensurePartyToParticipantAdditionProposal(
-                    domainId,
+                    synchronizerId,
                     dsoParty,
                     participantId,
                   )
@@ -110,14 +110,14 @@ class JoiningNodeDsoPartyHosting(
                         "Reconnecting to global domain so that the proposal can be recreated from the latest base."
                       )
                       for {
-                        _ <- participantAdminConnection.connectDomain(domainAlias)
+                        _ <- participantAdminConnection.connectDomain(synchronizerAlias)
                         _ <- retryProvider.waitUntil(
                           RetryFor.WaitingOnInitDependency,
                           "party_hosting_serial_observed",
                           s"Serial ${proposalNotFound.partyToParticipantMappingSerial} expected by sponsor is observed",
                           participantAdminConnection
                             .getPartyToParticipant(
-                              domainId,
+                              synchronizerId,
                               dsoParty,
                             )
                             .map(result =>
@@ -151,10 +151,10 @@ class JoiningNodeDsoPartyHosting(
           )
           _ <- participantAdminConnection.reconnectAllDomains()
           // Explicitly connect to global domain as that has manualConnect=false
-          _ <- participantAdminConnection.connectDomain(domainAlias)
+          _ <- participantAdminConnection.connectDomain(synchronizerAlias)
           _ = logger.info("candidate SV participant reconnected to global domain")
           _ <- dsoPartyHosting.waitForDsoPartyToParticipantAuthorization(
-            domainId,
+            synchronizerId,
             participantId,
             RetryFor.Automation,
           )

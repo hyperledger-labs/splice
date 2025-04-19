@@ -372,7 +372,7 @@ object DamlPlugin extends AutoPlugin {
       log: Logger,
   ) = {
     // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
-    val damlLibsDependencyTypes = Seq("daml-script" -> "daml3-script")
+    val damlLibsDependencyTypes = Seq("daml-script" -> "daml-script")
     val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq.empty[String])(_ :+ "-" + _)
     (for {
       (depType, depName) <- damlLibsDependencyTypes
@@ -421,7 +421,8 @@ object DamlPlugin extends AutoPlugin {
 
     val damlcCommand = damlc.getAbsolutePath :: "build" ::
       "--project-root" :: projectDirectory.toString ::
-      "--output" :: versionedDar.getAbsolutePath :: Nil
+      "--output" :: versionedDar.getAbsolutePath ::
+      "--enable-multi-package=no" :: Nil
     val command =
       // if the damlDarLfVersion is not set the daml.yaml is expected to contain the target lf-version in the build-options
       if (outputLfVersion.isEmpty) damlcCommand
@@ -553,7 +554,10 @@ object DamlPlugin extends AutoPlugin {
       ) match {
         case Success(dir) => dir
         case Failure(e) =>
-          log.error(s"Failed to parse codegen config in daml.yaml file: $damlYaml")
+          log.error(
+            s"Failed to parse codegen config in daml.yaml file: $damlYaml." +
+              s"Did you forget to specify codegen.java in $projectDir/daml.yaml?"
+          )
           throw e
       }
       IO.delete(projectDir / codegenDir)

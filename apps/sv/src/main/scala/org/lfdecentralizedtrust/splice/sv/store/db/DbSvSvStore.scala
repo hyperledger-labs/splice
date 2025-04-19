@@ -62,6 +62,7 @@ class DbSvSvStore(
     with NamedLogging {
 
   import multiDomainAcsStore.waitUntilAcsIngested
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
   def domainMigrationId: Long = domainMigrationInfo.currentMigrationId

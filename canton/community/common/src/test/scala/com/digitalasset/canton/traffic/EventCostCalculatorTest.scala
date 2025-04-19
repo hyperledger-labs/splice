@@ -1,13 +1,21 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.traffic
 
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.sequencing.protocol.{AllMembersOfDomain, ClosedEnvelope, Recipients}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.sequencing.protocol.{
+  AllMembersOfSynchronizer,
+  Batch,
+  ClosedEnvelope,
+  Recipients,
+}
 import com.digitalasset.canton.sequencing.traffic.EventCostCalculator
-import com.digitalasset.canton.sequencing.traffic.EventCostCalculator.EnvelopeCostDetails
-import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.sequencing.traffic.EventCostCalculator.{
+  EnvelopeCostDetails,
+  EventCostDetails,
+}
+import com.digitalasset.canton.topology.{DefaultTestIdentities, Member}
 import com.digitalasset.canton.{BaseTest, ProtocolVersionChecksAnyWordSpec}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
@@ -16,8 +24,8 @@ class EventCostCalculatorTest
     extends AnyWordSpec
     with BaseTest
     with ProtocolVersionChecksAnyWordSpec {
-  private val recipient1 = mock[Member]
-  private val recipient2 = mock[Member]
+  private val recipient1 = DefaultTestIdentities.participant1
+  private val recipient2 = DefaultTestIdentities.participant2
 
   "calculate cost correctly" in {
     val recipients = Recipients.cc(recipient1, recipient2)
@@ -32,18 +40,18 @@ class EventCostCalculatorTest
         testedProtocolVersion,
       )
     ) shouldBe EnvelopeCostDetails(
-      5L,
-      5L, // 5 * 2 * 5000 / 10000
-      10L,
-      recipients.allRecipients.toSeq,
+      writeCost = 5L,
+      readCost = 5L, // 5 * 2 * 5000 / 10000
+      finalCost = 10L,
+      recipients = recipients.allRecipients.toSeq,
     )
   }
 
   "use resolved group recipients" in {
-    val recipients = Recipients.cc(AllMembersOfDomain)
+    val recipients = Recipients.cc(AllMembersOfSynchronizer)
     new EventCostCalculator(loggerFactory).computeEnvelopeCost(
       PositiveInt.tryCreate(5000),
-      Map(AllMembersOfDomain -> Set(recipient1, recipient2)),
+      Map(AllMembersOfSynchronizer -> Set(recipient1, recipient2)),
     )(
       ClosedEnvelope.create(
         ByteString.copyFrom(Array.fill(5)(1.toByte)),
@@ -64,11 +72,11 @@ class EventCostCalculatorTest
     // ~ 500 recipients, cost multiplier 200, estimated payload 25000
     // This overflows an Int computation (-154496 instead of 275000)
 
-    val recipients = Recipients.cc(AllMembersOfDomain)
+    val recipients = Recipients.cc(AllMembersOfSynchronizer)
     val manyRecipients = List.fill(500)(mock[Member]).toSet
     new EventCostCalculator(loggerFactory).computeEnvelopeCost(
       PositiveInt.tryCreate(200),
-      Map(AllMembersOfDomain -> manyRecipients),
+      Map(AllMembersOfSynchronizer -> manyRecipients),
     )(
       ClosedEnvelope.create(
         ByteString.copyFrom(Array.fill(25000)(1.toByte)),
@@ -77,9 +85,9 @@ class EventCostCalculatorTest
         testedProtocolVersion,
       )
     ) shouldBe EnvelopeCostDetails(
-      25000L,
-      250000L, // 25000 * 500 * 200 / 10000
-      275000L,
+      writeCost = 25000L,
+      readCost = 250000L, // 25000 * 500 * 200 / 10000
+      finalCost = 275000L,
       recipients.allRecipients.toSeq,
     )
   }
@@ -90,11 +98,11 @@ class EventCostCalculatorTest
     val exception = intercept[IllegalStateException](
       new EventCostCalculator(loggerFactory).computeEnvelopeCost(
         PositiveInt.tryCreate(1_000_000_000),
-        Map(AllMembersOfDomain -> manyRecipients),
+        Map(AllMembersOfSynchronizer -> manyRecipients),
       )(
         ClosedEnvelope.create(
           ByteString.copyFrom(Array.fill(10_000_000)(1.toByte)),
-          Recipients.cc(AllMembersOfDomain),
+          Recipients.cc(AllMembersOfSynchronizer),
           Seq.empty,
           testedProtocolVersion,
         )
@@ -102,5 +110,36 @@ class EventCostCalculatorTest
     )
 
     exception.getMessage should include("Overflow in cost computation")
+  }
+
+  "respect minimum event cost" in {
+    val recipients = Recipients.cc(recipient1, recipient2)
+    val expectedEnvelopeCost = EnvelopeCostDetails(
+      writeCost = 5L,
+      readCost = 5L, // 5 * 2 * 5000 / 10000
+      finalCost = 10L,
+      recipients = recipients.allRecipients.toSeq,
+    )
+    val baseCost = NonNegativeLong.tryCreate(350)
+    new EventCostCalculator(loggerFactory).computeEventCost(
+      Batch.fromClosed(
+        testedProtocolVersion,
+        ClosedEnvelope.create(
+          ByteString.copyFrom(Array.fill(5)(1.toByte)),
+          recipients,
+          Seq.empty,
+          testedProtocolVersion,
+        ),
+      ),
+      PositiveInt.tryCreate(5000),
+      Map.empty,
+      testedProtocolVersion,
+      baseEventCost = baseCost,
+    ) shouldBe EventCostDetails(
+      costMultiplier = PositiveInt.tryCreate(5000),
+      groupToMembersSize = Map.empty,
+      envelopes = List(expectedEnvelopeCost),
+      eventCost = NonNegativeLong.tryCreate(expectedEnvelopeCost.finalCost + baseCost.value),
+    )
   }
 }
