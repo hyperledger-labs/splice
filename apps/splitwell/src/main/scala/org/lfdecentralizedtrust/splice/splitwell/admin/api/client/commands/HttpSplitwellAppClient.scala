@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.ExecutionContext
@@ -65,11 +65,11 @@ object HttpSplitwellAppClient {
   )(encG: definitions.ContractWithState) = {
     for {
       contract <- decodeContract(encG.contract)
-      domainId <- encG.domainId
-        .traverse(DomainId.fromProtoPrimitive(_, "domain_id"))
+      synchronizerId <- encG.domainId
+        .traverse(SynchronizerId.fromProtoPrimitive(_, "domain_id"))
     } yield ContractWithState(
       contract,
-      domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
+      synchronizerId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
     )
   }
 
@@ -177,8 +177,8 @@ object HttpSplitwellAppClient {
   }
 
   case class SplitwellDomains(
-      preferred: DomainId,
-      others: Seq[DomainId],
+      preferred: SynchronizerId,
+      others: Seq[SynchronizerId],
   )
   case class GetSplitwellDomainIds(
   ) extends BaseCommand[http.GetSplitwellDomainIdsResponse, SplitwellDomains] {
@@ -190,8 +190,8 @@ object HttpSplitwellAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetSplitwellDomainIdsResponse.OK(response) =>
         for {
-          preferred <- Codec.decode(Codec.DomainId)(response.preferred)
-          others <- response.otherDomainIds.traverse(id => Codec.decode(Codec.DomainId)(id))
+          preferred <- Codec.decode(Codec.SynchronizerId)(response.preferred)
+          others <- response.otherDomainIds.traverse(id => Codec.decode(Codec.SynchronizerId)(id))
         } yield SplitwellDomains(preferred, others)
     }
   }
@@ -199,7 +199,7 @@ object HttpSplitwellAppClient {
   case class GetConnectedDomains(
       partyId: PartyId
   ) extends BaseCommand[http.GetConnectedDomainsResponse, Seq[
-        DomainId
+        SynchronizerId
       ]] {
 
     override def submitRequest(
@@ -209,14 +209,14 @@ object HttpSplitwellAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetConnectedDomainsResponse.OK(response) =>
-        response.domainIds.traverse(id => Codec.decode(Codec.DomainId)(id))
+        response.domainIds.traverse(id => Codec.decode(Codec.SynchronizerId)(id))
     }
   }
 
   case class ListSplitwellInstalls(partyId: PartyId)
       extends BaseCommand[
         http.ListSplitwellInstallsResponse,
-        Map[DomainId, splitwellCodegen.SplitwellInstall.ContractId],
+        Map[SynchronizerId, splitwellCodegen.SplitwellInstall.ContractId],
       ] {
     override def submitRequest(
         client: Client,
@@ -228,7 +228,7 @@ object HttpSplitwellAppClient {
         for {
           installs <- response.installs.traverse(install =>
             for {
-              domain <- Codec.decode(Codec.DomainId)(install.domainId)
+              domain <- Codec.decode(Codec.SynchronizerId)(install.domainId)
               cid <- Codec.decodeJavaContractId(splitwellCodegen.SplitwellInstall.COMPANION)(
                 install.contractId
               )

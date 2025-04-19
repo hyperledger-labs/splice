@@ -6,9 +6,11 @@ module Splice.Scripts.TestExternalParty where
 import Daml.Script
 import DA.Time
 import DA.Assert
+
+import Splice.Amulet (ValidatorRight)
+import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Scripts.Util
-import Splice.Amulet (ValidatorRight)
 
 testExternalPartySetup = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
@@ -23,12 +25,14 @@ testExternalPartySetup = script do
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   context <- getPaymentTransferContext app aliceValidator
   amuletCid <- tap app aliceValidator 50.0
-  AmuletRules_CreateExternalPartySetupProposalResult{..} <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
-    context = context
-    inputs = [InputAmulet amuletCid]
-    user = externalUser.primaryParty
-    validator = aliceValidator.primaryParty
-    preapprovalExpiresAt
+  AmuletRules_CreateExternalPartySetupProposalResult{..} <-
+    checkTxMetadata app TxKind_Burn aliceValidator.primaryParty $
+    submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
+      context = context
+      inputs = [InputAmulet amuletCid]
+      user = externalUser.primaryParty
+      validator = aliceValidator.primaryParty
+      preapprovalExpiresAt
 
   -- Externally signed transaction to accept proposal.
   ExternalPartySetupProposal_AcceptResult{..} <- submit externalUser.primaryParty $ exerciseCmd proposalCid ExternalPartySetupProposal_Accept {}

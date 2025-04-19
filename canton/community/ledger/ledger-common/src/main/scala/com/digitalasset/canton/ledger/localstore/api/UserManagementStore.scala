@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.localstore.api
 
-import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, User, UserRight}
+import com.digitalasset.canton.ledger.api.{IdentityProviderId, User, UserRight}
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLogging}
 import com.digitalasset.daml.lf.data.Ref
 
@@ -39,8 +39,8 @@ trait UserManagementStore { self: NamedLogging =>
       loggingContext: LoggingContextWithTrace
   ): Future[Result[UserInfo]]
 
-  /** Always returns `maxResults` if possible, i.e. if a call to this method
-    * returned fewer than `maxResults` users, then the next page (as of calling this method) was empty.
+  /** Always returns `maxResults` if possible, i.e. if a call to this method returned fewer than
+    * `maxResults` users, then the next page (as of calling this method) was empty.
     */
   def listUsers(
       fromExcl: Option[Ref.UserId],

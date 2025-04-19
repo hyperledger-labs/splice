@@ -240,23 +240,34 @@ class NodeInitializer(
       _ <- importAuthorizedStoreSnapshot(dump.authorizedStoreSnapshot)
       _ <-
         if (expectedId != dump.id) {
-          connection.listMyKeys().flatMap { keys =>
-            NonEmpty.from(keys) match {
-              case None =>
-                Future.failed(
-                  Status.INTERNAL
-                    .withDescription(
-                      "Node is bootstrapping from dump but list of keys is empty"
-                    )
+          connection.listOwnerToKeyMapping(dump.id.member).flatMap {
+            case Seq(mapping) =>
+              val (validOtkKeys, invalidOtkKeys) = mapping.mapping.keys.partition(p =>
+                p.asSigningKey.fold(true)(_.usage.contains(SigningKeyUsage.ProofOfOwnership))
+              )
+              logger.info(
+                s"Removing keys from OwnerToKeyMapping as they are not flagged for proof-of-ownership usage. This can happen for old splice versions that incorrectly specified namespace only keys in the OwnerToKeyMapping in some cases: $invalidOtkKeys"
+              )
+              val validOtkKeysNE = NonEmpty
+                .from(validOtkKeys)
+                .getOrElse(
+                  throw Status.INTERNAL
+                    .withDescription("No valid key to use in OwnerToKeyMapping")
                     .asRuntimeException
                 )
-              case Some(keysNE) =>
-                connection.ensureInitialOwnerToKeyMapping(
-                  expectedId.member,
-                  keysNE.map(_.publicKey),
-                  RetryFor.Automation,
-                )
-            }
+              connection.ensureInitialOwnerToKeyMapping(
+                expectedId.member,
+                validOtkKeysNE,
+                RetryFor.Automation,
+              )
+            case mappings =>
+              Future.failed(
+                Status.INTERNAL
+                  .withDescription(
+                    s"Expected exactly one OwnerToKeyMapping for old node id ${dump.id} but got $mappings"
+                  )
+                  .asRuntimeException
+              )
           }
         } else Future.unit
     } yield ()

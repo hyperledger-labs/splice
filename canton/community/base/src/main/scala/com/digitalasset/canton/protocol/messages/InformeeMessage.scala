@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -16,12 +16,13 @@ import com.digitalasset.canton.protocol.{RootHash, v30}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.version.{
-  HasProtocolVersionedWithContextCompanion,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
+  VersionedProtoCodec,
+  VersioningCompanionContext,
 }
 
 import java.util.UUID
@@ -56,7 +57,7 @@ case class InformeeMessage(
 
   override def requestUuid: UUID = fullInformeeTree.transactionUuid
 
-  override def domainId: DomainId = fullInformeeTree.domainId
+  override def synchronizerId: SynchronizerId = fullInformeeTree.synchronizerId
 
   override def mediator: MediatorGroupRecipient = fullInformeeTree.mediator
 
@@ -83,17 +84,15 @@ case class InformeeMessage(
   override def pretty: Pretty[InformeeMessage] = prettyOfClass(unnamedParam(_.fullInformeeTree))
 
   @transient override protected lazy val companionObj: InformeeMessage.type = InformeeMessage
-
-  override def informeesArePublic: Boolean = false
 }
 
 object InformeeMessage
-    extends HasProtocolVersionedWithContextCompanion[InformeeMessage, (HashOps, ProtocolVersion)] {
+    extends VersioningCompanionContext[InformeeMessage, (HashOps, ProtocolVersion)] {
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.InformeeMessage)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.InformeeMessage)(
       supportedProtoVersion(_)((hashOps, proto) => fromProtoV30(hashOps)(proto)),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 

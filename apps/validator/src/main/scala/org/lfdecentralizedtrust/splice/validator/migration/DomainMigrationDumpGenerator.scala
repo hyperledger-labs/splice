@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.migration
 
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   SpliceLedgerConnection,
@@ -15,7 +16,8 @@ import org.lfdecentralizedtrust.splice.migration.{
   ParticipantUsersDataExporter,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -39,7 +41,7 @@ class DomainMigrationDumpGenerator(
 
   def generateDomainDump(
       migrationId: Long,
-      domain: DomainId,
+      domain: SynchronizerId,
   )(implicit tc: TraceContext): Future[DomainMigrationDump] = {
     for {
       (acsSnapshot, acsTimestamp) <- acsExporter
@@ -75,7 +77,7 @@ class DomainMigrationDumpGenerator(
 
   def getDomainDataSnapshot(
       timestamp: Instant,
-      domain: DomainId,
+      domain: SynchronizerId,
       migrationId: Long,
       force: Boolean,
   )(implicit
@@ -86,7 +88,7 @@ class DomainMigrationDumpGenerator(
       participantId <- participantConnection.getId()
       parties <- participantConnection
         .listPartyToParticipant(
-          filterStore = domain.filterString,
+          store = TopologyStoreId.SynchronizerStore(domain).some,
           filterParticipant = participantId.toProtoPrimitive,
         )
         .map(_.map(_.mapping.partyId))

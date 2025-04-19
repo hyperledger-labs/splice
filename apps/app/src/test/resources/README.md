@@ -76,10 +76,10 @@ all network indices must be odd numbers.
 - `03`: Validator, Admin API
 - `04`: Wallet, Admin API
 - `05`: DSO, Admin API
-- `06`: Domain manager, Admin API
 - `07`: Mediator, Admin API
-- `08`: Domain, Public API
-- `09`: Domain, Admin API
+- `08`: Sequencer, Public API
+- `09`: Sequencer, Admin API
+- `10`: Sequencer, BFT P2P API
 - `11`: ANS user, Admin API
 - `12`: Scan, Admin API
 - `13`: Splitwell, Admin API

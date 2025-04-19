@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.networking
@@ -9,18 +9,24 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import io.grpc.Attributes
 
 import java.net.URI
 
 /** Networking endpoint where host could be a hostname or ip address. */
-final case class Endpoint(host: String, port: Port) {
+final case class Endpoint(host: String, port: Port) extends UniformCantonConfigValidation {
   override def toString: String = s"$host:$port"
 
   def toURI(useTls: Boolean) = new URI(s"${if (useTls) "https" else "http"}://$toString")
 }
 
 object Endpoint {
+  implicit val endpointCantonConfigValidator: CantonConfigValidator[Endpoint] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[Endpoint]
+  }
 
   implicit val endpointOrdering: Ordering[Endpoint] =
     Ordering.by(_.toString)
@@ -32,9 +38,9 @@ object Endpoint {
   private val defaultHttpsPort = 443
   private def defaultPort(useTls: Boolean): Int = if (useTls) defaultHttpsPort else defaultHttpPort
 
-  /** Extracts from a list of URIs the endpoint configuration (host and port), as well as a flag indicating
-    *  whether they all use TLS or all don't. Will return an error if endpoints are not consistent in their usage
-    * of TLS.
+  /** Extracts from a list of URIs the endpoint configuration (host and port), as well as a flag
+    * indicating whether they all use TLS or all don't. Will return an error if endpoints are not
+    * consistent in their usage of TLS.
     */
   def fromUris(
       connections: NonEmpty[Seq[URI]]
@@ -47,7 +53,7 @@ object Endpoint {
         Either.cond[String, Boolean](
           a == b,
           b,
-          s"All domain connections must either use TLS or all not use TLS",
+          s"All synchronizer connections must either use TLS or all not use TLS",
         )
       )
     } yield (endpoints, useTls)
@@ -66,11 +72,11 @@ object Endpoint {
         case "https" => Right(true)
         case "http" => Right(false)
         case unknownScheme =>
-          Left(s"Domain connection url [$uri] has unknown scheme: $unknownScheme")
+          Left(s"Synchronizer connection url [$uri] has unknown scheme: $unknownScheme")
       }
       port <- Port
         .create(portO.getOrElse(defaultPort(useTls)))
-        .leftMap(err => s"Domain connection url [$uri] has an invalid port: $err")
+        .leftMap(err => s"Synchronizer connection url [$uri] has an invalid port: $err")
     } yield (Endpoint(host, port), useTls)
   }
 

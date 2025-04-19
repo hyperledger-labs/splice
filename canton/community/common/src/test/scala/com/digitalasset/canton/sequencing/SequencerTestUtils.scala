@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -18,7 +18,7 @@ import com.digitalasset.canton.sequencing.protocol.{
 }
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
-import com.digitalasset.canton.topology.{DefaultTestIdentities, DomainId}
+import com.digitalasset.canton.topology.{DefaultTestIdentities, SynchronizerId}
 import com.digitalasset.canton.{BaseTest, SequencerCounter}
 import com.google.protobuf.ByteString
 
@@ -36,7 +36,7 @@ object SequencerTestUtils extends BaseTest {
   def mockDeliverClosedEnvelope(
       counter: Long = 0L,
       timestamp: CantonTimestamp = CantonTimestamp.Epoch,
-      domainId: DomainId = DefaultTestIdentities.domainId,
+      synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId,
       deserializedFrom: Option[ByteString] = None,
       messageId: Option[MessageId] = Some(MessageId.tryCreate("mock-deliver")),
       topologyTimestampO: Option[CantonTimestamp] = None,
@@ -45,8 +45,9 @@ object SequencerTestUtils extends BaseTest {
 
     val deliver = Deliver.create[ClosedEnvelope](
       SequencerCounter(counter),
+      None, // TODO(#11834): Make sure that tests using mockDeliverClosedEnvelope are not affected by this after counters are gone
       timestamp,
-      domainId,
+      synchronizerId,
       messageId,
       batch,
       topologyTimestampO,
@@ -69,7 +70,8 @@ object SequencerTestUtils extends BaseTest {
   def mockDeliver(
       sc: Long = 0,
       timestamp: CantonTimestamp = CantonTimestamp.Epoch,
-      domainId: DomainId = DefaultTestIdentities.domainId,
+      previousTimestamp: Option[CantonTimestamp] = None,
+      synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId,
       messageId: Option[MessageId] = Some(MessageId.tryCreate("mock-deliver")),
       topologyTimestampO: Option[CantonTimestamp] = None,
       trafficReceipt: Option[TrafficReceipt] = None,
@@ -77,8 +79,9 @@ object SequencerTestUtils extends BaseTest {
     val batch = Batch.empty(testedProtocolVersion)
     Deliver.create[Nothing](
       SequencerCounter(sc),
+      previousTimestamp,
       timestamp,
-      domainId,
+      synchronizerId,
       messageId,
       batch,
       topologyTimestampO,
@@ -90,15 +93,16 @@ object SequencerTestUtils extends BaseTest {
   def mockDeliverError(
       sc: Long = 0,
       timestamp: CantonTimestamp = CantonTimestamp.Epoch,
-      domainId: DomainId = DefaultTestIdentities.domainId,
+      synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId,
       messageId: MessageId = MessageId.tryCreate("mock-deliver"),
       sequencerError: SequencerDeliverError = SubmissionRequestRefused("mock-submission-refused"),
       trafficReceipt: Option[TrafficReceipt] = None,
   ): DeliverError =
     DeliverError.create(
       SequencerCounter(sc),
+      None, // TODO(#11834): Make sure that tests using mockDeliverError are not affected by this after counters are gone
       timestamp,
-      domainId,
+      synchronizerId,
       messageId,
       sequencerError,
       BaseTest.testedProtocolVersion,

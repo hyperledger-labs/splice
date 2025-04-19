@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.client.services.admin
@@ -11,7 +11,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
   ListKnownPartiesRequest,
   PartyDetails as ApiPartyDetails,
 }
-import com.digitalasset.canton.ledger.api.domain.{
+import com.digitalasset.canton.ledger.api.{
   IdentityProviderId,
   ObjectMeta,
   ParticipantId,
@@ -30,7 +30,6 @@ object PartyManagementClient {
   private def details(d: ApiPartyDetails): PartyDetails =
     PartyDetails(
       Party.assertFromString(d.party),
-      if (d.displayName.isEmpty) None else Some(d.displayName),
       d.isLocal,
       ObjectMeta.empty,
       IdentityProviderId(d.identityProviderId),
@@ -39,12 +38,19 @@ object PartyManagementClient {
   private val getParticipantIdRequest = GetParticipantIdRequest()
 
   private def listKnownPartiesRequest(pageToken: String, pageSize: Int) =
-    ListKnownPartiesRequest(pageToken, pageSize)
+    ListKnownPartiesRequest(
+      pageToken = pageToken,
+      pageSize = pageSize,
+      identityProviderId = "",
+    )
 
   private def getPartiesRequest(parties: OneAnd[Set, Ref.Party]) = {
     import scalaz.std.iterable.*
     import scalaz.syntax.foldable.*
-    GetPartiesRequest(parties.toList)
+    GetPartiesRequest(
+      parties = parties.toList,
+      identityProviderId = "",
+    )
   }
 }
 
@@ -83,12 +89,17 @@ final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
 
   def allocateParty(
       hint: Option[String],
-      displayName: Option[String],
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Future[PartyDetails] =
     LedgerClient
       .stubWithTracing(service, token)
-      .allocateParty(new AllocatePartyRequest(hint.getOrElse(""), displayName.getOrElse("")))
+      .allocateParty(
+        AllocatePartyRequest(
+          partyIdHint = hint.getOrElse(""),
+          localMetadata = None,
+          identityProviderId = "",
+        )
+      )
       .map(_.partyDetails.getOrElse(sys.error("No PartyDetails in response.")))
       .map(PartyManagementClient.details)
 

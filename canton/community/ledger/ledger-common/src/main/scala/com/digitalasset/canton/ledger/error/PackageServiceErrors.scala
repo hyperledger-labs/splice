@@ -1,10 +1,18 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error
 
-import com.daml.error.*
+import com.digitalasset.base.error.{
+  ContextualizedDamlError,
+  ErrorCategory,
+  ErrorCode,
+  ErrorGroup,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.daml.lf.archive.Error as LfArchiveError
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.Error
@@ -18,6 +26,7 @@ import ParticipantErrorGroup.LedgerApiErrorGroup.PackageServiceErrorGroup
   "Errors raised by the Package Management Service on package uploads."
 )
 object PackageServiceErrors extends PackageServiceErrorGroup {
+
   @Explanation("Package parsing errors raised during package upload.")
   object Reading extends ErrorGroup {
     @Explanation(
@@ -30,8 +39,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
           ErrorCategory.InvalidIndependentOfSystemState,
         ) {
       final case class Error(reason: String)(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause = "Dar file name is invalid",
             extraContext = Map("reason" -> reason),
           )
@@ -42,8 +51,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
     object InvalidDar
         extends ErrorCode(id = "INVALID_DAR", ErrorCategory.InvalidIndependentOfSystemState) {
       final case class Error(entries: Seq[String], throwable: Throwable)(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause = "Dar file is corrupt",
             throwableO = Some(throwable),
             extraContext = Map(
@@ -52,13 +61,33 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
             ),
           )
     }
+    @Explanation(
+      """The main package of the uploaded DAR does not match the expected package id."""
+    )
+    @Resolution(
+      """Investigate where the DAR is coming from and whether it was manipulated or the provided package id was wrong."""
+    )
+    object MainPackageInDarDoesNotMatchExpected
+        extends ErrorCode(
+          id = "MAIN_PACKAGE_IN_DAR_DOES_NOT_MATCH_EXPECTED",
+          ErrorCategory.InvalidGivenCurrentSystemStateOther,
+        ) {
+
+      final case class Reject(found: String, expected: String)(implicit
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
+            cause =
+              s"The main package of the uploaded DAR is '$found' while the provided expected value is '$expected'"
+          )
+    }
+
     @Explanation("""This error indicates that the supplied zipped dar file was invalid.""")
     @Resolution("Inspect the error message for details and contact support.")
     object InvalidZipEntry
         extends ErrorCode(id = "INVALID_ZIP_ENTRY", ErrorCategory.InvalidIndependentOfSystemState) {
       final case class Error(name: String, entries: Seq[String])(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause = "Dar zip file is corrupt",
             extraContext = Map(
               "name" -> name,
@@ -77,8 +106,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
           ErrorCategory.InvalidIndependentOfSystemState,
         ) {
       final case class Error(entries: Seq[String])(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause = "Unsupported legacy Dar zip file",
             extraContext = Map("entries" -> entries),
           )
@@ -89,8 +118,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
     object ZipBomb
         extends ErrorCode(id = "ZIP_BOMB", ErrorCategory.InvalidIndependentOfSystemState) {
       final case class Error(msg: String)(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause = "Dar zip file seems to be a zip bomb.",
             extraContext = Map("msg" -> msg),
           )
@@ -103,8 +132,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
     object ParseError
         extends ErrorCode(id = "DAR_PARSE_ERROR", ErrorCategory.InvalidIndependentOfSystemState) {
       final case class Error(reason: String)(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause = "Failed to parse the dar file content.",
             extraContext = Map(reason -> reason),
           )
@@ -120,8 +149,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
         ErrorCategory.SystemInternalAssumptionViolated,
       ) {
     final case class Validation(nameOfFunc: String, msg: String, detailMsg: String = "")(implicit
-        val loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        val loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = "Internal package validation error.",
           extraContext = Map(
             "nameOfFunc" -> nameOfFunc,
@@ -130,20 +159,20 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
           ),
         )
     final case class Error(missing: Set[Ref.PackageRef])(implicit
-        val loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        val loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = "Failed to resolve package ids locally.",
           extraContext = Map("missing" -> missing),
         )
     final case class Generic(reason: String)(implicit
-        val loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        val loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = "Generic error (please check the reason string).",
           extraContext = Map("reason" -> reason),
         )
     final case class Unhandled(throwable: Throwable, additionalReason: Option[String] = None)(
-        implicit val loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        implicit val loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = "Failed with an unknown error cause",
           throwableO = Some(throwable),
           extraContext = {
@@ -160,8 +189,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
     def handleLfArchiveError(
         lfArchiveError: LfArchiveError
     )(implicit
-        contextualizedErrorLogger: ContextualizedErrorLogger
-    ): DamlError =
+        errorLoggingContext: ErrorLoggingContext
+    ): ContextualizedDamlError =
       lfArchiveError match {
         case LfArchiveError.InvalidDar(entries, cause) =>
           PackageServiceErrors.Reading.InvalidDar
@@ -180,8 +209,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
       }
 
     def handleLfEnginePackageError(err: Error.Package.Error)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ): DamlError = err match {
+        loggingContext: ErrorLoggingContext
+    ): ContextualizedDamlError = err match {
       case Error.Package.Internal(nameOfFunc, msg, _) =>
         PackageServiceErrors.InternalError.Validation(nameOfFunc, msg)
       case Error.Package.Validation(validationError) =>
@@ -207,8 +236,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
           ErrorCategory.InvalidIndependentOfSystemState,
         ) {
       final case class Error(validationError: validation.ValidationError)(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause = "Package validation failed.",
             extraContext = Map("validationError" -> validationError),
           )
@@ -219,8 +248,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
         languageVersion: language.LanguageVersion,
         allowedLanguageVersions: VersionRange[language.LanguageVersion],
     )(implicit
-        val loggingContext: ContextualizedErrorLogger
-    ) extends DamlError(
+        val loggingContext: ErrorLoggingContext
+    ) extends ContextualizedDamlError(
           cause = CommandExecutionErrors.Package.AllowedLanguageVersions
             .buildCause(packageId, languageVersion, allowedLanguageVersions),
           extraContext = Map(
@@ -246,8 +275,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
           packageIds: Set[Ref.PackageId],
           missingDependencies: Set[Ref.PackageId],
       )(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause =
               "The set of packages in the dar is not self-consistent and is missing dependencies",
             extraContext = Map(
@@ -272,12 +301,12 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
           upgradeError: UpgradeError,
           phase: TypecheckUpgrades.UploadPhaseCheck,
       )(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(cause = phase match {
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(cause = phase match {
             case TypecheckUpgrades.MaximalDarCheck =>
-              s"The uploaded DAR contains a package $newPackage, but upgrade checks indicate that new package $newPackage cannot be an upgrade of existing package $oldPackage. Reason: ${upgradeError.prettyInternal}"
+              s"Upgrade checks indicate that new package $newPackage cannot be an upgrade of existing package $oldPackage. Reason: ${upgradeError.prettyInternal}"
             case TypecheckUpgrades.MinimalDarCheck =>
-              s"The uploaded DAR contains a package $oldPackage, but upgrade checks indicate that existing package $newPackage cannot be an upgrade of new package $oldPackage. Reason: ${upgradeError.prettyInternal}"
+              s"Upgrade checks indicate that existing package $newPackage cannot be an upgrade of new package $oldPackage. Reason: ${upgradeError.prettyInternal}"
           })
     }
 
@@ -285,7 +314,6 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
       """This error indicates that a package with name daml-prim that isn't a utility package was uploaded. All daml-prim packages should be utility packages.""""
     )
     @Resolution("Contact the supplier of the Dar.")
-    @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
     object UpgradeDamlPrimIsNotAUtilityPackage
         extends ErrorCode(
           id = "DAML_PRIM_NOT_UTILITY_PACKAGE",
@@ -294,8 +322,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
       final case class Error(
           uploadedPackage: Util.PkgIdWithNameAndVersion
       )(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause =
               s"Tried to upload a package $uploadedPackage, but this package is not a utility package. All packages named `daml-prim` must be a utility package.",
             extraContext = Map(
@@ -308,19 +336,19 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
       """This error indicates that the Dar upload failed upgrade checks because a package with the same version and package name has been previously uploaded."""
     )
     @Resolution("Inspect the error message and contact support.")
-    @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
     object UpgradeVersion
         extends ErrorCode(
           id = "KNOWN_DAR_VERSION",
           ErrorCategory.InvalidIndependentOfSystemState,
         ) {
+      @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
       final case class Error(
           uploadedPackage: Util.PkgIdWithNameAndVersion,
           existingPackage: Ref.PackageId,
           packageVersion: Ref.PackageVersion,
       )(implicit
-          val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(
+          val loggingContext: ErrorLoggingContext
+      ) extends ContextualizedDamlError(
             cause =
               s"Tried to upload package $uploadedPackage, but a different package $existingPackage with the same name and version has previously been uploaded.",
             extraContext = Map(

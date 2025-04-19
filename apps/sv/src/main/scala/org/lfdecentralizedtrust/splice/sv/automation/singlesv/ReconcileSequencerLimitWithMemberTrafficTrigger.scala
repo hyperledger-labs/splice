@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{SynchronizerId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -63,14 +63,14 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
           Future.successful(TaskSuccess(s"Skipping MemberTraffic with invalid memberId: ${err}"))
         },
         memberId => {
-          val domainId = DomainId.tryFromString(memberTraffic.payload.synchronizerId)
+          val synchronizerId = SynchronizerId.tryFromString(memberTraffic.payload.synchronizerId)
           val sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
-            domainId,
+            synchronizerId,
             sequencerAdminConnectionO,
             extraSynchronizerNodes,
           )
           sequencerAdminConnection.getStatus
-            .map(_.successOption.map(_.domainId))
+            .map(_.successOption.map(_.synchronizerId))
             .flatMap {
               case None =>
                 Future.failed(
@@ -78,11 +78,11 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                     .withDescription("Sequencer is not yet initialized")
                     .asRuntimeException()
                 )
-              case Some(sequencerDomainId) if sequencerDomainId != domainId =>
+              case Some(sequencerSynchronizerId) if sequencerSynchronizerId != synchronizerId =>
                 Future.failed(
                   Status.INTERNAL
                     .withDescription(
-                      s"The MemberTraffic contract domainId must match the connected domain ${sequencerDomainId}"
+                      s"The MemberTraffic contract synchronizerId must match the connected domain ${sequencerSynchronizerId}"
                     )
                     .asRuntimeException()
                 )
@@ -91,7 +91,9 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                   .getDsoRulesWithSvNodeStates()
                   .flatMap(rulesAndStates => {
                     if (
-                      rulesAndStates.activeSvParticipantAndMediatorIds(domainId).contains(memberId)
+                      rulesAndStates
+                        .activeSvParticipantAndMediatorIds(synchronizerId)
+                        .contains(memberId)
                     ) {
                       // SVs are granted unlimited traffic and do not need to purchase it via MemberTraffic contracts.
                       // While the top-up trigger for SV validators is disabled by default, we also explicitly ignore
@@ -108,7 +110,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                           .fold(0L)(_.consumedTraffic)
                       reconcileExtraTrafficLimitForMember(
                         memberId,
-                        domainId,
+                        synchronizerId,
                         trafficLimitOffset,
                         sequencerAdminConnection,
                       )
@@ -121,7 +123,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
 
   private def reconcileExtraTrafficLimitForMember(
       memberId: Member,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       trafficLimitOffset: Long,
       sequencerAdminConnection: SequencerAdminConnection,
   )(implicit tc: TraceContext): Future[TaskSuccess] = {
@@ -135,12 +137,12 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       case Some(trafficState) =>
         for {
           // Compute new extra traffic limit
-          totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
+          totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, synchronizerId)
           newExtraTrafficLimit = NonNegativeLong
             .tryCreate(trafficLimitOffset + totalPurchasedTraffic)
 
           // Get current sequencer domain state
-          sequencerDomainState <- sequencerAdminConnection.getSequencerDomainState()
+          sequencerSynchronizerState <- sequencerAdminConnection.getSequencerSynchronizerState()
           currentExtraTrafficLimit = trafficState.extraTrafficLimit
 
           // Compare and reconcile old and new limits
@@ -149,7 +151,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
               sequencerAdminConnection
                 .setSequencerTrafficControlState(
                   trafficState,
-                  sequencerDomainState,
+                  sequencerSynchronizerState,
                   newExtraTrafficLimit,
                   context.pollingClock,
                   trafficBalanceReconciliationDelay,

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
@@ -38,12 +38,13 @@ object ApproximateTime {
 
 final case class SequencedTime(value: CantonTimestamp) {
   def toApproximate: ApproximateTime = ApproximateTime(value)
-
+  def immediatePredecessor: SequencedTime = SequencedTime(value.immediatePredecessor)
   def toProtoPrimitive: ProtoTimestamp = value.toProtoTimestamp
   def toLf: LfTimestamp = value.toLf
 }
 object SequencedTime {
   val MinValue: SequencedTime = SequencedTime(CantonTimestamp.MinValue)
+  val MaxValue: SequencedTime = SequencedTime(CantonTimestamp.MaxValue)
   implicit val orderingSequencedTime: Ordering[SequencedTime] =
     Ordering.by[SequencedTime, CantonTimestamp](_.value)
   def fromProtoPrimitive(ts: ProtoTimestamp): ParsingResult[SequencedTime] =

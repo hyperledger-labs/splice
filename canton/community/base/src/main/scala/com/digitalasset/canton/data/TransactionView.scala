@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -6,7 +6,10 @@ package com.digitalasset.canton.data
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.data.ActionDescription.ExerciseActionDescription
+import com.digitalasset.canton.data.ActionDescription.{
+  ExerciseActionDescription,
+  FetchActionDescription,
+}
 import com.digitalasset.canton.data.TransactionView.{
   InvalidView,
   WithPath,
@@ -25,11 +28,13 @@ import com.google.common.annotations.VisibleForTesting
 import monocle.Lens
 import monocle.macros.GenLens
 
-/** A single view of a transaction, embedded in a Merkle tree.
-  * Nodes of the Merkle tree may or may not be blinded.
+/** A single view of a transaction, embedded in a Merkle tree. Nodes of the Merkle tree may or may
+  * not be blinded.
   *
-  * @param subviews the top-most subviews of this view
-  * @throws TransactionView$.InvalidView if the `viewCommonData` is unblinded and equals the `viewCommonData` of a direct subview
+  * @param subviews
+  *   the top-most subviews of this view
+  * @throws TransactionView$.InvalidView
+  *   if the `viewCommonData` is unblinded and equals the `viewCommonData` of a direct subview
   */
 final case class TransactionView private (
     viewCommonData: MerkleTree[ViewCommonData],
@@ -89,16 +94,16 @@ final case class TransactionView private (
 
   val viewHash: ViewHash = ViewHash.fromRootHash(rootHash)
 
-  /** Traverses all unblinded subviews `v1, v2, v3, ...` in pre-order and yields
-    * `f(...f(f(z, v1), v2)..., vn)`
+  /** Traverses all unblinded subviews `v1, v2, v3, ...` in pre-order and yields `f(...f(f(z, v1),
+    * v2)..., vn)`
     */
   def foldLeft[A](z: A)(f: (A, TransactionView) => A): A =
     subviews.unblindedElements
       .to(LazyList)
       .foldLeft(f(z, this))((acc, subView) => subView.foldLeft(acc)(f))
 
-  /** Yields all (direct and indirect) subviews of this view in pre-order.
-    * The first element is this view.
+  /** Yields all (direct and indirect) subviews of this view in pre-order. The first element is this
+    * view.
     */
   lazy val flatten: Seq[TransactionView] =
     foldLeft(Seq.newBuilder[TransactionView])((acc, v) => acc += v).result()
@@ -106,8 +111,8 @@ final case class TransactionView private (
   lazy val tryFlattenToParticipantViews: Seq[ParticipantTransactionView] =
     flatten.map(ParticipantTransactionView.tryCreate)
 
-  /** Yields all (direct and indirect) subviews of this view in pre-order, along with the subview position
-    * under the root view position `rootPos`. The first element is this view.
+  /** Yields all (direct and indirect) subviews of this view in pre-order, along with the subview
+    * position under the root view position `rootPos`. The first element is this view.
     */
   def allSubviewsWithPosition(rootPos: ViewPosition): Seq[(TransactionView, ViewPosition)] = {
     def helper(
@@ -147,9 +152,9 @@ final case class TransactionView private (
   ): TransactionView =
     copy(viewCommonData, viewParticipantData, subviews).tryValidated()
 
-  /** If the view with the given hash appears either as this view or one of its unblinded descendants,
-    * replace it by the given view.
-    * TODO(i12900): not stack safe unless we have limits on the depths of views.
+  /** If the view with the given hash appears either as this view or one of its unblinded
+    * descendants, replace it by the given view. TODO(i12900): not stack safe unless we have limits
+    * on the depths of views.
     */
   def replace(h: ViewHash, v: TransactionView): TransactionView =
     if (viewHash == h) v
@@ -161,11 +166,13 @@ final case class TransactionView private (
     subviews = Some(subviews.toProtoV30),
   )
 
-  /** The global key inputs that the [[com.digitalasset.daml.lf.transaction.ContractStateMachine]] computes
-    * while interpreting the root action of the view, enriched with the maintainers of the key and the
-    * [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used for serializing the key.
+  /** The global key inputs that the [[com.digitalasset.daml.lf.transaction.ContractStateMachine]]
+    * computes while interpreting the root action of the view, enriched with the maintainers of the
+    * key and the [[com.digitalasset.canton.protocol.LfLanguageVersion]] to be used for serializing
+    * the key.
     *
-    * @throws java.lang.IllegalStateException if the [[ViewParticipantData]] of this view or any subview is blinded
+    * @throws java.lang.IllegalStateException
+    *   if the [[ViewParticipantData]] of this view or any subview is blinded
     */
   def globalKeyInputs(implicit
       loggingContext: NamedLoggingContext
@@ -185,13 +192,14 @@ final case class TransactionView private (
         subviews.unblindedElements.foldLeft(viewParticipantData.resolvedKeysWithMaintainers) {
           (acc, subview) =>
             val subviewGki = subview.globalKeyInputs
-            MapsUtil.mergeWith(acc, subviewGki)((accRes, _subviewRes) => accRes)
+            MapsUtil.mergeWith(acc, subviewGki)((accRes, _) => accRes)
         }
     }
 
   /** The input contracts of the view (including subviews).
     *
-    * @throws java.lang.IllegalStateException if the [[ViewParticipantData]] of this view or any subview is blinded
+    * @throws java.lang.IllegalStateException
+    *   if the [[ViewParticipantData]] of this view or any subview is blinded
     */
   def inputContracts(implicit
       loggingContext: NamedLoggingContext
@@ -199,7 +207,8 @@ final case class TransactionView private (
 
   /** The contracts appearing in create nodes in the view (including subviews).
     *
-    * @throws java.lang.IllegalStateException if the [[ViewParticipantData]] of this view or any subview is blinded
+    * @throws java.lang.IllegalStateException
+    *   if the [[ViewParticipantData]] of this view or any subview is blinded
     */
   def createdContracts(implicit
       loggingContext: NamedLoggingContext
@@ -318,18 +327,17 @@ final case class TransactionView private (
 }
 
 object TransactionView
-    extends HasProtocolVersionedWithContextCompanion[
+    extends VersioningCompanionContext[
       TransactionView,
       (HashOps, ProtocolVersion),
     ] {
   override def name: String = "TransactionView"
-  override def supportedProtoVersions: SupportedProtoVersions =
-    SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ViewNode)(
-        supportedProtoVersion(_)(fromProtoV30),
-        _.toProtoV30.toByteString,
-      )
+  override def versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ViewNode)(
+      supportedProtoVersion(_)(fromProtoV30),
+      _.toProtoV30,
     )
+  )
 
   private def tryCreate(
       viewCommonData: MerkleTree[ViewCommonData],
@@ -344,7 +352,8 @@ object TransactionView
 
   /** Creates a view.
     *
-    * @throws InvalidView if the `viewCommonData` is unblinded and equals the `viewCommonData` of a direct subview
+    * @throws InvalidView
+    *   if the `viewCommonData` is unblinded and equals the `viewCommonData` of a direct subview
     */
   def tryCreate(hashOps: HashOps)(
       viewCommonData: MerkleTree[ViewCommonData],
@@ -378,7 +387,8 @@ object TransactionView
 
   /** Creates a view.
     *
-    * Yields `Left(...)` if the `viewCommonData` is unblinded and equals the `viewCommonData` of a direct subview
+    * Yields `Left(...)` if the `viewCommonData` is unblinded and equals the `viewCommonData` of a
+    * direct subview
     */
   def create(hashOps: HashOps)(
       viewCommonData: MerkleTree[ViewCommonData],
@@ -415,11 +425,11 @@ object TransactionView
     for {
       commonData <- MerkleTree.fromProtoOptionV30(
         protoView.viewCommonData,
-        ViewCommonData.fromByteString(expectedProtocolVersion)(hashOps),
+        ViewCommonData.fromByteString(expectedProtocolVersion, hashOps),
       )
       participantData <- MerkleTree.fromProtoOptionV30(
         protoView.viewParticipantData,
-        ViewParticipantData.fromByteString(expectedProtocolVersion)(hashOps),
+        ViewParticipantData.fromByteString(expectedProtocolVersion, hashOps),
       )
       subViews <- TransactionSubviews.fromProtoV30(context, protoView.subviews)
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
@@ -445,14 +455,23 @@ object TransactionView
     def validateExercise(
         parentExercise: ExerciseActionDescription,
         childExercises: Seq[WithPath[ExerciseActionDescription]],
+        childFetches: Seq[WithPath[FetchActionDescription]],
     ): Either[String, Unit] = {
       val parentPackages = parentExercise.packagePreference
-      childExercises
-        .map(_.map(_.packagePreference.removedAll(parentPackages).headOption))
-        .collectFirst { case WithPath(p, Some(k)) =>
-          s"Detected unexpected exercise package preference: $k at $p"
-        }
-        .toLeft(())
+      for {
+        _ <- childExercises
+          .map(_.map(_.packagePreference.removedAll(parentPackages).headOption))
+          .collectFirst { case WithPath(p, Some(k)) =>
+            s"Detected unexpected exercise package preference: $k at $p"
+          }
+          .toLeft(())
+        _ <- childFetches
+          .map(_.map(_.packagePreference.removedAll(parentPackages).headOption))
+          .collectFirst { case WithPath(p, Some(k)) =>
+            s"Detected unexpected fetch package preference: $k at $p"
+          }
+          .toLeft(())
+      } yield ()
     }
 
     parentData.actionDescription match {
@@ -461,6 +480,9 @@ object TransactionView
           ead,
           childData.map(_.map(_.actionDescription)).collect {
             case WithPath(p, e: ExerciseActionDescription) => WithPath(p, e)
+          },
+          childData.map(_.map(_.actionDescription)).collect {
+            case WithPath(p, e: FetchActionDescription) => WithPath(p, e)
           },
         )
       case _ => Either.unit

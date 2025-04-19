@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
 import com.digitalasset.canton.data.CantonTimestamp
+import io.grpc.Status
 
 final case class Reassignment[+E](
     updateId: String,
@@ -26,12 +27,20 @@ object Reassignment {
   private[splice] def fromProto(
       proto: multidomain.Reassignment
   ): Reassignment[ReassignmentEvent] = {
-    val event = proto.event match {
-      case multidomain.Reassignment.Event.UnassignedEvent(out) =>
+    // TODO(#18782) Support reassignment batching
+    val singleEvent = proto.events match {
+      case Seq(e) => e
+      case events =>
+        throw Status.INTERNAL
+          .withDescription(s"Reassignment batching is not currently supported: $events")
+          .asRuntimeException
+    }
+    val event = singleEvent.event match {
+      case multidomain.ReassignmentEvent.Event.Unassigned(out) =>
         ReassignmentEvent.Unassign.fromProto(out)
-      case multidomain.Reassignment.Event.AssignedEvent(in) =>
+      case multidomain.ReassignmentEvent.Event.Assigned(in) =>
         ReassignmentEvent.Assign.fromProto(in)
-      case multidomain.Reassignment.Event.Empty =>
+      case multidomain.ReassignmentEvent.Event.Empty =>
         throw new IllegalArgumentException("uninitialized transfer event")
     }
     val recordTime = CantonTimestamp

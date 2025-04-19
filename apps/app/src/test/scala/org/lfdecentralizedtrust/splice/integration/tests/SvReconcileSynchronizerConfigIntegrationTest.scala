@@ -20,8 +20,8 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     initDso()
 
     val decentralizedSynchronizerId =
-      inside(sv1Backend.participantClient.domains.list_connected()) { case Seq(domain) =>
-        domain.domainId
+      inside(sv1Backend.participantClient.synchronizers.list_connected()) { case Seq(domain) =>
+        domain.synchronizerId
       }
 
     val amuletConfig: AmuletConfig[USD] =
@@ -30,9 +30,9 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     clue("domain parameter is initialized") {
       eventually() {
         val trafficControlParameters =
-          sv1Backend.participantClientWithAdminToken.topology.domain_parameters
-            .get_dynamic_domain_parameters(decentralizedSynchronizerId)
-            .trafficControlParameters
+          sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
+            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+            .trafficControl
             .value
         trafficControlParameters.maxBaseTrafficAmount.value shouldBe
           amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount
@@ -107,9 +107,9 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     clue("domain parameter is reconciled") {
       eventually() {
         val trafficControlParameters =
-          sv1Backend.participantClientWithAdminToken.topology.domain_parameters
-            .get_dynamic_domain_parameters(decentralizedSynchronizerId)
-            .trafficControlParameters
+          sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
+            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+            .trafficControl
             .value
         trafficControlParameters.maxBaseTrafficAmount.value shouldBe
           amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1
@@ -144,6 +144,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     ),
     amuletConfig.tickDuration,
     amuletConfig.packageConfig,
+    java.util.Optional.empty(),
     java.util.Optional.empty(),
   )
 

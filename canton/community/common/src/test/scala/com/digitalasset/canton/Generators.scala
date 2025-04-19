@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -18,8 +18,8 @@ object Generators {
     Gen.stringOfN(256, Gen.alphaNumChar).map(ByteString.copyFromUtf8)
   )
 
-  implicit val applicationIdArb: Arbitrary[ApplicationId] = Arbitrary(
-    Gen.stringOfN(32, Gen.alphaNumChar).map(ApplicationId.assertFromString)
+  implicit val userIdArb: Arbitrary[UserId] = Arbitrary(
+    Gen.stringOfN(32, Gen.alphaNumChar).map(UserId.assertFromString)
   )
   implicit val commandIdArb: Arbitrary[CommandId] = Arbitrary(
     Gen.stringOfN(32, Gen.alphaNumChar).map(CommandId.assertFromString)

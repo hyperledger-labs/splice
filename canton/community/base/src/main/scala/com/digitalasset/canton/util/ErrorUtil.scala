@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -22,6 +22,12 @@ object ErrorUtil {
     result.toString
   }
 
+  def internalErrorGrpc(msg: String)(implicit loggingContext: ErrorLoggingContext): Nothing = {
+    val t = new StatusRuntimeException(Status.INTERNAL.withDescription(msg))
+    logInternalError(t)
+    throw t
+  }
+
   /** Logs and rethrows any throwable.
     */
   def withThrowableLogging[T](action: => T, valueOnThrowable: Option[T] = None)(implicit
@@ -31,7 +37,7 @@ object ErrorUtil {
       action
     } catch {
       case t: Throwable =>
-        loggingContext.logger.error("Unexpected exception", t)(loggingContext.traceContext)
+        loggingContext.error("Unexpected exception", t)
         valueOnThrowable match {
           case Some(value) if NonFatal(t) => value
           case Some(_) | None => throw t
@@ -41,7 +47,7 @@ object ErrorUtil {
   val internalErrorMessage: String = "An internal error has occurred."
 
   private def logInternalError(t: Throwable)(implicit loggingContext: ErrorLoggingContext): Unit =
-    loggingContext.logger.error(internalErrorMessage, t)(loggingContext.traceContext)
+    loggingContext.error(internalErrorMessage, t)
 
   /** Throws a throwable and logs it at ERROR level with proper formatting. */
   def internalError(t: Throwable)(implicit loggingContext: ErrorLoggingContext): Nothing = {
@@ -49,13 +55,8 @@ object ErrorUtil {
     throw t
   }
 
-  def internalErrorGrpc(msg: String)(implicit loggingContext: ErrorLoggingContext): Nothing = {
-    val t = new StatusRuntimeException(Status.INTERNAL.withDescription(msg))
-    logInternalError(t)
-    throw t
-  }
-
-  /** Wraps a throwable in [[scala.util.Failure]] and logs it at ERROR level with proper formatting */
+  /** Wraps a throwable in [[scala.util.Failure]] and logs it at ERROR level with proper formatting
+    */
   def internalErrorTry(
       t: Throwable
   )(implicit loggingContext: ErrorLoggingContext): Failure[Nothing] = {
@@ -85,8 +86,18 @@ object ErrorUtil {
   def invalidState(message: => String)(implicit loggingContext: ErrorLoggingContext): Nothing =
     internalError(new IllegalStateException(message))
 
-  /** Indicate an illegal state by logging an ERROR and return a IllegalStateException in a failed future.
-    * @return The throwable in a failed future.
+  /** Indicates an illegal argument by logging an ERROR and throw an IllegalArgumentException
+    * @throws java.lang.IllegalArgumentException
+    */
+  def invalidArgument(message: => String)(implicit
+      loggingContext: ErrorLoggingContext
+  ): Nothing =
+    internalError(new IllegalArgumentException(message))
+
+  /** Indicate an illegal state by logging an ERROR and return a IllegalStateException in a failed
+    * future.
+    * @return
+    *   The throwable in a failed future.
     */
   def invalidStateAsync(
       message: => String
@@ -94,7 +105,8 @@ object ErrorUtil {
     internalErrorAsync(new IllegalStateException(message))
 
   /** Log a throwable at ERROR level with proper formatting.
-    * @return The throwable in a failed future.
+    * @return
+    *   The throwable in a failed future.
     */
   def internalErrorAsync(
       t: Throwable
@@ -104,7 +116,8 @@ object ErrorUtil {
   }
 
   /** Log a throwable at ERROR level with proper formatting.
-    * @return The throwable in a failed [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]].
+    * @return
+    *   The throwable in a failed [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]].
     */
   def internalErrorAsyncShutdown(
       t: Throwable
@@ -113,21 +126,30 @@ object ErrorUtil {
     FutureUnlessShutdown.failed(t)
   }
 
-  /** If `condition` is not satisfied, log an ERROR and return a failed future with an [[java.lang.IllegalArgumentException]]
+  /** If `condition` is not satisfied, log an ERROR and return a failed future with an
+    * [[java.lang.IllegalArgumentException]]
     */
   def requireArgumentAsync(condition: Boolean, message: => String)(implicit
       loggingContext: ErrorLoggingContext
   ): Future[Unit] =
     if (condition) Future.unit else internalErrorAsync(new IllegalArgumentException(message))
 
-  /** If `condition` is not satisfied, log an ERROR and return a failed future with an [[java.lang.IllegalStateException]]
+  def requireArgumentAsyncShutdown(condition: Boolean, message: => String)(implicit
+      loggingContext: ErrorLoggingContext
+  ): FutureUnlessShutdown[Unit] =
+    if (condition) FutureUnlessShutdown.unit
+    else internalErrorAsyncShutdown(new IllegalArgumentException(message))
+
+  /** If `condition` is not satisfied, log an ERROR and return a failed future with an
+    * [[java.lang.IllegalStateException]]
     */
   def requireStateAsync(condition: Boolean, message: => String)(implicit
       loggingContext: ErrorLoggingContext
   ): Future[Unit] =
     if (condition) Future.unit else internalErrorAsync(new IllegalStateException(message))
 
-  /** If `condition` is not satisfied, log an ERROR and return a failed FutureUnlessShutdown with an [[java.lang.IllegalStateException]]
+  /** If `condition` is not satisfied, log an ERROR and return a failed FutureUnlessShutdown with an
+    * [[java.lang.IllegalStateException]]
     */
   def requireStateAsyncShutdown(condition: Boolean, message: => String)(implicit
       loggingContext: ErrorLoggingContext

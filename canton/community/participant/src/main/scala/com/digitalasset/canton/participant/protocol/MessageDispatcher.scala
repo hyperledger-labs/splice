@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -19,14 +19,14 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
-import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
+import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.protocol.reassignment.{
   AssignmentProcessor,
   UnassignmentProcessor,
 }
 import com.digitalasset.canton.participant.protocol.submission.{
-  InFlightSubmissionTracker,
+  InFlightSubmissionSynchronizerTracker,
   SequencedSubmission,
 }
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
@@ -38,12 +38,13 @@ import com.digitalasset.canton.protocol.{
   RequestAndRootHashMessage,
   RequestProcessor,
   RootHash,
+  messages,
 }
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
 import com.digitalasset.canton.topology.processing.{SequencedTime, TopologyTransactionProcessor}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{Checked, ErrorUtil}
@@ -53,10 +54,11 @@ import com.google.common.annotations.VisibleForTesting
 import com.google.rpc.status.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-/** Dispatches the incoming messages of the [[com.digitalasset.canton.sequencing.client.SequencerClient]]
-  * to the different processors. It also informs the [[conflictdetection.RequestTracker]] about the passing of time for messages
+/** Dispatches the incoming messages of the
+  * [[com.digitalasset.canton.sequencing.client.SequencerClient]] to the different processors. It
+  * also informs the [[conflictdetection.RequestTracker]] about the passing of time for messages
   * that are not processed by the [[TransactionProcessor]].
   */
 trait MessageDispatcher { this: NamedLogging =>
@@ -64,16 +66,18 @@ trait MessageDispatcher { this: NamedLogging =>
 
   protected def protocolVersion: ProtocolVersion
 
-  protected def domainId: DomainId
+  protected def synchronizerId: SynchronizerId
 
   protected def participantId: ParticipantId
 
-  protected type ProcessingResult
-  protected def doProcess[A](
-      kind: MessageKind[A],
-      run: => FutureUnlessShutdown[A],
-  ): FutureUnlessShutdown[ProcessingResult]
-  protected implicit def processingResultMonoid: Monoid[ProcessingResult]
+  protected type ProcessingAsyncResult
+  protected implicit def processingAsyncResultMonoid: Monoid[ProcessingAsyncResult]
+
+  protected type ProcessingResult = FutureUnlessShutdown[ProcessingAsyncResult]
+  protected def doProcess(
+      kind: MessageKind
+  ): ProcessingResult
+  protected def pureProcessingResult: ProcessingResult = Monoid[ProcessingResult].empty
 
   protected def requestTracker: RequestTracker
 
@@ -85,26 +89,19 @@ trait MessageDispatcher { this: NamedLogging =>
   protected def requestCounterAllocator: RequestCounterAllocator
   protected def recordOrderPublisher: RecordOrderPublisher
   protected def badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor
-  protected def repairProcessor: RepairProcessor
-  protected def inFlightSubmissionTracker: InFlightSubmissionTracker
-  protected def metrics: SyncDomainMetrics
+  protected def inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker
+  protected def metrics: ConnectedSynchronizerMetrics
 
   implicit protected val ec: ExecutionContext
 
   def handleAll(events: Traced[Seq[WithOpeningErrors[PossiblyIgnoredProtocolEvent]]]): HandlerResult
 
-  /** Returns a future that completes when all calls to [[handleAll]]
-    * whose returned [[scala.concurrent.Future]] has completed prior to this call have completed processing.
-    */
-  @VisibleForTesting
-  def flush(): Future[Unit]
-
   private def processAcsCommitmentEnvelope(
-      envelopes: List[DefaultOpenEnvelope],
+      envelopes: Seq[DefaultOpenEnvelope],
       sc: SequencerCounter,
       ts: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
-    val acsCommitments = envelopes.mapFilter(select[SignedProtocolMessage[AcsCommitment]])
+  )(implicit traceContext: TraceContext): ProcessingResult = {
+    val acsCommitments = envelopes.mapFilter(select[SignedProtocolMessage[messages.AcsCommitment]])
     if (acsCommitments.nonEmpty) {
       // When a participant receives an ACS commitment from a counter-participant, the counter-participant
       // expects to receive the corresponding commitment from the local participant.
@@ -117,14 +114,17 @@ trait MessageDispatcher { this: NamedLogging =>
       // It is nevertheless OK to schedule the empty ACS change
       // because we use a different tie breaker for the empty ACS commitment.
       // This is also why we must not tick the record order publisher here.
-      recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
-      doProcess(
-        AcsCommitment, {
-          logger.debug(s"Processing ACS commitments for timestamp $ts")
-          acsCommitmentProcessor(ts, Traced(acsCommitments))
-        },
-      )
-    } else FutureUnlessShutdown.pure(processingResultMonoid.empty)
+      FutureUnlessShutdown
+        .lift(
+          recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
+        )
+        .flatMap(_ =>
+          doProcess(AcsCommitment { () =>
+            logger.debug(s"Processing ACS commitments for timestamp $ts")
+            acsCommitmentProcessor(ts, Traced(acsCommitments))
+          })
+        )
+    } else pureProcessingResult
   }
 
   private def tryProtocolProcessor(
@@ -139,50 +139,44 @@ trait MessageDispatcher { this: NamedLogging =>
       )
 
   /** Rules for processing batches of envelopes:
-    * <ul>
-    *   <li>Identity transactions can be included in any batch of envelopes. They must be processed first.
-    *     <br/>
-    *     The identity processor ignores replayed or invalid transactions and merely logs an error.
-    *   </li>
-    *   <li>Acs commitments can be included in any batch of envelopes.
-    *     They must be processed before the requests and results to
-    *     meet the precondition of [[com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor]]'s `processBatch`
+    *   - Identity transactions can be included in any batch of envelopes. They must be processed
+    *     first. The identity processor ignores replayed or invalid transactions and merely logs an
+    *     error.
+    *   - Acs commitments can be included in any batch of envelopes. They must be processed before
+    *     the requests and results to meet the precondition of
+    *     [[com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor]]'s `processBatch`
     *     method.
-    *   </li>
-    *   <li>A [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] message should be sent only by the trusted mediator of the domain.
-    *     The mediator should never include further messages with a [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]].
-    *     So a participant accepts a [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]]
-    *     only if there are no other messages (except topology transactions and ACS commitments) in the batch.
-    *     Otherwise, the participant ignores the [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] and raises an alarm.
-    *   </li>
-    *   <li>
-    *     Request messages originate from untrusted participants.
-    *     If the batch contains exactly one [[com.digitalasset.canton.protocol.messages.RootHashMessage]]
-    *     that is sent to the participant and the mediator only,
-    *     the participant processes only request messages with the same root hash.
-    *     If there are no such root hash message or multiple thereof,
-    *     the participant does not process the request at all
-    *     because the mediator will reject the request as a whole.
-    *   </li>
-    *   <li>
-    *     We do not know the submitting member of a particular submission because such a submission may be sequenced through
-    *     an untrusted individual sequencer node (e.g., on a BFT domain). Such a sequencer node could lie about
-    *     the actual submitting member. These lies work even with signed submission requests
-    *     when an earlier submission request is replayed.
-    *     So we cannot rely on honest domain nodes sending their messages only once and instead must
-    *     deduplicate replays on the recipient side.
-    *   </li>
-    * </ul>
+    *   - A [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] message should
+    *     be sent only by the trusted mediator of the synchronizer. The mediator should never
+    *     include further messages with a
+    *     [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]]. So a participant
+    *     accepts a [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] only if
+    *     there are no other messages (except topology transactions and ACS commitments) in the
+    *     batch. Otherwise, the participant ignores the
+    *     [[com.digitalasset.canton.protocol.messages.ConfirmationResultMessage]] and raises an
+    *     alarm.
+    *   - Request messages originate from untrusted participants. If the batch contains exactly one
+    *     [[com.digitalasset.canton.protocol.messages.RootHashMessage]] that is sent to the
+    *     participant and the mediator only, the participant processes only request messages with
+    *     the same root hash. If there are no such root hash message or multiple thereof, the
+    *     participant does not process the request at all because the mediator will reject the
+    *     request as a whole.
+    *   - We do not know the submitting member of a particular submission because such a submission
+    *     may be sequenced through an untrusted individual sequencer node (e.g., on a BFT
+    *     synchronizer). Such a sequencer node could lie about the actual submitting member. These
+    *     lies work even with signed submission requests when an earlier submission request is
+    *     replayed. So we cannot rely on honest synchronizer nodes sending their messages only once
+    *     and instead must deduplicate replays on the recipient side.
     */
   protected def processBatch(
       eventE: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]]
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
+  )(implicit traceContext: TraceContext): ProcessingResult = {
     val deliver = eventE.event.content
     // TODO(#13883) Validate the topology timestamp
     // TODO(#13883) Centralize the topology timestamp constraints in a single place so that they are well-documented
-    val Deliver(sc, ts, _, _, batch, topologyTimestampO, _) = deliver
+    val Deliver(sc, _pts, ts, _, _, batch, topologyTimestampO, _) = deliver
 
-    val envelopesWithCorrectDomainId = filterBatchForDomainId(batch, sc, ts)
+    val envelopesWithCorrectSynchronizerId = filterBatchForSynchronizerId(batch, sc, ts)
 
     // Sanity check the batch
     // we can receive an empty batch if it was for a deliver we sent but were not a recipient
@@ -197,30 +191,25 @@ trait MessageDispatcher { this: NamedLogging =>
         sc,
         SequencedTime(ts),
         deliver.topologyTimestampO,
-        envelopesWithCorrectDomainId,
+        envelopesWithCorrectSynchronizerId,
       )
-      trafficResult <- processTraffic(ts, topologyTimestampO, envelopesWithCorrectDomainId)
-      acsCommitmentResult <- processAcsCommitmentEnvelope(envelopesWithCorrectDomainId, sc, ts)
-      // Make room for the repair requests that have been inserted before the current timestamp.
-      //
-      // Some sequenced events do not take this code path (e.g. deliver errors),
-      // but repair requests may still be tagged to their timestamp.
-      // We therefore wedge all of them in now before we possibly allocate a request counter for the current event.
-      // It is safe to not wedge repair requests with the sequenced events they're tagged to
-      // because wedging affects only request counter allocation.
-      repairProcessorResult <- repairProcessorWedging(ts)
+      trafficResult <- processTraffic(ts, topologyTimestampO, envelopesWithCorrectSynchronizerId)
+      acsCommitmentResult <- processAcsCommitmentEnvelope(
+        envelopesWithCorrectSynchronizerId,
+        sc,
+        ts,
+      )
       transactionReassignmentResult <- processTransactionAndReassignmentMessages(
         eventE,
         sc,
         ts,
-        envelopesWithCorrectDomainId,
+        envelopesWithCorrectSynchronizerId,
       )
     } yield Foldable[List].fold(
       List(
         identityResult,
         trafficResult,
         acsCommitmentResult,
-        repairProcessorResult,
         transactionReassignmentResult,
       )
     )
@@ -230,40 +219,40 @@ trait MessageDispatcher { this: NamedLogging =>
       sc: SequencerCounter,
       ts: SequencedTime,
       topologyTimestampO: Option[CantonTimestamp],
-      envelopes: List[DefaultOpenEnvelope],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] =
+      envelopes: Seq[DefaultOpenEnvelope],
+  )(implicit traceContext: TraceContext): ProcessingResult =
     doProcess(
-      TopologyTransaction,
-      topologyProcessor(sc, ts, topologyTimestampO, Traced(envelopes)),
+      TopologyTransaction(() => topologyProcessor(sc, ts, topologyTimestampO, Traced(envelopes)))
     )
 
   protected def processTraffic(
       ts: CantonTimestamp,
       timestampOfSigningKeyO: Option[CantonTimestamp],
-      envelopes: List[DefaultOpenEnvelope],
+      envelopes: Seq[DefaultOpenEnvelope],
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[ProcessingResult] =
+  ): ProcessingResult =
     doProcess(
-      TrafficControlTransaction,
-      trafficProcessor.processSetTrafficPurchasedEnvelopes(ts, timestampOfSigningKeyO, envelopes),
+      TrafficControlTransaction(() =>
+        trafficProcessor.processSetTrafficPurchasedEnvelopes(ts, timestampOfSigningKeyO, envelopes)
+      )
     )
 
   private def processTransactionAndReassignmentMessages(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
       sc: SequencerCounter,
       ts: CantonTimestamp,
-      envelopes: List[DefaultOpenEnvelope],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
+      envelopes: Seq[DefaultOpenEnvelope],
+  )(implicit traceContext: TraceContext): ProcessingResult = {
     def alarmIfNonEmptySigned(
-        kind: MessageKind[?],
+        viewType: ViewType,
         envelopes: Seq[
           OpenEnvelope[SignedProtocolMessage[HasRequestId & SignedProtocolMessageContent]]
         ],
     ): Unit =
       if (envelopes.nonEmpty) {
         val requestIds = envelopes.map(_.protocolMessage.message.requestId)
-        alarm(sc, ts, show"Received unexpected $kind for $requestIds").discard
+        alarm(sc, ts, show"Received unexpected $viewType for $requestIds").discard
       }
 
     // Extract the participant relevant messages from the batch. All other messages are ignored.
@@ -283,13 +272,13 @@ trait MessageDispatcher { this: NamedLogging =>
         val viewType = msg.protocolMessage.message.viewType
         val processor = tryProtocolProcessor(viewType)
 
-        doProcess(ResultKind(viewType), processor.processResult(event))
+        doProcess(ResultKind(viewType, () => processor.processResult(event)))
 
       case _ =>
         // Alarm about invalid confirmation result messages
-        confirmationResults.groupBy(_.protocolMessage.message.viewType).foreach {
-          case (viewType, messages) => alarmIfNonEmptySigned(ResultKind(viewType), messages)
-        }
+        confirmationResults
+          .groupBy(_.protocolMessage.message.viewType)
+          .foreach(alarmIfNonEmptySigned.tupled)
 
         val containsTopologyTransactions = DefaultOpenEnvelopesFilter.containsTopology(
           envelopes = envelopes,
@@ -309,22 +298,22 @@ trait MessageDispatcher { this: NamedLogging =>
   }
 
   private def processEncryptedViewsAndRootHashMessages(
-      encryptedViews: List[OpenEnvelope[EncryptedViewMessage[ViewType]]],
-      rootHashMessages: List[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
+      encryptedViews: Seq[OpenEnvelope[EncryptedViewMessage[ViewType]]],
+      rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
       containsTopologyTransactions: Boolean,
       sc: SequencerCounter,
       ts: CantonTimestamp,
       isReceipt: Boolean,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
+  )(implicit traceContext: TraceContext): ProcessingResult = {
     def withNewRequestCounter(
-        body: RequestCounter => FutureUnlessShutdown[ProcessingResult]
-    ): FutureUnlessShutdown[ProcessingResult] =
+        body: RequestCounter => ProcessingResult
+    ): ProcessingResult =
       requestCounterAllocator.allocateFor(sc) match {
         case Some(rc) => body(rc)
-        case None => FutureUnlessShutdown.pure(processingResultMonoid.empty)
+        case None => pureProcessingResult
       }
 
-    def processRequest(goodRequest: GoodRequest) =
+    def processRequest(goodRequest: GoodRequest): ProcessingResult =
       withNewRequestCounter { rc =>
         val rootHashMessage: goodRequest.rootHashMessage.type = goodRequest.rootHashMessage
         val viewType: rootHashMessage.viewType.type = rootHashMessage.viewType
@@ -337,8 +326,10 @@ trait MessageDispatcher { this: NamedLogging =>
           isReceipt,
         )
         doProcess(
-          RequestKind(goodRequest.rootHashMessage.viewType),
-          processor.processRequest(ts, rc, sc, batch),
+          RequestKind(
+            goodRequest.rootHashMessage.viewType,
+            () => processor.processRequest(ts, rc, sc, batch),
+          )
         )
       }
 
@@ -354,7 +345,7 @@ trait MessageDispatcher { this: NamedLogging =>
              * In order to safely drop the confirmation request, we must make sure that every other participant will be able to make
              * the same decision, otherwise we will break transparency.
              * Here, the decision is based on the fact that the batch contained a valid topology transaction. These transactions are
-             * addressed to `AllMembersOfDomain`, which by definition means that everyone will receive them.
+             * addressed to `AllMembersOfSynchronizer`, which by definition means that everyone will receive them.
              * Therefore, anyone who received this confirmation request has also received the topology transaction, and will
              * be able to make the same decision and drop the confirmation request.
              *
@@ -363,43 +354,43 @@ trait MessageDispatcher { this: NamedLogging =>
              * their sequencing time, but it would likely make the code more complicated than relying on the above argument.
              */
             alarm(sc, ts, "Invalid batch containing both a request and topology transaction")
-            tickRecordOrderPublisher(sc, ts)
+            pureProcessingResult
           } else
             processRequest(goodRequest)
 
         case Left(DoNotExpectMediatorResult) =>
-          if (containsTopologyTransactions) {
-            // The topology processor will tick the record order publisher at the end of the processing
-            doProcess(UnspecifiedMessageKind, FutureUnlessShutdown.pure(()))
-          } else
-            tickRecordOrderPublisher(sc, ts)
+          pureProcessingResult
+
         case Left(ExpectMalformedMediatorConfirmationRequestResult) =>
           // The request is malformed from this participant's and the mediator's point of view if the sequencer is honest.
           // An honest mediator will therefore try to send a `MalformedMediatorConfirmationRequestResult`.
           // We do not really care about the result though and just discard the request.
-          tickRecordOrderPublisher(sc, ts)
+          pureProcessingResult
+
         case Left(SendMalformedAndExpectMediatorResult(rootHash, mediator, reason)) =>
           // The request is malformed from this participant's point of view, but not necessarily from the mediator's.
           doProcess(
-            UnspecifiedMessageKind,
-            badRootHashMessagesRequestProcessor.sendRejectionAndTerminate(
-              sc,
-              ts,
-              rootHash,
-              mediator,
-              LocalRejectError.MalformedRejects.BadRootHashMessages.Reject(reason),
-            ),
+            UnspecifiedMessageKind(() =>
+              badRootHashMessagesRequestProcessor.sendRejectionAndTerminate(
+                ts,
+                rootHash,
+                mediator,
+                LocalRejectError.MalformedRejects.BadRootHashMessages.Reject(reason),
+              )
+            )
           )
       }
     } yield result
   }
 
   /** Checks the root hash messages and extracts the views with the correct view type.
-    * @return [[com.digitalasset.canton.util.Checked.Abort]] indicates a really malformed request and the appropriate reaction
+    * @return
+    *   [[com.digitalasset.canton.util.Checked.Abort]] indicates a really malformed request and the
+    *   appropriate reaction
     */
   private def checkRootHashMessageAndViews(
-      rootHashMessages: List[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
-      encryptedViews: List[OpenEnvelope[EncryptedViewMessage[ViewType]]],
+      rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
+      encryptedViews: Seq[OpenEnvelope[EncryptedViewMessage[ViewType]]],
   )(implicit
       traceContext: TraceContext
   ): Checked[FailedRootHashMessageCheck, String, GoodRequest] = for {
@@ -428,18 +419,20 @@ trait MessageDispatcher { this: NamedLogging =>
     )
   } yield goodRequest
 
-  /** Return only the root hash messages sent to a mediator, along with the mediator group recipient.
-    * The mediator group recipient can be `None` if there is no root hash message sent to a mediator group.
-    * @throws IllegalArgumentException if there are root hash messages that address more than one mediator group.
+  /** Return only the root hash messages sent to a mediator, along with the mediator group
+    * recipient. The mediator group recipient can be `None` if there is no root hash message sent to
+    * a mediator group.
+    * @throws IllegalArgumentException
+    *   if there are root hash messages that address more than one mediator group.
     */
   private def filterRootHashMessagesToMediator(
-      rootHashMessages: List[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
-      encryptedViews: List[OpenEnvelope[EncryptedViewMessage[ViewType]]],
+      rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
+      encryptedViews: Seq[OpenEnvelope[EncryptedViewMessage[ViewType]]],
   )(implicit traceContext: TraceContext): Checked[
     Nothing,
     String,
     (
-        List[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
+        Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
         Option[MediatorGroupRecipient],
     ),
   ] = {
@@ -465,10 +458,10 @@ trait MessageDispatcher { this: NamedLogging =>
 
     if (allMediators.sizeCompare(1) > 0 && encryptedViews.nonEmpty) {
       // TODO(M99) The sequencer should have checked that no participant can send such a request.
-      //  Honest nodes of the domain should not send such a request either
+      //  Honest nodes of the synchronizer should not send such a request either
       //  (though they do send other batches to several mediators, e.g., topology updates).
-      //  So the domain nodes or the sequencer are malicious.
-      //  Handle this case of dishonest domain nodes more gracefully.
+      //  So the synchronizer nodes or the sequencer are malicious.
+      //  Handle this case of dishonest synchronizer nodes more gracefully.
       ErrorUtil.internalError(
         new IllegalArgumentException(
           s"Received batch with encrypted views and root hash messages addressed to multiple mediators: $allMediators"
@@ -488,7 +481,7 @@ trait MessageDispatcher { this: NamedLogging =>
   }
 
   def checkSingleRootHashMessage(
-      rootHashMessages: List[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
+      rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
       hasEncryptedViews: Boolean,
   ): Checked[FailedRootHashMessageCheck, String, OpenEnvelope[
     RootHashMessage[SerializedRootHashMessagePayload]
@@ -521,12 +514,12 @@ trait MessageDispatcher { this: NamedLogging =>
         )
     }
 
-  /** Check that we received encrypted views with the same view type as the root hash message.
-    * If there is no such view, return an aborting error; otherwise return those views.
-    * Also return non-aborting errors for the other received view types (if any).
+  /** Check that we received encrypted views with the same view type as the root hash message. If
+    * there is no such view, return an aborting error; otherwise return those views. Also return
+    * non-aborting errors for the other received view types (if any).
     */
   private def checkEncryptedViewsForRootHashMessage(
-      encryptedViews: List[OpenEnvelope[EncryptedViewMessage[ViewType]]],
+      encryptedViews: Seq[OpenEnvelope[EncryptedViewMessage[ViewType]]],
       rootHashMessage: RootHashMessage[SerializedRootHashMessagePayload],
       mediator: MediatorGroupRecipient,
   ): Checked[SendMalformedAndExpectMediatorResult, String, GoodRequest] = {
@@ -568,26 +561,27 @@ trait MessageDispatcher { this: NamedLogging =>
     badEncryptedViewsC.flatMap((_: Unit) => goodEncryptedViewsC)
   }
 
-  protected def repairProcessorWedging(
-      upToExclusive: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
-    lazy val future = FutureUnlessShutdown.pure {
-      repairProcessor.wedgeRepairRequests(upToExclusive)
-    }
-    doProcess(UnspecifiedMessageKind, future)
-  }
-
   protected def observeSequencing(
       events: Seq[RawProtocolEvent]
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
+  )(implicit traceContext: TraceContext): ProcessingResult = {
     val receipts = events.mapFilter {
-      case Deliver(counter, timestamp, _domainId, messageIdO, _batch, _, _) =>
+      case Deliver(
+            counter,
+            _previousTimestamp,
+            timestamp,
+            _synchronizerId,
+            messageIdO,
+            _batch,
+            _,
+            _,
+          ) =>
         // The event was submitted by the current participant iff the message ID is set.
-        messageIdO.map(_ -> SequencedSubmission(counter, timestamp))
+        messageIdO.map(_ -> SequencedSubmission(timestamp))
       case DeliverError(
             _counter,
+            _previousTimestamp,
             _timestamp,
-            _domainId,
+            _synchronizerId,
             _messageId,
             _reason,
             _trafficReceipt,
@@ -605,45 +599,32 @@ trait MessageDispatcher { this: NamedLogging =>
       case (map, receipt) => map + receipt
     }
     doProcess(
-      DeliveryMessageKind,
-      inFlightSubmissionTracker.observeSequencing(domainId, receiptsMap),
+      DeliveryMessageKind(() =>
+        inFlightSubmissionSynchronizerTracker.observeSequencing(receiptsMap)
+      )
     )
   }
 
   protected def observeDeliverError(
       error: DeliverError
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] =
+  )(implicit traceContext: TraceContext): ProcessingResult =
     doProcess(
-      DeliveryMessageKind,
-      inFlightSubmissionTracker.observeDeliverError(error),
+      DeliveryMessageKind(() => inFlightSubmissionSynchronizerTracker.observeDeliverError(error))
     )
 
-  private def tickRecordOrderPublisher(sc: SequencerCounter, ts: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[ProcessingResult] = {
-    lazy val future = FutureUnlessShutdown.outcomeF {
-      recordOrderPublisher.tick(sc, ts, eventO = None, requestCounterO = None)
-    }
-    doProcess(UnspecifiedMessageKind, future)
-  }
-
-  protected def filterBatchForDomainId(
+  protected def filterBatchForSynchronizerId(
       batch: Batch[DefaultOpenEnvelope],
       sc: SequencerCounter,
       ts: CantonTimestamp,
-  )(implicit traceContext: TraceContext): List[DefaultOpenEnvelope] =
-    ProtocolMessage.filterDomainsEnvelopes(
-      batch,
-      domainId,
-      (wrongMsgs: List[DefaultOpenEnvelope]) => {
-        alarm(
-          sc,
-          ts,
-          s"Received messages with wrong domain IDs ${wrongMsgs.map(_.protocolMessage.domainId)}. Discarding them.",
-        ).discard
-        ()
-      },
-    )
+  )(implicit traceContext: TraceContext): Seq[DefaultOpenEnvelope] =
+    ProtocolMessage.filterSynchronizerEnvelopes(batch.envelopes, synchronizerId) { wrongMsgs =>
+      alarm(
+        sc,
+        ts,
+        s"Received messages with wrong synchronizer ids ${wrongMsgs.map(_.protocolMessage.synchronizerId)}. Discarding them.",
+      ).discard
+      ()
+    }
 
   protected def alarm(sc: SequencerCounter, ts: CantonTimestamp, msg: String)(implicit
       traceContext: TraceContext
@@ -696,11 +677,25 @@ trait MessageDispatcher { this: NamedLogging =>
 
 private[participant] object MessageDispatcher {
 
+  final case class TickDecision(
+      tickTopologyProcessor: Boolean = true,
+      tickRequestTracker: Boolean = true,
+      tickRecordOrderPublisher: Boolean = true,
+  ) {
+
+    /** Not ticking always wins */
+    def combine(other: TickDecision): TickDecision = TickDecision(
+      tickTopologyProcessor = tickTopologyProcessor && other.tickTopologyProcessor,
+      tickRequestTracker = tickRequestTracker && other.tickRequestTracker,
+      tickRecordOrderPublisher = tickRecordOrderPublisher && other.tickRecordOrderPublisher,
+    )
+  }
+
   type ParticipantTopologyProcessor = (
       SequencerCounter,
       SequencedTime,
       Option[CantonTimestamp],
-      Traced[List[DefaultOpenEnvelope]],
+      Traced[Seq[DefaultOpenEnvelope]],
   ) => HandlerResult
 
   trait RequestProcessors {
@@ -735,26 +730,28 @@ private[participant] object MessageDispatcher {
     }
   }
 
-  /** @tparam A The type returned by processors for the given kind
+  /** @tparam A
+    *   The type returned by processors for the given kind
     */
-  sealed trait MessageKind[A] extends Product with Serializable with PrettyPrinting {
+  sealed trait MessageKind extends Product with Serializable with PrettyPrinting {
     override protected def pretty: Pretty[MessageKind.this.type] =
       prettyOfObject[MessageKind.this.type]
   }
 
-  case object TopologyTransaction extends MessageKind[AsyncResult]
-  case object TrafficControlTransaction extends MessageKind[Unit]
-  final case class RequestKind(viewType: ViewType) extends MessageKind[AsyncResult] {
+  final case class TopologyTransaction(run: () => HandlerResult) extends MessageKind
+  final case class TrafficControlTransaction(runSync: () => FutureUnlessShutdown[Unit])
+      extends MessageKind
+  final case class RequestKind(viewType: ViewType, run: () => HandlerResult) extends MessageKind {
     override protected def pretty: Pretty[RequestKind] = prettyOfParam(_.viewType)
   }
-  final case class ResultKind(viewType: ViewType) extends MessageKind[AsyncResult] {
+  final case class ResultKind(viewType: ViewType, run: () => HandlerResult) extends MessageKind {
     override protected def pretty: Pretty[ResultKind] = prettyOfParam(_.viewType)
   }
-  case object AcsCommitment extends MessageKind[Unit]
-  case object MalformedMessage extends MessageKind[Unit]
-  case object UnspecifiedMessageKind extends MessageKind[Unit]
-  case object CausalityMessageKind extends MessageKind[Unit]
-  case object DeliveryMessageKind extends MessageKind[Unit]
+  final case class AcsCommitment(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
+  final case class MalformedMessage(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
+  final case class UnspecifiedMessageKind(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
+  final case class CausalityMessageKind(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
+  final case class DeliveryMessageKind(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
 
   @VisibleForTesting
   private[protocol] sealed trait FailedRootHashMessageCheck extends Product with Serializable
@@ -773,7 +770,7 @@ private[participant] object MessageDispatcher {
   trait Factory[+T <: MessageDispatcher] {
     def create(
         protocolVersion: ProtocolVersion,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         participantId: ParticipantId,
         requestTracker: RequestTracker,
         requestProcessors: RequestProcessors,
@@ -783,15 +780,14 @@ private[participant] object MessageDispatcher {
         requestCounterAllocator: RequestCounterAllocator,
         recordOrderPublisher: RecordOrderPublisher,
         badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
-        repairProcessor: RepairProcessor,
-        inFlightSubmissionTracker: InFlightSubmissionTracker,
+        inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
         loggerFactory: NamedLoggerFactory,
-        metrics: SyncDomainMetrics,
+        metrics: ConnectedSynchronizerMetrics,
     )(implicit ec: ExecutionContext, tracer: Tracer): T
 
     def create(
         protocolVersion: ProtocolVersion,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         participantId: ParticipantId,
         requestTracker: RequestTracker,
         transactionProcessor: TransactionProcessor,
@@ -803,10 +799,9 @@ private[participant] object MessageDispatcher {
         requestCounterAllocator: RequestCounterAllocator,
         recordOrderPublisher: RecordOrderPublisher,
         badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
-        repairProcessor: RepairProcessor,
-        inFlightSubmissionTracker: InFlightSubmissionTracker,
+        inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
         loggerFactory: NamedLoggerFactory,
-        metrics: SyncDomainMetrics,
+        metrics: ConnectedSynchronizerMetrics,
     )(implicit ec: ExecutionContext, tracer: Tracer): T = {
       val requestProcessors = new RequestProcessors {
         override def getInternal[P](viewType: ViewType { type Processor = P }): Option[P] =
@@ -820,7 +815,7 @@ private[participant] object MessageDispatcher {
 
       create(
         protocolVersion,
-        domainId,
+        synchronizerId,
         participantId,
         requestTracker,
         requestProcessors,
@@ -830,8 +825,7 @@ private[participant] object MessageDispatcher {
         requestCounterAllocator,
         recordOrderPublisher,
         badRootHashMessagesRequestProcessor,
-        repairProcessor,
-        inFlightSubmissionTracker,
+        inFlightSubmissionSynchronizerTracker,
         loggerFactory,
         metrics,
       )

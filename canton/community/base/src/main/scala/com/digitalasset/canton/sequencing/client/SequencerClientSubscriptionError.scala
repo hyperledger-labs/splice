@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -36,7 +36,9 @@ object SequencerClientSubscriptionError {
       prettyOfClass(param("reason", _.reason.unquoted))
   }
 
-  /** The application handler threw an exception while processing the event (synchronously or asynchronously) */
+  /** The application handler threw an exception while processing the event (synchronously or
+    * asynchronously)
+    */
   final case class ApplicationHandlerException(
       exception: Throwable,
       firstSequencerCounter: SequencerCounter,

@@ -1,19 +1,26 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
-import com.daml.error.*
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.base.error.{
+  Alarm,
+  AlarmErrorCode,
+  ErrorCategory,
+  ErrorCode,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.InteractiveSubmission.TransactionMetadataForHashing
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.data.ViewType.TransactionViewType
+import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries}
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.SubmissionErrorGroup
 import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors
@@ -21,7 +28,6 @@ import com.digitalasset.canton.ledger.participant.state.{ChangeId, SubmitterInfo
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.metrics.TransactionProcessingMetrics
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.WrapsProcessorError
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.ProcessorError
@@ -29,15 +35,16 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.Transac
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.TransactionConfirmationRequestCreationError
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.PackageUnknownTo
 import com.digitalasset.canton.participant.protocol.submission.{
-  InFlightSubmissionTracker,
+  InFlightSubmissionSynchronizerTracker,
   TransactionConfirmationRequestFactory,
 }
 import com.digitalasset.canton.participant.protocol.validation.{
+  AuthorizationValidator,
   InternalConsistencyChecker,
   ModelConformanceChecker,
-  TransactionConfirmationResponseFactory,
+  TransactionConfirmationResponsesFactory,
 }
-import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
+import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
@@ -46,7 +53,8 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.hash.HashTracer.NoOp
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -58,14 +66,13 @@ import scala.concurrent.ExecutionContext
 class TransactionProcessor(
     override val participantId: ParticipantId,
     confirmationRequestFactory: TransactionConfirmationRequestFactory,
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     damle: DAMLe,
-    staticDomainParameters: StaticDomainParameters,
-    parameters: ParticipantNodeParameters,
-    crypto: DomainSyncCryptoClient,
+    staticSynchronizerParameters: StaticSynchronizerParameters,
+    crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClient,
-    inFlightSubmissionTracker: InFlightSubmissionTracker,
-    ephemeral: SyncDomainEphemeralState,
+    inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
+    ephemeral: SyncEphemeralState,
     commandProgressTracker: CommandProgressTracker,
     metrics: TransactionProcessingMetrics,
     override protected val timeouts: ProcessingTimeout,
@@ -82,44 +89,43 @@ class TransactionProcessor(
       TransactionProcessor.TransactionSubmissionError,
     ](
       new TransactionProcessingSteps(
-        domainId,
+        synchronizerId,
         participantId,
         confirmationRequestFactory,
-        new TransactionConfirmationResponseFactory(
+        new TransactionConfirmationResponsesFactory(
           participantId,
-          domainId,
-          staticDomainParameters.protocolVersion,
+          synchronizerId,
+          staticSynchronizerParameters.protocolVersion,
           loggerFactory,
         ),
         ModelConformanceChecker(
           damle,
           confirmationRequestFactory.transactionTreeFactory,
-          SerializableContractAuthenticator(crypto.pureCrypto),
+          ContractAuthenticator(crypto.pureCrypto),
           participantId,
           packageResolver,
           loggerFactory,
         ),
-        staticDomainParameters,
+        staticSynchronizerParameters,
         crypto,
-        ephemeral.contractStore,
         metrics,
-        SerializableContractAuthenticator(crypto.pureCrypto),
-        new AuthenticationValidator(loggerFactory, damle.enrichTransaction),
-        new AuthorizationValidator(participantId, parameters.enableExternalAuthorization),
+        ContractAuthenticator(crypto.pureCrypto),
+        damle.enrichTransaction,
+        damle.enrichCreateNode,
+        new AuthorizationValidator(participantId),
         new InternalConsistencyChecker(
-          staticDomainParameters.protocolVersion,
-          loggerFactory,
+          loggerFactory
         ),
         commandProgressTracker,
         loggerFactory,
         futureSupervisor,
       ),
-      inFlightSubmissionTracker,
+      inFlightSubmissionSynchronizerTracker,
       ephemeral,
       crypto,
       sequencerClient,
-      domainId,
-      staticDomainParameters.protocolVersion,
+      synchronizerId,
+      staticSynchronizerParameters.protocolVersion,
       loggerFactory,
       futureSupervisor,
       promiseFactory,
@@ -129,13 +135,13 @@ class TransactionProcessor(
       submissionParam: TransactionProcessingSteps.SubmissionParam
   ): MetricsContext =
     MetricsContext(
-      "application-id" -> submissionParam.submitterInfo.applicationId,
+      "user-id" -> submissionParam.submitterInfo.userId,
       "type" -> "send-confirmation-request",
     )
 
   override protected def preSubmissionValidations(
       params: TransactionProcessingSteps.SubmissionParam,
-      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
@@ -144,6 +150,7 @@ class TransactionProcessor(
       params.transaction,
       params.submitterInfo,
       params.disclosedContracts,
+      params.transactionMeta.timeBoundaries,
       cryptoSnapshot,
       protocolVersion,
     )
@@ -155,7 +162,8 @@ class TransactionProcessor(
       wfTransaction: WellFormedTransaction[WithoutSuffixes],
       submitterInfo: SubmitterInfo,
       disclosedContracts: Map[LfContractId, SerializableContract],
-      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+      timeBoundaries: LedgerTimeBoundaries,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
@@ -171,10 +179,8 @@ class TransactionProcessor(
             commandId = submitterInfo.commandId,
             transactionUUID = externallySignedSubmission.transactionUUID,
             mediatorGroup = externallySignedSubmission.mediatorGroup.value,
-            domainId = domainId,
-            ledgerEffectiveTime = Option.when(externallySignedSubmission.usesLedgerEffectiveTime)(
-              wfTransaction.metadata.ledgerTime.toLf
-            ),
+            synchronizerId = synchronizerId,
+            timeBoundaries = timeBoundaries,
             submissionTime = wfTransaction.metadata.submissionTime.toLf,
             disclosedContracts = disclosedContracts,
           ),
@@ -215,6 +221,7 @@ class TransactionProcessor(
       keyResolver: LfKeyResolver,
       transaction: WellFormedTransaction[WithoutSuffixes],
       disclosedContracts: Map[LfContractId, SerializableContract],
+      topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -229,7 +236,8 @@ class TransactionProcessor(
         keyResolver,
         transaction,
         disclosedContracts,
-      )
+      ),
+      topologySnapshot,
     )
 }
 
@@ -243,18 +251,10 @@ object TransactionProcessor {
     override def underlyingProcessorError(): Option[ProcessorError] = None
   }
 
-  trait TransactionSubmissionError extends TransactionProcessorError with TransactionError {
-    override protected def pretty: Pretty[TransactionSubmissionError] =
-      this.prettyOfString(_ =>
-        this.code.toMsg(
-          cause,
-          correlationId = None,
-          limit = None,
-        ) + "; " + ContextualizedErrorLogger.formatContextAsString(
-          context
-        )
-      )
-  }
+  trait TransactionSubmissionError
+      extends TransactionProcessorError
+      with TransactionError
+      with TransactionErrorPrettyPrinting
 
   object SubmissionErrors extends SubmissionErrorGroup {
 
@@ -297,15 +297,15 @@ object TransactionProcessor {
 
     @Explanation(
       """This error occurs if a transaction was submitted referring to a contract that
-        |is not known on the domain. This can occur in case of race conditions between a transaction and
+        |is not known on the synchronizer. This can occur in case of race conditions between a transaction and
         |an archival or unassignment."""
     )
     @Resolution(
-      """Check domain for submission and/or re-submit the transaction."""
+      """Check synchronizer for submission and/or re-submit the transaction."""
     )
-    object UnknownContractDomain
+    object UnknownContractSynchronizer
         extends ErrorCode(
-          id = "UNKNOWN_CONTRACT_DOMAIN",
+          id = "UNKNOWN_CONTRACT_SYNCHRONIZER",
           ErrorCategory.InvalidGivenCurrentSystemStateOther,
         ) {
       final case class Error(contractId: LfContractId)
@@ -361,7 +361,7 @@ object TransactionProcessor {
     final case class SubmissionAlreadyInFlight(
         changeId: ChangeId,
         existingSubmissionId: Option[LedgerSubmissionId],
-        existingSubmissionDomain: DomainId,
+        existingSubmissionSynchronizerId: SynchronizerId,
     ) extends TransactionErrorImpl(cause = "The submission is already in-flight")(
           ConsistencyErrors.SubmissionAlreadyInFlight.code
         )
@@ -371,13 +371,16 @@ object TransactionProcessor {
       """This error occurs when the sequencer refuses to accept a command due to backpressure."""
     )
     @Resolution("Wait a bit and retry, preferably with some backoff factor.")
-    object DomainBackpressure
-        extends ErrorCode(id = "DOMAIN_BACKPRESSURE", ErrorCategory.ContentionOnSharedResources) {
+    object SequencerBackpressure
+        extends ErrorCode(
+          id = "SEQUENCER_BACKPRESSURE",
+          ErrorCategory.ContentionOnSharedResources,
+        ) {
       override def logLevel: Level = Level.INFO
 
       final case class Rejection(reason: String)
           extends TransactionErrorImpl(
-            cause = "The domain is overloaded.",
+            cause = "The sequencer is overloaded.",
             // Only reported asynchronously, so covered by submission rank guarantee
             definiteAnswer = true,
           )
@@ -418,14 +421,14 @@ object TransactionProcessor {
           with TransactionSubmissionError
     }
 
-    @Explanation("""This error occurs when the command cannot be sent to the domain.""")
+    @Explanation("""This error occurs when the command cannot be sent to the synchronizer.""")
     object SequencerRequest
         extends ErrorCode(
           id = "SEQUENCER_REQUEST_FAILED",
           ErrorCategory.ContentionOnSharedResources,
         ) {
       // TODO(i5990) proper send async client errors
-      //  SendAsyncClientError.RequestRefused(SendAsyncError.Overloaded) is already mapped to DomainBackpressure
+      //  SendAsyncClientError.RequestRefused(SendAsyncError.Overloaded) is already mapped to SequencerBackpressure
       final case class Error(sendError: SendAsyncClientError)
           extends TransactionErrorImpl(
             cause = "Failed to send command",
@@ -444,7 +447,7 @@ object TransactionProcessor {
       """Resubmit if the delay is caused by high load.
         |If the command requires substantial processing on the participant,
         |specify a higher minimum ledger time with the command submission so that a higher max sequencing time is derived.
-        |Alternatively, you can increase the dynamic domain parameter ledgerTimeRecordTimeTolerance.
+        |Alternatively, you can increase the dynamic synchronizer parameter ledgerTimeRecordTimeTolerance.
         |"""
     )
     object TimeoutError
@@ -457,16 +460,20 @@ object TransactionProcessor {
           with TransactionSubmissionError
     }
 
-    @Explanation("The participant routed the transaction to a domain without an active mediator.")
-    @Resolution("Add a mediator to the domain.")
-    object DomainWithoutMediatorError
+    @Explanation(
+      "The participant routed the transaction to a synchronizer without an active mediator."
+    )
+    @Resolution("Add a mediator to the synchronizer.")
+    object SynchronizerWithoutMediatorError
         extends ErrorCode(
-          id = "DOMAIN_WITHOUT_MEDIATOR",
+          id = "SYNCHRONIZER_WITHOUT_MEDIATOR",
           ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ) {
-      final case class Error(topology_snapshot_timestamp: CantonTimestamp, chosen_domain: DomainId)
-          extends TransactionErrorImpl(
-            cause = "There are no active mediators on the domain"
+      final case class Error(
+          topologySnapshotTimestamp: CantonTimestamp,
+          chosenSynchronizerId: SynchronizerId,
+      ) extends TransactionErrorImpl(
+            cause = "There are no active mediators on the synchronizer"
           )
           with TransactionSubmissionError
     }
@@ -511,7 +518,7 @@ object TransactionProcessor {
         ) {
       final case class Error(chosen_mediator: MediatorGroupRecipient, timestamp: CantonTimestamp)
           extends TransactionErrorImpl(
-            cause = "the chosen mediator is not active on the domain"
+            cause = "the chosen mediator is not active on the synchronizer"
           )
     }
 
@@ -533,10 +540,10 @@ object TransactionProcessor {
     }
   }
 
-  final case class DomainParametersError(domainId: DomainId, context: String)
+  final case class SynchronizerParametersError(synchronizerId: SynchronizerId, context: String)
       extends TransactionProcessorError {
-    override protected def pretty: Pretty[DomainParametersError] = prettyOfClass(
-      param("domain", _.domainId),
+    override protected def pretty: Pretty[SynchronizerParametersError] = prettyOfClass(
+      param("synchronizer", _.synchronizerId),
       param("context", _.context.unquoted),
     )
   }

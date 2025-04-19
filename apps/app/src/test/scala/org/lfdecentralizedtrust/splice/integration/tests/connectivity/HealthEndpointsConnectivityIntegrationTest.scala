@@ -1,18 +1,12 @@
 package org.lfdecentralizedtrust.splice.integration.tests.connectivity
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 
 class HealthEndpointsConnectivityIntegrationTest extends IntegrationTest {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withManualStart

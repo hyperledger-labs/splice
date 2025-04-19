@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -9,6 +9,7 @@ import cats.syntax.functorFilter.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameView}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.topology.ParticipantId
@@ -17,16 +18,19 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LfTransactionUtil
 import com.digitalasset.daml.lf.transaction.NodeId
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 case object TransactionViewDecompositionFactory {
 
   /** Keeps track of the state of the transaction view tree.
     *
-    * @param views chains `NewView` and `SameView` as they get created to construct a transaction view tree
-    * @param informees is used to aggregate the informees' partyId until a NewView is created
-    * @param quorums is used to aggregate the different quorums (originated from the different ActionNodes) until a
-    *                NewView is created
+    * @param views
+    *   chains `NewView` and `SameView` as they get created to construct a transaction view tree
+    * @param informees
+    *   is used to aggregate the informees' partyId until a NewView is created
+    * @param quorums
+    *   is used to aggregate the different quorums (originated from the different ActionNodes) until
+    *   a NewView is created
     */
   final private case class BuildState[V](
       views: Chain[V] = Chain.empty,
@@ -181,12 +185,12 @@ case object TransactionViewDecompositionFactory {
       transaction: WellFormedTransaction[WithoutSuffixes],
       viewRbContext: RollbackContext,
       submittingAdminPartyO: Option[LfPartyId],
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Seq[NewView]] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): FutureUnlessShutdown[Seq[NewView]] = {
 
     val tx: LfVersionedTransaction = transaction.unwrap
     val rootNodes = tx.roots.toSeq
 
-    val policyMapF: Iterable[Future[(NodeId, ActionNodeInfo)]] =
+    val policyMapF: Iterable[FutureUnlessShutdown[(NodeId, ActionNodeInfo)]] =
       tx.nodes.collect { case (nodeId, node: LfActionNode) =>
         val childNodeIds = node match {
           case e: LfNodeExercises => e.children.toSeq
@@ -207,7 +211,7 @@ case object TransactionViewDecompositionFactory {
         )
       }
 
-    Future.sequence(policyMapF).map(_.toMap).map { policyMap =>
+    FutureUnlessShutdown.sequence(policyMapF).map(_.toMap).map { policyMap =>
       Builder(tx.nodes, policyMap)
         .builds(rootNodes, BuildState[NewView](rollbackContext = viewRbContext))
         .views
@@ -222,7 +226,10 @@ case object TransactionViewDecompositionFactory {
       nodeId: LfNodeId,
       childNodeIds: Seq[LfNodeId],
       transaction: WellFormedTransaction[WithoutSuffixes],
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[(LfNodeId, ActionNodeInfo)] = {
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): FutureUnlessShutdown[(LfNodeId, ActionNodeInfo)] = {
     def createQuorum(
         informeesMap: Map[LfPartyId, (Set[ParticipantId], NonNegativeInt)],
         threshold: NonNegativeInt,
@@ -247,8 +254,8 @@ case object TransactionViewDecompositionFactory {
     }
   }
 
-  /** Returns informees, participants hosting those informees,
-    * and corresponding threshold for a given action node.
+  /** Returns informees, participants hosting those informees, and corresponding threshold for a
+    * given action node.
     */
   def informeesParticipantsAndThreshold(
       node: LfActionNode,
@@ -257,7 +264,7 @@ case object TransactionViewDecompositionFactory {
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[
+  ): FutureUnlessShutdown[
     (Map[LfPartyId, (Set[ParticipantId], NonNegativeInt)], NonNegativeInt)
   ] = {
     val confirmingParties =

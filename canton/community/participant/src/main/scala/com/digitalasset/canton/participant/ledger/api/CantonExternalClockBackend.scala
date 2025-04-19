@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api
@@ -11,7 +11,8 @@ import com.digitalasset.canton.tracing.NoTracing
 import java.time.Instant
 import scala.concurrent.Future
 
-/** Time service backend for testing only to enable the ledger api server to work with the Canton sim-clock or remote clock
+/** Time service backend for testing only to enable the ledger api server to work with the Canton
+  * sim-clock or remote clock
   */
 class CantonExternalClockBackend(clock: Clock, protected val loggerFactory: NamedLoggerFactory)
     extends TimeServiceBackend

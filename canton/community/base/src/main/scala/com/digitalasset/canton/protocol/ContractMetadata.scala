@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -21,9 +21,12 @@ import com.digitalasset.canton.{LfPartyId, LfVersioned, checked}
 
 /** Metadata for a contract.
   *
-  * @param signatories Must include the maintainers of the key if any
-  * @param stakeholders Must include the signatories
-  * @throws ContractMetadata.InvalidContractMetadata if some maintainers are not signatories or some signatories are not stakeholders.
+  * @param signatories
+  *   Must include the maintainers of the key if any
+  * @param stakeholders
+  *   Must include the signatories
+  * @throws ContractMetadata.InvalidContractMetadata
+  *   if some maintainers are not signatories or some signatories are not stakeholders.
   */
 final case class ContractMetadata private (
     signatories: Set[LfPartyId],
@@ -76,9 +79,9 @@ object ContractMetadata
     with HasVersionedMessageCompanionDbHelpers[ContractMetadata] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v32,
+      ProtocolVersion.v33,
       supportedProtoVersion(v30.SerializableContract.Metadata)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 

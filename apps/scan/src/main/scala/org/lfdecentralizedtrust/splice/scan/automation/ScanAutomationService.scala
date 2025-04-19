@@ -56,7 +56,12 @@ class ScanAutomationService(
       DomainTimeSynchronization.Noop,
       DomainUnpausedSynchronization.Noop,
       store,
-      PackageIdResolver.inferFromAmuletRules(clock, store, loggerFactory),
+      PackageIdResolver.inferFromAmuletRulesIfEnabled(
+        config.parameters.enableCantonPackageSelection,
+        clock,
+        store,
+        loggerFactory,
+      ),
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,

@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationTrigger
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationTrigger.ScheduledMigration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -54,7 +54,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
       .getMigrationSchedule()
       .map(schedule => ScheduledMigration(schedule.time.toInstant, schedule.migrationId))
 
-  override protected def getDomainId()(implicit tc: TraceContext): Future[DomainId] = {
+  override protected def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] = {
     scanConnection.getAmuletRulesDomain()(tc)
   }
 
@@ -68,7 +68,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
       task: DomainMigrationTrigger.Task
   )(implicit tc: TraceContext): Future[DomainMigrationDump] = {
     dumpGenerator
-      .generateDomainDump(task.migrationId, task.domainId)
+      .generateDomainDump(task.migrationId, task.synchronizerId)
   }
 
 }

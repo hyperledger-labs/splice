@@ -14,10 +14,10 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.migration.{AcsExporter, DomainMigrationTrigger}
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.topology.transaction.DomainParametersState
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -30,7 +30,7 @@ import scala.jdk.OptionConverters.*
 final class DecentralizedSynchronizerMigrationTrigger(
     override protected val currentMigrationId: Long,
     baseContext: TriggerContext,
-    domainAlias: DomainAlias,
+    synchronizerAlias: SynchronizerAlias,
     localSynchronizerNode: LocalSynchronizerNode,
     dsoStore: SvDsoStore,
     ledgerConnection: SpliceLedgerConnection,
@@ -72,7 +72,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
     } yield DomainMigrationTrigger.ScheduledMigration(schedule.time, schedule.migrationId)
   }
 
-  override protected def getDomainId()(implicit tc: TraceContext): Future[DomainId] = {
+  override protected def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] = {
     dsoStore.getDsoRules().map(_.domain)
   }
 
@@ -85,13 +85,13 @@ final class DecentralizedSynchronizerMigrationTrigger(
   override protected def generateDump(task: DomainMigrationTrigger.Task)(implicit
       tc: TraceContext
   ): Future[DomainMigrationDump] = for {
-    _ <- ensureDomainIsPaused(task.domainId)
+    _ <- ensureDomainIsPaused(task.synchronizerId)
     dump <- exportMigrationDump(task.migrationId)
   } yield dump
 
   private def ensureDomainIsPaused(
-      decentralizedSynchronizerId: DomainId
-  )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersState]] = for {
+      decentralizedSynchronizerId: SynchronizerId
+  )(implicit tc: TraceContext): Future[TopologyResult[SynchronizerParametersState]] = for {
     domainParamsTopologyResult <- participantAdminConnection
       .ensureDomainParameters(
         decentralizedSynchronizerId,
@@ -105,7 +105,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
   ): Future[DomainMigrationDump] = {
     DomainMigrationDump
       .getDomainMigrationDump(
-        domainAlias,
+        synchronizerAlias,
         ledgerConnection,
         participantAdminConnection,
         localSynchronizerNode,

@@ -27,6 +27,7 @@ set +e
 if ! prefix=$(git show "$sha":VERSION 2>&1); then
     prefix=$(cat "${SPLICE_ROOT}/VERSION")
 fi
+
 set -e
 git_commit_message=$(git log -1 --pretty=format:%B "$sha")
 if [[ $git_commit_message == *"[release]"* ]]; then

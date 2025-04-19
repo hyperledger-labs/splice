@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -65,7 +65,7 @@ class HeadlessConsole(
 
   private def runModule(
       code: String,
-      path: Option[File] = None,
+      path: Option[File],
   ): Either[HeadlessConsoleError, Unit] =
     for {
       interpreter <- interpreterO
@@ -89,7 +89,8 @@ class HeadlessConsole(
     lock.release()
 }
 
-/** Creates an interpreter but with matching bindings to the InteractiveConsole for running scripts non-interactively
+/** Creates an interpreter but with matching bindings to the InteractiveConsole for running scripts
+  * non-interactively
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 object HeadlessConsole extends NoTracing {
@@ -185,9 +186,10 @@ object HeadlessConsole extends NoTracing {
   }
 
   /** Converts a return value from Ammonite into:
-    *  - Unit if successful
-    *  - Our own error hierarchy if the Ammonite error could be mapped
-    * @throws java.lang.RuntimeException If the value is unknown
+    *   - Unit if successful
+    *   - Our own error hierarchy if the Ammonite error could be mapped
+    * @throws java.lang.RuntimeException
+    *   If the value is unknown
     */
   private def convertAmmoniteResult(
       result: Res[_],
@@ -203,7 +205,8 @@ object HeadlessConsole extends NoTracing {
     }
 
   /** Converts a failing return value from Ammonite into our own error types.
-    * @throws java.lang.RuntimeException If the failing error is unknown
+    * @throws java.lang.RuntimeException
+    *   If the failing error is unknown
     */
   private def convertAmmoniteError(result: Failing, logger: TracedLogger): HeadlessConsoleError =
     result match {

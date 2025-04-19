@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions 
 import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
 import io.circe.Json
 
 object DsoTables extends AcsTables with NamedLogging {
@@ -43,7 +43,7 @@ object DsoTables extends AcsTables with NamedLogging {
       requesterName: Option[String] = None,
       electionRequestEpoch: Option[Long] = None,
       memberTrafficMember: Option[Member] = None,
-      memberTrafficDomain: Option[DomainId] = None,
+      memberTrafficDomain: Option[SynchronizerId] = None,
       ansEntryName: Option[String] = None,
       actionAnsEntryContextCid: Option[splice.ans.AnsEntryContext.ContractId] = None,
       actionAnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,

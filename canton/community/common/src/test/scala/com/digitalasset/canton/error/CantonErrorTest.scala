@@ -1,10 +1,17 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error
 
-import com.daml.error.*
-import com.daml.error.utils.DecodedCantonError
+import com.digitalasset.base.error.utils.DecodedCantonError
+import com.digitalasset.base.error.{
+  Alarm,
+  AlarmErrorCode,
+  ErrorCategory,
+  ErrorClass,
+  ErrorCode,
+  ErrorGroup,
+}
 import com.digitalasset.canton.BaseTestWordSpec
 import com.digitalasset.canton.error.TestGroup.NestedGroup.MyCode.MyError
 import com.digitalasset.canton.error.TestGroup.NestedGroup.{MyCode, TestAlarmErrorCode}
@@ -119,7 +126,7 @@ class CantonErrorTest extends BaseTestWordSpec {
       val deserializedCantonError = DecodedCantonError.fromStatusRuntimeException(sre).value
 
       deserializedCantonError.resources shouldBe empty
-      deserializedCantonError.code.category.securitySensitive shouldBe true
+      deserializedCantonError.code.category.redactDetails shouldBe true
       deserializedCantonError.code.id shouldBe "NA"
       deserializedCantonError.context shouldBe empty
       deserializedCantonError.correlationId shouldBe empty

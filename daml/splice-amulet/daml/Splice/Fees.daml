@@ -24,6 +24,9 @@ relTimeToDays dt = relTimeToMicros dt / microsPerDay
 daysToRelTime : Decimal -> RelTime
 daysToRelTime d = convertMicrosecondsToRelTime $ ceiling $ d * microsPerDay
 
+relTimeToSeconds : RelTime -> Decimal
+relTimeToSeconds dt = relTimeToMicros dt / 1e6
+
 
 -- Rates per mining round
 -------------------------
@@ -143,3 +146,17 @@ instance Patchable FixedFee where
 instance Patchable RatePerRound where
   patch new base current = RatePerRound with
     rate = patch new.rate base.rate current.rate
+
+-- RatePerDay
+----------------
+data RatePerDay = RatePerDay with
+    rate : Decimal
+  deriving (Eq, Ord, Show)
+
+chargeRatePerDay : RatePerDay -> RelTime -> Decimal
+chargeRatePerDay rate dt = rate.rate * relTimeToDays dt
+
+ratePerRoundToRatePerDay : RatePerRound -> RelTime -> RatePerDay
+ratePerRoundToRatePerDay perRound tickDuration =
+  -- Note: not using the 'relTimeToDays' function here to reduce the magnitude of rounding errors
+  RatePerDay with rate = perRound.rate * (microsPerDay / relTimeToMicros tickDuration)

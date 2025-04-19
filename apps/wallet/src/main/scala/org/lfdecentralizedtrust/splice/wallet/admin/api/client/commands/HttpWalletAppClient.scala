@@ -35,7 +35,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -284,10 +284,10 @@ object HttpWalletAppClient {
             contract <- Contract
               .fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(contractWithState.contract)
               .leftMap(_.toString)
-            domainId <- contractWithState.domainId.traverse(DomainId.fromString)
+            synchronizerId <- contractWithState.domainId.traverse(SynchronizerId.fromString)
           } yield ContractWithState(
             contract,
-            domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
+            synchronizerId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
           )
         )
     }
@@ -718,7 +718,7 @@ object HttpWalletAppClient {
 
   case class CreateBuyTrafficRequest(
       receivingValidator: PartyId,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       trafficAmount: Long,
       expiresAt: CantonTimestamp,
       trackingId: String,
@@ -736,7 +736,7 @@ object HttpWalletAppClient {
     ] = {
       val request = definitions.CreateBuyTrafficRequest(
         Codec.encode(receivingValidator),
-        Codec.encode(domainId),
+        Codec.encode(synchronizerId),
         trafficAmount,
         trackingId,
         Codec.encode(expiresAt),

@@ -6,4 +6,8 @@
 splice-amulet docs
 ==================
 
+.. toctree::
+   :maxdepth: 3
+   :titlesonly:
+
 {{{body}}}

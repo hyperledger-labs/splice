@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.store.Limit
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AnsSubscriptionRenewalPaymentTrigger
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
@@ -1058,37 +1059,43 @@ class WalletTxLogIntegrationTest
         _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
       )
 
-      actAndCheck(
-        "Alice accepts the request",
-        aliceWalletClient.acceptSubscriptionRequest(request.contractId),
-      )(
-        "Request disappears from Alice's list",
-        _ => {
-          aliceWalletClient.listSubscriptionRequests() shouldBe empty
-          aliceWalletClient
-            .listSubscriptions()
-            .find(
-              _.subscription.payload.reference == request.contractId
-            )
-            .value
-        },
-      )
+      // Pause trigger so that we can actuall observe the SubscriptionPayment state before the SVs collect the payment.
+      setTriggersWithin(triggersToPauseAtStart =
+        Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[AnsSubscriptionRenewalPaymentTrigger])
+      ) {
 
-      // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
-      clue("Alice's automation triggers the second payment") {
-        eventually() {
-          inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
-            sub.subscription.payload should equal(
-              new subsCodegen.Subscription(
-                request.payload.subscriptionData,
-                request.contractId,
+        actAndCheck(
+          "Alice accepts the request",
+          aliceWalletClient.acceptSubscriptionRequest(request.contractId),
+        )(
+          "Request disappears from Alice's list",
+          _ => {
+            aliceWalletClient.listSubscriptionRequests() shouldBe empty
+            aliceWalletClient
+              .listSubscriptions()
+              .find(
+                _.subscription.payload.reference == request.contractId
               )
-            )
+              .value
+          },
+        )
 
-            inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
-              state.payload.subscription shouldBe sub.subscription.contractId
-              state.payload.payData should equal(request.payload.payData)
-              state
+        // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
+        clue("Alice's automation triggers the second payment") {
+          eventually() {
+            inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
+              sub.subscription.payload should equal(
+                new subsCodegen.Subscription(
+                  request.payload.subscriptionData,
+                  request.contractId,
+                )
+              )
+
+              inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
+                state.payload.subscription shouldBe sub.subscription.contractId
+                state.payload.payData should equal(request.payload.payData)
+                state
+              }
             }
           }
         }

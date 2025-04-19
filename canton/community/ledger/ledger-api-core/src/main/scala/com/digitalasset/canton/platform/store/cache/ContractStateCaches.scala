@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.cache
 
 import cats.data.NonEmptyVector
-import com.digitalasset.canton.data.{AbsoluteOffset, Offset}
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.cache.ContractKeyStateValue.{Assigned, Unassigned}
@@ -14,18 +14,22 @@ import com.digitalasset.canton.platform.store.cache.ContractStateValue.{
   ExistingContractValue,
 }
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
+import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent.ReassignmentAccepted
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.transaction.GlobalKey
 
 import scala.concurrent.ExecutionContext
 
-/** Encapsulates the contract and key state caches with operations for mutating them.
-  * The caches are used for serving contract activeness and key lookups
-  * for command interpretation performed during command submission.
+/** Encapsulates the contract and key state caches with operations for mutating them. The caches are
+  * used for serving contract activeness and key lookups for command interpretation performed during
+  * command submission.
   *
-  * @param keyState The contract key state cache.
-  * @param contractState The contract state cache.
-  * @param loggerFactory The logger factory.
+  * @param keyState
+  *   The contract key state cache.
+  * @param contractState
+  *   The contract state cache.
+  * @param loggerFactory
+  *   The logger factory.
   */
 class ContractStateCaches(
     private[cache] val keyState: StateCache[GlobalKey, ContractKeyStateValue],
@@ -35,8 +39,9 @@ class ContractStateCaches(
 
   /** Update the state caches with a batch of events.
     *
-    * @param eventsBatch The contract state update events batch.
-    *                    The updates batch must be non-empty and with strictly increasing event sequential ids.
+    * @param eventsBatch
+    *   The contract state update events batch. The updates batch must be non-empty and with
+    *   strictly increasing event sequential ids.
     */
   def push(
       eventsBatch: NonEmptyVector[ContractStateEvent]
@@ -61,25 +66,26 @@ class ContractStateCaches(
               driverMetadata = created.driverMetadata,
             )
         )
+
       case archived: ContractStateEvent.Archived =>
         archived.globalKey.foreach { key =>
           keyMappingsBuilder.addOne(key -> Unassigned)
         }
         contractMappingsBuilder.addOne(archived.contractId -> Archived(archived.stakeholders))
+
+      case _: ReassignmentAccepted => ()
     }
 
     val keyMappings = keyMappingsBuilder.result()
     val contractMappings = contractMappingsBuilder.result()
 
     val validAt = eventsBatch.last.eventOffset
-    if (keyMappings.nonEmpty) {
-      keyState.putBatch(validAt, keyMappings)
-    }
+    keyState.putBatch(validAt, keyMappings)
     contractState.putBatch(validAt, contractMappings)
   }
 
   /** Reset the contract and key state caches to the specified offset. */
-  def reset(lastPersistedLedgerEnd: Option[AbsoluteOffset]): Unit = {
+  def reset(lastPersistedLedgerEnd: Option[Offset]): Unit = {
     keyState.reset(lastPersistedLedgerEnd)
     contractState.reset(lastPersistedLedgerEnd)
   }
@@ -87,7 +93,7 @@ class ContractStateCaches(
 
 object ContractStateCaches {
   def build(
-      initialCacheIndex: Offset,
+      initialCacheIndex: Option[Offset],
       maxContractsCacheSize: Long,
       maxKeyCacheSize: Long,
       metrics: LedgerApiServerMetrics,

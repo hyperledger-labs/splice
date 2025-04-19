@@ -2,10 +2,11 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{TransferInputStore, TransferInputStoreTest}
@@ -120,7 +121,7 @@ abstract class ExternalPartyWalletStoreTest
 
   protected lazy val acsOffset: Long = nextOffset()
   protected lazy val domain: String = dummyDomain.toProtoPrimitive
-  protected lazy val domainAlias: DomainAlias = DomainAlias.tryCreate(domain)
+  protected lazy val synchronizerAlias: SynchronizerAlias = SynchronizerAlias.tryCreate(domain)
 }
 
 class DbExternalPartyWalletStoreTest
@@ -160,15 +161,12 @@ class DbExternalPartyWalletStoreTest
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(domainAlias -> dummyDomain)
+        Map(synchronizerAlias -> dummyDomain)
       )
     } yield store
   }
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[?] =
-    for {
-      _ <- resetAllAppTables(storage)
-    } yield ()
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
 }

@@ -1,26 +1,23 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.JsonObject
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AmuletRules_AddFutureAmuletConfigSchedule,
 }
-import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.PartyId
+import io.circe.JsonObject
 import org.openqa.selenium.By
 import spray.json.DefaultJsonProtocol.StringJsonFormat
 
@@ -43,8 +40,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
   val amuletPrice = 2
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
@@ -381,20 +377,17 @@ class ScanFrontendTimeBasedIntegrationTest
             aliceValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
-            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           advanceRoundsByOneTick
           buyMemberTraffic(
             aliceValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
-            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           buyMemberTraffic(
             bobValidatorBackend,
             trafficAmount,
             env.environment.clock.now,
-            scanConnection = Some(HasAmuletRulesWrapper(sv1ScanBackend.getAmuletRules().contract)),
           )
           (1 to 5).foreach(_ => advanceRoundsByOneTick)
         },

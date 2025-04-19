@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.auth
@@ -208,8 +208,9 @@ object UserBasedOngoingAuthorization {
     )
   }
 
-  /** @param userRightsCheckIntervalInSeconds - determines the interval at which to check whether user rights state has changed.
-    *                                          Also, double of this value serves as timeout value for subsequent user rights state checks.
+  /** @param userRightsCheckIntervalInSeconds
+    *   determines the interval at which to check whether user rights state has changed. Also,
+    *   double of this value serves as timeout value for subsequent user rights state checks.
     */
   def apply[A](
       observer: ServerCallStreamObserver[A],

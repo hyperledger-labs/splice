@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.indexerbenchmark
@@ -14,10 +14,13 @@ import scopt.OptionParser
 
 import java.time.Duration
 
-/** @param updateCount The number of updates to process.
-  * @param updateSource The name of the source of state updates.
-  * @param waitForUserInput If enabled, the app will wait for user input after the benchmark has finished,
-  *                         but before cleaning up resources.
+/** @param updateCount
+  *   The number of updates to process.
+  * @param updateSource
+  *   The name of the source of state updates.
+  * @param waitForUserInput
+  *   If enabled, the app will wait for user input after the benchmark has finished, but before
+  *   cleaning up resources.
   */
 final case class Config(
     updateCount: Option[Long],

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -9,16 +9,20 @@ import com.daml.metrics.api.opentelemetry.{
   QualificationFilteringMetricsFactory,
 }
 import com.daml.metrics.api.{MetricQualification, MetricsContext, MetricsInfoFilter}
-import com.daml.metrics.grpc.DamlGrpcServerMetrics
-import com.daml.metrics.{HealthMetrics, HistogramDefinition, MetricsFilterConfig}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.daml.metrics.{HistogramDefinition, MetricsFilterConfig}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.{
+  CantonConfigValidator,
+  NonNegativeFiniteDuration,
+  UniformCantonConfigValidation,
+}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.domain.metrics.{MediatorMetrics, SequencerMetrics}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
 import com.digitalasset.canton.metrics.MetricsReporterConfig.{Csv, Logging, Prometheus}
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
+import com.digitalasset.canton.synchronizer.metrics.{MediatorMetrics, SequencerMetrics}
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.OpenTelemetry
@@ -36,11 +40,15 @@ import scala.collection.concurrent.TrieMap
 
 /** Configure metric instrumentiation
   *
-  * @param reporters which reports should be used to report metric output
-  * @param jvmMetrics if true, then JvmMetrics will be reported
-  * @param histograms customized histogram definitions
-  * @param qualifiers which metric qualifiers to include generally. by default, all except Debug metrics
-  *                   are included. The qualifier filtering takes precedence over the individual reporter filters
+  * @param reporters
+  *   which reports should be used to report metric output
+  * @param jvmMetrics
+  *   if true, then JvmMetrics will be reported
+  * @param histograms
+  *   customized histogram definitions
+  * @param qualifiers
+  *   which metric qualifiers to include generally. by default, all except Debug metrics are
+  *   included. The qualifier filtering takes precedence over the individual reporter filters
   */
 final case class MetricsConfig(
     reporters: Seq[MetricsReporterConfig] = Seq.empty,
@@ -53,7 +61,7 @@ final case class MetricsConfig(
       MetricQualification.Saturation,
       MetricQualification.Traffic,
     ),
-) {
+) extends UniformCantonConfigValidation {
 
   // if empty, no filter, otherwise, the union of all filters
   val globalFilters: Seq[MetricsFilterConfig] =
@@ -65,6 +73,10 @@ final case class MetricsConfig(
 }
 
 object MetricsConfig {
+  implicit val metricsConfigCantonConfigValidator: CantonConfigValidator[MetricsConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[MetricsConfig]
+  }
 
   /** Control and enable jvm metrics */
   final case class JvmMetrics(
@@ -74,9 +86,12 @@ object MetricsConfig {
       memoryPools: Boolean = true,
       threads: Boolean = true,
       gc: Boolean = true,
-  )
+  ) extends UniformCantonConfigValidation
 
   object JvmMetrics {
+    implicit val jvmMetricsCanontConfigValidator: CantonConfigValidator[JvmMetrics] =
+      CantonConfigValidatorDerivation[JvmMetrics]
+
     def setup(config: JvmMetrics, openTelemetry: OpenTelemetry): Unit =
       if (config.enabled) {
         if (config.classes) Classes.registerObservers(openTelemetry).discard
@@ -96,41 +111,56 @@ sealed trait MetricsReporterConfig {
 
 object MetricsReporterConfig {
 
+  implicit val metricsReporterConfigCantonConfigValidator
+      : CantonConfigValidator[MetricsReporterConfig] = {
+    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[MetricsReporterConfig]
+  }
+
   final case class Prometheus(
       address: String = "localhost",
       port: Port = Port.tryCreate(9464),
       filters: Seq[MetricsFilterConfig] = Seq.empty,
   ) extends MetricsReporterConfig
+      with UniformCantonConfigValidation
 
   /** CSV metrics reporter configuration
     *
-    * This reporter will write the given metrics into respective csv files. Please note that you should use
-    * filters as otherwise, you'll get many files
+    * This reporter will write the given metrics into respective csv files. Please note that you
+    * should use filters as otherwise, you'll get many files
     *
-    * @param directory where to write the csv files to
-    * @param interval how often to write the csv files
-    * @param contextKeys which context keys to include in the name. defaults to node names
-    * @param filters which metrics to include
+    * @param directory
+    *   where to write the csv files to
+    * @param interval
+    *   how often to write the csv files
+    * @param contextKeys
+    *   which context keys to include in the name. defaults to node names
+    * @param filters
+    *   which metrics to include
     */
   final case class Csv(
       directory: File,
       interval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
-      contextKeys: Set[String] = Set("node", "domain"),
+      contextKeys: Set[String] = Set("node", "synchronizer"),
       filters: Seq[MetricsFilterConfig] = Seq.empty,
   ) extends MetricsReporterConfig
+      with UniformCantonConfigValidation
 
   /** Log metrics reporter configuration
     *
     * This reporter will log the metrics in the given interval
     *
-    * @param interval how often to log the metrics
-    * @param filters which metrics to include
+    * @param interval
+    *   how often to log the metrics
+    * @param filters
+    *   which metrics to include
     */
   final case class Logging(
       interval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
       filters: Seq[MetricsFilterConfig] = Seq.empty,
       logAsInfo: Boolean = true,
   ) extends MetricsReporterConfig
+      with UniformCantonConfigValidation
 
 }
 final case class MetricsRegistry(
@@ -173,8 +203,6 @@ final case class MetricsRegistry(
         new SequencerMetrics(
           histograms.sequencer,
           labeledMetricsFactory,
-          new DamlGrpcServerMetrics(labeledMetricsFactory, "sequencer"),
-          new HealthMetrics(labeledMetricsFactory),
         )
       },
     )
@@ -188,8 +216,6 @@ final case class MetricsRegistry(
         new MediatorMetrics(
           histograms.mediator,
           labeledMetricsFactory,
-          new DamlGrpcServerMetrics(labeledMetricsFactory, "mediator"),
-          new HealthMetrics(labeledMetricsFactory),
         )
       },
     )
@@ -216,10 +242,20 @@ final case class MetricsRegistry(
         )
     }
 
-  /** returns the documented metrics by possibly creating fake participants / sequencers / mediators */
-  def metricsDoc(): (Seq[MetricDoc.Item], Seq[MetricDoc.Item], Seq[MetricDoc.Item]) =
-    // TODO(#17917) resurrect once the metrics docs have been re-enabled
-    (Seq.empty, Seq.empty, Seq.empty)
+  /** returns the documented metrics by possibly creating fake participants / sequencers / mediators
+    */
+  def metricsDoc(): (Seq[MetricDoc.Item], Seq[MetricDoc.Item], Seq[MetricDoc.Item]) = {
+    val generator = new MetricsDocGenerator()
+    new ParticipantMetrics(histograms.participant, generator)
+    val participantMetrics = generator.getAll()
+    generator.reset()
+    new SequencerMetrics(histograms.sequencer, generator)
+    val sequencerMetrics = generator.getAll()
+    generator.reset()
+    new MediatorMetrics(histograms.mediator, generator)
+    val mediatorMetrics = generator.getAll()
+    (participantMetrics, sequencerMetrics, mediatorMetrics)
+  }
 
   override def close(): Unit = ()
 

@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import anorm.SqlParser.{array, byteArray, int, str}
+import anorm.SqlParser.{array, byteArray, int}
 import anorm.{RowParser, ~}
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.platform.store.backend.ContractStorageBackend
@@ -11,9 +11,12 @@ import com.digitalasset.canton.platform.store.backend.ContractStorageBackend.{
   RawArchivedContract,
   RawCreatedContract,
 }
-import com.digitalasset.canton.platform.store.backend.Conversions.{contractId, timestampFromMicros}
+import com.digitalasset.canton.platform.store.backend.Conversions.{
+  OffsetToStatement,
+  contractId,
+  timestampFromMicros,
+}
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
-import com.digitalasset.canton.platform.store.cache.LedgerEndCache
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader.{
   KeyAssigned,
   KeyState,
@@ -26,19 +29,21 @@ import java.sql.Connection
 
 class ContractStorageBackendTemplate(
     queryStrategy: QueryStrategy,
-    ledgerEndCache: LedgerEndCache,
     stringInterning: StringInterning,
 ) extends ContractStorageBackend {
 
-  override def keyState(key: Key, validAt: Offset)(connection: Connection): KeyState = {
-    val resultParser =
-      (contractId("contract_id") ~ array[Int]("flat_event_witnesses")).map {
-        case cId ~ stakeholders =>
-          KeyAssigned(cId, stakeholders.view.map(stringInterning.party.externalize).toSet)
-      }.singleOpt
+  override def supportsBatchKeyStateLookups: Boolean = false
 
+  override def keyStates(keys: Seq[Key], validAt: Offset)(
+      connection: Connection
+  ): Map[Key, KeyState] = keys.map(key => key -> keyState(key, validAt)(connection)).toMap
+
+  override def keyState(key: Key, validAt: Offset)(connection: Connection): KeyState = {
+    val resultParser = (contractId("contract_id") ~ array[Int]("flat_event_witnesses")).map {
+      case cId ~ stakeholders =>
+        KeyAssigned(cId, stakeholders.view.map(stringInterning.party.externalize).toSet)
+    }.singleOpt
     import com.digitalasset.canton.platform.store.backend.Conversions.HashToStatement
-    import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
     SQL"""
          WITH last_contract_key_create AS (
                 SELECT lapi_events_create.*
@@ -62,9 +67,9 @@ class ContractStorageBackendTemplate(
   }
 
   private val archivedContractRowParser: RowParser[(ContractId, RawArchivedContract)] =
-    (str("contract_id") ~ array[Int]("flat_event_witnesses"))
+    (contractId("contract_id") ~ array[Int]("flat_event_witnesses"))
       .map { case coid ~ flatEventWitnesses =>
-        ContractId.assertFromString(coid) -> RawArchivedContract(
+        coid -> RawArchivedContract(
           flatEventWitnesses = flatEventWitnesses.view
             .map(stringInterning.party.externalize)
             .toSet
@@ -76,12 +81,11 @@ class ContractStorageBackendTemplate(
   ): Map[ContractId, RawArchivedContract] =
     if (contractIds.isEmpty) Map.empty
     else {
-      import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
       SQL"""
        SELECT contract_id, flat_event_witnesses
        FROM lapi_events_consuming_exercise
        WHERE
-         contract_id ${queryStrategy.anyOfStrings(contractIds.map(_.coid))}
+         contract_id ${queryStrategy.anyOfBinary(contractIds.map(_.toBytes.toByteArray))}
          AND event_offset <= $before"""
         .as(archivedContractRowParser.*)(connection)
         .toMap
@@ -89,10 +93,9 @@ class ContractStorageBackendTemplate(
 
   private val rawCreatedContractRowParser
       : RowParser[(ContractId, ContractStorageBackend.RawCreatedContract)] =
-    (str("contract_id")
+    (contractId("contract_id")
       ~ int("template_id")
       ~ int("package_name")
-      ~ int("package_version").?
       ~ array[Int]("flat_event_witnesses")
       ~ byteArray("create_argument")
       ~ int("create_argument_compression").?
@@ -103,12 +106,10 @@ class ContractStorageBackendTemplate(
       ~ array[Int]("create_key_maintainers").?
       ~ byteArray("driver_metadata"))
       .map {
-        case coid ~ internedTemplateId ~ internedPackageName ~ internedPackageVersion ~ flatEventWitnesses ~ createArgument ~ createArgumentCompression ~ ledgerEffectiveTime ~ signatories ~ createKey ~ createKeyCompression ~ keyMaintainers ~ driverMetadata =>
-          ContractId.assertFromString(coid) -> RawCreatedContract(
+        case coid ~ internedTemplateId ~ internedPackageName ~ flatEventWitnesses ~ createArgument ~ createArgumentCompression ~ ledgerEffectiveTime ~ signatories ~ createKey ~ createKeyCompression ~ keyMaintainers ~ driverMetadata =>
+          coid -> RawCreatedContract(
             templateId = stringInterning.templateId.unsafe.externalize(internedTemplateId),
             packageName = stringInterning.packageName.unsafe.externalize(internedPackageName),
-            packageVersion =
-              internedPackageVersion.map(stringInterning.packageVersion.unsafe.externalize),
             flatEventWitnesses =
               flatEventWitnesses.view.map(stringInterning.party.externalize).toSet,
             createArgument = createArgument,
@@ -128,13 +129,11 @@ class ContractStorageBackendTemplate(
   ): Map[ContractId, RawCreatedContract] =
     if (contractIds.isEmpty) Map.empty
     else {
-      import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
       SQL"""
          SELECT
            contract_id,
            template_id,
            package_name,
-           package_version,
            flat_event_witnesses,
            create_argument,
            create_argument_compression,
@@ -146,33 +145,33 @@ class ContractStorageBackendTemplate(
            driver_metadata
          FROM lapi_events_create
          WHERE
-           contract_id ${queryStrategy.anyOfStrings(contractIds.map(_.coid))}
+           contract_id ${queryStrategy.anyOfBinary(contractIds.map(_.toBytes.toByteArray))}
            AND event_offset <= $before"""
         .as(rawCreatedContractRowParser.*)(connection)
         .toMap
     }
 
-  override def assignedContracts(contractIds: Seq[ContractId])(
+  override def assignedContracts(
+      contractIds: Seq[ContractId],
+      before: Offset,
+  )(
       connection: Connection
   ): Map[ContractId, RawCreatedContract] =
     if (contractIds.isEmpty) Map.empty
     else {
-      import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
-      val ledgerEndOffset = Offset.fromAbsoluteOffsetO(ledgerEndCache()._1)
       SQL"""
          WITH min_event_sequential_ids_of_assign AS (
              SELECT MIN(event_sequential_id) min_event_sequential_id
              FROM lapi_events_assign
              WHERE
-               contract_id ${queryStrategy.anyOfStrings(contractIds.map(_.coid))}
-               AND event_offset <= $ledgerEndOffset
+               contract_id ${queryStrategy.anyOfBinary(contractIds.map(_.toBytes.toByteArray))}
+               AND event_offset <= $before
              GROUP BY contract_id
            )
          SELECT
            contract_id,
            template_id,
            package_name,
-           package_version,
            flat_event_witnesses,
            create_argument,
            create_argument_compression,

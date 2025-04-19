@@ -12,7 +12,7 @@ import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
-import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
+import com.digitalasset.canton.lifecycle.{HasCloseContext, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
@@ -23,7 +23,7 @@ import org.apache.pekko.actor.ActorSystem
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.concurrent.{blocking, Future}
+import scala.concurrent.{Future, blocking}
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpAdminService}
 
 object NodeBootstrap {
@@ -94,10 +94,10 @@ abstract class NodeBootstrapBase[
     storageFactory
       .tryCreate(
         connectionPoolForParticipant,
-        parameterConfig.logQueryCost,
+        parameterConfig.loggingConfig.queryCost,
         clock,
         Some(scheduler),
-        nodeMetrics.dbStorage,
+        nodeMetrics.storageMetrics,
         parameterConfig.processingTimeouts,
         loggerFactory,
       )
@@ -169,7 +169,7 @@ abstract class NodeBootstrapBase[
         val stores = List()
         val instances =
           grpcAdminServers ++ getNode.toList ++ stores ++ List(clock, httpAdminService)
-        Lifecycle.close(instances*)(logger)
+        LifeCycle.close(instances*)(logger)
         logger.debug(s"Successfully completed shutdown of $name")
       } else {
         logger.warn(
@@ -179,4 +179,7 @@ abstract class NodeBootstrapBase[
       }
     }
   }
+
+  // unused in splice
+  override def registerDeclarativeChangeTrigger(trigger: () => Unit): Unit = ???
 }

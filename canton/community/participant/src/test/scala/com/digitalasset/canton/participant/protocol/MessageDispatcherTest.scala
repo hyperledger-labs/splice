@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -6,7 +6,6 @@ package com.digitalasset.canton.participant.protocol
 import cats.syntax.flatMap.*
 import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.crypto.{
@@ -21,23 +20,25 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.MediatorError
-import com.digitalasset.canton.ledger.participant.state.Update
+import com.digitalasset.canton.ledger.participant.state.SequencedUpdate
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.PrettyUtil
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
-import com.digitalasset.canton.participant.metrics.{ParticipantTestMetrics, SyncDomainMetrics}
+import com.digitalasset.canton.participant.metrics.{
+  ConnectedSynchronizerMetrics,
+  ParticipantTestMetrics,
+}
 import com.digitalasset.canton.participant.protocol.MessageDispatcher.{AcsCommitment as _, *}
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.protocol.submission.{
-  InFlightSubmissionTracker,
+  InFlightSubmissionSynchronizerTracker,
   SequencedSubmission,
 }
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedView.CompressedView
-import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast.Broadcast
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
 import com.digitalasset.canton.protocol.{
   LocalRejectError,
@@ -51,6 +52,7 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.{TrafficControlProcessor, TrafficReceipt}
 import com.digitalasset.canton.sequencing.{
+  AsyncResult,
   HandlerResult,
   PossiblyIgnoredProtocolEvent,
   RawProtocolEvent,
@@ -80,15 +82,13 @@ trait MessageDispatcherTest {
 
   import MessageDispatcherTest.*
 
-  private val domainId = DomainId.tryFromString("messageDispatcher::domain")
+  private val synchronizerId = SynchronizerId.tryFromString("messageDispatcher::synchronizer")
   private val testTopologyTimestamp = CantonTimestamp.Epoch
   private val participantId =
     ParticipantId.tryFromProtoPrimitive("PAR::messageDispatcher::participant")
   private val otherParticipant = ParticipantId.tryFromProtoPrimitive("PAR::other::participant")
   private val mediatorGroup = MediatorGroupRecipient(MediatorGroupIndex.zero)
   private val mediatorGroup2 = MediatorGroupRecipient(MediatorGroupIndex.one)
-  private val partyId = PartyId.tryFromProtoPrimitive("party::default")
-  private val otherPartyId = PartyId.tryFromProtoPrimitive("party::other")
 
   private val sessionKeyMapTest = NonEmpty(
     Seq,
@@ -96,7 +96,7 @@ trait MessageDispatcherTest {
       ByteString.EMPTY,
       // this is only a placeholder, the data is not encrypted
       EncryptionAlgorithmSpec.RsaOaepSha256,
-      Fingerprint.tryCreate("dummy"),
+      Fingerprint.tryFromString("dummy"),
     ),
   )
 
@@ -111,15 +111,14 @@ trait MessageDispatcherTest {
       requestCounterAllocator: RequestCounterAllocator,
       recordOrderPublisher: RecordOrderPublisher,
       badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
-      repairProcessor: RepairProcessor,
-      inFlightSubmissionTracker: InFlightSubmissionTracker,
+      inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
   )
 
   object Fixture {
     def mk(
         mkMd: (
             ProtocolVersion,
-            DomainId,
+            SynchronizerId,
             ParticipantId,
             RequestTracker,
             RequestProcessors,
@@ -129,10 +128,9 @@ trait MessageDispatcherTest {
             RequestCounterAllocator,
             RecordOrderPublisher,
             BadRootHashMessagesRequestProcessor,
-            RepairProcessor,
-            InFlightSubmissionTracker,
+            InFlightSubmissionSynchronizerTracker,
             NamedLoggerFactory,
-            SyncDomainMetrics,
+            ConnectedSynchronizerMetrics,
         ) => MessageDispatcher,
         initRc: RequestCounter = RequestCounter(0),
         cleanReplaySequencerCounter: SequencerCounter = SequencerCounter(0),
@@ -201,18 +199,27 @@ trait MessageDispatcherTest {
       val recordOrderPublisher = mock[RecordOrderPublisher]
       when(
         recordOrderPublisher.tick(
+          any[SequencedUpdate],
+          any[SequencerCounter],
+          any[Option[RequestCounter]],
+        )(
+          any[TraceContext]
+        )
+      )
+        .thenAnswer(FutureUnlessShutdown.unit)
+      when(
+        recordOrderPublisher.scheduleEmptyAcsChangePublication(
           any[SequencerCounter],
           any[CantonTimestamp],
-          any[Option[Traced[Update]]],
-          any[Option[RequestCounter]],
-        )(any[TraceContext])
+        )(
+          any[TraceContext]
+        )
       )
-        .thenAnswer(Future.unit)
+        .thenAnswer(UnlessShutdown.unit)
 
       val badRootHashMessagesRequestProcessor = mock[BadRootHashMessagesRequestProcessor]
       when(
         badRootHashMessagesRequestProcessor.sendRejectionAndTerminate(
-          any[SequencerCounter],
           any[CantonTimestamp],
           any[RootHash],
           any[MediatorGroupRecipient],
@@ -221,17 +228,18 @@ trait MessageDispatcherTest {
       )
         .thenReturn(badRootHashMessagesRequestProcessorF)
 
-      val repairProcessor = mock[RepairProcessor]
-
-      val inFlightSubmissionTracker = mock[InFlightSubmissionTracker]
+      val inFlightSubmissionSynchronizerTracker = mock[InFlightSubmissionSynchronizerTracker]
       when(
-        inFlightSubmissionTracker.observeSequencing(
-          any[DomainId],
-          any[Map[MessageId, SequencedSubmission]],
+        inFlightSubmissionSynchronizerTracker.observeSequencing(
+          any[Map[MessageId, SequencedSubmission]]
         )(anyTraceContext)
       )
         .thenReturn(FutureUnlessShutdown.unit)
-      when(inFlightSubmissionTracker.observeDeliverError(any[DeliverError])(anyTraceContext))
+      when(
+        inFlightSubmissionSynchronizerTracker.observeDeliverError(any[DeliverError])(
+          anyTraceContext
+        )
+      )
         .thenReturn(FutureUnlessShutdown.unit)
 
       val protocolProcessors = new RequestProcessors {
@@ -244,11 +252,11 @@ trait MessageDispatcherTest {
         }
       }
 
-      val syncDomainMetrics = ParticipantTestMetrics.domain
+      val connectedSynchronizerMetrics = ParticipantTestMetrics.synchronizer
 
       val messageDispatcher = mkMd(
         testedProtocolVersion,
-        domainId,
+        synchronizerId,
         participantId,
         requestTracker,
         protocolProcessors,
@@ -258,10 +266,9 @@ trait MessageDispatcherTest {
         requestCounterAllocator,
         recordOrderPublisher,
         badRootHashMessagesRequestProcessor,
-        repairProcessor,
-        inFlightSubmissionTracker,
+        inFlightSubmissionSynchronizerTracker,
         loggerFactory,
-        syncDomainMetrics,
+        connectedSynchronizerMetrics,
       )
 
       Fixture(
@@ -275,8 +282,7 @@ trait MessageDispatcherTest {
         requestCounterAllocator,
         recordOrderPublisher,
         badRootHashMessagesRequestProcessor,
-        repairProcessor,
-        inFlightSubmissionTracker,
+        inFlightSubmissionSynchronizerTracker,
       )
     }
   }
@@ -290,8 +296,9 @@ trait MessageDispatcherTest {
   ): Deliver[DefaultOpenEnvelope] =
     Deliver.create(
       sc,
+      None,
       ts,
-      domainId,
+      synchronizerId,
       messageId,
       batch,
       topologyTimestampO,
@@ -318,7 +325,7 @@ trait MessageDispatcherTest {
       ViewHash(TestHash.digest(9000)),
       sessionKeys = sessionKeyMapTest,
       encryptedTestView,
-      domainId,
+      synchronizerId,
       SymmetricKeyScheme.Aes128Gcm,
       testedProtocolVersion,
     )
@@ -330,7 +337,7 @@ trait MessageDispatcherTest {
       viewHash = ViewHash(TestHash.digest(9001)),
       sessionKeys = sessionKeyMapTest,
       encryptedView = encryptedOtherTestView,
-      domainId = domainId,
+      synchronizerId = synchronizerId,
       viewEncryptionScheme = SymmetricKeyScheme.Aes128Gcm,
       protocolVersion = testedProtocolVersion,
     )
@@ -339,12 +346,11 @@ trait MessageDispatcherTest {
   private val testMediatorResult =
     SignedProtocolMessage.from(
       ConfirmationResultMessage.create(
-        domainId,
+        synchronizerId,
         TestViewType,
         requestId,
         TestHash.dummyRootHash,
         Verdict.Approve(testedProtocolVersion),
-        Set.empty,
         testedProtocolVersion,
       ),
       testedProtocolVersion,
@@ -353,12 +359,11 @@ trait MessageDispatcherTest {
   private val otherTestMediatorResult =
     SignedProtocolMessage.from(
       ConfirmationResultMessage.create(
-        domainId,
+        synchronizerId,
         OtherTestViewType,
         requestId,
         TestHash.dummyRootHash,
         Verdict.Approve(testedProtocolVersion),
-        Set.empty,
         testedProtocolVersion,
       ),
       testedProtocolVersion,
@@ -368,7 +373,7 @@ trait MessageDispatcherTest {
   protected def messageDispatcher(
       mkMd: (
           ProtocolVersion,
-          DomainId,
+          SynchronizerId,
           ParticipantId,
           RequestTracker,
           RequestProcessors,
@@ -378,10 +383,9 @@ trait MessageDispatcherTest {
           RequestCounterAllocator,
           RecordOrderPublisher,
           BadRootHashMessagesRequestProcessor,
-          RepairProcessor,
-          InFlightSubmissionTracker,
+          InFlightSubmissionSynchronizerTracker,
           NamedLoggerFactory,
-          SyncDomainMetrics,
+          ConnectedSynchronizerMetrics,
       ) => MessageDispatcher
   ) = {
 
@@ -396,19 +400,14 @@ trait MessageDispatcherTest {
 
     val factory =
       new TopologyTransactionTestFactory(loggerFactory, initEc = executionContext)
-    val idTx = TopologyTransactionsBroadcast.create(
-      domainId,
-      Seq(
-        Broadcast(
-          String255.tryCreate("some request"),
-          List(factory.ns1k1_k1),
-        )
-      ),
+    val idTx = TopologyTransactionsBroadcast(
+      synchronizerId,
+      List(factory.ns1k1_k1),
       testedProtocolVersion,
     )
 
     val rawCommitment = mock[AcsCommitment]
-    when(rawCommitment.domainId).thenReturn(domainId)
+    when(rawCommitment.synchronizerId).thenReturn(synchronizerId)
     when(rawCommitment.representativeProtocolVersion).thenReturn(
       AcsCommitment.protocolVersionRepresentativeFor(testedProtocolVersion)
     )
@@ -428,12 +427,11 @@ trait MessageDispatcherTest {
     val MalformedMediatorConfirmationRequestResult =
       SignedProtocolMessage.from(
         ConfirmationResultMessage.create(
-          domainId,
+          synchronizerId,
           TestViewType,
           RequestId(CantonTimestamp.MinValue),
           TestHash.dummyRootHash,
           reject,
-          Set.empty,
           testedProtocolVersion,
         ),
         testedProtocolVersion,
@@ -468,9 +466,11 @@ trait MessageDispatcherTest {
         sc: SequencerCounter,
         ts: CantonTimestamp,
     ): Assertion = {
-      verify(sut.recordOrderPublisher).tick(isEq(sc), isEq(ts), isEq(None), isEq(None))(
-        anyTraceContext
-      )
+      verify(sut.recordOrderPublisher).tick(
+        argThat[SequencedUpdate](_.recordTime == ts),
+        argThat[SequencerCounter](_ == sc),
+        argThat[Option[RequestCounter]](_.isEmpty),
+      )(anyTraceContext)
       succeed
     }
 
@@ -478,14 +478,16 @@ trait MessageDispatcherTest {
         sut: Fixture,
         expected: Map[MessageId, SequencedSubmission],
     ): Assertion = {
-      verify(sut.inFlightSubmissionTracker).observeSequencing(isEq(domainId), isEq(expected))(
+      verify(sut.inFlightSubmissionSynchronizerTracker).observeSequencing(isEq(expected))(
         anyTraceContext
       )
       succeed
     }
 
     def checkObserveDeliverError(sut: Fixture, expected: DeliverError): Assertion = {
-      verify(sut.inFlightSubmissionTracker).observeDeliverError(isEq(expected))(anyTraceContext)
+      verify(sut.inFlightSubmissionSynchronizerTracker).observeDeliverError(isEq(expected))(
+        anyTraceContext
+      )
       succeed
     }
 
@@ -540,8 +542,8 @@ trait MessageDispatcherTest {
       for {
         _ <- sut.messageDispatcher
           .handleAll(signAndTrace(event))
+          .flatMap(_.unwrap)
           .onShutdown(fail(s"Encountered shutdown while handling $event"))
-        _ <- sut.messageDispatcher.flush()
       } yield {
         checks
       }
@@ -553,31 +555,19 @@ trait MessageDispatcherTest {
         val ts = CantonTimestamp.Epoch
         val prefix = TimeProof.timeEventMessageIdPrefix
         val deliver = SequencerTestUtils.mockDeliver(
-          sc.v,
-          ts,
-          domainId,
+          sc = sc.v,
+          timestamp = ts,
+          synchronizerId = synchronizerId,
           messageId = Some(MessageId.tryCreate(s"$prefix testing")),
         )
         // Check that we're calling the topology manager before we're publishing the deliver event and ticking the
         // request tracker
-        when(
-          sut.recordOrderPublisher.scheduleEmptyAcsChangePublication(
-            any[SequencerCounter],
-            any[CantonTimestamp],
-          )(any[TraceContext])
-        )
-          .thenAnswer {
-            checkTickTopologyProcessor(sut, sc, ts).discard
-          }
         when(sut.requestTracker.tick(any[SequencerCounter], any[CantonTimestamp])(anyTraceContext))
           .thenAnswer {
             checkTickTopologyProcessor(sut, sc, ts).discard
           }
 
         handle(sut, deliver) {
-          verify(sut.recordOrderPublisher).scheduleEmptyAcsChangePublication(isEq(sc), isEq(ts))(
-            any[TraceContext]
-          )
           checkTicks(sut, sc, ts)
         }.futureValue
       }
@@ -588,7 +578,7 @@ trait MessageDispatcherTest {
             participantId,
             PositiveInt.one,
             NonNegativeLong.tryCreate(1000),
-            domainId,
+            synchronizerId,
             testedProtocolVersion,
           ),
           testedProtocolVersion,
@@ -755,7 +745,6 @@ trait MessageDispatcherTest {
       )
 
       val result = sut.messageDispatcher.handleAll(signAndTrace(event)).unwrap.futureValue
-      sut.messageDispatcher.flush().futureValue
 
       result shouldBe UnlessShutdown.AbortedDueToShutdown
       verify(sut.acsCommitmentProcessor, never)
@@ -790,7 +779,6 @@ trait MessageDispatcherTest {
       )
 
       val result = sut.messageDispatcher.handleAll(signAndTrace(event)).unwrap.futureValue
-      sut.messageDispatcher.flush().futureValue
       val abort = result.traverse(_.unwrap).unwrap.futureValue
 
       abort.flatten shouldBe UnlessShutdown.AbortedDueToShutdown
@@ -807,14 +795,14 @@ trait MessageDispatcherTest {
           ViewHash(TestHash.digest(9002)),
           sessionKeys = sessionKeyMapTest,
           encryptedUnknownTestView,
-          domainId,
+          synchronizerId,
           SymmetricKeyScheme.Aes128Gcm,
           testedProtocolVersion,
         )
       val rootHashMessage =
         RootHashMessage(
           rootHash(1),
-          domainId,
+          synchronizerId,
           testedProtocolVersion,
           UnknownTestViewType,
           testTopologyTimestamp,
@@ -849,12 +837,11 @@ trait MessageDispatcherTest {
       val unknownTestMediatorResult =
         SignedProtocolMessage.from(
           ConfirmationResultMessage.create(
-            domainId,
+            synchronizerId,
             UnknownTestViewType,
             requestId,
             TestHash.dummyRootHash,
             Verdict.Approve(testedProtocolVersion),
-            Set.empty,
             testedProtocolVersion,
           ),
           testedProtocolVersion,
@@ -884,23 +871,18 @@ trait MessageDispatcherTest {
       error.getMessage should include(show"No processor for view type $UnknownTestViewType")
 
     }
-    "ignore protocol messages for foreign domains" in {
+    "ignore protocol messages for foreign synchronizers" in {
       val sut = mk()
       val sc = SequencerCounter(1)
       val ts = CantonTimestamp.ofEpochSecond(1)
-      val txForeignDomain = TopologyTransactionsBroadcast.create(
-        DomainId.tryFromString("foo::bar"),
-        Seq(
-          Broadcast(
-            String255.tryCreate("some request"),
-            List(factory.ns1k1_k1),
-          )
-        ),
+      val txForeignSynchronizer = TopologyTransactionsBroadcast(
+        SynchronizerId.tryFromString("foo::bar"),
+        List(factory.ns1k1_k1),
         testedProtocolVersion,
       )
       val event =
         mkDeliver(
-          Batch.of(testedProtocolVersion, txForeignDomain -> Recipients.cc(participantId)),
+          Batch.of(testedProtocolVersion, txForeignSynchronizer -> Recipients.cc(participantId)),
           sc,
           ts,
         )
@@ -919,7 +901,7 @@ trait MessageDispatcherTest {
         logEntries => {
           logEntries should not be empty
           forEvery(logEntries) {
-            _.warningMessage should include("Received messages with wrong domain IDs")
+            _.warningMessage should include("Received messages with wrong synchronizer ids")
           }
         },
       )
@@ -941,7 +923,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            domainId,
+            synchronizerId,
             testedProtocolVersion,
             viewType,
             testTopologyTimestamp,
@@ -969,7 +951,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            domainId,
+            synchronizerId,
             testedProtocolVersion,
             viewType,
             testTopologyTimestamp,
@@ -1055,7 +1037,6 @@ trait MessageDispatcherTest {
                   case SendMalformedAndExpectMediatorResult(rootHash, mediatorId, reason) =>
                     verify(sut.badRootHashMessagesRequestProcessor)
                       .sendRejectionAndTerminate(
-                        eqTo(sc),
                         eqTo(ts),
                         eqTo(rootHash),
                         eqTo(mediatorId),
@@ -1084,7 +1065,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            domainId,
+            synchronizerId,
             testedProtocolVersion,
             viewType,
             testTopologyTimestamp,
@@ -1141,7 +1122,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            domainId,
+            synchronizerId,
             testedProtocolVersion,
             viewType,
             testTopologyTimestamp,
@@ -1224,7 +1205,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            domainId,
+            synchronizerId,
             testedProtocolVersion,
             viewType,
             testTopologyTimestamp,
@@ -1292,10 +1273,10 @@ trait MessageDispatcherTest {
               checkTicks(sut)
             },
             _.warningMessage should include(
-              show"Received unexpected ${RequestKind(TestViewType)} for $requestId"
+              show"Received unexpected ${RequestKind(TestViewType, () => FutureUnlessShutdown.pure(AsyncResult.immediate))} for $requestId"
             ),
             _.warningMessage should include(
-              show"Received unexpected ${RequestKind(OtherTestViewType)} for $requestId"
+              show"Received unexpected ${RequestKind(OtherTestViewType, () => FutureUnlessShutdown.pure(AsyncResult.immediate))} for $requestId"
             ),
           )
           .futureValue
@@ -1324,8 +1305,9 @@ trait MessageDispatcherTest {
         val deliver3 = mkDeliver(dummyBatch, SequencerCounter(2), CantonTimestamp.ofEpochSecond(2))
         val deliverError4 = DeliverError.create(
           SequencerCounter(3),
+          None,
           CantonTimestamp.ofEpochSecond(3),
-          domainId,
+          synchronizerId,
           messageId3,
           SequencerErrors.SubmissionRequestRefused("invalid batch"),
           testedProtocolVersion,
@@ -1345,11 +1327,8 @@ trait MessageDispatcherTest {
         checkObserveSequencing(
           sut,
           Map(
-            messageId1 -> SequencedSubmission(SequencerCounter(0), CantonTimestamp.Epoch),
-            messageId2 -> SequencedSubmission(
-              SequencerCounter(1),
-              CantonTimestamp.ofEpochSecond(1),
-            ),
+            messageId1 -> SequencedSubmission(CantonTimestamp.Epoch),
+            messageId2 -> SequencedSubmission(CantonTimestamp.ofEpochSecond(1)),
           ),
         )
         checkObserveDeliverError(sut, deliverError4)
@@ -1403,14 +1382,8 @@ trait MessageDispatcherTest {
         checkObserveSequencing(
           sut,
           Map(
-            messageId1 -> SequencedSubmission(
-              SequencerCounter(0),
-              CantonTimestamp.Epoch,
-            ),
-            messageId2 -> SequencedSubmission(
-              SequencerCounter(1),
-              CantonTimestamp.ofEpochSecond(1),
-            ),
+            messageId1 -> SequencedSubmission(CantonTimestamp.Epoch),
+            messageId2 -> SequencedSubmission(CantonTimestamp.ofEpochSecond(1)),
           ),
         )
 

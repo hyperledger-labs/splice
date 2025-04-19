@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -13,20 +13,18 @@ import com.digitalasset.canton.logging.pretty.Pretty
 
 import scala.annotation.tailrec
 
-/** Utility class for clients who want to '''make use''' of pretty printing.
-  * Import this as follows:
-  * <pre>
-  * import com.digitalasset.canton.util.ShowUtil._
-  * </pre>
+/** Utility class for clients who want to '''make use''' of pretty printing. Import this as follows:
+  * {{{
+  * import com.digitalasset.canton.util.ShowUtil.*
+  * }}}
   * In some cases, an import at the top of the file will not make the `show` interpolator available.
   * To work around this, you need to import this INSIDE of the using class.
   *
-  * To enforce pretty printing, the `show` interpolator should be used for creating strings.
-  * That is, `show"s\$myComplexObject"` will result in a compile error,
-  * if pretty printing is not implemented for `myComplexObject`.
-  * In contrast, `s"\$myComplexObject"` will fall back to the default (non-pretty) toString implementation,
-  * if pretty printing is not implemented for `myComplexObject`.
-  * Even if pretty printing is implemented for the type `T` of `myComplexObject`,
+  * To enforce pretty printing, the `show` interpolator should be used for creating strings. That
+  * is, `show"s\$myComplexObject"` will result in a compile error, if pretty printing is not
+  * implemented for `myComplexObject`. In contrast, `s"\$myComplexObject"` will fall back to the
+  * default (non-pretty) toString implementation, if pretty printing is not implemented for
+  * `myComplexObject`. Even if pretty printing is implemented for the type `T` of `myComplexObject`,
   * `s"\$myComplexObject"` will not use it, if the compiler fails to infer `T: Pretty`.
   */
 object ShowUtil extends ShowUtil {
@@ -44,19 +42,24 @@ trait ShowUtil extends cats.syntax.ShowSyntax {
     Show.show(_.toPrettyString())
   }
 
-  /** Enables syntax like
-    * `show"This is a string: \${myString.doubleQuoted}"`
-    * and
-    * `show"This is a hash: \${myHash.readableHash}"`.
+  /** Enables syntax like:
+    * {{{
+    * show"This is a string: \${myString.doubleQuoted}"
+    * }}}
+    *
+    * and:
+    * {{{
+    * show"This is a hash: \${myHash.readableHash}"
+    * }}}
     */
   abstract class StringOperators(s: String) {
 
-    /** Use this to quote names. (E.g. Domain 'myDomain')
+    /** Use this to quote names. (E.g. synchronizer 'mySynchronizer')
       */
     def singleQuoted: Shown = Shown("'" + s + "'")
 
-    /** Use this to quote string constants, to separate them from the embedding sentence.
-      * (E.g. the request failed with "index out of bounds".)
+    /** Use this to quote string constants, to separate them from the embedding sentence. (E.g. the
+      * request failed with "index out of bounds".)
       */
     def doubleQuoted: Shown = Shown("\"" + s + "\"")
 
@@ -88,7 +91,7 @@ trait ShowUtil extends cats.syntax.ShowSyntax {
 
   implicit class ShowStringSyntax(s: String) extends StringOperators(s)
   implicit class ShowLengthLimitedStringSyntax(s: LengthLimitedString)
-      extends StringOperators(s.str)
+      extends StringOperators(s.unwrap)
   implicit class ShowLengthLimitedStringWrapperSyntax(s: LengthLimitedStringWrapper)
       extends StringOperators(s.unwrap)
 
@@ -96,7 +99,8 @@ trait ShowUtil extends cats.syntax.ShowSyntax {
     */
   implicit class ShowEitherSyntax[L: Show, R: Show](e: Either[L, R]) {
 
-    /** Prints the (left or right) value of an either without indicating whether it is left or right.
+    /** Prints the (left or right) value of an either without indicating whether it is left or
+      * right.
       */
     def showMerged: Shown = Shown(e.fold(_.show, _.show))
   }
@@ -119,13 +123,13 @@ trait ShowUtil extends cats.syntax.ShowSyntax {
     */
   implicit class ShowTraversableSyntax[T: Show](trav: Iterable[T]) {
 
-    /** Like `IterableOnce.mkString(String)` with the difference that
-      * individual elements are mapped to strings by using `show` is used instead of `toString`.
+    /** Like `IterableOnce.mkString(String)` with the difference that individual elements are mapped
+      * to strings by using `show` is used instead of `toString`.
       */
     def mkShow(sep: String = ", "): Shown = Shown(trav.map(_.show).mkString(sep))
 
-    /** Like `TraversableOnce.mkString(String, String, String)` with the difference that
-      * individual elements are mapped to strings by using `show` is used instead of `toString`.
+    /** Like `TraversableOnce.mkString(String, String, String)` with the difference that individual
+      * elements are mapped to strings by using `show` is used instead of `toString`.
       */
     def mkShow(start: String, sep: String, end: String): Shown = Shown(
       trav.map(_.show).mkString(start, sep, end)

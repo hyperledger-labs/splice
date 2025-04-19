@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import cats.data.OptionT
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
@@ -12,9 +13,9 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TimeQuery
+import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{PartyToParticipant, TopologyChangeOp}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -34,12 +35,12 @@ class DsoPartyHosting(
 ) extends NamedLogging {
 
   def isDsoPartyAuthorizedOn(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       mappings <-
-        listActivePartyToParticipantMappings(dsoParty, domainId, Some(participantId))
+        listActivePartyToParticipantMappings(dsoParty, synchronizerId, Some(participantId))
     } yield {
       logger.info("DSO party mappings to our participant: " + mappings.map(_.mapping))
       mappings.nonEmpty
@@ -47,13 +48,13 @@ class DsoPartyHosting(
 
   private def listActivePartyToParticipantMappings(
       party: PartyId,
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: Option[ParticipantId],
       timeQuery: TimeQuery = TimeQuery.HeadState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] =
     participantAdminConnection
       .listPartyToParticipant(
-        filterStore = domain.toProtoPrimitive,
+        store = TopologyStoreId.SynchronizerStore(domain).some,
         operation = Some(TopologyChangeOp.Replace),
         filterParticipant = participantId.fold("")(_.toProtoPrimitive),
         filterParty = party.toProtoPrimitive,
@@ -64,7 +65,7 @@ class DsoPartyHosting(
   // It is used in both candidate and sponsor side to ensure the party to participant are added successfully.
   // It returns the timestamp when the authorization becomes valid.
   def waitForDsoPartyToParticipantAuthorization(
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: ParticipantId,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retry(
@@ -88,7 +89,7 @@ class DsoPartyHosting(
     * if the participant is still included in the latest state.
     */
   private def getDsoPartyToParticipantTransaction(
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(for {

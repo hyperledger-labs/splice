@@ -1,0 +1,67 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestLockedAmulet where
+
+import DA.Time
+import Daml.Script
+
+import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
+import Splice.AmuletRules
+import Splice.Expiry
+import Splice.Scripts.Util
+
+testLocking : Script ()
+testLocking = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+
+  amuletCid <- tap app alice 1000.0
+
+  context <- getPaymentTransferContext app alice
+
+  let lockOutput = TransferOutput with
+        receiver = alice.primaryParty
+        receiverFeeRatio = 0.0
+        amount = 100.0
+        lock = Some TimeLock with
+          expiresAt = addRelTime now (days 2)
+          holders = [bob.primaryParty]
+          optContext = None
+
+
+  checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+    submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+    exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [InputAmulet amuletCid]
+        outputs = [lockOutput, lockOutput]
+        beneficiaries = None
+      context = context.context
+
+  [(lockedCid1, _), (lockedCid2, _)] <- query @LockedAmulet alice.primaryParty
+
+  submitMultiMustFail [alice.primaryParty] [app.dso] $
+    exerciseCmd lockedCid1 LockedAmulet_OwnerExpireLock with
+      openRoundCid = context.context.openMiningRound
+
+  submitMultiMustFail [alice.primaryParty] [app.dso] $
+    exerciseCmd lockedCid1 LockedAmulet_Unlock with
+      openRoundCid = context.context.openMiningRound
+
+  checkTxMetadata app TxKind_Unlock alice.primaryParty $
+    submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
+      exerciseCmd lockedCid1 LockedAmulet_Unlock with
+        openRoundCid = context.context.openMiningRound
+
+  passTime (days 2)
+
+  checkTxMetadata app TxKind_Unlock alice.primaryParty $
+    submitMulti [alice.primaryParty] [app.dso] $
+      exerciseCmd lockedCid2 LockedAmulet_OwnerExpireLock with
+        openRoundCid = context.context.openMiningRound
+
+  pure ()

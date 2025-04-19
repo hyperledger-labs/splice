@@ -1,9 +1,8 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.execution
 
-import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.admin.command_inspection_service.{
   CommandState,
   CommandStatus as ApiCommandStatus,
@@ -12,12 +11,14 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
 }
 import com.daml.ledger.api.v2.commands.Command
 import com.daml.ledger.api.v2.completion.Completion
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -129,7 +130,9 @@ trait CommandResultHandle {
   def failedSync(err: StatusRuntimeException): Unit
   def internalErrorSync(err: Throwable): Unit
 
-  def extractFailure[T](f: Future[T])(implicit executionContext: ExecutionContext): Future[T] =
+  def extractFailure[T](
+      f: FutureUnlessShutdown[T]
+  )(implicit executionContext: ExecutionContext): FutureUnlessShutdown[T] =
     f.transform {
       case ff @ Failure(err: StatusRuntimeException) =>
         failedSync(err)
@@ -178,19 +181,19 @@ trait CommandProgressTracker {
   def registerCommand(
       commandId: String,
       submissionId: Option[String],
-      applicationId: String,
+      userId: String,
       commands: Seq[Command],
       actAs: Set[String],
   )(implicit traceContext: TraceContext): CommandResultHandle
 
   def findHandle(
       commandId: String,
-      applicationId: String,
+      userId: String,
       actAs: Seq[String],
       submissionId: Option[String],
   ): CommandResultHandle
 
-  def processLedgerUpdate(update: Traced[TransactionLogUpdate]): Unit
+  def processLedgerUpdate(update: TransactionLogUpdate): Unit
 
 }
 
@@ -205,19 +208,19 @@ object CommandProgressTracker {
     override def registerCommand(
         commandId: String,
         submissionId: Option[String],
-        applicationId: String,
+        userId: String,
         commands: Seq[Command],
         actAs: Set[String],
     )(implicit traceContext: TraceContext): CommandResultHandle = CommandResultHandle.NoOp
 
     override def findHandle(
         commandId: String,
-        applicationId: String,
+        userId: String,
         actAs: Seq[String],
         submissionId: Option[String],
     ): CommandResultHandle =
       CommandResultHandle.NoOp
 
-    override def processLedgerUpdate(update: Traced[TransactionLogUpdate]): Unit = ()
+    override def processLedgerUpdate(update: TransactionLogUpdate): Unit = ()
   }
 }

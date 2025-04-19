@@ -23,7 +23,7 @@ object Trees {
   ): State = {
     var state = initialState
     val stack: mutable.Stack[StackElement] = mutable.Stack()
-    val roots = tree.getRootEventIds.asScala.map(id => tree.getEventsById.get(id))
+    val roots = tree.getRootNodeIds.asScala.map(id => tree.getEventsById.get(id))
     stack.pushAll(roots.map((_, Seq())).reverse)
     while (stack.nonEmpty) {
       val (node, pathToNode) = stack.pop()
@@ -32,7 +32,7 @@ object Trees {
           state = onCreate(state, created, pathToNode)
         case exercised: ExercisedEvent =>
           state = onExercise(state, exercised, pathToNode)
-          val children = exercised.getChildEventIds.asScala.map(tree.getEventsById.get(_))
+          val children = tree.getChildNodeIds(exercised).asScala.map(tree.getEventsById.get(_))
           stack.pushAll(children.map((_, pathToNode :+ node)).reverse)
         case _ =>
       }
@@ -43,32 +43,33 @@ object Trees {
   /** Returns a map that maps event ids to consecutive numbers, assigned by in-order traversing the transaction tree */
   def getLocalEventIndices(
       tree: TransactionTree
-  ): Map[String, Int] = {
+  ): Map[Int, Int] = {
     val eventsById = tree.getEventsById.asScala
     @tailrec
     def makeEventIdToNumber(
         pending: List[TreeEvent],
-        acc: Map[String, Int],
-    ): Map[String, Int] = {
+        acc: Map[Int, Int],
+    ): Map[Int, Int] = {
       pending match {
         case Nil =>
           acc
         case head :: tail =>
           head match {
             case created: CreatedEvent =>
-              makeEventIdToNumber(tail, acc + (created.getEventId -> acc.size))
+              makeEventIdToNumber(tail, acc + (created.getNodeId.intValue() -> acc.size))
             case exercised: ExercisedEvent =>
               makeEventIdToNumber(
-                exercised.getChildEventIds.asScala.map(eventsById).toList ++ tail,
-                acc + (exercised.getEventId -> acc.size),
+                tree.getChildNodeIds(exercised).asScala.map(eventsById).toList ++ tail,
+                acc + (exercised.getNodeId.intValue() -> acc.size),
               )
             case _ => sys.error(s"Unexpected event type: $head")
           }
       }
     }
     makeEventIdToNumber(
-      tree.getRootEventIds.asScala.map(eventsById).toList,
+      tree.getRootNodeIds.asScala.map(eventsById).toList,
       Map.empty,
     )
   }
+
 }

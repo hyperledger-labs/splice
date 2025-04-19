@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -28,13 +28,15 @@ class LfGenerator extends AnyWordSpec with BaseTest with ScalaCheckDrivenPropert
   }
 }
 
-/** Unlike the generators from the daml-lf repository, the transaction generator below creates well-formed
-  * (in the sense of GenTransaction#isWellFormed) transactions
+/** Unlike the generators from the daml-lf repository, the transaction generator below creates
+  * well-formed (in the sense of GenTransaction#isWellFormed) transactions
   */
 object LfGenerator {
   val lfGen = ValueGenerators
 
-  /** The LF generator generates huge (template) identifiers by default; truncate to something reasonable */
+  /** The LF generator generates huge (template) identifiers by default; truncate to something
+    * reasonable
+    */
   def truncateIdentifier(id: Ref.Identifier): Ref.Identifier = {
     def truncateDotted(name: Ref.DottedName): Ref.DottedName =
       Ref.DottedName.assertFromNames(

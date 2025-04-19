@@ -1,0 +1,3 @@
+# this .gitignore not only ignores the actual output files, but also ensures a checkout creates
+# the __tests__/actual directory, so that the test can actually write the output there.
+*.json

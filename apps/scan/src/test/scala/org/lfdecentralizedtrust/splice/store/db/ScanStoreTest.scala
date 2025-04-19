@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
@@ -66,6 +65,7 @@ import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
+  EventId,
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
 }
@@ -73,10 +73,11 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
 
 import java.time.Instant
 import java.util.{Collections, Optional}
@@ -213,7 +214,8 @@ abstract class ScanStoreTest
                 new splice.types.Round(2),
                 changeToInitialAmountAsOfRoundZero.bigDecimal,
                 holdingFee.bigDecimal,
-              )
+              ),
+              Optional.empty(),
             ).toValue,
             nextOffset(),
           )(
@@ -317,7 +319,7 @@ abstract class ScanStoreTest
         for {
           store <- mkStore()
           // Close the first 2 rounds, no events for them.
-          _ <- Seq(0L, 1L).traverse { round =>
+          _ <- MonadUtil.sequentialTraverse_(Seq(0L, 1L)) { round =>
             for {
               _ <- dummyDomain.create(
                 closedMiningRound(dsoParty, round)
@@ -326,7 +328,7 @@ abstract class ScanStoreTest
             } yield ()
           }
           amuletRulesContract = amuletRules()
-          _ <- balanceChanges.traverse { case (round, balanceChanges) =>
+          _ <- MonadUtil.sequentialTraverse_(balanceChanges) { case (round, balanceChanges) =>
             for {
               _ <- dummyDomain.exercise(
                 amuletRulesContract,
@@ -837,7 +839,7 @@ abstract class ScanStoreTest
     "getTotalPurchasedMemberTraffic" should {
 
       "return the sum over all traffic contracts for the member" in {
-        val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
+        val namespace = Namespace(Fingerprint.tryFromString(s"dummy"))
         val goodMember = ParticipantId(UniqueIdentifier.tryCreate("good", namespace))
         val badMember = MediatorId(UniqueIdentifier.tryCreate("bad", namespace))
         val goodContracts =
@@ -920,7 +922,7 @@ abstract class ScanStoreTest
           _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
         } yield {
           store
-            .findFeaturedAppRight(userParty(1))
+            .lookupFeaturedAppRight(userParty(1))
             .futureValue should be(expectedResult)
         }
       }
@@ -1417,7 +1419,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1463,7 +1465,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1501,7 +1503,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1534,7 +1536,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1573,7 +1575,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1599,7 +1601,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1637,7 +1639,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1664,7 +1666,7 @@ abstract class ScanStoreTest
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
-                s"${tx.getUpdateId}:0",
+                EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, 0),
                 PartyId.tryFromProtoPrimitive(transferCmd.payload.sender),
                 transferCmd.payload.nonce,
                 transferCmd.contractId.contractId,
@@ -1727,7 +1729,7 @@ abstract class ScanStoreTest
           )
           transferCmd1Status =
             TransferCommandTxLogEntry(
-              s"${tx1.getUpdateId}:0",
+              EventId.prefixedFromUpdateIdAndNodeId(tx1.getUpdateId, 0),
               PartyId.tryFromProtoPrimitive(transferCmd1.payload.sender),
               transferCmd1.payload.nonce,
               transferCmd1.contractId.contractId,
@@ -1755,21 +1757,21 @@ abstract class ScanStoreTest
             transferCmd4,
           )
           transferCmd2Status = TransferCommandTxLogEntry(
-            s"${tx2.getUpdateId}:0",
+            EventId.prefixedFromUpdateIdAndNodeId(tx2.getUpdateId, 0),
             PartyId.tryFromProtoPrimitive(transferCmd2.payload.sender),
             transferCmd2.payload.nonce,
             transferCmd2.contractId.contractId,
             TransferCommandTxLogEntry.Status.Created(TransferCommandCreated()),
           )
           transferCmd3Status = TransferCommandTxLogEntry(
-            s"${tx3.getUpdateId}:0",
+            EventId.prefixedFromUpdateIdAndNodeId(tx3.getUpdateId, 0),
             PartyId.tryFromProtoPrimitive(transferCmd3.payload.sender),
             transferCmd3.payload.nonce,
             transferCmd3.contractId.contractId,
             TransferCommandTxLogEntry.Status.Created(TransferCommandCreated()),
           )
           transferCmd4Status = TransferCommandTxLogEntry(
-            s"${tx4.getUpdateId}:0",
+            EventId.prefixedFromUpdateIdAndNodeId(tx4.getUpdateId, 0),
             PartyId.tryFromProtoPrimitive(transferCmd4.payload.sender),
             transferCmd4.payload.nonce,
             transferCmd4.contractId.contractId,
@@ -1923,6 +1925,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       receiver.toProtoPrimitive,
       java.util.List.of(mkInputAmulet()),
       java.util.List.of(mkTransferOutput(receiver, amount)),
+      Optional.empty(),
     )
 
   def mkTransferContext() = new splice.amuletrules.TransferContext(
@@ -1949,6 +1952,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       provider.toProtoPrimitive,
       transferInputs.asJava,
       transferOutputs.asJava,
+      Optional.empty(),
     )
 
   def mkAmuletRules_Transfer(transfer: splice.amuletrules.Transfer) =
@@ -2009,6 +2013,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       ),
       java.util.List.of(),
       Optional.empty(),
+      Optional.empty(),
     )
 
   def mkTransferResultRecord(
@@ -2051,6 +2056,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       ),
       new java.math.BigDecimal(inputAmuletAmount),
       memberTrafficCid,
+      Optional.empty(),
       Optional.empty(),
     ).toValue
 
@@ -2179,7 +2185,8 @@ trait AmuletTransferUtil { self: StoreTest =>
         new splice.types.Round(round),
         changeToInitialAmountAsOfRoundZero.bigDecimal,
         changeToHoldingFeesRate.bigDecimal,
-      )
+      ),
+      Optional.empty(),
     ).toValue
 
   def amuletTemplate(amount: Double, owner: PartyId) = {
@@ -2202,7 +2209,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       epoch: Long = 123,
   ) = {
     val templateId = dsorulesCodegen.DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID
-    val newDomainId = "new-domain-id"
+    val newSynchronizerId = "new-domain-id"
     val template = new dsorulesCodegen.DsoRules(
       dsoParty.toProtoPrimitive,
       epoch,
@@ -2223,8 +2230,8 @@ trait AmuletTransferUtil { self: StoreTest =>
         1,
         new decentralizedsynchronizerCodegen.DsoDecentralizedSynchronizerConfig(
           Collections.emptyMap(),
-          newDomainId,
-          newDomainId,
+          newSynchronizerId,
+          newSynchronizerId,
         ),
         Optional.empty(),
       ),
@@ -2329,14 +2336,14 @@ class DbScanStoreTest
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(DomainAlias.tryCreate(domain) -> dummyDomain)
+        Map(SynchronizerAlias.tryCreate(domain) -> dummyDomain)
       )
     } yield store
   }
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[?] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

@@ -48,7 +48,7 @@ def _setup_logger(name, loglevel, file_path):
     # Ensure the log directory exists
     log_directory = os.path.dirname(file_path)
     if log_directory and not os.path.exists(log_directory):
-      os.makedirs(log_directory)
+        os.makedirs(log_directory)
 
     file_handler = logging.FileHandler(file_path)
     file_handler.setFormatter(
@@ -1026,6 +1026,14 @@ class LfValue:
     # data AmuletExpireSummary -> round
     def get_amulet_expire_summary_round(self):
         return self.__get_record_field("round").__get_round_number()
+
+    # data AmuletRules_ConvertFeaturedAppActivityMarkers -> openRoundCid
+    def get_amuletrules_convertfeaturedappactivitymarkers_openroundcid(self):
+        return self.__get_record_field("openMiningRoundCid").get_contract_id()
+
+    # data TransferInstructionResult -> output
+    def get_transferinstructionresult_output(self):
+        return self.__get_record_field("output").__get_variant()
 
     # data SteppedRate
     def __get_stepped_rate(self):
@@ -2050,7 +2058,10 @@ class State:
             case TemplateQualifiedNames.dso_bootstrap:
                 pass
             case _:
-                self._fail(transaction, f"Unexpected root CreatedEvent: {event}")
+                self._fail(
+                    transaction,
+                    f"Unexpected root CreatedEvent: {event} for transaction: {transaction}",
+                )
         return HandleTransactionResult.empty()
 
     def handle_receive_sv_reward_coupon(self, transaction, event):
@@ -2944,7 +2955,7 @@ class State:
         )
         return HandleTransactionResult.for_open_round(round_number)
 
-    def handle_locked_owner_expire_lock(self, transaction, event):
+    def handle_locked_owner_expire_lock(self, transaction, event, log_prefix="ExpireUnlock"):
         summary = (
             event.exercise_result.get_locked_amulet_owner_expire_lock_result_amulet_sum()
         )
@@ -2956,7 +2967,7 @@ class State:
         formatted_amulet = self.format_amulet(amulet_cid, amulet)
         self._txinfo(
             transaction,
-            "ExpireUnlock",
+            log_prefix,
             f"Amulet {formatted_amulet} was unlocked because lock expired",
         )
         return HandleTransactionResult.for_open_round(round_number)
@@ -3478,6 +3489,155 @@ class State:
         # Not associated with any round so just return an empty result
         return HandleTransactionResult.empty()
 
+    def handle_convert_featured_app_activity_markers(self, transaction, event):
+        assert len(event.child_event_ids) == 1
+        event = transaction.events_by_id[event.child_event_ids[0]]
+        assert event.choice_name == "AmuletRules_ConvertFeaturedAppActivityMarkers"
+        open_round = self.active_contracts[
+            event.exercise_argument.get_amuletrules_convertfeaturedappactivitymarkers_openroundcid()
+        ]
+        round_number = open_round.payload.get_open_mining_round_round()
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, CreatedEvent)
+                and child_event.template_id.qualified_name
+                == TemplateQualifiedNames.app_reward_coupon
+            ):
+                self.active_contracts[child_event.contract_id] = child_event
+        return HandleTransactionResult.for_open_round(round_number)
+
+    def handle_locked_input(self, child_event, transaction):
+        if (
+            isinstance(child_event, ExercisedEvent)
+            and child_event.choice_name == "LockedAmulet_OwnerExpireLock"
+        ):
+            self.handle_locked_owner_expire_lock(
+                transaction, child_event, log_prefix="Unlock transfer inputs with expired locks"
+            )
+
+    def handle_transfer_factory_transfer(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            self.handle_locked_input(child_event, transaction)
+            # There is either a TransferPreapproval_Send
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "TransferPreapproval_Send"
+            ):
+                return self.handle_transfer_preapproval_send(
+                    transaction, child_event
+                )
+            # Or a direct call to AmuletRules_Transfer
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                output = event.exercise_result.get_transferinstructionresult_output()
+                description = "Token standard: offer transfer" if output["tag"] == "TransferInstructionResult_Pending" else "Token standard: self-transfer"
+                return self.handle_transfer(
+                    transaction, child_event, description=description
+                )
+        raise Exception(
+            f"Could not find TransferPreapproval_Send or AmuletRules_Transfer child event for TransferFactory_Transfer: {transaction}"
+        )
+
+    def handle_transfer_instruction_accept(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: unlock funds for accepted transfer"
+                )
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction, child_event, description="Token standard: accept transfer"
+                )
+        raise Exception(
+            f"Could not find AmuletRules_Transfer child of TransferInstruction_Accept"
+        )
+
+    def handle_transfer_instruction_reject(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: offer rejected - return locked funds"
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
+
+    def handle_transfer_instruction_withdraw(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: offer withdrawn - return locked funds"
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
+
+    def handle_allocation_factory_allocate(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            self.handle_locked_input(child_event, transaction)
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction, child_event, description="Token standard: lock funds for allocation "
+                )
+        raise Exception(
+            f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
+        )
+
+    def handle_allocation_execute_transfer(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: unlock allocated funds"
+                )
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction, child_event, description="Token standard: execute allocated transfer"
+                )
+        raise Exception(
+            f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
+        )
+
+    def handle_allocation_withdraw(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction, child_event, log_prefix="Token standard: allocation withdrawn - return locked funds"
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
+
     def handle_root_exercised_event(self, transaction, event):
         LOG.debug(f"Root exercise: {event.choice_name}")
         match event.choice_name:
@@ -3622,6 +3782,34 @@ class State:
                 return HandleTransactionResult.empty()
             case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()
+            case "FeaturedAppRight_CreateActivityMarker":
+                return HandleTransactionResult.empty()
+            case "DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers":
+                return self.handle_convert_featured_app_activity_markers(
+                    transaction, event
+                )
+            case "TransferFactory_Transfer":
+                return self.handle_transfer_factory_transfer(transaction, event)
+            case "TransferFactory_PublicFetch":
+                return HandleTransactionResult.empty()
+            case "TransferInstruction_Accept":
+                return self.handle_transfer_instruction_accept(transaction, event)
+            case "TransferInstruction_Reject":
+                return self.handle_transfer_instruction_reject(transaction, event)
+            case "TransferInstruction_Withdraw":
+                return self.handle_transfer_instruction_withdraw(transaction, event)
+            # case "TransferInstruction_Update": -- intentionally not handled, as it is not used by Amulet
+            case "AllocationFactory_Allocate":
+                return self.handle_allocation_factory_allocate(transaction, event)
+            case "AllocationFactory_PublicFetch":
+                return HandleTransactionResult.empty()
+            case "Allocation_ExecuteTransfer":
+                return self.handle_allocation_execute_transfer(transaction, event)
+            case "Allocation_Withdraw":
+                return self.handle_allocation_withdraw(transaction, event)
+            # case "AllocationInstruction_Withdraw": -- intentionally not handled, as it is not used by Amulet
+            # case "AllocationInstruction_Update": -- intentionally not handled, as it is not used by Amulet
+            # no handling of `AllocationRequest` choices as they are not visible to the DSO party
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"
 
@@ -3755,7 +3943,7 @@ class AppState:
                     LOG.debug(f"Saved app state to {args.cache_file_path}")
             except Exception as e:
                 LOG.error(f"Could not save app state to {args.cache_file_path}: {e}")
-                os.replace(backup, args.cache_file_path) # overwrite if present
+                os.replace(backup, args.cache_file_path)  # overwrite if present
                 backup = None
             if backup:
                 os.remove(backup)
@@ -3763,6 +3951,7 @@ class AppState:
     def finalize_batch(self, args):
         self._save_to_cache(args)
         self.state.flush_report()
+
 
 def _rename_to_backup(filename):
     """Rename FILENAME to a unique name in the same folder with leading and
@@ -3783,6 +3972,7 @@ def _rename_to_backup(filename):
                 pass
             except IsADirectoryError:
                 pass
+
 
 def _parse_cli_args():
     # Parse command line arguments

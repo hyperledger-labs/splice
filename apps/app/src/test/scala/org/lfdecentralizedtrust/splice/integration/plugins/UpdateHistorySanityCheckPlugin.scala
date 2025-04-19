@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.Identifier
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllScanAppConfigs_
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
+import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponse, UpdateHistoryItem}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.members
@@ -40,7 +40,7 @@ class UpdateHistorySanityCheckPlugin(
     ignoredRootCreates: Seq[Identifier],
     ignoredRootExercises: Seq[(Identifier, String)],
     protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment]
+) extends EnvironmentSetupPlugin[SpliceConfig, SpliceEnvironment]
     with Matchers
     with Eventually
     with Inspectors
@@ -138,6 +138,7 @@ class UpdateHistorySanityCheckPlugin(
         case (otherItem, idx) if founderComparable(idx) != otherItem =>
           otherItem -> founderComparable(idx)
       }
+
       different should be(empty)
     }
   }

@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.util.ShowUtil.*
@@ -20,7 +20,8 @@ class SequencerPruningIntegrationTest
     with WalletTestUtil
     with ProcessTestUtil {
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     super.environmentDefinition
       .addConfigTransforms(
         (_, config) =>
@@ -53,7 +54,7 @@ class SequencerPruningIntegrationTest
                 bobValidatorConfig
                   .copy(
                     participantClient = ParticipantClientConfig(
-                      ClientConfig(port = Port.tryCreate(5902)),
+                      FullClientConfig(port = Port.tryCreate(5902)),
                       bobValidatorConfig.participantClient.ledgerApi.copy(
                         clientConfig =
                           bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(

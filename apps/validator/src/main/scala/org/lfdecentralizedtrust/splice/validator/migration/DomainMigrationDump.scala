@@ -7,9 +7,8 @@ import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.migration.{Dar, ParticipantUsersData}
-import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.google.protobuf.ByteString
 import io.circe.{Codec, Decoder, Encoder}
 
@@ -17,7 +16,7 @@ import java.util.Base64
 import java.time.Instant
 
 final case class DomainMigrationDump(
-    domainId: DomainId,
+    domainId: SynchronizerId,
     migrationId: Long,
     participant: NodeIdentitiesDump,
     participantUsers: Option[ParticipantUsersData],
@@ -29,7 +28,7 @@ final case class DomainMigrationDump(
   override def pretty: Pretty[DomainMigrationDump.this.type] =
     Pretty.prettyNode(
       "DomainMigrationDump",
-      param("domainId", _.domainId),
+      param("synchronizerId", _.domainId),
       param("migrationId", _.migrationId),
       param("participant", _.participant),
       param("participantUsers", _.participantUsers),
@@ -46,7 +45,7 @@ final case class DomainMigrationDump(
     acsTimestamp = acsTimestamp.toString,
     dars = dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
-      http.Dar(dar.hash.toHexString, content)
+      http.Dar(dar.mainPackageId, content)
     }.toVector,
     migrationId = migrationId,
     domainId = domainId.toProtoPrimitive,
@@ -68,7 +67,7 @@ object DomainMigrationDump {
       .fromHttp(ParticipantId.tryFromProtoPrimitive, response.participant)
       .leftMap(_ => "Failed to parse Participant Node Identities")
     participantUsers = response.participantUsers.map(ParticipantUsersData.fromHttp)
-    domainId <- DomainId fromString response.domainId
+    domainId <- SynchronizerId fromString response.domainId
     migrationId = response.migrationId
     acsSnapshot = {
       val decoded = base64Decoder.decode(response.acsSnapshot)
@@ -76,7 +75,7 @@ object DomainMigrationDump {
     }
     dars = response.dars.map { dar =>
       val decoded = base64Decoder.decode(dar.content)
-      Dar(Hash.tryFromHexString(dar.hash), ByteString.copyFrom(decoded))
+      Dar(dar.hash, ByteString.copyFrom(decoded))
     }
     createdAt = Instant.parse(response.createdAt)
   } yield DomainMigrationDump(

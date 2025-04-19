@@ -3,8 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.plugins
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.metrics.MetricsReporterConfig
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
+import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
@@ -19,7 +18,10 @@ import sys.process.*
   * that will be required by the following test, but leaves the port in a TIME_WAIT state.
   */
 case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
-    extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTests.SpliceTestConsoleEnvironment]
+    extends EnvironmentSetupPlugin[
+      SpliceConfig,
+      SpliceEnvironment,
+    ]
     with BaseTest {
 
   protected val timeout = 2.minutes

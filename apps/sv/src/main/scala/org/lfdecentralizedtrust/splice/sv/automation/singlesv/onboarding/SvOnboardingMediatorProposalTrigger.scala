@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboa
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.MemberIdUtil
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, MediatorId, SequencerId}
+import com.digitalasset.canton.topology.{SynchronizerId, MediatorId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -49,8 +49,10 @@ class SvOnboardingMediatorProposalTrigger(
   ): Future[Seq[MediatorToOnboard]] = {
     for {
       rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
-      domainId = rulesAndStates.dsoRules.domain
-      currentMediatorState <- participantAdminConnection.getMediatorDomainState(domainId)
+      synchronizerId = rulesAndStates.dsoRules.domain
+      currentMediatorState <- participantAdminConnection.getMediatorSynchronizerState(
+        synchronizerId
+      )
     } yield {
       val currentSynchronizerConfigs = rulesAndStates.currentSynchronizerNodeConfigs()
       val synchronizerNodeConfiguredNodes = currentSynchronizerConfigs
@@ -70,7 +72,7 @@ class SvOnboardingMediatorProposalTrigger(
           }
           .map { case (mediatorId, sequencerId) =>
             MediatorToOnboard(
-              domainId,
+              synchronizerId,
               mediatorId,
               sequencerId,
             )
@@ -95,7 +97,7 @@ class SvOnboardingMediatorProposalTrigger(
         "sequencer_added_to_topology_state",
         s"Sequencer is added to the topology state for $task",
         participantAdminConnection
-          .getSequencerDomainState(task.domainId)
+          .getSequencerSynchronizerState(task.synchronizerId)
           .map(state =>
             // required so that the mediator doesn't have an assigned counter when the sequencer initializes from the snapshot
             // if the mediator would have a counter, it will not be able to initialize from the sequencer
@@ -106,8 +108,8 @@ class SvOnboardingMediatorProposalTrigger(
           ),
         logger,
       )
-      _ <- participantAdminConnection.ensureMediatorDomainStateAdditionProposal(
-        task.domainId,
+      _ <- participantAdminConnection.ensureMediatorSynchronizerStateAdditionProposal(
+        task.synchronizerId,
         task.mediatorId,
         RetryFor.Automation,
       )
@@ -119,7 +121,7 @@ class SvOnboardingMediatorProposalTrigger(
   override protected def isStaleTask(task: MediatorToOnboard)(implicit
       tc: TraceContext
   ): Future[Boolean] =
-    participantAdminConnection.getMediatorDomainState(task.domainId).map { state =>
+    participantAdminConnection.getMediatorSynchronizerState(task.synchronizerId).map { state =>
       state.mapping.active.contains(task.mediatorId)
     }
 }
@@ -127,12 +129,12 @@ class SvOnboardingMediatorProposalTrigger(
 object SvOnboardingMediatorProposalTrigger {
 
   case class MediatorToOnboard(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       mediatorId: MediatorId,
       sequencerId: SequencerId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[MediatorToOnboard.this.type] = prettyOfClass(
-      param("domainId", _.domainId),
+      param("synchronizerId", _.synchronizerId),
       param("mediatorId", _.mediatorId),
       param("sequencerId", _.sequencerId),
     )

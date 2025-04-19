@@ -1,10 +1,11 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
 
 import com.daml.grpc.GrpcStatus
 import com.daml.logging.entries.{LoggingValue, ToLoggingValue}
+import com.google.rpc.status.Status as ProtoStatus
 import io.grpc.{StatusRuntimeException, protobuf}
 
 sealed abstract class SubmissionResult extends Product with Serializable {
@@ -20,7 +21,8 @@ object SubmissionResult {
 
   /** The submission has failed with a synchronous error.
     *
-    * Asynchronous errors are reported via the command completion stream as a [[Update.CommandRejected]]
+    * Asynchronous errors are reported via the command completion stream as a
+    * [[Update.CommandRejected]]
     *
     * See the documentation in `error.proto` for how to report common submission errors.
     */
@@ -40,5 +42,10 @@ object SubmissionResult {
             "message" -> error.status.message,
           )
         )
+
+    def apply(status: com.google.rpc.Status): SynchronousError = new SynchronousError(
+      ProtoStatus.fromJavaProto(status)
+    )
+
   }
 }

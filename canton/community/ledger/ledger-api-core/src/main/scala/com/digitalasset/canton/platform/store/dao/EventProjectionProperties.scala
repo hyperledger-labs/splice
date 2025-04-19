@@ -1,28 +1,35 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
 
-import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.api.domain.{CumulativeFilter, TemplateWildcardFilter}
+import com.digitalasset.canton.ledger.api.{CumulativeFilter, EventFormat, TemplateWildcardFilter}
+import com.digitalasset.canton.platform.index.IndexServiceImpl.InterfaceViewPackageUpgrade
 import com.digitalasset.canton.platform.store.dao.EventProjectionProperties.Projection
+import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.*
+import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.View
+import scala.concurrent.Future
 
-/**  This class encapsulates the logic of how contract arguments and interface views are
-  *  being projected to the consumer based on the filter criteria and the relation between
-  *  interfaces and templates implementing them.
+/** This class encapsulates the logic of how contract arguments and interface views are being
+  * projected to the consumer based on the filter criteria and the relation between interfaces and
+  * templates implementing them.
   *
-  * @param verbose enriching in verbose mode
-  * @param templateWildcardWitnesses all the parties for which contract arguments will be
-  *                                  populated for all the templates,if None then contract arguments
-  *                                  for all the parties and for all the templates will be populated
-  * @param witnessTemplateProjections per witness party, per template projections
-  * @param templateWildcardCreatedEventBlobParties parties for which the created event blob will be
-  *                                                populated for all the templates, if None then
-  *                                                blobs for all the parties and all the templates
-  *                                                will be populated
+  * @param verbose
+  *   enriching in verbose mode
+  * @param templateWildcardWitnesses
+  *   all the parties for which contract arguments will be populated for all the templates,if None
+  *   then contract arguments for all the parties and for all the templates will be populated
+  * @param witnessTemplateProjections
+  *   per witness party, per template projections
+  * @param templateWildcardCreatedEventBlobParties
+  *   parties for which the created event blob will be populated for all the templates, if None then
+  *   blobs for all the parties and all the templates will be populated
+  * @param interfaceViewPackageUpgrade
+  *   computes which interface instance version should be used for rendering an interface view for a
+  *   given interface instance
   */
 final case class EventProjectionProperties(
     verbose: Boolean,
@@ -32,6 +39,10 @@ final case class EventProjectionProperties(
     templateWildcardCreatedEventBlobParties: Option[Set[String]] = Some(
       Set.empty
     ), // TODO(#19364) fuse with the templateWildcardWitnesses into a templateWildcard Projection and potentially include it into the following Map
+)(
+    // Note: including this field in a separate argument list to the case class to not affect the deep equality check of the
+    //       regular argument list
+    val interfaceViewPackageUpgrade: InterfaceViewPackageUpgrade
 ) {
   def render(witnesses: Set[String], templateId: Identifier): Projection =
     (witnesses.iterator.map(Some(_))
@@ -64,76 +75,95 @@ object EventProjectionProperties {
       )
   }
 
-  /** @param transactionFilter     Transaction filter as defined by the consumer of the API.
-    * @param verbose                enriching in verbose mode
-    * @param interfaceImplementedBy The relation between an interface id and template id.
-    *                               If template has no relation to the interface,
-    *                               an empty Set must be returned.
-    * @param alwaysPopulateArguments If this flag is set, the witnessTemplate filter will
-    *                                be populated with all the parties, so that rendering of
-    *                                contract arguments and contract keys is always true.
+  /** @param eventFormat
+    *   EventFormat as defined by the consumer of the API.
+    * @param interfaceImplementedBy
+    *   The relation between an interface id and template id. If template has no relation to the
+    *   interface, an empty Set must be returned.
+    * @param alwaysPopulateArguments
+    *   If this flag is set, the witnessTemplate filter will be populated with all the parties, so
+    *   that rendering of contract arguments and contract keys is always true.
     */
   def apply(
-      transactionFilter: domain.TransactionFilter,
-      verbose: Boolean,
+      eventFormat: EventFormat,
+      interfaceImplementedBy: Identifier => Set[Identifier],
+      resolveTypeConRef: TypeConRef => Set[Identifier],
+      interfaceViewPackageUpgrade: InterfaceViewPackageUpgrade,
+      alwaysPopulateArguments: Boolean,
+  ): EventProjectionProperties =
+    EventProjectionProperties(
+      verbose = eventFormat.verbose,
+      templateWildcardWitnesses = templateWildcardWitnesses(eventFormat, alwaysPopulateArguments),
+      templateWildcardCreatedEventBlobParties =
+        templateWildcardCreatedEventBlobParties(eventFormat),
+      witnessTemplateProjections = witnessTemplateProjections(
+        eventFormat,
+        interfaceImplementedBy,
+        resolveTypeConRef,
+      ),
+    )(
+      interfaceViewPackageUpgrade = interfaceViewPackageUpgrade
+    )
+
+  @VisibleForTesting
+  val UseOriginalViewPackageId: InterfaceViewPackageUpgrade =
+    (_: Ref.ValueRef, originalTemplateImplementation: Ref.ValueRef) =>
+      Future.successful(Right(originalTemplateImplementation))
+
+  @VisibleForTesting
+  def apply(
+      eventFormat: EventFormat,
       interfaceImplementedBy: Identifier => Set[Identifier],
       resolveTypeConRef: TypeConRef => Set[Identifier],
       alwaysPopulateArguments: Boolean,
   ): EventProjectionProperties =
     EventProjectionProperties(
-      verbose = verbose,
-      templateWildcardWitnesses =
-        templateWildcardWitnesses(transactionFilter, alwaysPopulateArguments),
-      templateWildcardCreatedEventBlobParties =
-        templateWildcardCreatedEventBlobParties(transactionFilter),
-      witnessTemplateProjections = witnessTemplateProjections(
-        transactionFilter,
-        interfaceImplementedBy,
-        resolveTypeConRef,
-      ),
+      eventFormat = eventFormat,
+      interfaceImplementedBy = interfaceImplementedBy,
+      resolveTypeConRef = resolveTypeConRef,
+      alwaysPopulateArguments = alwaysPopulateArguments,
+      interfaceViewPackageUpgrade = (_: Ref.ValueRef, _: Ref.ValueRef) =>
+        Future.failed(
+          new UnsupportedOperationException("Not expected to be called in unit tests")
+        ),
     )
 
   private def templateWildcardWitnesses(
-      domainTransactionFilter: domain.TransactionFilter,
+      apiTransactionFilter: EventFormat,
       alwaysPopulateArguments: Boolean,
   ): Option[Set[String]] =
     if (alwaysPopulateArguments) {
-      domainTransactionFilter.filtersForAnyParty match {
+      apiTransactionFilter.filtersForAnyParty match {
         case Some(_) => None
         // filters for any party (party-wildcard) is not defined, getting the template wildcard witnesses from the filters by party
         case None =>
           Some(
-            domainTransactionFilter.filtersByParty.keysIterator
-              .map(_.toString)
-              .toSet
+            apiTransactionFilter.filtersByParty.keysIterator.toSet
           )
       }
     } else
-      domainTransactionFilter.filtersForAnyParty match {
+      apiTransactionFilter.filtersForAnyParty match {
         case Some(cumulative) if cumulative.templateWildcardFilter.isDefined => None
         // filters for any party (party-wildcard) not defined at all or defined but for specific templates, getting the template wildcard witnesses from the filters by party
         case _ =>
           Some(
-            domainTransactionFilter.filtersByParty.iterator
-              .collect {
-                case (party, cumulative) if cumulative.templateWildcardFilter.isDefined =>
-                  party
-              }
-              .map(_.toString)
-              .toSet
+            apiTransactionFilter.filtersByParty.iterator.collect {
+              case (party, cumulative) if cumulative.templateWildcardFilter.isDefined =>
+                party
+            }.toSet
           )
       }
 
   private def templateWildcardCreatedEventBlobParties(
-      domainTransactionFilter: domain.TransactionFilter
+      apiTransactionFilter: EventFormat
   ): Option[Set[String]] =
-    domainTransactionFilter.filtersForAnyParty match {
+    apiTransactionFilter.filtersForAnyParty match {
       case Some(CumulativeFilter(_, _, Some(TemplateWildcardFilter(true)))) =>
         None // include blobs for all templates and all parties
       // filters for any party (party-wildcard) not defined at all or defined but for specific templates, getting the template wildcard witnesses from the filters by party
       case _ =>
         Some(
-          domainTransactionFilter.filtersByParty.iterator
+          apiTransactionFilter.filtersByParty.iterator
             .collect {
               case (
                     party,
@@ -147,15 +177,15 @@ object EventProjectionProperties {
     }
 
   private def witnessTemplateProjections(
-      domainTransactionFilter: domain.TransactionFilter,
+      apiEventFormat: EventFormat,
       interfaceImplementedBy: Identifier => Set[Identifier],
       resolveTypeConRef: TypeConRef => Set[Identifier],
   ): Map[Option[String], Map[Identifier, Projection]] = {
     val partyFilterPairs =
-      domainTransactionFilter.filtersByParty.view.map { case (p, f) =>
+      apiEventFormat.filtersByParty.view.map { case (p, f) =>
         (Some(p), f)
       } ++
-        domainTransactionFilter.filtersForAnyParty.toList.view.map((None, _))
+        apiEventFormat.filtersForAnyParty.toList.view.map((None, _))
     (for {
       (partyO, cumulativeFilter) <- partyFilterPairs
     } yield {

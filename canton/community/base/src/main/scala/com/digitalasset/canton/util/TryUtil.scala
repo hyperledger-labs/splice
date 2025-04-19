@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -10,9 +10,10 @@ import scala.util.{Failure, Success, Try}
 
 object TryUtil {
 
-  /** Constructs a `Try` using the by-name parameter.  This
-    * method will ensure any non-fatal exception and [[java.lang.InterruptedException]] is caught and a
-    * `Failure` object is returned.
+  val unit: Try[Unit] = Success(())
+
+  /** Constructs a `Try` using the by-name parameter. This method will ensure any non-fatal
+    * exception and [[java.lang.InterruptedException]] is caught and a `Failure` object is returned.
     */
   def tryCatchInterrupted[A](r: => A): Try[A] =
     try Success(r)
@@ -29,8 +30,8 @@ object TryUtil {
     def valueOr[B >: A](f: Throwable => B): B = a.fold(f, identity)
   }
 
-  /** Unwraps all [[java.util.concurrent.CompletionException]] from a failure and
-    * leaves only the wrapped causes (unless there is no such cause)
+  /** Unwraps all [[java.util.concurrent.CompletionException]] from a failure and leaves only the
+    * wrapped causes (unless there is no such cause)
     */
   def unwrapCompletionException[A](x: Try[A]): Try[A] = x match {
     case _: Success[_] => x

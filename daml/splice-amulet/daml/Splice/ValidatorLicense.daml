@@ -56,7 +56,6 @@ template ValidatorLicense with
     faucetState : Optional FaucetState
     metadata : Optional ValidatorLicenseMetadata
     lastActiveAt : Optional Time -- ^ Last time this validator was active. Tracked to get a view on the set of validator nodes that are up and running.
-
   where
     signatory dso -- sponsor is not a signatory as that complicates re-issuing crates
     observer validator -- not a signatory to simplify the creation of the license as part of onboarding

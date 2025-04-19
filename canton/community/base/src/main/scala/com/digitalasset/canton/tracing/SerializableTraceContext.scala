@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -17,8 +17,8 @@ import com.digitalasset.canton.version.{
 }
 import com.typesafe.scalalogging.Logger
 
-/** Wrapper around [[TraceContext]] to keep serialization out of the [[TraceContext]] itself
-  * and thereby reduce its dependencies.
+/** Wrapper around [[TraceContext]] to keep serialization out of the [[TraceContext]] itself and
+  * thereby reduce its dependencies.
   */
 final case class SerializableTraceContext(traceContext: TraceContext)
     extends HasVersionedWrapper[SerializableTraceContext] {
@@ -47,9 +47,9 @@ object SerializableTraceContext
     with HasVersionedMessageCompanionDbHelpers[SerializableTraceContext] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v32,
+      ProtocolVersion.v33,
       supportedProtoVersion(v30.TraceContext)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
@@ -58,8 +58,8 @@ object SerializableTraceContext
 
   val empty: SerializableTraceContext = SerializableTraceContext(TraceContext.empty)
 
-  /** Construct a TraceContext from provided protobuf structure.
-    * Errors will be logged at a WARN level using the provided storageLogger and an empty TraceContext will be returned.
+  /** Construct a TraceContext from provided protobuf structure. Errors will be logged at a WARN
+    * level using the provided storageLogger and an empty TraceContext will be returned.
     */
   def fromProtoSafeV30Opt(logger: Logger)(
       traceContextP: Option[v30.TraceContext]

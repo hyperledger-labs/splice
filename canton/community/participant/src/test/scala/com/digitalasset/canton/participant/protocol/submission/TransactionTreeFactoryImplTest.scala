@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -49,7 +49,7 @@ final class TransactionTreeFactoryImplTest
   def createTransactionTreeFactory(version: ProtocolVersion): TransactionTreeFactoryImpl =
     TransactionTreeFactoryImpl(
       ExampleTransactionFactory.submittingParticipant,
-      factory.domainId,
+      factory.synchronizerId,
       version,
       factory.cryptoOps,
       loggerFactory,
@@ -66,16 +66,16 @@ final class TransactionTreeFactoryImplTest
     val submitterInfo = DefaultParticipantStateValues.submitterInfo(actAs)
     treeFactory
       .createTransactionTree(
-        transaction,
-        submitterInfo,
-        Some(WorkflowId.assertFromString("testWorkflowId")),
-        factory.mediatorGroup,
-        factory.transactionSeed,
-        factory.transactionUuid,
-        snapshot,
-        contractInstanceOfId,
-        keyResolver,
-        factory.ledgerTime.plusSeconds(100),
+        transaction = transaction,
+        submitterInfo = submitterInfo,
+        workflowId = Some(WorkflowId.assertFromString("testWorkflowId")),
+        mediator = factory.mediatorGroup,
+        transactionSeed = factory.transactionSeed,
+        transactionUuid = factory.transactionUuid,
+        topologySnapshot = snapshot,
+        contractOfId = contractInstanceOfId,
+        keyResolver = keyResolver,
+        maxSequencingTime = factory.ledgerTime.plusSeconds(100),
         validatePackageVettings = true,
       )
       .failOnShutdown

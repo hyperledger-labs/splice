@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -7,8 +7,11 @@ import com.digitalasset.canton.tracing.TracingConfig.{Propagation, Tracer}
 
 import scala.concurrent.duration.FiniteDuration
 
-/** @param propagation       How should trace contexts (debugging details associated with actions) be propagated between nodes.
-  * @param tracer            Tracer configuration
+/** @param propagation
+  *   How should trace contexts (debugging details associated with actions) be propagated between
+  *   nodes.
+  * @param tracer
+  *   Tracer configuration
   */
 final case class TracingConfig(
     propagation: Propagation = Propagation.Enabled,

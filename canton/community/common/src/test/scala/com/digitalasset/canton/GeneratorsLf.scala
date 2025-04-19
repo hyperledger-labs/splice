@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -6,7 +6,7 @@ package com.digitalasset.canton
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, TestHash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.{
-  AuthenticatedContractIdVersionV10,
+  AuthenticatedContractIdVersionV11,
   ExampleTransactionFactory,
   LfContractId,
   LfGlobalKey,
@@ -32,6 +32,22 @@ object GeneratorsLf {
     Arbitrary.arbitrary[CantonTimestamp].map(_.underlying)
   )
 
+  implicit val LedgerUserIdArb: Arbitrary[LedgerUserId] = Arbitrary(
+    Gen.stringOfN(8, Gen.alphaChar).map(LedgerUserId.assertFromString)
+  )
+
+  implicit val lfCommandIdArb: Arbitrary[LfCommandId] = Arbitrary(
+    Gen.stringOfN(8, Gen.alphaChar).map(LfCommandId.assertFromString)
+  )
+
+  implicit val lfSubmissionIdArb: Arbitrary[LfSubmissionId] = Arbitrary(
+    Gen.stringOfN(8, Gen.alphaChar).map(LfSubmissionId.assertFromString)
+  )
+
+  implicit val lfWorkflowIdArb: Arbitrary[LfWorkflowId] = Arbitrary(
+    Gen.stringOfN(8, Gen.alphaChar).map(LfWorkflowId.assertFromString)
+  )
+
   implicit val lfContractIdArb: Arbitrary[LfContractId] = Arbitrary(
     for {
       index <- Gen.posNum[Int]
@@ -41,7 +57,7 @@ object GeneratorsLf {
       contractIdSuffix = Unicum(
         Hash.build(TestHash.testHashPurpose, HashAlgorithm.Sha256).add(suffix).finish()
       )
-    } yield AuthenticatedContractIdVersionV10.fromDiscriminator(
+    } yield AuthenticatedContractIdVersionV11.fromDiscriminator(
       contractIdDiscriminator,
       contractIdSuffix,
     )

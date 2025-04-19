@@ -1,24 +1,24 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.ledger.api.v2.admin.party_management_service
+import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
-import com.digitalasset.canton.ledger.client.services.admin.PartyManagementClient
-import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
-import sttp.tapir.generic.auto.*
-
-import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.JsCantonError
+import com.digitalasset.canton.ledger.client.services.admin.PartyManagementClient
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidArgument
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Codec
+import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.jsonBody
-import sttp.tapir.{Endpoint, path, query}
+import sttp.tapir.server.ServerEndpoint
+import sttp.tapir.{AnyEndpoint, path, query}
 
+import scala.concurrent.{ExecutionContext, Future}
 
 class JsPartyManagementService(
     partyManagementClient: PartyManagementClient,
@@ -29,9 +29,9 @@ class JsPartyManagementService(
     with NamedLogging {
   import JsPartyManagementService.*
 
-  def endpoints() =
+  def endpoints(): List[ServerEndpoint[Any, Future]] =
     List(
-      withServerLogic(
+      asPagedList(
         JsPartyManagementService.listKnownPartiesEndpoint,
         listKnownParties,
       ),
@@ -50,15 +50,20 @@ class JsPartyManagementService(
       ),
     )
 
-  private val listKnownParties: CallerContext => TracedInput[Unit] => Future[
+  private val listKnownParties: CallerContext => TracedInput[PagedList[Unit]] => Future[
     Either[JsCantonError, party_management_service.ListKnownPartiesResponse]
   ] = ctx =>
     req =>
       partyManagementClient
         .serviceStub(ctx.token())(req.traceContext)
-        .listKnownParties(party_management_service.ListKnownPartiesRequest())
+        .listKnownParties(
+          party_management_service.ListKnownPartiesRequest(
+            req.in.pageToken.getOrElse(""),
+            req.in.pageSize.getOrElse(0),
+            "",
+          )
+        )
         .resultToRight
-  // TODO (i19538) paging
 
   private val getParty
       : CallerContext => TracedInput[(String, Option[String], List[String])] => Future[
@@ -117,20 +122,14 @@ class JsPartyManagementService(
         }
 }
 
-object JsPartyManagementService {
+object JsPartyManagementService extends DocumentationEndpoints {
   import Endpoints.*
   import JsPartyManagementCodecs.*
 
   private val parties = v2Endpoint.in(sttp.tapir.stringToPath("parties"))
   private val partyPath = "party"
 
-  val allocatePartyEndpoint: Endpoint[
-    CallerContext,
-    party_management_service.AllocatePartyRequest,
-    JsCantonError,
-    party_management_service.AllocatePartyResponse,
-    Any,
-  ] = parties.post
+  val allocatePartyEndpoint = parties.post
     .in(jsonBody[party_management_service.AllocatePartyRequest])
     .out(jsonBody[party_management_service.AllocatePartyResponse])
     .description("Allocate a new party to the participant node")
@@ -138,6 +137,7 @@ object JsPartyManagementService {
   val listKnownPartiesEndpoint =
     parties.get
       .out(jsonBody[party_management_service.ListKnownPartiesResponse])
+      .inPagedListParams()
       .description("List all known parties.")
 
   val getParticipantIdEndpoint =
@@ -159,31 +159,39 @@ object JsPartyManagementService {
     .in(jsonBody[party_management_service.UpdatePartyDetailsRequest])
     .out(jsonBody[party_management_service.UpdatePartyDetailsResponse])
     .description("Allocate a new party to the participant node")
+  override def documentation: Seq[AnyEndpoint] = Seq(
+    listKnownPartiesEndpoint,
+    allocatePartyEndpoint,
+    getParticipantIdEndpoint,
+    getPartyEndpoint,
+    updatePartyEndpoint,
+  )
 }
 
 object JsPartyManagementCodecs {
+  import JsSchema.config
 
-  implicit val partyDetails: Codec[party_management_service.PartyDetails] = deriveCodec
+  implicit val partyDetails: Codec[party_management_service.PartyDetails] = deriveRelaxedCodec
   implicit val listKnownPartiesResponse: Codec[party_management_service.ListKnownPartiesResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val allocatePartyRequest: Codec[party_management_service.AllocatePartyRequest] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val allocatePartyResponse: Codec[party_management_service.AllocatePartyResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val getPartiesRequest: Codec[party_management_service.GetPartiesRequest] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val getPartiesResponse: Codec[party_management_service.GetPartiesResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val updatePartyDetailsRequest
       : Codec[party_management_service.UpdatePartyDetailsRequest] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val updatePartyDetailsResponse
       : Codec[party_management_service.UpdatePartyDetailsResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val getParticipantIdResponse: Codec[party_management_service.GetParticipantIdResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 }

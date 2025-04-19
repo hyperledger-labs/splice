@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.transports.replay
@@ -11,38 +11,34 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
-import com.digitalasset.canton.sequencing.client.SequencerClient.ReplayStatistics
-import com.digitalasset.canton.sequencing.client.transports.replay.ReplayingEventsSequencerClientTransport.ReplayingSequencerSubscription
+import com.digitalasset.canton.sequencing.client.transports.replay.ReplayingEventsSequencerClientTransport.{
+  ReplayStatistics,
+  ReplayingSequencerSubscription,
+}
 import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransport,
   SequencerClientTransportPekko,
 }
-import com.digitalasset.canton.sequencing.protocol.{
-  AcknowledgeRequest,
-  GetTrafficStateForMemberRequest,
-  GetTrafficStateForMemberResponse,
-  SignedContent,
-  SubmissionRequest,
-  SubscriptionRequest,
-  TopologyStateForInitRequest,
-  TopologyStateForInitResponse,
-}
+import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{SequencerClientRecorder, SerializedEventHandler}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, MonadUtil}
+import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.Status
 
 import java.nio.file.Path
 import java.time.Duration as JDuration
+import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Transport implementation for replaying messages from a file.
-  * @param replayPath points to a file containing events to be replayed.
-  *                   The events must be serialized versions of `TracedSignedSerializedSequencedEvent`.
+  * @param replayPath
+  *   points to a file containing events to be replayed. The events must be serialized versions of
+  *   `TracedSignedSerializedSequencedEvent`.
   */
 class ReplayingEventsSequencerClientTransport(
     protocolVersion: ProtocolVersion,
@@ -80,7 +76,7 @@ class ReplayingEventsSequencerClientTransport(
     EitherT.pure(GetTrafficStateForMemberResponse(None, protocolVersion))
 
   /** Replays all events in `replayPath` to the handler. */
-  override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
+  override def subscribe[E](request: SubscriptionRequestV2, handler: SerializedEventHandler[E])(
       implicit traceContext: TraceContext
   ): ReplayingSequencerSubscription[E] = {
     logger.info("Loading messages for replaying...")
@@ -91,7 +87,7 @@ class ReplayingEventsSequencerClientTransport(
     val startTime = CantonTimestamp.now()
     val startNanos = System.nanoTime()
     val replayF = MonadUtil
-      .sequentialTraverse_(messages) { e =>
+      .sequentialTraverse(messages) { e =>
         logger.debug(
           s"Replaying event with sequencer counter ${e.counter} and timestamp ${e.timestamp}"
         )(e.traceContext)
@@ -109,12 +105,15 @@ class ReplayingEventsSequencerClientTransport(
         logger.info(
           show"Finished feeding ${messages.size} messages within $duration to the subscription."
         )
-        SequencerClient.replayStatistics.add(
+        ReplayingEventsSequencerClientTransport.replayStatistics.add(
           ReplayStatistics(replayPath, messages.size, startTime, duration)
         )
       }
 
-    FutureUtil.doNotAwait(replayF, "An exception has occurred while replaying messages.")
+    FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
+      replayF,
+      "An exception has occurred while replaying messages.",
+    )
     new ReplayingSequencerSubscription(timeouts, loggerFactory)
   }
 
@@ -133,7 +132,7 @@ class ReplayingEventsSequencerClientTransport(
 
   override type SubscriptionError = Nothing
 
-  override def subscribe(request: SubscriptionRequest)(implicit
+  override def subscribe(request: SubscriptionRequestV2)(implicit
       traceContext: TraceContext
   ): SequencerSubscriptionPekko[SubscriptionError] =
     // TODO(#13789) figure out how to implement this
@@ -146,6 +145,28 @@ class ReplayingEventsSequencerClientTransport(
 }
 
 object ReplayingEventsSequencerClientTransport {
+
+  /** Hook for informing tests about replay statistics.
+    *
+    * If a [[SequencerClient]] is used with
+    * [[transports.replay.ReplayingEventsSequencerClientTransport]], the transport will add a
+    * statistics to this queue whenever a replay attempt has completed successfully.
+    *
+    * A test can poll this statistics from the queue to determine whether the replay has completed
+    * and to get statistics on the replay.
+    *
+    * LIMITATION: This is only suitable for manual / sequential test setups, as the statistics are
+    * shared through a global queue.
+    */
+  @VisibleForTesting
+  lazy val replayStatistics: BlockingQueue[ReplayStatistics] = new LinkedBlockingQueue()
+
+  final case class ReplayStatistics(
+      inputPath: Path,
+      numberOfEvents: Int,
+      startTime: CantonTimestamp,
+      duration: JDuration,
+  )
 
   /** Does nothing until closed or completed. */
   class ReplayingSequencerSubscription[E](

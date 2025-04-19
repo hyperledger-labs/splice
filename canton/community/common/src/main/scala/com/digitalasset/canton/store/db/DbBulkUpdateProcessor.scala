@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.db
@@ -6,7 +6,7 @@ package com.digitalasset.canton.store.db
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.resource.DbStorage
@@ -19,7 +19,7 @@ import slick.dbio.{DBIOAction, Effect, NoStream}
 
 import java.sql.Statement
 import scala.collection.immutable
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 /** Implementation of aggregated bulk update operations for DB stores */
@@ -28,16 +28,18 @@ trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
   protected implicit def executionContext: ExecutionContext
   protected def storage: DbStorage
 
-  /** Run the [[bulkUpdateAction]] for the given `items` and then check the reported update row counts.
-    * For items where the update row count is not 1, look what is in the store and produce a corresponding
-    * response by comparing the item with the found data.
+  /** Run the [[bulkUpdateAction]] for the given `items` and then check the reported update row
+    * counts. For items where the update row count is not 1, look what is in the store and produce a
+    * corresponding response by comparing the item with the found data.
     *
-    * @return An [[scala.collection.Iterable]] of the same size as `items` that contains the response for `items(i)` is at index `i`.
+    * @return
+    *   An [[scala.collection.Iterable]] of the same size as `items` that contains the response for
+    *   `items(i)` is at index `i`.
     */
   protected def bulkUpdateWithCheck(items: NonEmpty[Seq[Traced[A]]], queryBaseName: String)(implicit
       traceContext: TraceContext,
       closeContext: CloseContext,
-  ): Future[Iterable[Try[B]]] = {
+  ): FutureUnlessShutdown[Iterable[Try[B]]] = {
     val bulkUpdate = bulkUpdateAction(items)
     for {
       updateCounts <- storage.queryAndUpdate(bulkUpdate, s"$queryBaseName update")
@@ -60,10 +62,10 @@ trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
   protected def bulkUpdateWithCheck(items: Seq[Traced[A]], queryBaseName: String)(implicit
       traceContext: TraceContext,
       closeContext: CloseContext,
-  ): Future[Iterable[Try[B]]] =
+  ): FutureUnlessShutdown[Iterable[Try[B]]] =
     NonEmpty.from(items) match {
       case Some(itemsNel) => bulkUpdateWithCheck(itemsNel, queryBaseName)
-      case None => Future.successful(Iterable.empty[Try[B]])
+      case None => FutureUnlessShutdown.pure(Iterable.empty[Try[B]])
     }
 
   /** Idempotent bulk DB operation for the given items. */
@@ -74,18 +76,15 @@ trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
   /** What to return for an item when the bulk operation returns an update count of 1 */
   protected def onSuccessItemUpdate(item: Traced[A]): Try[B]
 
-  /** Inspect the update counts (same order as the items).
-    * If exactly one row was updated, everything is fine.
-    * In case of 0 rows or no information, we should check whether the update actually happened
-    * (e.g., if the affected rows were underreported).
+  /** Inspect the update counts (same order as the items). If exactly one row was updated,
+    * everything is fine. In case of 0 rows or no information, we should check whether the update
+    * actually happened (e.g., if the affected rows were underreported).
     *
-    * To that end, return two sequences:
-    * <ol>
-    *   <li>The list of items to check in the DB: [[BulkUpdatePendingCheck]].
-    *       The [[com.digitalasset.canton.util.SingleUseCell]] is a placeholder for the result of the check.</li>
-    *   <li>A list of outcomes, which is the same length as items / updateCounts.
-    *       The outcome is either a `Try[B]` or the [[BulkUpdatePendingCheck]].</li>
-    * <ul>
+    * To that end, return two sequences: <ol> <li>The list of items to check in the DB:
+    * [[BulkUpdatePendingCheck]]. The [[com.digitalasset.canton.util.SingleUseCell]] is a
+    * placeholder for the result of the check.</li> <li>A list of outcomes, which is the same length
+    * as items / updateCounts. The outcome is either a `Try[B]` or the
+    * [[BulkUpdatePendingCheck]].</li> <ul>
     */
   private def analyzeUpdateCounts(
       items: Seq[Traced[A]],
@@ -119,9 +118,9 @@ trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
   private def checkReplacements(
       toCheck: Seq[BulkUpdatePendingCheck[A, B]],
       queryBaseName: String,
-  )(implicit traceContext: TraceContext, closeContext: CloseContext): Future[Unit] =
+  )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[Unit] =
     NonEmpty.from(toCheck) match {
-      case None => Future.unit
+      case None => FutureUnlessShutdown.unit
       case Some(toCheckNE) =>
         val ids = toCheckNE.map(x => itemIdentifier(x.target.value))
         val lookupQuery = checkQuery(ids)
@@ -140,7 +139,9 @@ trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
   /** Type of data returned when checking what information the store contains for a given item. */
   protected type CheckData
 
-  /** The type of identifier that is used to correlate items and the information retrieved from the store when checking. */
+  /** The type of identifier that is used to correlate items and the information retrieved from the
+    * store when checking.
+    */
   protected type ItemIdentifier
 
   /** Identifier selector for items */
@@ -154,8 +155,8 @@ trait DbBulkUpdateProcessor[A, B] extends BatchAggregator.Processor[A, Try[B]] {
       batchTraceContext: TraceContext
   ): DbAction.ReadOnly[immutable.Iterable[CheckData]]
 
-  /** Compare the item against the data that was found in the store and produce a result.
-    * It is called for each item that the update command returned an update counter not equal to 1.
+  /** Compare the item against the data that was found in the store and produce a result. It is
+    * called for each item that the update command returned an update counter not equal to 1.
     */
   protected def analyzeFoundData(item: A, foundData: Option[CheckData])(implicit
       traceContext: TraceContext

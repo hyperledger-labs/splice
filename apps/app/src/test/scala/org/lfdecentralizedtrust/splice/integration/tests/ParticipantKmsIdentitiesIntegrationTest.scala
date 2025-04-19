@@ -22,6 +22,8 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
   val aliceParticipantDumpFile = testDumpDir.resolve("alice-kms-id-identity-dump.json")
   val sv2ParticipantDumpFile = testDumpDir.resolve("sv2-kms-id-identity-dump.json")
 
+  val participantIdPrefix = "aliceValidatorNew"
+
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .fromResources(Seq("simple-topology.conf"), this.getClass.getSimpleName)
@@ -39,7 +41,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
                   ParticipantBootstrapDumpConfig
                     .File(
                       aliceParticipantDumpFile,
-                      Some(s"aliceValidator"),
+                      Some(participantIdPrefix),
                     )
                 ),
               )
@@ -116,6 +118,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
         dumpMatchesParticipantState(
           predefinedDump,
           aliceValidatorBackend.participantClientWithAdminToken,
+          Some(participantIdPrefix),
         )
 
         val dumpFromValidator = aliceValidatorBackend.dumpParticipantIdentities()
@@ -195,9 +198,14 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
   private def dumpMatchesParticipantState(
       dump: NodeIdentitiesDump,
       participant: ParticipantClientReference,
+      prefixOverwrite: Option[String] = None,
   ) = {
     clue("Participant ID is the same") {
-      participant.id shouldBe dump.id
+      participant.id shouldBe ParticipantId(
+        dump.id.uid.tryChangeId(
+          prefixOverwrite.getOrElse(dump.id.uid.toProtoPrimitive.split("::")(0))
+        )
+      )
     }
     clue("keys are correctly registered") {
       val keys = participant.keys.secret.list()

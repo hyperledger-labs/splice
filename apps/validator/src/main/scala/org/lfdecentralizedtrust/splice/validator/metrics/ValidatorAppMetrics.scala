@@ -7,7 +7,7 @@ import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import org.lfdecentralizedtrust.splice.BaseSpliceMetrics
 import com.digitalasset.canton.metrics.DbStorageHistograms
 
-/** Modelled after [[com.digitalasset.canton.domain.metrics.DomainMetrics]].
+/** Modelled after [[com.digitalasset.canton.synchronizer.metrics.DomainMetrics]].
   *
   * This is only a bare-bones implementation so the code compiles so far.
   */

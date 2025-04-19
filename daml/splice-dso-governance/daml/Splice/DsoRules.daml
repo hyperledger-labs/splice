@@ -277,6 +277,10 @@ data DsoRules_CreateTransferCommandCounterResult = DsoRules_CreateTransferComman
 data DsoRules_ExpireTransferPreapprovalResult = DsoRules_ExpireTransferPreapprovalResult
   deriving (Show, Eq)
 
+data DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult = DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult
+  with
+    result : AmuletRules_ConvertFeaturedAppActivityMarkersResult
+
 -- Workflow templates
 ---------------------
 
@@ -1308,6 +1312,15 @@ template DsoRules with
       do
         exercise transferPreapprovalCid TransferPreapproval_Expire
         pure DsoRules_ExpireTransferPreapprovalResult
+
+    nonconsuming choice DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers : DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        argument : AmuletRules_ConvertFeaturedAppActivityMarkers
+      controller dsoDelegate
+      do result <- exercise amuletRulesCid argument
+         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
+
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =

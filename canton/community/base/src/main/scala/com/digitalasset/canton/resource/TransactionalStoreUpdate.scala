@@ -1,23 +1,23 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
 
 import cats.syntax.foldable.*
 import com.daml.nameof.NameOf.functionFullName
-import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIOAction, Effect, NoStream}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-/** A store update operation that can be executed transactionally with other independent update operations.
-  * Transactionality means that either all updates execute or none.
-  * The updates in a transactional execution must be independent of each other.
-  * During such an execution, partial updates may be observable by concurrent store accesses.
+/** A store update operation that can be executed transactionally with other independent update
+  * operations. Transactionality means that either all updates execute or none. The updates in a
+  * transactional execution must be independent of each other. During such an execution, partial
+  * updates may be observable by concurrent store accesses.
   *
-  * Useful for updating stores on multiple domains transactionally.
+  * Useful for updating stores on multiple synchronizers transactionally.
   */
 sealed trait TransactionalStoreUpdate {
 
@@ -25,7 +25,7 @@ sealed trait TransactionalStoreUpdate {
   def runStandalone()(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): Future[Unit]
+  ): FutureUnlessShutdown[Unit]
 }
 
 object TransactionalStoreUpdate {
@@ -33,7 +33,8 @@ object TransactionalStoreUpdate {
   /** Executes the unordered sequence of [[TransactionalStoreUpdate]]s transactionally,
     * i.e., either all of them succeed or none.
     *
-    * @throws java.lang.IllegalArgumentException if `updates` contains several DB store updates that use different [[DbStorage]] objects.
+    * @throws java.lang.IllegalArgumentException
+    *   if `updates` contains several DB store updates that use different [[DbStorage]] objects.
     */
   def execute(
       updates: Seq[TransactionalStoreUpdate]
@@ -41,8 +42,8 @@ object TransactionalStoreUpdate {
       traceContext: TraceContext,
       ec: ExecutionContext,
       closeContext: CloseContext,
-  ): Future[Unit] = updates match {
-    case Seq() => Future.unit
+  ): FutureUnlessShutdown[Unit] = updates match {
+    case Seq() => FutureUnlessShutdown.unit
     case Seq(singleUpdate) => singleUpdate.runStandalone()
     case _ =>
       // We first execute all DB updates in a single DB transaction and, if successful, all in-memory updates afterwards.
@@ -73,15 +74,16 @@ object TransactionalStoreUpdate {
 
   /** Transactional update of an in-memory store.
     *
-    * @param perform The update to perform. Must always succeed and never throw an exception.
+    * @param perform
+    *   The update to perform. Must always succeed and never throw an exception.
     */
-  private[canton] class InMemoryTransactionalStoreUpdate(val perform: () => Unit)
+  private[canton] final class InMemoryTransactionalStoreUpdate(val perform: () => Unit)
       extends TransactionalStoreUpdate {
     override def runStandalone()(implicit
         traceContext: TraceContext,
         callerCloseContext: CloseContext,
-    ): Future[Unit] =
-      Future.successful(perform())
+    ): FutureUnlessShutdown[Unit] =
+      FutureUnlessShutdown.pure(perform())
   }
 
   private[canton] object InMemoryTransactionalStoreUpdate {
@@ -91,10 +93,12 @@ object TransactionalStoreUpdate {
 
   /** Transactional update of a DB store.
     *
-    * @param sql The DB action to perform.
-    * @param storage The [[DbStorage]] to be used to execute the `sql` action.
+    * @param sql
+    *   The DB action to perform.
+    * @param storage
+    *   The [[DbStorage]] to be used to execute the `sql` action.
     */
-  private[canton] class DbTransactionalStoreUpdate(
+  private[canton] final class DbTransactionalStoreUpdate(
       val sql: DBIOAction[_, NoStream, Effect.Write with Effect.Transactional],
       val storage: DbStorage,
       override protected val loggerFactory: NamedLoggerFactory,
@@ -104,7 +108,7 @@ object TransactionalStoreUpdate {
     override def runStandalone()(implicit
         traceContext: TraceContext,
         callerCloseContext: CloseContext,
-    ): Future[Unit] =
+    ): FutureUnlessShutdown[Unit] =
       storage.update_(sql, functionFullName)(traceContext, callerCloseContext)
 
   }

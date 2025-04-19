@@ -1,22 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import {
-  ListVoteRequests,
-  Loading,
-  supportsVoteEffectivityAndSetConfig,
-} from '@lfdecentralizedtrust/splice-common-frontend';
+import { ListVoteRequests, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useDsoInfo } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 
 import { Box } from '@mui/material';
 import Container from '@mui/material/Container';
 
+import { useFeatureSupport } from '../../hooks/useFeatureSupport';
 import Layout from '../Layout';
 
 //TODO(#16139): retire this logics
 const ScanListVoteRequests: React.FC = () => {
   const dsoInfosQuery = useDsoInfo();
-  if (dsoInfosQuery.isLoading) {
+  const featureSupport = useFeatureSupport();
+  if (dsoInfosQuery.isLoading || featureSupport.isLoading) {
     return <Loading />;
   }
   if (dsoInfosQuery.isError) {
@@ -25,9 +23,7 @@ const ScanListVoteRequests: React.FC = () => {
   if (!dsoInfosQuery.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-  const supportNewGovernanceFlow = supportsVoteEffectivityAndSetConfig(
-    dsoInfosQuery.data.amuletRules.payload.configSchedule.initialValue
-  );
+  const supportNewGovernanceFlow = featureSupport.data?.newGovernanceFlow || false;
   return (
     <Layout>
       <Box bgcolor="colors.neutral.15" sx={{ flex: 1 }}>

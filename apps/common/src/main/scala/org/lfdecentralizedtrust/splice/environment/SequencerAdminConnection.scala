@@ -3,36 +3,36 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import cats.implicits.catsSyntaxTuple2Semigroupal
-import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
-import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import cats.implicits.*
 import com.digitalasset.canton.admin.api.client.commands.{
+  GrpcAdminCommand,
   SequencerAdminCommands,
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponse
-import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.sequencing.protocol
-import com.digitalasset.canton.protocol.StaticDomainParameters
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.admin.v30.OnboardingStateResponse
+import com.digitalasset.canton.sequencing.protocol
+import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
+import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
-import com.digitalasset.canton.topology.transaction.SequencerDomainState
-import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.topology.admin.v30.GenesisStateResponse
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
+import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
+import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
+import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -45,7 +45,7 @@ class SequencerAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-)(implicit protected val ec: ExecutionContextExecutor, tracer: Tracer)
+)(implicit val ec: ExecutionContextExecutor, tracer: Tracer)
     extends TopologyAdminConnection(
       config,
       apiLoggingConfig,
@@ -53,7 +53,8 @@ class SequencerAdminConnection(
       grpcClientMetrics,
       retryProvider,
     )
-    with StatusAdminConnection {
+    with StatusAdminConnection
+    with SequencerBftAdminConnection {
 
   override val serviceName = "Canton Sequencer Admin API"
 
@@ -73,11 +74,12 @@ class SequencerAdminConnection(
       TopologyAdminCommands.Read
         .GenesisState(
           timestamp = Some(timestamp),
-          filterDomainStore = None,
+          synchronizerStore = None,
           observer = responseObserver,
         )
     ).flatMap(_ => responseObserver.resultBytes)
   }
+
   def getOnboardingState(sequencerId: SequencerId)(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
@@ -92,7 +94,7 @@ class SequencerAdminConnection(
     */
   def initializeFromBeginning(
       topologySnapshot: GenericStoredTopologyTransactions,
-      domainParameters: StaticDomainParameters,
+      domainParameters: StaticSynchronizerParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
       SequencerAdminCommands.InitializeFromGenesisState(
@@ -106,7 +108,7 @@ class SequencerAdminConnection(
     */
   def initializeFromGenesisState(
       genesisState: ByteString,
-      domainParameters: StaticDomainParameters,
+      domainParameters: StaticSynchronizerParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
       SequencerAdminCommands.InitializeFromGenesisState(
@@ -177,12 +179,12 @@ class SequencerAdminConnection(
     )
   }
 
-  def getSequencerDomainState()(implicit
+  def getSequencerSynchronizerState()(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainState]] = {
+  ): Future[TopologyResult[SequencerSynchronizerState]] = {
     for {
-      domainId <- getStatus.map(_.trySuccess.domainId)
-      sequencerState <- getSequencerDomainState(domainId)
+      synchronizerId <- getStatus.map(_.trySuccess.synchronizerId)
+      sequencerState <- getSequencerSynchronizerState(synchronizerId)
     } yield sequencerState
   }
 
@@ -196,7 +198,7 @@ class SequencerAdminConnection(
     */
   def setSequencerTrafficControlState(
       currentTrafficState: TrafficState,
-      currentSequencerState: TopologyResult[SequencerDomainState],
+      currentSequencerState: TopologyResult[SequencerSynchronizerState],
       newTotalExtraTrafficLimit: NonNegativeLong,
       clock: Clock,
       timeout: NonNegativeFiniteDuration,
@@ -209,7 +211,7 @@ class SequencerAdminConnection(
     // There are multiple cases where we need the caller to retry: we (ab)use gRPC Status codes to communicate this.
     def checkSuccessOrAbort(): Future[Option[io.grpc.Status]] = for {
       (sequencerState, trafficState) <- (
-        getSequencerDomainState(),
+        getSequencerSynchronizerState(),
         getSequencerTrafficControlState(currentTrafficState.member),
       ).tupled
     } yield {

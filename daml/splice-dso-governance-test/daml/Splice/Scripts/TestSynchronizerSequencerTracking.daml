@@ -31,6 +31,7 @@ testSynchronizerMigration = do
         migrationId = 1
         sequencerId = "sequencer-id-" <> partyToText sv
         url = "sequencer-" <> partyToText sv <> ".address:1234"
+        peerUrl = Some ("http://sequencer-" <> partyToText sv <> ".address:3000")
         availableAfter = Some now
       mediator = Some MediatorConfig with
         mediatorId = "mediator-id-" <> partyToText sv
@@ -49,6 +50,7 @@ testSynchronizerMigration = do
       migrationId = 1
       sequencerId = "sequencer-id-" <> partyToText sv
       url = "sequencer-" <> partyToText sv <> ".address:1234"
+      peerUrl = Some ("http://sequencer-" <> partyToText sv <> ".address:3000")
       availableAfter = Some now
     synchronizerConfig.legacySequencerConfig === Some LegacySequencerConfig with
       migrationId = 0

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.networking.grpc
@@ -20,9 +20,8 @@ import io.netty.handler.ssl.{SslContext, SslContextBuilder}
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, TimeUnit}
 
-/** The [[io.grpc.ServerBuilder]] is pretty "loose" with its type parameters
-  * causing some issues for `scalac` and IntelliJ.
-  * Here we provide a wrapper hiding these type issues.
+/** The [[io.grpc.ServerBuilder]] is pretty "loose" with its type parameters causing some issues for
+  * `scalac` and IntelliJ. Here we provide a wrapper hiding these type issues.
   */
 trait CantonServerBuilder {
   def mutableHandlerRegistry(): CantonMutableHandlerRegistry
@@ -54,8 +53,8 @@ trait CantonMutableHandlerRegistry extends AutoCloseable {
 
 object CantonServerBuilder {
 
-  /** Creates our wrapper for a grpc ServerBuilder.
-    * As we only create our servers from our configuration this is intentionally private.
+  /** Creates our wrapper for a grpc ServerBuilder. As we only create our servers from our
+    * configuration this is intentionally private.
     */
   private class BaseBuilder(
       serverBuilder: ServerBuilder[_ <: ServerBuilder[?]],
@@ -120,10 +119,11 @@ object CantonServerBuilder {
       keepAlive: Option[KeepAliveServerConfig],
       builder: NettyServerBuilder,
   ): NettyServerBuilder =
-    keepAlive.fold(builder) { opt =>
-      val time = opt.time.unwrap.toMillis
-      val timeout = opt.timeout.unwrap.toMillis
-      val permitTime = opt.permitKeepAliveTime.unwrap.toMillis
+    keepAlive.fold(builder) { ka =>
+      val time = ka.time.unwrap.toMillis
+      val timeout = ka.timeout.unwrap.toMillis
+      val permitTime = ka.permitKeepAliveTime.unwrap.toMillis
+      val permitKAWOCalls = ka.permitKeepAliveWithoutCalls
       builder
         .keepAliveTime(time, TimeUnit.MILLISECONDS)
         .keepAliveTimeout(timeout, TimeUnit.MILLISECONDS)
@@ -131,11 +131,14 @@ object CantonServerBuilder {
           permitTime,
           TimeUnit.MILLISECONDS,
         ) // gracefully allowing a bit more aggressive keep alives from clients
+        .permitKeepAliveWithoutCalls(permitKAWOCalls)
     }
 
   /** Create a GRPC server build using conventions from our configuration.
-    * @param config server configuration
-    * @return builder to attach application services and interceptors
+    * @param config
+    *   server configuration
+    * @return
+    *   builder to attach application services and interceptors
     */
   def forConfig(
       config: ServerConfig,
@@ -178,7 +181,7 @@ object CantonServerBuilder {
   private def baseSslBuilder(config: BaseTlsArguments): SslContextBuilder = {
     import scala.jdk.CollectionConverters.*
     val s1 =
-      GrpcSslContexts.forServer(config.certChainFile.unwrap, config.privateKeyFile.unwrap)
+      GrpcSslContexts.forServer(config.certChainFile.pemStream, config.privateKeyFile.pemStream)
     val s2 = config.protocols.fold(s1)(protocols => s1.protocols(protocols*))
     config.ciphers.fold(s2)(ciphers => s2.ciphers(ciphers.asJava))
   }
@@ -191,7 +194,7 @@ object CantonServerBuilder {
   ): SslContext = {
     val s1 = baseSslBuilder(config)
     val s2 = config.trustCollectionFile.fold(s1)(trustCollection =>
-      s1.trustManager(trustCollection.unwrap)
+      s1.trustManager(trustCollection.pemStream)
     )
     val s3 = s2.clientAuth(config.clientAuth.clientAuth)
     val sslContext = s3.build()
@@ -200,8 +203,8 @@ object CantonServerBuilder {
     sslContext
   }
 
-  /** We know this operation is safe due to the definition of [[io.grpc.ServerBuilder]].
-    * This method isolates the usage of `asInstanceOf` to only here.
+  /** We know this operation is safe due to the definition of [[io.grpc.ServerBuilder]]. This method
+    * isolates the usage of `asInstanceOf` to only here.
     */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def reifyBuilder(builder: ServerBuilder[?]): ServerBuilder[_ <: ServerBuilder[?]] =

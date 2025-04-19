@@ -17,15 +17,15 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReconcileSynchroni
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
-import com.digitalasset.canton.admin.api.client.data.DynamicDomainParameters as ConsoleDynamicDomainParameters
+import com.digitalasset.canton.admin.api.client.data.DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters
 import com.digitalasset.canton.time.{PositiveFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.NonNegativeFiniteDuration as InternalNonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
-import com.digitalasset.canton.topology.transaction.DomainParametersState
+import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -38,7 +38,7 @@ import scala.jdk.OptionConverters.*
 
 /** A trigger to reconcile the domain config from the AmuletConfig to the dynamic domain parameters
   */
-class ReconcileDynamicDomainParametersTrigger(
+class ReconcileDynamicSynchronizerParametersTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
@@ -70,10 +70,12 @@ class ReconcileDynamicDomainParametersTrigger(
       decentralizedSynchronizerConfig =
         dsoRules.payload.config.decentralizedSynchronizer.synchronizers.asScala
           .get(decentralizedSynchronizerId.toProtoPrimitive)
-      stateHistory <- participantAdminConnection.listDomainParametersState(
+      stateHistory <- participantAdminConnection.listSynchronizerParametersState(
         decentralizedSynchronizerId
       )
-      state <- participantAdminConnection.getDomainParametersState(decentralizedSynchronizerId)
+      state <- participantAdminConnection.getSynchronizerParametersState(
+        decentralizedSynchronizerId
+      )
       submissionTimeRecordTimeToleranceTarget = getSubmissionTimeRecordTimeToleranceTarget(
         domainTime,
         state,
@@ -102,8 +104,8 @@ class ReconcileDynamicDomainParametersTrigger(
   // to 48, then wait 48h and then change the tolerance to 24h.
   private def getSubmissionTimeRecordTimeToleranceTarget(
       domainTime: CantonTimestamp,
-      currentState: TopologyResult[DomainParametersState],
-      stateHistory: Seq[TopologyResult[DomainParametersState]],
+      currentState: TopologyResult[SynchronizerParametersState],
+      stateHistory: Seq[TopologyResult[SynchronizerParametersState]],
   )(implicit tc: TraceContext): Option[InternalNonNegativeFiniteDuration] = {
     val requiredMinMediatorDeduplicationTimeout =
       InternalNonNegativeFiniteDuration.fromConfig(submissionTimeRecordTimeTolerance * 2)
@@ -115,7 +117,7 @@ class ReconcileDynamicDomainParametersTrigger(
       None
     } else {
       val incompatibleTransactions = stateHistory.filterNot(tx =>
-        ConsoleDynamicDomainParameters(tx.mapping.parameters)
+        ConsoleDynamicSynchronizerParameters(tx.mapping.parameters)
           .compatibleWithNewSubmissionTimeRecordTimeTolerance(submissionTimeRecordTimeTolerance)
       )
       val lastValidUntil: Instant = incompatibleTransactions
@@ -159,7 +161,7 @@ class ReconcileDynamicDomainParametersTrigger(
       )
     } yield {
       TaskSuccess(
-        s"Successfully reconciled DynamicDomainParameters $task"
+        s"Successfully reconciled DynamicSynchronizerParameters $task"
       )
     }
   }
@@ -171,33 +173,32 @@ class ReconcileDynamicDomainParametersTrigger(
   }
 
   private def updateDomainParameters(
-      existingDomainParameters: DynamicDomainParameters,
+      existingDomainParameters: DynamicSynchronizerParameters,
       amuletConfig: AmuletConfig[USD],
       synchronizerConfig: Option[SynchronizerConfig],
       submissionTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
-  ): DynamicDomainParameters = {
+  ): DynamicSynchronizerParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
     // Make sure that the bootstrap script for the upgrade domain is aligned with any changes made to the
     // dynamic domain parameters here to prevent the soft synchronizer upgrade test from failing
     existingDomainParameters.tryUpdate(
-      trafficControlParameters =
-        existingDomainParameters.trafficControlParameters.map { trafficControl =>
-          trafficControl.copy(
-            maxBaseTrafficAmount =
-              NonNegativeLong.tryCreate(domainFeesConfig.baseRateTrafficLimits.burstAmount),
-            readVsWriteScalingFactor =
-              PositiveInt.tryCreate(domainFeesConfig.readVsWriteScalingFactor.toInt),
-            maxBaseTrafficAccumulationDuration = PositiveFiniteDuration.tryOfSeconds(
-              domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds / 1000_000
-            ),
-          )
-        },
+      trafficControlParameters = existingDomainParameters.trafficControl.map { trafficControl =>
+        trafficControl.copy(
+          maxBaseTrafficAmount =
+            NonNegativeLong.tryCreate(domainFeesConfig.baseRateTrafficLimits.burstAmount),
+          readVsWriteScalingFactor =
+            PositiveInt.tryCreate(domainFeesConfig.readVsWriteScalingFactor.toInt),
+          maxBaseTrafficAccumulationDuration = PositiveFiniteDuration.tryOfSeconds(
+            domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds / 1000_000
+          ),
+        )
+      },
       reconciliationInterval = synchronizerConfig
         .flatMap(_.acsCommitmentReconciliationInterval.toScala)
         .fold(
           PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval)
         )(PositiveSeconds.tryOfSeconds(_)),
-      acsCommitmentsCatchUpConfigParameter = Some(SvUtil.defaultAcsCommitmentsCatchUpConfig),
+      acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
       submissionTimeRecordTimeTolerance = submissionTimeRecordTimeToleranceTarget.getOrElse(
         existingDomainParameters.submissionTimeRecordTimeTolerance
       ),

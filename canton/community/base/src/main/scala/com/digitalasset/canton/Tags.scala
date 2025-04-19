@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -9,48 +9,42 @@ import com.digitalasset.canton.config.CantonRequireTypes.{
   LengthLimitedStringWrapperCompanion,
   String255,
 }
-import pureconfig.{ConfigReader, ConfigWriter}
-import pureconfig.error.CannotConvert
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
 import slick.jdbc.{GetResult, SetParameter}
 
-/** Participant local identifier used to refer to a Domain without the need to fetch identifying information from a domain.
-  * This does not need to be globally unique. Only unique for the participant using it.
-  * @param str String with given alias
+/** Participant local identifier used to refer to a synchronizer without the need to fetch
+  * identifying information from a synchronizer. This does not need to be globally unique. Only
+  * unique for the participant using it.
+  * @param str
+  *   String with given alias
   */
-final case class DomainAlias(protected val str: String255)
+final case class SynchronizerAlias(protected val str: String255)
     extends LengthLimitedStringWrapper
     with PrettyPrinting {
-  override protected def pretty: Pretty[DomainAlias] =
-    prettyOfString(inst => show"Domain ${inst.unwrap.singleQuoted}")
+  override protected def pretty: Pretty[SynchronizerAlias] =
+    prettyOfString(inst => show"Synchronizer ${inst.unwrap.singleQuoted}")
 }
-object DomainAlias extends LengthLimitedStringWrapperCompanion[String255, DomainAlias] {
+object SynchronizerAlias extends LengthLimitedStringWrapperCompanion[String255, SynchronizerAlias] {
   override protected def companion: String255.type = String255
-  override def instanceName: String = "DomainAlias"
-  override protected def factoryMethodWrapper(str: String255): DomainAlias = DomainAlias(str)
-
-  implicit val configReader: ConfigReader[DomainAlias] = ConfigReader.fromString(str =>
-    create(str).left.map(err => CannotConvert(str, "DomainAlias", err))
-  )
-
-  implicit val configWriter: ConfigWriter[DomainAlias] =
-    ConfigWriter.toString(_.toProtoPrimitive)
+  override def instanceName: String = "SynchronizerAlias"
+  override protected def factoryMethodWrapper(str: String255): SynchronizerAlias =
+    SynchronizerAlias(str)
 }
 
 /** Class representing a SequencerAlias.
   *
-  * A SequencerAlias serves as a shorthand, or 'nickname', for a particular sequencer or
-  * group of Highly Available (HA) replicas of a sequencer within a specific node.
+  * A SequencerAlias serves as a shorthand, or 'nickname', for a particular sequencer or group of
+  * Highly Available (HA) replicas of a sequencer within a specific node.
   *
   * Note:
-  * - SequencerAlias is a node-local concept. This means that two different participants
-  *   may assign different aliases to the same sequencer or group of HA sequencer replicas.
+  *   - SequencerAlias is a node-local concept. This means that two different participants may
+  *     assign different aliases to the same sequencer or group of HA sequencer replicas.
   *
-  * - The uniqueness of a SequencerAlias is only enforced within a given domain ID. This
-  *   means a node can use the same sequencer alias for different sequencers as long as
-  *   these sequencers belong to different domains.
+  *   - The uniqueness of a SequencerAlias is only enforced within a given synchronizer id. This
+  *     means a node can use the same sequencer alias for different sequencers as long as these
+  *     sequencers belong to different synchronizers.
   */
 final case class SequencerAlias private (protected val str: String255)
     extends LengthLimitedStringWrapper
@@ -81,7 +75,8 @@ object SequencerAlias extends LengthLimitedStringWrapperCompanion[String255, Seq
 }
 
 /** Command identifier for tracking ledger commands
-  * @param id ledger string representing command
+  * @param id
+  *   ledger string representing command
   */
 final case class CommandId(private val id: LfLedgerString) extends PrettyPrinting {
   def unwrap: LfLedgerString = id
@@ -106,35 +101,37 @@ object CommandId {
     pp >> v.toLengthLimitedString
 }
 
-/** Application identifier for identifying customer applications in the ledger api
-  * @param id ledger string representing application
+/** User identifier for identifying customer users in the ledger api
+  * @param id
+  *   ledger string representing user
   */
-final case class ApplicationId(private val id: LedgerApplicationId) extends PrettyPrinting {
-  def unwrap: LedgerApplicationId = id
+final case class UserId(private val id: LedgerUserId) extends PrettyPrinting {
+  def unwrap: LedgerUserId = id
   def toProtoPrimitive: String = unwrap
   def toLengthLimitedString: String255 =
-    checked(String255.tryCreate(id)) // LedgerApplicationId is limited to 255 chars
-  override protected def pretty: Pretty[ApplicationId] = prettyOfParam(_.unwrap)
+    checked(String255.tryCreate(id)) // LedgerUserId is limited to 255 chars
+  override protected def pretty: Pretty[UserId] = prettyOfParam(_.unwrap)
 }
 
-object ApplicationId {
-  def assertFromString(str: String) = ApplicationId(LedgerApplicationId.assertFromString(str))
-  def fromProtoPrimitive(str: String): Either[String, ApplicationId] =
-    LedgerApplicationId.fromString(str).map(ApplicationId(_))
+object UserId {
+  def assertFromString(str: String) = UserId(LedgerUserId.assertFromString(str))
+  def fromProtoPrimitive(str: String): Either[String, UserId] =
+    LedgerUserId.fromString(str).map(UserId(_))
 
-  implicit val getResultApplicationId: GetResult[ApplicationId] =
+  implicit val getResultUserId: GetResult[UserId] =
     GetResult(r => r.nextString()).andThen {
       fromProtoPrimitive(_).valueOr(err =>
-        throw new DbDeserializationException(s"Failed to deserialize application id: $err")
+        throw new DbDeserializationException(s"Failed to deserialize user id: $err")
       )
     }
 
-  implicit val setParameterApplicationId: SetParameter[ApplicationId] = (v, pp) =>
-    pp >> v.toLengthLimitedString
+  implicit val setParameterUserId: SetParameter[UserId] = (v, pp) => pp >> v.toLengthLimitedString
 }
 
-/** Workflow identifier for identifying customer workflows, i.e. individual requests, in the ledger api
-  * @param id ledger string representing workflow
+/** Workflow identifier for identifying customer workflows, i.e. individual requests, in the ledger
+  * api
+  * @param id
+  *   ledger string representing workflow
   */
 final case class WorkflowId(private val id: LfWorkflowId) extends PrettyPrinting {
   def unwrap: LfWorkflowId = id

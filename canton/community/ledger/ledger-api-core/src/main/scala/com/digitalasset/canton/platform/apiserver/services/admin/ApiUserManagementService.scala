@@ -1,9 +1,8 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.admin.user_management_service as proto
 import com.daml.ledger.api.v2.admin.user_management_service.{
   CreateUserResponse,
@@ -15,16 +14,18 @@ import com.daml.ledger.api.v2.admin.user_management_service.{
 }
 import com.daml.platform.v1.page_tokens.ListUsersPageTokenPayload
 import com.daml.tracing.Telemetry
+import com.digitalasset.base.error.ErrorResource
 import com.digitalasset.canton.auth.ClaimSet.Claims
-import com.digitalasset.canton.auth.{
-  AuthorizationChecksErrors,
-  AuthorizationInterceptor,
-  ClaimAdmin,
-}
-import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
-import com.digitalasset.canton.ledger.api.domain.*
+import com.digitalasset.canton.auth.{AuthInterceptor, AuthorizationChecksErrors, ClaimAdmin}
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.{FieldValidator, ValueValidator}
+import com.digitalasset.canton.ledger.api.{
+  IdentityProviderId,
+  ObjectMeta,
+  SubmissionIdGenerator,
+  User,
+  UserRight,
+}
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.groups.{
   RequestValidationErrors,
@@ -88,7 +89,10 @@ private[apiserver] final class ApiUserManagementService(
           pUser <- requirePresence(request.user, "user")
           pUserId <- requireUserId(pUser.id, "id")
           pMetadata = pUser.metadata.getOrElse(
-            com.daml.ledger.api.v2.admin.object_meta.ObjectMeta()
+            com.daml.ledger.api.v2.admin.object_meta.ObjectMeta(
+              resourceVersion = "",
+              annotations = Map.empty,
+            )
           )
           _ <- requireEmptyString(
             pMetadata.resourceVersion,
@@ -146,7 +150,10 @@ private[apiserver] final class ApiUserManagementService(
           pUser <- requirePresence(request.user, "user")
           pUserId <- requireUserId(pUser.id, "user.id")
           pMetadata = pUser.metadata.getOrElse(
-            com.daml.ledger.api.v2.admin.object_meta.ObjectMeta()
+            com.daml.ledger.api.v2.admin.object_meta.ObjectMeta(
+              resourceVersion = "",
+              annotations = Map.empty,
+            )
           )
           pFieldMask <- requirePresence(request.updateMask, "update_mask")
           pOptPrimaryParty <- optionalString(pUser.primaryParty)(requireParty)
@@ -211,9 +218,9 @@ private[apiserver] final class ApiUserManagementService(
     }
 
   private def resolveAuthenticatedUserContext(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Future[AuthenticatedUserContext] =
-    AuthorizationInterceptor
+    AuthInterceptor
       .extractClaimSetFromContext()
       .fold(
         fa = error =>
@@ -305,7 +312,7 @@ private[apiserver] final class ApiUserManagementService(
           val protoUsers = page.users.map(toProtoUser)
           proto.ListUsersResponse(
             protoUsers,
-            encodeNextPageToken(if (page.users.size < pageSize) None else page.lastUserIdOption),
+            encodeNextPageToken(if (page.users.sizeIs < pageSize) None else page.lastUserIdOption),
           )
         }
     }
@@ -315,7 +322,8 @@ private[apiserver] final class ApiUserManagementService(
       request: proto.GrantUserRightsRequest
   ): Future[proto.GrantUserRightsResponse] = withSubmissionId(loggerFactory, telemetry) {
     implicit loggingContext =>
-      implicit val errorLoggingContext = ErrorLoggingContext(logger, loggingContext)
+      implicit val errorLoggingContext: ErrorLoggingContext =
+        ErrorLoggingContext(logger, loggingContext)
       // Retrieving the authenticated user context from the thread-local context
       val authorizedUserContextF: Future[AuthenticatedUserContext] =
         resolveAuthenticatedUserContext
@@ -438,7 +446,7 @@ private[apiserver] final class ApiUserManagementService(
   }
 
   private def handleUpdatePathResult[T](userId: Ref.UserId, result: update.Result[T])(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Future[T] =
     result match {
       case Left(e: update.UpdatePathError) =>
@@ -457,7 +465,7 @@ private[apiserver] final class ApiUserManagementService(
       isParticipantAdmin: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace,
-      errorLogger: ContextualizedErrorLogger,
+      errorLogger: ErrorLoggingContext,
   ): Future[Unit] = {
     val parties = userParties(rights)
     val partiesExistingInPartyRecordStore =
@@ -481,7 +489,7 @@ private[apiserver] final class ApiUserManagementService(
       identityProviderId: IdentityProviderId,
   )(implicit
       loggingContext: LoggingContextWithTrace,
-      errorLogger: ContextualizedErrorLogger,
+      errorLogger: ErrorLoggingContext,
   ): Future[Unit] =
     indexKnownParties(partiesWithoutRecord.toList).flatMap { partiesKnown =>
       val unknownParties = partiesWithoutRecord -- partiesKnown
@@ -500,13 +508,13 @@ private[apiserver] final class ApiUserManagementService(
   private def partiesNotExistsError(
       unknownParties: Set[Ref.Party],
       identityProviderId: IdentityProviderId,
-  )(implicit errorLogger: ContextualizedErrorLogger) = {
+  )(implicit errorLogger: ErrorLoggingContext) = {
     val message =
       s"Provided parties have not been found in " +
         s"identity_provider_id=`${identityProviderId.toRequestString}`: [${unknownParties.mkString(",")}]."
     Future.failed(
-      RequestValidationErrors.InvalidArgument
-        .Reject(message)
+      RequestValidationErrors.UnknownResource
+        .Reject(ErrorResource.Parties, unknownParties.toSeq, message)
         .asGrpcError
     )
   }
@@ -515,7 +523,7 @@ private[apiserver] final class ApiUserManagementService(
       id: IdentityProviderId
   )(implicit
       loggingContext: LoggingContextWithTrace,
-      errorLogger: ContextualizedErrorLogger,
+      errorLogger: ErrorLoggingContext,
   ): Future[Unit] =
     identityProviderExists(id)
       .flatMap { idpExists =>
@@ -541,7 +549,7 @@ private[apiserver] final class ApiUserManagementService(
 
   private def fromProtoRight(
       right: proto.Right
-  )(implicit errorLogger: ContextualizedErrorLogger): Either[StatusRuntimeException, UserRight] =
+  )(implicit errorLogger: ErrorLoggingContext): Either[StatusRuntimeException, UserRight] =
     right match {
       case proto.Right(_: proto.Right.Kind.ParticipantAdmin) =>
         Right(UserRight.ParticipantAdmin)
@@ -571,7 +579,7 @@ private[apiserver] final class ApiUserManagementService(
   private def fromProtoRights(
       rights: Seq[proto.Right]
   )(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Either[StatusRuntimeException, Set[UserRight]] =
     rights.toList.traverse(fromProtoRight).map(_.toSet)
 
@@ -591,7 +599,7 @@ object ApiUserManagementService {
   object AuthenticatedUserContext {
     def apply(claims: Claims): AuthenticatedUserContext = claims match {
       case claims: Claims if claims.resolvedFromUser =>
-        AuthenticatedUserContext(claims.applicationId, claims.claims.contains(ClaimAdmin))
+        AuthenticatedUserContext(claims.userId, claims.claims.contains(ClaimAdmin))
       case claims: Claims =>
         AuthenticatedUserContext(None, claims.claims.contains(ClaimAdmin))
     }
@@ -630,7 +638,7 @@ object ApiUserManagementService {
       .getOrElse("")
 
   def decodeUserIdFromPageToken(pageToken: String)(implicit
-      loggingContext: ContextualizedErrorLogger
+      loggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Option[Ref.UserId]] =
     if (pageToken.isEmpty) {
       Right(None)
@@ -654,7 +662,7 @@ object ApiUserManagementService {
     }
 
   private def invalidPageToken(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): StatusRuntimeException =
     RequestValidationErrors.InvalidArgument
       .Reject("Invalid page token")
@@ -662,7 +670,7 @@ object ApiUserManagementService {
 
   def handleResult[T](operation: String)(
       result: UserManagementStore.Result[T]
-  )(implicit errorLogger: ContextualizedErrorLogger): Future[T] =
+  )(implicit errorLogger: ErrorLoggingContext): Future[T] =
     result match {
       case Left(UserManagementStore.PermissionDenied(id)) =>
         Future.failed(

@@ -25,5 +25,24 @@ spec:
               number: 5008
             host: global-domain-{{ $migrationId }}-sequencer.{{ $cluster.svNamespace }}.svc.cluster.local
 ---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: sequencer-{{ $cluster.svNamespace }}-domain-{{ $migrationId }}-bft
+  namespace: {{ $releaseNamespace }}
+spec:
+  hosts:
+    - "sequencer-p2p-{{ $migrationId }}.{{ $ingressName }}.{{ $cluster.hostname }}"
+  gateways:
+    - cluster-ingress/cn-http-gateway
+  http:
+    - match:
+        - port: 443
+      route:
+        - destination:
+            port:
+              number: 5010
+            host: global-domain-{{ $migrationId }}-sequencer.{{ $cluster.svNamespace }}.svc.cluster.local
+---
 {{- end }}
 {{- end }}

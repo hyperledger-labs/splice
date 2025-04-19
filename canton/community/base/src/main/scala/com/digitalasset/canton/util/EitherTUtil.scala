@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -23,7 +23,9 @@ import scala.util.{Failure, Success, Try}
   */
 object EitherTUtil {
 
-  /** Similar to `finallyET` but will only call the provided handler if `fn` returns a left/error or fails. */
+  /** Similar to `finallyET` but will only call the provided handler if `fn` returns a left/error or
+    * fails.
+    */
   def onErrorOrFailure[A, B](errorHandler: () => Unit)(
       fn: => EitherT[Future, A, B]
   )(implicit executionContext: ExecutionContext): EitherT[Future, A, B] =
@@ -70,7 +72,9 @@ object EitherTUtil {
   ): EitherT[Future, E, A] =
     liftFailedFuture(fut.map(Right(_)), errorHandler)
 
-  /** Variation of fromFuture  that takes a [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] */
+  /** Variation of fromFuture that takes a
+    * [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]]
+    */
   def fromFuture[E, A](futUnlSht: FutureUnlessShutdown[A], errorHandler: Throwable => E)(implicit
       ec: ExecutionContext
   ): EitherT[FutureUnlessShutdown, E, A] =
@@ -84,7 +88,9 @@ object EitherTUtil {
       errorHandler(x).asLeft[A]
     })
 
-  /** Variation of liftFailedFuture that takes a [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]] */
+  /** Variation of liftFailedFuture that takes a
+    * [[com.digitalasset.canton.lifecycle.FutureUnlessShutdown]]
+    */
   def liftFailedFuture[E, A](
       futUnlSht: FutureUnlessShutdown[Either[E, A]],
       errorHandler: Throwable => E,
@@ -133,8 +139,8 @@ object EitherTUtil {
     result.thereafter(logError)
   }
 
-  /** Discard `eitherT` and log an error if it does not result in a `Right`.
-    * This is useful to document that an `EitherT[Future,_,_]` is intentionally not being awaited upon.
+  /** Discard `eitherT` and log an error if it does not result in a `Right`. This is useful to
+    * document that an `EitherT[Future,_,_]` is intentionally not being awaited upon.
     */
   def doNotAwait(
       eitherT: EitherT[Future, _, _],
@@ -166,6 +172,11 @@ object EitherTUtil {
       timer.stop()
     }
   }
+
+  def rightUS[A, B](v: Future[B])(implicit
+      executionContext: ExecutionContext
+  ): EitherT[FutureUnlessShutdown, A, B] =
+    EitherT.right(v).mapK(FutureUnlessShutdown.outcomeK)
 
   /** Transform an EitherT into a Future.failed on left
     *

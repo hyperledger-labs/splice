@@ -34,6 +34,7 @@ class ExternalPartyWalletAutomationService(
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    enableCantonPackageSelection: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -45,7 +46,8 @@ class ExternalPartyWalletAutomationService(
       domainTimeSync,
       domainUnpausedSync,
       store,
-      PackageIdResolver.inferFromAmuletRules(
+      PackageIdResolver.inferFromAmuletRulesIfEnabled(
+        enableCantonPackageSelection,
         clock,
         scanConnection,
         loggerFactory,

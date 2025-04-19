@@ -3,12 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.automation.{PackageVettingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, VoteRequest}
 import org.lfdecentralizedtrust.splice.util.Contract
 
@@ -17,12 +17,15 @@ import scala.concurrent.{ExecutionContext, Future}
 class ValidatorPackageVettingTrigger(
     override protected val participantAdminConnection: ParticipantAdminConnection,
     scanConnection: BftScanConnection,
-    override protected val prevetDuration: NonNegativeFiniteDuration,
     override protected val context: TriggerContext,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PackageVettingTrigger(ValidatorPackageVettingTrigger.packages) {
+
+  override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =
+    scanConnection.getAmuletRulesDomain()(tc)
+
   override def getAmuletRules()(implicit tc: TraceContext) =
     scanConnection.getAmuletRules()
 

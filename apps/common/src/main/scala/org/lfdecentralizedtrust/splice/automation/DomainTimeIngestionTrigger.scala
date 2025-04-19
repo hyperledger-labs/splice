@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.automation
 
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.store.DomainTimeStore
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
@@ -15,7 +15,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 final class DomainTimeIngestionTrigger(
-    domainAlias: DomainAlias,
+    synchronizerAlias: SynchronizerAlias,
     domainTimeStore: DomainTimeStore,
     participantAdminConnection: ParticipantAdminConnection,
     context: TriggerContext,
@@ -25,15 +25,15 @@ final class DomainTimeIngestionTrigger(
   override def completeTask(
       task: PeriodicTaskTrigger.PeriodicTask
   )(implicit tc: TraceContext): Future[TaskOutcome] =
-    participantAdminConnection.getDomainId(domainAlias).transformWith {
+    participantAdminConnection.getSynchronizerId(synchronizerAlias).transformWith {
       case Failure(s: StatusRuntimeException) if s.getStatus.getCode == Status.Code.NOT_FOUND =>
         // This can happen during initialization, just skip it to reduce log noise.
         Future.successful(TaskNoop)
       case Failure(e) => Future.failed(e)
-      case Success(domainId) =>
+      case Success(synchronizerId) =>
         for {
           time <- participantAdminConnection
-            .getDomainTimeLowerBound(domainId, context.config.pollingInterval)
+            .getDomainTimeLowerBound(synchronizerId, context.config.pollingInterval)
             .map(_.timestamp)
           _ <- domainTimeStore.ingestDomainTime(time)
         } yield TaskSuccess(show"Updated domain time to $time")

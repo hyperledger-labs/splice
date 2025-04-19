@@ -30,7 +30,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.CometBftConfigLimits
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
@@ -113,7 +113,7 @@ object SpliceUtil {
       user: PartyId,
       logger: TracedLogger,
       connection: SpliceLedgerConnection,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       retryProvider: RetryProvider,
       lookupValidatorRightByParty: (
           PartyId
@@ -146,7 +146,7 @@ object SpliceUtil {
                 ),
               deduplicationOffset = offset,
             )
-            .withDomainId(domainId)
+            .withSynchronizerId(synchronizerId)
             .yieldUnit()
         case QueryResult(_, Some(_)) =>
           logger.info(s"ValidatorRight for $user already exists, skipping")
@@ -248,7 +248,7 @@ object SpliceUtil {
   def defaultAmuletConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
-      initialDomainId: DomainId,
+      initialSynchronizerId: SynchronizerId,
       initialExtraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
       initialMinTopupAmount: Long = dummyMinTopupAmount,
       initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
@@ -263,7 +263,7 @@ object SpliceUtil {
     defaultAmuletConfig(
       initialTickDuration,
       initialMaxNumInputs,
-      initialDomainId,
+      initialSynchronizerId,
       initialExtraTrafficPrice,
       initialMinTopupAmount,
       initialBaseRateBurstAmount,
@@ -285,7 +285,7 @@ object SpliceUtil {
       numUnclaimedRewardsThreshold: Int,
       numMemberTrafficContractsThreshold: Int,
       maxNumCometBftNodes: Int,
-      dummyDomain: DomainId,
+      dummyDomain: SynchronizerId,
   ): DsoRulesConfig = new DsoRulesConfig(
     numUnclaimedRewardsThreshold, // numUnclaimedRewardsThreshold
     numMemberTrafficContractsThreshold, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
@@ -322,7 +322,7 @@ object SpliceUtil {
   def defaultAmuletConfig(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
-      initialDomainId: DomainId,
+      initialSynchronizerId: SynchronizerId,
       initialExtraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
       initialMinTopupAmount: Long = dummyMinTopupAmount,
       initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
@@ -331,7 +331,8 @@ object SpliceUtil {
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       transferPreapprovalFee: Option[BigDecimal] = None,
-      nextDomainId: Option[DomainId] = None,
+      featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
+      nextSynchronizerId: Option[SynchronizerId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
@@ -342,8 +343,8 @@ object SpliceUtil {
 
       // global domain config
       defaultDecentralizedSynchronizerConfig(
-        initialDomainId,
-        nextDomainId,
+        initialSynchronizerId,
+        nextSynchronizerId,
         initialExtraTrafficPrice,
         initialMinTopupAmount,
         initialBaseRateBurstAmount,
@@ -355,6 +356,7 @@ object SpliceUtil {
       new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
       initialPackageConfig,
       transferPreapprovalFee.map(_.bigDecimal).toJava,
+      featuredAppActivityMarkerAmount.map(_.bigDecimal).toJava,
     )
 
   def defaultAnsConfig(
@@ -380,25 +382,25 @@ object SpliceUtil {
   )
 
   private def defaultDecentralizedSynchronizerConfig(
-      initialDomainId: DomainId,
-      nextDomainId: Option[DomainId],
+      initialSynchronizerId: SynchronizerId,
+      nextSynchronizerId: Option[SynchronizerId],
       initialExtraTrafficPrice: BigDecimal,
       initialMinTopupAmount: Long,
       initialBaseRateBurstAmount: Long,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration,
       initialReadVsWriteScalingFactor: Int,
   ): AmuletDecentralizedSynchronizerConfig = {
-    val domainId = initialDomainId.toProtoPrimitive
-    val next = nextDomainId.map(_.toProtoPrimitive)
+    val synchronizerId = initialSynchronizerId.toProtoPrimitive
+    val next = nextSynchronizerId.map(_.toProtoPrimitive)
     new AmuletDecentralizedSynchronizerConfig(
       // requiredSynchronizers
       new DamlSet(
-        (Map(domainId -> DamlUnit.getInstance) ++ next
+        (Map(synchronizerId -> DamlUnit.getInstance) ++ next
           .map(_ -> DamlUnit.getInstance)
           .toList).asJava
       ),
       // activeSynchronizer
-      next getOrElse domainId,
+      next getOrElse synchronizerId,
       // fees
       domainFeesConfig(
         baseRateBurstAmount = initialBaseRateBurstAmount,

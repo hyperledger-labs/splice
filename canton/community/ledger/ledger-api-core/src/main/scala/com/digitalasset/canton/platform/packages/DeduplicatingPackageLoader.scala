@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.packages
@@ -14,8 +14,8 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Try}
 
-/** Deduplicates package load requests, such that concurrent requests
-  * only access the data store and decode the package once.
+/** Deduplicates package load requests, such that concurrent requests only access the data store and
+  * decode the package once.
   */
 class DeduplicatingPackageLoader() {
   // Concurrent map of promises to request each package only once.

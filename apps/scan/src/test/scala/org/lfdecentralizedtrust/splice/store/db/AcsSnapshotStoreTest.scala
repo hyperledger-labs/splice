@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreErrors, StoreTest, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -166,7 +167,7 @@ class AcsSnapshotStoreTest
               )
               _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp)
               contractsInSnapshot <- queryAll(store, timestamp)
-            } yield contractsInSnapshot.createdEventsInPage.map(_.getContractId) should be(
+            } yield contractsInSnapshot.createdEventsInPage.map(_.event.getContractId) should be(
               expectedContractsPerTimestamp(timestamp).map(_.contractId.contractId)
             )
           }
@@ -201,7 +202,7 @@ class AcsSnapshotStoreTest
           lastSnapshot <- store.lookupSnapshotBefore(DefaultMigrationId, timestamp2)
           _ <- store.insertNewSnapshot(lastSnapshot, DefaultMigrationId, timestamp2)
           result <- queryAll(store, timestamp2)
-        } yield result.createdEventsInPage.map(_.getContractId) should be(
+        } yield result.createdEventsInPage.map(_.event.getContractId) should be(
           (acs ++ Seq(omr1, omr2)).map(_.contractId.contractId)
         )
       }
@@ -231,13 +232,13 @@ class AcsSnapshotStoreTest
           afterT2 <- queryAll(store, timestamp2)
           afterT3 <- queryAll(store, timestamp3)
         } yield {
-          afterT1.createdEventsInPage.map(_.getContractId) should be(
+          afterT1.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(alwaysThere, toArchive).map(_.contractId.contractId)
           )
-          afterT2.createdEventsInPage.map(_.getContractId) should be(
+          afterT2.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(alwaysThere).map(_.contractId.contractId)
           )
-          afterT3.createdEventsInPage.map(_.getContractId) should be(
+          afterT3.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(alwaysThere, toCreateT3).map(_.contractId.contractId)
           )
         }
@@ -299,13 +300,13 @@ class AcsSnapshotStoreTest
             Seq.empty,
           )
         } yield {
-          resultParty1.createdEventsInPage.map(_.getContractId) should be(
+          resultParty1.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(p1, bothParties).map(_.contractId.contractId)
           )
-          resultParty2.createdEventsInPage.map(_.getContractId) should be(
+          resultParty2.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(p2, bothParties).map(_.contractId.contractId)
           )
-          resultBothParties.createdEventsInPage.map(_.getContractId) should be(
+          resultBothParties.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(p1, p2, bothParties).map(_.contractId.contractId)
           )
         }
@@ -348,10 +349,10 @@ class AcsSnapshotStoreTest
             Seq(PackageQualifiedName(t2.identifier)),
           )
         } yield {
-          resultTemplate1.createdEventsInPage.map(_.getContractId) should be(
+          resultTemplate1.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(t1).map(_.contractId.contractId)
           )
-          resultTemplate2.createdEventsInPage.map(_.getContractId) should be(
+          resultTemplate2.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(t2).map(_.contractId.contractId)
           )
         }
@@ -393,7 +394,7 @@ class AcsSnapshotStoreTest
             Seq(PackageQualifiedName(ok.identifier)),
           )
         } yield {
-          result.createdEventsInPage.map(_.getContractId) should be(
+          result.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(ok).map(_.contractId.contractId)
           )
         }
@@ -418,7 +419,7 @@ class AcsSnapshotStoreTest
               Seq.empty,
             )
             .flatMap { result =>
-              val newAcc = acc ++ result.createdEventsInPage.map(_.getContractId)
+              val newAcc = acc ++ result.createdEventsInPage.map(_.event.getContractId)
               result.afterToken match {
                 case Some(value) => queryRecursive(store, Some(value), newAcc)
                 case None => Future.successful(newAcc)
@@ -497,7 +498,7 @@ class AcsSnapshotStoreTest
           )
         } yield {
           resultDso.createdEventsInPage should be(empty)
-          resultWanteds.createdEventsInPage.map(_.getContractId).toSet should be(
+          resultWanteds.createdEventsInPage.map(_.event.getContractId).toSet should be(
             Set(amulet1, amulet2, lockedAmulet1, lockedAmulet2).map(_.contractId.contractId)
           )
         }
@@ -533,7 +534,7 @@ class AcsSnapshotStoreTest
           )
         } yield {
           resultHolder.createdEventsInPage should be(empty)
-          resultOwner.createdEventsInPage.map(_.getContractId) should be(
+          resultOwner.createdEventsInPage.map(_.event.getContractId) should be(
             Seq(amulet.contractId.contractId)
           )
         }
@@ -790,7 +791,7 @@ class AcsSnapshotStoreTest
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[?] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

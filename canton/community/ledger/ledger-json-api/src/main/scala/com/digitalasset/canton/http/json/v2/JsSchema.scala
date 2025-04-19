@@ -1,57 +1,71 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
-import com.daml.error.*
-import com.daml.error.ErrorCategory.GenericErrorCategory
-import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.admin.object_meta.ObjectMeta
-import com.daml.ledger.api.v2.offset_checkpoint
 import com.daml.ledger.api.v2.trace_context.TraceContext
-import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent.CreatedEvent
+import com.daml.ledger.api.v2.{offset_checkpoint, reassignment, transaction_filter}
+import com.digitalasset.base.error.utils.DecodedCantonError
+import com.digitalasset.base.error.{DamlErrorWithDefiniteAnswer, RpcError}
+import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
+import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
+import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent.{CreatedEvent, ExercisedEvent}
 import com.google.protobuf
 import com.google.protobuf.field_mask.FieldMask
 import com.google.protobuf.struct.Struct
 import com.google.protobuf.util.JsonFormat
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.{Codec, Decoder, Encoder, Json}
-import io.grpc.Status
-import org.slf4j.event.Level
 import sttp.tapir.CodecFormat.TextPlain
+import sttp.tapir.generic.Derived
+import sttp.tapir.generic.auto.*
 import sttp.tapir.{DecodeResult, Schema, SchemaType}
 
 import java.time.Instant
 import java.util.Base64
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.Duration
 import scala.util.Try
 
 /** JSON wrappers that do not belong to a particular service */
 object JsSchema {
 
+  implicit val config: Configuration = Configuration.default.copy(
+    useDefaults = true
+  )
   final case class JsTransaction(
-      update_id: String,
-      command_id: String,
-      workflow_id: String,
-      effective_at: com.google.protobuf.timestamp.Timestamp,
+      updateId: String,
+      commandId: String,
+      workflowId: String,
+      effectiveAt: com.google.protobuf.timestamp.Timestamp,
       events: Seq[JsEvent.Event],
       offset: Long,
-      domain_id: String,
-      trace_context: Option[TraceContext],
-      record_time: com.google.protobuf.timestamp.Timestamp,
+      synchronizerId: String,
+      traceContext: Option[TraceContext],
+      recordTime: com.google.protobuf.timestamp.Timestamp,
   )
 
   final case class JsTransactionTree(
-      update_id: String,
-      command_id: String,
-      workflow_id: String,
-      effective_at: Option[protobuf.timestamp.Timestamp],
+      updateId: String,
+      commandId: String,
+      workflowId: String,
+      effectiveAt: Option[protobuf.timestamp.Timestamp],
       offset: Long,
-      events_by_id: Map[String, JsTreeEvent.TreeEvent],
-      root_event_ids: Seq[String],
-      domain_id: String,
-      trace_context: Option[TraceContext],
-      record_time: protobuf.timestamp.Timestamp,
+      eventsById: Map[Int, JsTreeEvent.TreeEvent],
+      synchronizerId: String,
+      traceContext: Option[TraceContext],
+      recordTime: protobuf.timestamp.Timestamp,
+  )
+
+  final case class JsTopologyTransaction(
+      updateId: String,
+      events: Seq[JsTopologyEvent.Event],
+      offset: Long,
+      synchronizerId: String,
+      traceContext: Option[TraceContext],
+      recordTime: com.google.protobuf.timestamp.Timestamp,
   )
 
   final case class JsStatus(
@@ -61,58 +75,169 @@ object JsSchema {
   )
 
   final case class JsInterfaceView(
-      interface_id: String,
-      view_status: JsStatus,
-      view_value: Option[Json],
+      interfaceId: String,
+      viewStatus: JsStatus,
+      viewValue: Option[Json],
   )
+  object JsReassignmentEvent {
+    sealed trait JsReassignmentEvent
+
+    final case class JsAssignmentEvent(
+        source: String,
+        target: String,
+        unassignId: String,
+        submitter: String,
+        reassignmentCounter: Long,
+        createdEvent: CreatedEvent,
+    ) extends JsReassignmentEvent
+
+    final case class JsUnassignedEvent(value: reassignment.UnassignedEvent)
+        extends JsReassignmentEvent
+
+  }
+
+  final case class JsReassignment(
+      updateId: String,
+      commandId: String,
+      workflowId: String,
+      offset: Long,
+      events: Seq[JsReassignmentEvent.JsReassignmentEvent],
+      traceContext: Option[com.daml.ledger.api.v2.trace_context.TraceContext],
+      recordTime: com.google.protobuf.timestamp.Timestamp,
+  )
+
+  object JsServicesCommonCodecs {
+    import io.circe.generic.extras.auto.*
+    implicit val jsTransactionRW: Codec[JsTransaction] = deriveConfiguredCodec
+
+    implicit val unassignedEventRW: Codec[reassignment.UnassignedEvent] = deriveRelaxedCodec
+
+    implicit val wildcardFilterRW: Codec[transaction_filter.WildcardFilter] =
+      deriveRelaxedCodec
+    implicit val templateFilterRW: Codec[transaction_filter.TemplateFilter] =
+      deriveRelaxedCodec
+    implicit val interfaceFilterRW: Codec[transaction_filter.InterfaceFilter] =
+      deriveRelaxedCodec
+
+    implicit val identifierFilterWildcardRW
+        : Codec[transaction_filter.CumulativeFilter.IdentifierFilter.WildcardFilter] =
+      deriveRelaxedCodec
+
+    implicit val identifierFilterTemplateRW
+        : Codec[transaction_filter.CumulativeFilter.IdentifierFilter.TemplateFilter] =
+      deriveRelaxedCodec
+    implicit val identifierFilterInterfaceRW
+        : Codec[transaction_filter.CumulativeFilter.IdentifierFilter.InterfaceFilter] =
+      deriveRelaxedCodec
+
+    implicit val identifierFilterRW: Codec[transaction_filter.CumulativeFilter.IdentifierFilter] =
+      deriveConfiguredCodec // ADT
+
+    implicit val cumulativeFilterRW: Codec[transaction_filter.CumulativeFilter] =
+      deriveRelaxedCodec
+
+    implicit val filtersRW: Codec[transaction_filter.Filters] = deriveRelaxedCodec
+    implicit val transactionFilterRW: Codec[transaction_filter.TransactionFilter] =
+      deriveRelaxedCodec
+    implicit val eventFormatRW: Codec[transaction_filter.EventFormat] = deriveRelaxedCodec
+    implicit val transactionShapeRW: Codec[transaction_filter.TransactionShape] =
+      deriveConfiguredCodec // ADT
+    implicit val transactionFormatRW: Codec[transaction_filter.TransactionFormat] =
+      deriveRelaxedCodec
+
+    implicit val identifierFilterSchema
+        : Schema[transaction_filter.CumulativeFilter.IdentifierFilter] =
+      Schema.oneOfWrapped
+
+    implicit val jsReassignment: Codec[JsReassignment] = deriveConfiguredCodec
+
+    implicit val jsReassignmentEventRW: Codec[JsReassignmentEvent.JsReassignmentEvent] =
+      deriveConfiguredCodec
+
+    implicit val jsReassignmentEventJsUnassignedEventRW
+        : Codec[JsReassignmentEvent.JsUnassignedEvent] =
+      deriveConfiguredCodec
+
+    implicit val jsReassignmentEventJsAssignedEventRW
+        : Codec[JsReassignmentEvent.JsAssignmentEvent] =
+      deriveConfiguredCodec
+
+  }
 
   object JsEvent {
     sealed trait Event
 
     final case class CreatedEvent(
-        event_id: String,
-        contract_id: String,
-        template_id: String,
-        contract_key: Option[Json],
-        create_argument: Option[Json],
-        created_event_blob: protobuf.ByteString,
-        interface_views: Seq[JsInterfaceView],
-        witness_parties: Seq[String],
+        offset: Long,
+        nodeId: Int,
+        contractId: String,
+        templateId: String,
+        contractKey: Option[Json],
+        createArgument: Option[Json],
+        createdEventBlob: protobuf.ByteString,
+        interfaceViews: Seq[JsInterfaceView],
+        witnessParties: Seq[String],
         signatories: Seq[String],
         observers: Seq[String],
-        created_at: protobuf.timestamp.Timestamp,
-        package_name: String,
+        createdAt: protobuf.timestamp.Timestamp,
+        packageName: String,
     ) extends Event
 
     final case class ArchivedEvent(
-        event_id: String,
-        contract_id: String,
-        template_id: String,
-        witness_parties: Seq[String],
-        package_name: String,
+        offset: Long,
+        nodeId: Int,
+        contractId: String,
+        templateId: String,
+        witnessParties: Seq[String],
+        packageName: String,
+        implementedInterfaces: Seq[String],
+    ) extends Event
+
+    final case class ExercisedEvent(
+        offset: Long,
+        nodeId: Int,
+        contractId: String,
+        templateId: com.daml.ledger.api.v2.value.Identifier,
+        interfaceId: Option[com.daml.ledger.api.v2.value.Identifier],
+        choice: String,
+        choiceArgument: Json,
+        actingParties: Seq[String],
+        consuming: Boolean,
+        witnessParties: Seq[String],
+        lastDescendantNodeId: Int,
+        exerciseResult: Json,
+        packageName: String,
+        implementedInterfaces: Seq[com.daml.ledger.api.v2.value.Identifier],
+    ) extends Event
+  }
+
+  object JsTopologyEvent {
+    sealed trait Event
+
+    final case class ParticipantAuthorizationAdded(
+        partyId: String,
+        participantId: String,
+        participantPermission: Int,
+    ) extends Event
+
+    final case class ParticipantAuthorizationChanged(
+        partyId: String,
+        participantId: String,
+        participantPermission: Int,
+    ) extends Event
+
+    final case class ParticipantAuthorizationRevoked(
+        partyId: String,
+        participantId: String,
     ) extends Event
   }
 
   object JsTreeEvent {
     sealed trait TreeEvent
 
-    final case class ExercisedTreeEvent(
-        event_id: String,
-        contract_id: String,
-        template_id: String,
-        interface_id: Option[String],
-        choice: String,
-        choice_argument: Json,
-        acting_parties: Seq[String],
-        consuming: Boolean,
-        witness_parties: Seq[String],
-        child_event_ids: Seq[String],
-        exercise_result: Json,
-        package_name: String,
-    ) extends TreeEvent
-
     final case class CreatedTreeEvent(value: CreatedEvent) extends TreeEvent
 
+    final case class ExercisedTreeEvent(value: ExercisedEvent) extends TreeEvent
   }
 
   final case class JsCantonError(
@@ -132,11 +257,11 @@ object JsSchema {
     import DirectScalaPbRwImplicits.*
     implicit val rw: Codec[JsCantonError] = deriveCodec
 
-    def fromErrorCode(damlError: DamlError): JsCantonError = JsCantonError(
+    def fromErrorCode(damlError: RpcError): JsCantonError = JsCantonError(
       code = damlError.code.id,
       cause = damlError.cause,
-      correlationId = damlError.errorContext.correlationId,
-      traceId = damlError.errorContext.traceId,
+      correlationId = damlError.correlationId,
+      traceId = damlError.traceId,
       context = damlError.context,
       resources = damlError.resources.map { case (k, v) => (k.asString, v) },
       errorCategory = damlError.code.category.asInt,
@@ -163,53 +288,20 @@ object JsSchema {
         definiteAnswer = decodedCantonError.definiteAnswerO,
       )
 
-    implicit val genericErrorClass: ErrorClass = ErrorClass(
-      List(Grouping("generic", "ErrorClass"))
-    )
-
-    private final case class GenericErrorCode(
-        override val id: String,
-        override val category: ErrorCategory,
-    ) extends ErrorCode(id, category)
-
-    def toDecodedCantonError(jsCantonError: JsCantonError): DecodedCantonError =
-      // TODO (i19398) revisit error handling code
-      new DecodedCantonError(
-        code = GenericErrorCode(
-          id = jsCantonError.code,
-          category = GenericErrorCategory(
-            grpcCode = jsCantonError.grpcCodeValue.map(Status.fromCodeValue).map(_.getCode),
-            logLevel = Level.INFO,
-            retryable = jsCantonError.retryInfo.map(duration =>
-              ErrorCategoryRetry(FiniteDuration(duration.length, duration.unit))
-            ),
-            securitySensitive = false,
-            asInt = jsCantonError.errorCategory,
-            rank = 1,
-          ),
-        ),
-        cause = jsCantonError.cause,
-        correlationId = jsCantonError.correlationId,
-        traceId = jsCantonError.traceId,
-        context = jsCantonError.context,
-        resources = jsCantonError.resources.map { case (k, v) => (ErrorResource(k), v) },
-        definiteAnswerO = jsCantonError.definiteAnswer,
-      )
   }
   object DirectScalaPbRwImplicits {
+    import io.circe.generic.extras.auto.*
+    import sttp.tapir.json.circe.*
+    import sttp.tapir.generic.auto.*
 
-    implicit val om: Codec[ObjectMeta] = deriveCodec
-    implicit val traceContext: Codec[TraceContext] = deriveCodec
+    implicit val om: Codec[ObjectMeta] = deriveRelaxedCodec
+    implicit val traceContext: Codec[TraceContext] = deriveRelaxedCodec
     implicit val encodeDuration: Encoder[Duration] =
       Encoder.encodeString.contramap[Duration](_.toString)
 
     implicit val decodeDuration: Decoder[Duration] = Decoder.decodeString.emapTry { str =>
       Try(Duration.create(str))
     }
-
-    implicit val byteStringSchema: Schema[protobuf.ByteString] = Schema(
-      SchemaType.SString()
-    )
 
     implicit val encodeByteString: Encoder[protobuf.ByteString] =
       Encoder.encodeString.contramap[protobuf.ByteString] { v =>
@@ -220,12 +312,13 @@ object JsSchema {
         Try(protobuf.ByteString.copyFrom(Base64.getDecoder.decode(str)))
     }
 
-    implicit val field: Codec[scalapb.UnknownFieldSet.Field] = deriveCodec
-    implicit val unknownFieldSet: Codec[scalapb.UnknownFieldSet] = deriveCodec
+    // proto classes use default values
+    implicit val durationRW: Codec[protobuf.duration.Duration] = deriveConfiguredCodec
 
-    implicit val fieldMask: Codec[FieldMask] = deriveCodec
-    implicit val unknownFieldSetSchema: Schema[scalapb.UnknownFieldSet] =
-      Schema.string[scalapb.UnknownFieldSet]
+    implicit val field: Codec[scalapb.UnknownFieldSet.Field] = deriveConfiguredCodec
+    implicit val unknownFieldSet: Codec[scalapb.UnknownFieldSet] = deriveConfiguredCodec
+
+    implicit val fieldMask: Codec[FieldMask] = deriveConfiguredCodec
 
     implicit val encodeTimestamp: Encoder[protobuf.timestamp.Timestamp] =
       Encoder.encodeInstant.contramap[protobuf.timestamp.Timestamp] { timestamp =>
@@ -265,25 +358,73 @@ object JsSchema {
     implicit val decodeIdentifier: Decoder[com.daml.ledger.api.v2.value.Identifier] =
       Decoder.decodeString.map(IdentifierConverter.fromJson)
 
-    implicit val jsEvent: Codec[JsEvent.Event] = deriveCodec
-    implicit val any: Codec[com.google.protobuf.any.Any] = deriveCodec
-    implicit val jsStatus: Codec[JsStatus] = deriveCodec
-    implicit val jsInterfaceView: Codec[JsInterfaceView] = deriveCodec
-    implicit val jsCreatedEvent: Codec[JsEvent.CreatedEvent] = deriveCodec
-    implicit val jsArchivedEvent: Codec[JsEvent.ArchivedEvent] = deriveCodec
-    implicit val jsTransactionTree: Codec[JsTransactionTree] = deriveCodec
-    implicit val jsSubmitAndWaitForTransactionTreeResponse
-        : Codec[JsSubmitAndWaitForTransactionTreeResponse] = deriveCodec
-    implicit val jsTreeEvent: Codec[JsTreeEvent.TreeEvent] = deriveCodec
-    implicit val jsExercisedTreeEvent: Codec[JsTreeEvent.ExercisedTreeEvent] = deriveCodec
-    implicit val jsCreatedTreeEvent: Codec[JsTreeEvent.CreatedTreeEvent] = deriveCodec
+    implicit val jsEvent: Codec[JsEvent.Event] = deriveConfiguredCodec
+    implicit val jsCreatedEvent: Codec[JsEvent.CreatedEvent] = deriveConfiguredCodec
+    implicit val jsArchivedEvent: Codec[JsEvent.ArchivedEvent] = deriveConfiguredCodec
+    implicit val jsExercisedEvent: Codec[JsEvent.ExercisedEvent] = deriveConfiguredCodec
 
-    implicit val offsetCheckpoint: Codec[offset_checkpoint.OffsetCheckpoint] = deriveCodec
-    implicit val offsetCheckpointDomainTime: Codec[offset_checkpoint.DomainTime] = deriveCodec
+    implicit val any: Codec[com.google.protobuf.any.Any] = deriveConfiguredCodec
+    implicit val jsStatus: Codec[JsStatus] = deriveConfiguredCodec
+    implicit val jsInterfaceView: Codec[JsInterfaceView] = deriveConfiguredCodec
+
+    implicit val jsTransactionTree: Codec[JsTransactionTree] = deriveConfiguredCodec
+    implicit val jsTopologyTransaction: Codec[JsTopologyTransaction] = deriveConfiguredCodec
+    implicit val jsSubmitAndWaitForTransactionTreeResponse
+        : Codec[JsSubmitAndWaitForTransactionTreeResponse] = deriveConfiguredCodec
+    implicit val jsTreeEvent: Codec[JsTreeEvent.TreeEvent] = deriveConfiguredCodec
+    implicit val jsExercisedTreeEvent: Codec[JsTreeEvent.ExercisedTreeEvent] = deriveConfiguredCodec
+    implicit val jsCreatedTreeEvent: Codec[JsTreeEvent.CreatedTreeEvent] = deriveConfiguredCodec
+    implicit val jsTopologyEvent: Codec[JsTopologyEvent.Event] = deriveConfiguredCodec
+    implicit val jsParticipantAuthorizationChanged
+        : Codec[JsTopologyEvent.ParticipantAuthorizationChanged] = deriveConfiguredCodec
+    implicit val jsParticipantAuthorizationRevoked
+        : Codec[JsTopologyEvent.ParticipantAuthorizationRevoked] = deriveConfiguredCodec
+
+    implicit val offsetCheckpoint: Codec[offset_checkpoint.OffsetCheckpoint] = deriveRelaxedCodec
+    implicit val offsetCheckpointSynchronizerTime: Codec[offset_checkpoint.SynchronizerTime] =
+      deriveRelaxedCodec
 
     implicit val grpcStatusRW: Codec[
       com.google.rpc.status.Status
-    ] = deriveCodec
+    ] = deriveConfiguredCodec
 
+    // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
+
+    implicit val unknownFieldSetSchema: Schema[scalapb.UnknownFieldSet] =
+      Schema.string[scalapb.UnknownFieldSet]
+
+    implicit val identifierSchema: Schema[com.daml.ledger.api.v2.value.Identifier] = Schema.string
+
+    implicit val durationSchema: Schema[protobuf.duration.Duration] =
+      implicitly[Derived[Schema[protobuf.duration.Duration]]].value
+        .modify(_.unknownFields)(
+          _.copy(isOptional = true).description(
+            "This field is automatically added as part of protobuf to json mapping"
+          )
+        )
+
+    implicit val timestampSchema: Schema[protobuf.timestamp.Timestamp] = Schema.string
+
+    implicit val byteStringSchema: Schema[protobuf.ByteString] = Schema(
+      SchemaType.SString()
+    )
+
+    implicit val structSchema: Schema[protobuf.struct.Struct] = Schema.any
+
+    implicit val jsEventCreatedSchema: Schema[JsEvent.CreatedEvent] = Schema.derived
+
+    @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+    implicit val jsEventSchema: Schema[JsEvent.Event] =
+      Schema.oneOfWrapped
+
+    @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+    implicit val jsTreeEventSchema: Schema[JsTreeEvent.TreeEvent] =
+      Schema.oneOfWrapped
+
+    implicit val identifierFilterSchema
+        : Schema[transaction_filter.CumulativeFilter.IdentifierFilter] =
+      Schema.oneOfWrapped
+
+    implicit val valueSchema: Schema[com.google.protobuf.struct.Value] = Schema.any
   }
 }

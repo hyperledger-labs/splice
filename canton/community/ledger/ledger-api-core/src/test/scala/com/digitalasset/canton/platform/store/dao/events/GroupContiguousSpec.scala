@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -16,7 +16,7 @@ final class GroupContiguousSpec
     with ScalaCheckPropertyChecks
     with ScalaFutures
     with PekkoBeforeAndAfterAll {
-  import TransactionsReader.groupContiguous
+  import UpdateReader.groupContiguous
 
   behavior of "groupContiguous"
 

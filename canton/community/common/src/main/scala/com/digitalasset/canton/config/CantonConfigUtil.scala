@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
@@ -8,8 +8,8 @@ import pureconfig.generic.FieldCoproductHint
 
 object CantonConfigUtil {
 
-  /** By default pureconfig will expect our H2 config to use the value `h-2` for type.
-    * This just changes this expectation to being lower cased so `h2` will work.
+  /** By default pureconfig will expect our H2 config to use the value `h-2` for type. This just
+    * changes this expectation to being lower cased so `h2` will work.
     */
   def lowerCaseStorageConfigType[SC <: StorageConfig]: FieldCoproductHint[SC] =
     new FieldCoproductHint[SC]("type") {

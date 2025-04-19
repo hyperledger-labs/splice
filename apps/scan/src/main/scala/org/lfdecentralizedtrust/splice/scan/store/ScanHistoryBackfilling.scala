@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, TreeUpdateWith
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{Outcome, SourceMigrationInfo}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -45,11 +45,11 @@ class ScanHistoryBackfilling(
 
       def items(
           migrationId: Long,
-          domainId: DomainId,
+          synchronizerId: SynchronizerId,
           before: CantonTimestamp,
           count: Int,
       )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
-        connection.getUpdatesBefore(migrationId, domainId, before, None, count)
+        connection.getUpdatesBefore(migrationId, synchronizerId, before, None, count)
     }
 
   private val backfilling =
@@ -101,7 +101,7 @@ object ScanHistoryBackfilling {
   ): Boolean = {
     treeUpdate.update match {
       case TransactionTreeUpdate(tree) =>
-        val rootEvents = tree.getRootEventIds.asScala.map(tree.getEventsById.get)
+        val rootEvents = tree.getRootNodeIds.asScala.map(tree.getEventsById.get)
         rootEvents.exists {
           case created: javaApi.CreatedEvent =>
             // In `template DsoBootstrap`, the first argument is the DSO party
@@ -138,7 +138,7 @@ object ScanHistoryBackfilling {
   ): Boolean = {
     treeUpdate.update match {
       case TransactionTreeUpdate(tree) =>
-        val rootEvents = tree.getRootEventIds.asScala.map(tree.getEventsById.get)
+        val rootEvents = tree.getRootNodeIds.asScala.map(tree.getEventsById.get)
         rootEvents.exists {
           case exercised: javaApi.ExercisedEvent =>
             // In `choice DsoRules_AddConfirmedSv`, the first argument is the new SV party

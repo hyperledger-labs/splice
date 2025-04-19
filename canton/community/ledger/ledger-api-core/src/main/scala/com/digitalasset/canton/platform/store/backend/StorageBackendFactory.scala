@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -18,7 +18,6 @@ import com.digitalasset.canton.platform.store.interning.StringInterning
 trait StorageBackendFactory {
   def createIngestionStorageBackend: IngestionStorageBackend[_]
   def createParameterStorageBackend(stringInterning: StringInterning): ParameterStorageBackend
-  def createMeteringParameterStorageBackend: MeteringParameterStorageBackend
   def createPartyStorageBackend(ledgerEndCache: LedgerEndCache): PartyStorageBackend
   def createPartyRecordStorageBackend: PartyRecordStorageBackend
   def createCompletionStorageBackend(
@@ -26,8 +25,7 @@ trait StorageBackendFactory {
       loggerFactory: NamedLoggerFactory,
   ): CompletionStorageBackend
   def createContractStorageBackend(
-      ledgerEndCache: LedgerEndCache,
-      stringInterning: StringInterning,
+      stringInterning: StringInterning
   ): ContractStorageBackend
   def createEventStorageBackend(
       ledgerEndCache: LedgerEndCache,
@@ -41,8 +39,6 @@ trait StorageBackendFactory {
   def createStringInterningStorageBackend: StringInterningStorageBackend
   def createUserManagementStorageBackend: UserManagementStorageBackend
   def createIdentityProviderConfigStorageBackend: IdentityProviderStorageBackend
-  def createMeteringStorageReadBackend(ledgerEndCache: LedgerEndCache): MeteringStorageReadBackend
-  def createMeteringStorageWriteBackend: MeteringStorageWriteBackend
 
   final def readStorageBackend(
       ledgerEndCache: LedgerEndCache,
@@ -52,10 +48,9 @@ trait StorageBackendFactory {
     ReadStorageBackend(
       partyStorageBackend = createPartyStorageBackend(ledgerEndCache),
       completionStorageBackend = createCompletionStorageBackend(stringInterning, loggerFactory),
-      contractStorageBackend = createContractStorageBackend(ledgerEndCache, stringInterning),
+      contractStorageBackend = createContractStorageBackend(stringInterning),
       eventStorageBackend =
         createEventStorageBackend(ledgerEndCache, stringInterning, loggerFactory),
-      meteringStorageBackend = createMeteringStorageReadBackend(ledgerEndCache),
     )
 }
 
@@ -72,5 +67,4 @@ final case class ReadStorageBackend(
     completionStorageBackend: CompletionStorageBackend,
     contractStorageBackend: ContractStorageBackend,
     eventStorageBackend: EventStorageBackend,
-    meteringStorageBackend: MeteringStorageReadBackend,
 )

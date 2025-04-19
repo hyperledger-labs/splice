@@ -16,21 +16,21 @@ import org.lfdecentralizedtrust.splice.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.concurrent.duration.DurationInt
 
 trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil {
-  protected def splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
-  protected def splitwellAlias = DomainAlias.tryCreate("splitwell")
+  protected def splitwellUpgradeAlias = SynchronizerAlias.tryCreate("splitwellUpgrade")
+  protected def splitwellAlias = SynchronizerAlias.tryCreate("splitwell")
   protected def connectSplitwellUpgradeDomain(
       participant: ParticipantClientReference,
       ensurePartyIsOnNewDomain: PartyId,
   )(implicit env: SpliceTestConsoleEnvironment) = {
     val upgradeConfig =
-      splitwellBackend.participantClient.domains.config(splitwellUpgradeAlias).value
+      splitwellBackend.participantClient.synchronizers.config(splitwellUpgradeAlias).value
 
     import com.daml.nonempty.+-:
     val url = inside(upgradeConfig.sequencerConnections.connections.forgetNE) {
@@ -44,7 +44,7 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
       timeUntilSuccess = 40.seconds
     )(
       "Connect splitwell upgrade domain",
-      participant.domains.connect(splitwellUpgradeAlias, url),
+      participant.synchronizers.connect(splitwellUpgradeAlias, url),
     )(
       s"Wait for splitwell upgrade domain to be connected for party $ensurePartyIsOnNewDomain",
       _ => {
@@ -56,7 +56,7 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
   }
 
   protected def disconnectSplitwellUpgradeDomain(participant: ParticipantClientReference) =
-    participant.domains.disconnect(splitwellUpgradeAlias)
+    participant.synchronizers.disconnect(splitwellUpgradeAlias)
 
   protected def createSplitwellInstalls(splitwell: SplitwellAppClientReference, party: PartyId) = {
     actAndCheck(

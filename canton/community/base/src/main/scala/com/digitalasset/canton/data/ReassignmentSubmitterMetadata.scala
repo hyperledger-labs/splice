@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -10,18 +10,21 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{ParticipantId, UniqueIdentifier}
 
-/** Information about the submitters of the transaction in the case of a reassignment.
-  * This data structure is quite similar to [[com.digitalasset.canton.data.SubmitterMetadata]]
-  * but differ on a small number of fields.
+/** Information about the submitters of the transaction in the case of a reassignment. This data
+  * structure is quite similar to [[com.digitalasset.canton.data.SubmitterMetadata]] but differ on a
+  * small number of fields.
   */
 final case class ReassignmentSubmitterMetadata(
     submitter: LfPartyId,
     submittingParticipant: ParticipantId,
     commandId: LedgerCommandId,
     submissionId: Option[LedgerSubmissionId],
-    applicationId: LedgerApplicationId,
+    userId: LedgerUserId,
     workflowId: Option[LfWorkflowId],
-) extends PrettyPrinting {
+) extends PrettyPrinting
+    with HasSubmissionTrackerData {
+
+  override def submissionTrackerData: Option[SubmissionTrackerData] = None
 
   def toProtoV30: v30.ReassignmentSubmitterMetadata =
     v30.ReassignmentSubmitterMetadata(
@@ -29,7 +32,7 @@ final case class ReassignmentSubmitterMetadata(
       submittingParticipantUid = submittingParticipant.uid.toProtoPrimitive,
       commandId = commandId,
       submissionId = submissionId.getOrElse(""),
-      applicationId = applicationId,
+      userId = userId,
       workflowId = workflowId.getOrElse(""),
     )
 
@@ -38,9 +41,11 @@ final case class ReassignmentSubmitterMetadata(
     param("submitting participant", _.submittingParticipant),
     param("command id", _.commandId),
     paramIfDefined("submission id", _.submissionId),
-    param("application id", _.applicationId),
+    param("user id", _.userId),
     param("workflow id", _.workflowId),
   )
+
+  def submittingAdminParty: LfPartyId = submittingParticipant.adminParty.toLf
 }
 
 object ReassignmentSubmitterMetadata {
@@ -52,7 +57,7 @@ object ReassignmentSubmitterMetadata {
       submittingParticipantP,
       commandIdP,
       submissionIdP,
-      applicationIdP,
+      userIdP,
       workflowIdP,
     ) = reassignmentSubmitterMetadataP
 
@@ -64,14 +69,14 @@ object ReassignmentSubmitterMetadata {
           .map(ParticipantId(_))
       commandId <- ProtoConverter.parseCommandId(commandIdP)
       submissionId <- ProtoConverter.parseLFSubmissionIdO(submissionIdP)
-      applicationId <- ProtoConverter.parseLFApplicationId(applicationIdP)
+      userId <- ProtoConverter.parseLFUserId(userIdP)
       workflowId <- ProtoConverter.parseLFWorkflowIdO(workflowIdP)
     } yield ReassignmentSubmitterMetadata(
       submitter,
       submittingParticipant,
       commandId,
       submissionId,
-      applicationId,
+      userId,
       workflowId,
     )
   }

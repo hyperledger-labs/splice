@@ -1,0 +1,175 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Generic code for a two-step transfer of amulet. The first step is to lock
+-- the amulet, the second step is to transfer it.
+
+module Splice.Amulet.TwoStepTransfer (
+  TwoStepTransfer(..),
+
+  prepareTwoStepTransfer,
+  executeTwoStepTransfer,
+  abortTwoStepTransfer,
+
+  -- * Shared support code
+  holdingToTransferInputs,
+
+  -- * Test-only
+  holdingFeesForDuration,
+) where
+
+import DA.Optional (optionalToList)
+import DA.Time
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+
+import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
+import Splice.AmuletRules
+import Splice.Expiry
+import Splice.Fees
+import Splice.Round
+import Splice.Types
+import Splice.Util
+
+
+data TwoStepTransfer = TwoStepTransfer with
+    dso : Party
+    sender : Party
+    receiver : Party
+    amount : Decimal
+    lockContext : Text
+      -- ^ Context description of the lock. This is used to display the reason for
+      -- the lock in wallets.
+    transferBefore : Time
+    transferBeforeDeadline : Text -- ^ Name of the deadline for the transfer
+    provider : Party
+      -- ^ Provider that should be marked as the app provider on the second step.
+    allowFeaturing : Bool
+      -- ^ Whether the second step can be featured.
+
+-- | The extra amount locked to guard against the transfer fees changing between
+-- the time of locking the amulet and the time of executing the actual transfer.
+feeReserveMultiplier : Decimal
+feeReserveMultiplier = 4.0
+
+-- | Converting a set of holding inputs to inputs for an amulet transfer,
+-- unlocking any expired LockedAmulet holdings on the fly.
+holdingToTransferInputs : ForOwner -> PaymentTransferContext -> [ContractId Holding] -> Update [TransferInput]
+holdingToTransferInputs forOwner paymentContext inputHoldingCids =
+  forA inputHoldingCids $ \holdingCid -> do
+    holding <- fetchCheckedInterface @Holding forOwner holdingCid
+    case fromInterface holding of
+      Some (LockedAmulet {}) -> do
+        let lockedAmuletCid : ContractId LockedAmulet = fromInterfaceContractId holdingCid
+        -- We assume the lock is expired, and if not then we rely `LockedAmulet_OwnerExpireLock` to fail
+        result <- exercise lockedAmuletCid LockedAmulet_OwnerExpireLock with
+          openRoundCid = paymentContext.context.openMiningRound
+        pure $ InputAmulet result.amuletSum.amulet
+      None -> pure $ InputAmulet $ coerceContractId holdingCid
+
+-- | Prepare a two-step transfer of amulet by locking the funds.
+prepareTwoStepTransfer
+  : TwoStepTransfer -> Time -> [ContractId Holding] -> PaymentTransferContext
+  -> Update (ContractId LockedAmulet, [ContractId Holding], Metadata)
+prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentContext = do
+  require "requestedAt < transferBefore" (requestedAt < transferBefore)
+  -- over-approximate fees that will be due on the actual transfer
+  let receiverOutputForActualTransfer = TransferOutput with
+        receiver
+        amount
+        receiverFeeRatio = 0.0  -- all fees are paid by the sender
+        lock = None
+  [expectedTransferFees] <- exerciseComputeFees paymentContext sender [receiverOutputForActualTransfer]
+  openRound <- fetchChecked (ForDso with dso) paymentContext.context.openMiningRound
+  let lockDuration = transferBefore `subTime` requestedAt
+  let approximateHoldingFees = holdingFeesForDuration lockDuration openRound
+  let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
+
+  -- lock the amulet
+  transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) paymentContext inputHoldingCids
+  let transfer = Splice.AmuletRules.Transfer with
+        sender
+        provider = sender -- the sender is serving as its own "app provider"
+        outputs =
+          [ TransferOutput with
+              receiver = sender
+              amount = amount + feesReserveAmount
+              receiverFeeRatio = 0.0 -- locking fees are paid by the sender
+              lock = Some TimeLock with
+                expiresAt = transferBefore
+                holders = [dso]
+                optContext = Some lockContext
+          ]
+        inputs = transferInputs
+        beneficiaries = None
+
+  result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
+  let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
+  pure
+    ( lockedAmulet
+    , toInterfaceContractId <$> optionalToList result.senderChangeAmulet
+    , copyOnlyBurnMeta result.meta
+    )
+
+executeTwoStepTransfer
+  : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs
+  -> Update ([ContractId Holding], [ContractId Holding], Metadata)
+executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
+  assertWithinDeadline transferBeforeDeadline transferBefore
+  (paymentContext, beneficiaries) <-
+    if allowFeaturing
+      then do
+        beneficiaries <- either fail pure $ beneficiariesFromMetadata extraArgs.meta
+        context <- paymentFromChoiceContext dso extraArgs.context
+        pure (context, beneficiaries)
+      else do
+        -- ignore beneficiaries in case we are not allowing featuring
+        context <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
+        pure (context, None)
+  let openRoundCid = paymentContext.context.openMiningRound
+  -- unlock amulet
+  unlockResult <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
+  let amuletCid = unlockResult.amuletSum.amulet
+  -- execute transfer
+  let receiverOutput = TransferOutput with
+        receiver = receiver
+        amount = amount
+        receiverFeeRatio = 0.0  -- all fees are paid by the sender
+        lock = None
+  let amuletRulesTransfer = Splice.AmuletRules.Transfer with
+        sender
+        provider
+        inputs = [InputAmulet amuletCid]
+        outputs = [receiverOutput]
+        beneficiaries
+  result <- exerciseCheckedPaymentTransfer dso paymentContext amuletRulesTransfer
+  pure
+    ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)
+    , createdAmuletToHolding <$> result.createdAmulets
+    , copyOnlyBurnMeta result.meta
+    )
+
+abortTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update [ContractId Holding]
+abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
+  expireLockedAmulet <- getFromContextU @Bool extraArgs.context expireLockKey
+  if expireLockedAmulet
+    then do
+      openRoundCid <- getFromContextU @(ContractId OpenMiningRound) extraArgs.context openRoundContextKey
+      -- prudent engineering: check the DSO party
+      _ <- fetchChecked (ForDso with dso) openRoundCid
+      result <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
+      pure [toInterfaceContractId result.amuletSum.amulet]
+    else do
+      -- scan is telling us to not expire the lock, this is OK if the transfer expired
+      assertDeadlineExceeded transferBeforeDeadline transferBefore
+      pure []
+
+holdingFeesForDuration : RelTime -> OpenMiningRound -> Decimal
+holdingFeesForDuration duration openRound =
+    holdingFeesUsd / amuletPerUsd
+  where
+    holdingFeesPerDayUsd = ratePerRoundToRatePerDay openRound.transferConfigUsd.holdingFee openRound.tickDuration
+    holdingFeesUsd = chargeRatePerDay holdingFeesPerDayUsd duration
+    amuletPerUsd = openRound.amuletPrice

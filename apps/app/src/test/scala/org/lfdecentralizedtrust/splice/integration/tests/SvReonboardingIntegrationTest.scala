@@ -1,25 +1,20 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.typesafe.config.ConfigValueFactory
-import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
+import org.lfdecentralizedtrust.splice.config.{
+  ConfigTransforms,
+  NetworkAppClientConfig,
+  ParticipantBootstrapDumpConfig,
+  ParticipantClientConfig,
+}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   bumpUrl,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.config.*
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -32,6 +27,15 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 }
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.data.CantonTimestamp
+
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.typesafe.config.ConfigValueFactory
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
@@ -78,8 +82,7 @@ class SvReonboardingIntegrationTest
   private def validatorLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("validatorWalletLocal")
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation
@@ -98,7 +101,7 @@ class SvReonboardingIntegrationTest
                 sv4Config
                   .copy(
                     storage = sv4Config.storage match {
-                      case c: SpliceDbConfig.Postgres =>
+                      case c: DbConfig.Postgres =>
                         c.copy(
                           config = c.config
                             .withValue(
@@ -125,7 +128,7 @@ class SvReonboardingIntegrationTest
                     adminApi = referenceValidatorConfig.adminApi
                       .copy(internalPort = Some(Port.tryCreate(27503))),
                     participantClient = ParticipantClientConfig(
-                      ClientConfig(port = Port.tryCreate(27502)),
+                      FullClientConfig(port = Port.tryCreate(27502)),
                       referenceValidatorConfig.participantClient.ledgerApi.copy(
                         clientConfig =
                           referenceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
@@ -134,7 +137,7 @@ class SvReonboardingIntegrationTest
                       ),
                     ),
                     storage = referenceValidatorConfig.storage match {
-                      case c: SpliceDbConfig.Postgres =>
+                      case c: DbConfig.Postgres =>
                         c.copy(
                           config = c.config
                             .withValue(
@@ -266,7 +269,7 @@ class SvReonboardingIntegrationTest
         ).map(_.toProtoPrimitive)
 
         sv1Backend.appState.participantAdminConnection
-          .getMediatorDomainState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -277,7 +280,7 @@ class SvReonboardingIntegrationTest
           sv4MediatorId,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerDomainState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -337,7 +340,7 @@ class SvReonboardingIntegrationTest
               sv3Backend.participantClient.id,
             )
             sv1Backend.appState.participantAdminConnection
-              .getMediatorDomainState(decentralizedSynchronizerId)
+              .getMediatorSynchronizerState(decentralizedSynchronizerId)
               .futureValue
               .mapping
               .active
@@ -347,7 +350,7 @@ class SvReonboardingIntegrationTest
               sv3MediatorId,
             )
             sv1Backend.appState.participantAdminConnection
-              .getSequencerDomainState(decentralizedSynchronizerId)
+              .getSequencerSynchronizerState(decentralizedSynchronizerId)
               .futureValue
               .mapping
               .active
@@ -441,7 +444,7 @@ class SvReonboardingIntegrationTest
         val sv4SequencerIdNew =
           sv4ReonboardBackend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
         sv1Backend.appState.participantAdminConnection
-          .getMediatorDomainState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -452,7 +455,7 @@ class SvReonboardingIntegrationTest
           sv4MediatorIdNew,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerDomainState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active

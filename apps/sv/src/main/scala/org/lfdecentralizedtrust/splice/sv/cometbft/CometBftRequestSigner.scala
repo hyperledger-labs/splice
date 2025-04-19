@@ -3,13 +3,16 @@
 
 package org.lfdecentralizedtrust.splice.sv.cometbft
 
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.crypto.tink.subtle.{Ed25519Sign, Ed25519Verify}
 import com.google.protobuf.ByteString
 import io.grpc.Status
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import scalapb.GeneratedMessage
 
 import java.util.Base64
@@ -79,30 +82,27 @@ object CometBftRequestSigner {
       keyBytes <- participantAdminConnection.exportKeyPair(fingerprint)
     } yield keyBytes match {
       case keyBytes: ByteString =>
-        val keyPair = CryptoKeyPair.fromTrustedByteString(keyBytes)
-        val pubKey = keyPair
-          .map(_.publicKey)
-          .map(_.toProtoPublicKeyV30.getSigningPublicKey.publicKey.toByteArray)
-          .getOrElse(
-            throw Status.NOT_FOUND
-              .withDescription(
-                s"Public key $name could not be parsed."
-              )
-              .asRuntimeException()
-          )
-        val privKey = keyPair
-          .map(_.privateKey)
-          .map(_.toProtoPrivateKey.getSigningPrivateKey.privateKey.toByteArray)
-          .getOrElse(
-            throw Status.NOT_FOUND
-              .withDescription(
-                s"Private key $name could not be parsed."
-              )
-              .asRuntimeException()
-          )
+        val keyPair =
+          CryptoKeyPair
+            .fromTrustedByteString(keyBytes)
+            .getOrElse(
+              throw Status.NOT_FOUND
+                .withDescription(
+                  s"Key pair $name could not be parsed."
+                )
+                .asRuntimeException()
+            )
+        val pubKey = SubjectPublicKeyInfo.getInstance(
+          keyPair.publicKey.toProtoPublicKeyV30.getSigningPublicKey.publicKey.toByteArray
+        )
+        val privateKey = PrivateKeyInfo.getInstance(
+          keyPair.privateKey.toProtoPrivateKey.getSigningPrivateKey.privateKey.toByteArray
+        )
+        val privateKeyData =
+          ASN1OctetString.getInstance(privateKey.getPrivateKey.getOctets).getOctets
         new CometBftRequestSigner(
-          Base64.getEncoder.encodeToString(pubKey),
-          Base64.getEncoder.encodeToString(privKey),
+          Base64.getEncoder.encodeToString(pubKey.getPublicKeyData.getBytes),
+          Base64.getEncoder.encodeToString(privateKeyData),
         )
       case _ =>
         throw Status.NOT_FOUND
@@ -116,12 +116,16 @@ object CometBftRequestSigner {
 
   def fingerprintForBase64PublicKey(publicKey: String): String = {
     val decodedKey: Array[Byte] = Base64.getDecoder.decode(publicKey)
-    fingerprintForPublicKey(ByteString.copyFrom(decodedKey))
+    fingerprintForPublicKey(decodedKey)
   }
 
-  private def fingerprintForPublicKey(publicKey: ByteString) = {
-    val hash = Hash.digest(HashPurpose.PublicKeyFingerprint, publicKey, HashAlgorithm.Sha256)
-    val fingerprint = Fingerprint.tryCreate(hash.toLengthLimitedHexString)
+  private def fingerprintForPublicKey(publicKey: Array[Byte]) = {
+    val hash = Hash.digest(
+      HashPurpose.PublicKeyFingerprint,
+      ByteString.copyFrom(publicKey),
+      HashAlgorithm.Sha256,
+    )
+    val fingerprint = Fingerprint.tryFromString(hash.toLengthLimitedHexString)
     fingerprint.toLengthLimitedString.toString()
   }
 

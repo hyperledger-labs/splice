@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -16,15 +16,17 @@ import slick.jdbc.{GetResult, SetParameter}
 
 import scala.collection.immutable
 
-/** Trait for classes that can be serialized by using ProtoBuf.
-  * See "CONTRIBUTING.md" for our guidelines on serialization.
+/** Trait for classes that can be serialized by using ProtoBuf. See "CONTRIBUTING.md" for our
+  * guidelines on serialization.
   *
-  * This wrapper is to be used if a single instance needs to be serialized to different proto versions.
+  * This wrapper is to be used if a single instance needs to be serialized to different proto
+  * versions.
   *
-  * The underlying ProtoClass is [[com.digitalasset.canton.version.v1.UntypedVersionedMessage]]
-  * but we often specify the typed alias [[com.digitalasset.canton.version.VersionedMessage]]
-  * instead.
+  * The underlying ProtoClass is [[com.digitalasset.canton.version.v1.UntypedVersionedMessage]] but
+  * we often specify the typed alias [[com.digitalasset.canton.version.VersionedMessage]] instead.
   */
+// In the versioning framework, such calls are legitimate
+@SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
 trait HasVersionedWrapper[ValueClass] extends HasVersionedToByteString {
   self: ValueClass =>
 
@@ -32,35 +34,39 @@ trait HasVersionedWrapper[ValueClass] extends HasVersionedToByteString {
 
   /** Yields the proto representation of the class inside an `UntypedVersionedMessage` wrapper.
     *
-    * Subclasses should make this method public by default, as this supports composing proto serializations.
-    * Keep it protected, if there are good reasons for it
-    * (e.g. [[com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence]]).
+    * Subclasses should make this method public by default, as this supports composing proto
+    * serializations. Keep it protected, if there are good reasons for it (e.g.
+    * [[com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence]]).
     */
   def toProtoVersioned(version: ProtocolVersion): VersionedMessage[ValueClass] =
     companionObj.supportedProtoVersions.converters
       .collectFirst {
         case (protoVersion, supportedVersion) if version >= supportedVersion.fromInclusive =>
-          VersionedMessage(supportedVersion.serializer(self), protoVersion.v)
+          VersionedMessage(supportedVersion.serializer(self).toByteString, protoVersion.v)
       }
       .getOrElse(serializeToHighestVersion)
 
   private def serializeToHighestVersion: VersionedMessage[ValueClass] =
     VersionedMessage(
-      companionObj.supportedProtoVersions.higherConverter.serializer(self),
+      companionObj.supportedProtoVersions.higherConverter.serializer(self).toByteString,
       companionObj.supportedProtoVersions.higherProtoVersion.v,
     )
 
-  /** Yields a byte string representation of the corresponding `UntypedVersionedMessage` wrapper of this instance.
+  /** Yields a byte string representation of the corresponding `UntypedVersionedMessage` wrapper of
+    * this instance.
     */
   override def toByteString(version: ProtocolVersion): ByteString = toProtoVersioned(
     version
   ).toByteString
 
-  /** Yields a byte array representation of the corresponding `UntypedVersionedMessage` wrapper of this instance.
+  /** Yields a byte array representation of the corresponding `UntypedVersionedMessage` wrapper of
+    * this instance.
     */
   def toByteArray(version: ProtocolVersion): Array[Byte] = toByteString(version).toByteArray
 
-  /** Writes the byte string representation of the corresponding `UntypedVersionedMessage` wrapper of this instance to a file. */
+  /** Writes the byte string representation of the corresponding `UntypedVersionedMessage` wrapper
+    * of this instance to a file.
+    */
   def writeToFile(
       outputFile: String,
       version: ProtocolVersion = ProtocolVersion.latest,
@@ -80,16 +86,15 @@ trait HasVersionedMessageCompanionCommon[ValueClass] {
   type Deserializer
 
   /** Proto versions that are supported by `fromProtoVersioned`, `fromByteString`,
-    * `toProtoVersioned` and `toByteString`.
-    * See the helpers `supportedProtoVersion` and `supportedProtoVersionMemoized`
-    * below to define a `ProtoCodec`.
+    * `toProtoVersioned` and `toByteString`. See the helpers `supportedProtoVersion` and
+    * `supportedProtoVersionMemoized` below to define a `ProtoCodec`.
     */
   def supportedProtoVersions: SupportedProtoVersions
 
   case class ProtoCodec(
       fromInclusive: ProtocolVersion,
       deserializer: Deserializer,
-      serializer: Serializer,
+      serializer: ValueClass => scalapb.GeneratedMessage,
   )
 
   case class SupportedProtoVersions private (
@@ -163,8 +168,8 @@ trait HasVersionedMessageCompanionCommon[ValueClass] {
   }
 }
 
-/** Traits for the companion objects of classes that implement [[HasVersionedWrapper]].
-  * Provide default methods.
+/** Traits for the companion objects of classes that implement [[HasVersionedWrapper]]. Provide
+  * default methods.
   */
 trait HasVersionedMessageCompanion[ValueClass]
     extends HasVersionedMessageCompanionCommon[ValueClass] {
@@ -242,9 +247,8 @@ trait HasVersionedMessageCompanionDbHelpers[ValueClass <: HasVersionedWrapper[Va
     (valueO, pp) => pp >> valueO.map(_.toByteArray(protocolVersion))
 }
 
-/** Traits for the companion objects of classes that implement [[HasVersionedWrapper]].
-  * They provide default methods.
-  * Unlike [[HasVersionedMessageCompanion]] these traits allow to pass additional
+/** Traits for the companion objects of classes that implement [[HasVersionedWrapper]]. They provide
+  * default methods. Unlike [[HasVersionedMessageCompanion]] these traits allow to pass additional
   * context to the conversion methods.
   */
 trait HasVersionedMessageWithContextCompanion[ValueClass, Ctx]

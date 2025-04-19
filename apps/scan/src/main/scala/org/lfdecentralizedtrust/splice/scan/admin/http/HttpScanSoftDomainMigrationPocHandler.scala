@@ -18,12 +18,12 @@ import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.util.Codec
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
-  DomainParametersState,
-  MediatorDomainState,
-  SequencerDomainState,
+  SynchronizerParametersState,
+  MediatorSynchronizerState,
+  SequencerSynchronizerState,
   SignedTopologyTransaction,
   TopologyMapping,
   TopologyTransaction,
@@ -79,16 +79,16 @@ class HttpScanSoftDomainMigrationPocHandler(
   override def getSynchronizerIdentities(
       respond: ScanSoftDomainMigrationPocResource.GetSynchronizerIdentitiesResponse.type
   )(
-      domainIdPrefix: String
+      synchronizerIdPrefix: String
   )(
       extracted: TraceContext
   ): Future[ScanSoftDomainMigrationPocResource.GetSynchronizerIdentitiesResponse] = {
     implicit val tc = extracted
-    synchronizers.get(domainIdPrefix) match {
+    synchronizers.get(synchronizerIdPrefix) match {
       case None =>
         Future.successful(
           ScanSoftDomainMigrationPocResource.GetSynchronizerIdentitiesResponse.NotFound(
-            definitions.ErrorResponse(s"No synchronizer for $domainIdPrefix found")
+            definitions.ErrorResponse(s"No synchronizer for $synchronizerIdPrefix found")
           )
         )
       case Some(synchronizer) =>
@@ -126,12 +126,12 @@ class HttpScanSoftDomainMigrationPocHandler(
 
   def getSynchronizerBootstrappingTransactions(
       respond: ScanSoftDomainMigrationPocResource.GetSynchronizerBootstrappingTransactionsResponse.type
-  )(domainIdPrefix: String)(
+  )(synchronizerIdPrefix: String)(
       extracted: com.digitalasset.canton.tracing.TraceContext
   ): Future[ScanSoftDomainMigrationPocResource.GetSynchronizerBootstrappingTransactionsResponse] = {
     implicit val tc = extracted
-    val domainId = DomainId(
-      UniqueIdentifier.tryCreate(domainIdPrefix, store.key.dsoParty.uid.namespace)
+    val synchronizerId = SynchronizerId(
+      UniqueIdentifier.tryCreate(synchronizerIdPrefix, store.key.dsoParty.uid.namespace)
     )
     for {
       signedTransactionsProposals <- participantAdminConnection
@@ -139,9 +139,9 @@ class HttpScanSoftDomainMigrationPocHandler(
           store = TopologyStoreId.AuthorizedStore,
           proposals = true,
           includeMappings = Set(
-            TopologyMapping.Code.DomainParametersState,
-            TopologyMapping.Code.SequencerDomainState,
-            TopologyMapping.Code.MediatorDomainState,
+            TopologyMapping.Code.SynchronizerParametersState,
+            TopologyMapping.Code.SequencerSynchronizerState,
+            TopologyMapping.Code.MediatorSynchronizerState,
           ),
         )
         .map(_.map(_.transaction))
@@ -150,9 +150,9 @@ class HttpScanSoftDomainMigrationPocHandler(
           store = TopologyStoreId.AuthorizedStore,
           proposals = false,
           includeMappings = Set(
-            TopologyMapping.Code.DomainParametersState,
-            TopologyMapping.Code.SequencerDomainState,
-            TopologyMapping.Code.MediatorDomainState,
+            TopologyMapping.Code.SynchronizerParametersState,
+            TopologyMapping.Code.SequencerSynchronizerState,
+            TopologyMapping.Code.MediatorSynchronizerState,
           ),
         )
         .map(_.map(_.transaction))
@@ -160,52 +160,60 @@ class HttpScanSoftDomainMigrationPocHandler(
       domainParameters = signedTransactions
         .find {
           case SignedTopologyTransaction(
-                TopologyTransaction(_, _, DomainParametersState(actualDomainId, _)),
+                TopologyTransaction(_, _, SynchronizerParametersState(actualSynchronizerId, _)),
                 _,
                 _,
-              ) if actualDomainId == domainId =>
+              ) if actualSynchronizerId == synchronizerId =>
             true
           case _ => false
         }
         .getOrElse(
           throw Status.INTERNAL
-            .withDescription(s"No domain parameter for $domainId")
+            .withDescription(s"No domain parameter for $synchronizerId")
             .asRuntimeException()
         )
-      sequencerDomainState = signedTransactions
+      sequencerSynchronizerState = signedTransactions
         .find {
           case SignedTopologyTransaction(
-                TopologyTransaction(_, _, SequencerDomainState(actualDomainId, _, _, _)),
+                TopologyTransaction(
+                  _,
+                  _,
+                  SequencerSynchronizerState(actualSynchronizerId, _, _, _),
+                ),
                 _,
                 _,
-              ) if actualDomainId == domainId =>
+              ) if actualSynchronizerId == synchronizerId =>
             true
           case _ => false
         }
         .getOrElse(
           throw Status.INTERNAL
-            .withDescription(s"No sequencer domain state for $domainId")
+            .withDescription(s"No sequencer domain state for $synchronizerId")
             .asRuntimeException()
         )
       mediatorDomainState = signedTransactions
         .find {
           case SignedTopologyTransaction(
-                TopologyTransaction(_, _, MediatorDomainState(actualDomainId, _, _, _, _)),
+                TopologyTransaction(
+                  _,
+                  _,
+                  MediatorSynchronizerState(actualSynchronizerId, _, _, _, _),
+                ),
                 _,
                 _,
-              ) if actualDomainId == domainId =>
+              ) if actualSynchronizerId == synchronizerId =>
             true
           case _ => false
         }
         .getOrElse(
           throw Status.INTERNAL
-            .withDescription(s"No mediator domain state for $domainId")
+            .withDescription(s"No mediator domain state for $synchronizerId")
             .asRuntimeException()
         )
     } yield ScanSoftDomainMigrationPocResource.GetSynchronizerBootstrappingTransactionsResponse.OK(
       definitions.SynchronizerBootstrappingTransactions(
         Base64.getEncoder.encodeToString(domainParameters.toByteArray),
-        Base64.getEncoder.encodeToString(sequencerDomainState.toByteArray),
+        Base64.getEncoder.encodeToString(sequencerSynchronizerState.toByteArray),
         Base64.getEncoder.encodeToString(mediatorDomainState.toByteArray),
       )
     )

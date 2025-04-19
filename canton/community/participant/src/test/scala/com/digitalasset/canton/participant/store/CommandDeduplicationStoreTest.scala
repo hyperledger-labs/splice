@@ -1,49 +1,48 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
 
 import cats.syntax.option.*
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.ChangeId
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
-import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.protocol.submission.ChangeIdHash
 import com.digitalasset.canton.participant.store.CommandDeduplicationStore.OffsetAndPublicationTime
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
-import com.digitalasset.canton.{ApplicationId, BaseTest, CommandId, DefaultDamlValues, LfPartyId}
+import com.digitalasset.canton.{BaseTest, CommandId, DefaultDamlValues, LfPartyId, UserId}
 import org.scalatest.wordspec.AsyncWordSpec
 
 trait CommandDeduplicationStoreTest extends BaseTest { this: AsyncWordSpec =>
 
-  private lazy val applicationId1 = ApplicationId.assertFromString("applicationId-1")
-  private lazy val applicationId2 = ApplicationId.assertFromString("applicationId-2")
+  private lazy val userId1 = UserId.assertFromString("userId-1")
+  private lazy val userId2 = UserId.assertFromString("userId-2")
   private lazy val commandId1 = CommandId.assertFromString("commandId1")
   private lazy val commandId2 = CommandId.assertFromString("commandId2")
   private lazy val alice = LfPartyId.assertFromString("Alice")
   private lazy val bob = LfPartyId.assertFromString("Bob")
 
-  private lazy val changeId1a = ChangeId(applicationId1.unwrap, commandId1.unwrap, Set(alice))
-  private lazy val changeId1ab = ChangeId(applicationId1.unwrap, commandId1.unwrap, Set(alice, bob))
-  private lazy val changeId2 = ChangeId(applicationId2.unwrap, commandId2.unwrap, Set(alice))
+  private lazy val changeId1a = ChangeId(userId1.unwrap, commandId1.unwrap, Set(alice))
+  private lazy val changeId1ab = ChangeId(userId1.unwrap, commandId1.unwrap, Set(alice, bob))
+  private lazy val changeId2 = ChangeId(userId2.unwrap, commandId2.unwrap, Set(alice))
 
   private lazy val answer1 = DefiniteAnswerEvent(
-    GlobalOffset.tryFromLong(1),
+    Offset.tryFromLong(1),
     CantonTimestamp.ofEpochSecond(1),
     DefaultDamlValues.submissionId(1).some,
   )(
     TraceContext.withNewTraceContext(Predef.identity)
   )
   private lazy val answer2 = DefiniteAnswerEvent(
-    GlobalOffset.tryFromLong(2),
+    Offset.tryFromLong(2),
     CantonTimestamp.ofEpochSecond(2),
     DefaultDamlValues.submissionId(2).some,
   )(
     TraceContext.withNewTraceContext(Predef.identity)
   )
   private lazy val answer3 =
-    DefiniteAnswerEvent(GlobalOffset.tryFromLong(3), CantonTimestamp.ofEpochSecond(3), None)(
+    DefiniteAnswerEvent(Offset.tryFromLong(3), CantonTimestamp.ofEpochSecond(3), None)(
       TraceContext.withNewTraceContext(Predef.identity)
     )
 

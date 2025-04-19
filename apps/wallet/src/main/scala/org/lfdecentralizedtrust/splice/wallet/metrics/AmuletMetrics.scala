@@ -3,21 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.wallet.metrics
 
+import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
 import com.daml.metrics.api.MetricQualification.Traffic
-import com.daml.metrics.api.{MetricDoc, MetricInfo, MetricName, MetricsContext}
-import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
-import com.daml.metrics.api.MetricHandle.Gauge
-import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 
 class AmuletMetrics(owner: PartyId, metricsFactory: LabeledMetricsFactory) extends AutoCloseable {
   private val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "wallet"
 
-  @MetricDoc.Tag(
-    summary = "Unlocked amulet balance",
-    description = "The number of unlocked amulets.",
-    qualification = Traffic,
-  )
   val unlockedAmuletGauge: Gauge[Double] =
     metricsFactory.gauge[Double](
       MetricInfo(
@@ -29,11 +23,6 @@ class AmuletMetrics(owner: PartyId, metricsFactory: LabeledMetricsFactory) exten
       Double.NaN,
     )(MetricsContext.Empty.withExtraLabels("owner" -> owner.toString))
 
-  @MetricDoc.Tag(
-    summary = "Locked amulet balance",
-    description = "The number of locked amulets.",
-    qualification = Traffic,
-  )
   val lockedAmuletGauge: Gauge[Double] =
     metricsFactory.gauge[Double](
       MetricInfo(

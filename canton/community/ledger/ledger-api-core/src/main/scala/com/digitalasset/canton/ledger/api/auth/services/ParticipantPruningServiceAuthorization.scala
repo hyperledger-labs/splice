@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.auth.services
@@ -9,7 +9,7 @@ import com.daml.ledger.api.v2.admin.participant_pruning_service.{
   PruneRequest,
   PruneResponse,
 }
-import com.digitalasset.canton.auth.Authorizer
+import com.digitalasset.canton.auth.{Authorizer, RequiredClaim}
 import com.digitalasset.canton.ledger.api.ProxyCloseable
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import io.grpc.ServerServiceDefinition
@@ -30,6 +30,6 @@ class ParticipantPruningServiceAuthorization(
   override def close(): Unit = service.close()
 
   override def prune(request: PruneRequest): Future[PruneResponse] =
-    authorizer.requireAdminClaims(service.prune)(request)
+    authorizer.rpc(service.prune)(RequiredClaim.Admin())(request)
 
 }

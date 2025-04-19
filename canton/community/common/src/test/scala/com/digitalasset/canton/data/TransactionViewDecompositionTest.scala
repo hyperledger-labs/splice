@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -50,7 +50,7 @@ class TransactionViewDecompositionTest
               RollbackContext.empty,
               Some(ExampleTransactionFactory.submitter),
             )
-            .futureValue
+            .futureValueUS
             .toList shouldEqual example.rootViewDecompositions.toList
         }
       }
@@ -65,12 +65,14 @@ class TransactionViewDecompositionTest
         val flatTransactionSize = 10000
 
         val decomposition = timeouts.default.await("Decomposing test transaction")(
-          TransactionViewDecompositionFactory.fromTransaction(
-            defaultTopologySnapshot,
-            wftWithCreateNodes(flatTransactionSize, signatory, observer),
-            RollbackContext.empty,
-            None,
-          )
+          TransactionViewDecompositionFactory
+            .fromTransaction(
+              defaultTopologySnapshot,
+              wftWithCreateNodes(flatTransactionSize, signatory, observer),
+              RollbackContext.empty,
+              None,
+            )
+            .failOnShutdown
         )
 
         decomposition.size shouldBe flatTransactionSize
@@ -122,7 +124,7 @@ class TransactionViewDecompositionTest
             RollbackContext.empty,
             None,
           )
-          .futureValue
+          .futureValueUS
 
         val actual = RollbackDecomposition.rollbackDecomposition(decomposition)
 
@@ -241,10 +243,11 @@ object RollbackDecomposition {
 
   final case class RbSameTree(rb: RollbackScope) extends RollbackDecomposition
 
-  /** The purpose of this method is to map a tree [[TransactionViewDecomposition]] onto a [[RollbackDecomposition]]
-    * hierarchy aid comparison. The [[RollbackContext.nextChild]] value is significant but is not available
-    * for inspection or construction. For this reason we use trick of entering a rollback context and then converting
-    * to a rollback scope that has as its last sibling the nextChild value.
+  /** The purpose of this method is to map a tree [[TransactionViewDecomposition]] onto a
+    * [[RollbackDecomposition]] hierarchy aid comparison. The [[RollbackContext.nextChild]] value is
+    * significant but is not available for inspection or construction. For this reason we use trick
+    * of entering a rollback context and then converting to a rollback scope that has as its last
+    * sibling the nextChild value.
     */
   def rollbackDecomposition(
       decompositions: Seq[TransactionViewDecomposition]

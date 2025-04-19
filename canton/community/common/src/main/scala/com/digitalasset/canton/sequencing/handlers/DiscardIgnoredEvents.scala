@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.handlers
@@ -19,15 +19,16 @@ import com.digitalasset.canton.store.SequencedEventStore.{
   IgnoredSequencedEvent,
   OrdinarySequencedEvent,
 }
-import com.digitalasset.canton.time.DomainTimeTracker
+import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.tracing.TraceContext
 
-/** Forwards only [[com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent]]s
-  * to the given [[com.digitalasset.canton.sequencing.ApplicationHandler]].
+/** Forwards only [[com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent]]s to
+  * the given [[com.digitalasset.canton.sequencing.ApplicationHandler]].
   *
-  * This must only be used on code paths where there cannot be other types of events by construction.
-  * Otherwise, the application handler will not be informed about ignored event and cannot tick any of the trackers,
-  * including the [[com.digitalasset.canton.topology.processing.TopologyTransactionProcessor]].
+  * This must only be used on code paths where there cannot be other types of events by
+  * construction. Otherwise, the application handler will not be informed about ignored event and
+  * cannot tick any of the trackers, including the
+  * [[com.digitalasset.canton.topology.processing.TopologyTransactionProcessor]].
   */
 class DiscardIgnoredEvents[Env <: Envelope[_]](
     handler: OrdinaryApplicationHandler[Env],
@@ -37,9 +38,12 @@ class DiscardIgnoredEvents[Env <: Envelope[_]](
 
   override def name: String = handler.name
 
-  override def subscriptionStartsAt(start: SubscriptionStart, domainTimeTracker: DomainTimeTracker)(
-      implicit traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] = handler.subscriptionStartsAt(start, domainTimeTracker)
+  override def subscriptionStartsAt(
+      start: SubscriptionStart,
+      synchronizerTimeTracker: SynchronizerTimeTracker,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] = handler.subscriptionStartsAt(start, synchronizerTimeTracker)
 
   override def apply(
       tracedEvents: BoxedEnvelope[PossiblyIgnoredEnvelopeBox, Env]

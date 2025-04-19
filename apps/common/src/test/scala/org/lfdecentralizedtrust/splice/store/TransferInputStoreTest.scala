@@ -1,8 +1,8 @@
 package org.lfdecentralizedtrust.splice.store
 
-import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
@@ -49,7 +49,7 @@ abstract class TransferInputStoreTest extends StoreTest {
     "return correct results" in {
       for {
         store <- mkTransferInputStore(user)
-        _ <- (1 to 4).toList.traverse(n =>
+        _ <- MonadUtil.sequentialTraverse(1 to 4)(n =>
           dummyDomain.create(
             validatorRewardCoupon(round = n, user = user, amount = numeric(n)),
             createdEventSignatories = Seq(dsoParty),
@@ -83,7 +83,7 @@ abstract class TransferInputStoreTest extends StoreTest {
       for {
         store <- mkTransferInputStore(user)
         // for each round i, create 2 app reward coupons with amount i and 2i
-        _ <- (1 to 4).toList.traverse(n =>
+        _ <- MonadUtil.sequentialTraverse(1 to 4)(n =>
           for {
             _ <- dummyDomain.create(
               appRewardCoupon(round = n, provider = user, amount = numeric(n)),

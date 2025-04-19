@@ -1,19 +1,24 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.index
 
-import com.daml.error.ContextualizedErrorLogger
-import com.daml.executors.InstrumentedExecutors
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.resources.ProgramResource.StartupException
 import com.daml.timer.RetryStrategy
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.domain
+import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.error.IndexErrors.IndexDbException
 import com.digitalasset.canton.ledger.participant.state.index.IndexService
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
-import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  LoggingContextWithTrace,
+  NamedLoggerFactory,
+  NamedLogging,
+}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.InMemoryState
 import com.digitalasset.canton.platform.apiserver.TimedIndexService
@@ -22,7 +27,7 @@ import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.backend.common.MismatchException
 import com.digitalasset.canton.platform.store.cache.*
 import com.digitalasset.canton.platform.store.dao.events.{
-  BufferedTransactionsReader,
+  BufferedUpdateReader,
   ContractLoader,
   LfValueTranslation,
 }
@@ -35,7 +40,6 @@ import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.engine.Engine
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.duration.*
@@ -45,17 +49,26 @@ import scala.util.control.NoStackTrace
 final class IndexServiceOwner(
     config: IndexServiceConfig,
     dbSupport: DbSupport,
-    servicesExecutionContext: ExecutionContext,
     metrics: LedgerApiServerMetrics,
-    engine: Engine,
     participantId: Ref.ParticipantId,
     inMemoryState: InMemoryState,
     tracer: Tracer,
     val loggerFactory: NamedLoggerFactory,
-    incompleteOffsets: (Offset, Option[Set[Ref.Party]], TraceContext) => Future[Vector[Offset]],
+    incompleteOffsets: (
+        Offset,
+        Option[Set[Ref.Party]],
+        TraceContext,
+    ) => FutureUnlessShutdown[Vector[Offset]],
     contractLoader: ContractLoader,
-    getPackageMetadataSnapshot: ContextualizedErrorLogger => PackageMetadata,
+    getPackageMetadataSnapshot: ErrorLoggingContext => PackageMetadata,
+    getPackagePreference: logging.LoggingContextWithTrace => Ref.PackageName => Set[
+      Ref.PackageId
+    ] => FutureUnlessShutdown[
+      Option[Ref.PackageId]
+    ],
     lfValueTranslation: LfValueTranslation,
+    queryExecutionContext: ExecutionContextExecutorService,
+    commandExecutionContext: ExecutionContextExecutorService,
 ) extends ResourceOwner[IndexService]
     with NamedLogging {
   private val initializationRetryDelay = 100.millis
@@ -67,46 +80,39 @@ final class IndexServiceOwner(
       stringInterning = inMemoryState.stringInterningView,
       contractLoader = contractLoader,
       lfValueTranslation = lfValueTranslation,
+      queryExecutionContext = queryExecutionContext,
+      commandExecutionContext = commandExecutionContext,
     )
-
     for {
       _ <- Resource.fromFuture(verifyParticipantId(ledgerDao))
       _ <- Resource.fromFuture(waitForInMemoryStateInitialization())
 
       contractStore = new MutableCacheBackedContractStore(
-        metrics,
         ledgerDao.contractsReader,
         contractStateCaches = inMemoryState.contractStateCaches,
         loggerFactory = loggerFactory,
-      )(servicesExecutionContext)
+      )(commandExecutionContext)
 
-      inMemoryFanOutExecutionContext <- buildInMemoryFanOutExecutionContext(
-        metrics = metrics,
-        threadPoolSize = config.inMemoryFanOutThreadPoolSize.getOrElse(
-          IndexServiceConfig.DefaultInMemoryFanOutThreadPoolSize(noTracingLogger)
-        ),
-      ).acquire()
-
-      bufferedTransactionsReader = BufferedTransactionsReader(
-        delegate = ledgerDao.transactionsReader,
-        transactionsBuffer = inMemoryState.inMemoryFanoutBuffer,
+      bufferedTransactionsReader = BufferedUpdateReader(
+        delegate = ledgerDao.updateReader,
+        updatesBuffer = inMemoryState.inMemoryFanoutBuffer,
         lfValueTranslation = lfValueTranslation,
         metrics = metrics,
         eventProcessingParallelism = config.bufferedEventsProcessingParallelism,
         loggerFactory = loggerFactory,
-      )(inMemoryFanOutExecutionContext)
+      )(queryExecutionContext)
 
       bufferedCommandCompletionsReader = BufferedCommandCompletionsReader(
         inMemoryFanoutBuffer = inMemoryState.inMemoryFanoutBuffer,
         delegate = ledgerDao.completions,
         metrics = metrics,
         loggerFactory = loggerFactory,
-      )(inMemoryFanOutExecutionContext)
+      )(queryExecutionContext)
 
       indexService = new IndexServiceImpl(
         participantId = participantId,
         ledgerDao = ledgerDao,
-        transactionsReader = bufferedTransactionsReader,
+        updatesReader = bufferedTransactionsReader,
         commandCompletionsReader = bufferedCommandCompletionsReader,
         contractStore = contractStore,
         pruneBuffers = inMemoryState.inMemoryFanoutBuffer.prune,
@@ -116,6 +122,7 @@ final class IndexServiceOwner(
         metrics = metrics,
         loggerFactory = loggerFactory,
         idleStreamOffsetCheckpointTimeout = config.idleStreamOffsetCheckpointTimeout,
+        getPreferredPackageVersion = getPackagePreference,
       )
     } yield new TimedIndexService(indexService, metrics)
   }
@@ -133,6 +140,9 @@ final class IndexServiceOwner(
         )(TraceContext.empty)
         Future.failed(InMemoryStateNotInitialized)
       } else {
+        logger.info(
+          s"Participant in-memory state initialized."
+        )(TraceContext.empty)
         Future.unit
       }
     }
@@ -168,7 +178,7 @@ final class IndexServiceOwner(
             Future.failed(
               new MismatchException.ParticipantId(
                 foundParticipantId,
-                domain.ParticipantId(participantId),
+                ParticipantId(participantId),
               ) with StartupException
             )
           case None =>
@@ -185,18 +195,20 @@ final class IndexServiceOwner(
       stringInterning: StringInterning,
       contractLoader: ContractLoader,
       lfValueTranslation: LfValueTranslation,
+      queryExecutionContext: ExecutionContextExecutorService,
+      commandExecutionContext: ExecutionContextExecutorService,
   ): LedgerReadDao =
     JdbcLedgerDao.read(
       dbSupport = dbSupport,
-      servicesExecutionContext = servicesExecutionContext,
+      queryExecutionContext = queryExecutionContext,
+      commandExecutionContext = commandExecutionContext,
       metrics = metrics,
-      engine = Some(engine),
       participantId = participantId,
       ledgerEndCache = ledgerEndCache,
       stringInterning = stringInterning,
       completionsPageSize = config.completionsPageSize,
       activeContractsServiceStreamsConfig = config.activeContractsServiceStreams,
-      transactionFlatStreamsConfig = config.transactionFlatStreams,
+      updatesStreamsConfig = config.updatesStreams,
       transactionTreeStreamsConfig = config.transactionTreeStreams,
       globalMaxEventIdQueries = config.globalMaxEventIdQueries,
       globalMaxEventPayloadQueries = config.globalMaxEventPayloadQueries,
@@ -206,18 +218,6 @@ final class IndexServiceOwner(
       contractLoader = contractLoader,
       lfValueTranslation = lfValueTranslation,
     )
-
-  private def buildInMemoryFanOutExecutionContext(
-      metrics: LedgerApiServerMetrics,
-      threadPoolSize: Int,
-  ): ResourceOwner[ExecutionContextExecutorService] =
-    ResourceOwner
-      .forExecutorService(() =>
-        InstrumentedExecutors.newWorkStealingExecutor(
-          metrics.lapi.threadpool.inMemoryFanOut.toString,
-          threadPoolSize,
-        )
-      )
 
   private object InMemoryStateNotInitialized extends NoStackTrace
 }

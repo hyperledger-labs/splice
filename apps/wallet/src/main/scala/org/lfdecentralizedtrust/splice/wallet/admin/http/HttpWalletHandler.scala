@@ -45,7 +45,7 @@ import TreasuryService.AmuletOperationDedupConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.Json
@@ -730,7 +730,7 @@ class HttpWalletHandler(
 
   private def createTransferPreapprovalProposal(
       wallet: UserWalletService,
-      domain: DomainId,
+      domain: SynchronizerId,
       dedupOffset: Long,
   )(implicit tc: TraceContext) = {
     val store = wallet.store
@@ -753,7 +753,7 @@ class HttpWalletHandler(
         ),
         deduplicationOffset = dedupOffset,
       )
-      .withDomainId(domain)
+      .withSynchronizerId(domain)
       .yieldResult()
       .map(_.contractId)
   }

@@ -1,23 +1,23 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.protocol.{
-  AuthenticatedContractIdVersionV10,
+  AuthenticatedContractIdVersionV11,
   ExampleTransactionFactory,
   Unicum,
 }
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
 
-/** Daml lf and daml-on-x impose a maximum limit on contractIds for which Canton uses hashes.
-  * Test that (hex) string versions of all hash variants are below the limit.
+/** Daml lf and daml-on-x impose a maximum limit on contractIds for which Canton uses hashes. Test
+  * that (hex) string versions of all hash variants are below the limit.
   */
 class CryptoPureApiCantonCompatibilityTest extends AnyWordSpec with BaseTest {
 
-  private val cantonContractIdVersion = AuthenticatedContractIdVersionV10
+  private val cantonContractIdVersion = AuthenticatedContractIdVersionV11
   private val longString =
     (('a' to 'z').mkString + ('A' to 'Z').mkString + ('0' to '9').mkString + ":") * 10
 

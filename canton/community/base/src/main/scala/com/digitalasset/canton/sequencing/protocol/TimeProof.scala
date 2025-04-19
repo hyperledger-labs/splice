@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -31,17 +31,25 @@ import com.google.protobuf.ByteString
 import java.util.UUID
 
 /** Wrapper for a sequenced event that has the correct properties to act as a time proof:
-  *  - a deliver event with no envelopes
-  *  - has a message id that suggests it was requested as a time proof (this is practically unnecessary but will act
-  *     as a safeguard against future sequenced event changes)
-  * @param event the signed content wrapper containing the event
-  * @param deliver the time proof event itself. this must be the event content signedEvent wrapper.
+  *   - a deliver event with no envelopes
+  *   - has a message id that suggests it was requested as a time proof (this is practically
+  *     unnecessary but will act as a safeguard against future sequenced event changes)
+  * @param event
+  *   the signed content wrapper containing the event
+  * @param deliver
+  *   the time proof event itself. this must be the event content signedEvent wrapper.
   */
 final case class TimeProof private (
     private val event: OrdinarySequencedEvent[Envelope[?]],
     private val deliver: Deliver[Nothing],
 ) extends PrettyPrinting
     with HasCryptographicEvidence {
+
+  require(
+    event.signedEvent.content eq deliver,
+    "Time proof event must be the content of the provided signed sequencer event",
+  )
+
   def timestamp: CantonTimestamp = deliver.timestamp
 
   def traceContext: TraceContext = event.traceContext
@@ -56,17 +64,6 @@ final case class TimeProof private (
 }
 
 object TimeProof {
-
-  private def apply(
-      event: OrdinarySequencedEvent[Envelope[?]],
-      deliver: Deliver[Nothing],
-  ): TimeProof = {
-    require(
-      event.signedEvent.content eq deliver,
-      "Time proof event must be the content of the provided signed sequencer event",
-    )
-    new TimeProof(event, deliver)
-  }
 
   def fromProtoV30(
       protocolVersion: ProtocolVersion,
@@ -123,10 +120,11 @@ object TimeProof {
   def isTimeProofSubmission(submission: SubmissionRequest): Boolean =
     isTimeEventMessageId(submission.messageId) && isTimeEventBatch(submission.batch)
 
-  /** Send placed alongside the validation logic for a time proof to help ensure it remains consistent */
+  /** Send placed alongside the validation logic for a time proof to help ensure it remains
+    * consistent
+    */
   def sendRequest(
-      client: SequencerClient,
-      protocolVersion: ProtocolVersion,
+      client: SequencerClient
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = {
@@ -134,10 +132,10 @@ object TimeProof {
     client.sendAsync(
       // we intentionally ask for an empty event to be sequenced to observe the time.
       // this means we can safely share this event without mentioning other recipients.
-      batch = Batch.empty(protocolVersion),
-      // as we typically won't know the domain time at the point of doing this request (hence doing the request for the time...),
-      // we can't pick a known good domain time for the max sequencing time.
-      // if we were to guess it we may get it wrong and then in the event of no activity on the domain for our recipient,
+      batch = Batch.empty(client.protocolVersion),
+      // as we typically won't know the synchronizer time at the point of doing this request (hence doing the request for the time...),
+      // we can't pick a known good synchronizer time for the max sequencing time.
+      // if we were to guess it we may get it wrong and then in the event of no activity on the synchronizer for our recipient,
       // we'd then never actually learn of the time.
       // so instead we just use the maximum value allowed.
       maxSequencingTime = CantonTimestamp.MaxValue,
@@ -147,8 +145,8 @@ object TimeProof {
     )
   }
 
-  /** Use a constant prefix for a message which would permit the sequencer to track how many
-    * time request events it is receiving.
+  /** Use a constant prefix for a message which would permit the sequencer to track how many time
+    * request events it is receiving.
     */
   val timeEventMessageIdPrefix = "tick-"
   private def isTimeEventMessageId(messageId: MessageId): Boolean =
@@ -156,12 +154,15 @@ object TimeProof {
   private def isTimeEventBatch(batch: Batch[?]): Boolean =
     batch.envelopes.isEmpty // should be entirely empty
 
-  /** Make a unique message id for a time event submission request.
-    * Currently adding a short prefix for debugging at the sequencer so floods of time requests will be observable.
+  /** Make a unique message id for a time event submission request. Currently adding a short prefix
+    * for debugging at the sequencer so floods of time requests will be observable.
     */
   @VisibleForTesting
   def mkTimeProofRequestMessageId: MessageId =
     MessageId(
-      String73(s"$timeEventMessageIdPrefix${UUID.randomUUID()}")("time-proof-message-id".some)
+      String73.tryCreate(
+        s"$timeEventMessageIdPrefix${UUID.randomUUID()}",
+        "time-proof-message-id".some,
+      )
     )
 }

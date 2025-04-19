@@ -1,0 +1,29 @@
+{
+  "name": "token-standard-cli",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx tsc",
+    "cli": "npx ts-node src/main.ts",
+    "test:sbt": "PORT=0 vitest --run",
+    "test": "PORT=0 vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bignumber.js": "^9.2.1",
+    "canton-json-api-v2-openapi": "file:../dependencies/canton-json-api-v2/openapi-ts-client",
+    "commander": "^13.1.0",
+    "dayjs": "^1.11.13",
+    "transfer-instruction-openapi": "file:../splice-api-token-transfer-instruction-v1/openapi-ts-client"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "msw": "^2.7.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.4"
+  }
+}

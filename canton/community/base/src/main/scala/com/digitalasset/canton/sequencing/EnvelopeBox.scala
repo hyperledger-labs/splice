@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -12,8 +12,8 @@ import com.digitalasset.canton.store.SequencedEventStore.{
 }
 import com.digitalasset.canton.tracing.Traced
 
-/** Type class to manipulate envelopes inside their box.
-  * Specializes [[cats.Traverse]] to [[protocol.Envelope]] arguments.
+/** Type class to manipulate envelopes inside their box. Specializes [[cats.Traverse]] to
+  * [[protocol.Envelope]] arguments.
   */
 trait EnvelopeBox[Box[+_ <: Envelope[_]]] {
 
@@ -25,8 +25,8 @@ trait EnvelopeBox[Box[+_ <: Envelope[_]]] {
       f: A => G[B]
   )(implicit G: Applicative[G]): G[Box[B]]
 
-  /** We can compose a [[cats.Traverse]] with an [[EnvelopeBox]], but not several [[EnvelopeBox]]es due to the
-    * restriction to [[protocol.Envelope]]s in the type arguments.
+  /** We can compose a [[cats.Traverse]] with an [[EnvelopeBox]], but not several [[EnvelopeBox]]es
+    * due to the restriction to [[protocol.Envelope]]s in the type arguments.
     */
   type ComposedBox[Outer[+_], +A <: Envelope[_]] = Outer[Box[A]]
 
@@ -100,9 +100,9 @@ object EnvelopeBox {
           event: PossiblyIgnoredSequencedEvent[A]
       )(f: A => G[B])(implicit G: Applicative[G]): G[PossiblyIgnoredSequencedEvent[B]] =
         event match {
-          case ignored @ IgnoredSequencedEvent(_, _, _) =>
+          case ignored: IgnoredSequencedEvent[_] =>
             G.widen(traverseIgnoredSequencedEvent[G, A, B](ignored)(f))
-          case ordinary @ OrdinarySequencedEvent(_) =>
+          case ordinary: OrdinarySequencedEvent[_] =>
             G.widen(traverseOrdinarySequencedEvent(ordinary)(f))
         }
     }

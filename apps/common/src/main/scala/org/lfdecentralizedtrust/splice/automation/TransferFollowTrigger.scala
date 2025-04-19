@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.store.AppStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -78,7 +78,7 @@ class TransferFollowTrigger(
         }
       }
 
-  private[this] def isContractAbsentFromDomain(domain: DomainId, id: ContractId[?])(implicit
+  private[this] def isContractAbsentFromDomain(domain: SynchronizerId, id: ContractId[?])(implicit
       tc: TraceContext
   ): Future[Boolean] = {
     import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState.*

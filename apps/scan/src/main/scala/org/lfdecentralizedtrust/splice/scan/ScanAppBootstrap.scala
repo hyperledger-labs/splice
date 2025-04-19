@@ -8,7 +8,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.admin.http.AdminRoutes
-import org.lfdecentralizedtrust.splice.config.{ANStorageFactory, SharedSpliceAppParameters}
+import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.NodeBootstrapBase
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
@@ -36,7 +36,7 @@ class ScanAppBootstrap(
     val scanAppParameters: SharedSpliceAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: ScanAppMetrics,
+    override val metrics: ScanAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
@@ -113,7 +113,7 @@ object ScanAppBootstrap {
           testingConfigInternal,
           clock,
           scanMetrics,
-          new ANStorageFactory(scanConfig.storage),
+          new CommunityStorageFactory(scanConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

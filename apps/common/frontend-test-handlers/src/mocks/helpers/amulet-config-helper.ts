@@ -218,6 +218,7 @@ export function getAmuletRulesConfig(
       ],
     },
     transferPreapprovalFee: null,
+    featuredAppActivityMarkerAmount: null,
   };
 }
 
@@ -265,7 +266,9 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
     '    "readVsWriteScalingFactor": "4",\n' +
     '    "minTopupAmount": "200000"\n' +
     '  }\n' +
-    '}</pre></div></li><li data-key="issuanceCurve" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">issuanceCurve</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '}</pre></div></li>' +
+    '<li data-key="featuredAppActivityMarkerAmount" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">featuredAppActivityMarkerAmount</div><div class="jsondiffpatch-value"><pre>null</pre></div></li>' +
+    '<li data-key="issuanceCurve" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">issuanceCurve</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "initialValue": {\n' +
     '    "amuletToIssuePerYear": "40000000000.0",\n' +
     '    "validatorRewardPercentage": "0.05",\n' +
@@ -363,6 +366,7 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
     '    }\n' +
     '  ]\n' +
     '}</pre></div></li>' +
-    '<li data-key="transferPreapprovalFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">transferPreapprovalFee</div><div class="jsondiffpatch-value"><pre>null</pre></div></li></div>\n'.trim()
+    '<li data-key="transferPreapprovalFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">transferPreapprovalFee</div><div class="jsondiffpatch-value"><pre>null</pre></div></li>' +
+    '</div>\n'.trim()
   );
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -9,21 +9,20 @@ import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
 import com.daml.ledger.api.v2.update_service.{
   GetTransactionResponse,
   GetTransactionTreeResponse,
+  GetUpdateResponse,
   GetUpdateTreesResponse,
   GetUpdatesResponse,
 }
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.domain.ParticipantId
+import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.api.health.ReportsHealth
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
-import com.digitalasset.canton.ledger.participant.state.index.MeteringStore.ReportData
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
-import com.digitalasset.canton.platform.store.entries.PartyLedgerEntry
+import com.digitalasset.canton.platform.store.backend.common.UpdatePointwiseQueries.LookupKey
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
-import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.transaction.CommittedTransaction
 import org.apache.pekko.NotUsed
@@ -31,21 +30,32 @@ import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.Future
 
-private[platform] trait LedgerDaoTransactionsReader {
-  def getFlatTransactions(
-      startExclusive: Offset,
+private[platform] trait LedgerDaoUpdateReader {
+  def getUpdates(
+      startInclusive: Offset,
       endInclusive: Offset,
-      filter: TemplatePartiesFilter,
-      eventProjectionProperties: EventProjectionProperties,
-  )(implicit loggingContext: LoggingContextWithTrace): Source[(Offset, GetUpdatesResponse), NotUsed]
+      internalUpdateFormat: InternalUpdateFormat,
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): Source[(Offset, GetUpdatesResponse), NotUsed]
 
-  def lookupFlatTransactionById(
+  def lookupTransactionById(
       updateId: UpdateId,
-      requestingParties: Set[Party],
+      internalTransactionFormat: InternalTransactionFormat,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]]
 
+  def lookupTransactionByOffset(
+      offset: Offset,
+      internalTransactionFormat: InternalTransactionFormat,
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]]
+
+  def lookupUpdateBy(
+      lookupKey: LookupKey,
+      internalUpdateFormat: InternalUpdateFormat,
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetUpdateResponse]]
+
   def getTransactionTrees(
-      startExclusive: Offset,
+      startInclusive: Offset,
       endInclusive: Offset,
       requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
@@ -56,10 +66,17 @@ private[platform] trait LedgerDaoTransactionsReader {
   def lookupTransactionTreeById(
       updateId: UpdateId,
       requestingParties: Set[Party],
+      eventProjectionProperties: EventProjectionProperties,
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionTreeResponse]]
+
+  def lookupTransactionTreeByOffset(
+      offset: Offset,
+      requestingParties: Set[Party],
+      eventProjectionProperties: EventProjectionProperties,
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionTreeResponse]]
 
   def getActiveContracts(
-      activeAt: Offset,
+      activeAt: Option[Offset],
       filter: TemplatePartiesFilter,
       eventProjectionProperties: EventProjectionProperties,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetActiveContractsResponse, NotUsed]
@@ -67,9 +84,9 @@ private[platform] trait LedgerDaoTransactionsReader {
 
 private[platform] trait LedgerDaoCommandCompletionsReader {
   def getCommandCompletions(
-      startExclusive: Offset,
+      startInclusive: Offset,
       endInclusive: Offset,
-      applicationId: ApplicationId,
+      userId: UserId,
       parties: Set[Party],
   )(implicit
       loggingContext: LoggingContextWithTrace
@@ -80,7 +97,7 @@ private[platform] trait LedgerDaoEventsReader {
 
   def getEventsByContractId(
       contractId: ContractId,
-      requestingParties: Set[Ref.Party],
+      internalEventFormatO: Option[InternalEventFormat],
   )(implicit loggingContext: LoggingContextWithTrace): Future[GetEventsByContractIdResponse]
 
   // TODO(i16065): Re-enable getEventsByContractKey tests
@@ -100,9 +117,9 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
   ): Future[Option[ParticipantId]]
 
   /** Looks up the current ledger end */
-  def lookupLedgerEnd()(implicit loggingContext: LoggingContextWithTrace): Future[LedgerEnd]
+  def lookupLedgerEnd()(implicit loggingContext: LoggingContextWithTrace): Future[Option[LedgerEnd]]
 
-  def transactionsReader: LedgerDaoTransactionsReader
+  def updateReader: LedgerDaoUpdateReader
 
   def contractsReader: LedgerDaoContractsReader
 
@@ -123,15 +140,11 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
       loggingContext: LoggingContextWithTrace
   ): Future[List[IndexerPartyDetails]]
 
-  def getPartyEntries(
-      startExclusive: Offset,
-      endInclusive: Offset,
-  )(implicit loggingContext: LoggingContextWithTrace): Source[(Offset, PartyLedgerEntry), NotUsed]
-
-  /** Prunes participant events and completions in archived history and remembers largest
-    * pruning offset processed thus far.
+  /** Prunes participant events and completions in archived history and remembers largest pruning
+    * offset processed thus far.
     *
-    * @param pruneUpToInclusive offset up to which to prune archived history inclusively
+    * @param pruneUpToInclusive
+    *   offset up to which to prune archived history inclusively
     * @return
     */
   def prune(
@@ -142,37 +155,29 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
       loggingContext: LoggingContextWithTrace
   ): Future[Unit]
 
-  /** Return the pruned offsets from the parameters table (if defined)
-    * as a tuple of (participant_all_divulged_contracts_pruned_up_to_inclusive, participant_pruned_up_to_inclusive)
+  /** Return the pruned offsets from the parameters table (if defined) as a tuple of
+    * (participant_all_divulged_contracts_pruned_up_to_inclusive,
+    * participant_pruned_up_to_inclusive)
     */
   def pruningOffsets(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[(Option[Offset], Option[Offset])]
-
-  /** Returns all TransactionMetering records matching given criteria */
-  def meteringReportData(
-      from: Timestamp,
-      to: Option[Timestamp],
-      applicationId: Option[ApplicationId],
-  )(implicit loggingContext: LoggingContextWithTrace): Future[ReportData]
-
 }
 
 // TODO(i12285) sandbox-classic clean-up: This interface and its implementation is only used in the JdbcLedgerDao suite
 //                                It should be removed when the assertions in that suite are covered by other suites
-private[platform] trait LedgerWriteDao extends ReportsHealth {
+private[platform] trait LedgerWriteDaoForTests extends ReportsHealth {
 
-  /** Initializes the database with the given ledger identity.
-    * If the database was already intialized, instead compares the given identity parameters
-    * to the existing ones, and returns a Future failed with [[MismatchException]]
-    * if they don't match.
+  /** Initializes the database with the given ledger identity. If the database was already
+    * intialized, instead compares the given identity parameters to the existing ones, and returns a
+    * Future failed with [[MismatchException]] if they don't match.
     *
-    * This method is idempotent.
-    * This method is NOT safe to call concurrently.
+    * This method is idempotent. This method is NOT safe to call concurrently.
     *
     * This method must succeed at least once before other LedgerWriteDao methods may be used.
     *
-    * @param participantId the participant id to be stored
+    * @param participantId
+    *   the participant id to be stored
     */
   def initialize(
       participantId: ParticipantId
@@ -187,18 +192,18 @@ private[platform] trait LedgerWriteDao extends ReportsHealth {
       loggingContext: LoggingContextWithTrace
   ): Future[PersistenceResponse]
 
-  /** Stores a party allocation or rejection thereof.
-    *
-    * @param offset  Pair of previous offset and the offset to store the party entry at
-    * @param partyEntry  the PartyEntry to be stored
-    * @return Ok when the operation was successful otherwise a Duplicate
-    */
-  def storePartyEntry(offset: Offset, partyEntry: PartyLedgerEntry)(implicit
+  /** Stores a party allocation or rejection thereof. */
+  def storePartyAdded(
+      offset: Offset,
+      submissionIdOpt: Option[SubmissionId],
+      recordTime: Timestamp,
+      partyDetails: IndexerPartyDetails,
+  )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[PersistenceResponse]
 
-  /** This is a combined store transaction method to support sandbox-classic and tests
-    * !!! Usage of this is discouraged, with the removal of sandbox-classic this will be removed
+  /** This is a combined store transaction method to support only tests !!! Usage of this is
+    * discouraged.
     */
   def storeTransaction(
       completionInfo: Option[state.CompletionInfo],
@@ -207,12 +212,9 @@ private[platform] trait LedgerWriteDao extends ReportsHealth {
       ledgerEffectiveTime: Timestamp,
       offset: Offset,
       transaction: CommittedTransaction,
-      hostedWitnesses: List[Party],
       recordTime: Timestamp,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[PersistenceResponse]
 
 }
-
-private[platform] trait LedgerDao extends LedgerReadDao with LedgerWriteDao

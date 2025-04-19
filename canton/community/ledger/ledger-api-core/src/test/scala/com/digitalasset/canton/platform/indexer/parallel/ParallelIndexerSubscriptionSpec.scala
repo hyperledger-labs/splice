@@ -1,18 +1,25 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
 
 import com.daml.executors.executors.{NamedExecutor, QueueAwareExecutor}
 import com.daml.metrics.DatabaseMetrics
-import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.RepairCounter
+import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.Update.{
+  RepairTransactionAccepted,
+  TopologyTransactionEffective,
+}
 import com.digitalasset.canton.ledger.participant.state.{
-  DomainIndex,
-  RequestIndex,
+  RepairIndex,
   SequencerIndex,
+  SynchronizerIndex,
+  TransactionMeta,
   Update,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule.LoggerNameContains
 import com.digitalasset.canton.logging.{
   LoggingContextWithTrace,
@@ -23,19 +30,26 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.indexer.ha.TestConnection
-import com.digitalasset.canton.platform.indexer.parallel.ParallelIndexerSubscription.Batch
+import com.digitalasset.canton.platform.indexer.parallel.ParallelIndexerSubscription.{
+  Batch,
+  ZeroLedgerEnd,
+}
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.backend.{DbDto, ParameterStorageBackend}
 import com.digitalasset.canton.platform.store.dao.DbDispatcher
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, Traced}
-import com.digitalasset.canton.{RequestCounter, SequencerCounter}
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
+import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.crypto.Hash
-import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{CommittedTransaction, VersionedTransaction}
+import com.digitalasset.daml.lf.data.{Ref, Time}
+import com.digitalasset.daml.lf.transaction.CommittedTransaction
+import com.digitalasset.daml.lf.transaction.test.TransactionBuilder
+import com.digitalasset.daml.lf.value.Value.ContractId
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -45,7 +59,7 @@ import org.slf4j.event.Level
 import java.sql.Connection
 import java.time.Instant
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
 class ParallelIndexerSubscriptionSpec
     extends AnyFlatSpec
@@ -57,47 +71,54 @@ class ParallelIndexerSubscriptionSpec
   private val serializableTraceContext =
     SerializableTraceContext(traceContext).toDamlProto.toByteArray
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
+  implicit val actorSystem: ActorSystem = ActorSystem(
+    classOf[ParallelIndexerSubscriptionSpec].getSimpleName
+  )
+  implicit val materializer: Materializer = Materializer(actorSystem)
 
   private val someParty = DbDto.PartyEntry(
-    ledger_offset = "",
+    ledger_offset = 1,
     recorded_at = 0,
     submission_id = null,
     party = Some("party"),
-    display_name = None,
     typ = "accept",
     rejection_reason = None,
     is_local = Some(true),
   )
 
-  private val someDomainId: DomainId = DomainId.tryFromString("x::domainid")
-  private val someDomainId2: DomainId = DomainId.tryFromString("x::domainid2")
+  private val someSynchronizerId: SynchronizerId = SynchronizerId.tryFromString("x::synchronizerId")
+  private val someSynchronizerId2: SynchronizerId =
+    SynchronizerId.tryFromString("x::synchronizerId2")
+  private val someSynchronizerId3: SynchronizerId =
+    SynchronizerId.tryFromString("x::synchronizerId3")
 
   private val someTime = Instant.now
 
-  private val somePartyAllocationRejected = state.Update.PartyAllocationRejected(
-    submissionId = Ref.SubmissionId.assertFromString("abc"),
+  private val somePartyAllocation = state.Update.PartyAddedToParticipant(
+    party = Ref.Party.assertFromString("party"),
     participantId = Ref.ParticipantId.assertFromString("participant"),
-    recordTime = Timestamp.assertFromInstant(someTime),
-    rejectionReason = "reason",
+    recordTime = CantonTimestamp.assertFromInstant(someTime),
+    submissionId = Some(Ref.SubmissionId.assertFromString("abc")),
   )
 
-  private def offset(l: Long): Offset = Offset.fromLong(l)
+  private def offset(l: Long): Offset = Offset.tryFromLong(l)
 
   private val metrics = LedgerApiServerMetrics.ForTesting
 
+  private def hashCid(key: String): ContractId = ContractId.V1(Hash.hashPrivateKey(key))
+
   private val someEventCreated = DbDto.EventCreate(
-    event_offset = "",
+    event_offset = 1,
     update_id = "",
     ledger_effective_time = 15,
     command_id = None,
     workflow_id = None,
-    application_id = None,
+    user_id = None,
     submitters = None,
-    node_index = 3,
-    contract_id = "1",
+    node_id = 3,
+    contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
     package_name = "",
-    package_version = None,
     flat_event_witnesses = Set.empty,
     tree_event_witnesses = Set.empty,
     create_argument = Array.empty,
@@ -110,22 +131,22 @@ class ParallelIndexerSubscriptionSpec
     create_key_value_compression = None,
     event_sequential_id = 0,
     driver_metadata = Array.empty,
-    domain_id = "x::sourcedomain",
+    synchronizer_id = "x::sourcesynchronizer",
     trace_context = serializableTraceContext,
     record_time = 0,
   )
 
   private val someEventExercise = DbDto.EventExercise(
     consuming = true,
-    event_offset = "",
+    event_offset = 1,
     update_id = "",
     ledger_effective_time = 15,
     command_id = None,
     workflow_id = None,
-    application_id = None,
+    user_id = None,
     submitters = None,
-    node_index = 3,
-    contract_id = "1",
+    node_id = 3,
+    contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
     package_name = "",
     flat_event_witnesses = Set.empty,
@@ -135,26 +156,26 @@ class ParallelIndexerSubscriptionSpec
     exercise_argument = Array.empty,
     exercise_result = None,
     exercise_actors = Set.empty,
-    exercise_child_event_ids = Vector.empty,
+    exercise_last_descendant_node_id = 3,
     create_key_value_compression = None,
     exercise_argument_compression = None,
     exercise_result_compression = None,
     event_sequential_id = 0,
-    domain_id = "",
+    synchronizer_id = "",
     trace_context = serializableTraceContext,
     record_time = 0,
   )
 
   private val someEventAssign = DbDto.EventAssign(
-    event_offset = "",
+    event_offset = 1,
     update_id = "",
     command_id = None,
     workflow_id = None,
     submitter = None,
-    contract_id = "",
+    node_id = 0,
+    contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
     package_name = "",
-    package_version = None,
     flat_event_witnesses = Set.empty,
     create_argument = Array.empty,
     create_signatories = Set.empty,
@@ -167,8 +188,8 @@ class ParallelIndexerSubscriptionSpec
     event_sequential_id = 0,
     ledger_effective_time = 0,
     driver_metadata = Array.empty,
-    source_domain_id = "",
-    target_domain_id = "",
+    source_synchronizer_id = "",
+    target_synchronizer_id = "",
     unassign_id = "",
     reassignment_counter = 0,
     trace_context = serializableTraceContext,
@@ -176,18 +197,19 @@ class ParallelIndexerSubscriptionSpec
   )
 
   private val someEventUnassign = DbDto.EventUnassign(
-    event_offset = "",
+    event_offset = 1,
     update_id = "",
     command_id = None,
     workflow_id = None,
     submitter = None,
-    contract_id = "",
+    node_id = 1,
+    contract_id = hashCid("1").toBytes.toByteArray,
     template_id = "",
     package_name = "",
     flat_event_witnesses = Set.empty,
     event_sequential_id = 0,
-    source_domain_id = "",
-    target_domain_id = "",
+    source_synchronizer_id = "",
+    target_synchronizer_id = "",
     unassign_id = "",
     reassignment_counter = 0,
     assignment_exclusivity = None,
@@ -196,10 +218,10 @@ class ParallelIndexerSubscriptionSpec
   )
 
   private val someCompletion = DbDto.CommandCompletion(
-    completion_offset = "",
+    completion_offset = 1,
     record_time = 0,
     publication_time = 0,
-    application_id = "",
+    user_id = "",
     submitters = Set.empty,
     command_id = "",
     update_id = None,
@@ -210,10 +232,8 @@ class ParallelIndexerSubscriptionSpec
     deduplication_offset = None,
     deduplication_duration_seconds = None,
     deduplication_duration_nanos = None,
-    deduplication_start = None,
-    domain_id = "x::sourcedomain",
+    synchronizer_id = "x::sourcesynchronizer",
     message_uuid = None,
-    request_sequencer_counter = None,
     is_transaction = true,
     trace_context = serializableTraceContext,
   )
@@ -223,12 +243,10 @@ class ParallelIndexerSubscriptionSpec
       .map(offset)
       .zip(
         Vector(
-          somePartyAllocationRejected,
-          somePartyAllocationRejected
-            .copy(recordTime = somePartyAllocationRejected.recordTime.addMicros(1000)),
-          somePartyAllocationRejected
-            .copy(recordTime = somePartyAllocationRejected.recordTime.addMicros(2000)),
-        ).map(Traced[Update])
+          somePartyAllocation,
+          somePartyAllocation.copy(recordTime = somePartyAllocation.recordTime.addMicros(1000)),
+          somePartyAllocation.copy(recordTime = somePartyAllocation.recordTime.addMicros(2000)),
+        )
       )
 
   behavior of "inputMapper"
@@ -237,21 +255,22 @@ class ParallelIndexerSubscriptionSpec
     val actual = ParallelIndexerSubscription.inputMapper(
       metrics = metrics,
       toDbDto = _ => _ => Iterator(someParty, someParty),
-      toMeteringDbDto = _ => Vector.empty,
+      eventMetricsUpdater = _ => (),
       logger,
     )(
       List(
-        Offset.fromLong(1),
-        Offset.fromLong(2),
-        Offset.fromLong(3),
+        Offset.tryFromLong(1),
+        Offset.tryFromLong(2),
+        Offset.tryFromLong(3),
       ).zip(offsetsAndUpdates.map(_._2))
     )
     val expected = Batch[Vector[DbDto]](
-      lastOffset = offset(3),
-      lastSeqEventId = 0,
-      lastStringInterningId = 0,
-      lastRecordTime = someTime.plusMillis(2).toEpochMilli,
-      publicationTime = CantonTimestamp.MinValue,
+      ledgerEnd = LedgerEnd(
+        lastOffset = offset(3),
+        lastEventSeqId = 0L,
+        lastStringInterningId = 0,
+        lastPublicationTime = CantonTimestamp.MinValue,
+      ),
       lastTraceContext = TraceContext.empty,
       batch = Vector(
         someParty,
@@ -267,92 +286,28 @@ class ParallelIndexerSubscriptionSpec
     actual shouldBe expected
   }
 
-  behavior of "inputMapper transaction metering"
-
-  it should "extract transaction metering" in {
-
-    val applicationId = Ref.ApplicationId.assertFromString("a0")
-
-    val timestamp: Long = 12345
-    val offset = Ref.HexString.assertFromString("00" * 8 + "02")
-    val someHash = Hash.hashPrivateKey("p0")
-
-    val someRecordTime =
-      Time.Timestamp.assertFromInstant(Instant.parse("2000-01-01T00:00:00.000000Z"))
-
-    val someCompletionInfo = state.CompletionInfo(
-      actAs = Nil,
-      applicationId = applicationId,
-      commandId = Ref.CommandId.assertFromString("c0"),
-      optDeduplicationPeriod = None,
-      submissionId = None,
-      messageUuid = None,
-    )
-    val someTransactionMeta = state.TransactionMeta(
-      ledgerEffectiveTime = Time.Timestamp.assertFromLong(2),
-      workflowId = None,
-      submissionTime = Time.Timestamp.assertFromLong(3),
-      submissionSeed = someHash,
-      optUsedPackages = None,
-      optNodeSeeds = None,
-      optByKeyNodes = None,
-    )
-
-    val someTransactionAccepted = state.Update.TransactionAccepted(
-      completionInfoO = Some(someCompletionInfo),
-      transactionMeta = someTransactionMeta,
-      transaction = CommittedTransaction(
-        VersionedTransaction(LanguageVersion.v2_dev, Map.empty, ImmArray.empty)
-      ),
-      updateId = Ref.TransactionId.assertFromString("UpdateId"),
-      recordTime = someRecordTime,
-      hostedWitnesses = Nil,
-      contractMetadata = Map.empty,
-      domainId = DomainId.tryFromString("da::default"),
-      Some(
-        DomainIndex.of(
-          RequestIndex(RequestCounter(1), Some(SequencerCounter(1)), CantonTimestamp.now())
-        )
-      ),
-    )
-
-    val expected: Vector[DbDto.TransactionMetering] = Vector(
-      DbDto.TransactionMetering(
-        application_id = applicationId,
-        action_count = 0,
-        metering_timestamp = timestamp,
-        ledger_offset = offset,
-      )
-    )
-
-    val actual: Vector[DbDto.TransactionMetering] = ParallelIndexerSubscription
-      .inputMapper(
-        metrics = metrics,
-        toDbDto = _ => _ => Iterator.empty,
-        toMeteringDbDto = _ => expected,
-        logger,
-      )(
-        List(
-          (Offset.fromHexString(offset), Traced[Update](someTransactionAccepted))
-        )
-      )
-      .batch
-      .asInstanceOf[Vector[DbDto.TransactionMetering]]
-
-    actual shouldBe expected
-
-  }
-
   behavior of "seqMapperZero"
 
   it should "provide required Batch in happy path case" in {
-    val initialPublicationTime = CantonTimestamp.now()
-    ParallelIndexerSubscription.seqMapperZero(123, 234, initialPublicationTime) shouldBe Batch(
-      lastOffset = Offset.beforeBegin,
-      lastSeqEventId = 123,
+    val ledgerEnd = LedgerEnd(
+      lastOffset = offset(1),
+      lastEventSeqId = 123,
       lastStringInterningId = 234,
-      lastRecordTime = 0,
-      publicationTime = initialPublicationTime,
+      lastPublicationTime = CantonTimestamp.now(),
+    )
+
+    ParallelIndexerSubscription.seqMapperZero(Some(ledgerEnd)) shouldBe Batch(
+      ledgerEnd = ledgerEnd,
+      lastTraceContext = TraceContext.empty,
+      batch = Vector.empty,
+      batchSize = 0,
+      offsetsUpdates = Vector.empty,
+    )
+  }
+
+  it should "provide required Batch in case starting from scratch" in {
+    ParallelIndexerSubscription.seqMapperZero(None) shouldBe Batch(
+      ledgerEnd = ZeroLedgerEnd,
       lastTraceContext = TraceContext.empty,
       batch = Vector.empty,
       batchSize = 0,
@@ -369,45 +324,47 @@ class ParallelIndexerSubscriptionSpec
     val previousPublicationTime = simClock.monotonicTime()
     val currentPublicationTime = simClock.uniqueTime()
     previousPublicationTime should not be currentPublicationTime
+    val previousLedgerEnd = LedgerEnd(
+      lastOffset = offset(1),
+      lastEventSeqId = 15,
+      lastStringInterningId = 26,
+      lastPublicationTime = previousPublicationTime,
+    )
     val result = ParallelIndexerSubscription.seqMapper(
       internize = _.zipWithIndex.map(x => x._2 -> x._2.toString).take(2),
       metrics,
       simClock,
       logger,
     )(
-      previous = ParallelIndexerSubscription.seqMapperZero(15, 26, previousPublicationTime),
+      previous = ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd)),
       current = Batch(
-        lastOffset = offset(2),
-        lastSeqEventId = 0,
-        lastStringInterningId = 0,
-        lastRecordTime = someTime.toEpochMilli,
-        publicationTime = CantonTimestamp.MinValue,
+        ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
         lastTraceContext = TraceContext.empty,
         batch = Vector(
           someParty,
           someParty,
           someEventCreated,
           DbDto.IdFilterCreateStakeholder(0L, "", ""),
-          DbDto.IdFilterCreateNonStakeholderInformee(0L, ""),
+          DbDto.IdFilterCreateNonStakeholderInformee(0L, "", ""),
           DbDto.IdFilterConsumingStakeholder(0L, "", ""),
-          DbDto.IdFilterConsumingNonStakeholderInformee(0L, ""),
-          DbDto.IdFilterNonConsumingInformee(0L, ""),
+          DbDto.IdFilterConsumingNonStakeholderInformee(0L, "", ""),
+          DbDto.IdFilterNonConsumingInformee(0L, "", ""),
           someEventCreated,
           someEventCreated,
-          DbDto.TransactionMeta("", "", 0L, 0L, "x::sourcedomain", 0L, 0L),
+          DbDto.TransactionMeta("", 1, 0L, 0L, "x::sourcesynchronizer", 0L, 0L),
           someParty,
           someEventExercise,
-          DbDto.TransactionMeta("", "", 0L, 0L, "x::sourcedomain", 0L, 0L),
+          DbDto.TransactionMeta("", 1, 0L, 0L, "x::sourcesynchronizer", 0L, 0L),
           someParty,
           someEventAssign,
           DbDto.IdFilterAssignStakeholder(0L, "", ""),
           DbDto.IdFilterAssignStakeholder(0L, "", ""),
-          DbDto.TransactionMeta("", "", 0L, 0L, "x::sourcedomain", 0L, 0L),
+          DbDto.TransactionMeta("", 1, 0L, 0L, "x::sourcesynchronizer", 0L, 0L),
           someParty,
           someEventUnassign,
           DbDto.IdFilterUnassignStakeholder(0L, "", ""),
           DbDto.IdFilterUnassignStakeholder(0L, "", ""),
-          DbDto.TransactionMeta("", "", 0L, 0L, "x::sourcedomain", 0L, 0L),
+          DbDto.TransactionMeta("", 1, 0L, 0L, "x::sourcesynchronizer", 0L, 0L),
           someParty,
           someCompletion,
         ),
@@ -417,9 +374,10 @@ class ParallelIndexerSubscriptionSpec
     )
     import scala.util.chaining.*
 
-    result.lastSeqEventId shouldBe 21
-    result.lastStringInterningId shouldBe 1
-    result.publicationTime shouldBe currentPublicationTime
+    result.ledgerEnd.lastEventSeqId shouldBe 21
+    result.ledgerEnd.lastStringInterningId shouldBe 1
+    result.ledgerEnd.lastPublicationTime shouldBe currentPublicationTime
+    result.ledgerEnd.lastOffset shouldBe offset(2)
     result.batch(2).asInstanceOf[DbDto.EventCreate].event_sequential_id shouldBe 16
     result.batch(3).asInstanceOf[DbDto.IdFilterCreateStakeholder].event_sequential_id shouldBe 16
     result
@@ -476,15 +434,17 @@ class ParallelIndexerSubscriptionSpec
   }
 
   it should "preserve sequence id if nothing to assign" in {
+    val previousLedgerEnd = LedgerEnd(
+      lastOffset = offset(1),
+      lastEventSeqId = 15,
+      lastStringInterningId = 25,
+      lastPublicationTime = CantonTimestamp.now(),
+    )
     val simClock = new SimClock(loggerFactory = loggerFactory)
     val result = ParallelIndexerSubscription.seqMapper(_ => Nil, metrics, simClock, logger)(
-      ParallelIndexerSubscription.seqMapperZero(15, 25, CantonTimestamp.now()),
+      ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd)),
       Batch(
-        lastOffset = offset(2),
-        lastSeqEventId = 0,
-        lastStringInterningId = 0,
-        lastRecordTime = someTime.toEpochMilli,
-        publicationTime = CantonTimestamp.MinValue,
+        ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
         lastTraceContext = TraceContext.empty,
         batch = Vector(
           someParty,
@@ -496,88 +456,29 @@ class ParallelIndexerSubscriptionSpec
         offsetsUpdates = offsetsAndUpdates,
       ),
     )
-    result.lastSeqEventId shouldBe 15
-    result.lastStringInterningId shouldBe 25
-  }
-
-  it should "throw if offset going backwards in the new batch" in {
-    val simClock = new SimClock(loggerFactory = loggerFactory)
-    intercept[AssertionError](
-      ParallelIndexerSubscription.seqMapper(_ => Nil, metrics, simClock, logger)(
-        ParallelIndexerSubscription.seqMapperZero(15, 25, CantonTimestamp.now()),
-        Batch(
-          lastOffset = offset(2),
-          lastSeqEventId = 0,
-          lastStringInterningId = 0,
-          lastRecordTime = someTime.toEpochMilli,
-          publicationTime = CantonTimestamp.MinValue,
-          lastTraceContext = TraceContext.empty,
-          batch = Vector(
-            someParty,
-            someParty,
-            someParty,
-            someParty,
-          ),
-          batchSize = 3,
-          offsetsUpdates = Vector(1L, 3L, 2L)
-            .map(offset)
-            .zip(
-              Vector(
-                somePartyAllocationRejected,
-                somePartyAllocationRejected
-                  .copy(recordTime = somePartyAllocationRejected.recordTime.addMicros(1000)),
-                somePartyAllocationRejected
-                  .copy(recordTime = somePartyAllocationRejected.recordTime.addMicros(2000)),
-              ).map(Traced[Update])
-            ),
-        ),
-      )
-    ).getMessage shouldBe "assertion failed: Monotonic Offset violation detected from Offset(Bytes(000000000000000003)) to Offset(Bytes(000000000000000002))"
-  }
-
-  it should "throw if offset going backwards cross batch" in {
-    val simClock = new SimClock(loggerFactory = loggerFactory)
-    intercept[AssertionError](
-      ParallelIndexerSubscription.seqMapper(_ => Nil, metrics, simClock, logger)(
-        ParallelIndexerSubscription
-          .seqMapperZero(15, 25, CantonTimestamp.now())
-          .copy(lastOffset = offset(2)),
-        Batch(
-          lastOffset = offset(2),
-          lastSeqEventId = 0,
-          lastStringInterningId = 0,
-          lastRecordTime = someTime.toEpochMilli,
-          publicationTime = CantonTimestamp.MinValue,
-          lastTraceContext = TraceContext.empty,
-          batch = Vector(
-            someParty,
-            someParty,
-            someParty,
-            someParty,
-          ),
-          batchSize = 3,
-          offsetsUpdates = offsetsAndUpdates,
-        ),
-      )
-    ).getMessage shouldBe "assertion failed: Monotonic Offset violation detected from Offset(Bytes(000000000000000002)) to Offset(Bytes(000000000000000001))"
+    result.ledgerEnd.lastEventSeqId shouldBe 15
+    result.ledgerEnd.lastStringInterningId shouldBe 25
+    result.ledgerEnd.lastOffset shouldBe offset(2)
   }
 
   it should "take the last publication time, if bigger than the current time, and log" in {
     val now = CantonTimestamp.now()
     val simClock = new SimClock(now, loggerFactory = loggerFactory)
     val previous = now.plusSeconds(10)
+    val previousLedgerEnd = LedgerEnd(
+      lastOffset = offset(1),
+      lastEventSeqId = 15,
+      lastStringInterningId = 25,
+      lastPublicationTime = previous,
+    )
     loggerFactory.assertLogs(
       LoggerNameContains("ParallelIndexerSubscription") && SuppressionRule.Level(Level.INFO)
     )(
       ParallelIndexerSubscription
         .seqMapper(_ => Nil, metrics, simClock, logger)(
-          ParallelIndexerSubscription.seqMapperZero(15, 25, previous),
+          ParallelIndexerSubscription.seqMapperZero(Some(previousLedgerEnd)),
           Batch(
-            lastOffset = offset(2),
-            lastSeqEventId = 0,
-            lastStringInterningId = 0,
-            lastRecordTime = someTime.toEpochMilli,
-            publicationTime = CantonTimestamp.MinValue,
+            ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
             lastTraceContext = TraceContext.empty,
             batch = Vector(
               someParty,
@@ -589,7 +490,8 @@ class ParallelIndexerSubscriptionSpec
             offsetsUpdates = offsetsAndUpdates,
           ),
         )
-        .publicationTime shouldBe previous,
+        .ledgerEnd
+        .lastPublicationTime shouldBe previous,
       _.infoMessage should include("Has the clock been reset, e.g., during participant failover?"),
     )
   }
@@ -601,11 +503,7 @@ class ParallelIndexerSubscriptionSpec
       batchF = _ => "bumm"
     )(
       Batch(
-        lastOffset = offset(2),
-        lastSeqEventId = 0,
-        lastRecordTime = someTime.toEpochMilli,
-        publicationTime = CantonTimestamp.MinValue,
-        lastStringInterningId = 0,
+        ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
         lastTraceContext = TraceContext.empty,
         batch = Vector(
           someParty,
@@ -618,11 +516,7 @@ class ParallelIndexerSubscriptionSpec
       )
     )
     result shouldBe Batch(
-      lastOffset = offset(2),
-      lastSeqEventId = 0,
-      lastStringInterningId = 0,
-      lastRecordTime = someTime.toEpochMilli,
-      publicationTime = CantonTimestamp.MinValue,
+      ledgerEnd = ZeroLedgerEnd.copy(lastOffset = offset(2)),
       lastTraceContext = TraceContext.empty,
       batch = "bumm",
       batchSize = 3,
@@ -640,11 +534,17 @@ class ParallelIndexerSubscriptionSpec
       ): Future[T] =
         Future.successful(sql(connection))
 
-      override val executor = new QueueAwareExecutor with NamedExecutor {
+      override val executor: QueueAwareExecutor & NamedExecutor = new QueueAwareExecutor
+        with NamedExecutor {
         override def queueSize: Long = 0
         override def name: String = "test"
       }
 
+      override def executeSqlUS[T](databaseMetrics: DatabaseMetrics)(sql: Connection => T)(implicit
+          loggingContext: LoggingContextWithTrace,
+          ec: ExecutionContext,
+      ): FutureUnlessShutdown[T] =
+        FutureUnlessShutdown.pure(sql(connection))
     }
 
     val batchPayload = "Some batch payload"
@@ -654,12 +554,14 @@ class ParallelIndexerSubscriptionSpec
       case other => fail(s"Unexpected: $other")
     }
 
-    val inBatch = Batch(
+    val ledgerEnd = LedgerEnd(
       lastOffset = offset(2),
-      lastSeqEventId = 2000,
+      lastEventSeqId = 2000,
       lastStringInterningId = 300,
-      lastRecordTime = someTime.toEpochMilli,
-      publicationTime = CantonTimestamp.MinValue,
+      lastPublicationTime = CantonTimestamp.MinValue,
+    )
+    val inBatch = Batch(
+      ledgerEnd = ledgerEnd,
       lastTraceContext = TraceContext.empty,
       batch = batchPayload,
       batchSize = 0,
@@ -672,7 +574,7 @@ class ParallelIndexerSubscriptionSpec
       ParallelIndexerSubscription.ingester(
         ingestFunction,
         new ReassignmentOffsetPersistence {
-          override def persist(updates: Seq[(Update, Offset)], tracedLogger: TracedLogger)(implicit
+          override def persist(updates: Seq[(Offset, Update)], tracedLogger: TracedLogger)(implicit
               traceContext: TraceContext
           ): Future[Unit] = {
             persistedTransferOffsets.set(true)
@@ -691,11 +593,7 @@ class ParallelIndexerSubscriptionSpec
 
     outBatch shouldBe
       Batch(
-        lastOffset = offset(2),
-        lastSeqEventId = 2000,
-        lastStringInterningId = 300,
-        lastRecordTime = someTime.toEpochMilli,
-        publicationTime = CantonTimestamp.MinValue,
+        ledgerEnd = ledgerEnd,
         lastTraceContext = TraceContext.empty,
         batch = zeroDbBatch,
         batchSize = 0,
@@ -708,30 +606,26 @@ class ParallelIndexerSubscriptionSpec
 
   it should "apply ingestTailFunction on the last batch and forward the batch of batches" in {
     val ledgerEnd = ParameterStorageBackend.LedgerEnd(
-      lastOffset = offset(5).toAbsoluteOffsetO,
+      lastOffset = offset(5),
       lastEventSeqId = 2000,
       lastStringInterningId = 300,
       lastPublicationTime = CantonTimestamp.MinValue,
     )
 
     val secondBatchLedgerEnd = ParameterStorageBackend.LedgerEnd(
-      lastOffset = offset(6).toAbsoluteOffsetO,
+      lastOffset = offset(6),
       lastEventSeqId = 3000,
       lastStringInterningId = 400,
       lastPublicationTime = CantonTimestamp.MinValue.plusSeconds(10),
     )
 
-    val storeLedgerEndF: (LedgerEnd, Map[DomainId, DomainIndex]) => Future[Unit] = {
+    val storeLedgerEndF: (LedgerEnd, Map[SynchronizerId, SynchronizerIndex]) => Future[Unit] = {
       case (`secondBatchLedgerEnd`, _) => Future.unit
       case otherLedgerEnd => fail(s"Unexpected ledger end: $otherLedgerEnd")
     }
 
     val batch = Batch(
-      lastOffset = Offset.fromAbsoluteOffsetO(ledgerEnd.lastOffset),
-      lastSeqEventId = ledgerEnd.lastEventSeqId,
-      lastStringInterningId = ledgerEnd.lastStringInterningId,
-      lastRecordTime = someTime.toEpochMilli,
-      publicationTime = ledgerEnd.lastPublicationTime,
+      ledgerEnd = ledgerEnd,
       lastTraceContext = TraceContext.empty,
       batch = "Some batch payload",
       batchSize = 0,
@@ -740,12 +634,7 @@ class ParallelIndexerSubscriptionSpec
 
     val batchOfBatches = Vector(
       batch,
-      batch.copy(
-        lastSeqEventId = secondBatchLedgerEnd.lastEventSeqId,
-        lastOffset = Offset.fromAbsoluteOffsetO(secondBatchLedgerEnd.lastOffset),
-        lastStringInterningId = secondBatchLedgerEnd.lastStringInterningId,
-        publicationTime = secondBatchLedgerEnd.lastPublicationTime,
-      ),
+      batch.copy(ledgerEnd = secondBatchLedgerEnd),
     )
 
     val outBatchF =
@@ -760,203 +649,186 @@ class ParallelIndexerSubscriptionSpec
     outBatch shouldBe batchOfBatches
   }
 
-  behavior of "ledgerEndFromBatch"
-
-  it should "populate correct ledger-end from batch in happy path case" in {
-    ParallelIndexerSubscription.ledgerEndFrom(
-      Batch(
-        lastOffset = offset(5),
-        lastSeqEventId = 2000,
-        lastStringInterningId = 300,
-        lastRecordTime = someTime.toEpochMilli,
-        publicationTime = CantonTimestamp.MinValue.plusSeconds(20),
-        lastTraceContext = TraceContext.empty,
-        batch = "zero",
-        batchSize = 0,
-        offsetsUpdates = Vector.empty,
-      )
-    ) shouldBe ParameterStorageBackend.LedgerEnd(
-      lastOffset = offset(5).toAbsoluteOffsetO,
-      lastEventSeqId = 2000,
-      lastStringInterningId = 300,
-      lastPublicationTime = CantonTimestamp.MinValue.plusSeconds(20),
-    )
-  }
-
-  behavior of "domainLedgerEndFromBatch"
+  behavior of "synchronizerLedgerEndFromBatch"
 
   private val someSequencerIndex1 = SequencerIndex(
-    counter = SequencerCounter(11),
-    timestamp = CantonTimestamp.ofEpochMicro(123),
+    sequencerTimestamp = CantonTimestamp.ofEpochMicro(123)
   )
   private val someSequencerIndex2 = SequencerIndex(
-    counter = SequencerCounter(20),
-    timestamp = CantonTimestamp.ofEpochMicro(256),
+    sequencerTimestamp = CantonTimestamp.ofEpochMicro(256)
   )
-  private val someRequestIndex1 = RequestIndex(
-    counter = RequestCounter(5),
-    sequencerCounter = Some(SequencerCounter(15)),
+  private val someRepairIndex1 = RepairIndex(
     timestamp = CantonTimestamp.ofEpochMicro(153),
+    counter = RepairCounter(15),
   )
-  private val someRequestIndex2 = RequestIndex(
-    counter = RequestCounter(6),
-    sequencerCounter = None,
+  private val someRepairIndex2 = RepairIndex(
     timestamp = CantonTimestamp.ofEpochMicro(156),
+    counter = RepairCounter.Genesis,
   )
+  private val someRecordTime1 = CantonTimestamp.ofEpochMicro(100)
+  private val someRecordTime2 = CantonTimestamp.ofEpochMicro(300)
+  private val someRepairCounter1 = RepairCounter(0)
 
   it should "populate correct ledger-end from batches for a sequencer counter moved" in {
-    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
-      Vector(someDomainId -> DomainIndex.of(someSequencerIndex1))
+    ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
+      Vector(someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1))
     ) shouldBe Map(
-      someDomainId -> DomainIndex.of(someSequencerIndex1)
+      someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1)
     )
   }
 
-  it should "populate correct ledger-end from batches for a request counter moved" in {
-    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
-      Vector(someDomainId -> DomainIndex.of(someRequestIndex1))
+  it should "populate correct ledger-end from batches for a repair counter moved" in {
+    ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
+      Vector(someSynchronizerId -> SynchronizerIndex.of(someRepairIndex1))
     ) shouldBe Map(
-      someDomainId -> DomainIndex.of(someRequestIndex1)
+      someSynchronizerId -> SynchronizerIndex.of(someRepairIndex1)
     )
   }
 
   it should "populate correct ledger-end from batches for a mixed batch" in {
-    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
+    ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
       Vector(
-        someDomainId -> DomainIndex.of(someSequencerIndex1),
-        someDomainId -> DomainIndex.of(someSequencerIndex2),
-        someDomainId2 -> DomainIndex.of(someRequestIndex1),
-        someDomainId2 -> DomainIndex.of(someRequestIndex2),
+        someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId -> SynchronizerIndex.of(
+          RepairIndex(someRecordTime1, someRepairCounter1)
+        ),
+        someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex2),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRepairIndex1),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRepairIndex2),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRecordTime1),
       )
     ) shouldBe Map(
-      someDomainId -> DomainIndex(
-        None,
+      someSynchronizerId -> SynchronizerIndex(
+        Some(RepairIndex(someRecordTime1, someRepairCounter1)),
         Some(someSequencerIndex2),
+        someSequencerIndex2.sequencerTimestamp,
       ),
-      someDomainId2 -> DomainIndex(
-        Some(someRequestIndex2),
-        Some(
-          SequencerIndex(
-            counter = SequencerCounter(15),
-            timestamp = CantonTimestamp.ofEpochMicro(153),
-          )
-        ),
+      someSynchronizerId2 -> SynchronizerIndex(
+        Some(someRepairIndex2),
+        None,
+        someRepairIndex2.timestamp,
       ),
     )
   }
 
   it should "populate correct ledger-end from batches for a mixed batch 2" in {
-    ParallelIndexerSubscription.ledgerEndDomainIndexFrom(
+    ParallelIndexerSubscription.ledgerEndSynchronizerIndexFrom(
       Vector(
-        someDomainId -> DomainIndex.of(someSequencerIndex1),
-        someDomainId -> DomainIndex.of(someRequestIndex1),
-        someDomainId2 -> DomainIndex.of(someSequencerIndex1),
-        someDomainId2 -> DomainIndex.of(someRequestIndex2),
+        someSynchronizerId -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId -> SynchronizerIndex.of(someRepairIndex1),
+        someSynchronizerId -> SynchronizerIndex.of(someRecordTime2),
+        someSynchronizerId2 -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId2 -> SynchronizerIndex.of(someRepairIndex2),
+        someSynchronizerId3 -> SynchronizerIndex.of(someSequencerIndex1),
+        someSynchronizerId3 -> SynchronizerIndex.of(
+          RepairIndex(someSequencerIndex1.sequencerTimestamp, RepairCounter.Genesis)
+        ),
       )
     ) shouldBe Map(
-      someDomainId -> DomainIndex(
-        Some(someRequestIndex1),
-        Some(
-          SequencerIndex(
-            counter = SequencerCounter(15),
-            timestamp = CantonTimestamp.ofEpochMicro(153),
-          )
-        ),
-      ),
-      someDomainId2 -> DomainIndex(
-        Some(someRequestIndex2),
+      someSynchronizerId -> SynchronizerIndex(
+        Some(someRepairIndex1),
         Some(someSequencerIndex1),
+        someRecordTime2,
+      ),
+      someSynchronizerId2 -> SynchronizerIndex(
+        Some(someRepairIndex2),
+        Some(someSequencerIndex1),
+        someRepairIndex2.timestamp,
+      ),
+      someSynchronizerId3 -> SynchronizerIndex(
+        Some(RepairIndex(someSequencerIndex1.sequencerTimestamp, RepairCounter.Genesis)),
+        Some(someSequencerIndex1),
+        someSequencerIndex1.sequencerTimestamp,
       ),
     )
   }
 
   behavior of "aggregateLedgerEndForRepair"
 
-  private val someAggregatedLedgerEndForRepair: (LedgerEnd, Map[DomainId, DomainIndex]) =
-    ParameterStorageBackend.LedgerEnd(
-      lastOffset = offset(5).toAbsoluteOffsetO,
-      lastEventSeqId = 2000,
-      lastStringInterningId = 300,
-      lastPublicationTime = CantonTimestamp.ofEpochMicro(5),
-    ) -> Map(
-      someDomainId -> DomainIndex(
-        None,
-        Some(
-          SequencerIndex(
-            counter = SequencerCounter(5),
-            timestamp = CantonTimestamp.ofEpochMicro(5),
-          )
+  private val someAggregatedLedgerEndForRepair
+      : Option[(LedgerEnd, Map[SynchronizerId, SynchronizerIndex])] =
+    Some(
+      ParameterStorageBackend.LedgerEnd(
+        lastOffset = offset(5),
+        lastEventSeqId = 2000,
+        lastStringInterningId = 300,
+        lastPublicationTime = CantonTimestamp.ofEpochMicro(5),
+      ) -> Map(
+        someSynchronizerId -> SynchronizerIndex(
+          None,
+          Some(
+            SequencerIndex(
+              sequencerTimestamp = CantonTimestamp.ofEpochMicro(5)
+            )
+          ),
+          CantonTimestamp.ofEpochMicro(5),
         ),
-      ),
-      someDomainId2 -> DomainIndex(
-        Some(someRequestIndex2),
-        Some(
-          SequencerIndex(
-            counter = SequencerCounter(4),
-            timestamp = CantonTimestamp.ofEpochMicro(4),
-          )
+        someSynchronizerId2 -> SynchronizerIndex(
+          Some(someRepairIndex2),
+          Some(
+            SequencerIndex(
+              sequencerTimestamp = CantonTimestamp.ofEpochMicro(4)
+            )
+          ),
+          CantonTimestamp.ofEpochMicro(4),
         ),
-      ),
+      )
     )
 
   private val someBatchOfBatches: Vector[Batch[Unit]] = Vector(
     Batch(
-      lastOffset = offset(10),
-      lastSeqEventId = 2010,
-      lastStringInterningId = 310,
-      lastRecordTime = someTime.toEpochMilli + 10,
-      publicationTime = CantonTimestamp.ofEpochMicro(15),
+      ledgerEnd = LedgerEnd(
+        lastOffset = offset(10),
+        lastEventSeqId = 2010,
+        lastStringInterningId = 310,
+        lastPublicationTime = CantonTimestamp.ofEpochMicro(15),
+      ),
       lastTraceContext = TraceContext.empty,
       batch = (),
       batchSize = 0,
       offsetsUpdates = Vector(
-        offset(9) -> Traced(
+        offset(9) ->
           Update.SequencerIndexMoved(
-            domainId = someDomainId,
-            sequencerIndex = someSequencerIndex1,
-            requestCounterO = None,
-          )
-        ),
-        offset(10) -> Traced(
+            synchronizerId = someSynchronizerId,
+            recordTime = someSequencerIndex1.sequencerTimestamp,
+          ),
+        offset(10) ->
           Update.SequencerIndexMoved(
-            domainId = someDomainId2,
-            sequencerIndex = someSequencerIndex1,
-            requestCounterO = None,
-          )
-        ),
+            synchronizerId = someSynchronizerId2,
+            recordTime = someSequencerIndex1.sequencerTimestamp,
+          ),
       ),
     ),
     Batch(
-      lastOffset = offset(20),
-      lastSeqEventId = 2020,
-      lastStringInterningId = 320,
-      lastRecordTime = someTime.toEpochMilli + 20,
-      publicationTime = CantonTimestamp.ofEpochMicro(25),
+      ledgerEnd = LedgerEnd(
+        lastOffset = offset(20),
+        lastEventSeqId = 2020,
+        lastStringInterningId = 320,
+        lastPublicationTime = CantonTimestamp.ofEpochMicro(25),
+      ),
       lastTraceContext = TraceContext.empty,
       batch = (),
       batchSize = 0,
       offsetsUpdates = Vector(
-        offset(19) -> Traced(
+        offset(19) ->
           Update.SequencerIndexMoved(
-            domainId = someDomainId,
-            sequencerIndex = someSequencerIndex2,
-            requestCounterO = None,
-          )
-        ),
-        offset(20) -> Traced(
+            synchronizerId = someSynchronizerId,
+            recordTime = someSequencerIndex2.sequencerTimestamp,
+          ),
+        offset(20) ->
           Update.SequencerIndexMoved(
-            domainId = someDomainId2,
-            sequencerIndex = someSequencerIndex2,
-            requestCounterO = None,
-          )
-        ),
+            synchronizerId = someSynchronizerId2,
+            recordTime = someSequencerIndex2.sequencerTimestamp,
+          ),
       ),
     ),
   )
 
-  it should "correctly aggregate if batch has no new domain-indexes" in {
+  it should "correctly aggregate if batch has no new synchronizer-indexes" in {
     val aggregateLedgerEndForRepairRef =
-      new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](someAggregatedLedgerEndForRepair)
+      new AtomicReference[Option[(LedgerEnd, Map[SynchronizerId, SynchronizerIndex])]](
+        someAggregatedLedgerEndForRepair
+      )
     ParallelIndexerSubscription
       .aggregateLedgerEndForRepair(aggregateLedgerEndForRepairRef)
       .apply(Vector.empty)
@@ -965,53 +837,59 @@ class ParallelIndexerSubscriptionSpec
 
   it should "correctly aggregate if old state is empty" in {
     val aggregateLedgerEndForRepairRef =
-      new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](
-        ParallelIndexerSubscription.DefaultAggregatedLedgerEndForRepair
-      )
+      new AtomicReference[Option[(LedgerEnd, Map[SynchronizerId, SynchronizerIndex])]](None)
     ParallelIndexerSubscription
       .aggregateLedgerEndForRepair(aggregateLedgerEndForRepairRef)
       .apply(someBatchOfBatches)
     aggregateLedgerEndForRepairRef.get() shouldBe
-      ParameterStorageBackend.LedgerEnd(
-        lastOffset = offset(20).toAbsoluteOffsetO,
-        lastEventSeqId = 2020,
-        lastStringInterningId = 320,
-        lastPublicationTime = CantonTimestamp.ofEpochMicro(25),
-      ) -> Map(
-        someDomainId -> DomainIndex(
-          None,
-          Some(someSequencerIndex2),
-        ),
-        someDomainId2 -> DomainIndex(
-          None,
-          Some(someSequencerIndex2),
-        ),
+      Some(
+        ParameterStorageBackend.LedgerEnd(
+          lastOffset = offset(20),
+          lastEventSeqId = 2020,
+          lastStringInterningId = 320,
+          lastPublicationTime = CantonTimestamp.ofEpochMicro(25),
+        ) -> Map(
+          someSynchronizerId -> SynchronizerIndex(
+            None,
+            Some(someSequencerIndex2),
+            someSequencerIndex2.sequencerTimestamp,
+          ),
+          someSynchronizerId2 -> SynchronizerIndex(
+            None,
+            Some(someSequencerIndex2),
+            someSequencerIndex2.sequencerTimestamp,
+          ),
+        )
       )
   }
 
-  it should "correctly aggregate old and new ledger-end and domain indexes" in {
+  it should "correctly aggregate old and new ledger-end and synchronizer indexes" in {
     val aggregateLedgerEndForRepairRef =
-      new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](
+      new AtomicReference[Option[(LedgerEnd, Map[SynchronizerId, SynchronizerIndex])]](
         someAggregatedLedgerEndForRepair
       )
     ParallelIndexerSubscription
       .aggregateLedgerEndForRepair(aggregateLedgerEndForRepairRef)
       .apply(someBatchOfBatches)
     aggregateLedgerEndForRepairRef.get() shouldBe
-      ParameterStorageBackend.LedgerEnd(
-        lastOffset = offset(20).toAbsoluteOffsetO,
-        lastEventSeqId = 2020,
-        lastStringInterningId = 320,
-        lastPublicationTime = CantonTimestamp.ofEpochMicro(25),
-      ) -> Map(
-        someDomainId -> DomainIndex(
-          None,
-          Some(someSequencerIndex2),
-        ),
-        someDomainId2 -> DomainIndex(
-          Some(someRequestIndex2),
-          Some(someSequencerIndex2),
-        ),
+      Some(
+        ParameterStorageBackend.LedgerEnd(
+          lastOffset = offset(20),
+          lastEventSeqId = 2020,
+          lastStringInterningId = 320,
+          lastPublicationTime = CantonTimestamp.ofEpochMicro(25),
+        ) -> Map(
+          someSynchronizerId -> SynchronizerIndex(
+            None,
+            Some(someSequencerIndex2),
+            someSequencerIndex2.sequencerTimestamp,
+          ),
+          someSynchronizerId2 -> SynchronizerIndex(
+            Some(someRepairIndex2),
+            Some(someSequencerIndex2),
+            someSequencerIndex2.sequencerTimestamp,
+          ),
+        )
       )
   }
 
@@ -1021,13 +899,22 @@ class ParallelIndexerSubscriptionSpec
     val ledgerEndStoredPromise = Promise[Unit]()
     val processingEndStoredPromise = Promise[Unit]()
     val updateInMemoryStatePromise = Promise[Unit]()
-    val aggregatedLedgerEnd = new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](
-      LedgerEnd.beforeBegin -> Map.empty
-    )
+    val aggregatedLedgerEnd =
+      new AtomicReference[Option[(LedgerEnd, Map[SynchronizerId, SynchronizerIndex])]](
+        Some(
+          LedgerEnd(
+            lastOffset = offset(1),
+            lastEventSeqId = 1,
+            lastStringInterningId = 1,
+            lastPublicationTime = CantonTimestamp.MinValue,
+          )
+            -> Map.empty
+        )
+      )
     val input = Vector(
-      offset(13) -> Traced(Update.Init(Timestamp.now())),
-      offset(14) -> Traced(Update.Init(Timestamp.now())),
-      offset(15) -> Traced(Update.CommitRepair()),
+      offset(13) -> update,
+      offset(14) -> update,
+      offset(15) -> Update.CommitRepair(),
     )
     ParallelIndexerSubscription
       .commitRepair(
@@ -1053,12 +940,20 @@ class ParallelIndexerSubscriptionSpec
     val ledgerEndStoredPromise = Promise[Unit]()
     val processingEndStoredPromise = Promise[Unit]()
     val updateInMemoryStatePromise = Promise[Unit]()
-    val aggregatedLedgerEnd = new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](
-      LedgerEnd.beforeBegin -> Map.empty
-    )
+    val aggregatedLedgerEnd =
+      new AtomicReference[Option[(LedgerEnd, Map[SynchronizerId, SynchronizerIndex])]](
+        Some(
+          LedgerEnd(
+            lastOffset = offset(1),
+            lastEventSeqId = 1,
+            lastStringInterningId = 1,
+            lastPublicationTime = CantonTimestamp.MinValue,
+          ) -> Map.empty
+        )
+      )
     val input = Vector(
-      offset(13) -> Traced(Update.Init(Timestamp.now())),
-      offset(14) -> Traced(Update.Init(Timestamp.now())),
+      offset(13) -> update,
+      offset(14) -> update,
     )
     ParallelIndexerSubscription
       .commitRepair(
@@ -1080,4 +975,337 @@ class ParallelIndexerSubscriptionSpec
     updateInMemoryStatePromise.future.isCompleted shouldBe false
   }
 
+  behavior of "monotonicOffsetValidator"
+
+  it should "throw if offsets are not in a strictly increasing order" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.Epoch,
+      ),
+      offset(3L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.ofEpochSecond(1),
+      ),
+      offset(2L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.ofEpochSecond(2),
+      ),
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ => Future.successful(None),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe)
+
+    testSink.request(3)
+    testSink.expectNextN(offsetsUpdates.take(2))
+
+    val error = testSink.expectError()
+    error shouldBe an[AssertionError]
+    error.getMessage shouldBe "assertion failed: Monotonic Offset violation detected from Offset(3) to Offset(2)"
+  }
+
+  it should "throw if offsets are not in a strictly increasing compared to the initial offset" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.Epoch,
+      )
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = Some(Offset.tryFromLong(2)),
+          loadPreviousState = _ => Future.successful(None),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe)
+
+    testSink.request(1)
+    val error = testSink.expectError()
+    error shouldBe an[AssertionError]
+    error.getMessage shouldBe "assertion failed: Monotonic Offset violation detected from Offset(2) to Offset(1)"
+  }
+
+  it should "throw if sequenced timestamps decrease" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.ofEpochSecond(1),
+      ),
+      offset(2L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.Epoch,
+      ),
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ => Future.successful(None),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(2)
+    testSink.expectNextN(offsetsUpdates.take(1))
+
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(2\)"
+  }
+
+  it should "throw if sequenced timestamps decrease compared to clean synchronizer index" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.ofEpochSecond(1),
+      )
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ =>
+            Future.successful(
+              Some(
+                SynchronizerIndex.of(
+                  SequencerIndex(
+                    sequencerTimestamp = CantonTimestamp.ofEpochSecond(10)
+                  )
+                )
+              )
+            ),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(1)
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(1\)"
+  }
+
+  it should "throw if sequenced timestamps not increasing" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.ofEpochSecond(1),
+      ),
+      offset(2L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.ofEpochSecond(1),
+      ),
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ => Future.successful(None),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(2)
+    testSink.expectNextN(offsetsUpdates.take(1))
+
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: sequencer timestamp did not increase from .* to .* at offset Offset\(2\)"
+  }
+
+  it should "throw if sequenced timestamps not increasing compared to clean synchronizer index" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> Update.SequencerIndexMoved(
+        synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+        recordTime = CantonTimestamp.ofEpochSecond(1),
+      )
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ =>
+            Future.successful(
+              Some(
+                SynchronizerIndex.of(
+                  SequencerIndex(
+                    sequencerTimestamp = CantonTimestamp.ofEpochSecond(1)
+                  )
+                )
+              )
+            ),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(1)
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex raw"assertion failed: Monotonicity violation detected: sequencer timestamp did not increase from .* to .* at offset Offset\(1\)"
+  }
+
+  it should "throw if repair counters decrease" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(15L)),
+      offset(2L) -> repairUpdate(CantonTimestamp.Epoch, RepairCounter(13L)),
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ => Future.successful(None),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(2)
+    testSink.expectNextN(offsetsUpdates.take(1))
+
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex
+      raw"assertion failed: Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(2\)"
+  }
+
+  it should "throw if repair counters decrease compared to clean synchronizer index" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> repairUpdate(CantonTimestamp.ofEpochSecond(10), RepairCounter(15L))
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ =>
+            Future.successful(
+              Some(
+                SynchronizerIndex.of(
+                  RepairIndex(
+                    counter = RepairCounter(20L),
+                    timestamp = CantonTimestamp.ofEpochSecond(10),
+                  )
+                )
+              )
+            ),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(1)
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex
+      raw"assertion failed: Monotonicity violation detected: repair index decreases from .* to .* at offset Offset\(1\)"
+  }
+
+  it should "throw if record time decreases for floating events" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10)),
+      offset(2L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10)),
+      offset(3L) -> floatingUpdate(CantonTimestamp.Epoch),
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ => Future.successful(None),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(3)
+    testSink.expectNextN(offsetsUpdates.take(2))
+
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex
+      raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(3\)"
+  }
+
+  it should "throw if record time decreases for floating events compared to clean synchronizer index" in {
+    val offsetsUpdates: Vector[(Offset, Update)] = Vector(
+      offset(1L) -> floatingUpdate(CantonTimestamp.ofEpochSecond(10))
+    )
+
+    val testSink = Source(offsetsUpdates)
+      .via(
+        ParallelIndexerSubscription.monotonicityValidator(
+          initialOffset = None,
+          loadPreviousState = _ =>
+            Future.successful(
+              Some(
+                SynchronizerIndex.of(
+                  CantonTimestamp.ofEpochSecond(11)
+                )
+              )
+            ),
+          logger = logger,
+        )
+      )
+      .runWith(TestSink.probe[(Offset, Update)])
+
+    testSink.request(1)
+    val error = testSink.expectError().getCause
+    error shouldBe an[AssertionError]
+    error.getMessage should include regex
+      raw"assertion failed: Monotonicity violation detected: record time decreases from .* to .* at offset Offset\(1\)"
+  }
+
+  def update: Update =
+    Update.SequencerIndexMoved(
+      synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+      recordTime = CantonTimestamp.now(),
+    )
+
+  def repairUpdate(recordTime: CantonTimestamp, repairCounter: RepairCounter): Update =
+    RepairTransactionAccepted(
+      transactionMeta = TransactionMeta(
+        ledgerEffectiveTime = Time.Timestamp.assertFromLong(2),
+        workflowId = None,
+        submissionTime = Time.Timestamp.assertFromLong(3),
+        submissionSeed = crypto.Hash.assertFromString(
+          "01cf85cfeb36d628ca2e6f583fa2331be029b6b28e877e1008fb3f862306c086"
+        ),
+        timeBoundaries = LedgerTimeBoundaries.unconstrained,
+        optUsedPackages = None,
+        optNodeSeeds = None,
+        optByKeyNodes = None,
+      ),
+      transaction = CommittedTransaction(TransactionBuilder.Empty),
+      updateId = Ref.TransactionId.fromLong(15000),
+      contractMetadata = Map.empty,
+      synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+      repairCounter = repairCounter,
+      recordTime = recordTime,
+    )(TraceContext.empty)
+
+  def floatingUpdate(recordTime: CantonTimestamp): Update =
+    TopologyTransactionEffective(
+      updateId = Ref.TransactionId.fromLong(16000),
+      events = Set.empty,
+      synchronizerId = SynchronizerId.tryFromString("x::synchronizer"),
+      effectiveTime = recordTime,
+    )(TraceContext.empty)
 }

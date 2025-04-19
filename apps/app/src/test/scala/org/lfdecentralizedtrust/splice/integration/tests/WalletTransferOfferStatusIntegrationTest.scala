@@ -1,8 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
-import com.daml.ledger.api.v2.transaction.TreeEvent
-import com.daml.ledger.api.v2.transaction.TransactionTree
+import com.daml.ledger.api.v2.event.ExercisedEvent
+import com.daml.ledger.api.v2.transaction.{TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.CreatedEvent
 import org.lfdecentralizedtrust.splice.history.AmuletCreate
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
@@ -17,6 +18,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
+import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class WalletTransferOfferStatusIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -79,7 +81,10 @@ class WalletTransferOfferStatusIntegrationTest
         .by_id(parties, txId)
         .getOrElse(fail("Expected to see the transaction tree in the ledger."))
       val root = txTree.eventsById
-        .getOrElse(txTree.rootEventIds.head, fail("Must exist"))
+        .getOrElse(
+          txTree.eventsById.keySet.minOption.getOrElse(fail("mustExist")),
+          fail("Must exist"),
+        )
       txTree -> root
     }
 
@@ -114,12 +119,18 @@ class WalletTransferOfferStatusIntegrationTest
                     )
                   ) =>
                 status should be(TxLogEntry.Http.TransferOfferStatus.Accepted)
-                val (tree, exercise) = getRootFromTxId(
+                val (tree, exercise: TreeEvent) = getRootFromTxId(
                   txId,
                   Set(aliceUserParty, bobUserParty),
                 )
                 exercise.getExercised.choice should be("TransferOffer_Accept")
-                val acceptChildren = exercise.getExercised.childEventIds.map(
+                val childNodeIds = data.TransactionTree
+                  .fromProto(TransactionTree.toJavaProto(tree))
+                  .getChildNodeIds(
+                    data.ExercisedEvent.fromProto(ExercisedEvent.toJavaProto(exercise.getExercised))
+                  )
+                  .asScala
+                val acceptChildren = childNodeIds.map(
                   tree.eventsById.getOrElse(_, fail("Must exist"))
                 )
                 acceptChildren.map(_.getCreated.contractId) should contain(contractId)

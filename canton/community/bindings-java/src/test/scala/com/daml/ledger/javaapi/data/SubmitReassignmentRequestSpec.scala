@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data
 
@@ -18,8 +18,8 @@ class SubmitReassignmentRequestSpec
     PropertyCheckConfiguration(minSize = 1, sizeRange = 3)
 
   "SubmitReassignmentRequest.fromProto" should "convert Protoc-generated instances to data instances" in forAll(
-    reassignmentCommandGen.map(
-      SubmitReassignmentRequestProto.newBuilder().setReassignmentCommand(_).build
+    reassignmentCommandsGen.map(
+      SubmitReassignmentRequestProto.newBuilder().setReassignmentCommands(_).build
     )
   ) { request =>
     val commands = SubmitReassignmentRequest.fromProto(request)

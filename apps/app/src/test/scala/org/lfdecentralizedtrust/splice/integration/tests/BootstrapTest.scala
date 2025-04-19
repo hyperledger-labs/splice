@@ -1,23 +1,17 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
+import com.digitalasset.canton.ConsoleScriptRunner
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.useSelfSignedTokensForLedgerApiAuth
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class BootstrapTest extends IntegrationTest with HasConsoleScriptRunner {
+class BootstrapTest extends IntegrationTest {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       // we want a network in the same state that we would get when running `start-backends-for-local-frontend-testing.sh`
       .fromResources(
@@ -38,10 +32,18 @@ class BootstrapTest extends IntegrationTest with HasConsoleScriptRunner {
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       {
         clue("It should pass one time...") {
-          runScript(File("apps/splitwell/frontend/bootstrap-minimal.sc"))(env.environment)
+          ConsoleScriptRunner.run(
+            env.environment,
+            File("apps/splitwell/frontend/bootstrap-minimal.sc").toJava,
+            logger,
+          )
         }
         clue("And it should pass a second time...") {
-          runScript(File("apps/splitwell/frontend/bootstrap-minimal.sc"))(env.environment)
+          ConsoleScriptRunner.run(
+            env.environment,
+            File("apps/splitwell/frontend/bootstrap-minimal.sc").toJava,
+            logger,
+          )
         }
       },
       lines => {

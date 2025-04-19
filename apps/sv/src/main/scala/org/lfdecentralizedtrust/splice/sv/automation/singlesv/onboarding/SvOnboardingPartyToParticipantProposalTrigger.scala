@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -17,6 +18,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -63,7 +65,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
               dsoParty,
             )
             dsoPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
-              filterStore = dsoRules.domain.filterString,
+              store = TopologyStoreId.SynchronizerStore(dsoRules.domain).some,
               filterParty = dsoParty.filterString,
               proposals = AllProposals,
             )

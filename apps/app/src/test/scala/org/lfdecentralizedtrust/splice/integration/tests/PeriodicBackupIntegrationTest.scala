@@ -6,16 +6,11 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   PeriodicBackupDumpConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.GcpBucket
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.ParticipantId
 import org.slf4j.event.Level
@@ -32,8 +27,7 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig] extends 
 
   protected def readDump(filename: String): String
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4

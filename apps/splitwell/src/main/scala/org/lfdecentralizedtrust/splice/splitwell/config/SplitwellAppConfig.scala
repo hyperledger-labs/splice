@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.splitwell.config
 
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
-  SpliceDbConfig,
   SpliceBackendConfig,
   SpliceParametersConfig,
   ParticipantClientConfig,
@@ -31,8 +30,8 @@ case class SplitwellDomains(
 )
 
 case class SplitwellAppBackendConfig(
-    override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: SpliceDbConfig,
+    override val adminApi: AdminServerConfig = AdminServerConfig(),
+    override val storage: DbConfig,
     providerUser: String,
     participantClient: ParticipantClientConfig,
     scanClient: ScanAppClientConfig,

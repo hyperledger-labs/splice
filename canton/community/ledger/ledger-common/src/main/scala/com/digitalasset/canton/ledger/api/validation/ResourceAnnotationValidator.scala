@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -31,7 +31,8 @@ object ResourceAnnotationValidator {
     override val reason = s"The value of an annotation is empty for key: '${shorten(key)}'"
   }
 
-  /** @return a Left(actualSizeInBytes) in case of a failed validation
+  /** @return
+    *   a Left(actualSizeInBytes) in case of a failed validation
     */
   def isWithinMaxAnnotationsByteSize(annotations: Map[String, String]): Boolean = {
     val totalSizeInBytes = annotations.iterator.foldLeft(0L) { case (size, (key, value)) =>

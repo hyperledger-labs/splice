@@ -5,10 +5,11 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{
-  SpliceLedgerClient,
+  PackageVersionSupport,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -26,7 +27,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -112,6 +113,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       localSynchronizerNode: Option[LocalSynchronizerNode],
       extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
       upgradesConfig: UpgradesConfig,
+      packageVersionSupport: PackageVersionSupport,
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -135,6 +137,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       upgradesConfig,
       spliceInstanceNamesConfig,
       loggerFactory,
+      packageVersionSupport,
     )
 
   protected def newDsoPartyHosting(
@@ -225,7 +228,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def checkIsInDecentralizedNamespaceAndStartTrigger(
       dsoAutomation: SvDsoAutomationService,
       dsoStore: SvDsoStore,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
     retryProvider
       .ensureThatB(
@@ -236,7 +239,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
           for {
             _ <- participantAdminConnection
               .ensureDecentralizedNamespaceDefinitionProposalAccepted(
-                domainId,
+                synchronizerId,
                 dsoStore.key.dsoParty.uid.namespace,
                 dsoStore.key.svParty.uid.namespace,
                 RetryFor.WaitingOnInitDependency,

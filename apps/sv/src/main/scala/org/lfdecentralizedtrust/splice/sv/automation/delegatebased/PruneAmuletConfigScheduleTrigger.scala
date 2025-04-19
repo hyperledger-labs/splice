@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,6 +23,7 @@ import scala.jdk.CollectionConverters.*
 class PruneAmuletConfigScheduleTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -38,9 +39,12 @@ class PruneAmuletConfigScheduleTrigger(
       tc: TraceContext
   ): Future[Seq[AssignedContract[AmuletRules.ContractId, AmuletRules]]] = for {
     amuletRules <- store.getAssignedAmuletRules()
-    supportsPruneAmuletConfigSchedule = PackageIdResolver.supportsPruneAmuletConfigSchedule(
+    supportsPruneAmuletConfigSchedule <- packageVersionSupport.supportsPruneAmuletConfigSchedule(
+      Seq(
+        store.key.svParty,
+        store.key.dsoParty,
+      ),
       now,
-      amuletRules.payload,
     )
   } yield {
     if (
@@ -65,7 +69,7 @@ class PruneAmuletConfigScheduleTrigger(
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
-        .withDomainId(amuletRules.work.domain)
+        .withSynchronizerId(amuletRules.work.domain)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(s"Pruned AmuletRules config")

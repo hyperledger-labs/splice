@@ -1,23 +1,20 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
 
 import cats.implicits.toBifunctorOps
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.value.Identifier
-import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, JwksUrl}
 import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator.{
   AnnotationsSizeExceededError,
   EmptyAnnotationsValueError,
   InvalidAnnotationsKeyError,
 }
-import com.digitalasset.canton.ledger.api.validation.ValidationErrors.{invalidField, *}
+import com.digitalasset.canton.ledger.api.validation.ValidationErrors.*
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
-import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId as TopologyPartyId}
+import com.digitalasset.canton.ledger.api.{IdentityProviderId, JwksUrl, SubmissionId, WorkflowId}
+import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.topology.{ParticipantId, PartyId as TopologyPartyId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{Party, TypeConRef}
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -28,22 +25,22 @@ import scala.util.{Failure, Success, Try}
 object FieldValidator {
 
   def requireNonEmptyString(s: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, String] =
     Either.cond(s.nonEmpty, s, missingField(fieldName))
 
   def requireParty(s: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.Party] =
     Ref.Party.fromString(s).left.map(invalidArgument)
 
   def requirePartyField(s: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.Party] =
     Ref.Party.fromString(s).left.map(invalidField(fieldName, _))
 
   def requireTopologyPartyIdField(s: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, TopologyPartyId] = for {
     lf <- requirePartyField(s, fieldName)
     id <- TopologyPartyId
@@ -52,7 +49,7 @@ object FieldValidator {
   } yield id
 
   def optionalParticipantId(participantId: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Option[ParticipantId]] = optionalString(participantId) { s =>
     ParticipantId
       .fromProtoPrimitive("PAR::" + s, fieldName)
@@ -61,7 +58,7 @@ object FieldValidator {
   }
 
   def requireResourceVersion(raw: String, fieldName: String)(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Either[StatusRuntimeException, Long] =
     Try {
       raw.toLong
@@ -74,7 +71,7 @@ object FieldValidator {
     }
 
   def requireJwksUrl(raw: String, fieldName: String)(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Either[StatusRuntimeException, JwksUrl] =
     for {
       _ <- requireNonEmptyString(raw, fieldName)
@@ -84,7 +81,7 @@ object FieldValidator {
     } yield value
 
   def requireParties(parties: Set[String])(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Set[Party]] =
     parties.foldLeft[Either[StatusRuntimeException, Set[Party]]](Right(Set.empty)) {
       (acc, partyTxt) =>
@@ -98,28 +95,20 @@ object FieldValidator {
       s: String,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.UserId] =
     requireNonEmptyParsedId(Ref.UserId.fromString)(s, fieldName)
-
-  def requireApplicationId(
-      s: String,
-      fieldName: String,
-  )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Ref.ApplicationId] =
-    requireNonEmptyParsedId(Ref.ApplicationId.fromString)(s, fieldName)
 
   def requireLedgerString(
       s: String,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.LedgerString] =
     requireNonEmptyParsedId(Ref.LedgerString.fromString)(s, fieldName)
 
   def eventSequentialId(raw: String, fieldName: String, message: String)(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Either[StatusRuntimeException, Long] =
     Try {
       raw.toLong
@@ -134,7 +123,7 @@ object FieldValidator {
       s: String,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, IdentityProviderId.Id] =
     for {
       _ <- requireNonEmptyString(s, fieldName)
@@ -145,36 +134,36 @@ object FieldValidator {
       s: String,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, IdentityProviderId] =
     if (s.isEmpty) Right(IdentityProviderId.Default)
     else
       IdentityProviderId.Id.fromString(s).left.map(invalidField(fieldName, _))
 
   def requireLedgerString(s: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.LedgerString] =
     Ref.LedgerString.fromString(s).left.map(invalidArgument)
 
   def validateWorkflowId(s: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Option[domain.WorkflowId]] =
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, Option[WorkflowId]] =
     if (s.isEmpty) Right(None)
-    else requireLedgerString(s).map(x => Some(domain.WorkflowId(x)))
+    else requireLedgerString(s).map(x => Some(WorkflowId(x)))
 
   def validateSubmissionId(s: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Option[domain.SubmissionId]] =
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, Option[SubmissionId]] =
     optionalString(s) { nonEmptyString =>
       Ref.SubmissionId
         .fromString(nonEmptyString)
-        .map(domain.SubmissionId(_))
+        .map(SubmissionId(_))
         .left
         .map(invalidField("submission_id", _))
     }
 
   def requireSubmissionId(s: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.SubmissionId] =
     Ref.SubmissionId
       .fromString(s)
@@ -182,7 +171,7 @@ object FieldValidator {
       .map(invalidField(fieldName, _))
 
   def requireCommandId(s: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.CommandId] =
     Ref.CommandId
       .fromString(s)
@@ -190,24 +179,36 @@ object FieldValidator {
       .map(invalidField(fieldName, _))
 
   def requireWorkflowId(s: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.WorkflowId] =
     Ref.WorkflowId
       .fromString(s)
       .left
       .map(invalidField(fieldName, _))
 
-  def requireDomainId(s: String, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, DomainId] =
+  def requireSynchronizerId(s: String, fieldName: String)(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, SynchronizerId] =
     if (s.isEmpty) Left(missingField(fieldName))
-    else DomainId.fromString(s).left.map(invalidField(fieldName, _))
+    else SynchronizerId.fromString(s).left.map(invalidField(fieldName, _))
+
+  def optionalSynchronizerId(s: String, fieldName: String)(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, Option[SynchronizerId]] =
+    if (s.isEmpty) Right(None)
+    else SynchronizerId.fromString(s).left.map(invalidField(fieldName, _)).map(Some(_))
+
+  def requirePackageName(s: String, fieldName: String)(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, Ref.PackageName] =
+    if (s.isEmpty) Left(missingField(fieldName))
+    else Ref.PackageName.fromString(s).left.map(invalidField(fieldName, _))
 
   def requireContractId(
       s: String,
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, ContractId] =
     if (s.isEmpty) Left(missingField(fieldName))
     else ContractId.fromString(s).left.map(invalidField(fieldName, _))
@@ -216,13 +217,13 @@ object FieldValidator {
       s: M[T],
       fieldName: String,
   )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, M[T]] =
     if (s.nonEmpty) Right(s)
     else Left(missingField(fieldName))
 
   def validateTypeConRef(identifier: Identifier)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, TypeConRef] =
     for {
       qualifiedName <- validateTemplateQualifiedName(identifier.moduleName, identifier.entityName)
@@ -239,31 +240,16 @@ object FieldValidator {
     else someValidation(s).map(Option(_))
 
   def requireEmptyString(s: String, fieldName: String)(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Either[StatusRuntimeException, String] =
     Either.cond(s.isEmpty, s, invalidArgument(s"field $fieldName must be not set"))
-
-  def requireNonNegativeOffset(offset: Long, fieldName: String)(implicit
-      errorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Offset] =
-    Either.cond(
-      offset >= 0,
-      Offset.fromLong(offset),
-      RequestValidationErrors.NegativeOffset
-        .Error(
-          fieldName = fieldName,
-          offsetValue = offset,
-          message = s"Reason: the offset in $fieldName field was a negative integer ($offset)",
-        )
-        .asGrpcError,
-    )
 
   def verifyMetadataAnnotations(
       annotations: Map[String, String],
       allowEmptyValues: Boolean,
       fieldName: String,
   )(implicit
-      errorLogger: ContextualizedErrorLogger
+      errorLogger: ErrorLoggingContext
   ): Either[StatusRuntimeException, Map[String, String]] =
     ResourceAnnotationValidator.validateAnnotationsFromApiRequest(
       annotations,
@@ -284,5 +270,12 @@ object FieldValidator {
       validation: T => Either[StatusRuntimeException, U]
   ): Either[StatusRuntimeException, Option[U]] =
     t.map(validation).map(_.map(Some(_))).getOrElse(Right(None))
+
+  def requireOptional[T, U](t: Option[T], fieldName: String)(
+      validation: T => Either[StatusRuntimeException, U]
+  )(implicit
+      errorLogger: ErrorLoggingContext
+  ): Either[StatusRuntimeException, U] =
+    t.map(validation).getOrElse(Left(missingField(fieldName)))
 
 }

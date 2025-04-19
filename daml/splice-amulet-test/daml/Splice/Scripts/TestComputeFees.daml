@@ -47,6 +47,7 @@ test = script do
               lock = Some TimeLock with
                 expiresAt = addRelTime now (days 1)
                 holders = [bob.primaryParty, bob.primaryParty, provider1.primaryParty]
+                optContext = None
           , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
@@ -64,6 +65,7 @@ test = script do
               lock = Some TimeLock with
                 expiresAt = addRelTime now (days 1)
                 holders = [bob.primaryParty, bob.primaryParty, provider1.primaryParty]
+                optContext = None
           , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
@@ -127,6 +129,7 @@ testScaledHoldingFees = do
                       amount = 10.0
                       lock = None
                       receiverFeeRatio = 1.0]
+        beneficiaries = None
       context = context.context
 
   -- Actual holding fee should be based on the amulet price when the amulet was created, not the current one

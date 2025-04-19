@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -11,9 +11,12 @@ import com.digitalasset.daml.lf.transaction.Transaction.Metadata
 
 /** Collects the metadata of a LF transaction to the extent that is needed in Canton
   *
-  * @param ledgerTime The ledger time of the transaction
-  * @param submissionTime The submission time of the transaction
-  * @param seeds The node seeds by node ID
+  * @param ledgerTime
+  *   The ledger time of the transaction
+  * @param submissionTime
+  *   The submission time of the transaction
+  * @param seeds
+  *   The node seeds by node ID
   */
 final case class TransactionMetadata(
     ledgerTime: CantonTimestamp,

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -6,25 +6,23 @@ package com.digitalasset.canton.sequencing
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.admin.domain.v30
+import com.digitalasset.canton.admin.sequencer.v30
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
+import com.digitalasset.canton.networking.grpc.{ClientChannelBuilder, ManagedChannelBuilderProxy}
 import com.digitalasset.canton.networking.{Endpoint, UrlValidator}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.tracing.TracingConfig.Propagation
 import com.digitalasset.canton.{ProtoDeserializationError, SequencerAlias}
 import com.google.protobuf.ByteString
-import io.grpc.netty.NettyChannelBuilder
 
 import java.net.URI
 import java.util.concurrent.Executor
 
-/** Our [[com.digitalasset.canton.config.SequencerConnectionConfig]] provides a flexible structure for configuring how
-  * the domain and its members talk to a sequencer. It however leaves much information intentionally optional so it can
-  * be inferred at runtime based on information that may only be available at the point of creating a sequencer
-  * connection (for instance defaulting to domain connection information that a user has provided in an admin command).
-  * At this point these structures can then be constructed which contain all the mandatory details that sequencer clients
-  * need to actually connect.
+/** Our [[com.digitalasset.canton.config.ClientConfig]] provides the static configuration of API
+  * connections between console and nodes, and between synchronizer members via the config files.
+  * Participants however can connect to multiple synchronizers and sequencers, and the configuration
+  * of these connections is more dynamic. The structures below are used to represent the dynamic
+  * configuration of how a participant connects to a sequencer.
   */
 sealed trait SequencerConnection extends PrettyPrinting {
   def withAlias(alias: SequencerAlias): SequencerConnection
@@ -65,9 +63,11 @@ final case class GrpcSequencerConnection(
 
   def mkChannelBuilder(clientChannelBuilder: ClientChannelBuilder, tracePropagation: Propagation)(
       implicit executor: Executor
-  ): NettyChannelBuilder =
-    clientChannelBuilder
-      .create(endpoints, transportSecurity, executor, customTrustCertificates, tracePropagation)
+  ): ManagedChannelBuilderProxy =
+    ManagedChannelBuilderProxy(
+      clientChannelBuilder
+        .create(endpoints, transportSecurity, executor, customTrustCertificates, tracePropagation)
+    )
 
   override def toProtoV30: v30.SequencerConnection =
     v30.SequencerConnection(

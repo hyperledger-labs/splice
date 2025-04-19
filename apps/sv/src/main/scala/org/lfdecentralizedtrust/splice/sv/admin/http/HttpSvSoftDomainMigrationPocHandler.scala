@@ -5,7 +5,11 @@ package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  ParticipantAdminConnection,
+  RetryProvider,
+}
 import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc as v0
 import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrationPocResource
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
@@ -14,10 +18,11 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, UniqueIdentifier}
-import com.digitalasset.canton.topology.store.{TopologyStoreId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.Spanning
 import io.grpc.Status
+
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -32,6 +37,7 @@ class HttpSvSoftDomainMigrationPocHandler(
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     val amuletAppParameters: SharedSpliceAppParameters,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContextExecutor
 ) extends v0.SvSoftDomainMigrationPocHandler[TracedUser]
@@ -42,13 +48,13 @@ class HttpSvSoftDomainMigrationPocHandler(
 
   override def reconcileSynchronizerDamlState(
       respond: SvSoftDomainMigrationPocResource.ReconcileSynchronizerDamlStateResponse.type
-  )(domainIdPrefix: String)(
+  )(synchronizerIdPrefix: String)(
       extracted: TracedUser
   ): Future[SvSoftDomainMigrationPocResource.ReconcileSynchronizerDamlStateResponse] = {
     implicit val TracedUser(_, traceContext) = extracted
-    val domainId = DomainId(
+    val synchronizerId = SynchronizerId(
       UniqueIdentifier.tryCreate(
-        domainIdPrefix,
+        synchronizerIdPrefix,
         dsoStore.key.dsoParty.uid.namespace,
       )
     )
@@ -59,18 +65,19 @@ class HttpSvSoftDomainMigrationPocHandler(
       clock,
       retryProvider,
       logger,
+      packageVersionSupport,
     )
     val node = synchronizerNodes
-      .get(domainIdPrefix)
+      .get(synchronizerIdPrefix)
       .getOrElse(
         throw Status.NOT_FOUND
-          .withDescription(s"No synchronizer node for $domainIdPrefix configured")
+          .withDescription(s"No synchronizer node for $synchronizerIdPrefix configured")
           .asRuntimeException()
       )
     synchronizerNodeReconciler
       .reconcileSynchronizerNodeConfigIfRequired(
         Some(node),
-        domainId,
+        synchronizerId,
         SynchronizerNodeReconciler.SynchronizerNodeState.OnboardedImmediately,
         migrationId,
       )
@@ -79,13 +86,13 @@ class HttpSvSoftDomainMigrationPocHandler(
 
   override def signDsoPartyToParticipant(
       respond: SvSoftDomainMigrationPocResource.SignDsoPartyToParticipantResponse.type
-  )(domainIdPrefix: String)(
+  )(synchronizerIdPrefix: String)(
       extracted: TracedUser
   ): Future[SvSoftDomainMigrationPocResource.SignDsoPartyToParticipantResponse] = {
     implicit val TracedUser(_, traceContext) = extracted
-    val domainId = DomainId(
+    val synchronizerId = SynchronizerId(
       UniqueIdentifier.tryCreate(
-        domainIdPrefix,
+        synchronizerIdPrefix,
         dsoStore.key.dsoParty.uid.namespace,
       )
     )
@@ -102,7 +109,7 @@ class HttpSvSoftDomainMigrationPocHandler(
         "sign_dso_party_to_participant",
         "sign_dso_party_to_participant",
         participantAdminConnection.proposeInitialPartyToParticipant(
-          TopologyStoreId.DomainStore(domainId),
+          TopologyStoreId.SynchronizerStore(synchronizerId),
           dsoStore.key.dsoParty,
           participantIds,
           isProposal = true,

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.setup
 
 import cats.data.EitherT
+import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   DarResource,
@@ -12,7 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, UniqueIdentifier}
@@ -31,7 +32,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class ParticipantPartyMigrator(
     connection: BaseLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
-    decentralizedSynchronizerAlias: DomainAlias,
+    decentralizedSynchronizerAlias: SynchronizerAlias,
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -43,7 +44,7 @@ class ParticipantPartyMigrator(
       nodeIdentitiesDump: NodeIdentitiesDump,
       validatorPartyHint: String,
       ledgerApiUser: String,
-      domainAlias: DomainAlias,
+      synchronizerAlias: SynchronizerAlias,
       getAcsSnapshot: PartyId => Future[ByteString],
       requiredDars: Seq[DarResource] = Seq.empty,
       overridePartiesToMigrate: Option[Seq[PartyId]],
@@ -52,10 +53,10 @@ class ParticipantPartyMigrator(
     for {
       participantId <- participantAdminConnection.getParticipantId()
       validatorPartyId = toPartyId(validatorPartyHint, participantId)
-      domainId <- participantAdminConnection.getDomainId(domainAlias)
+      synchronizerId <- participantAdminConnection.getSynchronizerId(synchronizerAlias)
       allPartyToParticipants <- participantAdminConnection
         .listPartyToParticipant(
-          domainId.filterString,
+          TopologyStoreId.SynchronizerStore(synchronizerId).some,
           filterParticipant = oldParticipantId.uid.toProtoPrimitive,
         )
       partyToParticipants =
@@ -74,7 +75,7 @@ class ParticipantPartyMigrator(
       partyIdsToMigrate = topologyTxs.map(_.mapping.partyId).toSet
       partyIdsAlreadyMigrated <- participantAdminConnection
         .listPartyToParticipant(
-          domainId.filterString,
+          TopologyStoreId.SynchronizerStore(synchronizerId).some,
           filterParticipant = participantId.uid.toProtoPrimitive,
         )
         .map(_.filter(_.mapping.participants.size == 1).map(_.mapping.partyId).toSet)
@@ -101,21 +102,21 @@ class ParticipantPartyMigrator(
           for {
             // This is a prerequisite for removing the domain trust certificate
             _ <- ensurePartiesUnhosted(
-              domainAlias,
+              synchronizerAlias,
               partyIdsToMigrate.toSeq,
             )
             // Remove the domain trust certificate of the old participant.
             // This is required to migrate the admin party of that node.
             // We just always do it even if the admin party is not migrated
             // to have fewer special cases
-            _ <- participantAdminConnection.ensureDomainTrustCertificateRemoved(
+            _ <- participantAdminConnection.ensureSynchronizerTrustCertificateRemoved(
               RetryFor.WaitingOnInitDependency,
-              domainId,
+              synchronizerId,
               oldParticipantId.member,
             )
             _ = logger.info(s"Hosting $partyIdsToMigrate on $participantId")
             _ <- ensurePartiesMigrated(
-              domainAlias,
+              synchronizerAlias,
               partyIdsToMigrate.toSeq,
               participantId,
             )
@@ -143,19 +144,19 @@ class ParticipantPartyMigrator(
   )
 
   private def ensurePartiesMigrated(
-      domainAlias: DomainAlias,
+      synchronizerAlias: SynchronizerAlias,
       partyIds: Seq[PartyId],
       participantId: ParticipantId,
   ): Future[Unit] = {
     Future
       .traverse(partyIds) { partyId =>
         for {
-          domainId <- participantAdminConnection.getDomainId(domainAlias)
+          synchronizerId <- participantAdminConnection.getSynchronizerId(synchronizerAlias)
           _ <- participantAdminConnection.ensureTopologyMapping[PartyToParticipant](
-            store = TopologyStoreId.DomainStore(domainId),
+            store = TopologyStoreId.SynchronizerStore(synchronizerId),
             s"Party $partyId is hosted on participant $participantId",
             EitherT {
-              participantAdminConnection.getPartyToParticipant(domainId, partyId).flatMap {
+              participantAdminConnection.getPartyToParticipant(synchronizerId, partyId).flatMap {
                 result =>
                   result.mapping.participants match {
                     case Seq(participant) if participant.participantId != participantId =>
@@ -190,16 +191,16 @@ class ParticipantPartyMigrator(
   }
 
   private def ensurePartiesUnhosted(
-      domainAlias: DomainAlias,
+      synchronizerAlias: SynchronizerAlias,
       partyIds: Seq[PartyId],
   ): Future[Unit] = {
-    participantAdminConnection.getDomainId(domainAlias).flatMap { domainId =>
+    participantAdminConnection.getSynchronizerId(synchronizerAlias).flatMap { synchronizerId =>
       Future
         .traverse(partyIds) { partyId =>
           for {
             _ <- participantAdminConnection.ensurePartyToParticipantRemoved(
               RetryFor.WaitingOnInitDependency,
-              domainId,
+              synchronizerId,
               partyId,
             )
           } yield ()
@@ -220,8 +221,8 @@ class ParticipantPartyMigrator(
         "dars_uploaded",
         "Required dars are uploaded",
         participantAdminConnection.listDars().map { dars =>
-          val availablesHases = dars.map(_.hash)
-          if (!requiredDars.forall(dar => availablesHases.contains(dar.darHash.toHexString)))
+          val availablePackageIds = dars.map(_.mainPackageId)
+          if (!requiredDars.forall(dar => availablePackageIds.contains(dar.packageId)))
             throw Status.FAILED_PRECONDITION
               .withDescription(
                 s"Required dars $requiredDars are not yet available"

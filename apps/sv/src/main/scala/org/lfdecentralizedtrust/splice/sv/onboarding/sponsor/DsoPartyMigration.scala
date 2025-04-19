@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.EitherT
 import cats.syntax.foldable.*
-import com.daml.error.utils.ErrorDetails
+import com.digitalasset.base.error.utils.ErrorDetails
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.DsoPartyMig
 import org.lfdecentralizedtrust.splice.sv.store.{SvSvStore, SvDsoStore}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
@@ -72,7 +72,7 @@ class DsoPartyMigration(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def downloadSnapshotFromTime(
       authorizedAt: Instant,
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
   )(implicit tc: TraceContext): Future[ByteString] = {
     def submitDummyTransaction(): Future[Unit] =
       svStoreWithIngestion.connection
@@ -84,7 +84,7 @@ class DsoPartyMigration(
           new FeaturedAppRight(svParty.toProtoPrimitive, svParty.toProtoPrimitive).createAnd
             .exerciseArchive(),
         )
-        .withDomainId(decentralizedSynchronizer)
+        .withSynchronizerId(decentralizedSynchronizer)
         .noDedup
         .yieldUnit()
     // Acquiring the ACS snapshot is tricky due to two issues:
@@ -101,7 +101,7 @@ class DsoPartyMigration(
           participantAdminConnection
             .downloadAcsSnapshot(
               Set(dsoParty),
-              filterDomainId = Some(decentralizedSynchronizer),
+              filterSynchronizerId = Some(decentralizedSynchronizer),
               timestamp = Some(authorizedAt),
             )
             .recoverWith { case ex: StatusRuntimeException =>

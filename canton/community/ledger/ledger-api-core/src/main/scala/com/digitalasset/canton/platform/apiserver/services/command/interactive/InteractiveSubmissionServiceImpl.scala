@@ -1,29 +1,36 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive
 
 import cats.data.EitherT
-import cats.implicits.toBifunctorOps
 import cats.syntax.either.*
-import com.daml.error.ErrorCode.LoggedApiException
-import com.daml.error.{ContextualizedErrorLogger, DamlError}
-import com.daml.ledger.api.v2.interactive.interactive_submission_service.*
-import com.daml.scalautil.future.FutureConversion.*
-import com.daml.timer.Delayed
+import com.daml.ledger.api.v2.interactive.interactive_submission_service as proto
+import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
+import com.digitalasset.base.error.ErrorCode.LoggedApiException
+import com.digitalasset.base.error.RpcError
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.crypto.InteractiveSubmission
 import com.digitalasset.canton.crypto.InteractiveSubmission.TransactionMetadataForHashing
-import com.digitalasset.canton.ledger.api.domain.{Commands as ApiCommands, SubmissionId}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.{
   ExecuteRequest,
   PrepareRequest as PrepareRequestInternal,
+  TransactionData,
 }
-import com.digitalasset.canton.ledger.api.util.TimeProvider
-import com.digitalasset.canton.ledger.configuration.LedgerTimeModel
-import com.digitalasset.canton.ledger.error.groups.{CommandExecutionErrors, RequestValidationErrors}
+import com.digitalasset.canton.ledger.api.{
+  Commands as ApiCommands,
+  DisclosedContract,
+  PackageReference,
+  SubmissionId,
+}
+import com.digitalasset.canton.ledger.error.CommonErrors.ServerIsShuttingDown
+import com.digitalasset.canton.ledger.error.groups.{CommandExecutionErrors, ConsistencyErrors}
 import com.digitalasset.canton.ledger.participant.state
-import com.digitalasset.canton.ledger.participant.state.SubmissionResult
+import com.digitalasset.canton.ledger.participant.state.index.{ContractState, ContractStore}
+import com.digitalasset.canton.ledger.participant.state.{SubmissionResult, SynchronizerRank}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.*
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -32,75 +39,79 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.platform.apiserver.SeedService
 import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutionResult,
   CommandExecutor,
 }
-import com.digitalasset.canton.platform.apiserver.services.command.interactive.PreparedTransactionDecoder.DeserializationResult
 import com.digitalasset.canton.platform.apiserver.services.{
   ErrorCause,
   RejectionGenerators,
-  TimeProviderType,
   logging,
 }
 import com.digitalasset.canton.platform.config.InteractiveSubmissionServiceConfig
 import com.digitalasset.canton.platform.store.dao.events.LfValueTranslation
 import com.digitalasset.canton.protocol.hash.HashTracer
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.{MonadUtil, TryUtil}
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.digitalasset.daml.lf.command.ApiCommand
 import com.digitalasset.daml.lf.crypto
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction}
+import com.digitalasset.daml.lf.data.ImmArray
+import com.digitalasset.daml.lf.data.Ref.PackageName
+import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction, Transaction}
+import com.digitalasset.daml.lf.value.Value.ContractId
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.Duration
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 private[apiserver] object InteractiveSubmissionServiceImpl {
+
   def createApiService(
-      writeService: state.WriteService,
-      timeProvider: TimeProvider,
-      timeProviderType: TimeProviderType,
+      submissionSyncService: state.SyncService,
       seedService: SeedService,
       commandExecutor: CommandExecutor,
       metrics: LedgerApiServerMetrics,
       checkOverloaded: TraceContext => Option[state.SubmissionResult],
       lfValueTranslation: LfValueTranslation,
       config: InteractiveSubmissionServiceConfig,
+      contractStore: ContractStore,
+      packagePreferenceBackend: PackagePreferenceBackend,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       executionContext: ExecutionContext,
       tracer: Tracer,
   ): InteractiveSubmissionService & AutoCloseable = new InteractiveSubmissionServiceImpl(
-    writeService,
-    timeProvider,
-    timeProviderType,
+    submissionSyncService,
     seedService,
     commandExecutor,
     metrics,
     checkOverloaded,
     lfValueTranslation,
     config,
+    contractStore,
+    packagePreferenceBackend,
     loggerFactory,
   )
 
 }
 
 private[apiserver] final class InteractiveSubmissionServiceImpl private[services] (
-    writeService: state.WriteService,
-    timeProvider: TimeProvider,
-    timeProviderType: TimeProviderType,
+    syncService: state.SyncService,
     seedService: SeedService,
     commandExecutor: CommandExecutor,
     metrics: LedgerApiServerMetrics,
     checkOverloaded: TraceContext => Option[state.SubmissionResult],
     lfValueTranslation: LfValueTranslation,
     config: InteractiveSubmissionServiceConfig,
+    contractStore: ContractStore,
+    packagePreferenceService: PackagePreferenceBackend,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext, tracer: Tracer)
     extends InteractiveSubmissionService
@@ -115,7 +126,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       request: PrepareRequestInternal
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[PrepareSubmissionResponse] =
+  ): FutureUnlessShutdown[proto.PrepareSubmissionResponse] =
     withEnrichedLoggingContext(logging.commands(request.commands)) { implicit loggingContext =>
       logger.info(
         s"Requesting preparation of daml transaction with command ID ${request.commands.commandId}"
@@ -139,7 +150,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
             .mkString("\n  ")}"
       )
 
-      implicit val errorLoggingContext: ContextualizedErrorLogger =
+      implicit val errorLoggingContext: ErrorLoggingContext =
         ErrorLoggingContext.fromOption(
           logger,
           loggingContext,
@@ -149,16 +160,73 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       evaluateAndHash(seedService.nextSeed(), request.commands, request.verboseHashing)
     }
 
-  private def handleCommandExecutionResult(
-      result: Either[ErrorCause, CommandExecutionResult]
-  )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Future[CommandExecutionResult] =
-    result.fold(
-      error => {
-        metrics.commands.failedCommandInterpretations.mark()
-        failedOnCommandExecution(error)
-      },
-      Future.successful,
-    )
+  private def lookupAndEnrichInputContracts(
+      transaction: Transaction,
+      disclosedContracts: Seq[DisclosedContract],
+  )(implicit
+      loggingContextWithTrace: LoggingContextWithTrace
+  ): EitherT[Future, String, Map[ContractId, FatContractInstance]] = {
+    val disclosedContractsByCoid =
+      disclosedContracts.groupMap(_.fatContractInstance.contractId)(_.fatContractInstance)
+
+    def enrich(instance: FatContractInstance) =
+      lfValueTranslation
+        .enrichCreateNode(instance.toCreateNode)
+        .map(enrichedCreate =>
+          FatContractInstance
+            .fromCreateNode(enrichedCreate, instance.createdAt, instance.cantonData)
+        )
+        .map(instance.contractId -> _)
+
+    MonadUtil
+      .parTraverseWithLimit(config.contractLookupParallelism)(transaction.inputContracts.toList) {
+        inputCoid =>
+          // First check the disclosed contracts
+          disclosedContractsByCoid.get(inputCoid) match {
+            // We expect a single disclosed contract for a coid
+            case Some(Seq(instance)) =>
+              EitherT.liftF[Future, String, (ContractId, FatContractInstance)](enrich(instance))
+            case Some(_) =>
+              EitherT.leftT[Future, (ContractId, FatContractInstance)](
+                s"Contract ID $inputCoid is not unique"
+              )
+            // If the contract is not disclosed, look it up from the store
+            case None =>
+              EitherT {
+                contractStore
+                  .lookupContractState(inputCoid)
+                  .flatMap {
+                    case active: ContractState.Active =>
+                      enrich(active.toFatContractInstance(inputCoid)).map(Right(_))
+                    // Engine interpretation likely would have failed if that was the case
+                    // However it's possible that the contract was archived or pruned in the meantime
+                    // That's not an issue however because if that was the case the transaction would have failed later
+                    // anyway during conflict detection.
+                    case ContractState.NotFound =>
+                      Future.failed[Either[String, (ContractId, FatContractInstance)]](
+                        ConsistencyErrors.ContractNotFound
+                          .Reject(
+                            s"Contract was not found in the participant contract store. You must either explicitly disclose the contract, or prepare the transaction via a participant that has knowledge of it",
+                            inputCoid,
+                          )
+                          .asGrpcError
+                      )
+                    case ContractState.Archived =>
+                      Future.failed[Either[String, (ContractId, FatContractInstance)]](
+                        CommandExecutionErrors.Interpreter.ContractNotActive
+                          .Reject(
+                            "Input contract has seemingly already been archived immediately after interpretation of the transaction",
+                            inputCoid,
+                            None,
+                          )
+                          .asGrpcError
+                      )
+                  }
+              }
+          }
+      }
+      .map(_.toMap)
+  }
 
   private def evaluateAndHash(
       submissionSeed: crypto.Hash,
@@ -166,70 +234,81 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       verboseHashing: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace,
-      errorLoggingContext: ContextualizedErrorLogger,
-  ): Future[PrepareSubmissionResponse] = {
-    val result: EitherT[Future, DamlError, PrepareSubmissionResponse] = for {
-      commandExecutionResultE <- withSpan("InteractiveSubmissionService.evaluate") { _ => _ =>
-        EitherT.liftF(commandExecutor.execute(commands, submissionSeed))
+      errorLoggingContext: ErrorLoggingContext,
+  ): FutureUnlessShutdown[proto.PrepareSubmissionResponse] = {
+    val result: EitherT[FutureUnlessShutdown, RpcError, proto.PrepareSubmissionResponse] = for {
+      commandExecutionResult <- withSpan("InteractiveSubmissionService.evaluate") { _ => _ =>
+        val synchronizerState = syncService.getRoutingSynchronizerState
+        commandExecutor
+          .execute(
+            commands = commands,
+            submissionSeed = submissionSeed,
+            routingSynchronizerState = synchronizerState,
+            forExternallySigned = true,
+          )
+          .leftFlatMap { errCause =>
+            metrics.commands.failedCommandInterpretations.mark()
+            EitherT.right[RpcError](failedOnCommandProcessing(errCause))
+          }
       }
-      preEnrichedCommandExecutionResult <- EitherT.liftF(
-        handleCommandExecutionResult(commandExecutionResultE)
-      )
+
+      preEnrichedCommandInterpretationResult = commandExecutionResult.commandInterpretationResult
+
       // We need to enrich the transaction before computing the hash, because record labels must be part of the hash
-      enrichedTransaction <- EitherT.liftF(
-        lfValueTranslation
-          .enrichVersionedTransaction(preEnrichedCommandExecutionResult.transaction)
-      )
-      commandExecutionResult = preEnrichedCommandExecutionResult.copy(transaction =
-        SubmittedTransaction(enrichedTransaction)
-      )
-      // Domain is required to be explicitly provided for now
-      domainId <- EitherT.fromEither[Future](
-        commandExecutionResult.optDomainId.toRight(
-          RequestValidationErrors.MissingField.Reject("domain_id")
+      enrichedTransaction <- EitherT
+        .liftF(
+          lfValueTranslation
+            .enrichVersionedTransaction(preEnrichedCommandInterpretationResult.transaction)
         )
+        .mapK(FutureUnlessShutdown.outcomeK)
+      // Compute input contracts by looking them up either from disclosed contracts or the local store
+      inputContracts <- lookupAndEnrichInputContracts(
+        enrichedTransaction.transaction,
+        commands.disclosedContracts.toList,
       )
-      // Require this participant to be connected to the domain on which the transaction will be run
-      protocolVersionForChosenDomain <- EitherT.fromEither[Future](
-        protocolVersionForDomainId(domainId)
+        .mapK(FutureUnlessShutdown.outcomeK)
+        .leftMap(CommandExecutionErrors.InteractiveSubmissionPreparationError.Reject(_))
+      // Require this participant to be connected to the synchronizer on which the transaction will be run
+      synchronizerId = commandExecutionResult.synchronizerRank.synchronizerId
+      protocolVersionForChosenSynchronizer <- EitherT.fromEither[FutureUnlessShutdown](
+        protocolVersionForSynchronizerId(synchronizerId)
       )
+
+      transactionData = TransactionData(
+        submitterInfo = commandExecutionResult.commandInterpretationResult.submitterInfo,
+        transactionMeta = commandExecutionResult.commandInterpretationResult.transactionMeta,
+        transaction = SubmittedTransaction(enrichedTransaction),
+        globalKeyMapping = commandExecutionResult.commandInterpretationResult.globalKeyMapping,
+        inputContracts = inputContracts,
+        synchronizerId = synchronizerId,
+      )
+
       // Use the highest hashing versions supported on that protocol version
       hashVersion = HashingSchemeVersion
-        .getHashingSchemeVersionsForProtocolVersion(protocolVersionForChosenDomain)
+        .getHashingSchemeVersionsForProtocolVersion(protocolVersionForChosenSynchronizer)
         .max1
       transactionUUID = UUID.randomUUID()
       mediatorGroup = 0
-      preparedTransaction <- EitherT.liftF(
-        transactionEncoder.serializeCommandExecutionResult(
-          commandExecutionResult,
-          // TODO(i20688) Domain ID should be picked by the domain router
-          domainId,
-          // TODO(i20688) Transaction UUID should be picked in the TransactionConfirmationRequestFactory
-          transactionUUID,
-          // TODO(i20688) Mediator group should be picked in the ProtocolProcessor
-          mediatorGroup,
+      preparedTransaction <- EitherT
+        .liftF(
+          transactionEncoder.serializeCommandInterpretationResult(
+            transactionData,
+            synchronizerId,
+            transactionUUID,
+            // TODO(i20688) Mediator group should be picked in the ProtocolProcessor
+            mediatorGroup,
+          )
         )
-      )
+        .mapK(FutureUnlessShutdown.outcomeK)
       metadataForHashing = TransactionMetadataForHashing.create(
-        commandExecutionResult.submitterInfo.actAs.toSet,
-        commandExecutionResult.submitterInfo.commandId,
+        transactionData.submitterInfo.actAs.toSet,
+        transactionData.submitterInfo.commandId,
         transactionUUID,
         mediatorGroup,
-        domainId,
-        Option.when(commandExecutionResult.dependsOnLedgerTime)(
-          commandExecutionResult.transactionMeta.ledgerEffectiveTime
-        ),
-        commandExecutionResult.transactionMeta.submissionTime,
-        commandExecutionResult.processedDisclosedContracts
-          .map { disclosedContract =>
-            disclosedContract.create.coid -> FatContractInstance.fromCreateNode(
-              disclosedContract.create,
-              disclosedContract.createdAt,
-              disclosedContract.driverMetadata,
-            )
-          }
-          .toList
-          .toMap,
+        synchronizerId,
+        transactionData.transactionMeta.timeBoundaries,
+        transactionData.transactionMeta.submissionTime,
+        inputContracts,
       )
       hashTracer: HashTracer =
         if (config.enableVerboseHashing && verboseHashing)
@@ -237,23 +316,23 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         else
           HashTracer.NoOp
       transactionHash <- EitherT
-        .fromEither[Future](
+        .fromEither[FutureUnlessShutdown](
           InteractiveSubmission.computeVersionedHash(
             hashVersion,
-            commandExecutionResult.transaction,
+            transactionData.transaction,
             metadataForHashing,
-            commandExecutionResult.transactionMeta.optNodeSeeds
+            transactionData.transactionMeta.optNodeSeeds
               .map(_.toList.toMap)
               .getOrElse(Map.empty),
-            protocolVersionForChosenDomain,
+            protocolVersionForChosenSynchronizer,
             hashTracer,
           )
         )
         .leftMap(err =>
           CommandExecutionErrors.InteractiveSubmissionPreparationError
-            .Reject(s"Failed to compute hash: $err")
+            .Reject(s"Failed to compute hash: $err"): RpcError
         )
-        .leftWiden[DamlError]
+
       hashingDetails = hashTracer match {
         // If we have a NoOp tracer but verboseHashing was requested, it means it's disabled on the participant
         // Return a message to explain that
@@ -264,20 +343,22 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         case HashTracer.NoOp => None
         case stringTracer: HashTracer.StringHashTracer => Some(stringTracer.result)
       }
-    } yield PrepareSubmissionResponse(
+    } yield proto.PrepareSubmissionResponse(
       preparedTransaction = Some(preparedTransaction),
-      preparedTransactionHash = transactionHash.getCryptographicEvidence,
+      preparedTransactionHash = transactionHash.unwrap,
       hashingSchemeVersion = hashVersion.toLAPIProto,
       hashingDetails = hashingDetails,
     )
 
-    result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(Future.fromTry)
+    result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(FutureUnlessShutdown.fromTry)
   }
 
-  private def failedOnCommandExecution(
+  private def failedOnCommandProcessing(
       error: ErrorCause
-  )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Future[CommandExecutionResult] =
-    Future.failed(
+  )(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): FutureUnlessShutdown[CommandExecutionResult] =
+    FutureUnlessShutdown.failed(
       RejectionGenerators
         .commandExecutorError(error)
         .asGrpcError
@@ -285,59 +366,66 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
 
   override def close(): Unit = ()
 
-  private def submitIfNotOverloaded(transactionInfo: CommandExecutionResult)(implicit
+  private def submitIfNotOverloaded(transactionInfo: TransactionData)(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[SubmissionResult] =
     checkOverloaded(loggingContext.traceContext) match {
       case Some(submissionResult) => Future.successful(submissionResult)
-      case None => submitTransactionWithDelay(transactionInfo)
+      case None => submitTransaction(transactionInfo)
     }
 
-  private def submitTransactionWithDelay(
-      transactionInfo: CommandExecutionResult
-  )(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[state.SubmissionResult] = {
-    val submitAt = transactionInfo.transactionMeta.ledgerEffectiveTime.toInstant
-      .minus(LedgerTimeModel.maximumToleranceTimeModel.avgTransactionLatency)
-    val submissionDelay = Duration.between(timeProvider.getCurrentTime, submitAt)
-    if (submissionDelay.isNegative)
-      submitTransaction(transactionInfo)
-    else {
-      logger.info(s"Delaying submission by $submissionDelay")
-      metrics.commands.delayedSubmissions.mark()
-      val scalaDelay = scala.concurrent.duration.Duration.fromNanos(submissionDelay.toNanos)
-      Delayed.Future.by(scalaDelay)({ submitTransaction(transactionInfo) })
-    }
-  }
   private def submitTransaction(
-      result: CommandExecutionResult
+      transactionInfo: TransactionData
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[state.SubmissionResult] = {
     metrics.commands.validSubmissions.mark()
+
     logger.trace("Submitting transaction to ledger.")
-    writeService
-      .submitTransaction(
-        result.submitterInfo,
-        result.optDomainId,
-        result.transactionMeta,
-        result.transaction,
-        result.interpretationTimeNanos,
-        result.globalKeyMapping,
-        result.processedDisclosedContracts,
+
+    val routingSynchronizerState = syncService.getRoutingSynchronizerState
+
+    syncService
+      .selectRoutingSynchronizer(
+        submitterInfo = transactionInfo.submitterInfo,
+        optSynchronizerId = Some(transactionInfo.synchronizerId),
+        transactionMeta = transactionInfo.transactionMeta,
+        transaction = transactionInfo.transaction,
+        // We expect to have all input contracts explicitly disclosed here,
+        // as we do not want the executing participant to use its local contracts when creating the views
+        disclosedContractIds = transactionInfo.inputContracts.keys.toList,
+        transactionUsedForExternalSigning = true,
+        routingSynchronizerState = routingSynchronizerState,
       )
-      .toScalaUnwrapped
+      .map(FutureUnlessShutdown.pure)
+      .leftMap(err => FutureUnlessShutdown.failed[SynchronizerRank](err.asGrpcError))
+      .merge
+      .flatten
+      .failOnShutdownTo(ServerIsShuttingDown.Reject().asGrpcError)
+      .flatMap { synchronizerRank =>
+        syncService
+          .submitTransaction(
+            transaction = transactionInfo.transaction,
+            synchronizerRank = synchronizerRank,
+            routingSynchronizerState = routingSynchronizerState,
+            submitterInfo = transactionInfo.submitterInfo,
+            transactionMeta = transactionInfo.transactionMeta,
+            _estimatedInterpretationCost = 0L,
+            keyResolver = transactionInfo.globalKeyMapping,
+            processedDisclosedContracts = ImmArray.from(transactionInfo.inputContracts.values),
+          )
+          .toScalaUnwrapped
+      }
   }
 
-  private def protocolVersionForDomainId(
-      domainId: DomainId
-  )(implicit loggingContext: LoggingContextWithTrace): Either[DamlError, ProtocolVersion] =
-    writeService
-      .getProtocolVersionForDomain(Traced(domainId))
+  private def protocolVersionForSynchronizerId(
+      synchronizerId: SynchronizerId
+  )(implicit loggingContext: LoggingContextWithTrace): Either[RpcError, ProtocolVersion] =
+    syncService
+      .getProtocolVersionForSynchronizer(Traced(synchronizerId))
       .toRight(
         CommandExecutionErrors.InteractiveSubmissionPreparationError
-          .Reject(s"Unknown domain ID $domainId")
+          .Reject(s"Unknown synchronizer id $synchronizerId")
       )
 
   private def handleSubmissionResult(result: Try[state.SubmissionResult])(implicit
@@ -347,7 +435,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
     result match {
       case Success(Acknowledged) =>
         logger.debug("Interactive submission acknowledged by sync-service.")
-        Success(())
+        TryUtil.unit
 
       case Success(result: SynchronousError) =>
         logger.info(s"Rejected: ${result.description}")
@@ -362,32 +450,44 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
   }
 
   override def execute(
-      request: ExecuteRequest
-  )(implicit loggingContext: LoggingContextWithTrace): Future[ExecuteSubmissionResponse] = {
+      executionRequest: ExecuteRequest
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): FutureUnlessShutdown[proto.ExecuteSubmissionResponse] = FutureUnlessShutdown.outcomeF {
     val commandIdLogging =
-      request.preparedTransaction.metadata
+      executionRequest.preparedTransaction.metadata
         .flatMap(_.submitterInfo.map(_.commandId))
         .map(logging.commandId)
         .toList
 
     withEnrichedLoggingContext(
-      logging.submissionId(request.submissionId),
+      logging.submissionId(executionRequest.submissionId),
       commandIdLogging*
     ) { implicit loggingContext =>
       logger.info(
-        s"Requesting execution of daml transaction with submission ID ${request.submissionId}"
+        s"Requesting execution of daml transaction with submission ID ${executionRequest.submissionId}"
       )
-      val result = for {
-        deserializationResult <- EitherT.liftF[Future, DamlError, DeserializationResult](
-          transactionDecoder.makeCommandExecutionResult(request)
-        )
-        _ <- EitherT.liftF[Future, DamlError, Unit](
-          submitIfNotOverloaded(deserializationResult.commandExecutionResult)
-            .transform(handleSubmissionResult)
-        )
-      } yield ExecuteSubmissionResponse()
-
-      result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(Future.fromTry)
+      for {
+        deserializationResult <- transactionDecoder.deserialize(executionRequest)
+        _ <- submitIfNotOverloaded(deserializationResult.preparedTransactionData)
+          .transform(handleSubmissionResult)
+      } yield proto.ExecuteSubmissionResponse()
     }
   }
+
+  override def getPreferredPackageVersion(
+      parties: Set[LfPartyId],
+      packageName: PackageName,
+      synchronizerId: Option[SynchronizerId],
+      vettingValidAt: Option[CantonTimestamp],
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): FutureUnlessShutdown[Option[(PackageReference, SynchronizerId)]] =
+    packagePreferenceService.getPreferredPackageVersion(
+      parties = parties,
+      packageName = packageName,
+      supportedPackageIds = None,
+      synchronizerId = synchronizerId,
+      vettingValidAt = vettingValidAt,
+    )
 }

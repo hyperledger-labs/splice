@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -6,7 +6,7 @@ package com.digitalasset.canton.crypto
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.serialization.DefaultDeserializationError
-import com.digitalasset.canton.version.{HasVersionedToByteString, ProtocolVersion}
+import com.digitalasset.canton.version.HasToByteString
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AsyncWordSpec
@@ -16,10 +16,13 @@ trait CryptoTestHelper extends BaseTest with HasExecutionContext {
 
   /** Gets a new encryption key by generating a new key.
     *
-    * @param crypto determines the algorithms used for signing, hashing, and encryption, used
-    *               on the client side for serialization.
-    * @param encryptionKeySpec the encryption key specification for the new key.
-    * @return an encryption public key
+    * @param crypto
+    *   determines the algorithms used for signing, hashing, and encryption, used on the client side
+    *   for serialization.
+    * @param encryptionKeySpec
+    *   the encryption key specification for the new key.
+    * @return
+    *   an encryption public key
     */
   protected def getEncryptionPublicKey(
       crypto: Crypto,
@@ -42,11 +45,15 @@ trait CryptoTestHelper extends BaseTest with HasExecutionContext {
 
   /** Gets a new signing key by generating a new key.
     *
-    * @param crypto    determines the algorithms used for signing, hashing, and encryption, used
-    *                  on the client side for serialization.
-    * @param usage     what the key must be used for
-    * @param keySpec   the signing key specification for the new key.
-    * @return a signing public key
+    * @param crypto
+    *   determines the algorithms used for signing, hashing, and encryption, used on the client side
+    *   for serialization.
+    * @param usage
+    *   what the key must be used for
+    * @param keySpec
+    *   the signing key specification for the new key.
+    * @return
+    *   a signing public key
     */
   protected def getSigningPublicKey(
       crypto: Crypto,
@@ -72,8 +79,8 @@ trait CryptoTestHelper extends BaseTest with HasExecutionContext {
 }
 
 object CryptoTestHelper {
-  case class TestMessage(bytes: ByteString) extends HasVersionedToByteString {
-    override def toByteString(version: ProtocolVersion): ByteString = bytes
+  final case class TestMessage(bytes: ByteString) extends HasToByteString {
+    override def toByteString: ByteString = bytes
   }
 
   object TestMessage {

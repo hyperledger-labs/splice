@@ -1,18 +1,18 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
 
-import com.daml.error.{ContextualizedErrorLogger, NoLogging}
 import com.daml.ledger.api.v2.value.Identifier
-import com.digitalasset.canton.ledger.api.DomainMocks
+import com.digitalasset.canton.ledger.api.ApiMocks
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import io.grpc.Status.Code.INVALID_ARGUMENT
 import org.mockito.MockitoSugar
 import org.scalatest.wordspec.AsyncWordSpec
 
 class IdentifierValidatorTest extends AsyncWordSpec with ValidatorTestUtils with MockitoSugar {
 
-  private implicit val contextualizedErrorLogger: ContextualizedErrorLogger = NoLogging
+  private implicit val errorLoggingContext: ErrorLoggingContext = NoLogging
 
   object api {
     val identifier = Identifier("package", moduleName = "module", entityName = "entity")
@@ -20,7 +20,7 @@ class IdentifierValidatorTest extends AsyncWordSpec with ValidatorTestUtils with
 
   "validating identifiers" should {
     "convert a valid identifier" in {
-      ValueValidator.validateIdentifier(api.identifier) shouldEqual Right(DomainMocks.identifier)
+      ValueValidator.validateIdentifier(api.identifier) shouldEqual Right(ApiMocks.identifier)
     }
 
     "not allow missing package ids" in {

@@ -62,6 +62,7 @@ class UserWalletManager(
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
     supportsSoftDomainMigrationPoc: Boolean,
     dedupDuration: DedupDuration,
+    enableCantonPackageSelection: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -112,21 +113,21 @@ class UserWalletManager(
     }
   }
 
-  retryProvider.runOnShutdownWithPriority_(new RunOnShutdown {
+  retryProvider.runOnShutdownWithPriority_(new RunOnClosing {
     override def name = s"set per-user retry providers as closed"
     override def done = false
-    override def run() = {
+    override def run()(implicit tc: TraceContext) = {
       endUserPartyWalletsMap.values.foreach { case (userRetryProvider, _) =>
         userRetryProvider.setAsClosing()
       }
     }
-  })(TraceContext.empty)
+  })
 
-  retryProvider.runOnShutdown_(new RunOnShutdown {
+  retryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name = s"shutdown per-user retry providers"
     // this is not perfectly precise, but RetryProvider.close is idempotent
     override def done = false
-    override def run() = {
+    override def run()(implicit tc: TraceContext) = {
       endUserPartyWalletsMap.values.foreach { case (userRetryProvider, _) =>
         userRetryProvider.close()
       }
@@ -236,6 +237,7 @@ class UserWalletManager(
       autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
       supportsSoftDomainMigrationPoc,
       dedupDuration,
+      enableCantonPackageSelection,
     )
     (userRetryProvider, walletService)
   }
@@ -302,7 +304,7 @@ class UserWalletManager(
 
   override def isHealthy: Boolean = endUserPartyWalletsMap.values.forall(_._2.isHealthy)
 
-  override def close(): Unit = Lifecycle.close(
+  override def close(): Unit = LifeCycle.close(
     // per-user retry providers should have been closed by the shutdown signal, so only closing the services here
     endUserPartyWalletsMap.values.map(_._2).toSeq*
   )(logger)

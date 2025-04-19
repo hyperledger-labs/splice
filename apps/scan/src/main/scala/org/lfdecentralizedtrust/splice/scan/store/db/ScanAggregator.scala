@@ -47,6 +47,7 @@ final class ScanAggregator(
     with FlagCloseableAsync {
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
   import profile.api.jdbcActionExtensionMethods
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   // Round totals are derived from TxLog entries, and are therefore linked to that store
   private[this] def roundTotalsStoreId: TxLogStoreId = txLogStoreId

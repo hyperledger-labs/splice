@@ -1,43 +1,43 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
-import cats.syntax.functor.*
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{HashOps, Signature}
-import com.digitalasset.canton.data.{
-  UnassignmentCommonData,
-  UnassignmentViewTree,
-  ViewConfirmationParameters,
-  ViewPosition,
-  ViewType,
-}
+import com.digitalasset.canton.data.{UnassignmentCommonData, UnassignmentViewTree, ViewType}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.version.{
-  HasProtocolVersionedWithContextCompanion,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
   RepresentativeProtocolVersion,
+  VersionedProtoCodec,
+  VersioningCompanionContext,
 }
 
 import java.util.UUID
 
 /** Message sent to the mediator as part of an unassignment request
   *
-  * @param tree The unassignment view tree blinded for the mediator
-  * @throws java.lang.IllegalArgumentException if the common data is blinded or the view is not blinded
+  * @param tree
+  *   The unassignment view tree blinded for the mediator
+  * @throws java.lang.IllegalArgumentException
+  *   if the common data is blinded or the view is not blinded
   */
 final case class UnassignmentMediatorMessage(
     tree: UnassignmentViewTree,
     override val submittingParticipantSignature: Signature,
+)(
+    val representativeProtocolVersion: RepresentativeProtocolVersion[
+      UnassignmentMediatorMessage.type
+    ]
 ) extends ReassignmentMediatorMessage {
   require(tree.commonData.isFullyUnblinded, "The unassignment common data must be unblinded")
   require(tree.view.isBlinded, "The unassignment view must be blinded")
@@ -46,28 +46,11 @@ final case class UnassignmentMediatorMessage(
 
   override def submittingParticipant: ParticipantId = tree.submittingParticipant
 
-  val protocolVersion: Source[ProtocolVersion] = commonData.sourceProtocolVersion
-
-  override val representativeProtocolVersion
-      : RepresentativeProtocolVersion[UnassignmentMediatorMessage.type] =
-    UnassignmentMediatorMessage.protocolVersionRepresentativeFor(protocolVersion.unwrap)
-
-  override def domainId: DomainId = commonData.sourceDomain.unwrap
+  override def synchronizerId: SynchronizerId = commonData.sourceSynchronizerId.unwrap
 
   override def mediator: MediatorGroupRecipient = commonData.sourceMediatorGroup
 
   override def requestUuid: UUID = commonData.uuid
-
-  override def informeesAndConfirmationParamsByViewPosition
-      : Map[ViewPosition, ViewConfirmationParameters] = {
-    val confirmingParties = commonData.confirmingParties.fmap(_.toNonNegative)
-    val nonConfirmingParties = commonData.stakeholders.nonConfirming.map(_ -> NonNegativeInt.zero)
-
-    val informees = confirmingParties ++ nonConfirmingParties
-    val threshold = NonNegativeInt.tryCreate(confirmingParties.size)
-
-    Map(tree.viewPosition -> ViewConfirmationParameters.create(informees, threshold))
-  }
 
   def toProtoV30: v30.UnassignmentMediatorMessage =
     v30.UnassignmentMediatorMessage(
@@ -86,26 +69,24 @@ final case class UnassignmentMediatorMessage(
 
   @transient override protected lazy val companionObj: UnassignmentMediatorMessage.type =
     UnassignmentMediatorMessage
-
-  override def informeesArePublic: Boolean = true
 }
 
 object UnassignmentMediatorMessage
-    extends HasProtocolVersionedWithContextCompanion[
+    extends VersioningCompanionContext[
       UnassignmentMediatorMessage,
-      (HashOps, Source[ProtocolVersion]),
+      (HashOps, Source[ProtocolVersionValidation]),
     ] {
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(
+  val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
       v30.UnassignmentMediatorMessage
     )(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
-  def fromProtoV30(context: (HashOps, Source[ProtocolVersion]))(
+  def fromProtoV30(context: (HashOps, Source[ProtocolVersionValidation]))(
       unassignmentMediatorMessageP: v30.UnassignmentMediatorMessage
   ): ParsingResult[UnassignmentMediatorMessage] = {
     val v30.UnassignmentMediatorMessage(treePO, submittingParticipantSignaturePO) =
@@ -130,7 +111,8 @@ object UnassignmentMediatorMessage
           submittingParticipantSignaturePO,
         )
         .flatMap(Signature.fromProtoV30)
-    } yield UnassignmentMediatorMessage(tree, submittingParticipantSignature)
+      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
+    } yield UnassignmentMediatorMessage(tree, submittingParticipantSignature)(rpv)
   }
 
   override def name: String = "UnassignmentMediatorMessage"

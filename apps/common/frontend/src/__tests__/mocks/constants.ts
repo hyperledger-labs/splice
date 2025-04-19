@@ -185,6 +185,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                   walletPayments: '0.1.5',
                 },
                 transferPreapprovalFee: null,
+                featuredAppActivityMarkerAmount: null,
               },
             },
           },

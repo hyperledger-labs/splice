@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error.generator
 
-import com.daml.error.{ErrorClass, Grouping}
+import com.digitalasset.base.error.{ErrorClass, Grouping}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 
 import scala.collection.mutable

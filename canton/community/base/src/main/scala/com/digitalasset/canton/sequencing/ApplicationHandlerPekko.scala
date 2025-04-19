@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -42,11 +42,11 @@ class ApplicationHandlerPekko[F[+_], Context](
     extends NamedLogging {
   import ApplicationHandlerPekko.*
 
-  /** Calls the `handler` sequentially for each sequenced event,
-    * and stops if synchronous processing throws an exception.
-    * `Control` elements are passed through.
+  /** Calls the `handler` sequentially for each sequenced event, and stops if synchronous processing
+    * throws an exception. `Control` elements are passed through.
     *
-    * @param asyncParallelism How many asynchronous processing steps are run concurrently.
+    * @param asyncParallelism
+    *   How many asynchronous processing steps are run concurrently.
     */
   def asFlow(
       asyncParallelism: PositiveInt
@@ -194,6 +194,6 @@ object ApplicationHandlerPekko {
   private final case class EventBatchSynchronousResult(
       firstSc: SequencerCounter,
       lastSc: SequencerCounter,
-      asyncResult: AsyncResult,
+      asyncResult: AsyncResult[Unit],
   )(implicit val traceContext: TraceContext)
 }

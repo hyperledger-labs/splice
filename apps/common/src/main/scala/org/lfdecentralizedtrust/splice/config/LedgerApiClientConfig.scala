@@ -3,11 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.config
 
-import org.apache.pekko.actor.ActorSystem
-import org.lfdecentralizedtrust.splice.auth.{AuthTokenSource, AuthToken}
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.FullClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
+import org.apache.pekko.actor.ActorSystem
+import org.lfdecentralizedtrust.splice.auth.{AuthToken, AuthTokenSource}
+
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
@@ -15,7 +16,7 @@ import scala.concurrent.duration.DurationInt
   * @param authConfig Auth tokens used by the app
   */
 case class LedgerApiClientConfig(
-    clientConfig: ClientConfig,
+    clientConfig: FullClientConfig,
     authConfig: AuthTokenSourceConfig,
 ) {
   // Note: Some places, e.g., Cantons RemoteParticipantConfig expects a static token,

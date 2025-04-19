@@ -1,23 +1,23 @@
 import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 import cats.syntax.either._
 import com.digitalasset.canton.console.LocalInstanceReference
-import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.version.ProtocolVersion
 
 def main() {
-  val domainParametersConfig = DomainParametersConfig(
+  val synchronizerParametersConfig = SynchronizerParametersConfig(
     alphaVersionSupport = true
   )
 
   def staticParameters(sequencer: LocalInstanceReference) =
-    domainParametersConfig
-      .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v32)
-      .map(StaticDomainParameters(_))
+    synchronizerParametersConfig
+      .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v33)
+      .map(StaticSynchronizerParameters(_))
       .getOrElse(sys.error("whatever"))
 
   val initialize = decode[Boolean](sys.env.get("CANTON_DOMAIN_INITIALIZE").getOrElse("true"))
-    .getOrElse(sys.error("Failed to parse CANTON_DOMAIN_INITIALIZE. Expected true or false"))
+    .getOrElse(sys.error("Failed to parse CANTON_synchronizer_INITIALIZE. Expected true or false"))
   if (initialize) {
     utils.retry_until_true {
       sequencer.health.status match {
@@ -25,19 +25,19 @@ def main() {
           logger.info(s"Failed to query sequencer status: $msg")
           false
         case NodeStatus.NotInitialized(_, _) =>
-          logger.info("Initializing domain")
-          com.digitalasset.canton.console.EnterpriseConsoleMacros.bootstrap.domain(
-            "domain",
-            domainOwners = Seq(sequencer),
+          logger.info("Initializing synchronizer")
+          com.digitalasset.canton.console.ConsoleMacros.bootstrap.synchronizer(
+            "synchronizer",
+            synchronizerOwners = Seq(sequencer),
             sequencers = Seq(sequencer),
             mediators = Seq(mediator),
-            domainThreshold = PositiveInt.one,
-            staticDomainParameters = staticParameters(sequencer),
+            synchronizerThreshold = PositiveInt.one,
+            staticSynchronizerParameters = staticParameters(sequencer),
           )
-          logger.info("Domain initialized")
+          logger.info("synchronizer initialized")
           true
         case NodeStatus.Success(_) =>
-          logger.info(s"Domain is already initialized")
+          logger.info(s"synchronizer is already initialized")
           true
       }
     }

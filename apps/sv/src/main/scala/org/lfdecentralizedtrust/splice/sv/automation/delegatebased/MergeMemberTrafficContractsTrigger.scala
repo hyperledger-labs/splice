@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchron
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_MergeMemberTrafficContracts
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{SynchronizerId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -50,10 +50,10 @@ class MergeMemberTrafficContractsTrigger(
           for {
             dsoRules <- store.getDsoRules()
             threshold = dsoRules.payload.config.numMemberTrafficContractsThreshold
-            domainId = DomainId.tryFromString(memberTraffic.payload.synchronizerId)
+            synchronizerId = SynchronizerId.tryFromString(memberTraffic.payload.synchronizerId)
             memberTraffics <- store.listMemberTrafficContracts(
               memberId,
-              domainId,
+              synchronizerId,
               PageLimit.tryCreate(2 * threshold.toInt),
             )
             outcome <-
@@ -62,7 +62,7 @@ class MergeMemberTrafficContractsTrigger(
               else
                 Future.successful(
                   TaskSuccess(
-                    s"More than ${threshold} member traffic contracts are required for $memberId on domain $domainId " +
+                    s"More than ${threshold} member traffic contracts are required for $memberId on domain $synchronizerId " +
                       s"in order to merge them. Currently, there are only ${memberTraffics.length}."
                   )
                 )

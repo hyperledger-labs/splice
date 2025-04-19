@@ -1,23 +1,24 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.daml.logging.entries.LoggingValue.OfString
 import com.daml.logging.entries.ToLoggingKey.*
 import com.daml.logging.entries.{LoggingEntries, LoggingEntry, LoggingKey, LoggingValue}
-import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
-import com.digitalasset.canton.ledger.api.domain.{
+import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.ledger.api.{
   Commands,
   CumulativeFilter,
-  EventId,
+  EventFormat,
   TemplateWildcardFilter,
-  TransactionFilter,
+  TopologyFormat,
+  TransactionFormat,
+  TransactionShape,
+  UpdateFormat,
   UpdateId,
 }
 import com.digitalasset.daml.lf.data.Ref.{Identifier, Party}
 import com.digitalasset.daml.lf.data.logging.*
-import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
 import scalaz.syntax.tag.ToTagOps
 
@@ -47,20 +48,20 @@ package object logging {
   private[services] def readAs(partyNames: Iterable[Party]): LoggingEntry =
     "readAs" -> partyNames
 
+  private[services] def submitter(id: String): LoggingEntry =
+    "submitter" -> id
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private[services] def readAsStrings(partyNames: Iterable[String]): LoggingEntry =
     readAs(partyNames.asInstanceOf[Iterable[Party]])
 
-  private[services] def startExclusive(offset: ParticipantOffset): LoggingEntry =
-    "startExclusive" -> offset
+  private[services] def startExclusive(offset: Option[Offset]): LoggingEntry =
+    "startExclusive" -> offset.fold(0L)(_.unwrap)
 
   private[services] def endInclusive(
-      offset: Option[ParticipantOffset]
+      offset: Option[Offset]
   ): LoggingEntry =
     "endInclusive" -> offset
-
-  private[services] def offset(offset: String): LoggingEntry =
-    "offset" -> offset
 
   private[services] def offset(offset: Long): LoggingEntry =
     "offset" -> offset.toString
@@ -68,20 +69,80 @@ package object logging {
   private[services] def commandId(id: String): LoggingEntry =
     "commandId" -> id
 
-  private[services] def eventId(id: EventId): LoggingEntry =
-    "eventId" -> OfString(id.unwrap)
-
-  private[services] def filters(
-      filters: TransactionFilter
+  private[services] def eventFormat(
+      eventFormat: EventFormat
   ): LoggingEntry =
     "filters" -> LoggingValue.Nested(
       LoggingEntries.fromMap(
-        filters.filtersByParty.view.map { case (party, partyFilters) =>
+        eventFormat.filtersByParty.view.map { case (party, partyFilters) =>
           party.toLoggingKey -> filtersToLoggingValue(partyFilters)
         }.toMap ++
-          filters.filtersForAnyParty.fold(Map.empty[LoggingKey, LoggingValue])(filters =>
+          eventFormat.filtersForAnyParty.fold(Map.empty[LoggingKey, LoggingValue])(filters =>
             Map("anyParty" -> filtersToLoggingValue(filters))
           )
+      )
+    )
+
+  private[services] def transactionShape(
+      transactionShape: TransactionShape
+  ): LoggingEntry =
+    "transactionShape" -> LoggingValue.OfString(
+      transactionShape match {
+        case TransactionShape.LedgerEffects => "LedgerEffects"
+        case TransactionShape.AcsDelta => "AcsDelta"
+      }
+    )
+
+  private[services] def transactionFormat(
+      transactionFormat: TransactionFormat
+  ): LoggingEntry =
+    "transaction format" -> LoggingValue.Nested(
+      LoggingEntries.fromMap(
+        Map(
+          "filters" -> eventFormat(transactionFormat.eventFormat)._2,
+          transactionShape(transactionFormat.transactionShape),
+        )
+      )
+    )
+
+  private[services] def topologyFormat(
+      topologyFormat: TopologyFormat
+  ): LoggingEntry =
+    "topologyFormat" -> LoggingValue.Nested(
+      LoggingEntries.fromMap(
+        Map(
+          "participantAuthorizationFormat" -> topologyFormat.participantAuthorizationFormat
+            .map(_.parties match {
+              case Some(parties) => (if (parties.isEmpty) "all parties" else parties): LoggingValue
+              case None => LoggingValue.Empty
+            })
+            .getOrElse(LoggingValue.Empty)
+        )
+      )
+    )
+
+  private[services] def updateFormat(
+      updateFormat: UpdateFormat
+  ): LoggingEntry =
+    "updateFormat" -> LoggingValue.Nested(
+      LoggingEntries.fromMap(
+        Map(
+          "transaction format" -> LoggingValue.OfIterable(
+            updateFormat.includeTransactions
+              .map(transactionFormat(_)._2)
+              .toList
+          ),
+          "reassignment filters" -> LoggingValue.OfIterable(
+            updateFormat.includeReassignments
+              .map(eventFormat(_)._2)
+              .toList
+          ),
+          "topology format" -> LoggingValue.OfIterable(
+            updateFormat.includeTopologyEvents
+              .map(topologyFormat(_)._2)
+              .toList
+          ),
+        )
       )
     )
 
@@ -131,9 +192,6 @@ package object logging {
 
   private[services] def contractId(id: ContractId): LoggingEntry =
     "contractId" -> id.coid
-
-  private[services] def contractKey(key: Value): LoggingEntry =
-    "contractKey" -> key.toString
 
   private[services] def templateId(id: Identifier): LoggingEntry =
     "templateId" -> id.toString

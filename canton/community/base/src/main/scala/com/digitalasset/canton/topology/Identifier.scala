@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -59,11 +59,11 @@ trait HasNamespace extends HasFingerprint {
   @inline final override def fingerprint: Fingerprint = namespace.fingerprint
 }
 
-/** a unique identifier within a namespace
-  * Based on the Ledger API PartyIds/LedgerStrings being limited to 255 characters, we allocate
-  * - 64 + 4 characters to the namespace/fingerprint (essentially SHA256 with extra bytes),
-  * - 2 characters as delimiters, and
-  * - the last 185 characters for the Identifier.
+/** a unique identifier within a namespace Based on the Ledger API PartyIds/LedgerStrings being
+  * limited to 255 characters, we allocate
+  *   - 64 + 4 characters to the namespace/fingerprint (essentially SHA256 with extra bytes),
+  *   - 2 characters as delimiters, and
+  *   - the last 185 characters for the Identifier.
   */
 final case class UniqueIdentifier private (identifier: String185, namespace: Namespace)
     extends HasNamespace
@@ -82,11 +82,13 @@ final case class UniqueIdentifier private (identifier: String185, namespace: Nam
     */
   def tryChangeId(id: String): UniqueIdentifier = UniqueIdentifier.tryCreate(id, namespace)
 
-  // utility to filter UIDs using prefixes obtained via UniqueIdentifier.splitFilter() below
-  def matchesPrefixes(idPrefix: String, nsPrefix: String): Boolean =
-    identifier.unwrap.startsWith(idPrefix) && namespace.toProtoPrimitive.startsWith(
-      nsPrefix
-    )
+  // utility to filter UIDs using the id and namespace components obtained via UniqueIdentifier.splitFilter() below
+  def matchesFilters(idFilter: String, nsFilterO: Option[String]): Boolean = nsFilterO match {
+    case Some(nsFilter) =>
+      identifier.unwrap == idFilter && namespace.toProtoPrimitive.startsWith(nsFilter)
+    case None =>
+      identifier.unwrap.startsWith(idFilter)
+  }
 
   override protected def pretty: Pretty[this.type] =
     prettyOfString(uid => uid.identifier.str.show + UniqueIdentifier.delimiter + uid.namespace.show)
@@ -122,8 +124,12 @@ object UniqueIdentifier {
 
   /** Create a unique identifier
     *
-    * @param id the identifier (prefix) that can be chosen freely but must conform to the LF standard, not exceed 185 chars and must not use two consecutive columns.
-    * @param fingerprint the fingerprint of the namespace, which is normally a hash of the public key, but in some tests might be chosen freely.
+    * @param id
+    *   the identifier (prefix) that can be chosen freely but must conform to the LF standard, not
+    *   exceed 185 chars and must not use two consecutive columns.
+    * @param fingerprint
+    *   the fingerprint of the namespace, which is normally a hash of the public key, but in some
+    *   tests might be chosen freely.
     */
   def create(id: String, fingerprint: String): Either[String, UniqueIdentifier] =
     for {
@@ -179,20 +185,22 @@ object UniqueIdentifier {
   implicit val setParameterUid: SetParameter[UniqueIdentifier] = (v, pp) =>
     pp >> v.toLengthLimitedString
 
-  /** @throws com.digitalasset.canton.store.db.DbDeserializationException if the string is not a valid unqiue identifier */
+  /** @throws com.digitalasset.canton.store.db.DbDeserializationException
+    *   if the string is not a valid unqiue identifier
+    */
   def deserializeFromDb(uid: String): UniqueIdentifier =
     fromProtoPrimitive_(uid).valueOr(err =>
       throw new DbDeserializationException(s"Failed to parse a unique ID $uid: $err")
     )
 
-  /** Split an uid filter into the two subparts */
-  def splitFilter(filter: String, append: String = ""): (String, String) = {
+  /** Split a uid filter into the two subparts */
+  def splitFilter(filter: String): (String, Option[String]) = {
     val items = filter.split(UniqueIdentifier.delimiter)
     val prefix = items(0)
     if (items.lengthCompare(1) > 0) {
       val suffix = items(1)
-      (prefix ++ append, suffix ++ append)
-    } else (prefix ++ append, append)
+      (prefix, Some(suffix))
+    } else (prefix, None)
   }
 
 }

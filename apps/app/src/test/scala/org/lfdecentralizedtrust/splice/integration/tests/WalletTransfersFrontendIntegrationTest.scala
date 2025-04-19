@@ -1,8 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
   FrontendLoginUtil,
@@ -10,7 +8,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -25,8 +22,7 @@ class WalletTransfersFrontendIntegrationTest
 
   private val amuletPrice = 2
   override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)

@@ -1,10 +1,8 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.daml.error.ContextualizedErrorLogger
-import com.daml.error.ErrorCode.LoggedApiException
 import com.daml.ledger.api.v2.command_submission_service.{
   CommandSubmissionServiceGrpc,
   SubmitReassignmentRequest,
@@ -15,13 +13,16 @@ import com.daml.ledger.api.v2.command_submission_service.{
 import com.daml.ledger.api.v2.commands.Commands
 import com.daml.metrics.Timed
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
-import com.daml.tracing.{SpanAttribute, Telemetry, TelemetryContext}
+import com.daml.tracing.Telemetry
+import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
 import com.digitalasset.canton.ledger.api.validation.{CommandsValidator, SubmitRequestValidator}
 import com.digitalasset.canton.ledger.api.{SubmissionIdGenerator, ValidationLogger}
 import com.digitalasset.canton.ledger.participant.state
-import com.digitalasset.canton.ledger.participant.state.{ReassignmentCommand, WriteService}
+import com.digitalasset.canton.ledger.participant.state.{ReassignmentCommand, SubmissionSyncService}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.TimerAndTrackOnShutdownSyntax
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.TracedLoggerOps.TracedLoggerOps
 import com.digitalasset.canton.logging.{
@@ -31,11 +32,13 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcFUSExtended
 import com.digitalasset.canton.platform.apiserver.execution.{
   CommandProgressTracker,
   CommandResultHandle,
 }
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.util.Thereafter.syntax.*
 
 import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
@@ -44,7 +47,7 @@ import scala.util.{Failure, Success, Try}
 final class ApiCommandSubmissionService(
     commandSubmissionService: CommandSubmissionService & AutoCloseable,
     commandsValidator: CommandsValidator,
-    writeService: WriteService,
+    submissionSyncService: SubmissionSyncService,
     currentLedgerTime: () => Instant,
     currentUtcTime: () => Instant,
     maxDeduplicationDuration: Duration,
@@ -61,17 +64,17 @@ final class ApiCommandSubmissionService(
   private val validator = new SubmitRequestValidator(commandsValidator)
 
   override def submit(request: SubmitRequest): Future[SubmitResponse] = {
-    implicit val traceContext = getAnnotedCommandTraceContext(request.commands, telemetry)
-    submitWithTraceContext(Traced(request))
+    implicit val traceContext = getAnnotatedCommandTraceContext(request.commands, telemetry)
+    submitWithTraceContext(Traced(request)).asGrpcResponse
   }
 
   def submitWithTraceContext(
       request: Traced[SubmitRequest]
-  ): Future[SubmitResponse] = {
+  ): FutureUnlessShutdown[SubmitResponse] = {
     implicit val loggingContextWithTrace: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory)(request.traceContext)
     val requestWithSubmissionId = generateSubmissionIdIfEmpty(request.value)
-    val errorLogger: ContextualizedErrorLogger =
+    val errorLogger: ErrorLoggingContext =
       ErrorLoggingContext.fromOption(
         logger,
         loggingContextWithTrace,
@@ -81,7 +84,7 @@ final class ApiCommandSubmissionService(
       .map {
         case allCommands @ Commands(
               workflowId,
-              applicationId,
+              userId,
               commandId,
               commands,
               deduplicationPeriod,
@@ -91,20 +94,21 @@ final class ApiCommandSubmissionService(
               readAs,
               submissionId,
               disclosedContracts,
-              domainId,
+              synchronizerId,
               packageIdSelectionPreference,
+              prefetchKeys,
             ) =>
           tracker.registerCommand(
             commandId,
             Option.when(submissionId.nonEmpty)(submissionId),
-            applicationId,
+            userId,
             commands,
             actAs = allCommands.actAs.toSet,
           )(loggingContextWithTrace.traceContext)
       }
       .getOrElse(CommandResultHandle.NoOp)
 
-    val result = Timed.timedAndTrackedFuture(
+    val result = Timed.timedAndTrackedFutureUS(
       metrics.commands.submissions,
       metrics.commands.submissionsRunning,
       Timed
@@ -119,7 +123,8 @@ final class ApiCommandSubmissionService(
         )
         .fold(
           t =>
-            Future.failed(ValidationLogger.logFailureWithTrace(logger, requestWithSubmissionId, t)),
+            FutureUnlessShutdown
+              .failed(ValidationLogger.logFailureWithTrace(logger, requestWithSubmissionId, t)),
           commandSubmissionService.submit(_).map(_ => SubmitResponse()),
         ),
     )
@@ -129,59 +134,60 @@ final class ApiCommandSubmissionService(
   override def submitReassignment(
       request: SubmitReassignmentRequest
   ): Future[SubmitReassignmentResponse] = {
-    implicit val telemetryContext: TelemetryContext =
-      telemetry.contextFromGrpcThreadLocalContext()
-    implicit val loggingContextWithTrace: LoggingContextWithTrace =
-      LoggingContextWithTrace(loggerFactory, telemetry)
+    implicit val traceContext: TraceContext =
+      getAnnotatedReassignmentCommandTraceContext(request.reassignmentCommands, telemetry)
+    submitReassignmentWithTraceContext(Traced(request)).asGrpcResponse
+  }
 
-    request.reassignmentCommand.foreach { command =>
-      telemetryContext
-        .setAttribute(SpanAttribute.ApplicationId, command.applicationId)
-        .setAttribute(SpanAttribute.CommandId, command.commandId)
-        .setAttribute(SpanAttribute.Submitter, command.submitter)
-        .setAttribute(SpanAttribute.WorkflowId, command.workflowId)
-    }
-    val requestWithSubmissionId = generateSubmissionIdIfEmpty(request)
-    val errorLogger: ContextualizedErrorLogger =
+  def submitReassignmentWithTraceContext(
+      request: Traced[SubmitReassignmentRequest]
+  ): FutureUnlessShutdown[SubmitReassignmentResponse] = {
+    implicit val loggingContextWithTrace: LoggingContextWithTrace =
+      LoggingContextWithTrace(loggerFactory)(request.traceContext)
+    val requestWithSubmissionId = generateSubmissionIdIfEmpty(request.value)
+    val errorLogger: ErrorLoggingContext =
       ErrorLoggingContext.fromOption(
         logger,
         loggingContextWithTrace,
-        requestWithSubmissionId.reassignmentCommand.map(_.submissionId),
+        requestWithSubmissionId.reassignmentCommands.map(_.submissionId),
       )
     Timed
       .value(
         metrics.commands.reassignmentValidation,
-        validator.validateReassignment(request)(errorLogger),
+        validator.validateReassignment(requestWithSubmissionId)(errorLogger),
       )
       .fold(
         t =>
-          Future.failed(ValidationLogger.logFailureWithTrace(logger, requestWithSubmissionId, t)),
+          FutureUnlessShutdown
+            .failed(ValidationLogger.logFailureWithTrace(logger, requestWithSubmissionId, t)),
         request =>
-          writeService
-            .submitReassignment(
-              submitter = request.submitter,
-              applicationId = request.applicationId,
-              commandId = request.commandId,
-              submissionId = Some(request.submissionId),
-              workflowId = request.workflowId,
-              reassignmentCommand = request.reassignmentCommand match {
-                case Left(assignCommand) =>
-                  ReassignmentCommand.Assign(
-                    sourceDomain = assignCommand.sourceDomainId,
-                    targetDomain = assignCommand.targetDomainId,
-                    unassignId = CantonTimestamp(assignCommand.unassignId),
-                  )
-                case Right(unassignCommand) =>
-                  ReassignmentCommand.Unassign(
-                    sourceDomain = unassignCommand.sourceDomainId,
-                    targetDomain = unassignCommand.targetDomainId,
-                    contractId = unassignCommand.contractId,
-                  )
-              },
-            )
-            .toScalaUnwrapped
-            .transform(handleSubmissionResult)
-            .andThen(logger.logErrorsOnCall[SubmitReassignmentResponse]),
+          FutureUnlessShutdown.outcomeF(
+            submissionSyncService
+              .submitReassignment(
+                submitter = request.submitter,
+                userId = request.userId,
+                commandId = request.commandId,
+                submissionId = Some(request.submissionId),
+                workflowId = request.workflowId,
+                reassignmentCommands = request.reassignmentCommands.map {
+                  case Left(assignCommand) =>
+                    ReassignmentCommand.Assign(
+                      sourceSynchronizer = assignCommand.sourceSynchronizerId,
+                      targetSynchronizer = assignCommand.targetSynchronizerId,
+                      unassignId = CantonTimestamp(assignCommand.unassignId),
+                    )
+                  case Right(unassignCommand) =>
+                    ReassignmentCommand.Unassign(
+                      sourceSynchronizer = unassignCommand.sourceSynchronizerId,
+                      targetSynchronizer = unassignCommand.targetSynchronizerId,
+                      contractId = unassignCommand.contractId,
+                    )
+                },
+              )
+              .toScalaUnwrapped
+              .transform(handleSubmissionResult)
+              .thereafter(logger.logErrorsOnCall[SubmitReassignmentResponse])
+          ),
       )
   }
 
@@ -194,8 +200,8 @@ final class ApiCommandSubmissionService(
   private def generateSubmissionIdIfEmpty(
       request: SubmitReassignmentRequest
   ): SubmitReassignmentRequest =
-    if (request.reassignmentCommand.exists(_.submissionId.isEmpty))
-      request.update(_.reassignmentCommand.submissionId := submissionIdGenerator.generate())
+    if (request.reassignmentCommands.exists(_.submissionId.isEmpty))
+      request.update(_.reassignmentCommands.submissionId := submissionIdGenerator.generate())
     else
       request
 

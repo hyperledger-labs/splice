@@ -158,10 +158,10 @@ class HttpScanProxyHandler(
     withSpan(s"$workflowId.getAnsRules") { implicit traceContext => _ =>
       for {
         response <- scanConnection.getAnsRules()
-        maybeDomainId = response.state.fold(dId => Some(dId.toProtoPrimitive), None)
+        maybeSynchronizerId = response.state.fold(dId => Some(dId.toProtoPrimitive), None)
         maybeCachedContract = MaybeCachedContractWithState(
           Some(response.contract.toHttp),
-          maybeDomainId,
+          maybeSynchronizerId,
         )
       } yield {
         respond.OK(definitions.GetAnsRulesResponse(ansRulesUpdate = maybeCachedContract))

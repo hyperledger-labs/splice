@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
@@ -103,8 +103,8 @@ class ReconcileSequencerConnectionsTrigger(
                     ),
                   )
               }
-              participantAdminConnection.modifyOrRegisterDomainConnectionConfigAndReconnect(
-                DomainConnectionConfig(
+              participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
+                SynchronizerConnectionConfig(
                   alias,
                   sequencerConnectionConfig,
                 ),
@@ -126,7 +126,9 @@ class ReconcileSequencerConnectionsTrigger(
 
   private def modifySequencerConnections(
       sequencerConnections: SequencerConnections
-  )(implicit traceContext: TraceContext): DomainConnectionConfig => Option[DomainConnectionConfig] =
+  )(implicit
+      traceContext: TraceContext
+  ): SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig] =
     conf => {
       if (differentEndpointSet(sequencerConnections, conf.sequencerConnections.connections)) {
         logger.info(

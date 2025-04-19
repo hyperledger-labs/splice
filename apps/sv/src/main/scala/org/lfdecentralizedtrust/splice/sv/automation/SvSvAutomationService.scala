@@ -48,7 +48,8 @@ class SvSvAutomationService(
       domainUnpausedSync,
       svStore,
       PackageIdResolver
-        .inferFromAmuletRules(
+        .inferFromAmuletRulesIfEnabled(
+          config.parameters.enableCantonPackageSelection,
           clock,
           dsoStore,
           loggerFactory,

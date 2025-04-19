@@ -17,7 +17,9 @@ module Splice.Expiry
   )
   where
 
--- import Splice.Amulet
+import Splice.Api.Token.MetadataV1
+import Splice.Amulet.TokenApiUtils
+
 import Splice.Fees
 import Splice.Types
 import Splice.Round
@@ -25,6 +27,7 @@ import Splice.RelRound
 
 import DA.Date
 import DA.Time
+import DA.TextMap as TextMap
 
 
 -- Representing sets of values with uppper bounds
@@ -172,6 +175,11 @@ estimateOpenRoundCreatedAt _ _ AfterMaxBound = AfterMaxBound
 data TimeLock = TimeLock with
     holders: [Party]
     expiresAt: Time
+    optContext : Optional Text
+      -- ^ Short, human-readable description of the context in which the amulet is locked.
+      -- Intended for wallets to inform the user about the reason for the lock.
+      -- Consider what details to share about the context, as that might be private and
+      -- the string here will be public information.
   deriving (Eq, Show, Ord)
 
 -- | `doesLockExpireBeforeAmulet` computes whether a `TimeLock` expires before a `Amulet`
@@ -195,3 +203,27 @@ isAmuletExpired round amuletAmount =
     -- This amulet will never expire unless it is broken into smaller amount.
     Singleton x -> x.number <= round.round.number - 2
     AfterMaxBound -> False
+
+
+-- AnyValue conversions
+-----------------------
+
+instance ToAnyValue TimeLock where
+  toAnyValue lock = AV_Map $
+    addOptionalAnyValue lockContextContextKey lock.optContext $
+    TextMap.fromList
+      [ (lockExpiresAtContextKey, toAnyValue lock.expiresAt),
+        (lockHoldersContextKey, toAnyValue lock.holders)
+      ]
+
+instance FromAnyValue TimeLock where
+  fromAnyValue (AV_Map values) = do
+    let context = ChoiceContext with values
+    expiresAt <- getFromContext @Time context lockExpiresAtContextKey
+    holders <- getFromContext @[Party] context lockHoldersContextKey
+    optContext <- lookupFromContext @Text context lockContextContextKey
+    pure $ TimeLock with
+      expiresAt
+      holders
+      optContext
+  fromAnyValue _ = error "expected AV_Map for TimeLock"

@@ -3,8 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
-import cats.syntax.foldable.*
 import com.daml.ledger.api.v2.interactive
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
@@ -59,6 +59,7 @@ import org.apache.pekko.stream.Materializer
 
 import java.time.Instant
 import java.util.Base64
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -165,11 +166,11 @@ class HttpValidatorAdminHandler(
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.getValidatorDomainDataSnapshot") { _ => _ =>
       for {
-        domainId <- getAmuletRulesDomain()(tracedContext)
+        synchronizerId <- getAmuletRulesDomain()(tracedContext)
         res <- dumpGenerator
           .getDomainDataSnapshot(
             Instant.parse(timestamp),
-            domainId,
+            synchronizerId,
             // TODO(#9731): get migration id from scan instead of configuring here
             migrationId getOrElse (config.domainMigrationId + 1),
             force.getOrElse(false),
@@ -192,7 +193,7 @@ class HttpValidatorAdminHandler(
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.getDecentralizedSynchronizerConnectionConfig") { _ => _ =>
       for {
-        connectionConfig <- participantAdminConnection.getDomainConnectionConfig(
+        connectionConfig <- participantAdminConnection.getSynchronizerConnectionConfig(
           config.domains.global.alias
         )
       } yield v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse.OK(
@@ -286,42 +287,49 @@ class HttpValidatorAdminHandler(
     }
   }
 
+  @nowarn("msg=deprecated")
   private def decodeSignedTopologyTx(
       publicKey: SigningPublicKey,
       topologyTx: definitions.SignedTopologyTx,
-  ): GenericSignedTopologyTransaction =
+  ): GenericSignedTopologyTransaction = {
+    val tx = TopologyTransaction
+      .fromTrustedByteString(
+        ByteString.copyFrom(Base64.getDecoder.decode(topologyTx.topologyTx))
+      )
+      .valueOr(error =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"failed to construct topology transaction: $error")
+          .asRuntimeException()
+      )
     SignedTopologyTransaction(
-      transaction = TopologyTransaction
-        .fromTrustedByteString(
-          ByteString.copyFrom(Base64.getDecoder.decode(topologyTx.topologyTx))
-        )
-        .valueOr(error =>
-          throw Status.INVALID_ARGUMENT
-            .withDescription(s"failed to construct topology transaction: $error")
-            .asRuntimeException()
-        ),
+      transaction = tx,
       signatures = NonEmpty.mk(
         Set,
-        Signature(
-          Raw,
-          HexString
-            .parseToByteString(topologyTx.signedHash)
-            .getOrElse(
-              throw Status.INVALID_ARGUMENT
-                .withDescription(
-                  s"Failed to decode hex-encoded tx signature: ${topologyTx.signedHash}"
-                )
-                .asRuntimeException
-            ),
-          signedBy = publicKey.fingerprint,
-          signingAlgorithmSpec = None,
+        SingleTransactionSignature(
+          tx.hash,
+          Signature(
+            Raw,
+            HexString
+              .parseToByteString(topologyTx.signedHash)
+              .getOrElse(
+                throw Status.INVALID_ARGUMENT
+                  .withDescription(
+                    s"Failed to decode hex-encoded tx signature: ${topologyTx.signedHash}"
+                  )
+                  .asRuntimeException
+              ),
+            signedBy = publicKey.fingerprint,
+            signingAlgorithmSpec = None,
+            signatureDelegation = None,
+          ),
         ),
       ),
       isProposal = true,
     )(
-      SignedTopologyTransaction.supportedProtoVersions
+      SignedTopologyTransaction.versioningTable
         .protocolVersionRepresentativeFor(ProtocolVersion.dev)
     )
+  }
 
   override def submitExternalPartyTopology(
       respond: v0.ValidatorAdminResource.SubmitExternalPartyTopologyResponse.type
@@ -347,12 +355,10 @@ class HttpValidatorAdminHandler(
           .mapping
         val partyId = partyToParticipant.partyId
         for {
-          _ <- body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)).traverse_ { tx =>
-            participantAdminConnection.addTopologyTransactions(
-              store = TopologyStoreId.AuthorizedStore,
-              txs = Seq(tx),
-            )
-          }
+          _ <- participantAdminConnection.addTopologyTransactions(
+            store = TopologyStoreId.AuthorizedStore,
+            txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
+          )
           // Check the authorized store first
           _ <- participantAdminConnection
             .listPartyToKey(
@@ -379,7 +385,7 @@ class HttpValidatorAdminHandler(
           )
           _ <- participantAdminConnection
             .listPartyToParticipant(
-              filterStore = TopologyStoreId.AuthorizedStore.filterName,
+              store = TopologyStoreId.AuthorizedStore.some,
               filterParty = partyId.filterString,
             )
             .map { txs =>
@@ -392,7 +398,7 @@ class HttpValidatorAdminHandler(
               )
             }
           // now wait for the topology transactions to be broadcast to the domain.
-          domainId <- getAmuletRulesDomain()(tracedContext)
+          synchronizerId <- getAmuletRulesDomain()(tracedContext)
           _ <- retryProvider.retry(
             RetryFor.Automation,
             "broadcast_party_to_key_mapping",
@@ -400,7 +406,7 @@ class HttpValidatorAdminHandler(
             participantAdminConnection
               .listPartyToKey(
                 filterParty = Some(partyId),
-                filterStore = TopologyStoreId.DomainStore(domainId),
+                filterStore = TopologyStoreId.SynchronizerStore(synchronizerId),
               )
               .map { txs =>
                 txs.headOption.getOrElse(
@@ -557,7 +563,7 @@ class HttpValidatorAdminHandler(
     requireWalletEnabled { _ =>
       val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
       for {
-        domainId <- getAmuletRulesDomain()(tracedContext)
+        synchronizerId <- getAmuletRulesDomain()(tracedContext)
         result <- store.lookupExternalPartySetupProposalByUserPartyWithOffset(userParty).flatMap {
           case QueryResult(_, Some(externalPartySetupProposal)) => {
             if (externalPartySetupProposal.contract.contractId.contractId != body.contractId)
@@ -581,11 +587,11 @@ class HttpValidatorAdminHandler(
                 .toSeq
               storeWithIngestion.connection
                 .prepareSubmission(
-                  Some(domainId),
+                  Some(synchronizerId),
                   Seq(userParty),
                   Seq(userParty),
                   commands,
-                  storeWithIngestion.connection.disclosedContracts(externalPartySetupProposal),
+                  DisclosedContracts.Empty,
                   body.verboseHashing.getOrElse(false),
                 )
                 .flatMap { r =>
@@ -723,7 +729,7 @@ class HttpValidatorAdminHandler(
       val senderParty = PartyId.tryFromProtoPrimitive(body.senderPartyId)
       val receiverParty = PartyId.tryFromProtoPrimitive(body.receiverPartyId)
       for {
-        domainId <- getAmuletRulesDomain()(tracedContext)
+        synchronizerId <- getAmuletRulesDomain()(tracedContext)
         // This check is just to make it fail early. The actual preapproval is fixed when the automation
         // executes the transfer but we want the user to get feedback during the prepare step already.
         _ <- scanConnection.lookupTransferPreapprovalByParty(receiverParty).map { preapprovalO =>
@@ -758,7 +764,7 @@ class HttpValidatorAdminHandler(
           .toSeq
         r <- storeWithIngestion.connection
           .prepareSubmission(
-            Some(domainId),
+            Some(synchronizerId),
             Seq(senderParty),
             Seq(senderParty),
             commands,

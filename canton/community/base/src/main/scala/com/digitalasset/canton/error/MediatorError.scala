@@ -1,9 +1,16 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error
 
-import com.daml.error.*
+import com.digitalasset.base.error.{
+  Alarm,
+  AlarmErrorCode,
+  ErrorCategory,
+  ErrorCode,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.error.CantonErrorGroups.MediatorErrorGroup
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import org.slf4j.event.Level
@@ -29,7 +36,7 @@ object MediatorError extends MediatorErrorGroup {
     final case class Reject(
         override val cause: String = Reject.defaultCause,
         unresponsiveParties: String = "",
-    ) extends BaseCantonError.Impl(cause)
+    ) extends CantonBaseError.Impl(cause)
         with MediatorError {
 
       override def isMalformed: Boolean = false
@@ -67,7 +74,7 @@ object MediatorError extends MediatorErrorGroup {
 
     final case class Reject(
         override val cause: String
-    ) extends BaseCantonError.Impl(cause)
+    ) extends CantonBaseError.Impl(cause)
         with MediatorError {
 
       override def isMalformed: Boolean = false
@@ -91,7 +98,7 @@ object MediatorError extends MediatorErrorGroup {
         override val cause: String
     ) extends Alarm(cause)
         with MediatorError
-        with BaseCantonError {
+        with CantonBaseError {
 
       override def isMalformed: Boolean = true
 
@@ -112,11 +119,12 @@ object MediatorError extends MediatorErrorGroup {
         ErrorCategory.SystemInternalAssumptionViolated,
       ) {
 
-    /** @param throwableO optional throwable that will not be serialized and is therefore not delivered to clients.
+    /** @param throwableO
+      *   optional throwable that will not be serialized and is therefore not delivered to clients.
       */
     final case class Reject(
         override val cause: String,
         override val throwableO: Option[Throwable] = None,
-    ) extends BaseCantonError.Impl(cause)
+    ) extends CantonBaseError.Impl(cause)
   }
 }

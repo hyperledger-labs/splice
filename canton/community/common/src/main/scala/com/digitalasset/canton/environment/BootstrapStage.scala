@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -14,7 +14,7 @@ import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
   HasCloseContext,
-  Lifecycle,
+  LifeCycle,
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -45,7 +45,7 @@ sealed trait BootstrapStageOrLeaf[T <: CantonNode]
 
 }
 
-class RunningNode[T <: CantonNode](
+final class RunningNode[T <: CantonNode](
     val bootstrap: BootstrapStage.Callback,
     val node: T,
 )(implicit ec: ExecutionContext)
@@ -71,24 +71,24 @@ abstract class BootstrapStage[T <: CantonNode, StageResult <: BootstrapStageOrLe
   private val closeables = new AtomicReference[Seq[AutoCloseable]](Seq.empty)
   protected val stageResult = new AtomicReference[Option[StageResult]](None)
 
-  /** can be used to track closeables created with this class that should be cleaned up after this stage */
+  /** can be used to track closeables created with this class that should be cleaned up after this
+    * stage
+    */
   protected def addCloseable[C <: AutoCloseable](item: C): Unit =
     closeables.updateAndGet(_ :+ item).discard
 
   /** indicates the type of external input the stage might be waiting for */
   def waitingFor: Option[WaitingForExternalInput] = None
 
-  /** main handler to implement where we attempt to init this stage
-    * if we return None, then the init was okay but stopped at this level (waiting for
-    *   further input)
+  /** main handler to implement where we attempt to init this stage if we return None, then the init
+    * was okay but stopped at this level (waiting for further input)
     */
   protected def attempt()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Option[StageResult]]
 
-  /** the attempt and store handler that runs sequential on the init queue
-    * it will attempt to create the next stage and store it in the current
-    *   atomic reference
+  /** the attempt and store handler that runs sequential on the init queue it will attempt to create
+    * the next stage and store it in the current atomic reference
     */
   protected def attemptAndStore()(implicit
       traceContext: TraceContext
@@ -116,8 +116,8 @@ abstract class BootstrapStage[T <: CantonNode, StageResult <: BootstrapStageOrLe
       description,
     )
 
-  /** iterative start handler which will attempt to start the stages until
-    * we are either up and running or awaiting some init action by the user
+  /** iterative start handler which will attempt to start the stages until we are either up and
+    * running or awaiting some init action by the user
     */
   def start()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
     if (stageResult.get().isDefined) {
@@ -133,7 +133,7 @@ abstract class BootstrapStage[T <: CantonNode, StageResult <: BootstrapStageOrLe
         case Some(stage) =>
           logger.debug(s"Succeeded startup stage: $description")
           def closeOnFailure() = {
-            Lifecycle.close(this)(logger)
+            LifeCycle.close(this)(logger)
             bootstrap.abortThisNodeOnStartupFailure()
           }
           stage
@@ -166,7 +166,7 @@ abstract class BootstrapStage[T <: CantonNode, StageResult <: BootstrapStageOrLe
     val stageResultCloseables = stageResult.getAndSet(None).toList
     val thisStageCloseables = closeables.getAndSet(Seq.empty).reverse
     val allCloseables = stageResultCloseables ++ thisStageCloseables
-    Lifecycle.close(allCloseables*)(logger)
+    LifeCycle.close(allCloseables*)(logger)
   }
 
 }
@@ -186,8 +186,8 @@ abstract class BootstrapStageWithStorage[
 
   private val backgroundStarted = new AtomicBoolean(false)
 
-  /** if a passive node hits a manual init step, it will return "start" is succeeded
-    * and wait in the background for the active node to finish the startup sequence
+  /** if a passive node hits a manual init step, it will return "start" is succeeded and wait in the
+    * background for the active node to finish the startup sequence
     */
   protected def toBackgroundForPassiveNode()(implicit traceContext: TraceContext): Unit =
     if (!backgroundStarted.getAndSet(true)) {
@@ -232,17 +232,16 @@ abstract class BootstrapStageWithStorage[
   /** test whether the stage is completed already through a previous init. if so, return result */
   protected def stageCompleted(implicit
       traceContext: TraceContext
-  ): Future[Option[M]]
+  ): FutureUnlessShutdown[Option[M]]
 
   /** given the result of this stage, create the next stage */
   protected def buildNextStage(result: M): EitherT[FutureUnlessShutdown, String, StageResult]
 
-  /** if the stage didn't complete yet, the node is active and auto-init is set to true, perform
-    * the steps necessary. note, this invocation will be thread safe and only run once
-    * however, any implementation needs to be crash resilient, if it didn't complete fully, it
-    * might be called again.
-    * if this stage does not support auto-init, you must return None
-    * the method may throw "PassiveInstanceException" if it becomes passive
+  /** if the stage didn't complete yet, the node is active and auto-init is set to true, perform the
+    * steps necessary. note, this invocation will be thread safe and only run once however, any
+    * implementation needs to be crash resilient, if it didn't complete fully, it might be called
+    * again. if this stage does not support auto-init, you must return None. The method may throw
+    * "PassiveInstanceException" if it becomes passive
     */
   protected def autoCompleteStage(): EitherT[FutureUnlessShutdown, String, Option[M]]
 
@@ -261,7 +260,7 @@ abstract class BootstrapStageWithStorage[
         EitherT.pure[FutureUnlessShutdown, String][Option[StageResult]](None)
       } else {
         EitherT
-          .right[String](performUnlessClosingF("check-already-init")(stageCompleted))
+          .right[String](performUnlessClosingUSF("check-already-init")(stageCompleted))
           .flatMap[String, Option[StageResult]] {
             case Some(result) =>
               logger.info(
@@ -294,7 +293,7 @@ abstract class BootstrapStageWithStorage[
         } else
           {
             for {
-              current <- performUnlessClosingEitherU(s"check-already-init-$description")(
+              current <- performUnlessClosingEitherUSF(s"check-already-init-$description")(
                 EitherT.right[String](stageCompleted)
               )
               _ <- EitherT.cond[FutureUnlessShutdown](
@@ -331,7 +330,7 @@ abstract class BootstrapStageWithStorage[
   ): EitherT[FutureUnlessShutdown, String, Option[StageResult]] =
     performUnlessClosingEitherUSF(description) {
       for {
-        result <- EitherT.right(stageCompleted).mapK(FutureUnlessShutdown.outcomeK)
+        result <- EitherT.right(stageCompleted)
         stageO <- result match {
           case Some(result) =>
             buildNextStage(result).map(Some(_))

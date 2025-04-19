@@ -78,6 +78,9 @@ spec:
   servers:
   - hosts:
     - "public.{{ (.Values.cluster).hostname }}"
+    {{- if .Values.publicDocs }}
+    - "docs.{{ (.Values.cluster).hostname }}"
+    {{- end }}
     port:
       name: http
       number: 80
@@ -93,3 +96,6 @@ spec:
       credentialName: cn-{{ (.Values.cluster).basename }}net-tls
     hosts:
     - "public.{{ (.Values.cluster).hostname }}"
+    {{- if .Values.publicDocs }}
+    - "docs.{{ (.Values.cluster).hostname }}"
+    {{- end }}

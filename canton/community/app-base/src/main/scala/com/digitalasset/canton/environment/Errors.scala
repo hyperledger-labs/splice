@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -69,4 +69,8 @@ sealed trait ShutdownError {
   */
 final case class ConfigurationNotFound(name: String) extends StartupError with ShutdownError {
   def message = s"configuration not found: $name"
+}
+
+final case class InvalidDeclarativeStateConfig(name: String, err: String) extends StartupError {
+  def message: String = "invalid declarative state config: " + err
 }

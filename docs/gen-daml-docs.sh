@@ -14,8 +14,9 @@ gen_project_docs () (
     local -a DAML_FILES
     readarray -t DAML_FILES < <(find daml -name '*.daml')
     "$DAMLC_VERSION_DIR/damlc/damlc" docs --index-template "$DOCS_DIR/api-templates/$2-index-template.rst" "${DAML_FILES[@]}" --exclude-modules '**.Scripts.**' -f rst -o "$DOCS_DIR/src/app_dev/api/$2"
-    # Workaround to fix indentation issues in rst output due to https://github.com/digital-asset/daml/issues/16956
-    find "$DOCS_DIR/src/app_dev/api/$2" -name '*.rst' -exec sed -i -z 's!\( *\)\(Controller\\: [^\n]*map\)\n *\([^\n]*\)\n *\([^\n]*\)\n!\1\2\n\1\3\n\1\4\n!g' {} +
+    # Workaround for https://github.com/digital-asset/daml/pull/20889/files so we get toctrees again
+    # shellcheck disable=SC2016
+    find "$DOCS_DIR/src/app_dev/api/$2" -name '*.rst' -exec sed -i 's/^* :doc:`\(.*\)`$/   \1/g' {} +
 )
 
 ensure_damlc_exists() {
@@ -39,9 +40,15 @@ ensure_damlc_exists() {
 
 ensure_damlc_exists
 
-DAML_PROJECT_FILES="$(find "$SPLICE_ROOT/daml" -maxdepth 2 \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml -not -ipath '*-test*' -not -ipath '*splitwell*' -not -ipath '*app-manager*' -print)"
+DAML_PROJECT_FILES="\
+  $(find "$SPLICE_ROOT/daml" "$SPLICE_ROOT/token-standard" -maxdepth 2 \
+    \( -name target -o -name .daml -o -name src \) -prune -o -name daml.yaml \
+    -not \( -ipath '*-test*' -not -ipath '*splice-token-standard-test*' \)  \
+    -not -ipath '*splitwell*' \
+    -not -ipath '*app-manager*' \
+    -print)"
 for project_file in $DAML_PROJECT_FILES
 do
-    project="$(basename "$(dirname "$project_file")")"
-    gen_project_docs "daml/$project" "$project"
+    project_dir="$(dirname "${project_file#"$SPLICE_ROOT"/}")"
+    gen_project_docs "$project_dir" "$(basename "$project_dir")"
 done

@@ -1,13 +1,11 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
-import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.platform.indexer.parallel.{PostPublishData, PublishSource}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -31,7 +29,7 @@ private[backend] trait StorageBackendTestsCompletions
   it should "correctly find completions by offset range" in {
     TraceContext.withNewTraceContext { aTraceContext =>
       val party = someParty
-      val applicationId = someApplicationId
+      val userId = someUserId
       val emptyTraceContext = SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
       val serializableTraceContext = SerializableTraceContext(aTraceContext).toDamlProto.toByteArray
 
@@ -50,15 +48,33 @@ private[backend] trait StorageBackendTestsCompletions
       executeSql(updateLedgerEnd(offset(3), 3L))
       val completions0to2 = executeSql(
         backend.completion
-          .commandCompletions(Offset.beforeBegin, offset(2), applicationId, Set(party), limit = 10)
+          .commandCompletions(
+            Offset.firstOffset,
+            offset(2),
+            userId,
+            Set(party),
+            limit = 10,
+          )
       )
       val completions1to2 = executeSql(
         backend.completion
-          .commandCompletions(offset(1), offset(2), applicationId, Set(party), limit = 10)
+          .commandCompletions(
+            offset(2),
+            offset(2),
+            userId,
+            Set(party),
+            limit = 10,
+          )
       )
       val completions0to9 = executeSql(
         backend.completion
-          .commandCompletions(Offset.beforeBegin, offset(9), applicationId, Set(party), limit = 10)
+          .commandCompletions(
+            Offset.firstOffset,
+            offset(9),
+            userId,
+            Set(party),
+            limit = 10,
+          )
       )
 
       completions0to2 should have length 2
@@ -73,9 +89,9 @@ private[backend] trait StorageBackendTestsCompletions
     }
   }
 
-  it should "correctly persist and retrieve application IDs" in {
+  it should "correctly persist and retrieve user IDs" in {
     val party = someParty
-    val applicationId = someApplicationId
+    val userId = someUserId
 
     val dtos = Vector(
       dtoCompletion(offset(1), submitters = Set(party))
@@ -87,13 +103,19 @@ private[backend] trait StorageBackendTestsCompletions
 
     val completions = executeSql(
       backend.completion
-        .commandCompletions(Offset.beforeBegin, offset(1), applicationId, Set(party), limit = 10)
+        .commandCompletions(
+          Offset.firstOffset,
+          offset(1),
+          userId,
+          Set(party),
+          limit = 10,
+        )
     )
 
     completions should not be empty
     completions.head.completionResponse.completion should not be empty
-    completions.head.completionResponse.completion.toList.head.applicationId should be(
-      applicationId
+    completions.head.completionResponse.completion.toList.head.userId should be(
+      userId
     )
   }
 
@@ -112,9 +134,9 @@ private[backend] trait StorageBackendTestsCompletions
     val completions = executeSql(
       backend.completion
         .commandCompletions(
-          Offset.beforeBegin,
+          Offset.firstOffset,
           offset(2),
-          someApplicationId,
+          someUserId,
           Set(party),
           limit = 10,
         )
@@ -135,14 +157,13 @@ private[backend] trait StorageBackendTestsCompletions
 
   it should "correctly persist and retrieve command deduplication offsets" in {
     val party = someParty
-    val anOffset = Offset.beforeBegin.toLong
-    val anOffsetHex = ApiOffset.fromLong(anOffset)
+    val anOffset = 1L
 
     val dtos = Vector(
       dtoCompletion(
         offset(1),
         submitters = Set(party),
-        deduplicationOffset = Some(anOffsetHex),
+        deduplicationOffset = Some(anOffset),
       ),
       dtoCompletion(offset(2), submitters = Set(party), deduplicationOffset = None),
     )
@@ -154,9 +175,9 @@ private[backend] trait StorageBackendTestsCompletions
     val completions = executeSql(
       backend.completion
         .commandCompletions(
-          Offset.beforeBegin,
+          Offset.firstOffset,
           offset(2),
-          someApplicationId,
+          someUserId,
           Set(party),
           limit = 10,
         )
@@ -202,9 +223,9 @@ private[backend] trait StorageBackendTestsCompletions
     val completions = executeSql(
       backend.completion
         .commandCompletions(
-          Offset.beforeBegin,
+          Offset.firstOffset,
           offset(2),
-          someApplicationId,
+          someUserId,
           Set(party),
           limit = 10,
         )
@@ -245,9 +266,9 @@ private[backend] trait StorageBackendTestsCompletions
     val completions = executeSql(
       backend.completion
         .commandCompletions(
-          Offset.beforeBegin,
+          Offset.firstOffset,
           offset(2),
-          someApplicationId,
+          someUserId,
           Set(party, party2),
           limit = 10,
         )
@@ -290,9 +311,9 @@ private[backend] trait StorageBackendTestsCompletions
     val caught = intercept[IllegalArgumentException](
       executeSql(
         backend.completion.commandCompletions(
-          Offset.beforeBegin,
+          Offset.firstOffset,
           offset(1),
-          someApplicationId,
+          someUserId,
           Set(party),
           limit = 10,
         )
@@ -315,9 +336,9 @@ private[backend] trait StorageBackendTestsCompletions
     val caught2 = intercept[IllegalArgumentException](
       executeSql(
         backend.completion.commandCompletions(
-          offset(1),
           offset(2),
-          someApplicationId,
+          offset(2),
+          someUserId,
           Set(party),
           limit = 10,
         )
@@ -340,9 +361,9 @@ private[backend] trait StorageBackendTestsCompletions
         offset = offset(2),
         submitters = Set(someParty),
         commandId = commandId,
-        applicationId = "applicationid1",
+        userId = "userid1",
         submissionId = Some(submissionId),
-        domainId = "x::domain1",
+        synchronizerId = "x::synchronizer1",
         messageUuid = Some(messageUuid.toString),
         publicationTime = publicationTime,
         isTransaction = true,
@@ -351,9 +372,9 @@ private[backend] trait StorageBackendTestsCompletions
         offset = offset(5),
         submitters = Set(someParty),
         commandId = commandId,
-        applicationId = "applicationid1",
+        userId = "userid1",
         submissionId = Some(submissionId),
-        domainId = "x::domain1",
+        synchronizerId = "x::synchronizer1",
         messageUuid = Some(messageUuid.toString),
         publicationTime = publicationTime,
         isTransaction = false,
@@ -362,41 +383,26 @@ private[backend] trait StorageBackendTestsCompletions
         offset = offset(9),
         submitters = Set(someParty),
         commandId = commandId,
-        applicationId = "applicationid1",
+        userId = "userid1",
         submissionId = Some(submissionId),
-        domainId = "x::domain1",
+        synchronizerId = "x::synchronizer1",
         recordTime = recordTime,
         messageUuid = None,
         updateId = None,
         publicationTime = publicationTime,
         isTransaction = true,
-        requestSequencerCounter = Some(11),
-      ),
-      dtoCompletion(
-        offset = offset(11),
-        submitters = Set(someParty),
-        commandId = commandId,
-        applicationId = "applicationid1",
-        submissionId = Some(submissionId),
-        domainId = "x::domain1",
-        recordTime = recordTime,
-        messageUuid = None,
-        updateId = None,
-        publicationTime = publicationTime,
-        isTransaction = true,
-        requestSequencerCounter = None,
       ),
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(ingest(dtos, _))
     executeSql(
-      backend.completion.commandCompletionsForRecovery(offset(1), offset(10))
+      backend.completion.commandCompletionsForRecovery(offset(2), offset(10))
     ) shouldBe Vector(
       PostPublishData(
-        submissionDomainId = DomainId.tryFromString("x::domain1"),
+        submissionSynchronizerId = SynchronizerId.tryFromString("x::synchronizer1"),
         publishSource = PublishSource.Local(messageUuid),
-        applicationId = Ref.ApplicationId.assertFromString("applicationid1"),
+        userId = Ref.UserId.assertFromString("userid1"),
         commandId = Ref.CommandId.assertFromString(commandId),
         actAs = Set(someParty),
         offset = offset(2),
@@ -406,12 +412,11 @@ private[backend] trait StorageBackendTestsCompletions
         traceContext = TraceContext.empty,
       ),
       PostPublishData(
-        submissionDomainId = DomainId.tryFromString("x::domain1"),
+        submissionSynchronizerId = SynchronizerId.tryFromString("x::synchronizer1"),
         publishSource = PublishSource.Sequencer(
-          requestSequencerCounter = SequencerCounter(11),
-          sequencerTimestamp = CantonTimestamp(recordTime),
+          sequencerTimestamp = CantonTimestamp(recordTime)
         ),
-        applicationId = Ref.ApplicationId.assertFromString("applicationid1"),
+        userId = Ref.UserId.assertFromString("userid1"),
         commandId = Ref.CommandId.assertFromString(commandId),
         actAs = Set(someParty),
         offset = offset(9),
@@ -421,10 +426,5 @@ private[backend] trait StorageBackendTestsCompletions
         traceContext = TraceContext.empty,
       ),
     )
-
-    // this tries to deserialize the last dto which has an invalid combination of message_uuid and request_sequencer_counter
-    intercept[IllegalStateException](
-      executeSql(backend.completion.commandCompletionsForRecovery(offset(2), offset(11)))
-    ).getMessage should include("if message_uuid is empty, this field should be populated")
   }
 }

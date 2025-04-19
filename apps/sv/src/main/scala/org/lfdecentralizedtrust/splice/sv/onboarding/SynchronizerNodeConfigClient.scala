@@ -63,11 +63,11 @@ trait SynchronizerNodeConfigClient {
   ): OptionT[Future, (DsoRulesStore.DsoRulesWithSvNodeState, Option[SynchronizerNodeConfig])] = {
     for {
       rulesAndState <- OptionT.liftF(dsoStore.getDsoRulesWithSvNodeState(svParty))
-      domainId = rulesAndState.dsoRules.domain
+      synchronizerId = rulesAndState.dsoRules.domain
       nodeState = rulesAndState.svNodeState.payload
       synchronizerNodeConfig =
         nodeState.state.synchronizerNodes.asScala.get(
-          domainId.toProtoPrimitive
+          synchronizerId.toProtoPrimitive
         )
     } yield (rulesAndState, synchronizerNodeConfig)
   }
@@ -81,11 +81,11 @@ trait SynchronizerNodeConfigClient {
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Unit] = {
-    val domainId = rulesAndState.dsoRules.domain
+    val synchronizerId = rulesAndState.dsoRules.domain
     val cmd = rulesAndState.dsoRules.exercise(
       _.exerciseDsoRules_SetSynchronizerNodeConfig(
         store.key.svParty.toProtoPrimitive,
-        domainId.toProtoPrimitive,
+        synchronizerId.toProtoPrimitive,
         newSvNodeConfig,
         rulesAndState.svNodeState.contractId,
       )

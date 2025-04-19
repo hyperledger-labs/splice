@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
@@ -8,8 +8,8 @@ import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.{BatchingExecutorCanton, ExecutionContextExecutor}
 
-/** A light-weight execution context that runs tasks on the thread calling `execute`.
-  * Only use this for running tasks that will terminate very quickly.
+/** A light-weight execution context that runs tasks on the thread calling `execute`. Only use this
+  * for running tasks that will terminate very quickly.
   */
 final case class DirectExecutionContext(logger: Logger)
     extends ExecutionContextExecutor

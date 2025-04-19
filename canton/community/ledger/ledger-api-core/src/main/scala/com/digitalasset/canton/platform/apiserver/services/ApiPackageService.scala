@@ -1,9 +1,8 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.package_service.PackageServiceGrpc.PackageService
 import com.daml.ledger.api.v2.package_service.{
   GetPackageRequest,
@@ -23,7 +22,7 @@ import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.grpc.Logging.traceId
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.ledger.participant.state.WriteService
+import com.digitalasset.canton.ledger.participant.state.PackageSyncService
 import com.digitalasset.canton.logging.LoggingContextUtil.createLoggingContext
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   implicitExtractTraceContext,
@@ -36,6 +35,7 @@ import com.digitalasset.canton.logging.{
   NamedLoggerFactory,
   NamedLogging,
 }
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.daml.lf.archive.DamlLf.{Archive, HashFunction}
 import com.digitalasset.daml.lf.data.Ref
 import io.grpc.ServerServiceDefinition
@@ -43,7 +43,7 @@ import io.grpc.ServerServiceDefinition
 import scala.concurrent.{ExecutionContext, Future}
 
 private[apiserver] final class ApiPackageService(
-    writeService: WriteService,
+    packageSyncService: PackageSyncService,
     telemetry: Telemetry,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -62,10 +62,10 @@ private[apiserver] final class ApiPackageService(
     implicit val loggingContextWithTrace: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory, telemetry)
     logger.info(s"Received request to list packages: $request")
-    writeService
+    packageSyncService
       .listLfPackages()
-      .map(p => ListPackagesResponse(p.map(_.packageId.toString)))
-      .andThen(logger.logErrorsOnCall[ListPackagesResponse])
+      .map(p => ListPackagesResponse(p.map(_.packageId)))
+      .thereafter(logger.logErrorsOnCall[ListPackagesResponse])
   }
 
   override def getPackage(request: GetPackageRequest): Future[GetPackageResponse] =
@@ -75,20 +75,20 @@ private[apiserver] final class ApiPackageService(
     ) { implicit loggingContext =>
       logger.info(s"Received request for a package: $request")
       withValidatedPackageId(request.packageId, request) { packageId =>
-        writeService
+        packageSyncService
           .getLfArchive(packageId)
           .flatMap {
             case None =>
               Future.failed[GetPackageResponse](
                 RequestValidationErrors.NotFound.Package
                   .Reject(packageId = packageId)(
-                    createContextualizedErrorLogger
+                    createerrorLoggingContext
                   )
                   .asGrpcError
               )
             case Some(archive) => Future.successful(toGetPackageResponse(archive))
           }
-          .andThen(logger.logErrorsOnCall[GetPackageResponse])
+          .thereafter(logger.logErrorsOnCall[GetPackageResponse])
       }
     }
 
@@ -103,7 +103,9 @@ private[apiserver] final class ApiPackageService(
         Future {
           val result =
             if (
-              writeService.getPackageMetadataSnapshot.packageIdVersionMap.keySet.contains(packageId)
+              packageSyncService.getPackageMetadataSnapshot.packageIdVersionMap.keySet.contains(
+                packageId
+              )
             ) {
               PackageStatus.PACKAGE_STATUS_REGISTERED
             } else {
@@ -111,7 +113,7 @@ private[apiserver] final class ApiPackageService(
             }
           GetPackageStatusResponse(result)
         }
-          .andThen(logger.logErrorsOnCall[GetPackageStatusResponse])
+          .thereafter(logger.logErrorsOnCall[GetPackageStatusResponse])
       }
     }
 
@@ -128,7 +130,7 @@ private[apiserver] final class ApiPackageService(
               request,
               ValidationErrors
                 .invalidArgument(s"Invalid package id: $errorMessage")(
-                  createContextualizedErrorLogger
+                  createerrorLoggingContext
                 ),
             )
           ),
@@ -147,8 +149,8 @@ private[apiserver] final class ApiPackageService(
     )
   }
 
-  private def createContextualizedErrorLogger(implicit
+  private def createerrorLoggingContext(implicit
       loggingContext: LoggingContextWithTrace
-  ): ContextualizedErrorLogger =
+  ): ErrorLoggingContext =
     ErrorLoggingContext(logger, loggingContext)
 }

@@ -3,21 +3,19 @@
 
 package org.lfdecentralizedtrust.splice.migration
 
-import cats.implicits.catsSyntaxParallelTraverse_
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   ParticipantAdminConnection,
   RetryFor,
 }
 import org.lfdecentralizedtrust.splice.util.UploadablePackage
-import com.digitalasset.canton.config.{DomainTimeTrackerConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{SynchronizerTimeTrackerConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -34,8 +32,8 @@ class DomainDataRestorer(
   def connectDomainAndRestoreData(
       ledgerConnection: BaseLedgerConnection,
       userId: String,
-      domainAlias: DomainAlias,
-      domainId: DomainId,
+      synchronizerAlias: SynchronizerAlias,
+      synchronizerId: SynchronizerId,
       sequencerConnections: SequencerConnections,
       dars: Seq[Dar],
       acsSnapshot: ByteString,
@@ -52,13 +50,13 @@ class DomainDataRestorer(
       )
       .flatMap {
         case None =>
-          val domainConnectionConfig = DomainConnectionConfig(
-            domainAlias,
-            domainId = Some(domainId),
+          val domainConnectionConfig = SynchronizerConnectionConfig(
+            synchronizerAlias,
+            synchronizerId = Some(synchronizerId),
             sequencerConnections = sequencerConnections,
             manualConnect = true,
-            initializeFromTrustedDomain = true,
-            timeTracker = DomainTimeTrackerConfig(
+            initializeFromTrustedSynchronizer = true,
+            timeTracker = SynchronizerTimeTrackerConfig(
               timeTrackerMinObservationDuration
             ),
           )
@@ -77,8 +75,8 @@ class DomainDataRestorer(
             _ = logger.info("Importing the ACS")
             _ <- importAcs(acsSnapshot)
             _ = logger.info("Imported the ACS")
-            _ <- participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
-              domainAlias,
+            _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
+              synchronizerAlias,
               config => Some(config.copy(manualConnect = false)),
             )
             _ <- ledgerConnection.ensureUserMetadataAnnotation(
@@ -90,7 +88,7 @@ class DomainDataRestorer(
           } yield ()
         case Some(_) =>
           logger.info("Domain is already registered and ACS is imported")
-          participantAdminConnection.connectDomain(domainAlias)
+          participantAdminConnection.connectDomain(synchronizerAlias)
       }
   }
 
@@ -101,16 +99,14 @@ class DomainDataRestorer(
   }
 
   private def importDars(dars: Seq[Dar])(implicit tc: TraceContext) = {
-    dars
+    val packages = dars
       .map { dar =>
-        UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
+        UploadablePackage.fromByteString(dar.mainPackageId, dar.content)
       }
-      .parTraverse_ { dar =>
-        participantAdminConnection.uploadDarFileLocally(
-          dar,
-          RetryFor.WaitingOnInitDependency,
-        )
-      }
+    participantAdminConnection.uploadDarFiles(
+      packages,
+      RetryFor.WaitingOnInitDependency,
+    )
   }
 
 }

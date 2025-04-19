@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -6,18 +6,16 @@ package com.digitalasset.canton.participant.store
 import cats.syntax.parallel.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.HasCloseContext
-import com.digitalasset.canton.participant.admin.repair.RepairContext
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.participant.protocol.RequestJournal.RequestData
 import com.digitalasset.canton.participant.protocol.RequestJournal.RequestState.*
-import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.{BaseTest, RequestCounter}
+import com.digitalasset.canton.participant.util.TimeOfRequest
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.{BaseTest, FailOnShutdown, RequestCounter}
 import org.scalatest.wordspec.AsyncWordSpecLike
 
-import scala.concurrent.Future
-
-trait RequestJournalStoreTest {
-  this: AsyncWordSpecLike with BaseTest with HasCloseContext =>
+trait RequestJournalStoreTest extends FailOnShutdown {
+  this: AsyncWordSpecLike & BaseTest & HasCloseContext =>
 
   def requestJournalStore(mk: () => RequestJournalStore): Unit = {
     val rc = RequestCounter(0)
@@ -29,14 +27,15 @@ trait RequestJournalStoreTest {
       (rc + 2, Clean, tsWithSecs(3)),
       (rc + 4, Pending, tsWithSecs(5)),
     )
-    def setupRequests(store: RequestJournalStore): Future[List[Unit]] = Future.traverse(requests) {
-      case (reqC, state, timestamp) =>
+    def setupRequests(store: RequestJournalStore): FutureUnlessShutdown[Unit] = MonadUtil
+      .sequentialTraverse(requests) { case (reqC, state, timestamp) =>
         val data = state match {
           case Clean => RequestData.clean(reqC, timestamp, commitTime)
           case Pending => RequestData.initial(reqC, timestamp)
         }
         store.insert(data)
-    }
+      }
+      .map(_ => ())
 
     "insert and retrieve request" in {
       val store = mk()
@@ -58,16 +57,19 @@ trait RequestJournalStoreTest {
       "find the first request by request counter whose commit time is after" in {
         val store = mk()
         val data0 = RequestData.initial(rc, ts)
-        val data1 = RequestData.clean(rc + 1L, ts, ts.plusSeconds(10))
+        val data1 = RequestData.clean(rc + 1L, ts.plusSeconds(1), ts.plusSeconds(10))
         val data2 = RequestData.clean(rc + 2L, ts.plusSeconds(2), ts.plusSeconds(4))
-        val data3 = RequestData.clean(rc + 3L, ts.plusSeconds(2), ts.plusSeconds(5))
+        val data3 = RequestData.clean(rc + 3L, ts.plusSeconds(3), ts.plusSeconds(5))
         val inserts = List(data0, data1, data2, data3)
         for {
           _ <- inserts.parTraverse(store.insert)
           find5 <- store.firstRequestWithCommitTimeAfter(ts.plusSeconds(5))
           find1 <- store.firstRequestWithCommitTimeAfter(ts.plusSeconds(1))
           find10 <- store.firstRequestWithCommitTimeAfter(ts.plusSeconds(10))
-          _ <- valueOrFail(store.replace(rc, ts, Clean, Some(ts.plusSeconds(10))))(
+          _ <- valueOrFail(
+            store
+              .replace(rc, ts, Clean, Some(ts.plusSeconds(10)))
+          )(
             s"replace $rc from $Pending to $Clean"
           )
           find7 <- store.firstRequestWithCommitTimeAfter(ts.plusSeconds(7))
@@ -85,7 +87,7 @@ trait RequestJournalStoreTest {
 
     "inserting is idempotent" in {
       val store = mk()
-      val data = RequestData(rc, Pending, ts, Some(RepairContext.tryCreate("repair-trace-context")))
+      val data = RequestData(rc, Pending, ts)
       for {
         _ <- store.insert(data)
         _ <- store.insert(data)
@@ -103,34 +105,25 @@ trait RequestJournalStoreTest {
       } yield succeed
     }
 
-    "inserting repair request preserves repair context" in {
+    "inserting fails if inserting conflicting timestamps" in {
       val store = mk()
-      val firstRepair = RepairContext.tryCreate("first repair")
-      val secondRepair = RepairContext.tryCreate("second repair")
-      val data0 = RequestData(rc, Pending, ts)
-      val data1 = RequestData.clean(rc + 1L, ts, ts, Some(firstRepair))
-      val data2 = RequestData.clean(rc + 2L, ts, ts, Some(secondRepair))
+      val data = RequestData(rc, Pending, ts)
+      val data2 = RequestData(rc + 1, Pending, ts)
       for {
-        _regularRequest <- store.insert(data0)
-        _regularResult <- valueOrFail(store.replace(rc, ts, Clean, Some(commitTime)))(
-          s"relace $rc from $Pending to $Clean"
-        )
-        _firstRepair <- store.insert(data1)
-        _secondRepair <- store.insert(data2)
-        firstRepairResult <- store.query(rc + 1L).value
-        secondRepairResult <- store.query(rc + 2L).value
-      } yield {
-        firstRepairResult shouldBe Some(data1)
-        secondRepairResult shouldBe Some(data2)
-      }
+        _ <- store.insert(data)
+        _ <- loggerFactory.suppressWarningsAndErrors(store.insert(data2).failed)
+      } yield succeed
     }
 
     "replace state" in {
       val store = mk()
       for {
         _ <- store.insert(RequestData(rc, Pending, ts))
-        _ <- valueOrFail(store.replace(rc, ts, Clean, Some(CantonTimestamp.Epoch)))("replace")
-        result <- valueOrFail(store.query(rc))("query")
+        _ <- valueOrFail(
+          store
+            .replace(rc, ts, Clean, Some(CantonTimestamp.Epoch))
+        )("replace")
+        result <- valueOrFailUS(store.query(rc))("query")
       } yield result shouldBe RequestData.clean(rc, ts, CantonTimestamp.Epoch)
     }
 
@@ -138,9 +131,15 @@ trait RequestJournalStoreTest {
       val store = mk()
       for {
         _ <- store.insert(RequestData(rc, Pending, ts))
-        _ <- valueOrFail(store.replace(rc, ts, Clean, Some(CantonTimestamp.Epoch)))("replace")
-        _ <- valueOrFail(store.replace(rc, ts, Clean, Some(CantonTimestamp.Epoch)))("replace again")
-        result <- valueOrFail(store.query(rc))("query")
+        _ <- valueOrFail(
+          store
+            .replace(rc, ts, Clean, Some(CantonTimestamp.Epoch))
+        )("replace")
+        _ <- valueOrFail(
+          store
+            .replace(rc, ts, Clean, Some(CantonTimestamp.Epoch))
+        )("replace again")
+        result <- valueOrFailUS(store.query(rc))("query")
       } yield result shouldBe RequestData.clean(rc, ts, CantonTimestamp.Epoch)
     }
 
@@ -149,11 +148,12 @@ trait RequestJournalStoreTest {
       for {
         _ <- store.insert(RequestData(rc, Pending, ts))
         replaced <- leftOrFail(
-          store.replace(rc, ts.plusSeconds(1), Clean, Some(ts.plusSeconds(2)))
+          store
+            .replace(rc, ts.plusSeconds(1), Clean, Some(ts.plusSeconds(2)))
         )(
           "replace"
         )
-        result <- valueOrFail(store.query(rc))("query")
+        result <- valueOrFailUS(store.query(rc))("query")
       } yield {
         replaced shouldBe InconsistentRequestTimestamp(rc, ts, ts.plusSeconds(1))
         result shouldBe RequestData(rc, Pending, ts)
@@ -171,10 +171,12 @@ trait RequestJournalStoreTest {
       val store = mk()
       for {
         _ <- store.insert(RequestData(rc, Pending, ts))
-        replaced <- leftOrFail(store.replace(rc, ts, Clean, Some(ts.plusSeconds(-1))))(
+        replaced <- leftOrFail(
+          store.replace(rc, ts, Clean, Some(ts.plusSeconds(-1)))
+        )(
           "replace"
         )
-        result <- valueOrFail(store.query(rc))("query")
+        result <- valueOrFailUS(store.query(rc))("query")
       } yield {
         replaced shouldBe CommitTimeBeforeRequestTime(rc, ts, ts.plusSeconds(-1))
         result shouldBe RequestData(rc, Pending, ts)
@@ -221,7 +223,7 @@ trait RequestJournalStoreTest {
       }
     }
 
-    def setupPruning(store: RequestJournalStore): Future[Unit] =
+    def setupPruning(store: RequestJournalStore): FutureUnlessShutdown[Unit] =
       for {
         _ <- store.insert(RequestData.clean(rc, CantonTimestamp.ofEpochSecond(1), commitTime))
         _ <- store.insert(RequestData.clean(rc + 1, CantonTimestamp.ofEpochSecond(2), commitTime))
@@ -256,12 +258,14 @@ trait RequestJournalStoreTest {
     }
 
     "deleteSince" should {
-      "remove all requests from the given counter on" in {
+      "remove all requests from the given request timestamp on" in {
         val store = mk()
         for {
           _ <- setupRequests(store)
-          _ <- store.deleteSince(RequestCounter(2))
-          result0 <- valueOrFail(store.query(RequestCounter(0)))("Request 0 is retained")
+          _ <- store.deleteSinceRequestTimestamp(tsWithSecs(3))
+          result0 <- valueOrFailUS(
+            store.query(RequestCounter(0))
+          )("Request 0 is retained")
           result2 <- store.query(RequestCounter(2)).value
           _ <- store.insert(RequestData(RequestCounter(2), Pending, tsWithSecs(10)))
         } yield {
@@ -270,11 +274,11 @@ trait RequestJournalStoreTest {
         }
       }
 
-      "remove all requests even if there is no request for the counter" in {
+      "remove all requests even if there is no request for the timestamp" in {
         val store = mk()
         for {
           _ <- store.insert(RequestData(RequestCounter(-3), Pending, tsWithSecs(-1)))
-          _ <- store.deleteSince(RequestCounter(-5))
+          _ <- store.deleteSinceRequestTimestamp(tsWithSecs(-1).immediatePredecessor)
           result <- store.query(RequestCounter(-3)).value
         } yield {
           result shouldBe None
@@ -285,53 +289,12 @@ trait RequestJournalStoreTest {
         val store = mk()
         for {
           _ <- store.insert(RequestData(RequestCounter(0), Pending, tsWithSecs(0)))
-          _ <- store.deleteSince(RequestCounter(1))
-          result <- valueOrFail(store.query(RequestCounter(0)))("Lookup request 0")
+          _ <- store.deleteSinceRequestTimestamp(tsWithSecs(0).immediateSuccessor)
+          result <- valueOrFailUS(
+            store.query(RequestCounter(0))
+          )("Lookup request 0")
         } yield {
           result shouldBe RequestData(RequestCounter(0), Pending, tsWithSecs(0))
-        }
-      }
-    }
-
-    "repairRequests" should {
-      "return the repair requests in ascending order" in {
-        val store = mk()
-        val requests = List(
-          RequestData(RequestCounter(0), Pending, tsWithSecs(0)),
-          RequestData(
-            RequestCounter(1),
-            Pending,
-            tsWithSecs(0),
-            repairContext = Some(RepairContext.tryCreate("repair1")),
-          ),
-          RequestData(
-            RequestCounter(2),
-            Pending,
-            tsWithSecs(0),
-            repairContext = Some(RepairContext.tryCreate("repair2")),
-          ),
-          RequestData(RequestCounter(3), Pending, tsWithSecs(3)),
-          RequestData(
-            RequestCounter(4),
-            Pending,
-            tsWithSecs(4),
-            repairContext = Some(RepairContext.tryCreate("repair3")),
-          ),
-          RequestData(RequestCounter(6), Pending, tsWithSecs(5)),
-        )
-        for {
-          empty <- store.repairRequests(RequestCounter.Genesis)
-          _ <- requests.parTraverse_(store.insert)
-          repair1 <- store.repairRequests(RequestCounter(1))
-          repair2 <- store.repairRequests(RequestCounter(2))
-          repair4 <- store.repairRequests(RequestCounter(4))
-          repair6 <- store.repairRequests(RequestCounter(6))
-        } yield {
-          empty shouldBe Seq.empty
-          repair1 shouldBe Seq(requests(1), requests(2), requests(4))
-          repair2 shouldBe Seq(requests(2), requests(4))
-          repair4 shouldBe Seq(requests(4))
-          repair6 shouldBe Seq.empty
         }
       }
     }
@@ -342,7 +305,10 @@ trait RequestJournalStoreTest {
         _ <- setupRequests(store)
         initialDirtyRequests <- store.totalDirtyRequests()
         // transition one of the request to the clean state and expect total dirty requests to be decreased by 1
-        _ <- valueOrFail(store.replace(rc, tsWithSecs(1), Clean, Some(tsWithSecs(8))))(
+        _ <- valueOrFail(
+          store
+            .replace(rc, tsWithSecs(1), Clean, Some(tsWithSecs(8)))
+        )(
           "changing one request to the clean state"
         )
         totalDirtyRequests <- store.totalDirtyRequests()
@@ -357,17 +323,17 @@ trait RequestJournalStoreTest {
         val store = mk()
         for {
           _ <- setupRequests(store)
-          early <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(0))
-          firstAt <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(1))
-          firstAfter <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(2))
-          secondAt <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(3))
-          secondAfter <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(4))
+          early <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(0))
+          firstAt <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(1))
+          firstAfter <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(2))
+          secondAt <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(3))
+          secondAfter <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(4))
         } yield {
           early shouldBe None
-          firstAt shouldBe Some(rc)
-          firstAfter shouldBe Some(rc)
-          secondAt shouldBe Some(rc + 2)
-          secondAfter shouldBe Some(rc + 2)
+          firstAt shouldBe Some(TimeOfRequest(rc, tsWithSecs(1)))
+          firstAfter shouldBe Some(TimeOfRequest(rc, tsWithSecs(1)))
+          secondAt shouldBe Some(TimeOfRequest(rc + 2, tsWithSecs(3)))
+          secondAfter shouldBe Some(TimeOfRequest(rc + 2, tsWithSecs(3)))
         }
       }
 
@@ -375,23 +341,29 @@ trait RequestJournalStoreTest {
         val store = mk()
         for {
           _ <- setupRequests(store)
-          _ <- valueOrFail(store.replace(rc, tsWithSecs(1), Clean, Some(tsWithSecs(1000))))(
+          _ <- valueOrFail(
+            store
+              .replace(rc, tsWithSecs(1), Clean, Some(tsWithSecs(1000)))
+          )(
             "replace1"
           )
-          _ <- valueOrFail(store.replace(rc + 2, tsWithSecs(3), Clean, Some(tsWithSecs(3))))(
+          _ <- valueOrFail(
+            store
+              .replace(rc + 2, tsWithSecs(3), Clean, Some(tsWithSecs(3)))
+          )(
             "replace2"
           )
-          early <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(0))
-          firstAt <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(1))
-          firstAfter <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(2))
-          secondAt <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(3))
-          secondAfter <- store.lastRequestCounterWithRequestTimestampBeforeOrAt(tsWithSecs(4))
+          early <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(0))
+          firstAt <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(1))
+          firstAfter <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(2))
+          secondAt <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(3))
+          secondAfter <- store.lastRequestTimeWithRequestTimestampBeforeOrAt(tsWithSecs(4))
         } yield {
           early shouldBe None
-          firstAt shouldBe Some(rc)
-          firstAfter shouldBe Some(rc)
-          secondAt shouldBe Some(rc + 2)
-          secondAfter shouldBe Some(rc + 2)
+          firstAt shouldBe Some(TimeOfRequest(rc, tsWithSecs(1)))
+          firstAfter shouldBe Some(TimeOfRequest(rc, tsWithSecs(1)))
+          secondAt shouldBe Some(TimeOfRequest(rc + 2, tsWithSecs(3)))
+          secondAfter shouldBe Some(TimeOfRequest(rc + 2, tsWithSecs(3)))
         }
       }
     }

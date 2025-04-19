@@ -8,7 +8,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
@@ -56,7 +56,7 @@ class BftScanConnectionTest
 
   val clock = new SimClock(loggerFactory = loggerFactory)
 
-  val domainId = DomainId.tryFromString("domain::id")
+  val synchronizerId = SynchronizerId.tryFromString("domain::id")
 
   def getMockedConnections(n: Int): Seq[SingleScanConnection] = {
     val connections = (0 until n).map { n =>
@@ -80,14 +80,14 @@ class BftScanConnectionTest
                   SpliceUtil.defaultAmuletConfigSchedule(
                     NonNegativeFiniteDuration(Duration.ofMinutes(10)),
                     10,
-                    domainId,
+                    synchronizerId,
                   ),
                   false,
                 ),
                 ByteString.EMPTY,
                 Instant.EPOCH,
               ),
-              ContractState.Assigned(domainId), // ...except this
+              ContractState.Assigned(synchronizerId), // ...except this
             )
           )
         )
@@ -95,7 +95,7 @@ class BftScanConnectionTest
         Future.successful(
           Seq(
             DomainScans(
-              domainId,
+              synchronizerId,
               scans = connections.zipWithIndex.map { case (_, n) =>
                 DsoScan(s"https://$n.example.com", n.toString)
               },
@@ -135,7 +135,7 @@ class BftScanConnectionTest
       updates: Seq[LedgerClient.GetTreeUpdatesResponse],
       count: Int,
   ): Unit = {
-    when(mock.getUpdatesBefore(migrationId, domainId, before, Some(atOrAfter), count))
+    when(mock.getUpdatesBefore(migrationId, synchronizerId, before, Some(atOrAfter), count))
       .thenReturn(Future.successful(updates))
   }
   def makeMockFailUpdatesBefore(
@@ -143,7 +143,7 @@ class BftScanConnectionTest
       before: CantonTimestamp,
       failure: Throwable,
   ): Unit = {
-    when(mock.getUpdatesBefore(0, domainId, before, None, 2))
+    when(mock.getUpdatesBefore(0, synchronizerId, before, None, 2))
       .thenReturn(Future.failed(failure))
   }
   private def jtime(n: Int) = Instant.EPOCH.plusSeconds(n.toLong)
@@ -158,13 +158,12 @@ class BftScanConnectionTest
           jtime(n),
           n.toLong,
           java.util.Map.of(),
-          java.util.List.of(),
-          domainId.toProtoPrimitive,
+          synchronizerId.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           jtime(n),
         )
       ),
-      domainId = domainId,
+      synchronizerId = synchronizerId,
     )
   }
   def getBft(
@@ -363,7 +362,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             None,
-            Map(domainId -> DomainRecordTimeRange(ctime(1), ctime(2))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(2))),
             complete = true,
           )
         )
@@ -381,7 +380,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             if (complete) Some(0) else None,
-            Map(domainId -> DomainRecordTimeRange(ctime(start), ctime(10))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(start), ctime(10))),
             complete = complete,
           )
         )
@@ -397,7 +396,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             Some(0),
-            Map(domainId -> DomainRecordTimeRange(ctime(1), ctime(10))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(10))),
             complete = true,
           )
         )
@@ -410,7 +409,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             None,
-            Map(domainId -> DomainRecordTimeRange(ctime(1), ctime(2))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(2))),
             complete = true,
           )
         )
@@ -420,7 +419,7 @@ class BftScanConnectionTest
       val bft = getBft(connections)
 
       for {
-        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(3), None, 2)
+        migrationInfo <- bft.getUpdatesBefore(0, synchronizerId, ctime(3), None, 2)
       } yield migrationInfo should be(updatesResponse)
     }
 
@@ -430,7 +429,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             None,
-            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
           )
         )
@@ -457,7 +456,7 @@ class BftScanConnectionTest
       val bft = getBft(connections)
 
       for {
-        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10)
+        migrationInfo <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10)
       } yield migrationInfo should be(updates3to5)
     }
 
@@ -467,7 +466,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             None,
-            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
           )
         )
@@ -487,7 +486,7 @@ class BftScanConnectionTest
 
       // It's ok to accept the answer from a single scan, because all other scans claim to have no data.
       for {
-        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10)
+        migrationInfo <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10)
       } yield migrationInfo should be(updates1to5)
     }
 
@@ -497,7 +496,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             None,
-            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
           )
         )
@@ -523,7 +522,7 @@ class BftScanConnectionTest
 
       // It's ok to accept the matching answer from the two scans, because we have f=1.
       for {
-        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10)
+        migrationInfo <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10)
       } yield migrationInfo should be(updates1to5)
     }
 
@@ -533,7 +532,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             None,
-            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
           )
         )
@@ -562,7 +561,7 @@ class BftScanConnectionTest
 
       // Can't accept the matching answer from the two remaining scans, we have f=2, and they could be both malicious
       for {
-        failure <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10).failed
+        failure <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10).failed
       } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
         code should be(StatusCodes.BadGateway)
         message should include(
@@ -577,7 +576,7 @@ class BftScanConnectionTest
         Some(
           SourceMigrationInfo(
             None,
-            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
           )
         )
@@ -610,7 +609,7 @@ class BftScanConnectionTest
 
       // Note: getUpdatesBefore() doesn't produce WARN logs, so we don't need to suppress them
       for {
-        failure <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10).failed
+        failure <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10).failed
       } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
         code should be(StatusCodes.BadGateway)
         message should include("Failed to reach consensus from 5 Scan nodes")

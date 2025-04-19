@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
 
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.TracedLogger
 
 import java.util.concurrent.{ExecutorService, TimeUnit}
@@ -19,7 +19,9 @@ final case class ExecutorServiceExtensions[EC <: ExecutorService](executorServic
     timeouts.shutdownShort.asFiniteApproximation
 
   /** Cleanly shuts down an executor service as best we can.
-    * @param name Name of the component using the ExecutorService. Used in log messages if executor does not shutdown cleanly.
+    * @param name
+    *   Name of the component using the ExecutorService. Used in log messages if executor does not
+    *   shutdown cleanly.
     */
   def close(name: String): Unit = close(Some(name))
 
@@ -33,7 +35,7 @@ final case class ExecutorServiceExtensions[EC <: ExecutorService](executorServic
       case _ => true
     }
 
-    Lifecycle.shutdownResource(
+    LifeCycle.shutdownResource(
       name.getOrElse(s"executor-${executorService.toString}"),
       () => executorService.shutdown(),
       () => { val _ = executorService.shutdownNow() },

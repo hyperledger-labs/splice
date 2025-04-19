@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.memory
@@ -13,11 +13,11 @@ import com.digitalasset.canton.util.OptionUtil
 
 import java.util.concurrent.atomic.AtomicReference
 
-/** Mixin for a in-memory store that provides a thread-safe storage slot for the latest point in time when
-  * pruning has started or finished.
+/** Mixin for a in-memory store that provides a thread-safe storage slot for the latest point in
+  * time when pruning has started or finished.
   *
-  * The pruning method of the store must use [[advancePruningTimestamp]] to signal the start end completion
-  * of each pruning.
+  * The pruning method of the store must use [[advancePruningTimestamp]] to signal the start end
+  * completion of each pruning.
   */
 trait InMemoryPrunableByTime extends PrunableByTime {
   this: NamedLogging =>

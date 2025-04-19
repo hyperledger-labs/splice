@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -40,10 +40,10 @@ object DamlPackageLoader {
 
   final case class LoadError(message: String)
 
-  /** Utility to check that the DAR file is valid.
-    * This will check useful things such as whether the DAR file is potentially a zipbomb and that it
-    * follows the expected specification.
-    * By specifying unzippedMaxBytes, it will check that the unzipped DAR does not exceed this size. Defaults to 1GB.
+  /** Utility to check that the DAR file is valid. This will check useful things such as whether the
+    * DAR file is potentially a zipbomb and that it follows the expected specification. By
+    * specifying unzippedMaxBytes, it will check that the unzipped DAR does not exceed this size.
+    * Defaults to 1GB.
     */
   def validateDar(
       name: String,

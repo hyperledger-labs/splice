@@ -1,18 +1,23 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.{
+  Added,
+  ChangedTo,
+  Revoked,
+}
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel.*
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization
 import com.digitalasset.canton.topology.DefaultTestIdentities.sequencerId
-import com.digitalasset.canton.topology.store.SignedTopologyTransactions
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
 import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
+  SynchronizerId,
   TestingOwnerWithKeys,
   UniqueIdentifier,
 }
@@ -27,15 +32,21 @@ class TopologyTransactionDiffTest
   private lazy val topologyFactory =
     new TestingOwnerWithKeys(sequencerId, loggerFactory, executorService)
 
+  private lazy val synchronizerId = SynchronizerId(
+    UniqueIdentifier.tryFromProtoPrimitive("synchronizer::mysync")
+  )
+
   private def ptp(
       partyId: PartyId,
-      participants: List[ParticipantId],
+      participants: List[(ParticipantId, ParticipantPermission)],
   ): SignedTopologyTransaction[Replace, PartyToParticipant] = {
 
     val mapping = PartyToParticipant.tryCreate(
       partyId,
       PositiveInt.one,
-      participants.map(HostingParticipant(_, ParticipantPermission.Submission)),
+      participants.map { case (participant, permission) =>
+        HostingParticipant(participant, permission)
+      },
     )
 
     val tx: TopologyTransaction[Replace, PartyToParticipant] = TopologyTransaction(
@@ -46,6 +57,20 @@ class TopologyTransactionDiffTest
     )
 
     topologyFactory.mkTrans[Replace, PartyToParticipant](trans = tx)
+  }
+
+  private def synchronizerTrustCertificate(
+      participantId: ParticipantId
+  ): SignedTopologyTransaction[Replace, SynchronizerTrustCertificate] = {
+
+    val tx: TopologyTransaction[Replace, SynchronizerTrustCertificate] = TopologyTransaction(
+      Replace,
+      PositiveInt.one,
+      SynchronizerTrustCertificate(participantId, synchronizerId),
+      testedProtocolVersion,
+    )
+
+    topologyFactory.mkTrans[Replace, SynchronizerTrustCertificate](trans = tx)
   }
 
   "TopologyTransactionDiff" should {
@@ -66,24 +91,31 @@ class TopologyTransactionDiffTest
           charlie -> p2
        */
       val initialTxs = List(
-        ptp(alice, List(p1, p2)),
-        ptp(bob, List(p1)),
-        ptp(charlie, List(p2)),
+        ptp(
+          alice,
+          List(p1 -> ParticipantPermission.Submission, p2 -> ParticipantPermission.Submission),
+        ),
+        ptp(bob, List(p1 -> ParticipantPermission.Submission)),
+        ptp(charlie, List(p2 -> ParticipantPermission.Submission)),
       )
-      val initialState = SignedTopologyTransactions(initialTxs)
 
       def diffInitialWith(
           newState: Seq[SignedTopologyTransaction[Replace, TopologyMapping]]
-      ) =
-        TopologyTransactionDiff(
-          initialState,
-          SignedTopologyTransactions[TopologyChangeOp.Replace, TopologyMapping](newState),
-        )
+      ) = TopologyTransactionDiff(
+        synchronizerId,
+        initialTxs,
+        newState,
+        p1,
+        testedProtocolVersion,
+      )
+        .map { case TopologyTransactionDiff(events, _, _) =>
+          events
+        }
       // Same transactions
-      diffInitialWith(initialState.result) shouldBe empty
+      diffInitialWith(initialTxs) shouldBe None
 
       // Empty target -> everything is removed
-      diffInitialWith(Nil) should contain theSameElementsAs Set(
+      diffInitialWith(Nil).value.forgetNE should contain theSameElementsAs Set(
         PartyToParticipantAuthorization(alice.toLf, p1.toLf, Revoked),
         PartyToParticipantAuthorization(alice.toLf, p2.toLf, Revoked),
         PartyToParticipantAuthorization(bob.toLf, p1.toLf, Revoked),
@@ -92,42 +124,75 @@ class TopologyTransactionDiffTest
 
       diffInitialWith(
         List(
-          ptp(alice, List(p2)), // no p1
+          ptp(alice, List(p2 -> ParticipantPermission.Submission)), // no p1
 
-          ptp(bob, List(p1)),
-          ptp(charlie, List(p2)),
+          ptp(bob, List(p1 -> ParticipantPermission.Submission)),
+          ptp(charlie, List(p2 -> ParticipantPermission.Submission)),
         )
-      ) should contain theSameElementsAs Set(
+      ).value.forgetNE should contain theSameElementsAs Set(
         PartyToParticipantAuthorization(alice.toLf, p1.toLf, Revoked)
       )
 
       diffInitialWith(
         List(
           ptp(alice, List()), // nobody
-          ptp(bob, List(p1)),
-          ptp(charlie, List(p2)),
+          ptp(bob, List(p1 -> ParticipantPermission.Submission)),
+          ptp(charlie, List(p2 -> ParticipantPermission.Submission)),
         )
-      ) should contain theSameElementsAs Set(
+      ).value.forgetNE should contain theSameElementsAs Set(
         PartyToParticipantAuthorization(alice.toLf, p1.toLf, Revoked),
         PartyToParticipantAuthorization(alice.toLf, p2.toLf, Revoked),
       )
 
       diffInitialWith(
         List(
-          ptp(alice, List(p1, p2)),
-          ptp(bob, List(p1, p2)), // p2 added
-          ptp(charlie, List(p2)),
+          ptp(
+            alice,
+            List(p1 -> ParticipantPermission.Submission, p2 -> ParticipantPermission.Submission),
+          ),
+          ptp(
+            bob,
+            List(p1 -> ParticipantPermission.Submission, p2 -> ParticipantPermission.Submission),
+          ), // p2 added
+          ptp(charlie, List(p2 -> ParticipantPermission.Submission)),
         )
-      ) should contain theSameElementsAs Set(
-        PartyToParticipantAuthorization(bob.toLf, p2.toLf, Submission)
+      ).value.forgetNE should contain theSameElementsAs Set(
+        PartyToParticipantAuthorization(bob.toLf, p2.toLf, Added(Submission))
       )
 
       diffInitialWith(
         List(
-          ptp(donald, List(p1)) // new
+          ptp(donald, List(p1 -> ParticipantPermission.Submission)) // new
         ) ++ initialTxs
-      ) should contain theSameElementsAs Set(
-        PartyToParticipantAuthorization(donald.toLf, p1.toLf, Submission)
+      ).value.forgetNE should contain theSameElementsAs Set(
+        PartyToParticipantAuthorization(donald.toLf, p1.toLf, Added(Submission))
+      )
+
+      diffInitialWith(
+        List(
+          synchronizerTrustCertificate(p1), // new
+          synchronizerTrustCertificate(p2), // new
+        ) ++ initialTxs
+      ).value.forgetNE should contain theSameElementsAs Set(
+        PartyToParticipantAuthorization(p1.adminParty.toLf, p1.toLf, Added(Submission)),
+        PartyToParticipantAuthorization(p2.adminParty.toLf, p2.toLf, Added(Submission)),
+      )
+
+      diffInitialWith(
+        List(
+          ptp(
+            bob,
+            List(p1 -> ParticipantPermission.Confirmation, p2 -> ParticipantPermission.Observation),
+          ), // p2 added, p1 overridden
+          ptp(
+            alice,
+            List(p1 -> ParticipantPermission.Submission, p2 -> ParticipantPermission.Submission),
+          ),
+          ptp(charlie, List(p2 -> ParticipantPermission.Submission)),
+        )
+      ).value.forgetNE should contain theSameElementsAs Set(
+        PartyToParticipantAuthorization(bob.toLf, p1.toLf, ChangedTo(Confirmation)),
+        PartyToParticipantAuthorization(bob.toLf, p2.toLf, Added(Observation)),
       )
     }
 

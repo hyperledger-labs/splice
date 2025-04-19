@@ -62,20 +62,20 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     sv4Backend.stop()
 
     val decentralizedSynchronizerId =
-      inside(sv4Backend.participantClient.domains.list_connected()) { case Seq(domain) =>
-        domain.domainId
+      inside(sv4Backend.participantClient.synchronizers.list_connected()) { case Seq(domain) =>
+        domain.synchronizerId
       }
 
     clue("simulate the domain was left disconnected when error occur during party migration.") {
-      sv4Backend.participantClient.domains.disconnect_all()
-      sv4Backend.participantClient.domains.list_connected() shouldBe empty
+      sv4Backend.participantClient.synchronizers.disconnect_all()
+      sv4Backend.participantClient.synchronizers.list_connected() shouldBe empty
     }
 
     clue("sv will connect to all domains during initialization.") {
       sv4Backend.startSync()
-      inside(sv4Backend.participantClient.domains.list_connected()) {
+      inside(sv4Backend.participantClient.synchronizers.list_connected()) {
         case Seq(listConnectedDomainsResult) =>
-          listConnectedDomainsResult.domainId shouldBe decentralizedSynchronizerId
+          listConnectedDomainsResult.synchronizerId shouldBe decentralizedSynchronizerId
       }
     }
   }
@@ -205,12 +205,12 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(3)
         participantAdminConnection
-          .getSequencerDomainState(decentralizedSynchronizerId)
+          .getSequencerSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getMediatorDomainState(decentralizedSynchronizerId)
+          .getMediatorSynchronizerState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)

@@ -3,8 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import com.daml.error.ErrorCategory
-import com.daml.error.utils.ErrorDetails
+import com.digitalasset.base.error.ErrorCategory
+import com.digitalasset.base.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.{MetricInfo, MetricQualification, MetricsContext}
@@ -15,7 +15,7 @@ import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
-  RunOnShutdown,
+  RunOnClosing,
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
@@ -72,10 +72,10 @@ final class RetryProvider(
     )
   private val shutdown = new AtomicBoolean(false)
 
-  runOnShutdown_(new RunOnShutdown {
+  runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"trigger promise for shutdown signal"
     override def done: Boolean = promisesRunningThatAreShutdownAware.isEmpty && shutdown.get()
-    override def run(): Unit = {
+    override def run()(implicit tc: TraceContext): Unit = {
       logger.debug("Sending node-level shutdown signal (via future).")(
         TraceContext.empty
       )
@@ -612,23 +612,23 @@ object RetryProvider {
                       statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                         "An error occurred. Please contact the operator and inquire about the request"
                       ) ||
-                        // This can happen if the party allocation has not yet been propagated to the new domain.
+                        // This can happen if the party allocation has not yet been propagated to the new synchronizer.
                         statusCode == Status.Code.INVALID_ARGUMENT &&
-                        raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
+                        raw"No participant of the party .* has confirmation permission on both synchronizers at respective timestamps".r
                           .findFirstMatchIn(description)
                           .isDefined ||
-                        // This can happen if the party allocation has not yet been propagated to the new domain.
+                        // This can happen if the party allocation has not yet been propagated to the new synchronizer.
                         statusCode == Status.Code.INVALID_ARGUMENT &&
-                        raw"The following parties are not active on the target domain".r
+                        raw"The following stakeholders are not active on the target synchronizer".r
                           .findFirstMatchIn(description)
                           .isDefined || // TODO(#10160) Remove this once Canton fixes the error code.
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
                           description.contains(
                             SequencerErrors.MaxSequencingTimeTooFar.id
                           )) ||
-                        // This can occur when we try to get the domain time while still being disconnected from the domain
+                        // This can occur when we try to get the synchronizer time while still being disconnected from the synchronizer
                         statusCode == Status.Code.INVALID_ARGUMENT &&
-                        raw"Time tracker for domain .* not found".r
+                        raw"Time tracker for synchronizer .* not found".r
                           .findFirstMatchIn(description)
                           .isDefined || // This can occur if the party has not yet been propagated to the ledger API server
                         statusCode == Status.Code.INVALID_ARGUMENT &&

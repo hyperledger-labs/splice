@@ -1,23 +1,26 @@
-sdk-version: 3.0.0-snapshot.20240318.12913.0.v1c415c97
+sdk-version: 3.3.0-snapshot.20250415.13756.0.vafc5c867
 name: splice-dso-governance-test
 source: daml
-version: 0.1.12
+version: 0.1.13
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml3-script
+  - daml-script
 data-dependencies:
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 - ../splice-amulet-test/.daml/dist/splice-amulet-test-current.dar
 - ../splice-amulet-name-service/.daml/dist/splice-amulet-name-service-current.dar
 - ../splice-amulet-name-service-test/.daml/dist/splice-amulet-name-service-test-current.dar
+- ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
 - ../splice-util/.daml/dist/splice-util-current.dar
 - ../splice-dso-governance/.daml/dist/splice-dso-governance-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
+- ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
   - --target=2.1
+  - --disable-deprecated-exceptions-warning
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java

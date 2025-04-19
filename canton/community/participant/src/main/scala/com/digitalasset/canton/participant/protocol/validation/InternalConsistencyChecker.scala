@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -8,6 +8,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.FullTransactionViewTree
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -27,26 +28,24 @@ import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.value.Value
 
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class InternalConsistencyChecker(
-    protocolVersion: ProtocolVersion,
-    override val loggerFactory: NamedLoggerFactory,
+    override val loggerFactory: NamedLoggerFactory
 ) extends NamedLogging {
 
-  /** Checks if there is no internal consistency issue between views, e.g., it would return an error if
-    * there are two different views (within the same rollback scope) that archive the same contract.
+  /** Checks if there is no internal consistency issue between views, e.g., it would return an error
+    * if there are two different views (within the same rollback scope) that archive the same
+    * contract.
     *
-    * The method does not check for consistency issues inside of a single view. This is checked by Daml engine as part
-    * of [[ModelConformanceChecker]].
+    * The method does not check for consistency issues inside of a single view. This is checked by
+    * Daml engine as part of [[ModelConformanceChecker]].
     */
   def check(
-      rootViewTrees: NonEmpty[Seq[FullTransactionViewTree]],
-      hostedParty: LfPartyId => Boolean,
+      rootViewTrees: NonEmpty[Seq[FullTransactionViewTree]]
   )(implicit
       traceContext: TraceContext
   ): Either[ErrorWithInternalConsistencyCheck, Unit] =
@@ -108,16 +107,6 @@ class InternalConsistencyChecker(
       case Some(ne) => Left(ErrorWithInternalConsistencyCheck(UsedAfterArchive(ne)))
       case None => Either.unit
     }
-
-  /** @param inconsistent - the set of inconsistent keys or the empty set if no inconsistencies have been found,
-    *                     see [[KeyState.inconsistentKeys]] to see how inconsistency is detected.
-    * @return - returns a failed result if there are inconsistent keys
-    */
-  private def checkConsistentKeyUse(inconsistent: Set[LfGlobalKey]): Result[Unit] =
-    NonEmpty.from(inconsistent) match {
-      case Some(ne) => Left(ErrorWithInternalConsistencyCheck(InconsistentKeyUse(ne)))
-      case None => Either.unit
-    }
 }
 
 object InternalConsistencyChecker {
@@ -126,12 +115,11 @@ object InternalConsistencyChecker {
 
   sealed trait Error extends PrettyPrinting
 
-  /** This trait manages pushing the active state onto a stack when a new rollback context
-    * is entered and restoring the rollback back active state when a rollback scope is
-    * exited.
+  /** This trait manages pushing the active state onto a stack when a new rollback context is
+    * entered and restoring the rollback back active state when a rollback scope is exited.
     *
-    * It is assumed that not all rollback scopes will be presented to [[adjustRollbackScope]]
-    * in order but there may be hierarchical jumps in rollback scopt between calls.
+    * It is assumed that not all rollback scopes will be presented to [[adjustRollbackScope]] in
+    * order but there may be hierarchical jumps in rollback scopt between calls.
     */
   private sealed trait PushPopRollbackScope[M <: PushPopRollbackScope[M, T], T] {
 
@@ -181,10 +169,14 @@ object InternalConsistencyChecker {
     loop(starting)
   }
 
-  /** @param referenced - Contract ids used or created by previous views, including rolled back usages and creations.
-    * @param rollbackScope - The current rollback scope
-    * @param consumed - Contract ids consumed in a previous view
-    * @param stack - The stack of rollback scopes that are currently open
+  /** @param referenced
+    *   Contract ids used or created by previous views, including rolled back usages and creations.
+    * @param rollbackScope
+    *   The current rollback scope
+    * @param consumed
+    *   Contract ids consumed in a previous view
+    * @param stack
+    *   The stack of rollback scopes that are currently open
     */
   private final case class ContractState(
       referenced: Set[LfContractId],
@@ -215,10 +207,17 @@ object InternalConsistencyChecker {
   private type KeyResolution = Option[Value.ContractId]
   private type KeyMapping = Map[LfGlobalKey, KeyResolution]
 
-  /** @param preResolutions - The the key resolutions that must be in place before processing the transaction in order to successfully process all previous views.
-    * @param rollbackScope - The current rollback scope
-    * @param activeResolutions - The key resolutions that are in place after processing all previous views that have been changed by some previous view. This excludes changes to key resolutions performed by rolled back views.
-    * @param stack - The stack of rollback scopes that are currently open
+  /** @param preResolutions
+    *   The the key resolutions that must be in place before processing the transaction in order to
+    *   successfully process all previous views.
+    * @param rollbackScope
+    *   The current rollback scope
+    * @param activeResolutions
+    *   The key resolutions that are in place after processing all previous views that have been
+    *   changed by some previous view. This excludes changes to key resolutions performed by rolled
+    *   back views.
+    * @param stack
+    *   The stack of rollback scopes that are currently open
     */
   private final case class KeyState(
       preResolutions: KeyMapping,
@@ -313,7 +312,7 @@ object InternalConsistencyChecker {
   )(implicit
       loggingContext: NamedLoggingContext,
       ec: ExecutionContext,
-  ): Future[Map[LfPartyId, Boolean]] = {
+  ): FutureUnlessShutdown[Map[LfPartyId, Boolean]] = {
     val parties =
       rootViewTrees.forgetNE
         .flatMap(_.view.globalKeyInputs.values.flatMap(_.unversioned.maintainers))

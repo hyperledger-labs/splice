@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform
@@ -50,7 +50,7 @@ class DispatcherState(
     }
   })
 
-  def startDispatcher(initializationOffset: Offset): Unit = blocking(synchronized {
+  def startDispatcher(initializationOffset: Option[Offset]): Unit = blocking(synchronized {
     dispatcherStateRef match {
       case DispatcherNotRunning =>
         val activeDispatcher = buildDispatcher(initializationOffset)
@@ -85,9 +85,9 @@ class DispatcherState(
         dispatcher
           .cancel(() => dispatcherNotRunning)
           .transform {
-            case Success(_) =>
+            case success @ Success(_) =>
               logger.debug(s"Active $ServiceName stopped.")
-              Success(())
+              success
             case f @ Failure(failure) =>
               logger.warn(s"Failed stopping active $ServiceName", failure)
               f
@@ -118,9 +118,9 @@ class DispatcherState(
             )
           )
           .transform {
-            case Success(()) =>
+            case success @ Success(_) =>
               logger.info(s"$ServiceName shutdown.")
-              Success(())
+              success
             case f @ Failure(failure) =>
               logger.warn(s"Error during $ServiceName shutdown", failure)
               f
@@ -128,20 +128,22 @@ class DispatcherState(
     }
   }
 
-  private def buildDispatcher(initializationOffset: Offset): Dispatcher[Offset] =
+  private def buildDispatcher(
+      initializationOffset: Option[Offset]
+  ): Dispatcher[Offset] =
     Dispatcher(
       name = ServiceName,
-      zeroIndex = Offset.beforeBegin,
+      firstIndex = Offset.firstOffset,
       headAtInitialization = initializationOffset,
     )
 
   private def dispatcherNotRunning: StatusRuntimeException = {
-    val contextualizedErrorLogger = ErrorLoggingContext(
+    val errorLoggingContext = ErrorLoggingContext(
       logger = logger,
       loggerFactory.properties,
       traceContext,
     )
-    CommonErrors.ServiceNotRunning.Reject(ServiceName)(contextualizedErrorLogger).asGrpcError
+    CommonErrors.ServiceNotRunning.Reject(ServiceName)(errorLoggingContext).asGrpcError
   }
 }
 

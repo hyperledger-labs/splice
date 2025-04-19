@@ -1,29 +1,29 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
 
-import com.daml.error.ContextualizedErrorLogger
 import com.digitalasset.canton.ledger.error.IndexErrors
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import io.grpc.StatusRuntimeException
 import org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException
 import org.postgresql.util.PSQLException
 
 import java.sql.*
 
-/** Wraps SQLExceptions into transient and non-transient errors.
-  * Transience classification is done as follows:
+/** Wraps SQLExceptions into transient and non-transient errors. Transience classification is done
+  * as follows:
   *
-  * * Problems that are likely to be resolved with retries are transient errors. For example, network outages or db access
-  * serialization problems.
+  * * Problems that are likely to be resolved with retries are transient errors. For example,
+  * network outages or db access serialization problems.
   *
-  * * Problems that cannot be recovered from are non-transient. For example, an illegal argument exception inside a
-  * database transaction or a unique constraint violation.
+  * * Problems that cannot be recovered from are non-transient. For example, an illegal argument
+  * exception inside a database transaction or a unique constraint violation.
   */
 object DatabaseSelfServiceError {
   def apply(
       exception: Throwable
-  )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Throwable = exception match {
+  )(implicit errorLoggingContext: ErrorLoggingContext): Throwable = exception match {
     // This frequently occurs when running with H2, because H2 does not properly implement the serializable
     // isolation level. This causes unexpected constraint violation exceptions when running with H2 in the presence
     // of contention. For now, we retry on these exceptions.
@@ -40,12 +40,12 @@ object DatabaseSelfServiceError {
   }
 
   private def retryable(ex: SQLException)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): StatusRuntimeException =
     IndexErrors.DatabaseErrors.SqlTransientError.Reject(ex).asGrpcError
 
   private def nonRetryable(ex: SQLException)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
+      errorLoggingContext: ErrorLoggingContext
   ): StatusRuntimeException =
     IndexErrors.DatabaseErrors.SqlNonTransientError.Reject(ex).asGrpcError
 

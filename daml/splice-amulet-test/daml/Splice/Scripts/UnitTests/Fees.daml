@@ -1,0 +1,31 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Unit tests for the fees module
+module Splice.Scripts.UnitTests.Fees where
+
+import DA.Assert ((===))
+import DA.Time
+
+import Daml.Script
+
+import Splice.Fees
+
+test_toRatePerDay : Script ()
+test_toRatePerDay = do
+    expectedRatePerDay === ratePerRoundToRatePerDay ratePerRound tickDuration
+  where
+    expectedRatePerDay = RatePerDay with rate = ratePerRound.rate * 24.0 * 6.0
+
+    ratePerRound : RatePerRound
+    ratePerRound = RatePerRound with rate = 0.02
+
+    tickDuration : RelTime
+    tickDuration = minutes 10
+
+test_chargeRatePerDay : Script ()
+test_chargeRatePerDay = do
+    expectedCharge === chargeRatePerDay ratePerDay (days 101)
+  where
+    expectedCharge = 101.0 * 0.03
+    ratePerDay = RatePerDay with rate = 0.03

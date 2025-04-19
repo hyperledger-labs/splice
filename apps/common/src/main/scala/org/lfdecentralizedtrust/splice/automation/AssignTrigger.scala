@@ -60,7 +60,7 @@ class AssignTrigger(
   private[automation] override final def additionalRetryableConditions
       : Map[Status.Code, RetryProvider.Condition.Category] = {
     import io.grpc.Status
-    import com.daml.error.ErrorCategory.InvalidIndependentOfSystemState
+    import com.digitalasset.base.error.ErrorCategory.InvalidIndependentOfSystemState
     import org.lfdecentralizedtrust.splice.environment.RetryProvider.Condition
     /*
     targeting this error, for which we want to retry (see #8267):

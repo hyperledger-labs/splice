@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -11,7 +11,7 @@ import "scalapb/scalapb.proto";
 
 message CompletionInfo {
   repeated string act_as = 1;
-  string application_id = 2;
+  string user_id = 2;
   string command_id = 3;
   com.digitalasset.canton.protocol.v30.DeduplicationPeriod opt_deduplication_period = 4;
   string submission_id = 5;
@@ -36,7 +36,7 @@ message SubmissionTrackingData {
 message TransactionSubmissionTrackingData {
   CompletionInfo completion_info = 1;
   RejectionCause rejection_cause = 2;
-  string domain_id = 3;
+  string synchronizer_id = 3;
 
   message RejectionCause {
     oneof cause {

@@ -111,14 +111,14 @@ class ArchiveClosedMiningRoundsTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[Boolean] = {
     val closedRound = task.value
-    val domainId = closedRound.domain
+    val synchronizerId = closedRound.domain
     for {
       // lookup closed mining round once again in the ACS to check if it was
       // archived or reassigned; if the latter, listArchivableClosedMiningRounds
       // can give us a corrected task with the new assignment
       closedRoundExists <- store.multiDomainAcsStore
         .lookupContractByIdOnDomain(splice.round.ClosedMiningRound.COMPANION)(
-          domainId,
+          synchronizerId,
           closedRound.contractId,
         )
         .map(_.isDefined)

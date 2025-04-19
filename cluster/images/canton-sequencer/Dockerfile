@@ -9,6 +9,7 @@ LABEL org.opencontainers.image.base.name="canton:${base_version}"
 
 EXPOSE 5008
 EXPOSE 5009
+EXPOSE 5010
 EXPOSE 10013
 
 COPY app.conf /app/

@@ -3,6 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.config
 
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 
-case class SynchronizerConfig(alias: DomainAlias)
+case class SynchronizerConfig(alias: SynchronizerAlias)

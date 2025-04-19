@@ -4,6 +4,8 @@
 -- Base types for Amulet and all related modules.
 module Splice.Types where
 
+import Splice.Api.Token.HoldingV1
+import Splice.Util (HasCheckedFetch(..))
 
 newtype Round = Round with number : Int
   deriving (Eq, Show, Ord)
@@ -36,3 +38,9 @@ data ForOwner = ForOwner with
     dso : Party
     owner : Party
   deriving (Eq, Show)
+
+
+instance HasCheckedFetch HoldingView ForOwner where
+  contractGroupId HoldingView {..} = ForOwner with
+    dso = instrumentId.admin
+    owner = owner

@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -48,12 +48,12 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val contract = task.contract
     for {
-      targetDomainId <- targetDomain()(tc)
+      targetSynchronizerId <- targetDomain()(tc)
       cid = PrettyContractId(companion.getTemplateIdWithPackageId, contract.contractId)
       outcome <-
-        if (task.domain == targetDomainId) {
+        if (task.domain == targetSynchronizerId) {
           Future.successful(
-            show"Create of $cid already on target domain ${targetDomainId}, no need to transfer"
+            show"Create of $cid already on target domain ${targetSynchronizerId}, no need to transfer"
           )
         } else
           for {
@@ -62,10 +62,10 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
               command = LedgerClient.ReassignmentCommand.Unassign(
                 contractId = contract.contractId,
                 source = task.domain,
-                target = targetDomainId,
+                target = targetSynchronizerId,
               ),
             )
-          } yield show"Submitted unassign of $cid from ${task.domain} to ${targetDomainId}"
+          } yield show"Submitted unassign of $cid from ${task.domain} to ${targetSynchronizerId}"
 
     } yield TaskSuccess(outcome)
   }
@@ -73,7 +73,7 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
   private[automation] override final def additionalRetryableConditions
       : Map[Status.Code, RetryProvider.Condition.Category] = {
     import io.grpc.Status
-    import com.daml.error.ErrorCategory.InvalidIndependentOfSystemState
+    import com.digitalasset.base.error.ErrorCategory.InvalidIndependentOfSystemState
     import org.lfdecentralizedtrust.splice.environment.RetryProvider.Condition
     /*
     targeting this error, for which we want to retry (see #8267):
@@ -93,5 +93,5 @@ object UnassignTrigger {
   type Interface[I, Id <: ContractId[I], View <: DamlRecord[View]] =
     UnassignTrigger[Contract.Companion.Interface[Id, I, View], Id, View]
 
-  type GetTargetDomain = () => TraceContext => Future[DomainId]
+  type GetTargetDomain = () => TraceContext => Future[SynchronizerId]
 }

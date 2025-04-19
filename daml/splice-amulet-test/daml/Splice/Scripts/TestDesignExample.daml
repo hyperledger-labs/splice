@@ -50,6 +50,7 @@ template Escrow
                      lock = Some TimeLock with
                        holders = [arbiter]
                        expiresAt = lock.expiresAt `addRelTime` days 90
+                       optContext = None
                      receiverFeeRatio = 0.0
                  , TransferOutput with
                      receiver = arbiter
@@ -57,6 +58,7 @@ template Escrow
                      lock = None
                      receiverFeeRatio = 1.0
                  ]
+               beneficiaries = None
          exerciseAppTransfer transferContext transfer
 
 test_designExample : Script ()
@@ -92,6 +94,7 @@ test_designExample= do
   appRewardCoupon === AppRewardCoupon with
     dso = app.dso
     provider = alice.primaryParty
+    beneficiary = Some alice.primaryParty
     featured = False
     amount = transferConfig.createFee.fee + transferConfig.lockHolderFee.fee
     round = Round 2
@@ -109,6 +112,7 @@ test_designExample= do
   appRewardCoupon === AppRewardCoupon with
     dso = app.dso
     provider = alice.primaryParty
+    beneficiary = Some alice.primaryParty
     featured = False
     amount = transferConfig.createFee.fee
     round = Round 40002
@@ -185,6 +189,7 @@ test_designExample= do
     lock = TimeLock with
       holders = [arbiter.primaryParty]
       expiresAt = t0 `addRelTime` days 180
+      optContext = None
     amulet = Amulet with
       dso = app.dso
       owner = alice.primaryParty
@@ -206,6 +211,7 @@ test_designExample= do
   appRewardCoupon === AppRewardCoupon with
     dso = app.dso
     provider = arbiter.primaryParty
+    beneficiary = Some arbiter.primaryParty
     featured = True
     amount =
       -- rewards are issued for all output fees, but not the senderChangeFee
@@ -222,6 +228,7 @@ test_designExample= do
   appReward === AppRewardCoupon with
     dso = app.dso
     provider = arbiter.primaryParty
+    beneficiary = Some arbiter.primaryParty
     featured = True
     amount =
       transferConfig.createFee.fee

@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.store
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Timer}
 import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import scala.collection.concurrent.TrieMap
 
@@ -36,10 +36,10 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
       0L,
     )(metricsContext)
 
-  private val perSynchronizerLastIngestedRecordTimeMs: TrieMap[DomainId, Gauge[Long]] =
+  private val perSynchronizerLastIngestedRecordTimeMs: TrieMap[SynchronizerId, Gauge[Long]] =
     TrieMap.empty
 
-  def getLastIngestedRecordTimeMsForSynchronizer(synchronizerId: DomainId) =
+  def getLastIngestedRecordTimeMsForSynchronizer(synchronizerId: SynchronizerId) =
     perSynchronizerLastIngestedRecordTimeMs.getOrElseUpdate(
       synchronizerId,
       metricsFactory.gauge(

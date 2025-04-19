@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.runner.common
@@ -365,7 +365,8 @@ class PureConfigReaderWriterSpec
       |  input-mapping-parallelism = 16
       |  max-input-buffer-size = 50
       |  restart-delay = "10s"
-      |  submission-batch-size = 50""".stripMargin
+      |  submission-batch-size = 50
+      |  disable-monotonicity-checks = false""".stripMargin
 
   it should "support current defaults" in {
     val value = validIndexerConfigValue
@@ -403,7 +404,7 @@ class PureConfigReaderWriterSpec
       |max-contract-state-cache-size=10000
       |max-transactions-in-memory-fan-out-buffer-size=1000
       |prepare-package-metadata-time-out-warning="5s"
-      |transaction-flat-streams {
+      |updates-streams {
       |    max-ids-per-id-page=20000
       |    max-pages-per-id-pages-buffer=1
       |    max-parallel-id-consuming-queries=4

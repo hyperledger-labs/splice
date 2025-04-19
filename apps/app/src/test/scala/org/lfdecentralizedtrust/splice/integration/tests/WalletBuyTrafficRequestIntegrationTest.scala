@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.wallet.automation.{
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
 
 import java.time.Duration
 import scala.concurrent.Future
@@ -75,16 +75,16 @@ class WalletBuyTrafficRequestIntegrationTest
         aliceWalletClient.tap(100.0)
 
         val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-        val badDomainId = DomainId.tryFromString("dummy::domain")
+        val badSynchronizerId = SynchronizerId.tryFromString("dummy::domain")
         val errorString = {
           s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests' on 127.0.0.1:5503. " +
-            s"Command failed, message: Could not find participant hosting $aliceValidatorParty on domain $badDomainId"
+            s"Command failed, message: Could not find participant hosting $aliceValidatorParty on domain $badSynchronizerId"
         }
         failCreatingInvalidTrafficRequest(
           aliceWalletClient,
           aliceValidatorParty,
           errorString,
-          domainId = Some(badDomainId),
+          synchronizerId = Some(badSynchronizerId),
         )
       }
     }
@@ -382,7 +382,7 @@ class WalletBuyTrafficRequestIntegrationTest
       buyerValidator: ValidatorAppBackendReference,
       trafficRecipient: ValidatorAppBackendReference,
       trafficAmount: Option[Long] = None,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
       trackingId: Option[String] = None,
       expiresAt: Option[CantonTimestamp] = None,
   )(implicit env: SpliceTests.SpliceTestConsoleEnvironment) = {
@@ -402,7 +402,7 @@ class WalletBuyTrafficRequestIntegrationTest
         "Alice creates a buy traffic request",
         buyer.createBuyTrafficRequest(
           trafficRecipient.getValidatorPartyId(),
-          domainId.getOrElse(activeSynchronizerId),
+          synchronizerId.getOrElse(activeSynchronizerId),
           trafficAmount.getOrElse(minTopupAmount),
           trackingId.getOrElse(defaultTrackingId),
           expiresAt.getOrElse(now.plus(Duration.ofMinutes(1))),
@@ -427,7 +427,7 @@ class WalletBuyTrafficRequestIntegrationTest
       trafficRecipient: PartyId,
       errorString: String,
       trafficAmount: Option[Long] = None,
-      domainId: Option[DomainId] = None,
+      synchronizerId: Option[SynchronizerId] = None,
       trackingId: Option[String] = None,
       expiresAt: Option[CantonTimestamp] = None,
   )(implicit env: SpliceTests.SpliceTestConsoleEnvironment) = {
@@ -436,7 +436,7 @@ class WalletBuyTrafficRequestIntegrationTest
     assertThrowsAndLogsCommandFailures(
       buyer.createBuyTrafficRequest(
         trafficRecipient,
-        domainId.getOrElse(activeSynchronizerId),
+        synchronizerId.getOrElse(activeSynchronizerId),
         trafficAmount.getOrElse(minTopupAmount),
         tid,
         expiresAt.getOrElse(now.plus(Duration.ofMinutes(1))),

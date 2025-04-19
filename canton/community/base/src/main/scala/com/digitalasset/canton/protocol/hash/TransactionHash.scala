@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
@@ -31,9 +31,11 @@ object TransactionHash {
         )
   }
 
-  /** Deterministically hash a versioned transaction and its metadata using the Version 1 of the hashing algorithm.
+  /** Deterministically hash a versioned transaction and its metadata using the Version 1 of the
+    * hashing algorithm.
     *
-    * @param hashTracer tracer that can be used to debug encoding of the transaction.
+    * @param hashTracer
+    *   tracer that can be used to debug encoding of the transaction.
     */
   @throws[NodeHashingError]
   def tryHashTransactionWithMetadataV1(
@@ -47,6 +49,7 @@ object TransactionHash {
       hashTracer,
       enforceNodeSeedForCreateNodes = true,
     ).addPurpose
+      .addHashingSchemeVersion(HashingSchemeVersion.V2)
       .addHash(
         TransactionHash
           .tryHashTransactionV1(versionedTransaction, nodeSeeds, hashTracer.subNodeTracer),
@@ -61,7 +64,8 @@ object TransactionHash {
 
   /** Deterministically hash a versioned transaction using the Version 1 of the hashing algorithm.
     *
-    * @param hashTracer tracer that can be used to debug encoding of the transaction.
+    * @param hashTracer
+    *   tracer that can be used to debug encoding of the transaction.
     */
   @throws[NodeHashingError]
   private[hash] def tryHashTransactionV1(

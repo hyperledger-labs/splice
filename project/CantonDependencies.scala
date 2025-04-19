@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.2.0-snapshot.20241111.13401.0.v7e9180fc"
+  val version: String = "3.3.0-snapshot.20250415.13756.0.vafc5c867"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -23,7 +23,7 @@ object CantonDependencies {
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
-  lazy val apispec_version = "0.7.2"
+  lazy val apispec_version = "0.11.7"
   lazy val pekko_version = "1.1.2"
   lazy val pekko_http_version = "1.1.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
@@ -91,12 +91,15 @@ object CantonDependencies {
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
   lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % daml_libraries_version
-  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_compiler_version
+  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
   lazy val daml_lf_transaction_test_lib =
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
   lazy val daml_lf_api_type_signature =
     "com.daml" %% "daml-lf-api-type-signature" % daml_libraries_version
+  lazy val daml_libs_scala_grpc_test_utils =
+    "com.daml" %% "grpc-test-utils" % daml_libraries_version
 
+  lazy val daml_nonempty = "com.daml" %% "nonempty" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_contextualized_logging =
@@ -221,6 +224,7 @@ object CantonDependencies {
     "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry-java17" % s"$opentelemetry_java_instrumentation_version-alpha"
   lazy val opentelemetry_instrumentation_hikari =
     "io.opentelemetry.instrumentation" % "opentelemetry-hikaricp-3.0" % s"$opentelemetry_java_instrumentation_version-alpha"
+  lazy val opentelemetry_proto = "io.opentelemetry" % "opentelemetry-proto" % "1.7.1-alpha"
 
   lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.9.2"
 
@@ -236,7 +240,7 @@ object CantonDependencies {
   lazy val sttp_okhttp = "com.softwaremill.sttp.client3" %% "okhttp-backend" % sttp_version
   lazy val sttp_circe = "com.softwaremill.sttp.client3" %% "circe" % sttp_version
 
-  lazy val tapir_version = "1.8.5"
+  lazy val tapir_version = "1.11.7"
   lazy val tapir_json_circe = "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % tapir_version
   lazy val tapir_pekko_http_server =
     "com.softwaremill.sttp.tapir" %% "tapir-pekko-http-server" % tapir_version
@@ -259,6 +263,8 @@ object CantonDependencies {
   // We have to exclude conflicting parser version
   lazy val ujson_circe =
     "com.lihaoyi" %% "ujson-circe" % upickle_version exclude ("io.circe", "circe-parser_2.13")
+
+  lazy val protostuff_parser = "io.protostuff" % "protostuff-parser" % "3.1.40"
 
   lazy val toxiproxy_java = "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4"
 

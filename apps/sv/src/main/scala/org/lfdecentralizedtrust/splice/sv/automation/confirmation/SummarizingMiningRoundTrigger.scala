@@ -24,7 +24,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -144,7 +144,7 @@ class SummarizingMiningRoundTrigger(
   /** Query the open reward contracts for a given round. This should only be used
     * for a SummarizingMiningRound.
     */
-  private def queryRewards(round: Long, domain: DomainId)(implicit
+  private def queryRewards(round: Long, domain: SynchronizerId)(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[RoundRewards] = {

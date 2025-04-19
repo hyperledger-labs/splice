@@ -34,3 +34,27 @@ spec:
           port:
             number: 80
           host: docs.docs.svc.cluster.local
+{{- if .Values.publicDocs }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: cluster-docs-public
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+  - "docs.{{ (.Values.cluster).cantonHostname }}"
+  {{- if eq (.Values.cluster).hostname  (.Values.cluster).daHostname }}
+  - "docs.{{ (.Values.cluster).daHostname }}"
+  {{- end }}
+  gateways:
+  - cn-public-http-gateway
+  http:
+  - match:
+      - port: 443
+    route:
+      - destination:
+          port:
+            number: 80
+          host: docs.docs.svc.cluster.local
+{{- end}}

@@ -37,19 +37,23 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   WalletValidatorAppClientConfig,
 }
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
+import com.digitalasset.canton.config.ConfigErrors.{
+  CantonConfigError,
+  GenericConfigError,
+  NoConfigFiles,
+  SubstitutionError,
+}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.participant.config.{
-  CommunityParticipantConfig,
-  RemoteParticipantConfig,
-}
+import com.digitalasset.canton.participant.config.{ParticipantNodeConfig, RemoteParticipantConfig}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
@@ -67,8 +71,11 @@ import scala.util.Try
 import scala.util.control.NoStackTrace
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
-import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
+import com.digitalasset.canton.synchronizer.mediator.{MediatorNodeConfig, RemoteMediatorConfig}
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  RemoteSequencerConfig,
+  SequencerNodeConfig,
+}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 
@@ -84,38 +91,51 @@ case class SpliceConfig(
     ansAppExternalClients: Map[InstanceName, AnsAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
-    // TODO(#736): we want to remove all of the configurations options below:
-    participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
-    remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
-    participantsX: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
-    remoteParticipantsX: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(
       timeouts = TimeoutSettings(
         console = ConsoleCommandTimeout(
-          bounded = NonNegativeDuration.tryFromDuration(2.minutes),
-          requestTimeout = NonNegativeDuration.tryFromDuration(40.seconds),
+          bounded = NonNegativeDuration.tryFromDuration(2.minutes)
         )
       )
     ),
     features: CantonFeatures = CantonFeatures(),
     override val pekkoConfig: Option[Config] = None,
-) extends CantonConfig // TODO(#736): generalize or fork this trait.
-    with ConfigDefaults[DefaultPorts, SpliceConfig] {
+) extends ConfigDefaults[DefaultPorts, SpliceConfig]
+    with SharedCantonConfig[SpliceConfig] {
 
-  override type ParticipantConfigType = CommunityParticipantConfig
+  override def withDefaults(defaults: DefaultPorts, edition: CantonEdition): SpliceConfig = this
 
-  override def validate: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
+  // TODO(#736): we want to remove all of the configurations options below:
+  override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
+  override val remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty
+  override val mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty
+  override val remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty
+  override val sequencers: Map[InstanceName, SequencerNodeConfig] = Map.empty
+  override val remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty
+  override def portDescription: String = {
+    def nodePorts(config: LocalNodeConfig): Seq[String] =
+      portDescriptionFromConfig(config)(Seq(("http-api", _.adminApi)))
+
+    Seq(
+      svApps.fmap(nodePorts),
+      scanApps.fmap(nodePorts),
+      validatorApps.fmap(nodePorts),
+    )
+      .flatMap(_.map { case (name, ports) =>
+        nodePortsDescription(name, ports)
+      })
+      .mkString(";")
+  }
+
+  def validate: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
 
   private lazy val validatorAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     validatorApps.fmap { validatorConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
-        parameters.timeouts.console.requestTimeout,
+        parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
@@ -150,12 +170,9 @@ case class SpliceConfig(
   private lazy val svAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     svApps.fmap { svConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
-        parameters.timeouts.console.requestTimeout,
+        parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
@@ -189,12 +206,9 @@ case class SpliceConfig(
   private lazy val scanAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     scanApps.fmap { scanConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
-        parameters.timeouts.console.requestTimeout,
+        parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
@@ -228,12 +242,9 @@ case class SpliceConfig(
   private lazy val splitwellAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     splitwellApps.fmap { splitwellConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
-        parameters.timeouts.console.requestTimeout,
+        parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
@@ -275,20 +286,6 @@ case class SpliceConfig(
     import writers.*
     ConfigWriter[SpliceConfig].to(this).render(SpliceConfig.defaultConfigRenderer)
   }
-
-  override def withDefaults(ports: DefaultPorts): SpliceConfig =
-    this // TODO(#736): CantonCommunityConfig does more here. Do we want to copy that?
-  // NOTE(Simon): in particular it handles default ports derived from the ports object introduced in https://github.com/DACH-NY/canton/commit/ccff59fccf349893cc68413a7859e8ef748a94fa
-
-  // TODO(#736): we want to remove these mediator configs
-
-  override def mediators: Map[InstanceName, MediatorNodeConfigType] = Map.empty
-
-  override def remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty
-
-  override def sequencers: Map[InstanceName, SequencerNodeConfigType] = Map.empty
-
-  override def remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty
 }
 
 // NOTE: the below is patterned after CantonCommunityConfig.
@@ -308,6 +305,49 @@ object SpliceConfig {
     TraceContext.empty,
   )
 
+  /** Copy-pasta from CantonConfig.loadAndValidate */
+  def loadAndValidate(
+      config: Config
+  )(implicit elc: ErrorLoggingContext = elc): Either[CantonConfigError, SpliceConfig] = {
+    // config.resolve forces any substitutions to be resolved (typically referenced environment variables or system properties).
+    // this normally would happen by default during ConfigFactory.load(),
+    // however we have to manually as we've merged in individual files.
+    val result = Either.catchOnly[UnresolvedSubstitution](config.resolve())
+    result match {
+      case Right(resolvedConfig) =>
+        loadRawConfig(resolvedConfig)
+          .flatMap { conf =>
+            val confWithDefaults = conf.withDefaults(new DefaultPorts(), CommunityCantonEdition)
+            confWithDefaults.validate.toEither
+              .map(_ => confWithDefaults)
+              .leftMap(causes => ConfigErrors.ValidationError.Error(causes.toList))
+          }
+      case Left(substitutionError) => Left(SubstitutionError.Error(Seq(substitutionError)))
+    }
+  }
+
+  /** Copy-pasta from CantonConfig.loadRawConfig
+    */
+  private[config] def loadRawConfig(
+      rawConfig: Config
+  )(implicit elc: ErrorLoggingContext): Either[CantonConfigError, SpliceConfig] =
+    pureconfig.ConfigSource
+      .fromConfig(rawConfig)
+      .at("canton")
+      .load[SpliceConfig]
+      .leftMap(failures =>
+        GenericConfigError.Error(ConfigErrors.getMessage[SpliceConfig](failures))
+      )
+
+  def parseAndLoad(
+      files: Seq[File]
+  )(implicit elc: ErrorLoggingContext): Either[CantonConfigError, SpliceConfig] =
+    for {
+      nonEmpty <- NonEmpty.from(files).toRight(NoConfigFiles.Error())
+      parsedAndMerged <- CantonConfig.parseAndMergeConfigs(nonEmpty)
+      loaded <- loadAndValidate(parsedAndMerged)
+    } yield loaded
+
   import CantonConfig.*
   import pureconfig.generic.semiauto.*
 
@@ -316,7 +356,12 @@ object SpliceConfig {
       elc: ErrorLoggingContext
   ) {
     import CantonConfig.ConfigReaders.*
+    import BaseCantonConfig.Readers.*
+    import CantonConfig.ConfigReaders.dbConfigReader
 
+    implicit val configReader: ConfigReader[SynchronizerAlias] = ConfigReader.fromString(str =>
+      SynchronizerAlias.create(str).left.map(err => CannotConvert(str, "SynchronizerAlias", err))
+    )
     implicit val nonNegativeBigDecimalReader: ConfigReader[NonNegativeNumeric[BigDecimal]] =
       NonNegativeNumeric.nonNegativeNumericReader[BigDecimal]
 
@@ -350,10 +395,6 @@ object SpliceConfig {
 
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
-
-    implicit val postgresSpliceDbConfigReader: ConfigReader[SpliceDbConfig.Postgres] =
-      deriveReader[SpliceDbConfig.Postgres]
-    implicit val spliceDbConfigReader: ConfigReader[SpliceDbConfig] = deriveReader[SpliceDbConfig]
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
@@ -459,13 +500,22 @@ object SpliceConfig {
       implicit val sequencerPruningConfig2 = sequencerPruningConfig
       deriveReader[SvSequencerConfig]
         .emap { sequencerConfig =>
-          UrlValidator
-            .isValid(sequencerConfig.externalPublicApiUrl)
-            .bimap(
-              invalidUrl =>
-                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
-              _ => sequencerConfig,
-            )
+          for {
+            _ <- UrlValidator
+              .isValid(sequencerConfig.externalPublicApiUrl)
+              .leftMap(invalidUrl =>
+                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl")
+              )
+            _ <-
+              if (sequencerConfig.isBftSequencer) {
+                sequencerConfig.externalPeerApiUrlSuffix
+                  .toRight(
+                    ConfigValidationFailed(
+                      "Sequencer external peer url must be set for BFT sequencers"
+                    )
+                  )
+              } else Right(())
+          } yield sequencerConfig
         }
     }
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =
@@ -563,8 +613,6 @@ object SpliceConfig {
         } yield conf
       }
 
-    implicit val spliceAppParametersReader: ConfigReader[SharedSpliceAppParameters] =
-      deriveReader[SharedSpliceAppParameters]
     implicit val validatorOnboardingConfigReader: ConfigReader[ValidatorOnboardingConfig] =
       deriveReader[ValidatorOnboardingConfig]
     implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
@@ -668,18 +716,21 @@ object SpliceConfig {
     implicit val splitwellClientConfigReader: ConfigReader[SplitwellAppClientConfig] =
       deriveReader[SplitwellAppClientConfig]
 
-    implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
-      deriveReader[CommunityParticipantConfig]
-
     implicit val spliceConfigReader: ConfigReader[SpliceConfig] = deriveReader[SpliceConfig]
   }
 
   @nowarn("cat=unused")
   class ConfigWriters(confidential: Boolean) {
     val writers = new CantonConfig.ConfigWriters(confidential)
+    import BaseCantonConfig.Writers.*
 
     import writers.*
     import DeprecatedConfigUtils.*
+
+    implicit val dbConfigWriter: ConfigWriter[DbConfig] = deriveWriter[DbConfig]
+
+    implicit val configWriter: ConfigWriter[SynchronizerAlias] =
+      ConfigWriter.toString(_.toProtoPrimitive)
 
     implicit val nonNegativeBigDecimalWriter: ConfigWriter[NonNegativeNumeric[BigDecimal]] =
       ConfigWriter.toString(x => x.unwrap.toString)
@@ -718,12 +769,6 @@ object SpliceConfig {
       ConfigWriter.stringConfigWriter.contramap(_.toString())
     implicit val networkAppClientConfigReader: ConfigWriter[NetworkAppClientConfig] =
       deriveWriter[NetworkAppClientConfig]
-
-    implicit val postgresSpliceDbConfigWriter: ConfigWriter[SpliceDbConfig.Postgres] =
-      confidentialWriter[SpliceDbConfig.Postgres](pg =>
-        pg.copy(config = DbConfig.hideConfidential(pg.config))
-      )
-    implicit val spliceDbConfigWriter: ConfigWriter[SpliceDbConfig] = deriveWriter[SpliceDbConfig]
 
     implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
@@ -857,8 +902,6 @@ object SpliceConfig {
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 
-    implicit val spliceAppParametersWriter: ConfigWriter[SharedSpliceAppParameters] =
-      deriveWriter[SharedSpliceAppParameters]
     implicit val domainConfigWriter: ConfigWriter[SynchronizerConfig] =
       deriveWriter[SynchronizerConfig]
 
@@ -909,9 +952,6 @@ object SpliceConfig {
     implicit val splitwellClientConfigWriter: ConfigWriter[SplitwellAppClientConfig] =
       deriveWriter[SplitwellAppClientConfig]
 
-    implicit val communityParticipantConfigWriter: ConfigWriter[CommunityParticipantConfig] =
-      deriveWriter[CommunityParticipantConfig]
-
     implicit val spliceConfigWriter: ConfigWriter[SpliceConfig] =
       deriveWriter[SpliceConfig]
 
@@ -927,18 +967,18 @@ object SpliceConfig {
   def load(config: Config)(implicit
       elc: ErrorLoggingContext = elc
   ): Either[CantonConfigError, SpliceConfig] =
-    CantonConfig.loadAndValidate[SpliceConfig](config)
+    SpliceConfig.loadAndValidate(config)
 
   def parseAndLoadOrThrow(files: Seq[File])(implicit
       elc: ErrorLoggingContext = elc
   ): SpliceConfig =
-    CantonConfig
-      .parseAndLoad[SpliceConfig](files)
+    SpliceConfig
+      .parseAndLoad(files)
       .valueOr(error => throw SpliceConfigException(error))
 
   def loadOrThrow(config: Config)(implicit elc: ErrorLoggingContext = elc): SpliceConfig = {
-    CantonConfig
-      .loadAndValidate[SpliceConfig](config)
+    SpliceConfig
+      .loadAndValidate(config)
       .valueOr(error => throw SpliceConfigException(error))
   }
 

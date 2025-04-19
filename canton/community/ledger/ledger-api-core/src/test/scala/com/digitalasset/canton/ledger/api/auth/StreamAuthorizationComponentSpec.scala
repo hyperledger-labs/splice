@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.auth
@@ -11,7 +11,7 @@ import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.{UpdateService, U
 import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
 import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.auth.{
-  AuthorizationInterceptor,
+  AuthInterceptor,
   Authorizer,
   Claim,
   ClaimPublic,
@@ -19,10 +19,10 @@ import com.digitalasset.canton.auth.{
   ClaimSet,
 }
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.ledger.api.UserRight.CanReadAs
 import com.digitalasset.canton.ledger.api.auth.services.UpdateServiceAuthorization
-import com.digitalasset.canton.ledger.api.domain.UserRight.CanReadAs
-import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, User}
 import com.digitalasset.canton.ledger.api.grpc.StreamingServiceLifecycleManagement
+import com.digitalasset.canton.ledger.api.{IdentityProviderId, User}
 import com.digitalasset.canton.ledger.localstore.InMemoryUserManagementStore
 import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
 import com.digitalasset.canton.logging.SuppressionRule.{FullSuppression, LoggerNameContains}
@@ -195,7 +195,7 @@ class StreamAuthorizationComponentSpec
     val claimSetFixture = ClaimSet.Claims(
       claims = List[Claim](ClaimPublic, ClaimReadAsParty(partyId1), ClaimReadAsParty(partyId2)),
       participantId = Some(participantId),
-      applicationId = Some(userId),
+      userId = Some(userId),
       expiration = Some(nowRef.get().plusSeconds(10)),
       identityProviderId = None,
       resolvedFromUser = true,
@@ -207,7 +207,7 @@ class StreamAuthorizationComponentSpec
           next: ServerCallHandler[ReqT, RespT],
       ): ServerCall.Listener[ReqT] = {
         val nextCtx =
-          Context.current.withValue(AuthorizationInterceptor.contextKeyClaimSet, claimSetFixture)
+          Context.current.withValue(AuthInterceptor.contextKeyClaimSet, claimSetFixture)
         Contexts.interceptCall(nextCtx, call, headers, next)
       }
     }
@@ -250,7 +250,7 @@ class StreamAuthorizationComponentSpec
           responseObserver: StreamObserver[GetUpdatesResponse],
       ): Unit = registerStream(responseObserver) {
         Source
-          .fromIterator(() => Iterator.continually(GetUpdatesResponse()))
+          .fromIterator(() => Iterator.continually(GetUpdatesResponse.defaultInstance))
           .map { elem =>
             Threading.sleep(200)
             logger.debug("sent")
@@ -271,21 +271,29 @@ class StreamAuthorizationComponentSpec
           responseObserver: StreamObserver[GetUpdateTreesResponse],
       ): Unit = notSupported
 
-      override def getTransactionTreeByEventId(
-          request: GetTransactionByEventIdRequest
+      override def getTransactionTreeByOffset(
+          request: GetTransactionByOffsetRequest
       ): Future[GetTransactionTreeResponse] = notSupported
 
       override def getTransactionTreeById(
           request: GetTransactionByIdRequest
       ): Future[GetTransactionTreeResponse] = notSupported
 
-      override def getTransactionByEventId(
-          request: GetTransactionByEventIdRequest
+      override def getTransactionByOffset(
+          request: GetTransactionByOffsetRequest
       ): Future[GetTransactionResponse] = notSupported
 
       override def getTransactionById(
           request: GetTransactionByIdRequest
       ): Future[GetTransactionResponse] = notSupported
+
+      override def getUpdateByOffset(
+          request: GetUpdateByOffsetRequest
+      ): Future[GetUpdateResponse] = notSupported
+
+      override def getUpdateById(
+          request: GetUpdateByIdRequest
+      ): Future[GetUpdateResponse] = notSupported
 
     }
     val grpcServerPort = UniquePortGenerator.next
@@ -304,6 +312,7 @@ class StreamAuthorizationComponentSpec
       servicesExecutor = ec,
       services = List(bindableService),
       loggerFactory = loggerFactory,
+      keepAlive = None,
     )
 
     val channelOwner = ResourceOwner.forChannel(
@@ -330,14 +339,19 @@ class StreamAuthorizationComponentSpec
       getTransactions(
         grpcChannel,
         GetUpdatesRequest(
+          beginExclusive = 0,
+          endInclusive = None,
           filter = Some(
             TransactionFilter(
               Map(
-                partyId1 -> Filters(),
-                partyId2 -> Filters(),
-              )
+                partyId1 -> Filters(Nil),
+                partyId2 -> Filters(Nil),
+              ),
+              None,
             )
-          )
+          ),
+          verbose = false,
+          updateFormat = None,
         ),
       )
     }
@@ -360,7 +374,7 @@ class StreamAuthorizationComponentSpec
       }
       .map { result =>
         logger.info("Teardown finished.")
-        result.get // populate error
+        result.success.value // populate error
         succeed
       }
   }

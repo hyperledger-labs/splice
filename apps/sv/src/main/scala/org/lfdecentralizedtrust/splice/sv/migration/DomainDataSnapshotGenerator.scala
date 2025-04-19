@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.migration.{
   AcsExporter,
   DarExporter,
-  DomainParametersStateTopologyConnection,
+  SynchronizerParametersStateTopologyConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -38,7 +38,7 @@ class DomainDataSnapshotGenerator(
 
   private val darExporter = new DarExporter(participantAdminConnection)
 
-  private val domainStateTopology = new DomainParametersStateTopologyConnection(
+  private val domainStateTopology = new SynchronizerParametersStateTopologyConnection(
     participantAdminConnection
   )
 
@@ -74,7 +74,7 @@ class DomainDataSnapshotGenerator(
   ): Future[DomainDataSnapshot] = for {
     decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
     domainParamsStateTopology <- domainStateTopology
-      .firstAuthorizedStateForTheLatestDomainParametersState(
+      .firstAuthorizedStateForTheLatestSynchronizerParametersState(
         decentralizedSynchronizer
       )
       .getOrElse {
@@ -91,16 +91,16 @@ class DomainDataSnapshotGenerator(
         _ <- retryProvider.waitUntil(
           RetryFor.Automation,
           "sequencer_paused_domain",
-          "sequencer observes DomainParametersState that pauses domain",
+          "sequencer observes SynchronizerParametersState that pauses domain",
           for {
-            sequencerDomainParameters <- sequencerConnection.getDomainParametersState(
+            sequencerDomainParameters <- sequencerConnection.getSynchronizerParametersState(
               decentralizedSynchronizer
             )
           } yield {
             if (sequencerDomainParameters.base.serial < domainParamsStateTopology.base.serial) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  s"Sequencer has not yet observed DomainParametersState with serial >= ${domainParamsStateTopology.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
+                  s"Sequencer has not yet observed SynchronizerParametersState with serial >= ${domainParamsStateTopology.base.serial}, current serial: ${sequencerDomainParameters.base.serial}"
                 )
                 .asRuntimeException()
             }
@@ -108,7 +108,7 @@ class DomainDataSnapshotGenerator(
           logger,
         )
         sequencerDomainParamsPaused <- domainStateTopology
-          .firstAuthorizedStateForTheLatestDomainParametersState(
+          .firstAuthorizedStateForTheLatestSynchronizerParametersState(
             decentralizedSynchronizer
           )
           .getOrElse {

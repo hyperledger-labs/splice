@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.apache.pekko.stream.Materializer
@@ -273,10 +273,10 @@ object HttpValidatorAdminAppClient {
               contractWithState.contract
             )
             .leftMap(_.toString)
-          domainId <- contractWithState.domainId.traverse(DomainId.fromString)
+          synchronizerId <- contractWithState.domainId.traverse(SynchronizerId.fromString)
         } yield ContractWithState(
           contract,
-          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
+          synchronizerId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
         )
       )
     }
@@ -434,10 +434,10 @@ object HttpValidatorAdminAppClient {
               contractWithState.contract
             )
             .leftMap(_.toString)
-          domainId <- contractWithState.domainId.traverse(DomainId.fromString)
+          synchronizerId <- contractWithState.domainId.traverse(SynchronizerId.fromString)
         } yield ContractWithState(
           contract,
-          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
+          synchronizerId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
         )
       )
     }

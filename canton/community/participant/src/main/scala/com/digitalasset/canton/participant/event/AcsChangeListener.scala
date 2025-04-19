@@ -1,8 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.event
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet
@@ -11,22 +12,27 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LfPartyId, ReassignmentCounter}
-import com.google.common.annotations.VisibleForTesting
-
-import scala.concurrent.Future
 
 /** Components that need to keep a running snapshot of ACS.
   */
 trait AcsChangeListener {
 
-  /** ACS change notification. Any response logic needs to happen in the background. The ACS change set may be empty,
-    * (e.g., in case of time proofs).
+  /** ACS change notification. Any response logic needs to happen in the background. The ACS change
+    * set may be empty, (e.g., in case of time proofs).
     *
-    * @param toc time of the change
-    * @param acsChange active contract set change descriptor
-    * @param waitFor processing won't start until this Future completes
+    * @param toc
+    *   time of the change
+    * @param acsChange
+    *   active contract set change descriptor
     */
-  def publish(toc: RecordTime, acsChange: AcsChange, waitFor: Future[Unit])(implicit
+  def publish(toc: RecordTime, acsChange: AcsChange)(implicit
+      traceContext: TraceContext
+  ): Unit
+
+  def publish(
+      sequencerTimestamp: CantonTimestamp,
+      commitSetO: Option[CommitSet],
+  )(implicit
       traceContext: TraceContext
   ): Unit
 
@@ -34,8 +40,8 @@ trait AcsChangeListener {
 
 /** Represents a change to the ACS. The deactivated contracts are accompanied by their stakeholders.
   *
-  * Note that we include the LfContractId (for uniqueness), but we do not include the contract hash because
-  * it already authenticates the contract contents.
+  * Note that we include the LfContractId (for uniqueness), but we do not include the contract hash
+  * because it already authenticates the contract contents.
   */
 final case class AcsChange(
     activations: Map[LfContractId, ContractStakeholdersAndReassignmentCounter],
@@ -74,15 +80,20 @@ object AcsChange extends HasLoggerName {
 
   /** Returns an AcsChange based on a given CommitSet.
     *
-    * @param commitSet The commit set from which to build the AcsChange.
-    * @param reassignmentCounterOfNonTransientArchivals A map containing reassignment counters for every non-transient
-    *                                               archived contracts in the commitSet, i.e., `commitSet.archivals`.
-    * @param reassignmentCounterOfTransientArchivals A map containing reassignment counters for every transient
-    *                                                archived contracts in the commitSet, i.e., `commitSet.archivals`.
-    * @throws java.lang.IllegalStateException if the contract ids in `reassignmentCounterOfTransientArchivals`;
-    *         if the contract ids in `reassignmentCounterOfNonTransientArchivals` are not a subset of `commitSet.archivals` ;
-    *         if the union of contracts ids in `reassignmentCounterOfTransientArchivals` and
-    *         `reassignmentCounterOfNonTransientArchivals` does not equal the contract ids in `commitSet.archivals`;
+    * @param commitSet
+    *   The commit set from which to build the AcsChange.
+    * @param reassignmentCounterOfNonTransientArchivals
+    *   A map containing reassignment counters for every non-transient archived contracts in the
+    *   commitSet, i.e., `commitSet.archivals`.
+    * @param reassignmentCounterOfTransientArchivals
+    *   A map containing reassignment counters for every transient archived contracts in the
+    *   commitSet, i.e., `commitSet.archivals`.
+    * @throws java.lang.IllegalStateException
+    *   if the contract ids in `reassignmentCounterOfTransientArchivals`; if the contract ids in
+    *   `reassignmentCounterOfNonTransientArchivals` are not a subset of `commitSet.archivals` ; if
+    *   the union of contracts ids in `reassignmentCounterOfTransientArchivals` and
+    *   `reassignmentCounterOfNonTransientArchivals` does not equal the contract ids in
+    *   `commitSet.archivals`;
     */
   def tryFromCommitSet(
       commitSet: CommitSet,
@@ -176,27 +187,5 @@ object AcsChange extends HasLoggerName {
       activations = activations,
       deactivations = archivalDeactivations ++ unassignmentDeactivations,
     )
-  }
-
-  @VisibleForTesting
-  def reassignmentCountersForArchivedTransient(
-      commitSet: CommitSet
-  ): Map[LfContractId, ReassignmentCounter] = {
-
-    // We first search in assignments, because they would have the most recent reassignment counter.
-    val transientCidsAssigned = commitSet.assignments.collect {
-      case (contractId, tcAndContractHash) if commitSet.archivals.keySet.contains(contractId) =>
-        (contractId, tcAndContractHash.reassignmentCounter)
-    }
-
-    // Then we search in creations
-    val transientCidsCreated = commitSet.creations.collect {
-      case (contractId, tcAndContractHash)
-          if commitSet.archivals.keySet.contains(contractId) && !transientCidsAssigned.keySet
-            .contains(contractId) =>
-        (contractId, tcAndContractHash.reassignmentCounter)
-    }
-
-    transientCidsAssigned ++ transientCidsCreated
   }
 }

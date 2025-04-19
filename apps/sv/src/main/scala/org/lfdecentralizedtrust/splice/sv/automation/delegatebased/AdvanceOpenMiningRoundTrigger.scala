@@ -72,7 +72,7 @@ class AdvanceOpenMiningRoundTrigger(
         )
         // We explicitly reassign open rounds so we can use them
         // as the target domain here.
-        .withDomainId(task.work.openRounds.domain)
+        .withSynchronizerId(task.work.openRounds.domain)
         .noDedup
         .yieldUnit()
     } yield TaskSuccess(
@@ -86,7 +86,7 @@ class AdvanceOpenMiningRoundTrigger(
     import cats.instances.future.*
     import cats.syntax.traverse.*
 
-    val domainId = task.work.openRounds.domain
+    val synchronizerId = task.work.openRounds.domain
     (for {
       // lookupOpenMiningRoundTriple and lookupAmuletRules will yield corrected
       // domains on next task listing if these have been invalidated by
@@ -94,7 +94,7 @@ class AdvanceOpenMiningRoundTrigger(
       _ <- OptionT(
         store.multiDomainAcsStore
           .lookupContractByIdOnDomain(splice.amuletrules.AmuletRules.COMPANION)(
-            domainId,
+            synchronizerId,
             task.work.amuletRulesId,
           )
       )
@@ -102,7 +102,7 @@ class AdvanceOpenMiningRoundTrigger(
         OptionT(
           store.multiDomainAcsStore
             .lookupContractByIdOnDomain(splice.round.OpenMiningRound.COMPANION)(
-              domainId,
+              synchronizerId,
               co.contractId,
             )
         )

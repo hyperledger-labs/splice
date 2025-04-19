@@ -2,8 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy
 
 import org.lfdecentralizedtrust.splice.config.{SpliceConfig, ParticipantClientConfig}
 import org.lfdecentralizedtrust.splice.sv.config.SvParticipantClientConfig
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -21,7 +20,7 @@ case class UseToxiproxy(
     createSvLedgerApiProxies: Boolean = false,
     createScanAppProxies: Boolean = false,
     createScanLedgerApiProxy: Boolean = false,
-) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment]
+) extends EnvironmentSetupPlugin[SpliceConfig, SpliceEnvironment]
     with BaseTest {
 
   val client = new ToxiproxyClient()

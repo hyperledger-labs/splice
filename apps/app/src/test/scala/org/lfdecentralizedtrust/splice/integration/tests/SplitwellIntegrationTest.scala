@@ -1,17 +1,12 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.splitwell.automation.AcceptedAppPaymentRequestsTrigger
 import org.lfdecentralizedtrust.splice.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -24,8 +19,7 @@ class SplitwellIntegrationTest
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
@@ -121,15 +115,15 @@ class SplitwellIntegrationTest
         "alice sees balance update on splitwell domain",
         _ =>
           inside(aliceSplitwellClient.listBalanceUpdates(key)) { case Seq(update) =>
-            val domainId = aliceValidatorBackend.participantClient.domains.id_of(
-              DomainAlias.tryCreate("splitwell")
+            val synchronizerId = aliceValidatorBackend.participantClient.synchronizers.id_of(
+              SynchronizerAlias.tryCreate("splitwell")
             )
             aliceValidatorBackend.participantClient.ledger_api_extensions.acs
               .lookup_contract_domain(
                 aliceUserParty,
                 Set(update.contractId.contractId),
               ) shouldBe Map(
-              update.contractId.contractId -> domainId
+              update.contractId.contractId -> synchronizerId
             )
           },
       )
@@ -149,11 +143,11 @@ class SplitwellIntegrationTest
         _ => aliceSplitwellClient.listGroups() should have size 1,
       )
       try {
-        splitwellBackend.participantClient.domains
-          .disconnect(DomainAlias.tryCreate("splitwell"))
+        splitwellBackend.participantClient.synchronizers
+          .disconnect(SynchronizerAlias.tryCreate("splitwell"))
       } finally {
-        splitwellBackend.participantClient.domains.reconnect(
-          DomainAlias.tryCreate("splitwell")
+        splitwellBackend.participantClient.synchronizers.reconnect(
+          SynchronizerAlias.tryCreate("splitwell")
         )
       }
       actAndCheck("alice creates group2", aliceSplitwellClient.requestGroup("group2"))(

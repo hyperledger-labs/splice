@@ -1,10 +1,11 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.option.*
 import com.daml.ledger.api.v2.event.CreatedEvent
+import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
 import com.daml.ledger.api.v2.reassignment.{AssignedEvent, UnassignedEvent}
 import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse.ContractEntry
 import com.daml.ledger.api.v2.state_service.{
@@ -12,13 +13,10 @@ import com.daml.ledger.api.v2.state_service.{
   IncompleteAssigned,
   IncompleteUnassigned,
 }
-import com.daml.ledger.api.v2.value.{Record, RecordField, Value}
+import com.daml.ledger.api.v2.value.{RecordField, Value}
+import com.daml.ledger.javaapi.data
 import com.digitalasset.canton.admin.api.client.data.TemplateId
-import com.digitalasset.canton.crypto.Salt
-import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.{LfPackageName, LfPackageVersion}
-import com.digitalasset.daml.lf.data.Time
+import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.timestamp.Timestamp
 
 /** Wrapper class to make scalapb LedgerApi classes more convenient to access
@@ -54,16 +52,16 @@ object LedgerApiTypeWrappers {
 
     def contractId: String = event.contractId
 
-    def domainId: Option[DomainId] = {
-      val domainStr = entry match {
+    def synchronizerId: Option[SynchronizerId] = {
+      val synchronizerStr = entry match {
         case ContractEntry.Empty => None
-        case ContractEntry.ActiveContract(contract) => contract.domainId.some
+        case ContractEntry.ActiveContract(contract) => contract.synchronizerId.some
         case ContractEntry.IncompleteUnassigned(unassigned) =>
           unassigned.unassignedEvent.map(_.source)
         case ContractEntry.IncompleteAssigned(assigned) => assigned.assignedEvent.map(_.target)
       }
 
-      domainStr.map(DomainId.tryFromString)
+      synchronizerStr.map(SynchronizerId.tryFromString)
     }
 
     def templateId: TemplateId = TemplateId.fromIdentifier(
@@ -85,8 +83,8 @@ object LedgerApiTypeWrappers {
     def unassignId: String = event.unassignId
     def assignmentExclusivity: Option[Timestamp] = event.assignmentExclusivity
 
-    def source: DomainId = DomainId.tryFromString(event.source)
-    def target: DomainId = DomainId.tryFromString(event.target)
+    def source: SynchronizerId = SynchronizerId.tryFromString(event.source)
+    def target: SynchronizerId = SynchronizerId.tryFromString(event.target)
   }
 
   final case class WrappedIncompleteAssigned(entry: IncompleteAssigned) {
@@ -100,8 +98,8 @@ object LedgerApiTypeWrappers {
     def reassignmentCounter: Long = event.reassignmentCounter
     def contractId: String = createdEvent.contractId
 
-    def source: DomainId = DomainId.tryFromString(event.source)
-    def target: DomainId = DomainId.tryFromString(event.target)
+    def source: SynchronizerId = SynchronizerId.tryFromString(event.source)
+    def target: SynchronizerId = SynchronizerId.tryFromString(event.target)
 
   }
 
@@ -116,13 +114,14 @@ object LedgerApiTypeWrappers {
    */
   final case class WrappedCreatedEvent(event: CreatedEvent) {
 
-    private def corrupt: String = s"corrupt event ${event.eventId} / ${event.contractId}"
+    private def corrupt: String =
+      s"corrupt event ${event.nodeId} / ${event.contractId} at ${event.offset}"
 
     def templateId: TemplateId =
       TemplateId.fromIdentifier(
         event.templateId.getOrElse(
           throw new IllegalArgumentException(
-            s"Template Id not specified for event ${event.eventId} / ${event.contractId}"
+            s"Template Id not specified for event ${event.nodeId} / ${event.contractId} at ${event.offset}"
           )
         )
       )
@@ -132,6 +131,9 @@ object LedgerApiTypeWrappers {
 
     def arguments: Map[String, Any] =
       event.createArguments.toList.flatMap(_.fields).flatMap(flatten(Seq(), _)).toMap
+
+    def toJava: data.CreatedEvent =
+      data.CreatedEvent.fromProto(toJavaProto(event))
   }
 
   private def flatten(prefix: Seq[String], field: RecordField): Seq[(String, Any)] = {
@@ -144,19 +146,4 @@ object LedgerApiTypeWrappers {
 
     field.value.map(_.sum).toList.flatMap(extract)
   }
-
-  /** Holder of "core" contract defining fields (particularly those relevant for importing contracts) */
-  final case class ContractData(
-      templateId: TemplateId,
-      packageName: LfPackageName,
-      packageVersion: Option[LfPackageVersion],
-      createArguments: Record,
-      // track signatories and observers for use as auth validation by daml engine
-      signatories: Set[String],
-      observers: Set[String],
-      inheritedContractId: LfContractId,
-      contractSalt: Option[Salt],
-      ledgerCreateTime: Option[Time.Timestamp],
-  )
-
 }

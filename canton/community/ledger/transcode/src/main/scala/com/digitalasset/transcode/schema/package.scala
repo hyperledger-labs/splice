@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.transcode
 
-/** Note:
-  * code in this package is a translation to scala2 of code from https://github.com/DACH-NY/transcode
+/** Note: code in this package is a translation to scala2 of code from
+  * https://github.com/DACH-NY/transcode
   */
 package schema {
   final case class Identifier(packageId: String, moduleName: String, entityName: String) {

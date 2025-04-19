@@ -104,6 +104,7 @@ class DbUserWalletStore(
     with LimitHelpers {
 
   import multiDomainAcsStore.waitUntilAcsIngested
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
   private def txLogStoreId: TxLogStoreId = multiDomainAcsStore.txLogStoreId
@@ -320,7 +321,6 @@ class DbUserWalletStore(
       tc: TraceContext
   ): Future[QueryResult[Option[TransferOfferTxLogEntry]]] =
     waitUntilAcsIngested {
-      import cats.implicits.*
       for {
         resultWithOffset <- storage
           .querySingle(
@@ -347,7 +347,6 @@ class DbUserWalletStore(
       tc: TraceContext
   ): Future[QueryResult[Option[BuyTrafficRequestTxLogEntry]]] =
     waitUntilAcsIngested {
-      import cats.implicits.*
       for {
         resultWithOffset <- storage
           .querySingle(

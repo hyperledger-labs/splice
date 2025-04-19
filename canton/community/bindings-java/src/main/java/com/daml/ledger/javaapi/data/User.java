@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
 
@@ -25,14 +25,12 @@ public final class User {
 
   public UserManagementServiceOuterClass.User toProto() {
     if (primaryParty == null || primaryParty.isEmpty()) {
-      return UserManagementServiceOuterClass.User.newBuilder()
-        .setId(id)
-        .build();
+      return UserManagementServiceOuterClass.User.newBuilder().setId(id).build();
     } else {
       return UserManagementServiceOuterClass.User.newBuilder()
-        .setId(id)
-        .setPrimaryParty(primaryParty.get())
-        .build();
+          .setId(id)
+          .setPrimaryParty(primaryParty.get())
+          .build();
     }
   }
 

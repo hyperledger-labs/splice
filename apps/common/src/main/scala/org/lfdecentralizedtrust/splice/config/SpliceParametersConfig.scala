@@ -7,15 +7,18 @@ import com.digitalasset.canton.config.{
   BatchingConfig,
   CachingConfigs,
   LocalNodeParametersConfig,
+  SessionSigningKeysConfig,
   WatchdogConfig,
 }
 
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
+    enableCantonPackageSelection: Boolean = true,
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 
   override def watchdog: Option[WatchdogConfig] = None
 
+  override def sessionSigningKeys: SessionSigningKeysConfig = ???
 }

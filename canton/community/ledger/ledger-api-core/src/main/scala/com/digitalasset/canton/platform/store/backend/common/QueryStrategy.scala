@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import com.digitalasset.canton.data.{AbsoluteOffset, Offset}
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   CompositeSql,
   SqlStringInterpolation,
@@ -13,30 +13,35 @@ import java.sql.Connection
 
 object QueryStrategy {
 
-  /** This populates the following part of the query:
-    *   SELECT ... WHERE ... ORDER BY ... [THIS PART]
+  /** This populates the following part of the query: SELECT ... WHERE ... ORDER BY ... [THIS PART]
     *
-    * @param limit optional limit
-    * @return the composable SQL
+    * @param limit
+    *   optional limit
+    * @return
+    *   the composable SQL
     */
   def limitClause(limit: Option[Int]): CompositeSql =
     limit
       .map(to => cSQL"fetch next $to rows only")
       .getOrElse(cSQL"")
 
-  /** Would be used in column selectors in GROUP BY situations to see whether a boolean column had true
-    * Example: getting all groups and see wheter they have someone who had covid:
-    * SELECT group_name, booleanOrAggregationFunction(has_covid) GROUP BY group_name;
+  /** Would be used in column selectors in GROUP BY situations to see whether a boolean column had
+    * true Example: getting all groups and see wheter they have someone who had covid: SELECT
+    * group_name, booleanOrAggregationFunction(has_covid) GROUP BY group_name;
     *
-    * @return the function name
+    * @return
+    *   the function name
     */
   def booleanOrAggregationFunction: String = "bool_or"
 
   /** Select a singleton element from some column based on max value of another column
     *
-    * @param singletonColumn column whose value should be returned when the orderingColumn hits max
-    * @param orderingColumn  column used for sorting the input rows
-    * @return an sql clause to be composed into the sql query
+    * @param singletonColumn
+    *   column whose value should be returned when the orderingColumn hits max
+    * @param orderingColumn
+    *   column used for sorting the input rows
+    * @return
+    *   an sql clause to be composed into the sql query
     */
   def lastByProxyAggregateFuction(singletonColumn: String, orderingColumn: String): String =
     s"(array_agg($singletonColumn ORDER BY $orderingColumn DESC))[1]"
@@ -49,29 +54,15 @@ object QueryStrategy {
   def constBooleanWhere(value: Boolean): String =
     if (value) "true" else "false"
 
-  /** Expression for `(offset <= endInclusive)`
-    *
-    * The offset column must only contain valid offsets (no NULL, no Offset.beforeBegin)
-    */
-  def offsetIsSmallerOrEqual(nonNullableColumn: String, endInclusive: Offset): CompositeSql = {
-    import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
-    // Note: special casing Offset.beforeBegin makes the resulting query simpler:
-    if (endInclusive == Offset.beforeBegin) {
-      cSQL"#${constBooleanWhere(false)}"
-    } else {
-      cSQL"#$nonNullableColumn <= $endInclusive"
-    }
-  }
-
   /** Expression for `(offset > startExclusive)`
     *
-    * The offset column must only contain valid offsets (no NULL, no Offset.beforeBegin)
+    * The offset column must only contain valid offsets (no NULLs)
     */
   def offsetIsGreater(
       nonNullableColumn: String,
-      startExclusive: Option[AbsoluteOffset],
+      startExclusive: Option[Offset],
   ): CompositeSql = {
-    import com.digitalasset.canton.platform.store.backend.Conversions.AbsoluteOffsetToStatement
+    import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
     // Note: casing Offset.beforeBegin makes the resulting query simpler:
     startExclusive match {
       case None => cSQL"#${constBooleanWhere(true)}"
@@ -79,31 +70,58 @@ object QueryStrategy {
     }
   }
 
-  /** Expression for `(startExclusive < offset <= endExclusive)`
+  /** Expression for `(offset <= endInclusive)`
     *
-    * The offset column must only contain valid offsets (no NULL, no Offset.beforeBegin)
+    * The offset column must only contain valid offsets (no NULLs)
+    */
+  def offsetIsLessOrEqual(
+      nonNullableColumn: String,
+      endInclusiveO: Option[Offset],
+  ): CompositeSql = {
+    import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
+    endInclusiveO match {
+      case None => cSQL"#${constBooleanWhere(false)}"
+      case Some(endInclusive) =>
+        cSQL"#$nonNullableColumn <= $endInclusive"
+    }
+  }
+
+  /** Expression for `(eventSeqId > limit)`
+    *
+    * The column must only contain valid integers (no NULLs)
+    */
+  def eventSeqIdIsGreater(
+      nonNullableColumn: String,
+      limitO: Option[Long],
+  ): CompositeSql =
+    limitO match {
+      case None => cSQL"#${constBooleanWhere(true)}"
+      case Some(limit) => cSQL"#$nonNullableColumn > $limit"
+    }
+
+  /** Expression for `(startInclusive <= offset <= endExclusive)`
+    *
+    * The offset column must only contain valid offsets (no NULLs)
     */
   def offsetIsBetween(
       nonNullableColumn: String,
-      startExclusive: Offset,
+      startInclusive: Offset,
       endInclusive: Offset,
   ): CompositeSql = {
     import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
-    // Note: special casing Offset.beforeBegin make the resulting query simpler:
-    if (endInclusive == Offset.beforeBegin) {
-      cSQL"#${constBooleanWhere(false)}"
-    } else if (startExclusive == Offset.beforeBegin) {
+    // Note: special casing Offset.firstOffset makes the resulting query simpler:
+    if (startInclusive == Offset.firstOffset) {
       cSQL"#$nonNullableColumn <= $endInclusive"
     } else {
-      cSQL"(#$nonNullableColumn > $startExclusive and #$nonNullableColumn <= $endInclusive)"
+      cSQL"(#$nonNullableColumn >= $startInclusive and #$nonNullableColumn <= $endInclusive)"
     }
   }
 }
 
 trait QueryStrategy {
 
-  /** Predicate which tests if the element referenced by the `elementColumnName`
-    * is in the array from column `arrayColumnName`
+  /** Predicate which tests if the element referenced by the `elementColumnName` is in the array
+    * from column `arrayColumnName`
     */
   def arrayContains(arrayColumnName: String, elementColumnName: String): String
 
@@ -115,12 +133,20 @@ trait QueryStrategy {
     cSQL"= ANY($longArray)"
   }
 
-  /** ANY SQL clause generation for a number of Long values
+  /** ANY SQL clause generation for a number of String values
     */
   def anyOfStrings(strings: Iterable[String]): CompositeSql = {
     val stringArray: Array[String] =
       strings.toArray
     cSQL"= ANY($stringArray)"
+  }
+
+  /** ANY SQL clause generation for a number of Binary values
+    */
+  def anyOfBinary(binaries: Iterable[Array[Byte]]): CompositeSql = {
+    val binaryArray: Array[Array[Byte]] =
+      binaries.toArray
+    cSQL"= ANY($binaryArray)"
   }
 
   def analyzeTable(tableName: String): CompositeSql

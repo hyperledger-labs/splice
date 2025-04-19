@@ -4,9 +4,9 @@
 package org.lfdecentralizedtrust.splice.config
 
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel.Warn
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
-import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.tracing.TracingConfig
 
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
@@ -14,13 +14,16 @@ import com.digitalasset.canton.tracing.TracingConfig
   */
 abstract class SpliceBackendConfig extends LocalNodeConfig {
   override val init: InitConfig = InitConfig()
-  override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
+
+  override def crypto: CryptoConfig = CryptoConfig()
+
   override val topology: TopologyConfig = TopologyConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
   def participantClient: BaseParticipantClientConfig
   def automation: AutomationConfig
+
 }
 
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
@@ -42,10 +45,7 @@ abstract class HttpClientConfig extends NetworkAppNodeConfig {}
   * creating a single [[SharedSpliceAppParameters]] instance once and passing that instance to all apps).
   */
 case class SharedSpliceAppParameters(
-    override val tracing: TracingConfig,
-    delayLoggingThreshold_ : NonNegativeFiniteDuration,
-    override val loggingConfig: LoggingConfig,
-    override val logQueryCost: Option[QueryCostMonitoringConfig],
+    monitoringConfig: MonitoringConfig,
     override val processingTimeouts: ProcessingTimeout,
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
@@ -62,9 +62,18 @@ case class SharedSpliceAppParameters(
   override def alphaVersionSupport: Boolean = false
   override def betaVersionSupport: Boolean = false
 
-  override val delayLoggingThreshold = delayLoggingThreshold_.toInternal
+  override def tracing: TracingConfig = monitoringConfig.tracing
+
+  override def loggingConfig: LoggingConfig = monitoringConfig.logging
+
+  override val delayLoggingThreshold = loggingConfig.delayLoggingThreshold.toInternal
 
   override val exitOnFatalFailures: Boolean = true
 
   override def watchdog: Option[WatchdogConfig] = None
+
+  override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
+
+  // not applicable
+  override def sessionSigningKeys: SessionSigningKeysConfig = ???
 }

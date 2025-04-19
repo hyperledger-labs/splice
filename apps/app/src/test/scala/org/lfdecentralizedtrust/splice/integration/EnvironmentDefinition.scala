@@ -7,8 +7,8 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
 }
 import org.lfdecentralizedtrust.splice.environment.{
-  EnvironmentImpl,
   SpliceConsoleEnvironment,
+  SpliceEnvironment,
   SpliceEnvironmentFactory,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -30,6 +30,8 @@ import com.digitalasset.canton.integration.{
   TestEnvironment,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
+import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
 import org.scalatest.matchers.should.Matchers
@@ -45,7 +47,7 @@ case class EnvironmentDefinition(
     val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
     val configTransformsWithContext: (String => Seq[SpliceConfig => SpliceConfig]) = (_: String) =>
       ConfigTransforms.defaults(),
-) extends BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment](
+) extends BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment](
       baseConfig,
       testingConfig,
       List(preSetup, setup),
@@ -104,6 +106,27 @@ case class EnvironmentDefinition(
 
   def withPreSetup(preSetup: SpliceTestConsoleEnvironment => Unit): EnvironmentDefinition =
     copy(preSetup = preSetup)
+
+  def withNoVettedPackages(
+      participants: SpliceTestConsoleEnvironment => Seq[ParticipantClientReference]
+  ): EnvironmentDefinition = {
+    copy(
+      preSetup = implicit env => {
+        this.preSetup(env)
+        participants(env).foreach { p =>
+          logger.info(s"Removing all vetted packages for ${p.name}")(TraceContext.empty)
+          p.topology.vetted_packages.propose(
+            p.id,
+            Seq.empty,
+            force = ForceFlags(
+              ForceFlag.AllowUnvetPackage,
+              ForceFlag.AllowUnvetPackageWithActiveContracts,
+            ),
+          )
+        }
+      }
+    )
+  }
 
   /** Use exactly this setup and replace any previously existing setup. */
   def withThisSetup(setup: SpliceTestConsoleEnvironment => Unit): EnvironmentDefinition =
@@ -334,17 +357,17 @@ case class EnvironmentDefinition(
       )
       .withSequencerConnectionsFromScanDisabled(10_000)
 
-  override lazy val environmentFactory: EnvironmentFactory[EnvironmentImpl] =
+  override lazy val environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
     SpliceEnvironmentFactory
 
   override def createTestConsole(
-      environment: EnvironmentImpl,
+      environment: SpliceEnvironment,
       loggerFactory: NamedLoggerFactory,
-  ): TestConsoleEnvironment[EnvironmentImpl] =
+  ): TestConsoleEnvironment[SpliceConfig, SpliceEnvironment] =
     new SpliceConsoleEnvironment(
       environment,
       new TestConsoleOutput(loggerFactory),
-    ) with TestEnvironment[EnvironmentImpl] {
+    ) with TestEnvironment[SpliceConfig] {
       override val actorSystem = super[TestEnvironment].actorSystem
       override val actualConfig: SpliceConfig = this.environment.config
 
@@ -409,7 +432,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
     env.amuletNodes.local.foreach(_.waitForInitialization())
 
   def allocateParty(participant: ParticipantClientReference, hint: String) =
-    participant.ledger_api.parties.allocate(hint, hint).party
+    participant.ledger_api.parties.allocate(hint).party
 
   private def withAllocatedAdminUser(
       user: String,

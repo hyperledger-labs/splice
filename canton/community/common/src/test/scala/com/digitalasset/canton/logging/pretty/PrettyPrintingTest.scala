@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
@@ -158,7 +158,7 @@ class PrettyPrintingTest extends AnyWordSpec with BaseTest {
     show"$nullInfix" shouldBe "null"
   }
 
-  "catch exception when pretty printing invalid control-chars" in {
+  "catch exception when pretty printing invalid control-chars" ifCrashOnPrettyPrintingErrors {
     final case class Invalid(str: String) extends PrettyPrinting {
       override protected[pretty] def pretty: Pretty[Invalid] = prettyOfString(_.str)
     }
@@ -169,8 +169,28 @@ class PrettyPrintingTest extends AnyWordSpec with BaseTest {
     val errorStr =
       "Unknown ansi-escape [0;31m at index 0 inside string cannot be parsed into an fansi.Str"
 
+    val invalidAnsi2 = "\u009bNormal string"
+
     val invalid = Invalid(invalidAnsi)
-    show"$invalid" should include(errorStr)
+    intercept[IllegalArgumentException](
+      show"$invalid"
+    ).getMessage should include(errorStr)
+
+    intercept[IllegalArgumentException](
+      invalid.toString
+    ).getMessage should (
+      include(errorStr) and include(
+        "The offending ANSI escape characters were replaced by a star"
+      ) and include("*")
+    )
+
+    intercept[IllegalArgumentException](
+      Invalid(invalidAnsi2).toString
+    ).getMessage should (
+      include("Unknown ansi-escape") and include(
+        "The offending ANSI escape characters were replaced by a star"
+      ) and include("*")
+    )
 
     val invalid2 = Invalid2(invalidAnsi)
     val config = ApiLoggingConfig()
@@ -203,5 +223,11 @@ class PrettyPrintingTest extends AnyWordSpec with BaseTest {
         })
         .show shouldBe "Object()"
     }
+  }
+
+  implicit class TestSelectionSupport(label: String) {
+    def ifCrashOnPrettyPrintingErrors(test: => org.scalatest.compatible.Assertion) =
+      if (Pretty.crashOnPrettyPrintingErrors) label in test
+      else ()
   }
 }
