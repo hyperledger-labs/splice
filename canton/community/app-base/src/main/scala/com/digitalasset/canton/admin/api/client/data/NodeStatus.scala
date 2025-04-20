@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.data
@@ -183,9 +183,12 @@ object SimpleStatus {
 /** Topology manager queue status
   *
   * Status around topology management queues
-  * @param manager number of queued commands in the topology manager
-  * @param dispatcher number of queued transactions in the dispatcher
-  * @param clients number of observed transactions that are not yet effective
+  * @param manager
+  *   number of queued commands in the topology manager
+  * @param dispatcher
+  *   number of queued transactions in the dispatcher
+  * @param clients
+  *   number of observed transactions that are not yet effective
   */
 final case class TopologyQueueStatus(manager: Int, dispatcher: Int, clients: Int)
     extends PrettyPrinting {

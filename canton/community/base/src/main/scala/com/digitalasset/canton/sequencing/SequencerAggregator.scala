@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -55,8 +55,7 @@ class SequencerAggregator(
       promise: PromiseUnlessShutdown[Either[SequencerAggregatorError, SequencerId]],
   )
 
-  /** Queue containing received and not yet handled events.
-    * Used for batched processing.
+  /** Queue containing received and not yet handled events. Used for batched processing.
     */
   private val receivedEvents: BlockingQueue[OrdinarySerializedEvent] =
     new ArrayBlockingQueue[OrdinarySerializedEvent](eventInboxSize.unwrap)
@@ -193,7 +192,7 @@ class SequencerAggregator(
       message: OrdinarySerializedEvent,
   ): SequencerMessageData = {
     implicit val traceContext = message.traceContext
-    val promise = new PromiseUnlessShutdown[Either[SequencerAggregatorError, SequencerId]](
+    val promise = PromiseUnlessShutdown.supervised[Either[SequencerAggregatorError, SequencerId]](
       "replica-manager-sync-service",
       futureSupervisor,
     )

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.transcode.daml_lf
@@ -19,7 +19,8 @@ import scala.util.Try
   */
 object SchemaProcessor {
 
-  /** Process Daml Packages. Provide visitor (codec/codegen) and result collector ([[Dictionary.collect]] etc).
+  /** Process Daml Packages. Provide visitor (codec/codegen) and result collector
+    * ([[Dictionary.collect]] etc).
     */
   def process[T](
       packages: Map[Ref.PackageId, Ast.PackageSignature],
@@ -29,8 +30,8 @@ object SchemaProcessor {
   ): Either[String, T] =
     process(packages.keys, packages.apply, filter)(visitor)(collect)
 
-  /** Process Daml Packages. Package signatures are computed lazily on demand. Provide visitor (codec/codegen) and
-    * result collector ([[Dictionary.collect]] etc).
+  /** Process Daml Packages. Package signatures are computed lazily on demand. Provide visitor
+    * (codec/codegen) and result collector ([[Dictionary.collect]] etc).
     */
   def process[T](
       rootPackages: IterableOnce[Ref.PackageId],

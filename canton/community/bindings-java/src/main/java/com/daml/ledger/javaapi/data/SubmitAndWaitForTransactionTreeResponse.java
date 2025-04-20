@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
 
@@ -8,6 +8,10 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.Objects;
 
+/**
+ * Helper wrapper of a grpc message used in SubmitAndWaitForTransactionTree call. Class will be
+ * removed in 3.4.0.
+ */
 public final class SubmitAndWaitForTransactionTreeResponse {
 
   @NonNull private final TransactionTree transaction;

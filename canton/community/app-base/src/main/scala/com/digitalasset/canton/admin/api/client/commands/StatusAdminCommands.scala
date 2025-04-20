@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -21,8 +21,10 @@ import scala.concurrent.Future
 object StatusAdminCommands {
 
   /** Query the shared part of the status endpoint and project to an attribute
-    * @param cmd Comment to query the node status endpoint
-    * @param projector Projector from the node status to the attribute
+    * @param cmd
+    *   Comment to query the node status endpoint
+    * @param projector
+    *   Projector from the node status to the attribute
     */
   final case class NodeStatusElement[S <: NodeStatus.Status, GrpcRequest, GrpcResponse, T](
       cmd: GrpcAdminCommand[GrpcRequest, GrpcResponse, NodeStatus[S]],
@@ -48,8 +50,10 @@ object StatusAdminCommands {
         kind: WaitingForExternalInput,
     ): Boolean =
       s match {
-        case _: NodeStatus.Failure | _: NodeStatus.Success[?] => false
-        case NodeStatus.NotInitialized(_active, waitingFor) => waitingFor.contains(kind)
+        case _: NodeStatus.Failure | _: NodeStatus.Success[?] =>
+          false
+        case NodeStatus.NotInitialized(_active, waitingFor) =>
+          waitingFor.contains(kind)
       }
   }
 

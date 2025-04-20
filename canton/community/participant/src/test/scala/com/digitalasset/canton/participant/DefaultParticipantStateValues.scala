@@ -1,14 +1,14 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
 
 import cats.syntax.option.*
 import com.digitalasset.canton.DefaultDamlValues.*
-import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
+import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.{ApplicationId, CommandId, DefaultDamlValues, LfPartyId, WorkflowId}
+import com.digitalasset.canton.{CommandId, DefaultDamlValues, LfPartyId, UserId, WorkflowId}
 import com.digitalasset.daml.lf.data.Ref
 
 /** Default values for participant state objects for unit testing */
@@ -16,14 +16,14 @@ object DefaultParticipantStateValues {
 
   def changeId(
       actAs: Set[LfPartyId],
-      applicationId: ApplicationId = DefaultDamlValues.applicationId(),
+      userId: UserId = DefaultDamlValues.userId(),
       commandId: CommandId = DefaultDamlValues.commandId(),
   ): ChangeId =
-    ChangeId(applicationId.unwrap, commandId.unwrap, actAs)
+    ChangeId(userId.unwrap, commandId.unwrap, actAs)
 
   def submitterInfo(
       actAs: List[Ref.Party],
-      applicationId: ApplicationId = DefaultDamlValues.applicationId(),
+      userId: UserId = DefaultDamlValues.userId(),
       commandId: CommandId = DefaultDamlValues.commandId(),
       deduplicationPeriod: DeduplicationPeriod = deduplicationDuration,
       submissionId: Option[Ref.SubmissionId] = DefaultDamlValues.submissionId().some,
@@ -31,7 +31,7 @@ object DefaultParticipantStateValues {
     SubmitterInfo(
       actAs,
       List.empty, // readAs parties in submitter info are ignored by canton
-      applicationId.unwrap,
+      userId.unwrap,
       commandId.unwrap,
       deduplicationPeriod,
       submissionId,
@@ -40,18 +40,17 @@ object DefaultParticipantStateValues {
 
   def completionInfo(
       actAs: List[Ref.Party],
-      applicationId: ApplicationId = DefaultDamlValues.applicationId(),
+      userId: UserId = DefaultDamlValues.userId(),
       commandId: CommandId = DefaultDamlValues.commandId(),
       optDeduplicationPeriod: Option[DeduplicationPeriod] = Some(deduplicationDuration),
       submissionId: Option[Ref.SubmissionId] = DefaultDamlValues.submissionId().some,
   ): CompletionInfo =
     CompletionInfo(
       actAs,
-      applicationId.unwrap,
+      userId.unwrap,
       commandId.unwrap,
       optDeduplicationPeriod,
       submissionId,
-      None,
     )
 
   def transactionMeta(
@@ -65,6 +64,7 @@ object DefaultParticipantStateValues {
       workflowId.map(_.unwrap),
       submissionTime.toLf,
       submissionSeed,
+      timeBoundaries = LedgerTimeBoundaries.unconstrained,
       optUsedPackages = None,
       optNodeSeeds = None,
       optByKeyNodes = None,

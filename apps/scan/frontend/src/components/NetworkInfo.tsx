@@ -6,7 +6,6 @@ import {
   ErrorDisplay,
   getAmuletConfigurationAsOfNow,
   Loading,
-  supportsVoteEffectivityAndSetConfig,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { microsecondsToMinutes } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import {
@@ -34,6 +33,7 @@ import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig/mod
 import { SteppedRate } from '@daml.js/splice-amulet/lib/Splice/Fees/module';
 
 import { useListDsoRulesVoteRequests } from '../hooks';
+import { useFeatureSupport } from '../hooks/useFeatureSupport';
 import { useScanConfig } from '../utils';
 
 const NetworkInfo: React.FC = () => {
@@ -41,6 +41,7 @@ const NetworkInfo: React.FC = () => {
   const amuletName = config.spliceInstanceNames.amuletName;
   const getAmuletRulesQuery = useGetAmuletRules();
   const openRoundsQuery = useOpenRounds();
+  const featureSupport = useFeatureSupport();
 
   let openRoundsDisplay: JSX.Element;
   switch (openRoundsQuery.status) {
@@ -93,15 +94,17 @@ const NetworkInfo: React.FC = () => {
     `The Super Validators mint ${amuletName} via smart contracts triggered by a consensus vote of 2/3 of the Super Validators.` +
     `Super Validators and Validators burn ${amuletName} to pay fees. Minting and burning takes place in fixed time cycles called rounds.`;
 
+  if (featureSupport.isLoading) {
+    return <Loading />;
+  }
+
   switch (getAmuletRulesQuery.status) {
     case 'loading':
       return <Loading />;
     case 'error':
       return <ErrorDisplay message="Failed to fetch amulet rules" />;
     case 'success':
-      const supportNewGovernanceFlow = supportsVoteEffectivityAndSetConfig(
-        getAmuletRulesQuery.data.contract.payload.configSchedule.initialValue
-      );
+      const supportNewGovernanceFlow = featureSupport.data?.newGovernanceFlow || false;
       return (
         <Card>
           <CardContent>

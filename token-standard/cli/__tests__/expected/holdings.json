@@ -1,0 +1,97 @@
+[
+  {
+    "contractId": "0",
+    "payload": {
+      "amount": "1064.0304414400",
+      "instrumentId": {
+        "admin": "dso::normalized",
+        "id": "Amulet"
+      },
+      "lock": {
+        "context": "transfer to 'bob::normalized'",
+        "expiresAfter": null,
+        "expiresAt": "2025-06-18T00:00:00.000000Z",
+        "holders": [
+          "dso::normalized"
+        ]
+      },
+      "meta": {
+        "values": {
+          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "1",
+          "amulet.splice.lfdecentralizedtrust.org/rate-per-round": "0.00380518"
+        }
+      },
+      "owner": "alice::normalized"
+    }
+  },
+  {
+    "contractId": "2",
+    "payload": {
+      "amount": "1.0000000000",
+      "instrumentId": {
+        "admin": "dso::normalized",
+        "id": "Amulet"
+      },
+      "lock": null,
+      "meta": {
+        "values": {
+          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "1",
+          "amulet.splice.lfdecentralizedtrust.org/rate-per-round": "0.00380518"
+        }
+      },
+      "owner": "alice::normalized"
+    }
+  },
+  {
+    "contractId": "3",
+    "payload": {
+      "amount": "4100.8695585600",
+      "instrumentId": {
+        "admin": "dso::normalized",
+        "id": "Amulet"
+      },
+      "lock": null,
+      "meta": {
+        "values": {
+          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "1",
+          "amulet.splice.lfdecentralizedtrust.org/rate-per-round": "0.00380518"
+        }
+      },
+      "owner": "alice::normalized"
+    }
+  },
+  {
+    "contractId": "4",
+    "payload": {
+      "amount": "30.0000000000",
+      "instrumentId": {
+        "admin": "alice::normalized",
+        "id": "DummyHolding"
+      },
+      "lock": null,
+      "meta": {
+        "values": {
+          "test": "test"
+        }
+      },
+      "owner": "alice::normalized"
+    }
+  },
+  {
+    "contractId": "5",
+    "payload": {
+      "amount": "40.0000000000",
+      "instrumentId": {
+        "admin": "alice::normalized",
+        "id": "DummyHolding"
+      },
+      "lock": null,
+      "meta": {
+        "values": {
+          "test": "test"
+        }
+      },
+      "owner": "alice::normalized"
+    }
+  }
+]

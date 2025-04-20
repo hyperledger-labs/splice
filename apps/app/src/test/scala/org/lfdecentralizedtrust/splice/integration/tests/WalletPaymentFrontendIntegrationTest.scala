@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as paymentCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.AcceptedAppPayment
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
@@ -12,7 +11,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletFrontendTestUtil,
   WalletTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 class WalletPaymentFrontendIntegrationTest
@@ -25,8 +23,7 @@ class WalletPaymentFrontendIntegrationTest
   private val tolerance = 0.005
   override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging

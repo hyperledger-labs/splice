@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -12,12 +12,12 @@ import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.DeterministicEncoding
 import com.google.protobuf.ByteString
 
-/** A position encodes the path from a view in a transaction tree to its root.
-  * The encoding must not depend on the hashes of the nodes.
+/** A position encodes the path from a view in a [[GenTransactionTree]] to its root. The encoding
+  * must not depend on the hashes of the nodes.
   *
-  * @param position The path from the view to the root as a singly-linked list.
-  *                 The path starts at the view rather than the root so that paths to the root can
-  *                 be shared.
+  * @param position
+  *   The path from the view to the root as a singly-linked list. The path starts at the view rather
+  *   than the root so that paths to the root can be shared.
   */
 final case class ViewPosition(position: List[MerklePathElement]) extends PrettyPrinting {
 
@@ -37,7 +37,7 @@ final case class ViewPosition(position: List[MerklePathElement]) extends PrettyP
 
 /** Same as [[ViewPosition]], with the position directed from the root to the leaf */
 final case class ViewPositionFromRoot(position: List[MerklePathElement]) extends AnyVal {
-  def isTopLevel: Boolean = position.size == 1
+  def isTopLevel: Boolean = position.sizeIs == 1
   def isEmpty: Boolean = position.isEmpty
 }
 
@@ -147,7 +147,7 @@ object ViewPosition {
   }
 
   def isDescendant(descendant: ViewPosition, ancestor: ViewPosition): Boolean =
-    descendant.position.size >= ancestor.position.size &&
+    descendant.position.sizeIs >= ancestor.position.size &&
       descendant.position.drop(
         descendant.position.size - ancestor.position.size
       ) == ancestor.position

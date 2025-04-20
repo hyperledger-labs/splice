@@ -1,11 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.flatMap.*
 import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -14,7 +13,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
-  Lifecycle,
+  LifeCycle,
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -46,19 +45,26 @@ import scala.util.{Failure, Random, Success, Try}
 
 trait SequencerTransportLookup {
 
-  /** Returns an arbitrary [[com.digitalasset.canton.sequencing.client.transports.SequencerClientTransportCommon]].
+  /** Returns an arbitrary
+    * [[com.digitalasset.canton.sequencing.client.transports.SequencerClientTransportCommon]].
     * Prefers healthy subscriptions to unhealthy ones.
     *
-    * @throws java.lang.IllegalStateException if there are currently no
-    *                                         [[com.digitalasset.canton.sequencing.client.transports.SequencerClientTransportCommon]]s at all
+    * @throws java.lang.IllegalStateException
+    *   if there are currently no
+    *   [[com.digitalasset.canton.sequencing.client.transports.SequencerClientTransportCommon]]s at
+    *   all
     */
   def transport(implicit traceContext: TraceContext): SequencerClientTransportCommon
 
-  /** Chooses a sequencer to try next.
-    * Currently picks a random healthy sequencer (not chosen so far) or a fixed sequencer if there are no healthy sequencers.
+  /** Chooses a sequencer to try next. Currently picks a random healthy sequencer (not chosen so
+    * far) or a fixed sequencer if there are no healthy sequencers.
     *
-    * @param previous The sequencers the client has already tried to send the submission request to
-    * @return The chosen sequencer, its transport, and the configured patience duration to wait before trying again (or None if the amplification factor has been exhausted with the chosen sequencer).
+    * @param previous
+    *   The sequencers the client has already tried to send the submission request to
+    * @return
+    *   The chosen sequencer, its transport, and the configured patience duration to wait before
+    *   trying again (or None if the amplification factor has been exhausted with the chosen
+    *   sequencer).
     */
   // TODO(#12377) Be more intelligent about choosing a sequencer
   def nextAmplifiedTransport(previous: Seq[SequencerId])(implicit
@@ -72,7 +78,8 @@ trait SequencerTransportLookup {
 
   /** Returns the transport for the given [[com.digitalasset.canton.topology.SequencerId]].
     *
-    * @throws java.lang.IllegalArgumentException if the [[com.digitalasset.canton.topology.SequencerId]] currently has not transport
+    * @throws java.lang.IllegalArgumentException
+    *   if the [[com.digitalasset.canton.topology.SequencerId]] currently has not transport
     */
   // TODO(#13789) remove after having switched over to Pekko everywhere
   def transport(sequencerId: SequencerId)(implicit
@@ -172,9 +179,9 @@ class SequencersTransportState(
       )
     })
 
-  /** Pick a random healthy sequencer connection, avoiding those in `avoid` if possible.
-    * If are no healthy sequencers, returns an unhealthy sequencer connection.
-    * Must only be called inside a `lock.synchronized` block.
+  /** Pick a random healthy sequencer connection, avoiding those in `avoid` if possible. If are no
+    * healthy sequencers, returns an unhealthy sequencer connection. Must only be called inside a
+    * `lock.synchronized` block.
     */
   private[this] def transportInternal(avoid: Set[SequencerId])(implicit
       traceContext: TraceContext
@@ -297,8 +304,8 @@ class SequencersTransportState(
       sequencerState: SequencerTransportState,
   )(implicit traceContext: TraceContext): Unit = {
     logger.debug(s"Closing sequencer subscription $sequencerId...")
-    sequencerState.subscription.foreach(_.close())
     sequencerState.transport.clientTransport.close()
+    sequencerState.subscription.foreach(_.close())
     val closeReason = sequencerState.subscription
       .map(_.resilientSequencerSubscription.closeReason)
       .getOrElse(Future.unit)
@@ -325,7 +332,7 @@ class SequencersTransportState(
     }
 
   private def isEnoughSequencersToOperateWithoutSequencer: Boolean =
-    states.size > sequencerTrustThreshold.get().unwrap
+    states.sizeIs > sequencerTrustThreshold.get().unwrap
 
   private def closeWithSubscriptionReason(sequencerId: SequencerId)(
       subscriptionCloseReason: Try[SubscriptionCloseReason[SequencerClientSubscriptionError]]
@@ -381,7 +388,7 @@ class SequencersTransportState(
 
     def complete(reason: Try[SequencerClient.CloseReason]): Unit = {
       closeReasonPromise.tryComplete(reason).discard
-      Lifecycle.close(this)(logger)
+      LifeCycle.close(this)(logger)
     }
 
     lazy val closeReason: Try[SequencerClient.CloseReason] = maybeCloseReason.collect {

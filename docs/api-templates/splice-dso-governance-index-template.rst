@@ -6,4 +6,8 @@
 splice-dso-governance docs
 ==========================
 
+.. toctree::
+   :maxdepth: 3
+   :titlesonly:
+
 {{{body}}}

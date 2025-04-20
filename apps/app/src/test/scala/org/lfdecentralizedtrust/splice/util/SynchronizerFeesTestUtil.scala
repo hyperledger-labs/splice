@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.util
 import com.daml.ledger.javaapi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.TrafficState
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
@@ -18,8 +18,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
-import org.lfdecentralizedtrust.splice.environment.PackageIdResolver
-import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
   TestCommon,
@@ -29,7 +27,6 @@ import org.lfdecentralizedtrust.splice.wallet.util.ExtraTrafficTopupParameters
 
 import java.time.Instant
 import java.util.Optional
-import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -55,12 +52,13 @@ trait SynchronizerFeesTestUtil extends TestCommon {
 
   def getTotalPurchasedTraffic(
       memberId: Member,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit env: SpliceTestConsoleEnvironment): Long = {
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(MemberTraffic.COMPANION)(
         sv1Backend.getDsoInfo().dsoParty,
-        co => co.data.synchronizerId == domainId.toProtoPrimitive && co.data.memberId == memberId.toProtoPrimitive,
+        co =>
+          co.data.synchronizerId == synchronizerId.toProtoPrimitive && co.data.memberId == memberId.toProtoPrimitive,
       )
       .map(_.data.totalPurchased.toLong)
       .sum
@@ -69,8 +67,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
   private def getOrCreateTopupStateCid(
       validatorApp: ValidatorAppBackendReference,
       memberId: Member,
-      domainId: DomainId,
-      packageIdResolverCustom: Option[PackageIdResolver],
+      synchronizerId: SynchronizerId,
   )(implicit env: SpliceTestConsoleEnvironment): ValidatorTopUpState.ContractId = {
     inside(listValidatorContracts(ValidatorTopUpState.COMPANION)(validatorApp)) {
       case Seq(topupState) => topupState.id
@@ -80,7 +77,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
           dsoParty.toProtoPrimitive,
           validatorParty.toProtoPrimitive,
           memberId.toProtoPrimitive,
-          domainId.toProtoPrimitive,
+          synchronizerId.toProtoPrimitive,
           validatorApp.config.domainMigrationId,
           Instant.ofEpochSecond(0),
         )
@@ -91,8 +88,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
               actAs = Seq(validatorParty),
               readAs = Seq(validatorParty),
               update = topupStateCreationCmd,
-              domainId = Some(domainId),
-              packageIdResolverCustom = packageIdResolverCustom,
+              synchronizerId = Some(synchronizerId),
             )
             .contractId
         new ValidatorTopUpState.ContractId(topupStateCid.contractId)
@@ -109,30 +105,16 @@ trait SynchronizerFeesTestUtil extends TestCommon {
       trafficAmount: Long,
       ts: CantonTimestamp,
       inputAmulets: Seq[AmuletPosition] = Seq(),
-      scanConnection: Option[HasAmuletRules] = None,
   )(implicit env: SpliceTestConsoleEnvironment): AmuletOperationOutcome = {
-    implicit val ec: ExecutionContext = env.executionContext
 
-    val packageIdResolverCustom = scanConnection match {
-      case Some(scanConnection) =>
-        Some(
-          PackageIdResolver.inferFromAmuletRules(
-            env.environment.clock,
-            scanConnection,
-            loggerFactory,
-          ): PackageIdResolver
-        )
-      case None => None
-    }
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
-    val domainId =
-      DomainId.tryFromString(
+    val synchronizerId =
+      SynchronizerId.tryFromString(
         sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.activeSynchronizer
       )
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
-    val topupStateCid =
-      getOrCreateTopupStateCid(validatorApp, memberId, domainId, packageIdResolverCustom)
+    val topupStateCid = getOrCreateTopupStateCid(validatorApp, memberId, synchronizerId)
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(WalletAppInstall.COMPANION)(
@@ -160,7 +142,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
         new CO_BuyMemberTraffic(
           trafficAmount,
           memberId.toProtoPrimitive,
-          domainId.toProtoPrimitive,
+          synchronizerId.toProtoPrimitive,
           validatorApp.config.domainMigrationId,
           new RelTime(1),
           Optional.of(topupStateCid),
@@ -180,7 +162,6 @@ trait SynchronizerFeesTestUtil extends TestCommon {
               transferContext.latestOpenMiningRound,
             )
             .toLedgerApiDisclosedContracts,
-          packageIdResolverCustom = packageIdResolverCustom,
         )
         .exerciseResult
         .outcomes
@@ -201,8 +182,8 @@ trait SynchronizerFeesTestUtil extends TestCommon {
       env: SpliceTestConsoleEnvironment
   ): BuyTrafficRequest.ContractId = {
     val now = env.environment.clock.now
-    val domainId =
-      DomainId.tryFromString(
+    val synchronizerId =
+      SynchronizerId.tryFromString(
         sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.activeSynchronizer
       )
     val validatorParty = validatorApp.getValidatorPartyId()
@@ -215,7 +196,7 @@ trait SynchronizerFeesTestUtil extends TestCommon {
     ) { case Seq(install) => install }
     val cmd = walletInstall.id.exerciseWalletAppInstall_CreateBuyTrafficRequest(
       memberId,
-      domainId.toProtoPrimitive,
+      synchronizerId.toProtoPrimitive,
       validatorApp.config.domainMigrationId,
       trafficAmount,
       now.plus(java.time.Duration.ofMinutes(1)).toInstant,
@@ -261,14 +242,14 @@ trait SynchronizerFeesTestUtil extends TestCommon {
 
   def getTrafficState(
       validatorApp: ValidatorAppBackendReference,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   ): TrafficState = {
     validatorApp.participantClientWithAdminToken.traffic_control
-      .traffic_state(domainId)
+      .traffic_state(synchronizerId)
   }
 
   def activeSynchronizerId(implicit env: SpliceTestConsoleEnvironment) =
-    DomainId.tryFromString(
+    SynchronizerId.tryFromString(
       sv1ScanBackend
         .getAmuletConfigAsOf(env.environment.clock.now)
         .decentralizedSynchronizer

@@ -1,27 +1,28 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.health
 
 import cats.Eval
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.RunOnShutdown
+import com.digitalasset.canton.lifecycle.RunOnClosing
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.concurrent.TrieMap
 
-/** Defines a [[HealthElement]] that merely aggregates the state of other (dependent) [[HealthElement]]s.
-  * The dependencies need not be reported anywhere.
+/** Defines a [[HealthElement]] that merely aggregates the state of other (dependent)
+  * [[HealthElement]]s. The dependencies need not be reported anywhere.
   *
-  * If you need to manage a state separately for this component,
-  * add a dedicated dependency on [[AtomicHealthElement]].
+  * If you need to manage a state separately for this component, add a dedicated dependency on
+  * [[AtomicHealthElement]].
   *
-  * @tparam ID The identifier type for the dependent health elements.
+  * @tparam ID
+  *   The identifier type for the dependent health elements.
   */
 trait CompositeHealthElement[ID, HE <: HealthElement] extends HealthElement {
 
-  /** Fetch the current states from the relevant dependencies
-    * and combine them into the new state to report for this element.
+  /** Fetch the current states from the relevant dependencies and combine them into the new state to
+    * report for this element.
     */
   protected def combineDependentStates: State
 
@@ -39,10 +40,10 @@ trait CompositeHealthElement[ID, HE <: HealthElement] extends HealthElement {
   // Unregister all dependencies when this element is closed.
   locally {
     import TraceContext.Implicits.Empty.*
-    associatedOnShutdownRunner.runOnShutdown_(new RunOnShutdown {
+    associatedHasRunOnClosing.runOnOrAfterClose_(new RunOnClosing {
       override def name: String = s"unregister-$name-from-dependencies"
       override def done: Boolean = false
-      override def run(): Unit = unregisterFromAll()
+      override def run()(implicit traceContext: TraceContext): Unit = unregisterFromAll()
     })
   }
 
@@ -59,16 +60,16 @@ trait CompositeHealthElement[ID, HE <: HealthElement] extends HealthElement {
   protected def removeDependency(id: ID): Unit =
     alterDependencies(add = Map.empty, remove = Set(id))
 
-  /** First removes all dependencies in `remove`, then adds all those in `add`.
-    * If an `ID` appears in `remove` and `add`, then the `ID` is replaced.
-    * Refreshes the state if any of the dependencies was changed.
+  /** First removes all dependencies in `remove`, then adds all those in `add`. If an `ID` appears
+    * in `remove` and `add`, then the `ID` is replaced. Refreshes the state if any of the
+    * dependencies was changed.
     *
-    * Updates of `dependencies` are not atomic: If this method is called concurrently
-    * multiple times, the resulting dependencies may not correspond to a serializable execution.
+    * Updates of `dependencies` are not atomic: If this method is called concurrently multiple
+    * times, the resulting dependencies may not correspond to a serializable execution.
     *
-    * If an dependency triggers a concurrent state refresh, then the state refresh may see
-    * an inconsistent set of dependencies and therefore derive an inconsistent state.
-    * This however is only temporary as in this case another state refresh will be triggered at the end.
+    * If an dependency triggers a concurrent state refresh, then the state refresh may see an
+    * inconsistent set of dependencies and therefore derive an inconsistent state. This however is
+    * only temporary as in this case another state refresh will be triggered at the end.
     */
   protected def alterDependencies(remove: Set[ID], add: Map[ID, HE]): Unit = {
     def removeId(id: ID): Boolean =
@@ -90,14 +91,14 @@ trait CompositeHealthElement[ID, HE <: HealthElement] extends HealthElement {
           true
       }
 
-    if (!associatedOnShutdownRunner.isClosing) {
+    if (!associatedHasRunOnClosing.isClosing) {
       val removedAtLeastOne = remove.map(removeId).exists(Predef.identity)
       val addedAtLeastOne =
         add.map { case (id, dependency) => addOrReplace(id, dependency) }.exists(Predef.identity)
       val dependenciesChanged = addedAtLeastOne || removedAtLeastOne
-      // Since the associatedOnShutdownRunner may have started closing while we've been modifying the dependencies,
+      // Since the associatedHasRunOnClosing may have started closing while we've been modifying the dependencies,
       // query the closing flag again and repeat the unregistration
-      if (associatedOnShutdownRunner.isClosing) {
+      if (associatedHasRunOnClosing.isClosing) {
         unregisterFromAll()
       } else if (dependenciesChanged) refreshFromDependencies()(TraceContext.empty)
     }

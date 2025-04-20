@@ -1,9 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
 
 import cats.syntax.functor.*
+import com.digitalasset.canton.ledger.participant.state.LapiCommitSet
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet.*
@@ -15,32 +16,36 @@ import com.digitalasset.canton.protocol.{
   RequestId,
   SerializableContract,
 }
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.util.SetsUtil.requireDisjoint
 import com.digitalasset.canton.{LfPartyId, ReassignmentCounter}
 
-/** Describes the effect of a confirmation request on the active contracts, contract keys, and reassignments.
-  * Transient contracts appear the following two sets:
-  * <ol>
-  *   <li>The union of [[creations]] and [[assignments]]</li>
-  *   <li>The union of [[archivals]] or [[unassignments]]</li>
-  * </ol>
+/** Describes the effect of a confirmation request on the active contracts, contract keys, and
+  * reassignments. Transient contracts appear the following two sets:
+  *   - The union of [[creations]] and [[assignments]]
+  *   - The union of [[archivals]] or [[unassignments]]
   *
-  * @param archivals    The contracts to be archived, along with their stakeholders. Must not contain contracts in [[unassignments]].
-  * @param creations    The contracts to be created.
-  * @param unassignments The contracts to be unassigned, along with their target domains and stakeholders.
-  *                     Must not contain contracts in [[archivals]].
-  * @param assignments  The contracts to be assigned, along with their reassignment IDs.
-  * @throws java.lang.IllegalArgumentException if `unassignments` overlap with `archivals`
-  *                                            or `creations` overlaps with `assignments`.
+  * @param archivals
+  *   The contracts to be archived, along with their stakeholders. Must not contain contracts in
+  *   [[unassignments]].
+  * @param creations
+  *   The contracts to be created.
+  * @param unassignments
+  *   The contracts to be unassigned, along with their target synchronizers and stakeholders. Must
+  *   not contain contracts in [[archivals]].
+  * @param assignments
+  *   The contracts to be assigned, along with their reassignment IDs.
+  * @throws java.lang.IllegalArgumentException
+  *   if `unassignments` overlap with `archivals` or `creations` overlaps with `assignments`.
   */
 final case class CommitSet(
     archivals: Map[LfContractId, ArchivalCommit],
     creations: Map[LfContractId, CreationCommit],
     unassignments: Map[LfContractId, UnassignmentCommit],
     assignments: Map[LfContractId, AssignmentCommit],
-) extends PrettyPrinting {
+) extends LapiCommitSet
+    with PrettyPrinting {
   requireDisjoint(unassignments.keySet -> "unassignments", archivals.keySet -> "archivals")
   requireDisjoint(assignments.keySet -> "assignments", creations.keySet -> "creations")
 
@@ -66,12 +71,12 @@ object CommitSet {
     )
   }
   final case class UnassignmentCommit(
-      targetDomainId: Target[DomainId],
+      targetSynchronizerId: Target[SynchronizerId],
       stakeholders: Set[LfPartyId],
       reassignmentCounter: ReassignmentCounter,
   ) extends PrettyPrinting {
     override protected def pretty: Pretty[UnassignmentCommit] = prettyOfClass(
-      param("targetDomainId", _.targetDomainId),
+      param("targetSynchronizerId", _.targetSynchronizerId),
       paramIfNonEmpty("stakeholders", _.stakeholders),
       param("reassignmentCounter", _.reassignmentCounter),
     )

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -15,8 +15,8 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.{Inside, LoneElement, OptionValues}
 
 /** There are two important parts to cover with Daml exceptions:
-  * - Create and exercise nodes under rollback nodes should not be indexed
-  * - Lookup and fetch nodes under rollback nodes may lead to divulgence
+  *   - Create and exercise nodes under rollback nodes should not be indexed
+  *   - Lookup and fetch nodes under rollback nodes may lead to divulgence
   */
 private[dao] trait JdbcLedgerDaoExceptionSpec
     extends LoneElement

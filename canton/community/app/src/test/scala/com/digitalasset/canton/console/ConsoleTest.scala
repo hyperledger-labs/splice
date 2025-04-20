@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -12,19 +12,20 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{CantonCommunityConfig, ClientConfig, TestingConfigInternal}
+import com.digitalasset.canton.config.{CantonConfig, ClientConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.console.HeadlessConsole.{
   CompileError,
   HeadlessConsoleError,
   RuntimeError,
 }
-import com.digitalasset.canton.domain.mediator.MediatorNodeBootstrap
-import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrap
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.metrics.OnDemandMetricsReader.NoOpOnDemandMetricsReader$
 import com.digitalasset.canton.participant.{ParticipantNode, ParticipantNodeBootstrap}
+import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrap
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
+import com.digitalasset.canton.tracing.TracerProvider
 import com.digitalasset.canton.{BaseTest, ConfigStubs}
 import io.grpc.stub.AbstractStub
 import io.opentelemetry.sdk.OpenTelemetrySdk
@@ -39,7 +40,7 @@ import java.nio.file.Paths
 
 class ConsoleTest extends AnyWordSpec with BaseTest {
 
-  lazy val DefaultConfig: CantonCommunityConfig = CantonCommunityConfig(
+  lazy val DefaultConfig: CantonConfig = CantonConfig(
     sequencers = Map(
       InstanceName.tryCreate("s1") -> ConfigStubs.sequencer,
       InstanceName.tryCreate("s2") -> ConfigStubs.sequencer,
@@ -59,7 +60,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
     ),
   )
 
-  lazy val NameClashConfig: CantonCommunityConfig = CantonCommunityConfig(
+  lazy val NameClashConfig: CantonConfig = CantonConfig(
     participants = Map(
       // Reserved keyword
       InstanceName.tryCreate("participants") -> ConfigStubs.participant,
@@ -71,26 +72,19 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
     ),
   )
 
-  abstract class TestEnvironment(val config: CantonCommunityConfig = DefaultConfig) {
-    val environment: CommunityEnvironment = mock[CommunityEnvironment]
-    val participants: ParticipantNodes[
-      ParticipantNodeBootstrap,
-      ParticipantNode,
-      config.ParticipantConfigType,
-    ] =
-      mock[
-        ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode, config.ParticipantConfigType]
-      ]
-    val sequencers: SequencerNodes[config.SequencerNodeConfigType] =
-      mock[SequencerNodes[config.SequencerNodeConfigType]]
-    val mediators: MediatorNodes[config.MediatorNodeConfigType] =
-      mock[MediatorNodes[config.MediatorNodeConfigType]]
+  abstract class TestEnvironment(val config: CantonConfig = DefaultConfig) {
+    val environment: CantonEnvironment = mock[CantonEnvironment]
+    val participants: ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode] =
+      mock[ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode]]
+    val sequencers: SequencerNodes = mock[SequencerNodes]
+    val mediators: MediatorNodes = mock[MediatorNodes]
     val participantBootstrap: ParticipantNodeBootstrap = mock[ParticipantNodeBootstrap]
     val participant: ParticipantNode = mock[ParticipantNode]
     val sequencer: SequencerNodeBootstrap = mock[SequencerNodeBootstrap]
     val mediator: MediatorNodeBootstrap = mock[MediatorNodeBootstrap]
     val adminToken: String = "0" * 64
 
+    when(environment.tracerProvider).thenReturn(mock[TracerProvider])
     when(environment.config).thenReturn(config)
     when(environment.testingConfig).thenReturn(
       TestingConfigInternal(initializeGlobalOpenTelemetry = false)
@@ -118,7 +112,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
     when(participantBootstrap.getAdminToken).thenReturn(Some(adminToken))
     when(participant.adminToken).thenReturn(CantonAdminToken(adminToken))
 
-    val adminCommandRunner: ConsoleGrpcAdminCommandRunner = mock[ConsoleGrpcAdminCommandRunner]
+    val adminCommandRunner: GrpcAdminCommandRunner = mock[GrpcAdminCommandRunner]
     val testConsoleOutput: TestConsoleOutput = new TestConsoleOutput(loggerFactory)
 
     // Setup default admin command response
@@ -134,14 +128,14 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
       .thenReturn(GenericCommandError("Mocked error"))
 
     val consoleEnvironment =
-      new CommunityConsoleEnvironment(
+      new CantonConsoleEnvironment(
         environment,
         consoleOutput = testConsoleOutput,
       ) {
         override protected def createAdminCommandRunner(
             consoleEnvironment: ConsoleEnvironment,
             apiName: String,
-        ): ConsoleGrpcAdminCommandRunner = adminCommandRunner
+        ): GrpcAdminCommandRunner = adminCommandRunner
       }
 
     def runOrFail(commands: String*): Unit = {
@@ -280,9 +274,18 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
       setupAdminCommandResponse("new", Right(Seq()))
       setupAdminCommandResponse("p-4", Right(Seq()))
 
-      runOrFail(s"""participants.all.dars.upload("$CantonExamplesPath", false)""")
+      when(
+        adminCommandRunner.runCommand(
+          anyString(),
+          any[ParticipantAdminCommands.Package.UploadDar],
+          any[ClientConfig],
+          isEq(Some(adminToken)),
+        )
+      ).thenReturn(CommandSuccessful(Seq("package")))
 
-      def verifyUploadDar(p: String): ConsoleCommandResult[String] =
+      runOrFail(s"""participants.all.dars.upload("$CantonExamplesPath", vetAllPackages=false)""")
+
+      def verifyUploadDar(p: String): ConsoleCommandResult[Seq[String]] =
         verify(adminCommandRunner).runCommand(
           isEq(p),
           any[ParticipantAdminCommands.Package.UploadDar],
@@ -303,7 +306,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
           helpText should include("start") // from instance extensions
           helpText should include("stop")
           helpText should include("dars")
-          helpText should include("domains")
+          helpText should include("synchronizers")
         },
       )
     }

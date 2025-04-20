@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -28,5 +28,35 @@ class MapsUtilTest extends AnyWordSpec with BaseTest {
       MapsUtil.toNonConflictingMap(Seq(1 -> 2, 1 -> 3)) shouldBe Left(Map(1 -> Set(2, 3)))
     }
 
+    "compute intersection based on values" in {
+      import MapsUtil.intersectValues
+
+      val empty = Map.empty[String, Set[Int]]
+
+      intersectValues(Map("1" -> Set(1)), empty) shouldBe Map.empty
+      intersectValues(empty, Map("1" -> Set(1))) shouldBe Map.empty
+      intersectValues(Map("1" -> Set(1)), Map("2" -> Set(2))) shouldBe Map.empty
+
+      intersectValues(Map("1" -> Set(1)), Map("2" -> Set(2), "1" -> Set(1))) shouldBe Map(
+        "1" -> Set(1)
+      )
+
+      intersectValues(
+        Map("1" -> Set(1), "2" -> Set(20, 21, 22, 23)),
+        Map("2" -> Set(20, 23, 25), "1" -> Set(1)),
+      ) shouldBe Map(
+        "1" -> Set(1),
+        "2" -> Set(20, 23),
+      )
+    }
+
+    "transpose" in {
+      import MapsUtil.transpose
+
+      transpose(Map(1 -> Set("a"), 2 -> Set("a"))) shouldBe Map("a" -> Set(1, 2))
+      transpose(Map(1 -> Set("a", "b"))) shouldBe Map("a" -> Set(1), "b" -> Set(1))
+      transpose(Map("a" -> Set.empty[Int], "b" -> Set(1))) shouldBe Map(1 -> Set("b"))
+      transpose(Map.empty[Int, Set[String]]) shouldBe Map.empty[String, Set[Int]]
+    }
   }
 }

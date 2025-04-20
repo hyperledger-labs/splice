@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
@@ -11,23 +11,26 @@ import org.scalatest.wordspec.AnyWordSpecLike
 class MetadataHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with HashUtilsTest {
 
   "Metadata Encoding" should {
-    val metadataHash = Hash
-      .fromHexStringRaw("e195ab4339850289226f5324c3b6e0d0734353b95ffe231b9caff9bdd2e4dd81")
+    val expectedMetadataHash = Hash
+      .fromHexStringRaw("2a0690693367f70fbe83e5e99df6930dbd2336618a3a0721bb6fa3bcc88d5a53")
       .getOrElse(fail("Invalid hash"))
+
     "be stable" in {
       TransactionMetadataHashBuilder
         .hashTransactionMetadataV1(metadata)
-        .toHexString shouldBe metadataHash.toHexString
+        .toHexString shouldBe expectedMetadataHash.toHexString
     }
 
     "explain encoding" in {
       val hashTracer = HashTracer.StringHashTracer(true)
-      TransactionMetadataHashBuilder.hashTransactionMetadataV1(
+
+      val actualMetadataHash = TransactionMetadataHashBuilder.hashTransactionMetadataV1(
         metadata,
         hashTracer,
-      ) shouldBe metadataHash
+      )
+
       hashTracer.result shouldBe """'00000030' # Hash Purpose
-                                   |'01' # 01 (Node Encoding Version)
+                                   |'01' # 01 (Metadata Encoding Version)
                                    |# Act As Parties
                                    |'00000002' # 2 (int)
                                    |'00000005' # 5 (int)
@@ -42,12 +45,15 @@ class MetadataHashV1Test extends BaseTest with AnyWordSpecLike with Matchers wit
                                    |'34633634373164332d346530392d343964642d616464662d366364393065313963353833' # 4c6471d3-4e09-49dd-addf-6cd90e19c583 (string)
                                    |# Mediator Group
                                    |'00000000' # 0 (int)
-                                   |# Domain Id
-                                   |'00000008' # 8 (int)
-                                   |'646f6d61696e4964' # domainId (string)
-                                   |# Ledger Effective Time
+                                   |# Synchronizer Id
+                                   |'0000000e' # 14 (int)
+                                   |'73796e6368726f6e697a65724964' # synchronizerId (string)
+                                   |# Min Time Boundary
                                    |'01' # Some
-                                   |'0000000000000000' # 0 (long)
+                                   |'000000000000aaaa' # 43690 (long)
+                                   |# Max Time Boundary
+                                   |'01' # Some
+                                   |'000000000000bbbb' # 48059 (long)
                                    |# Submission Time
                                    |'0000000000000000' # 0 (long)
                                    |# Disclosed Contracts
@@ -131,7 +137,10 @@ class MetadataHashV1Test extends BaseTest with AnyWordSpecLike with Matchers wit
                                    |  '626f62' # bob (string)
                                    |'010ee30a2b17bd729bc5ccada01a62bfb7283641610feb5913fb46b2972368a4' # Disclosed Contract
                                    |""".stripMargin
-      assertStringTracer(hashTracer, metadataHash)
+
+      actualMetadataHash shouldBe expectedMetadataHash
+
+      assertStringTracer(hashTracer, expectedMetadataHash)
     }
   }
 

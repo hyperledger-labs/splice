@@ -4,9 +4,9 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
-import org.lfdecentralizedtrust.splice.migration.DomainParametersStateTopologyConnection
+import org.lfdecentralizedtrust.splice.migration.SynchronizerParametersStateTopologyConnection
 import org.lfdecentralizedtrust.splice.store.DomainParamsStore
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
@@ -16,7 +16,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 final class DomainParamsIngestionTrigger(
-    domainAlias: DomainAlias,
+    synchronizerAlias: SynchronizerAlias,
     domainParamsStore: DomainParamsStore,
     participantAdminConnection: ParticipantAdminConnection,
     context: TriggerContext,
@@ -26,21 +26,21 @@ final class DomainParamsIngestionTrigger(
       quiet = true,
     ) {
 
-  private val domainStateTopology = new DomainParametersStateTopologyConnection(
+  private val domainStateTopology = new SynchronizerParametersStateTopologyConnection(
     participantAdminConnection
   )
 
   override def completeTask(
       task: PeriodicTaskTrigger.PeriodicTask
   )(implicit tc: TraceContext): Future[TaskOutcome] =
-    participantAdminConnection.getDomainId(domainAlias).transformWith {
+    participantAdminConnection.getSynchronizerId(synchronizerAlias).transformWith {
       case Failure(s: StatusRuntimeException) if s.getStatus.getCode == Status.Code.NOT_FOUND =>
         // This can happen during initialization, just skip it to reduce log noise.
         Future.successful(TaskNoop)
       case Failure(e) => Future.failed(e)
-      case Success(domainId) =>
+      case Success(synchronizerId) =>
         domainStateTopology
-          .firstAuthorizedStateForTheLatestDomainParametersState(domainId)
+          .firstAuthorizedStateForTheLatestSynchronizerParametersState(synchronizerId)
           .value
           .flatMap {
             case None => Future.successful(TaskNoop)

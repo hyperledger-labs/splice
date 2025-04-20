@@ -7,7 +7,7 @@ import com.daml.ledger.api.v2.CommandsOuterClass.DisclosedContract as Lav1Disclo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import com.daml.nonempty.{NonEmpty, Singleton}
 import com.daml.nonempty.NonEmptyReturningOps.*
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ShowUtil.*
 import PrettyInstances.*
 import io.grpc.StatusRuntimeException
@@ -29,28 +29,28 @@ sealed abstract class DisclosedContracts {
     case NE(contracts, _) => contracts.map(_.toDisclosedContract)
   }
 
-  /** Pick a consistent `domainId` argument for ledger API submission that will take
+  /** Pick a consistent `synchronizerId` argument for ledger API submission that will take
     * these disclosures.  This is entirely based on disclosed contracts' states if
     * `ifExpected` is [[None]]; otherwise equivalent to [[#assertOnDomain]].
     */
   @throws[Ex]
-  private[splice] def inferDomain(ifExpected: Option[DomainId]): Option[DomainId]
+  private[splice] def inferDomain(ifExpected: Option[SynchronizerId]): Option[SynchronizerId]
 
   /** Overwrite the domain id with the domain id of the disclosed contracts as those cannot be reassigned.
     */
   // TODO(#13713) Remove this once our domain selection logic works properly with soft domain migrations
-  private[splice] def overwriteDomain(target: DomainId): DomainId
+  private[splice] def overwriteDomain(target: SynchronizerId): SynchronizerId
 
-  /** Throw if any contracts with known state are not assigned to `domainId`.
+  /** Throw if any contracts with known state are not assigned to `synchronizerId`.
     */
   @throws[Ex]
-  private[splice] def assertOnDomain(domainId: DomainId): this.type =
+  private[splice] def assertOnDomain(synchronizerId: SynchronizerId): this.type =
     this match {
-      case Empty | NE(_, `domainId`) => this
-      case NE(contracts, otherDomainId) =>
+      case Empty | NE(_, `synchronizerId`) => this
+      case NE(contracts, otherSynchronizerId) =>
         // TODO (#8135) invalidate contracts
         retryableError(
-          show"disclosed contracts are not on expected domain $domainId, but on $otherDomainId: $contracts"
+          show"disclosed contracts are not on expected domain $synchronizerId, but on $otherSynchronizerId: $contracts"
         )
     }
 
@@ -96,19 +96,21 @@ object DisclosedContracts {
     throw (FAILED_PRECONDITION.augmentDescription(description).asRuntimeException(): Ex)
 
   case object Empty extends DisclosedContracts {
-    private[splice] override def inferDomain(ifExpected: Option[DomainId]): ifExpected.type =
+    private[splice] override def inferDomain(ifExpected: Option[SynchronizerId]): ifExpected.type =
       ifExpected
 
-    private[splice] override def overwriteDomain(target: DomainId) = target
+    private[splice] override def overwriteDomain(target: SynchronizerId) = target
 
     override def merge(other: DisclosedContracts) = other
   }
 
   final case class NE(
       private val contracts: NonEmpty[Seq[Contract[?, ?]]],
-      assignedDomain: DomainId,
+      assignedDomain: SynchronizerId,
   ) extends DisclosedContracts {
-    private[splice] override def inferDomain(ifExpected: Option[DomainId]): Some[DomainId] =
+    private[splice] override def inferDomain(
+        ifExpected: Option[SynchronizerId]
+    ): Some[SynchronizerId] =
       ifExpected match {
         case it @ Some(exDomain) =>
           assertOnDomain(exDomain)
@@ -116,7 +118,7 @@ object DisclosedContracts {
         case None => Some(assignedDomain)
       }
 
-    private[splice] override def overwriteDomain(target: DomainId) = assignedDomain
+    private[splice] override def overwriteDomain(target: SynchronizerId) = assignedDomain
 
     @throws[Ex]
     def addAll(other: Seq[ContractWithState[?, ?]]): NE = {

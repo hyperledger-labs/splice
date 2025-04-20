@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.data.LedgerTimeBoundaries
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.hash.TransactionHash.NodeHashingError
@@ -18,7 +19,7 @@ import com.digitalasset.canton.protocol.hash.{
   TransactionMetadataHashBuilder,
 }
 import com.digitalasset.canton.protocol.{LfContractId, LfHash, SerializableContract}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.digitalasset.daml.lf.data.{Bytes, Ref, Time}
@@ -55,8 +56,8 @@ object InteractiveSubmission {
         commandId: Ref.CommandId,
         transactionUUID: UUID,
         mediatorGroup: Int,
-        domainId: DomainId,
-        ledgerEffectiveTime: Option[Time.Timestamp],
+        synchronizerId: SynchronizerId,
+        timeBoundaries: LedgerTimeBoundaries,
         submissionTime: Time.Timestamp,
         disclosedContracts: Map[ContractId, FatContractInstance],
     ) = new TransactionMetadataForHashing(
@@ -64,35 +65,32 @@ object InteractiveSubmission {
       commandId = commandId,
       transactionUUID = transactionUUID,
       mediatorGroup = mediatorGroup,
-      domainId = domainId,
-      ledgerEffectiveTime = ledgerEffectiveTime,
+      synchronizerId = synchronizerId,
+      timeBoundaries = timeBoundaries,
       submissionTime = submissionTime,
       disclosedContracts = SortedMap.from(disclosedContracts),
     )
+
+    def saltFromSerializedContract(serializedNode: SerializableContract): Bytes =
+      Bytes.fromByteString(serializedNode.contractSalt.toProtoV30.salt)
 
     def apply(
         actAs: Set[Ref.Party],
         commandId: Ref.CommandId,
         transactionUUID: UUID,
         mediatorGroup: Int,
-        domainId: DomainId,
-        ledgerEffectiveTime: Option[Time.Timestamp],
+        synchronizerId: SynchronizerId,
+        timeBoundaries: LedgerTimeBoundaries,
         submissionTime: Time.Timestamp,
         disclosedContracts: Map[ContractId, SerializableContract],
     ): TransactionMetadataForHashing = {
 
       val asFatContracts = disclosedContracts
         .map { case (contractId, serializedNode) =>
-          // Salt is not hashed in V1, so it's not relevant for now, but the hashing function takes a FatContractInstance
-          // so we extract it and pass it in still
-          val salt = serializedNode.contractSalt
-            .map(_.toProtoV30.salt)
-            .map(Bytes.fromByteString)
-            .getOrElse(Bytes.Empty)
           contractId -> FatContractInstance.fromCreateNode(
             serializedNode.toLf,
             serializedNode.ledgerCreateTime.toLf,
-            salt,
+            saltFromSerializedContract(serializedNode),
           )
         }
 
@@ -101,8 +99,8 @@ object InteractiveSubmission {
         commandId,
         transactionUUID,
         mediatorGroup,
-        domainId,
-        ledgerEffectiveTime,
+        synchronizerId,
+        timeBoundaries,
         submissionTime,
         SortedMap.from(asFatContracts),
       )
@@ -114,13 +112,13 @@ object InteractiveSubmission {
       commandId: Ref.CommandId,
       transactionUUID: UUID,
       mediatorGroup: Int,
-      domainId: DomainId,
-      ledgerEffectiveTime: Option[Time.Timestamp],
+      synchronizerId: SynchronizerId,
+      timeBoundaries: LedgerTimeBoundaries,
       submissionTime: Time.Timestamp,
       disclosedContracts: SortedMap[ContractId, FatContractInstance],
   )
 
-  private def computeHashV1(
+  private def computeHashV2(
       transaction: VersionedTransaction,
       metadata: TransactionMetadataForHashing,
       nodeSeeds: Map[NodeId, LfHash],
@@ -141,8 +139,8 @@ object InteractiveSubmission {
       metadata.commandId,
       metadata.transactionUUID,
       metadata.mediatorGroup,
-      metadata.domainId.toProtoPrimitive,
-      metadata.ledgerEffectiveTime,
+      metadata.synchronizerId.toProtoPrimitive,
+      metadata.timeBoundaries,
       metadata.submissionTime,
       metadata.disclosedContracts,
     )
@@ -178,21 +176,25 @@ object InteractiveSubmission {
       )
     } else {
       hashVersion match {
-        case HashingSchemeVersion.V1 => computeHashV1(transaction, metadata, nodeSeeds, hashTracer)
+        case HashingSchemeVersion.V2 => computeHashV2(transaction, metadata, nodeSeeds, hashTracer)
       }
     }
   }
 
   /** Verify that the signatures provided cover the actAs parties, and are valid.
-    * @param hash hash of the transaction
-    * @param signatures signatures provided in the request
-    * @param cryptoSnapshot topology snapshot to use to validate signatures
-    * @param actAs actAs parties that should be covered by the signatures
+    * @param hash
+    *   hash of the transaction
+    * @param signatures
+    *   signatures provided in the request
+    * @param cryptoSnapshot
+    *   topology snapshot to use to validate signatures
+    * @param actAs
+    *   actAs parties that should be covered by the signatures
     */
   def verifySignatures(
       hash: Hash,
       signatures: Map[PartyId, Seq[Signature]],
-      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       actAs: Set[LfPartyId],
       logger: TracedLogger,
   )(implicit
@@ -234,12 +236,13 @@ object InteractiveSubmission {
     }
   }
 
-  /** Verifies that there are enough _valid_ signatures for each party to reach the threshold configured for that party.
+  /** Verifies that there are enough _valid_ signatures for each party to reach the threshold
+    * configured for that party.
     */
   private def verifySignatures(
       hash: Hash,
       signatures: Map[PartyId, Seq[Signature]],
-      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       logger: TracedLogger,
   )(implicit
       traceContext: TraceContext,
@@ -261,8 +264,9 @@ object InteractiveSubmission {
               .find(_.fingerprint == signature.signedBy)
               .toRight(s"Signing key ${signature.signedBy} is not a valid key for $party")
               .flatMap(key =>
+                // TODO(#23551) Add new usage for interactive submission
                 cryptoSnapshot.pureCrypto
-                  .verifySignature(hash, key, signature)
+                  .verifySignature(hash.unwrap, key, signature, SigningKeyUsage.ProtocolOnly)
                   .map(_ => key.fingerprint)
                   .leftMap(_.toString)
               )
@@ -277,7 +281,7 @@ object InteractiveSubmission {
             }
           }
           _ <- EitherT.cond[FutureUnlessShutdown](
-            validSignaturesSet.size >= authInfo.threshold.unwrap,
+            validSignaturesSet.sizeIs >= authInfo.threshold.unwrap,
             (),
             s"Received ${validSignatures.size} valid signatures (${invalidSignatures.size} invalid), but expected at least ${authInfo.threshold} valid for $party",
           )

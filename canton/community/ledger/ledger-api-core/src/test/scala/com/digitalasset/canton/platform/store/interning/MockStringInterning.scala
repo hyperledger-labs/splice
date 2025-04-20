@@ -1,16 +1,16 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interning
 
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.Party
 
 import scala.concurrent.blocking
 
-/** This StringInterning implementation is interning in a transparent way everything it sees.
-  * This is only for test purposes.
+/** This StringInterning implementation is interning in a transparent way everything it sees. This
+  * is only for test purposes.
   */
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 class MockStringInterning extends StringInterning {
@@ -69,21 +69,6 @@ class MockStringInterning extends StringInterning {
         rawStringInterning.tryExternalize(id).map(Ref.PackageName.assertFromString)
     }
 
-  override val packageVersion: StringInterningDomain[Ref.PackageVersion] =
-    new StringInterningDomain[Ref.PackageVersion] {
-      override val unsafe: StringInterningAccessor[String] = rawStringInterning
-
-      override def internalize(t: Ref.PackageVersion): Int = tryInternalize(t).get
-
-      override def tryInternalize(t: Ref.PackageVersion): Option[Int] =
-        rawStringInterning.tryInternalize(t.toString)
-
-      override def externalize(id: Int): Ref.PackageVersion = tryExternalize(id).get
-
-      override def tryExternalize(id: Int): Option[Ref.PackageVersion] =
-        rawStringInterning.tryExternalize(id).map(Ref.PackageVersion.assertFromString)
-    }
-
   override def party: StringInterningDomain[Party] =
     new StringInterningDomain[Party] {
       override val unsafe: StringInterningAccessor[String] = rawStringInterning
@@ -99,19 +84,19 @@ class MockStringInterning extends StringInterning {
         rawStringInterning.tryExternalize(id).map(Party.assertFromString)
     }
 
-  override val domainId: StringInterningDomain[DomainId] =
-    new StringInterningDomain[DomainId] {
+  override val synchronizerId: StringInterningDomain[SynchronizerId] =
+    new StringInterningDomain[SynchronizerId] {
       override val unsafe: StringInterningAccessor[String] = rawStringInterning
 
-      override def internalize(t: DomainId): Int = tryInternalize(t).get
+      override def internalize(t: SynchronizerId): Int = tryInternalize(t).get
 
-      override def tryInternalize(t: DomainId): Option[Int] =
+      override def tryInternalize(t: SynchronizerId): Option[Int] =
         rawStringInterning.tryInternalize(t.toProtoPrimitive)
 
-      override def externalize(id: Int): DomainId = tryExternalize(id).get
+      override def externalize(id: Int): SynchronizerId = tryExternalize(id).get
 
-      override def tryExternalize(id: Int): Option[DomainId] =
-        rawStringInterning.tryExternalize(id).map(DomainId.tryFromString)
+      override def tryExternalize(id: Int): Option[SynchronizerId] =
+        rawStringInterning.tryExternalize(id).map(SynchronizerId.tryFromString)
     }
 
   private[store] def reset(): Unit = blocking(synchronized {

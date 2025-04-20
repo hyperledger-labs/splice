@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.authentication.grpc
@@ -17,6 +17,7 @@ import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationToken,
   AuthenticationTokenManagerConfig,
 }
+import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth.TokenFetcher
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -31,45 +32,35 @@ final case class AuthenticationTokenWithExpiry(
     expiresAt: CantonTimestamp,
 )
 
-/** Attempts to hold a valid authentication token.
-  * The first token will not be fetched until `getToken` is called for the first time.
-  * Subsequent calls to `getToken` before the token is obtained will be resolved for the first token.
-  * `getToken` always returns a `EitherT[Future, ...]` but if a token is already available will be completed immediately with that token.
+/** Attempts to hold a valid authentication token. The first token will not be fetched until
+  * `getToken` is called for the first time. Subsequent calls to `getToken` before the token is
+  * obtained will be resolved for the first token. `getToken` always returns a `EitherT[Future,
+  * ...]` but if a token is already available will be completed immediately with that token.
   */
 class AuthenticationTokenManager(
-    obtainToken: TraceContext => EitherT[
-      FutureUnlessShutdown,
-      Status,
-      AuthenticationTokenWithExpiry,
-    ],
+    obtainToken: TokenFetcher,
     isClosed: => Boolean,
     config: AuthenticationTokenManagerConfig,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
-
-  sealed trait State
-  case object NoToken extends State
-  case class Refreshing(
-      pending: EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry]
-  ) extends State
-  case class HaveToken(token: AuthenticationToken) extends State
+  import AuthenticationTokenManager.*
 
   private val state = new AtomicReference[State](NoToken)
 
-  /** Request a token.
-    * If a token is immediately available the returned future will be immediately completed.
-    * If there is no token it will cause a token refresh to start and be completed once obtained.
-    * If there is a refresh already in progress it will be completed with this refresh.
+  /** Request a token. If a token is immediately available the returned future will be immediately
+    * completed. If there is no token it will cause a token refresh to start and be completed once
+    * obtained. If there is a refresh already in progress it will be completed with this refresh.
     */
   def getToken(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, AuthenticationToken] =
     refreshToken(refreshWhenHaveToken = false)
 
-  /** Invalidate the current token if it matches the provided value.
-    * Although unlikely, the token must be provided here in case a response terminates after a new token has already been generated.
+  /** Invalidate the current token if it matches the provided value. Although unlikely, the token
+    * must be provided here in case a response terminates after a new token has already been
+    * generated.
     */
   def invalidateToken(invalidToken: AuthenticationToken): Unit = {
     val _ = state.updateAndGet {
@@ -84,7 +75,7 @@ class AuthenticationTokenManager(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, AuthenticationToken] = {
     val refreshTokenPromise =
-      new PromiseUnlessShutdown[Either[Status, AuthenticationTokenWithExpiry]](
+      PromiseUnlessShutdown.supervised[Either[Status, AuthenticationTokenWithExpiry]](
         "refreshToken",
         FutureSupervisor.Noop,
       )
@@ -157,7 +148,7 @@ class AuthenticationTokenManager(
         scheduleRefreshBefore(expiresAt)
     }
 
-    promise.completeWith(obtainToken(traceContext).value)
+    promise.completeWithUS(obtainToken(traceContext).value).discard
     EitherT(currentRefreshTransformed).map(_.token)
   }
 
@@ -165,13 +156,13 @@ class AuthenticationTokenManager(
     if (!isClosed) {
       clock
         .scheduleAt(
-          backgroundRefreshToken,
+          _ => backgroundRefreshToken(),
           expiresAt.minus(config.refreshAuthTokenBeforeExpiry.asJava),
         )
         .discard
     }
 
-  private def backgroundRefreshToken(_now: CantonTimestamp): Unit =
+  private def backgroundRefreshToken(): Unit =
     if (!isClosed) {
       // Create a fresh trace context for each refresh to avoid long-lasting trace IDs from other contexts
       TraceContext.withNewTraceContext { implicit traceContext =>
@@ -179,4 +170,13 @@ class AuthenticationTokenManager(
       }
     }
 
+}
+
+object AuthenticationTokenManager {
+  sealed trait State
+  case object NoToken extends State
+  final case class Refreshing(
+      pending: EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry]
+  ) extends State
+  final case class HaveToken(token: AuthenticationToken) extends State
 }

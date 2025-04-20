@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -10,18 +10,18 @@ import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
+import com.digitalasset.canton.data.{CantonTimestamp, Offset, ViewType}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.GlobalOffset
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentData.*
+import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentData.*
 import com.digitalasset.canton.participant.protocol.reassignment.{
+  AssignmentData,
   IncompleteReassignmentData,
-  ReassignmentData,
   ReassignmentDataHelpers,
+  UnassignmentData,
 }
 import com.digitalasset.canton.participant.protocol.submission.SeedGenerator
 import com.digitalasset.canton.participant.store.ReassignmentStore.*
-import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.{
   asSerializable,
   contractInstance,
@@ -37,65 +37,66 @@ import com.digitalasset.canton.protocol.{
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
-import com.digitalasset.canton.store.IndexedDomain
+import com.digitalasset.canton.store.IndexedSynchronizer
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{Checked, MonadUtil}
-import com.digitalasset.canton.{BaseTest, LfPartyId, RequestCounter, SequencerCounter}
+import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{BaseTest, FailOnShutdown, LfPartyId, SequencerCounter}
 import monocle.macros.syntax.lens.*
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{Assertion, EitherValues}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.annotation.unused
+import scala.concurrent.ExecutionContext
 import scala.language.implicitConversions
 
-trait ReassignmentStoreTest {
+trait ReassignmentStoreTest extends FailOnShutdown {
   this: AsyncWordSpec & BaseTest =>
 
   import ReassignmentStoreTest.*
+
+  @unused
   private implicit val _ec: ExecutionContext = ec
 
-  private implicit def toGlobalOffset(i: Long): GlobalOffset = GlobalOffset.tryFromLong(i)
+  private implicit def toOffset(i: Long): Offset = Offset.tryFromLong(i)
 
-  protected def reassignmentStore(mk: IndexedDomain => ReassignmentStore): Unit = {
-    val reassignmentData = mkReassignmentData(reassignment10, mediator1)
-    val reassignmentData2 = mkReassignmentData(reassignment11, mediator1)
-    val reassignmentData3 = mkReassignmentData(reassignment20, mediator1)
+  protected def reassignmentStore(mk: IndexedSynchronizer => ReassignmentStore): Unit = {
+    val unassignmentData = mkUnassignmentData(reassignment10, mediator1)
+    val unassignmentData2 = mkUnassignmentData(reassignment11, mediator1)
+    val unassignmentData3 = mkUnassignmentData(reassignment20, mediator1)
 
-    def reassignmentDataFor(
+    def unassignmentDataFor(
         reassignmentId: ReassignmentId,
         contract: SerializableContract,
-        unassignmentGlobalOffset: Option[GlobalOffset] = None,
-    ): ReassignmentData = mkReassignmentData(
+    ): UnassignmentData = mkUnassignmentData(
       reassignmentId,
       mediator1,
       contract = contract,
-      unassignmentGlobalOffset = unassignmentGlobalOffset,
     )
 
-    val unassignmentResult = mkUnassignmentResult(reassignmentData)
+    val unassignmentResult = mkUnassignmentResult(unassignmentData)
     val withUnassignmentResult =
-      reassignmentData.copy(unassignmentResult = Some(unassignmentResult))
-    val toc = TimeOfChange(RequestCounter(0), CantonTimestamp.ofEpochSecond(3))
+      unassignmentData.copy(unassignmentResult = Some(unassignmentResult))
+    val ts = CantonTimestamp.ofEpochSecond(3)
 
     "lookup" should {
       "find previously stored reassignments" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
           lookup10 <- valueOrFail(store.lookup(reassignment10))(
             "lookup failed to find the stored reassignment"
           )
-        } yield assert(lookup10 == reassignmentData, "lookup finds the stored data")
+        } yield assert(lookup10 == unassignmentData, "lookup finds the stored data")
       }
 
       "not invent reassignments" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
           lookup10 <- store.lookup(reassignment11).value
         } yield assert(
           lookup10 == Left(UnknownReassignmentId(reassignment11)),
@@ -104,188 +105,40 @@ trait ReassignmentStoreTest {
       }
     }
 
-    "find" should {
-      "filter by party" in {
-        val store = mk(indexedTargetDomain)
-
-        val aliceReassignment = mkReassignmentData(
-          reassignment10,
-          mediator1,
-          LfPartyId.assertFromString("alice"),
-        )
-        val bobReassignment = mkReassignmentData(
-          reassignment11,
-          mediator1,
-          LfPartyId.assertFromString("bob"),
-        )
-        val eveReassignment = mkReassignmentData(
-          reassignment20,
-          mediator2,
-          LfPartyId.assertFromString("eve"),
-        )
-
-        for {
-          _ <- valueOrFail(store.addReassignment(aliceReassignment).failOnShutdown)(
-            "add alice failed"
-          )
-          _ <- valueOrFail(store.addReassignment(bobReassignment).failOnShutdown)("add bob failed")
-          _ <- valueOrFail(store.addReassignment(eveReassignment).failOnShutdown)("add eve failed")
-          lookup <- store.find(None, None, Some(LfPartyId.assertFromString("bob")), 10)
-        } yield {
-          assert(lookup.toList == List(bobReassignment))
-        }
-      }
-
-      "filter by timestamp" in {
-        val store = mk(indexedTargetDomain)
-
-        val reassignment1 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.ofEpochMilli(100L)),
-          mediator1,
-        )
-        val reassignment2 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.ofEpochMilli(200L)),
-          mediator1,
-        )
-        val reassignment3 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.ofEpochMilli(300L)),
-          mediator1,
-        )
-
-        for {
-
-          _ <- valueOrFail(store.addReassignment(reassignment1).failOnShutdown)("add1 failed")
-          _ <- valueOrFail(store.addReassignment(reassignment2).failOnShutdown)("add2 failed")
-          _ <- valueOrFail(store.addReassignment(reassignment3).failOnShutdown)("add3 failed")
-          lookup <- store.find(None, Some(CantonTimestamp.Epoch.plusMillis(200L)), None, 10)
-        } yield {
-          assert(lookup.toList == List(reassignment2))
-        }
-      }
-      "filter by domain" in {
-        val store = mk(indexedTargetDomain)
-
-        val reassignment1 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.ofEpochMilli(100L)),
-          mediator1,
-        )
-        val reassignment2 = mkReassignmentData(
-          ReassignmentId(sourceDomain2, CantonTimestamp.ofEpochMilli(200L)),
-          mediator2,
-        )
-
-        for {
-          _ <- valueOrFail(store.addReassignment(reassignment1).failOnShutdown)("add1 failed")
-          _ <- valueOrFail(store.addReassignment(reassignment2).failOnShutdown)("add2 failed")
-          lookup <- store.find(Some(sourceDomain2), None, None, 10)
-        } yield {
-          assert(lookup.toList == List(reassignment2))
-        }
-      }
-      "limit the number of results" in {
-        val store = mk(indexedTargetDomain)
-
-        val reassignmentData10 = mkReassignmentData(reassignment10, mediator1)
-        val reassignmentData11 = mkReassignmentData(reassignment11, mediator1)
-        val reassignmentData20 = mkReassignmentData(reassignment20, mediator2)
-
-        for {
-
-          _ <- valueOrFail(store.addReassignment(reassignmentData10).failOnShutdown)(
-            "first add failed"
-          )
-          _ <- valueOrFail(store.addReassignment(reassignmentData11).failOnShutdown)(
-            "second add failed"
-          )
-          _ <- valueOrFail(store.addReassignment(reassignmentData20).failOnShutdown)(
-            "third add failed"
-          )
-          lookup <- store.find(None, None, None, 2)
-        } yield {
-          assert(lookup.length == 2)
-        }
-      }
-      "apply filters conjunctively" in {
-        val store = mk(indexedTargetDomain)
-
-        // Correct timestamp
-        val reassignment1 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.Epoch.plusMillis(200L)),
-          mediator1,
-          LfPartyId.assertFromString("party1"),
-        )
-        // Correct submitter
-        val reassignment2 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.Epoch.plusMillis(100L)),
-          mediator1,
-          LfPartyId.assertFromString("party2"),
-        )
-        // Correct domain
-        val reassignment3 = mkReassignmentData(
-          ReassignmentId(sourceDomain2, CantonTimestamp.Epoch.plusMillis(100L)),
-          mediator2,
-          LfPartyId.assertFromString("party2"),
-        )
-        // Correct reassignment
-        val reassignment4 = mkReassignmentData(
-          ReassignmentId(sourceDomain2, CantonTimestamp.Epoch.plusMillis(200L)),
-          mediator2,
-          LfPartyId.assertFromString("party2"),
-        )
-
-        for {
-
-          _ <- valueOrFail(store.addReassignment(reassignment1).failOnShutdown)("first add failed")
-          _ <- valueOrFail(store.addReassignment(reassignment2).failOnShutdown)("second add failed")
-          _ <- valueOrFail(store.addReassignment(reassignment3).failOnShutdown)("third add failed")
-          _ <- valueOrFail(store.addReassignment(reassignment4).failOnShutdown)("fourth add failed")
-          lookup <- store.find(
-            Some(sourceDomain2),
-            Some(CantonTimestamp.Epoch.plusMillis(200L)),
-            Some(LfPartyId.assertFromString("party2")),
-            10,
-          )
-        } yield {
-          assert(lookup.toList == List(reassignment4))
-        }
-
-      }
-    }
-
     "findAfter" should {
 
-      def populate(store: ReassignmentStore): Future[List[ReassignmentData]] = {
-        val reassignment1 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.Epoch.plusMillis(200L)),
+      def populate(store: ReassignmentStore): FutureUnlessShutdown[List[UnassignmentData]] = {
+        val reassignment1 = mkUnassignmentData(
+          ReassignmentId(sourceSynchronizer1, CantonTimestamp.Epoch.plusMillis(200L)),
           mediator1,
           LfPartyId.assertFromString("party1"),
         )
-        val reassignment2 = mkReassignmentData(
-          ReassignmentId(sourceDomain1, CantonTimestamp.Epoch.plusMillis(100L)),
+        val reassignment2 = mkUnassignmentData(
+          ReassignmentId(sourceSynchronizer1, CantonTimestamp.Epoch.plusMillis(100L)),
           mediator1,
           LfPartyId.assertFromString("party2"),
         )
-        val reassignment3 = mkReassignmentData(
-          ReassignmentId(sourceDomain2, CantonTimestamp.Epoch.plusMillis(100L)),
+        val reassignment3 = mkUnassignmentData(
+          ReassignmentId(sourceSynchronizer2, CantonTimestamp.Epoch.plusMillis(100L)),
           mediator2,
           LfPartyId.assertFromString("party2"),
         )
-        val reassignment4 = mkReassignmentData(
-          ReassignmentId(sourceDomain2, CantonTimestamp.Epoch.plusMillis(200L)),
+        val reassignment4 = mkUnassignmentData(
+          ReassignmentId(sourceSynchronizer2, CantonTimestamp.Epoch.plusMillis(200L)),
           mediator2,
           LfPartyId.assertFromString("party2"),
         )
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignment1).failOnShutdown)("first add failed")
-          _ <- valueOrFail(store.addReassignment(reassignment2).failOnShutdown)("second add failed")
-          _ <- valueOrFail(store.addReassignment(reassignment3).failOnShutdown)("third add failed")
-          _ <- valueOrFail(store.addReassignment(reassignment4).failOnShutdown)("fourth add failed")
+          _ <- valueOrFail(store.addUnassignmentData(reassignment1))("first add failed")
+          _ <- valueOrFail(store.addUnassignmentData(reassignment2))("second add failed")
+          _ <- valueOrFail(store.addUnassignmentData(reassignment3))("third add failed")
+          _ <- valueOrFail(store.addUnassignmentData(reassignment4))("fourth add failed")
         } yield (List(reassignment1, reassignment2, reassignment3, reassignment4))
       }
 
       "order pending reassignments" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         for {
           reassignments <- populate(store)
@@ -298,29 +151,32 @@ trait ReassignmentStoreTest {
 
       }
       "give pending reassignments after the given timestamp" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         for {
           reassignments <- populate(store)
           List(reassignment1, reassignment2, reassignment3, reassignment4) =
             reassignments: @unchecked
-          lookup <- store.findAfter(
-            requestAfter =
-              Some(reassignment2.reassignmentId.unassignmentTs -> reassignment2.sourceDomain),
-            10,
-          )
+          lookup <- store
+            .findAfter(
+              requestAfter = Some(
+                reassignment2.reassignmentId.unassignmentTs -> reassignment2.sourceSynchronizer
+              ),
+              10,
+            )
+
         } yield {
           assert(lookup == Seq(reassignment3, reassignment1, reassignment4))
         }
       }
       "give no pending reassignments when empty" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for { lookup <- store.findAfter(None, 10) } yield {
           lookup shouldBe empty
         }
       }
       "limit the results" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         for {
           reassignments <- populate(store)
@@ -332,7 +188,7 @@ trait ReassignmentStoreTest {
         }
       }
       "exclude completed reassignments" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         for {
           reassignments <- populate(store)
@@ -341,9 +197,10 @@ trait ReassignmentStoreTest {
           checked <- store
             .completeReassignment(
               reassignment2.reassignmentId,
-              TimeOfChange(RequestCounter(3), CantonTimestamp.Epoch.plusSeconds(3)),
+              CantonTimestamp.Epoch.plusSeconds(3),
             )
             .value
+
           lookup <- store.findAfter(None, 10)
         } yield {
           assert(checked.successful)
@@ -353,29 +210,163 @@ trait ReassignmentStoreTest {
       }
     }
 
+    "addAssignmentDataIfAbsent" should {
+      val data = unassignmentData
+      val assignmentData = AssignmentData(
+        data.reassignmentId,
+        data.contract,
+      )
+
+      "be idempotent" in {
+        val store = mk(indexedTargetSynchronizer)
+
+        for {
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+        } yield succeed
+      }
+
+      "AddAssignmentData doesn't update if conflicting data" in {
+        val store = mk(indexedTargetSynchronizer)
+
+        val initialMetadata = assignmentData.contract.metadata
+
+        val updatedMetadata = ContractMetadata.tryCreate(
+          initialMetadata.signatories,
+          initialMetadata.stakeholders + LfPartyId.assertFromString("other"),
+          None,
+        )
+
+        val updatedAssignmentData =
+          assignmentData.focus(_.contract.metadata).replace(updatedMetadata)
+
+        for {
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+          _ <- valueOrFail(
+            store.addAssignmentDataIfAbsent(updatedAssignmentData)
+          )("addAssignmentDataIfAbsent")
+          entry <- store.findReassignmentEntry(data.reassignmentId).value
+        } yield entry.map(_.contract) shouldBe Right(data.contract)
+      }
+
+      "AddAssignmentData doesn't update the entry once the reassignment data is inserted" in {
+        val store = mk(indexedTargetSynchronizer)
+        for {
+          _ <- store.addUnassignmentData(data).value
+          entry11 <- store.findReassignmentEntry(data.reassignmentId).value
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+          entry12 <- store.findReassignmentEntry(data.reassignmentId).value
+
+          _ <- store.addUnassignmentResult(unassignmentResult).value
+          entry21 <- store.findReassignmentEntry(data.reassignmentId).value
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+          entry22 <- store.findReassignmentEntry(data.reassignmentId).value
+
+          _ <- store.completeReassignment(data.reassignmentId, ts).value
+          entry31 <- store.findReassignmentEntry(data.reassignmentId).value
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+          entry32 <- store.findReassignmentEntry(data.reassignmentId).value
+        } yield {
+          entry11 shouldBe entry12
+          entry21 shouldBe entry22
+          entry31 shouldBe entry32
+        }
+      }
+
+      "addUnassignment is called after addAssignmentData with conflicting data" in {
+        val store = mk(indexedTargetSynchronizer)
+        for {
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+          modifiedReassignmentData = ReassignmentStoreTest.mkUnassignmentDataForSynchronizer(
+            data.reassignmentId,
+            data.sourceMediator,
+            data.unassignmentRequest.submitter,
+            targetSynchronizer,
+            contract,
+            sourcePV = ProtocolVersion.create("6", allowDeleted = true).value,
+          )
+          _ <- store.addUnassignmentData(modifiedReassignmentData).value
+          entry <- store.findReassignmentEntry(data.reassignmentId).value
+        } yield entry shouldBe Right(
+          ReassignmentEntry(modifiedReassignmentData, None, None)
+        )
+      }
+
+      "complete the assignment before the unassignment" in {
+        val store = mk(indexedTargetSynchronizer)
+        (for {
+          _ <- store.addAssignmentDataIfAbsent(assignmentData).value
+          entry1 <- store.findReassignmentEntry(data.reassignmentId).value
+          lookup1 <- store.lookup(data.reassignmentId).value
+          _ <- store.completeReassignment(data.reassignmentId, ts).value
+          lookup2 <- store.lookup(data.reassignmentId).value
+
+          _ <- store.addUnassignmentData(data).value
+          lookup3 <- store.lookup(data.reassignmentId).value
+
+          _ <- store.addUnassignmentResult(unassignmentResult).value
+          lookup4 <- store.lookup(data.reassignmentId).value
+          entry4 <- store.findReassignmentEntry(data.reassignmentId).value
+        } yield {
+          lookup1 shouldBe Left(
+            AssignmentStartingBeforeUnassignment(unassignmentData.reassignmentId)
+          )
+          entry1 shouldBe Right(
+            ReassignmentEntry(
+              data.reassignmentId,
+              data.contract,
+              None,
+              CantonTimestamp.Epoch,
+              None,
+              None,
+              None,
+            )
+          )
+          lookup2 shouldBe Left(ReassignmentCompleted(unassignmentData.reassignmentId, ts))
+          lookup3 shouldBe Left(ReassignmentCompleted(unassignmentData.reassignmentId, ts))
+
+          lookup4 shouldBe Left(ReassignmentCompleted(unassignmentData.reassignmentId, ts))
+          entry4 shouldBe Right(
+            ReassignmentEntry(
+              data.copy(unassignmentResult = Some(unassignmentResult)),
+              None,
+              Some(ts),
+            )
+          )
+        })
+
+      }
+    }
+
     "add unassignment/in global offsets" should {
 
-      val reassignmentId = reassignmentData.reassignmentId
+      val reassignmentId = unassignmentData.reassignmentId
 
       val unassignmentOffset = UnassignmentGlobalOffset(10L)
       val assignmentOffset = AssignmentGlobalOffset(15L)
 
-      val reassignmentDataOnlyUnassignment =
-        reassignmentData.copy(reassignmentGlobalOffset =
-          Some(UnassignmentGlobalOffset(unassignmentOffset.offset))
+      val reassignmentEntryOnlyUnassignment =
+        ReassignmentEntry(
+          unassignmentData,
+          Some(UnassignmentGlobalOffset(unassignmentOffset.offset)),
+          None,
         )
-      val reassignmentDataReassignmentComplete = reassignmentData.copy(reassignmentGlobalOffset =
-        Some(
-          ReassignmentGlobalOffsets.create(unassignmentOffset.offset, assignmentOffset.offset).value
+
+      val reassignmentEntryReassignmentComplete =
+        reassignmentEntryOnlyUnassignment.copy(reassignmentGlobalOffset =
+          Some(
+            ReassignmentGlobalOffsets
+              .create(unassignmentOffset.offset, assignmentOffset.offset)
+              .value
+          )
         )
-      )
 
       "allow batch updates" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         val data = (1L until 13).flatMap { i =>
           val tid = reassignmentId.copy(unassignmentTs = CantonTimestamp.ofEpochSecond(i))
-          val reassignmentData = reassignmentDataFor(tid, contract)
+          val reassignmentData = unassignmentDataFor(tid, contract)
 
           val mod = 4
 
@@ -395,17 +386,17 @@ trait ReassignmentStoreTest {
 
         for {
           _ <- valueOrFail(MonadUtil.sequentialTraverse_(data) { case (_, reassignmentData) =>
-            store.addReassignment(reassignmentData).failOnShutdown
+            store.addUnassignmentData(reassignmentData)
           })("add reassignments")
 
           offsets = data.map { case (offset, reassignmentData) =>
             reassignmentData.reassignmentId -> offset
           }
 
-          _ <- store.addReassignmentsOffsets(offsets).valueOrFailShutdown("adding offsets")
+          _ <- store.addReassignmentsOffsets(offsets).value
 
           result <- valueOrFail(offsets.toList.parTraverse { case (reassignmentId, _) =>
-            store.lookup(reassignmentId)
+            store.findReassignmentEntry(reassignmentId)
           })("query reassignments")
         } yield {
           result.lengthCompare(offsets) shouldBe 0
@@ -430,64 +421,68 @@ trait ReassignmentStoreTest {
       }
 
       "be idempotent" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add")
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> unassignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset 1"
             )
 
-          lookupOnlyUnassignment1 <- valueOrFail(store.lookup(reassignmentId))(
+          lookupOnlyUnassignment1 <- valueOrFail(store.findReassignmentEntry(reassignmentId))(
             "lookup reassignment data"
           )
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> unassignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset 2"
             )
 
-          lookupOnlyUnassignment2 <- valueOrFail(store.lookup(reassignmentId))(
+          lookupOnlyUnassignment2 <- valueOrFail(store.findReassignmentEntry(reassignmentId))(
             "lookup reassignment data"
           )
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> assignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset 1"
             )
 
-          lookup1 <- valueOrFail(store.lookup(reassignmentId))("lookup reassignment data")
+          lookup1 <- valueOrFail(store.findReassignmentEntry(reassignmentId))(
+            "lookup reassignment data"
+          )
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> assignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset 2"
             )
 
-          lookup2 <- valueOrFail(store.lookup(reassignmentId))("lookup reassignment data")
+          lookup2 <- valueOrFail(store.findReassignmentEntry(reassignmentId))(
+            "lookup reassignment data"
+          )
 
         } yield {
-          lookupOnlyUnassignment1 shouldBe reassignmentDataOnlyUnassignment
-          lookupOnlyUnassignment2 shouldBe reassignmentDataOnlyUnassignment
+          lookupOnlyUnassignment1 shouldBe reassignmentEntryOnlyUnassignment
+          lookupOnlyUnassignment2 shouldBe reassignmentEntryOnlyUnassignment
 
-          lookup1 shouldBe reassignmentDataReassignmentComplete
-          lookup2 shouldBe reassignmentDataReassignmentComplete
+          lookup1 shouldBe reassignmentEntryReassignmentComplete
+          lookup2 shouldBe reassignmentEntryReassignmentComplete
         }
       }
 
       "return an error if assignment offset is the same as the unassignment" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add")
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> unassignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset"
             )
 
@@ -496,19 +491,19 @@ trait ReassignmentStoreTest {
               Map(reassignmentId -> AssignmentGlobalOffset(unassignmentOffset.offset))
             )
             .value
-            .failOnShutdown
+
         } yield failedAdd.left.value shouldBe a[ReassignmentGlobalOffsetsMerge]
       }
 
       "return an error if unassignment offset is the same as the assignment" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add")
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> assignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset"
             )
 
@@ -517,61 +512,63 @@ trait ReassignmentStoreTest {
               Map(reassignmentId -> UnassignmentGlobalOffset(assignmentOffset.offset))
             )
             .value
-            .failOnShutdown
+
         } yield failedAdd.left.value shouldBe a[ReassignmentGlobalOffsetsMerge]
       }
 
       "return an error if the new value differs from the old one" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add")
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> unassignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset 1"
             )
 
           _ <- store
             .addReassignmentsOffsets(Map(reassignmentId -> assignmentOffset))
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset 2"
             )
 
-          lookup1 <- valueOrFail(store.lookup(reassignmentId))("lookup reassignment data")
+          lookup1 <- valueOrFail(store.findReassignmentEntry(reassignmentId))(
+            "lookup reassignment data"
+          )
 
           successfulAddOutOffset <- store
             .addReassignmentsOffsets(Map(reassignmentId -> unassignmentOffset))
             .value
-            .failOnShutdown
+
           failedAddOutOffset <- store
             .addReassignmentsOffsets(
               Map(
                 reassignmentId -> UnassignmentGlobalOffset(
-                  GlobalOffset.tryFromLong(unassignmentOffset.offset.toLong - 1)
+                  Offset.tryFromLong(unassignmentOffset.offset.unwrap - 1)
                 )
               )
             )
             .value
-            .failOnShutdown
 
           successfulAddInOffset <- store
             .addReassignmentsOffsets(Map(reassignmentId -> assignmentOffset))
             .value
-            .failOnShutdown
+
           failedAddInOffset <- store
             .addReassignmentsOffsets(
               Map(
                 reassignmentId -> AssignmentGlobalOffset(
-                  GlobalOffset.tryFromLong(assignmentOffset.offset.toLong - 1)
+                  Offset.tryFromLong(assignmentOffset.offset.unwrap - 1)
                 )
               )
             )
             .value
-            .failOnShutdown
 
-          lookup2 <- valueOrFail(store.lookup(reassignmentId))("lookup reassignment data")
+          lookup2 <- valueOrFail(store.findReassignmentEntry(reassignmentId))(
+            "lookup reassignment data"
+          )
 
         } yield {
           successfulAddOutOffset.value shouldBe ()
@@ -580,68 +577,87 @@ trait ReassignmentStoreTest {
           successfulAddInOffset.value shouldBe ()
           failedAddInOffset.left.value shouldBe a[ReassignmentGlobalOffsetsMerge]
 
-          lookup1 shouldBe reassignmentDataReassignmentComplete
-          lookup2 shouldBe reassignmentDataReassignmentComplete
+          lookup1 shouldBe reassignmentEntryReassignmentComplete
+          lookup2 shouldBe reassignmentEntryReassignmentComplete
         }
       }
     }
 
-    "incomplete" should {
+    "findIncomplete" should {
       val limit = NonNegativeInt.tryCreate(10)
 
       def assertIsIncomplete(
           incompletes: Seq[IncompleteReassignmentData],
-          expectedReassignmentData: ReassignmentData,
-      ): Assertion =
-        incompletes.map(_.toReassignmentData) shouldBe Seq(expectedReassignmentData)
+          expectedReassignmentEntry: ReassignmentEntry,
+          queryOffset: Offset,
+      ): Assertion = {
+        val expectedIncomplete = IncompleteReassignmentData.tryCreate(
+          expectedReassignmentEntry.sourceSynchronizer,
+          expectedReassignmentEntry.unassignmentTs,
+          expectedReassignmentEntry.unassignmentRequest,
+          expectedReassignmentEntry.reassignmentGlobalOffset,
+          queryOffset,
+        )
+        incompletes.map(_.reassignmentId) shouldBe Seq(expectedReassignmentEntry.reassignmentId)
+        incompletes shouldBe Seq(expectedIncomplete)
+      }
 
       "list incomplete reassignments (unassignment done)" in {
-        val store = mk(indexedTargetDomain)
-        val reassignmentId = reassignmentData.reassignmentId
+        val store = mk(indexedTargetSynchronizer)
+        val reassignmentId = unassignmentData.reassignmentId
 
         val unassignmentOsset = 10L
         val assignmentOffset = 20L
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
           lookupNoOffset <- store.findIncomplete(None, Long.MaxValue, None, limit)
 
           _ <- store
             .addReassignmentsOffsets(
               Map(reassignmentId -> UnassignmentGlobalOffset(unassignmentOsset))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
-          lookupBeforeUnassignment <- store.findIncomplete(
-            None,
-            unassignmentOsset - 1,
-            None,
-            limit,
-          )
-          lookupAtUnassignment <- store.findIncomplete(None, unassignmentOsset, None, limit)
+          lookupBeforeUnassignment <- store
+            .findIncomplete(
+              None,
+              unassignmentOsset - 1,
+              None,
+              limit,
+            )
+
+          lookupAtUnassignment <- store
+            .findIncomplete(None, unassignmentOsset, None, limit)
 
           _ <- store
             .addReassignmentsOffsets(
               Map(reassignmentId -> AssignmentGlobalOffset(assignmentOffset))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset failed"
             )
 
-          lookupBeforeAssignment <- store.findIncomplete(
-            None,
-            assignmentOffset - 1,
-            None,
-            limit,
-          )
-          lookupAtAssignment <- store.findIncomplete(None, assignmentOffset, None, limit)
-          lookupAfterAssignment <- store.findIncomplete(
-            None,
-            assignmentOffset,
-            None,
-            limit,
-          )
+          lookupBeforeAssignment <- store
+            .findIncomplete(
+              None,
+              assignmentOffset - 1,
+              None,
+              limit,
+            )
+
+          lookupAtAssignment <- store
+            .findIncomplete(None, assignmentOffset, None, limit)
+
+          lookupAfterAssignment <- store
+            .findIncomplete(
+              None,
+              assignmentOffset,
+              None,
+              limit,
+            )
+
         } yield {
           lookupNoOffset shouldBe empty
 
@@ -649,16 +665,22 @@ trait ReassignmentStoreTest {
 
           assertIsIncomplete(
             lookupAtUnassignment,
-            reassignmentData.copy(reassignmentGlobalOffset =
-              Some(UnassignmentGlobalOffset(unassignmentOsset))
+            ReassignmentEntry(
+              unassignmentData,
+              Some(UnassignmentGlobalOffset(unassignmentOsset)),
+              None,
             ),
+            unassignmentOsset,
           )
 
           assertIsIncomplete(
             lookupBeforeAssignment,
-            reassignmentData.copy(reassignmentGlobalOffset =
-              Some(UnassignmentGlobalOffset(unassignmentOsset))
+            ReassignmentEntry(
+              unassignmentData,
+              Some(UnassignmentGlobalOffset(unassignmentOsset)),
+              None,
             ),
+            assignmentOffset - 1,
           )
 
           lookupAtAssignment shouldBe empty
@@ -667,54 +689,71 @@ trait ReassignmentStoreTest {
       }
 
       "list incomplete reassignments (assignment done)" in {
-        val store = mk(indexedTargetDomain)
-        val reassignmentId = reassignmentData.reassignmentId
+        val store = mk(indexedTargetSynchronizer)
+        val reassignmentId = unassignmentData.reassignmentId
 
         val assignmentOffset = 10L
         val unassignmentOffset = 20L
+        val assignmentData = AssignmentData(
+          unassignmentData.reassignmentId,
+          unassignmentData.contract,
+        )
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addAssignmentDataIfAbsent(assignmentData))("add failed")
           lookupNoOffset <- store.findIncomplete(None, Long.MaxValue, None, limit)
-
+          _ <- store.completeReassignment(assignmentData.reassignmentId, ts).value
           _ <-
             store
               .addReassignmentsOffsets(
                 Map(reassignmentId -> AssignmentGlobalOffset(assignmentOffset))
               )
-              .valueOrFailShutdown(
+              .valueOrFail(
                 "add assignment offset failed"
               )
-          lookupBeforeAssignment <- store.findIncomplete(
-            None,
-            assignmentOffset - 1,
-            None,
-            limit,
-          )
-          lookupAtAssignment <- store.findIncomplete(None, assignmentOffset, None, limit)
+
+          lookupBeforeAssignment <- store
+            .findIncomplete(
+              None,
+              assignmentOffset - 1,
+              None,
+              limit,
+            )
+
+          lookupAtAssignment <- store
+            .findIncomplete(None, assignmentOffset, None, limit)
+
+          _ <- store.addUnassignmentData(unassignmentData).value
+          _ <- store.addUnassignmentResult(unassignmentResult).value
 
           _ <-
             store
               .addReassignmentsOffsets(
                 Map(reassignmentId -> UnassignmentGlobalOffset(unassignmentOffset))
               )
-              .valueOrFailShutdown(
+              .valueOrFail(
                 "add unassignment offset failed"
               )
 
-          lookupBeforeUnassignment <- store.findIncomplete(
-            None,
-            unassignmentOffset - 1,
-            None,
-            limit,
-          )
-          lookupAtUnassignment <- store.findIncomplete(None, unassignmentOffset, None, limit)
-          lookupAfterUnassignment <- store.findIncomplete(
-            None,
-            unassignmentOffset,
-            None,
-            limit,
-          )
+          lookupBeforeUnassignment <- store
+            .findIncomplete(
+              None,
+              unassignmentOffset - 1,
+              None,
+              limit,
+            )
+
+          lookupAtUnassignment <- store
+            .findIncomplete(None, unassignmentOffset, None, limit)
+
+          lookupAfterUnassignment <- store
+            .findIncomplete(
+              None,
+              unassignmentOffset,
+              None,
+              limit,
+            )
+
         } yield {
           lookupNoOffset shouldBe empty
 
@@ -722,16 +761,22 @@ trait ReassignmentStoreTest {
 
           assertIsIncomplete(
             lookupAtAssignment,
-            reassignmentData.copy(reassignmentGlobalOffset =
-              Some(AssignmentGlobalOffset(assignmentOffset))
+            ReassignmentEntry(
+              assignmentData,
+              Some(AssignmentGlobalOffset(assignmentOffset)),
+              None,
             ),
+            assignmentOffset,
           )
 
           assertIsIncomplete(
             lookupBeforeUnassignment,
-            reassignmentData.copy(reassignmentGlobalOffset =
-              Some(AssignmentGlobalOffset(assignmentOffset))
+            ReassignmentEntry(
+              unassignmentData,
+              Some(AssignmentGlobalOffset(assignmentOffset)),
+              None,
             ),
+            unassignmentOffset - 1,
           )
 
           lookupAtUnassignment shouldBe empty
@@ -740,7 +785,7 @@ trait ReassignmentStoreTest {
       }
 
       "take stakeholders filter into account" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
         val alice = ReassignmentStoreTest.alice
         val bob = ReassignmentStoreTest.bob
@@ -753,78 +798,100 @@ trait ReassignmentStoreTest {
         val contracts = Seq(aliceContract, bobContract, aliceContract, bobContract)
         val reassignmentsData = contracts.zipWithIndex.map { case (contract, idx) =>
           val reassignmentId =
-            ReassignmentId(sourceDomain1, CantonTimestamp.Epoch.plusSeconds(idx.toLong))
+            ReassignmentId(sourceSynchronizer1, CantonTimestamp.Epoch.plusSeconds(idx.toLong))
 
-          reassignmentDataFor(
+          unassignmentDataFor(
             reassignmentId,
             contract,
-            unassignmentGlobalOffset = Some(unassignmentOffset),
           )
         }
-        val stakeholders = contracts.map(_.metadata.stakeholders)
 
-        val addReassignmentsET = reassignmentsData.parTraverse(store.addReassignment)
+        val addReassignmentsET = reassignmentsData.parTraverse(store.addUnassignmentData)
 
         def lift(stakeholder: LfPartyId, others: LfPartyId*): Option[NonEmpty[Set[LfPartyId]]] =
           Option(NonEmpty(Set, stakeholder, others*))
 
-        def stakeholdersOf(
-            incompleteReassignments: Seq[IncompleteReassignmentData]
-        ): Seq[Set[LfPartyId]] =
-          incompleteReassignments.map(_.contract.metadata.stakeholders)
-
         for {
-          _ <- valueOrFail(addReassignmentsET.failOnShutdown)("add failed")
+          _ <- valueOrFail(addReassignmentsET)("add failed")
+          _ <- store
+            .addReassignmentsOffsets(
+              reassignmentsData
+                .map(_.reassignmentId -> UnassignmentGlobalOffset(unassignmentOffset))
+                .toMap
+            )
+            .value
 
           lookupNone <- store.findIncomplete(None, unassignmentOffset, None, limit)
-          lookupAll <- store.findIncomplete(
-            None,
-            unassignmentOffset,
-            lift(alice, bob),
-            limit,
-          )
 
-          lookupAlice <- store.findIncomplete(None, unassignmentOffset, lift(alice), limit)
-          lookupBob <- store.findIncomplete(None, unassignmentOffset, lift(bob), limit)
+          lookupAll <- store
+            .findIncomplete(
+              None,
+              unassignmentOffset,
+              lift(alice, bob),
+              limit,
+            )
+
+          lookupAlice <- store
+            .findIncomplete(None, unassignmentOffset, lift(alice), limit)
+
+          lookupBob <- store
+            .findIncomplete(None, unassignmentOffset, lift(bob), limit)
+
         } yield {
-          stakeholdersOf(lookupNone) should contain theSameElementsAs stakeholders
-          stakeholdersOf(lookupAll) should contain theSameElementsAs stakeholders
-          stakeholdersOf(lookupAlice) should contain theSameElementsAs Seq(Set(alice), Set(alice))
-          stakeholdersOf(lookupBob) should contain theSameElementsAs Seq(Set(bob), Set(bob))
+          lookupNone.map(_.reassignmentId) should contain theSameElementsAs reassignmentsData.map(
+            _.reassignmentId
+          )
+          lookupAll.map(_.reassignmentId) should contain theSameElementsAs reassignmentsData.map(
+            _.reassignmentId
+          )
+          lookupAlice.map(_.reassignmentId) should contain theSameElementsAs reassignmentsData
+            .filter(_.contract == aliceContract)
+            .map(_.reassignmentId)
+          lookupBob.map(_.reassignmentId) should contain theSameElementsAs reassignmentsData
+            .filter(_.contract == bobContract)
+            .map(_.reassignmentId)
         }
       }
 
-      "take domain filter into account" in {
-        val store = mk(indexedTargetDomain)
+      "take synchronizer filter into account" in {
+        val store = mk(indexedTargetSynchronizer)
         val offset = 10L
 
-        val reassignment =
-          reassignmentData.copy(reassignmentGlobalOffset = Some(AssignmentGlobalOffset(offset)))
-
         for {
-          _ <- valueOrFail(store.addReassignment(reassignment).failOnShutdown)("add")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add")
+          _ <- store
+            .addReassignmentsOffsets(
+              Map(unassignmentData.reassignmentId -> AssignmentGlobalOffset(offset))
+            )
+            .valueOrFail("add out offset")
+          entry <- store
+            .findReassignmentEntry(unassignmentData.reassignmentId)
+            .valueOrFail("lookup")
 
-          lookup1a <- store.findIncomplete(Some(sourceDomain2), offset, None, limit) // Wrong domain
-          lookup1b <- store.findIncomplete(Some(sourceDomain1), offset, None, limit)
+          lookup1a <- store
+            .findIncomplete(Some(sourceSynchronizer2), offset, None, limit) // Wrong synchronizer
+          lookup1b <- store
+            .findIncomplete(Some(sourceSynchronizer1), offset, None, limit)
+
           lookup1c <- store.findIncomplete(None, offset, None, limit)
         } yield {
           lookup1a shouldBe empty
-          assertIsIncomplete(lookup1b, reassignment)
-          assertIsIncomplete(lookup1c, reassignment)
+          assertIsIncomplete(lookup1b, entry, offset)
+          assertIsIncomplete(lookup1c, entry, offset)
         }
       }
 
       "limit the results" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         val offset = 42L
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add")
           _ <- store
             .addReassignmentsOffsets(
-              Map(reassignmentData.reassignmentId -> UnassignmentGlobalOffset(offset))
+              Map(unassignmentData.reassignmentId -> UnassignmentGlobalOffset(offset))
             )
-            .valueOrFailShutdown("add out offset")
+            .valueOrFail("add out offset")
 
           lookup0 <- store.findIncomplete(None, offset, None, NonNegativeInt.zero)
           lookup1 <- store.findIncomplete(None, offset, None, NonNegativeInt.one)
@@ -839,19 +906,19 @@ trait ReassignmentStoreTest {
     "find first incomplete" should {
 
       "find incomplete reassignments (unassignment done)" in {
-        val store = mk(indexedTargetDomain)
-        val reassignmentId = reassignmentData.reassignmentId
+        val store = mk(indexedTargetSynchronizer)
+        val reassignmentId = unassignmentData.reassignmentId
 
         val unassignmentOffset = 10L
         val assignmentOffset = 20L
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
 
           _ <- store
             .addReassignmentsOffsets(
               Map(reassignmentId -> UnassignmentGlobalOffset(unassignmentOffset))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
           lookupAfterUnassignment <- store.findEarliestIncomplete()
@@ -860,34 +927,34 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId -> AssignmentGlobalOffset(assignmentOffset))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset failed"
             )
 
           lookupAfterAssignment <- store.findEarliestIncomplete()
         } yield {
           inside(lookupAfterUnassignment) { case Some((offset, _, _)) =>
-            offset shouldBe GlobalOffset.tryFromLong(unassignmentOffset)
+            offset shouldBe Offset.tryFromLong(unassignmentOffset)
           }
           lookupAfterAssignment shouldBe None
         }
       }
 
       "find incomplete reassignments (assignment done)" in {
-        val store = mk(indexedTargetDomain)
-        val reassignmentId = reassignmentData.reassignmentId
+        val store = mk(indexedTargetSynchronizer)
+        val reassignmentId = unassignmentData.reassignmentId
 
         val unassignmentOffset = 10L
         val assignmentOffset = 20L
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
 
           _ <- store
             .addReassignmentsOffsets(
               Map(reassignmentId -> AssignmentGlobalOffset(assignmentOffset))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset failed"
             )
           lookupAfterAssignment <- store.findEarliestIncomplete()
@@ -896,23 +963,23 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId -> UnassignmentGlobalOffset(unassignmentOffset))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
           lookupAfterUnassignment <- store.findEarliestIncomplete()
 
         } yield {
           inside(lookupAfterAssignment) { case Some((offset, _, _)) =>
-            offset shouldBe GlobalOffset.tryFromLong(assignmentOffset)
+            offset shouldBe Offset.tryFromLong(assignmentOffset)
           }
           lookupAfterUnassignment shouldBe None
         }
       }
 
       "returns None when reassignment store is empty or each reassignment is either complete or has no offset information" in {
-        val store = mk(indexedTargetDomain)
-        val reassignmentId1 = reassignmentData.reassignmentId
-        val reassignmentId3 = reassignmentData3.reassignmentId
+        val store = mk(indexedTargetSynchronizer)
+        val reassignmentId1 = unassignmentData.reassignmentId
+        val reassignmentId3 = unassignmentData3.reassignmentId
 
         val unassignmentOffset1 = 10L
         val assignmentOffset1 = 20L
@@ -922,8 +989,8 @@ trait ReassignmentStoreTest {
 
         for {
           lookupEmpty <- store.findEarliestIncomplete()
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addReassignment(reassignmentData3).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData3))("add failed")
 
           lookupAllInFlight <- store.findEarliestIncomplete()
 
@@ -931,7 +998,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId1 -> AssignmentGlobalOffset(assignmentOffset1))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset failed"
             )
 
@@ -939,7 +1006,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId1 -> UnassignmentGlobalOffset(unassignmentOffset1))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
 
@@ -949,7 +1016,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId3 -> AssignmentGlobalOffset(assignmentOffset3))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset failed"
             )
 
@@ -957,7 +1024,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId3 -> UnassignmentGlobalOffset(unassignmentOffset3))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
           lookupAllComplete <- store.findEarliestIncomplete()
@@ -971,10 +1038,10 @@ trait ReassignmentStoreTest {
       }
 
       "works in complex scenario" in {
-        val store = mk(indexedTargetDomain)
-        val reassignmentId1 = reassignmentData.reassignmentId
-        val reassignmentId2 = reassignmentData2.reassignmentId
-        val reassignmentId3 = reassignmentData3.reassignmentId
+        val store = mk(indexedTargetSynchronizer)
+        val reassignmentId1 = unassignmentData.reassignmentId
+        val reassignmentId2 = unassignmentData2.reassignmentId
+        val reassignmentId3 = unassignmentData3.reassignmentId
 
         val unassignmentOffset1 = 10L
         val assignmentOffset1 = 20L
@@ -986,15 +1053,15 @@ trait ReassignmentStoreTest {
         val assignmentOffset3 = 35L
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addReassignment(reassignmentData2).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addReassignment(reassignmentData3).failOnShutdown)("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData2))("add failed")
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData3))("add failed")
 
           _ <- store
             .addReassignmentsOffsets(
               Map(reassignmentId1 -> AssignmentGlobalOffset(assignmentOffset1))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset failed"
             )
 
@@ -1002,7 +1069,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId1 -> UnassignmentGlobalOffset(unassignmentOffset1))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
 
@@ -1010,7 +1077,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId2 -> AssignmentGlobalOffset(unassignmentOffset2))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
 
@@ -1018,7 +1085,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId3 -> AssignmentGlobalOffset(assignmentOffset3))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add assignment offset failed"
             )
 
@@ -1026,7 +1093,7 @@ trait ReassignmentStoreTest {
             .addReassignmentsOffsets(
               Map(reassignmentId3 -> UnassignmentGlobalOffset(unassignmentOffset3))
             )
-            .valueOrFailShutdown(
+            .valueOrFail(
               "add unassignment offset failed"
             )
 
@@ -1034,7 +1101,7 @@ trait ReassignmentStoreTest {
 
         } yield {
           inside(lookupEnd) { case Some((offset, _, _)) =>
-            offset shouldBe GlobalOffset.tryFromLong(unassignmentOffset2)
+            offset shouldBe Offset.tryFromLong(unassignmentOffset2)
           }
         }
       }
@@ -1042,88 +1109,92 @@ trait ReassignmentStoreTest {
 
     "addReassignment" should {
       "be idempotent" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))(
             "first add failed"
           )
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))(
             "second add failed"
           )
         } yield succeed
       }
 
       "detect modified reassignment data" in {
-        val store = mk(indexedTargetDomain)
-        val modifiedContract =
-          asSerializable(
-            reassignmentData.contract.contractId,
-            contractInstance(),
-            contract.metadata,
-            CantonTimestamp.ofEpochMilli(1),
-          )
-        val reassignmentDataModified = reassignmentData.copy(contract = modifiedContract)
+        val store = mk(indexedTargetSynchronizer)
+        val modifiedUnassignmentDecisionTime = CantonTimestamp.ofEpochMilli(100)
+
+        val reassignmentDataModified =
+          unassignmentData.copy(unassignmentDecisionTime = modifiedUnassignmentDecisionTime)
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))(
             "first add failed"
           )
-          add2 <- store.addReassignment(reassignmentDataModified).failOnShutdown.value
+          add2 <- store.addUnassignmentData(reassignmentDataModified).value
         } yield assert(
-          add2 == Left(ReassignmentDataAlreadyExists(reassignmentData, reassignmentDataModified)),
+          add2 == Left(ReassignmentDataAlreadyExists(unassignmentData, reassignmentDataModified)),
           "second add failed",
         )
       }
 
       "handle unassignment results" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(withUnassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(withUnassignmentResult))(
             "first add failed"
           )
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))(
             "second add failed"
           )
-          lookup2 <- valueOrFail(store.lookup(reassignment10))("UnassignmentResult missing")
-          _ <- valueOrFail(store.addReassignment(withUnassignmentResult).failOnShutdown)(
+          lookup2 <- valueOrFail(store.lookup(reassignment10))(
+            "UnassignmentResult missing"
+          )
+          _ <- valueOrFail(store.addUnassignmentData(withUnassignmentResult))(
             "third add failed"
           )
         } yield assert(lookup2 == withUnassignmentResult, "UnassignmentResult remains")
       }
 
       "add several reassignments" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
 
-        val reassignmentData10 = mkReassignmentData(reassignment10, mediator1)
-        val reassignmentData11 = mkReassignmentData(reassignment11, mediator1)
-        val reassignmentData20 = mkReassignmentData(reassignment20, mediator2)
+        val unassignmentData10 = mkUnassignmentData(reassignment10, mediator1)
+        val unassignmentData11 = mkUnassignmentData(reassignment11, mediator1)
+        val unassignmentData12 = mkUnassignmentData(reassignment20, mediator2)
 
         for {
 
-          _ <- valueOrFail(store.addReassignment(reassignmentData10).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData10))(
             "first add failed"
           )
-          _ <- valueOrFail(store.addReassignment(reassignmentData11).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData11))(
             "second add failed"
           )
-          _ <- valueOrFail(store.addReassignment(reassignmentData20).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData12))(
             "third add failed"
           )
-          lookup10 <- valueOrFail(store.lookup(reassignment10))("first reassignment not found")
-          lookup11 <- valueOrFail(store.lookup(reassignment11))("second reassignment not found")
-          lookup20 <- valueOrFail(store.lookup(reassignment20))("third reassignment not found")
+          lookup10 <- valueOrFail(store.lookup(reassignment10))(
+            "first reassignment not found"
+          )
+          lookup11 <- valueOrFail(store.lookup(reassignment11))(
+            "second reassignment not found"
+          )
+          lookup20 <- valueOrFail(store.lookup(reassignment20))(
+            "third reassignment not found"
+          )
         } yield {
-          lookup10 shouldBe reassignmentData10
-          lookup11 shouldBe reassignmentData11
-          lookup20 shouldBe reassignmentData20
+          lookup10 shouldBe unassignmentData10
+          lookup11 shouldBe unassignmentData11
+          lookup20 shouldBe unassignmentData12
         }
       }
 
-      "complain about reassignments for a different domain" in {
-        val store = mk(IndexedDomain.tryCreate(sourceDomain1.unwrap, 2))
+      "complain about reassignments for a different synchronizer" in {
+        val store = mk(IndexedSynchronizer.tryCreate(sourceSynchronizer1.unwrap, 2))
         loggerFactory.assertInternalError[IllegalArgumentException](
-          store.addReassignment(reassignmentData),
-          _.getMessage shouldBe s"Domain ${Target(sourceDomain1.unwrap)}: Reassignment store cannot store reassignment for domain $targetDomainId",
+          store.addUnassignmentData(unassignmentData),
+          _.getMessage shouldBe s"Synchronizer ${Target(sourceSynchronizer1.unwrap)}: Reassignment store cannot store reassignment for synchronizer $targetSynchronizerId",
         )
       }
     }
@@ -1131,28 +1202,30 @@ trait ReassignmentStoreTest {
     "addUnassignmentResult" should {
 
       "report missing reassignments" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          missing <- store.addUnassignmentResult(unassignmentResult).failOnShutdown.value
+          missing <- store.addUnassignmentResult(unassignmentResult).value
         } yield missing shouldBe Left(UnknownReassignmentId(reassignment10))
       }
 
       "add the result" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
-          lookup <- valueOrFail(store.lookup(reassignment10))("reassignment not found")
+          lookup <- valueOrFail(store.lookup(reassignment10))(
+            "reassignment not found"
+          )
         } yield assert(
-          lookup == reassignmentData.copy(unassignmentResult = Some(unassignmentResult)),
+          lookup == unassignmentData.copy(unassignmentResult = Some(unassignmentResult)),
           "result is stored",
         )
       }
 
       "report mismatching results" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         val modifiedUnassignmentResult = {
           val updatedContent = unassignmentResult.result
             .focus(_.content.timestamp)
@@ -1162,12 +1235,14 @@ trait ReassignmentStoreTest {
         }
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
-          modified <- store.addUnassignmentResult(modifiedUnassignmentResult).failOnShutdown.value
-          lookup <- valueOrFail(store.lookup(reassignment10))("reassignment not found")
+          modified <- store.addUnassignmentResult(modifiedUnassignmentResult).value
+          lookup <- valueOrFail(store.lookup(reassignment10))(
+            "reassignment not found"
+          )
         } yield {
           assert(
             modified == Left(
@@ -1180,7 +1255,7 @@ trait ReassignmentStoreTest {
             "modified result is flagged",
           )
           assert(
-            lookup == reassignmentData.copy(unassignmentResult = Some(unassignmentResult)),
+            lookup == unassignmentData.copy(unassignmentResult = Some(unassignmentResult)),
             "result is not overwritten stored",
           )
         }
@@ -1189,59 +1264,59 @@ trait ReassignmentStoreTest {
 
     "completeReassignment" should {
       "mark the reassignment as completed" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))("completion failed")
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))("completion failed")
           lookup <- store.lookup(reassignment10).value
-        } yield lookup shouldBe Left(ReassignmentCompleted(reassignment10, toc))
+        } yield lookup shouldBe Left(ReassignmentCompleted(reassignment10, ts))
       }
 
       "be idempotent" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))(
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))(
             "first completion failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))(
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))(
             "second completion failed"
           )
         } yield succeed
       }
 
       "be allowed before the result" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))(
             "first completion failed"
           )
           lookup1 <- store.lookup(reassignment10).value
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
           lookup2 <- store.lookup(reassignment10).value
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))(
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))(
             "second completion failed"
           )
         } yield {
-          lookup1 shouldBe Left(ReassignmentCompleted(reassignment10, toc))
-          lookup2 shouldBe Left(ReassignmentCompleted(reassignment10, toc))
+          lookup1 shouldBe Left(ReassignmentCompleted(reassignment10, ts))
+          lookup2 shouldBe Left(ReassignmentCompleted(reassignment10, ts))
         }
       }
 
       "detect mismatches" in {
-        val store = mk(indexedTargetDomain)
-        val toc2 = TimeOfChange(RequestCounter(0), CantonTimestamp.ofEpochSecond(4))
+        val store = mk(indexedTargetSynchronizer)
+        val ts2 = CantonTimestamp.ofEpochSecond(4)
         val modifiedReassignmentData =
-          reassignmentData.copy(unassignmentRequestCounter = RequestCounter(100))
+          unassignmentData.copy(unassignmentDecisionTime = CantonTimestamp.ofEpochSecond(100))
         val modifiedUnassignmentResult = {
           val updatedContent =
             unassignmentResult.result.focus(_.content.counter).replace(SequencerCounter(120))
@@ -1250,18 +1325,18 @@ trait ReassignmentStoreTest {
         }
 
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))(
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))(
             "first completion failed"
           )
-          complete2 <- store.completeReassignment(reassignment10, toc2).value
-          add2 <- store.addReassignment(modifiedReassignmentData).failOnShutdown.value
-          addResult2 <- store.addUnassignmentResult(modifiedUnassignmentResult).failOnShutdown.value
+          complete2 <- store.completeReassignment(reassignment10, ts2).value
+          add2 <- store.addUnassignmentData(modifiedReassignmentData).value
+          addResult2 <- store.addUnassignmentResult(modifiedUnassignmentResult).value
         } yield {
-          complete2 shouldBe Checked.continue(ReassignmentAlreadyCompleted(reassignment10, toc2))
+          complete2 shouldBe Checked.continue(ReassignmentAlreadyCompleted(reassignment10, ts2))
           add2 shouldBe Left(
             ReassignmentDataAlreadyExists(withUnassignmentResult, modifiedReassignmentData)
           )
@@ -1276,31 +1351,31 @@ trait ReassignmentStoreTest {
       }
 
       "store the first completion" in {
-        val store = mk(indexedTargetDomain)
-        val toc2 = TimeOfChange(RequestCounter(1), CantonTimestamp.ofEpochSecond(4))
+        val store = mk(indexedTargetSynchronizer)
+        val ts2 = CantonTimestamp.ofEpochSecond(4)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc2))(
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts2))(
             "later completion failed"
           )
-          complete2 <- store.completeReassignment(reassignment10, toc).value
+          complete2 <- store.completeReassignment(reassignment10, ts).value
           lookup <- store.lookup(reassignment10).value
         } yield {
-          complete2 shouldBe Checked.continue(ReassignmentAlreadyCompleted(reassignment10, toc))
-          lookup shouldBe Left(ReassignmentCompleted(reassignment10, toc2))
+          complete2 shouldBe Checked.continue(ReassignmentAlreadyCompleted(reassignment10, ts))
+          lookup shouldBe Left(ReassignmentCompleted(reassignment10, ts2))
         }
       }
     }
 
     "delete" should {
       "remove the reassignment" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
           _ <- store.deleteReassignment(reassignment10)
@@ -1309,89 +1384,89 @@ trait ReassignmentStoreTest {
       }
 
       "purge completed reassignments" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- valueOrFail(store.addUnassignmentResult(unassignmentResult))(
             "addResult failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))("completion failed")
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))("completion failed")
           _ <- store.deleteReassignment(reassignment10)
         } yield succeed
       }
 
       "ignore unknown reassignment IDs" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
           () <- store.deleteReassignment(reassignment10)
         } yield succeed
       }
 
       "be idempotent" in {
-        val store = mk(indexedTargetDomain)
+        val store = mk(indexedTargetSynchronizer)
         for {
-          _ <- valueOrFail(store.addReassignment(reassignmentData).failOnShutdown)("add failed")
-          () <- store.deleteReassignment(reassignment10)
-          () <- store.deleteReassignment(reassignment10)
+          _ <- valueOrFail(store.addUnassignmentData(unassignmentData))("add failed")
+          _ <- store.deleteReassignment(reassignment10)
+          _ <- store.deleteReassignment(reassignment10)
         } yield succeed
       }
     }
 
     "reassignment stores should be isolated" in {
-      val storeTarget = mk(indexedTargetDomain)
-      val store1 = mk(IndexedDomain.tryCreate(sourceDomain1.unwrap, 2))
+      val storeTarget = mk(indexedTargetSynchronizer)
+      val store1 = mk(IndexedSynchronizer.tryCreate(sourceSynchronizer1.unwrap, 2))
       for {
-        _ <- valueOrFail(storeTarget.addReassignment(reassignmentData).failOnShutdown)("add failed")
-        found <- store1.lookup(reassignmentData.reassignmentId).value
-      } yield found shouldBe Left(UnknownReassignmentId(reassignmentData.reassignmentId))
+        _ <- valueOrFail(storeTarget.addUnassignmentData(unassignmentData))("add failed")
+        found <- store1.lookup(unassignmentData.reassignmentId).value
+      } yield found shouldBe Left(UnknownReassignmentId(unassignmentData.reassignmentId))
     }
 
     "deleteCompletionsSince" should {
       "remove the completions from the criterion on" in {
-        val store = mk(indexedTargetDomain)
-        val toc1 = TimeOfChange(RequestCounter(1), CantonTimestamp.ofEpochSecond(5))
-        val toc2 = TimeOfChange(RequestCounter(2), CantonTimestamp.ofEpochSecond(7))
+        val store = mk(indexedTargetSynchronizer)
+        val ts1 = CantonTimestamp.ofEpochSecond(5)
+        val ts2 = CantonTimestamp.ofEpochSecond(7)
 
         val aliceReassignment =
-          mkReassignmentData(reassignment10, mediator1, LfPartyId.assertFromString("alice"))
-        val bobReassignment = mkReassignmentData(
+          mkUnassignmentData(reassignment10, mediator1, LfPartyId.assertFromString("alice"))
+        val bobReassignment = mkUnassignmentData(
           reassignment11,
           mediator1,
           LfPartyId.assertFromString("bob"),
         )
-        val eveReassignment = mkReassignmentData(
+        val eveReassignment = mkUnassignmentData(
           reassignment20,
           mediator2,
           LfPartyId.assertFromString("eve"),
         )
 
         for {
-          _ <- valueOrFail(store.addReassignment(aliceReassignment).failOnShutdown)(
+          _ <- valueOrFail(store.addUnassignmentData(aliceReassignment))(
             "add alice failed"
           )
-          _ <- valueOrFail(store.addReassignment(bobReassignment).failOnShutdown)("add bob failed")
-          _ <- valueOrFail(store.addReassignment(eveReassignment).failOnShutdown)("add eve failed")
-          _ <- valueOrFail(store.completeReassignment(reassignment10, toc))(
+          _ <- valueOrFail(store.addUnassignmentData(bobReassignment))("add bob failed")
+          _ <- valueOrFail(store.addUnassignmentData(eveReassignment))("add eve failed")
+          _ <- valueOrFail(store.completeReassignment(reassignment10, ts))(
             "completion alice failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment11, toc1))(
+          _ <- valueOrFail(store.completeReassignment(reassignment11, ts1))(
             "completion bob failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment20, toc2))(
+          _ <- valueOrFail(store.completeReassignment(reassignment20, ts2))(
             "completion eve failed"
           )
-          _ <- store.deleteCompletionsSince(RequestCounter(1))
+          _ <- store.deleteCompletionsSince(ts1)
           alice <- leftOrFail(store.lookup(reassignment10))("alice must still be completed")
           bob <- valueOrFail(store.lookup(reassignment11))("bob must not be completed")
           eve <- valueOrFail(store.lookup(reassignment20))("eve must not be completed")
-          _ <- valueOrFail(store.completeReassignment(reassignment11, toc2))(
+          _ <- valueOrFail(store.completeReassignment(reassignment11, ts2))(
             "second completion bob failed"
           )
-          _ <- valueOrFail(store.completeReassignment(reassignment20, toc1))(
+          _ <- valueOrFail(store.completeReassignment(reassignment20, ts1))(
             "second completion eve failed"
           )
         } yield {
-          alice shouldBe ReassignmentCompleted(reassignment10, toc)
+          alice shouldBe ReassignmentCompleted(reassignment10, ts)
           bob shouldBe bobReassignment
           eve shouldBe eveReassignment
         }
@@ -1410,7 +1485,7 @@ object ReassignmentStoreTest extends EitherValues with NoTracing {
       contractId = id,
       contractInstance = contractInstance(),
       ledgerTime = CantonTimestamp.Epoch,
-      metadata = ContractMetadata.tryCreate(Set.empty, Set(signatory), None),
+      metadata = ContractMetadata.tryCreate(Set(signatory), Set(signatory), None),
     )
 
   val coidAbs1 = suffixedId(1, 0)
@@ -1421,24 +1496,37 @@ object ReassignmentStoreTest extends EitherValues with NoTracing {
     ledgerTime = CantonTimestamp.Epoch,
   )
 
-  val domain1 = DomainId(UniqueIdentifier.tryCreate("domain1", "DOMAIN1"))
-  val sourceDomain1 = Source(DomainId(UniqueIdentifier.tryCreate("domain1", "DOMAIN1")))
-  val targetDomain1 = Target(DomainId(UniqueIdentifier.tryCreate("domain1", "DOMAIN1")))
+  val synchronizer1 = SynchronizerId(UniqueIdentifier.tryCreate("synchronizer1", "SYNCHRONIZER1"))
+  val sourceSynchronizer1 = Source(
+    SynchronizerId(UniqueIdentifier.tryCreate("synchronizer1", "SYNCHRONIZER1"))
+  )
+  val targetSynchronizer1 = Target(
+    SynchronizerId(UniqueIdentifier.tryCreate("synchronizer1", "SYNCHRONIZER1"))
+  )
   val mediator1 = MediatorGroupRecipient(MediatorGroupIndex.zero)
 
-  val domain2 = DomainId(UniqueIdentifier.tryCreate("domain2", "DOMAIN2"))
-  val sourceDomain2 = Source(DomainId(UniqueIdentifier.tryCreate("domain2", "DOMAIN2")))
-  val targetDomain2 = Target(DomainId(UniqueIdentifier.tryCreate("domain2", "DOMAIN2")))
+  val synchronizer2 = SynchronizerId(UniqueIdentifier.tryCreate("synchronizer2", "SYNCHRONIZER2"))
+  val sourceSynchronizer2 = Source(
+    SynchronizerId(UniqueIdentifier.tryCreate("synchronizer2", "SYNCHRONIZER2"))
+  )
+  val targetSynchronizer2 = Target(
+    SynchronizerId(UniqueIdentifier.tryCreate("synchronizer2", "SYNCHRONIZER2"))
+  )
   val mediator2 = MediatorGroupRecipient(MediatorGroupIndex.one)
 
-  val indexedTargetDomain =
-    IndexedDomain.tryCreate(DomainId(UniqueIdentifier.tryCreate("target", "DOMAIN")), 1)
-  val targetDomainId = Target(indexedTargetDomain.domainId)
-  val targetDomain = Target(DomainId(UniqueIdentifier.tryCreate("target", "DOMAIN")))
+  val indexedTargetSynchronizer =
+    IndexedSynchronizer.tryCreate(
+      SynchronizerId(UniqueIdentifier.tryCreate("target", "SYNCHRONIZER")),
+      1,
+    )
+  val targetSynchronizerId = Target(indexedTargetSynchronizer.synchronizerId)
+  val targetSynchronizer = Target(
+    SynchronizerId(UniqueIdentifier.tryCreate("target", "SYNCHRONIZER"))
+  )
 
-  val reassignment10 = ReassignmentId(sourceDomain1, CantonTimestamp.Epoch)
-  val reassignment11 = ReassignmentId(sourceDomain1, CantonTimestamp.ofEpochMilli(1))
-  val reassignment20 = ReassignmentId(sourceDomain2, CantonTimestamp.Epoch)
+  val reassignment10 = ReassignmentId(sourceSynchronizer1, CantonTimestamp.Epoch)
+  val reassignment11 = ReassignmentId(sourceSynchronizer1, CantonTimestamp.ofEpochMilli(1))
+  val reassignment20 = ReassignmentId(sourceSynchronizer2, CantonTimestamp.Epoch)
 
   val loggerFactoryNotUsed = NamedLoggerFactory.unnamedKey("test", "NotUsed-ReassignmentStoreTest")
   val ec: ExecutionContext = DirectExecutionContext(
@@ -1451,7 +1539,7 @@ object ReassignmentStoreTest extends EitherValues with NoTracing {
     DefaultProcessingTimeouts.testing,
     loggerFactoryNotUsed,
   )
-  val sequencerKey = crypto.generateSymbolicSigningKey()
+  val sequencerKey = crypto.generateSymbolicSigningKey(usage = SigningKeyUsage.ProtocolOnly)
 
   def sign(str: String): Signature = {
     val hash =
@@ -1459,28 +1547,28 @@ object ReassignmentStoreTest extends EitherValues with NoTracing {
         .build(TestHash.testHashPurpose)
         .addWithoutLengthPrefix(str)
         .finish()
-    crypto.sign(hash, sequencerKey.id)
+    crypto.sign(hash, sequencerKey.id, SigningKeyUsage.ProtocolOnly)
   }
 
   val seedGenerator = new SeedGenerator(crypto.pureCrypto)
 
-  def mkReassignmentDataForDomain(
+  def mkUnassignmentDataForSynchronizer(
       reassignmentId: ReassignmentId,
       sourceMediator: MediatorGroupRecipient,
       submittingParty: LfPartyId = LfPartyId.assertFromString("submitter"),
-      targetDomainId: Target[DomainId],
+      targetSynchronizerId: Target[SynchronizerId],
       contract: SerializableContract = contract,
-      unassignmentGlobalOffset: Option[GlobalOffset] = None,
-  ): ReassignmentData = {
+      sourcePV: ProtocolVersion = BaseTest.testedProtocolVersion,
+  ): UnassignmentData = {
 
     val identityFactory = TestingTopology()
-      .withDomains(reassignmentId.sourceDomain.unwrap)
+      .withSynchronizers(reassignmentId.sourceSynchronizer.unwrap)
       .build(loggerFactoryNotUsed)
 
-    val helpers = new ReassignmentDataHelpers(
+    val helpers = ReassignmentDataHelpers(
       contract,
-      reassignmentId.sourceDomain,
-      targetDomainId,
+      reassignmentId.sourceSynchronizer,
+      targetSynchronizerId,
       identityFactory,
     )
 
@@ -1488,39 +1576,37 @@ object ReassignmentStoreTest extends EitherValues with NoTracing {
       submittingParty,
       DefaultTestIdentities.participant1,
       sourceMediator,
+      sourcePV,
     )()
 
-    helpers.reassignmentData(reassignmentId, unassignmentRequest)(unassignmentGlobalOffset)
+    helpers.reassignmentData(reassignmentId, unassignmentRequest)
   }
 
-  private def mkReassignmentData(
+  private def mkUnassignmentData(
       reassignmentId: ReassignmentId,
       sourceMediator: MediatorGroupRecipient,
       submitter: LfPartyId = LfPartyId.assertFromString("submitter"),
       contract: SerializableContract = contract,
-      unassignmentGlobalOffset: Option[GlobalOffset] = None,
-  ): ReassignmentData =
-    mkReassignmentDataForDomain(
+  ): UnassignmentData =
+    mkUnassignmentDataForSynchronizer(
       reassignmentId,
       sourceMediator,
       submitter,
-      targetDomainId,
+      targetSynchronizerId,
       contract,
-      unassignmentGlobalOffset,
     )
 
-  def mkUnassignmentResult(reassignmentData: ReassignmentData): DeliveredUnassignmentResult = {
+  def mkUnassignmentResult(reassignmentData: UnassignmentData): DeliveredUnassignmentResult = {
     val requestId = RequestId(reassignmentData.unassignmentTs)
 
-    val mediatorMessage =
-      reassignmentData.unassignmentRequest.tree.mediatorMessage(Signature.noSignature)
+    val mediatorMessage = reassignmentData.unassignmentRequest.tree
+      .mediatorMessage(Signature.noSignature, BaseTest.testedProtocolVersion)
     val result = ConfirmationResultMessage.create(
-      mediatorMessage.domainId,
+      mediatorMessage.synchronizerId,
       ViewType.UnassignmentViewType,
       requestId,
       mediatorMessage.rootHash,
       Verdict.Approve(BaseTest.testedProtocolVersion),
-      mediatorMessage.allInformees,
       BaseTest.testedProtocolVersion,
     )
     val signedResult =
@@ -1533,8 +1619,9 @@ object ReassignmentStoreTest extends EitherValues with NoTracing {
       Batch.of(BaseTest.testedProtocolVersion, signedResult -> RecipientsTest.testInstance)
     val deliver = Deliver.create(
       SequencerCounter(1),
+      None,
       CantonTimestamp.ofEpochMilli(10),
-      reassignmentData.sourceDomain.unwrap,
+      reassignmentData.sourceSynchronizer.unwrap,
       Some(MessageId.tryCreate("1")),
       batch,
       Some(reassignmentData.unassignmentTs),

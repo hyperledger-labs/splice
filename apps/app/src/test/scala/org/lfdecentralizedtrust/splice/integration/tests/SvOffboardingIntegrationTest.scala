@@ -7,8 +7,8 @@ import cats.instances.future.*
 import cats.instances.seq.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
@@ -21,12 +21,8 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
@@ -53,8 +49,7 @@ class SvOffboardingIntegrationTest
   override lazy val resetRequiredTopologyState = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
@@ -117,7 +112,6 @@ class SvOffboardingIntegrationTest
         sv1Backend.participantClient.ledger_api_extensions.commands.submitJava(
           actAs = Seq(sv1Backend.getDsoInfo().svParty),
           readAs = Seq(sv1Backend.getDsoInfo().dsoParty),
-          optTimeout = None,
           commands = externalPartyAmuletRules.contractId
             .exerciseExternalPartyAmuletRules_CreateTransferCommand(
               sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
@@ -130,7 +124,7 @@ class SvOffboardingIntegrationTest
             .commands
             .asScala
             .toSeq,
-          applicationId = sv1Backend.config.ledgerApiUser,
+          userId = sv1Backend.config.ledgerApiUser,
         ),
       )(
         "Wait for 4 confirmations to be created for creating transfer command counter",
@@ -263,7 +257,7 @@ class SvOffboardingIntegrationTest
               val decentralizedNamespaces =
                 sv1Backend.participantClient.topology.decentralized_namespaces
                   .list(
-                    filterStore = decentralizedSynchronizerId.filterString,
+                    store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
                     filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
                   )
               inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
@@ -280,7 +274,7 @@ class SvOffboardingIntegrationTest
             clue("Check mediator offboarding") {
               val mediators =
                 sv3Backend.appState.participantAdminConnection
-                  .getMediatorDomainState(decentralizedSynchronizerId)
+                  .getMediatorSynchronizerState(decentralizedSynchronizerId)
                   .futureValue
                   .mapping
                   .active
@@ -312,7 +306,7 @@ class SvOffboardingIntegrationTest
             clue("Check sequencer offboarding") {
               val sequencers =
                 sv3Backend.appState.participantAdminConnection
-                  .getSequencerDomainState(decentralizedSynchronizerId)
+                  .getSequencerSynchronizerState(decentralizedSynchronizerId)
                   .futureValue
                   .mapping
                   .active

@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.ratelimiting
 
-import com.daml.error.DamlError
+import com.digitalasset.base.error.RpcError
 
 import scala.annotation.tailrec
 
@@ -38,7 +38,7 @@ object LimitResult {
     override def flatMap(f: Unit => LimitResult): LimitResult = f(())
   }
 
-  final case class OverLimit(error: DamlError) extends LimitResult {
+  final case class OverLimit(error: RpcError) extends LimitResult {
     override def flatMap(f: Unit => LimitResult): LimitResult = this
   }
 

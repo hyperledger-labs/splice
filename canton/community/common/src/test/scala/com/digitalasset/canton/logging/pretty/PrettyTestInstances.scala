@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
@@ -15,8 +15,8 @@ import com.digitalasset.canton.protocol.{
   LfVersionedTransaction,
 }
 
-/** Pretty printing implicits for use by tests only. These enable showing readable multiline diffs when expected
-  * and actual transactions differ unexpectedly.
+/** Pretty printing implicits for use by tests only. These enable showing readable multiline diffs
+  * when expected and actual transactions differ unexpectedly.
   */
 trait PrettyTestInstances {
   import Pretty.*

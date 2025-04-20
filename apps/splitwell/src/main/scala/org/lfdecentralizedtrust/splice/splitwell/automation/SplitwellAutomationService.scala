@@ -17,11 +17,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{
-  SpliceLedgerClient,
   DarResource,
   DarResources,
   PackageIdResolver,
   RetryProvider,
+  SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -46,6 +46,7 @@ class SplitwellAutomationService(
     supportsSoftDomainMigrationPoc: Boolean,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
+    enableCantonPackageSelection: Boolean,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -58,11 +59,15 @@ class SplitwellAutomationService(
       DomainTimeSynchronization.Noop,
       DomainUnpausedSynchronization.Noop,
       store,
-      PackageIdResolver.inferFromAmuletRules(
+      PackageIdResolver.inferFromAmuletRulesIfEnabled(
+        enableCantonPackageSelection,
         clock,
         scanConnection,
         loggerFactory,
         extraPackageIdResolver = SplitwellAutomationService.extraPackageIdResolver,
+        extraModules = Map(
+          "Splice.Splitwell" -> DarResources.splitwell.bootstrap.metadata.name
+        ),
       ),
       ledgerClient,
       retryProvider,

@@ -1,18 +1,18 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api.client
 
-import com.daml.error.{BaseError, ErrorCategory, ErrorClass, ErrorCode}
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.command_service.SubmitAndWaitResponse
 import com.daml.ledger.api.v2.commands.Commands
-import com.digitalasset.canton.BaseTest
+import com.digitalasset.base.error.{BaseError, ErrorCategory, ErrorClass, ErrorCode}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.ledger.client.services.commands.CommandServiceClient
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.util.SingleUseCell
+import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.google.rpc.code.Code
 import com.google.rpc.status.Status
 import org.scalatest.*
@@ -26,12 +26,13 @@ import scala.jdk.DurationConverters.ScalaDurationOps
 class CommandSubmitterWithRetryTest
     extends FixtureAsyncWordSpec
     with BaseTest
-    with PekkoBeforeAndAfterAll {
+    with PekkoBeforeAndAfterAll
+    with HasExecutionContext {
 
   private val timeout = 5.seconds
-  private val commands = Commands(
+  private val commands = Commands.defaultInstance.copy(
     workflowId = "workflowId",
-    applicationId = "applicationId",
+    userId = "userId",
     commandId = "commandId",
     actAs = Seq("party"),
     commands = Nil,
@@ -51,7 +52,9 @@ class CommandSubmitterWithRetryTest
       val simClock = new SimClock(loggerFactory = loggerFactory)
       when(synchronousCommandClient.submitAndWait(expectedCommands, Some(timeout)))
         .thenAnswer(
-          result.map(_.map(updateId => SubmitAndWaitResponse(updateId = updateId)))
+          result.map(
+            _.map(updateId => SubmitAndWaitResponse(updateId = updateId, completionOffset = 0))
+          )
         )
       sut = new CommandSubmitterWithRetry(
         synchronousCommandClient,
@@ -139,14 +142,14 @@ class CommandSubmitterWithRetryTest
       }
     }
 
-    "Gracefully reject commands submitted after closing" in { f =>
+    "gracefully reject commands submitted after closing" in { f =>
       f.runTest(commands, Future.never) { (sut, _, _) =>
         sut.close()
         sut.submitCommands(commands, timeout).map(_ shouldBe CommandResult.AbortedDueToShutdown)
       }
     }
 
-    "Gracefully reject pending commands when closing" in { f =>
+    "gracefully reject pending commands when closing" in { f =>
       f.runTest(commands, Future.never) { (sut, _, _) =>
         val result =
           sut.submitCommands(commands, timeout).map(_ shouldBe CommandResult.AbortedDueToShutdown)

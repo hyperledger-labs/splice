@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error
 
-import com.daml.error.{BaseError, ErrorCategory, ErrorClass, ErrorCode}
+import com.digitalasset.base.error.{BaseError, ErrorCategory, ErrorClass, ErrorCode}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.error.testpackage.SeriousError
 import com.digitalasset.canton.logging.ErrorLoggingContext
