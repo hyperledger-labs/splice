@@ -17,7 +17,6 @@ import Splice.Round
 import Splice.Schedule
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.Fees
-import Splice.Scripts.Parameters
 import Splice.Issuance()
 
 
@@ -28,6 +27,7 @@ import Splice.CometBft
 import Splice.DecentralizedSynchronizer
 
 import Splice.Scripts.DsoTestUtils
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 
 
 -- Vote Requests

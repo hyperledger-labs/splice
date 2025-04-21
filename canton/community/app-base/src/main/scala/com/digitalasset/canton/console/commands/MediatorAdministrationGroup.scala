@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -9,8 +9,9 @@ import com.digitalasset.canton.admin.api.client.commands.MediatorAdministrationC
   Prune,
 }
 import com.digitalasset.canton.admin.api.client.commands.{
-  DomainTimeCommands,
+  MediatorScanCommands,
   PruningSchedulerCommands,
+  SynchronizerTimeCommands,
 }
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -24,11 +25,14 @@ import com.digitalasset.canton.console.{
   MediatorReference,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.mediator.admin.v30
+import com.digitalasset.canton.mediator.admin.v30.Verdict
+import com.digitalasset.canton.networking.grpc.RecordingStreamObserver
 import com.digitalasset.canton.sequencing.{SequencerConnectionValidation, SequencerConnections}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.NoTracing
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -39,24 +43,24 @@ class MediatorTestingGroup(
 ) extends FeatureFlagFilter
     with Helpful {
 
-  @Help.Summary("Fetch the current time from the domain", FeatureFlag.Testing)
-  def fetch_domain_time(
+  @Help.Summary("Fetch the current time from the synchronizer", FeatureFlag.Testing)
+  def fetch_synchronizer_time(
       timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
         runner.adminCommand(
-          DomainTimeCommands.FetchTime(None, NonNegativeFiniteDuration.Zero, timeout)
+          SynchronizerTimeCommands.FetchTime(None, NonNegativeFiniteDuration.Zero, timeout)
         )
       }.timestamp
     }
 
-  @Help.Summary("Await for the given time to be reached on the domain", FeatureFlag.Testing)
-  def await_domain_time(time: CantonTimestamp, timeout: NonNegativeDuration): Unit =
+  @Help.Summary("Await for the given time to be reached on the synchronizer", FeatureFlag.Testing)
+  def await_synchronizer_time(time: CantonTimestamp, timeout: NonNegativeDuration): Unit =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
         runner.adminCommand(
-          DomainTimeCommands.AwaitTime(None, time, timeout)
+          SynchronizerTimeCommands.AwaitTime(None, time, timeout)
         )
       }
     }
@@ -129,9 +133,9 @@ class MediatorPruningAdministrationGroup(
 }
 
 class MediatorSetupGroup(node: MediatorReference) extends ConsoleCommandGroup.Impl(node) {
-  @Help.Summary("Assign a mediator to a domain")
+  @Help.Summary("Assign a mediator to a synchronizer")
   def assign(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       sequencerConnections: SequencerConnections,
       sequencerConnectionValidation: SequencerConnectionValidation =
         SequencerConnectionValidation.All,
@@ -142,7 +146,7 @@ class MediatorSetupGroup(node: MediatorReference) extends ConsoleCommandGroup.Im
     consoleEnvironment.run {
       runner.adminCommand(
         Initialize(
-          domainId,
+          synchronizerId,
           sequencerConnections,
           sequencerConnectionValidation,
         )
@@ -150,4 +154,31 @@ class MediatorSetupGroup(node: MediatorReference) extends ConsoleCommandGroup.Im
     }
   }
 
+}
+
+class MediatorScanGroup(
+    runner: AdminCommandRunner,
+    override protected val consoleEnvironment: ConsoleEnvironment,
+    override protected val name: String,
+    override protected val loggerFactory: NamedLoggerFactory,
+) extends NoTracing
+    with NamedLogging
+    with StreamingCommandHelper {
+  def verdicts(
+      fromRecordTimeOfRequestExclusive: CantonTimestamp,
+      maxItems: PositiveInt,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded,
+  ): Seq[Verdict] = {
+    val observer = new RecordingStreamObserver[v30.Verdict](completeAfter = maxItems)
+    val cmd = MediatorScanCommands.MediatorVerdicts(
+      mostRecentlyReceivedRecordTimeOfRequest = Some(fromRecordTimeOfRequestExclusive),
+      observer,
+    )
+    mkResult(
+      consoleEnvironment.run(runner.adminCommand(cmd)),
+      s"fetch mediator verdicts starting from $fromRecordTimeOfRequestExclusive",
+      observer,
+      timeout,
+    )
+  }
 }

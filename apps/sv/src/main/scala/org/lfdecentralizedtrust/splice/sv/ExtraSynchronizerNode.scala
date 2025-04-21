@@ -3,19 +3,19 @@
 
 package org.lfdecentralizedtrust.splice.sv
 
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
   RetryProvider,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.sv.config.SvSynchronizerNodeConfig
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSynchronizerNodeConfig}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import io.opentelemetry.api.trace.Tracer
 
 import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor
@@ -24,9 +24,10 @@ import scala.concurrent.ExecutionContextExecutor
 final class ExtraSynchronizerNode(
     override val sequencerAdminConnection: SequencerAdminConnection,
     override val mediatorAdminConnection: MediatorAdminConnection,
-    val parameters: DomainParametersConfig,
+    val parameters: SynchronizerParametersConfig,
     val sequencerPublicApi: ClientConfig,
     override val sequencerExternalPublicUrl: String,
+    override val sequencerConfig: SequencerConfig,
     override val sequencerAvailabilityDelay: Duration,
     override val mediatorSequencerAmplification: SubmissionRequestAmplification,
     override val loggerFactory: NamedLoggerFactory,
@@ -36,19 +37,21 @@ final class ExtraSynchronizerNode(
       mediatorAdminConnection,
       sequencerExternalPublicUrl,
       sequencerAvailabilityDelay,
+      sequencerConfig,
       mediatorSequencerAmplification,
     )
     with FlagCloseable
     with NamedLogging {
 
   override protected def onClosed(): Unit = {
-    Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
+    LifeCycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
   }
 }
 
 object ExtraSynchronizerNode {
   def fromConfig(
       conf: SvSynchronizerNodeConfig,
+      cometbftConfig: Option[SvCometBftConfig],
       loggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
       grpcClientMetrics: GrpcClientMetrics,
@@ -74,6 +77,7 @@ object ExtraSynchronizerNode {
       conf.parameters,
       conf.sequencer.internalApi,
       conf.sequencer.externalPublicApiUrl,
+      SequencerConfig.fromConfig(conf.sequencer, cometbftConfig),
       conf.sequencer.sequencerAvailabilityDelay.asJava,
       conf.mediator.sequencerRequestAmplification,
       loggerFactory,

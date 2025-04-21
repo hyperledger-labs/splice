@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
 
@@ -12,7 +12,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
  *
  * @see CreatedEvent
  * @see ExercisedEvent
- * @see TransactionTree
+ * @see TransactionTree; Interface will be removed in 3.4.0
  */
 public interface TreeEvent {
 
@@ -20,7 +20,10 @@ public interface TreeEvent {
   List<@NonNull String> getWitnessParties();
 
   @NonNull
-  String getEventId();
+  Long getOffset();
+
+  @NonNull
+  Integer getNodeId();
 
   @NonNull
   Identifier getTemplateId();

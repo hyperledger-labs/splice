@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -13,9 +13,12 @@ final case class ViewValidationResult(
 
 /** The result of the activeness check for a view
   *
-  * @param inactiveContracts The input contracts that are inactive
-  * @param alreadyLockedContracts The contracts that are already locked
-  * @param existingContracts The created contracts that already exist
+  * @param inactiveContracts
+  *   The input contracts that are inactive
+  * @param alreadyLockedContracts
+  *   The contracts that are already locked
+  * @param existingContracts
+  *   The created contracts that already exist
   */
 final case class ViewActivenessResult(
     inactiveContracts: Set[LfContractId],

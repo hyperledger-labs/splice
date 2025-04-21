@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
-import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForTreeTx
+import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForUpdatesLedgerEffects
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -70,13 +70,13 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
 
     def events =
       executeSql(
-        backend.event.transactionStreamingQueries.fetchEventPayloadsTree(
-          EventPayloadSourceForTreeTx.Create
+        backend.event.fetchEventPayloadsLedgerEffects(
+          EventPayloadSourceForUpdatesLedgerEffects.Create
         )(List(1L), Some(Set.empty))
       ) ++
         executeSql(
-          backend.event.transactionStreamingQueries.fetchEventPayloadsTree(
-            EventPayloadSourceForTreeTx.Consuming
+          backend.event.fetchEventPayloadsLedgerEffects(
+            EventPayloadSourceForUpdatesLedgerEffects.Consuming
           )(List(2L), Some(Set.empty))
         )
 
@@ -87,7 +87,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
     )
 
     def filterIds = executeSql(
-      backend.event.transactionStreamingQueries.fetchIdsOfCreateEventsForStakeholder(
+      backend.event.updateStreamingQueries.fetchIdsOfCreateEventsForStakeholder(
         stakeholderO = Some(someParty),
         templateIdO = None,
         startExclusive = 0,

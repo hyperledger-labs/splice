@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -18,7 +18,7 @@ import "scalapb/scalapb.proto";
 message DeduplicationPeriod {
   oneof period {
     google.protobuf.Duration duration = 1;
-    bytes offset = 2;
+    int64 offset = 2; // if specified, it must be a valid absolute offset (positive integer) or zero (ledger begin offset)
   }
 }
 
@@ -37,7 +37,7 @@ message RootHashMessage {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   bytes root_hash = 1;
-  string domain_id = 2;
+  string synchronizer_id = 2;
   ViewType view_type = 3;
   int64 submission_topology_time = 4; // in microseconds of UTC time since Unix epoch
   bytes payload = 5; // optional
@@ -119,7 +119,7 @@ message CommonMetadata {
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   // this used to contain a confirmation policy (Signatory or VIP) that no longer exists
   reserved 2;
-  string domain_id = 3;
+  string synchronizer_id = 3;
   string uuid = 4;
   int32 mediator_group = 5;
 }
@@ -129,27 +129,13 @@ message SubmitterMetadata {
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   repeated string act_as = 2;
-  string application_id = 3;
+  string user_id = 3;
   string command_id = 4;
   string submitting_participant_uid = 5;
   string submission_id = 6; // optional; absent if not specified by submitter
   v30.DeduplicationPeriod dedup_period = 7;
   int64 max_sequencing_time = 8; // in microseconds of UTC time since Unix epoch
   ExternalAuthorization external_authorization = 9; // optional
-}
-
-// Messages sent by a participant as part of the transaction protocol
-
-message SessionKeyLookup {
-  // An asymmetrically encrypted randomness, used to generate the session key. This session key decrypts the
-  // underlying view.
-  bytes session_key_encrypted = 1;
-
-  // The asymmetric encryption specification used to encrypt the session key randomness
-  com.digitalasset.canton.crypto.v30.EncryptionAlgorithmSpec encryption_algorithm_spec = 2;
-
-  // The fingerprint of the public key that was used to encrypt the session key randomness
-  string fingerprint = 3;
 }
 
 message EncryptedViewMessage {
@@ -162,8 +148,8 @@ message EncryptedViewMessage {
 
   com.digitalasset.canton.crypto.v30.Signature submitting_participant_signature = 3; // optional
   bytes view_hash = 4;
-  repeated SessionKeyLookup session_key_lookup = 5;
-  string domain_id = 6;
+  repeated com.digitalasset.canton.crypto.v30.AsymmetricEncrypted session_key_lookup = 5;
+  string synchronizer_id = 6;
   v30.ViewType view_type = 7;
 }
 
@@ -255,7 +241,8 @@ message ExternalAuthorization {
   // The hashing scheme version used when building the hash
   enum HashingSchemeVersion {
     HASHING_SCHEME_VERSION_UNSPECIFIED = 0;
-    HASHING_SCHEME_VERSION_V1 = 1;
+    reserved 1; // Hashing Scheme V1 - unsupported
+    HASHING_SCHEME_VERSION_V2 = 2;
   }
 
   repeated ExternalPartyAuthorization authentications = 1;

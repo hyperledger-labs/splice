@@ -1,9 +1,8 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
 
-import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.topology.store.TopologyStoreId
 
 trait TopologyManagerStatus {
@@ -11,8 +10,8 @@ trait TopologyManagerStatus {
 }
 
 object TopologyManagerStatus {
-  def combined[PureCrypto <: CryptoPureApi](
-      managers: TopologyManager[TopologyStoreId, PureCrypto]*
+  def combined(
+      managers: TopologyManager[TopologyStoreId]*
   ): TopologyManagerStatus =
     new TopologyManagerStatus {
       override def queueSize: Int = managers.map(_.queueSize).sum

@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error
 
-import com.daml.error.{ErrorClass, ErrorGroup}
+import com.digitalasset.base.error.{ErrorClass, ErrorGroup}
 
 object CantonErrorGroups {
 
@@ -36,11 +36,12 @@ object CantonErrorGroups {
     abstract class PruningServiceErrorGroup extends ErrorGroup()
     abstract class InspectionServiceErrorGroup extends ErrorGroup()
     abstract class RepairServiceErrorGroup extends ErrorGroup()
+    abstract class PartyManagementServiceErrorGroup extends ErrorGroup()
 
     object TransactionErrorGroup extends ErrorGroup() {
       // TransactionInjectErrors are initial injection errors resulting from the canton sync service
       abstract class InjectionErrorGroup extends ErrorGroup()
-      // TransactionRoutingErrors are routing errors resulting from the domain router
+      // TransactionRoutingErrors are routing errors resulting from the synchronizer router
       abstract class RoutingErrorGroup extends ErrorGroup()
       // TransactionSubmissionErrors are routing errors resulting from the transaction processor
       abstract class SubmissionErrorGroup extends ErrorGroup()

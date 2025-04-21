@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -11,15 +11,15 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission
 class PartyToParticipantComputations(override protected val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
 
-  /** Compute the new list of permissions from existing permissions and permissions
-    * that need to be added and removed.
+  /** Compute the new list of permissions from existing permissions and permissions that need to be
+    * added and removed.
     *
     * If a participant in `adds` is already permissioned, the permissions are updated.
     */
   def computeNewPermissions(
       existingPermissions: Map[ParticipantId, ParticipantPermission],
-      adds: List[(ParticipantId, ParticipantPermission)] = Nil,
-      removes: List[ParticipantId] = Nil,
+      adds: Seq[(ParticipantId, ParticipantPermission)] = Nil,
+      removes: Seq[ParticipantId] = Nil,
   ): Either[String, Map[ParticipantId, ParticipantPermission]] = {
 
     val conflictsO =

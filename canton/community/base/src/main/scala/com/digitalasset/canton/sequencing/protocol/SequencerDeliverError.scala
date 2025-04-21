@@ -1,24 +1,26 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
 
-import com.daml.error.*
+import com.digitalasset.base.error.{
+  Alarm,
+  AlarmErrorCode,
+  ErrorCategory,
+  ErrorClass,
+  ErrorCode,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerErrorGroup
-import com.digitalasset.canton.error.{
-  Alarm,
-  AlarmErrorCode,
-  BaseCantonError,
-  TransactionError,
-  TransactionErrorImpl,
-}
+import com.digitalasset.canton.error.{CantonBaseError, TransactionError, TransactionErrorImpl}
+import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.topology.Member
 import com.google.rpc.status.Status
 
 import java.time.Instant
-import scala.collection.immutable.Seq
 
 sealed trait SequencerDeliverError extends TransactionError
 
@@ -31,12 +33,19 @@ sealed abstract class SequencerDeliverErrorCode(id: String, category: ErrorCateg
     new TransactionErrorImpl(
       cause = message,
       definiteAnswer = true,
-    ) with SequencerDeliverError
+    ) with SequencerDeliverError {
+      override def toString: String = s"SequencerDeliverError(code = $id, message = $message)"
+    }
 
   /** Match the GRPC status on the ErrorCode and return the message string on success
     */
   def unapply(rpcStatus: Status): Option[String] =
-    BaseCantonError.extractStatusErrorCodeMessage(this, rpcStatus)
+    CantonBaseError.extractStatusErrorCodeMessage(this, rpcStatus)
+
+  def unapply(grpcError: GrpcError): Option[String] =
+    grpcError.decodedCantonError.flatMap(status =>
+      Option.when(status.code.id == id)(grpcError.status.getDescription)
+    )
 }
 
 @Explanation("""Delivery errors wrapped into sequenced events""")
@@ -45,19 +54,26 @@ object SequencerErrors extends SequencerErrorGroup {
       |This error occurs when the sequencer receives an invalid submission request, e.g. it has an
       |aggregation rule with an unreachable threshold.
       |Malformed requests will not emit any deliver event.
-      |""".stripMargin)
+      """)
   @Resolution("""
       |Check if the sender is running an attack.
       |If you can rule out an attack, please reach out to Canton support.
-      |""".stripMargin)
+      """)
   case object SubmissionRequestMalformed
-      extends AlarmErrorCode(id = "SEQUENCER_SUBMISSION_REQUEST_MALFORMED") {
+      extends AlarmErrorCode(id = "SEQUENCER_SUBMISSION_REQUEST_MALFORMED", redactDetails = false) {
     final case class Error(
-        submissionRequest: SubmissionRequest,
+        sender: String,
+        messageId: String,
         error: String,
     ) extends Alarm({
-          s"Send request [${submissionRequest.messageId}] is malformed. Discarding request. $error"
+          s"Send request [$messageId] from sender [$sender] is malformed. Discarding request. $error"
         })
+        with SequencerDeliverError
+
+    object Error {
+      def apply(submissionRequest: SubmissionRequest, error: String): Error =
+        Error(submissionRequest.sender.toProtoPrimitive, submissionRequest.messageId.unwrap, error)
+    }
   }
 
   @Explanation(
@@ -73,12 +89,12 @@ object SequencerErrors extends SequencerErrorGroup {
       )
 
   @Explanation(
-    """Topology timestamp on the submission request is earlier than allowed by the dynamic domain parameters."""
+    """Topology timestamp on the submission request is earlier than allowed by the dynamic synchronizer parameters."""
   )
   @Resolution(
     """This indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
-  case object TopoologyTimestampTooEarly
+  case object TopologyTimestampTooEarly
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_TOPOLOGY_TIMESTAMP_TOO_EARLY",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
@@ -88,8 +104,8 @@ object SequencerErrors extends SequencerErrorGroup {
         sequencingTimestamp: CantonTimestamp,
     ): SequencerDeliverError =
       // We can't easily compute a valid signing timestamp because we'd have to scan through
-      // the domain parameter updates to compute a bound, as the signing tolerance is taken
-      // from the domain parameters valid at the signing timestamp, not the sequencing timestamp.
+      // the synchronizer parameter updates to compute a bound, as the signing tolerance is taken
+      // from the synchronizer parameters valid at the signing timestamp, not the sequencing timestamp.
       apply(
         s"Topology timstamp $topologyTimestamp is too early for sequencing time $sequencingTimestamp."
       )
@@ -116,22 +132,10 @@ object SequencerErrors extends SequencerErrorGroup {
   }
 
   @Explanation(
-    """Topology timestamp is missing on the submission request."""
+    """Maximum sequencing time on the submission request is exceeding the maximum allowed interval into the future. Could be result of a concurrent dynamic synchronizer parameter change for sequencerAggregateSubmissionTimeout."""
   )
   @Resolution(
-    """This indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
-  )
-  case object TopologyTimestampMissing
-      extends SequencerDeliverErrorCode(
-        id = "SEQUENCER_TOPOLOGY_TIMESTAMP_MISSING",
-        ErrorCategory.InvalidGivenCurrentSystemStateOther,
-      )
-
-  @Explanation(
-    """Maximum sequencing time on the submission request is exceeding the maximum allowed interval into the future. Could be result of a concurrent dynamic domain parameter change for sequencerAggregateSubmissionTimeout."""
-  )
-  @Resolution(
-    """In case there was a recent concurrent dynamic domain parameter change, simply retry the submission. Otherwise this error code indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
+    """In case there was a recent concurrent dynamic synchronizer parameter change, simply retry the submission. Otherwise this error code indicates a bug in Canton (a faulty node behaviour). Please contact customer support."""
   )
   case object MaxSequencingTimeTooFar
       extends SequencerDeliverErrorCode(
@@ -188,7 +192,7 @@ object SequencerErrors extends SequencerErrorGroup {
       )
 
   @Explanation(
-    """The provided submission cost is outdated compared to the domain state at sequencing time."""
+    """The provided submission cost is outdated compared to the synchronizer state at sequencing time."""
   )
   @Resolution(
     """Re-submit the request with an updated submission cost."""
@@ -226,4 +230,60 @@ object SequencerErrors extends SequencerErrorGroup {
     def apply(ts: CantonTimestamp, sc: SequencerCounter): SequencerDeliverError =
       apply(s"Sequencer signing key not available at $ts and $sc")
   }
+
+  @Explanation(
+    """The senders of the submission request or the eligible senders in the aggregation rule are not known to the sequencer."""
+  )
+  @Resolution(
+    """This indicates a race with topology changes or a bug in Canton (a faulty node behaviour). Please contact customer support if this problem persists."""
+  )
+  case object SenderUnknown
+      extends SequencerDeliverErrorCode(
+        id = "SEQUENCER_SENDER_UNKNOWN",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    def apply(senders: Seq[Member]): SequencerDeliverError = apply(
+      s"(Eligible) Senders are unknown: ${senders.take(1000).mkString(", ")}"
+    )
+  }
+
+  @Explanation("""An internal error occurred on the sequencer.""")
+  @Resolution("""Contact support.""")
+  case object Internal
+      extends SequencerDeliverErrorCode(
+        id = "SEQUENCER_INTERNAL",
+        ErrorCategory.SystemInternalAssumptionViolated,
+      )
+
+  @Explanation("""An internal error occurred on the sequencer. Can only appear in tests.""")
+  @Resolution("""Contact support.""")
+  case object InternalTesting
+      extends SequencerDeliverErrorCode(
+        id = "SEQUENCER_INTERNAL_TESTING",
+        ErrorCategory.InvalidIndependentOfSystemState,
+      )
+
+  @Explanation("""The sequencer is overloaded and cannot handle the request.""")
+  @Resolution("""Retry with exponential backoff.""")
+  case object Overloaded
+      extends SequencerDeliverErrorCode(
+        id = "SEQUENCER_OVERLOADED",
+        ErrorCategory.ContentionOnSharedResources,
+      )
+
+  @Explanation("""The sequencer is currently unavailable.""")
+  @Resolution("""Retry quickly.""")
+  case object Unavailable
+      extends SequencerDeliverErrorCode(
+        id = "SEQUENCER_UNAVAILABLE",
+        ErrorCategory.TransientServerFailure,
+      )
+
+  @Explanation("""This sequencer does not support the requested feature.""")
+  @Resolution("""Contact the sequencer operator.""")
+  case object UnsupportedFeature
+      extends SequencerDeliverErrorCode(
+        id = "SEQUENCER_UNIMPLEMENTED",
+        ErrorCategory.InternalUnsupportedOperation,
+      )
 }

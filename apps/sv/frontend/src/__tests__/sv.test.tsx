@@ -4,8 +4,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
+import { FeatureSupportResponse } from 'scan-openapi';
 import { ListDsoRulesVoteRequestsResponse } from 'sv-openapi';
-import { test, expect, describe } from 'vitest';
+import { test, expect, describe, vitest } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
@@ -236,3 +237,42 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     expect(await screen.findByDisplayValue('validator::15')).toBeDefined();
   });
 });
+
+describe(
+  'UI adjusts to new vetting flow',
+  () => {
+    test('actions change based on vetted version', async () => {
+      server.use(
+        rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
+          return res(
+            ctx.json<FeatureSupportResponse>({
+              new_governance_flow: false,
+            })
+          );
+        })
+      );
+
+      const user = userEvent.setup();
+      render(<AppWithConfig />);
+
+      expect(await screen.findByText('Governance')).toBeDefined();
+      await user.click(screen.getByText('Governance'));
+
+      expect(await screen.findByText('Add DSO App Configuration Schedule')).toBeDefined();
+      server.use(
+        rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
+          return res(
+            ctx.json<FeatureSupportResponse>({
+              new_governance_flow: true,
+            })
+          );
+        })
+      );
+
+      await vitest.waitFor(async () => {
+        expect(await screen.findByText('Set Amulet Rules Configuration')).toBeDefined();
+      });
+    });
+  },
+  { timeout: 10000 }
+);

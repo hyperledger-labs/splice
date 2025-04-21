@@ -64,7 +64,6 @@ class ScanTxLogOwnerExpireLockIntegrationTest
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
         .submitJava(
           Seq(aliceParty),
-          optTimeout = None,
           commands = locked.contract.contractId
             .exerciseLockedAmulet_OwnerExpireLock(
               openRound.contractId

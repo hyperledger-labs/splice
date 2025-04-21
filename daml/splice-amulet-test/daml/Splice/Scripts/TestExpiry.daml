@@ -10,7 +10,7 @@ import Splice.Fees
 import Splice.Types
 import Splice.Round
 import Splice.Schedule
-import Splice.Scripts.Parameters
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Scripts.Util
 
 import DA.Assert

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -14,8 +14,9 @@ import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
-import com.digitalasset.canton.protocol.{AcsCommitmentsCatchUpConfig, StaticDomainParameters}
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
+import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
@@ -31,9 +32,9 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider
 import org.mockito.{ArgumentMatchers, ArgumentMatchersSugar}
 import org.scalacheck.Test
 import org.scalactic.source.Position
-import org.scalactic.{source, Prettifier}
+import org.scalactic.{Prettifier, source}
 import org.scalatest.*
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{Eventually, PatienceConfiguration, ScalaFutures}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -73,8 +74,8 @@ trait TestEssentials
     BaseTest.testedProtocolVersionValidation
   protected lazy val testedReleaseProtocolVersion: ReleaseProtocolVersion =
     BaseTest.testedReleaseProtocolVersion
-  protected lazy val defaultStaticDomainParameters: StaticDomainParameters =
-    BaseTest.defaultStaticDomainParameters
+  protected lazy val defaultStaticSynchronizerParameters: StaticSynchronizerParameters =
+    BaseTest.defaultStaticSynchronizerParameters
 
   // default to providing an empty trace context to all tests
   protected implicit def traceContext: TraceContext = TraceContext.empty
@@ -97,6 +98,8 @@ trait TestEssentials
 
   val futureSupervisor: FutureSupervisor = FutureSupervisor.Noop
 
+  lazy val wallClock = new WallClock(timeouts, loggerFactory)
+
   // Make sure that JUL logging is redirected to SLF4J
   if (!SLF4JBridgeHandler.isInstalled) {
     // we want everything going to slf4j so remove any default loggers
@@ -104,53 +107,16 @@ trait TestEssentials
     SLF4JBridgeHandler.install()
   }
 
-  /** Execution context for running "quick" computations.
-    * As there are many implementations of DirectExecutionContext, this is provided as a convenience field,
-    * so that tests don't have to deal with imports.
+  /** Execution context for running "quick" computations. As there are many implementations of
+    * DirectExecutionContext, this is provided as a convenience field, so that tests don't have to
+    * deal with imports.
     */
   lazy val directExecutionContext: ExecutionContext = DirectExecutionContext(noTracingLogger)
 }
 
-/** Base traits for tests. Makes syntactic sugar and logging available.
-  */
-trait BaseTest
-    extends TestEssentials
-    with Matchers
-    with Inspectors
-    with LoneElement
-    with TableDrivenPropertyChecks
-    with Inside
-    with EitherValues
-    with OptionValues
-    with TryValues
-    with AppendedClues { self =>
+trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
 
   import scala.language.implicitConversions
-
-  /** A metrics factory constructed from an OpenTelemetryOnDemandMetricsReader which allows to make assertion
-    * on the content of the metrics registry.
-    */
-  def testableMetricsFactory(
-      testName: String,
-      onDemandMetricsReader: OpenTelemetryOnDemandMetricsReader,
-      histograms: Set[String],
-  ): OpenTelemetryMetricsFactory = {
-    val sdkBuilder = OpenTelemetrySdk.builder()
-    val meterProvider = SdkMeterProvider.builder()
-    meterProvider.registerMetricReader(onDemandMetricsReader)
-    sdkBuilder.setMeterProvider(meterProvider.build())
-    val openTelemetry = ConfiguredOpenTelemetry(
-      sdkBuilder.build(),
-      SdkTracerProvider.builder(),
-      onDemandMetricsReader,
-    )
-    new OpenTelemetryMetricsFactory(
-      openTelemetry.openTelemetry.meterBuilder(testName).build(),
-      histograms,
-      None,
-      MetricsContext.Empty,
-    )
-  }
 
   /** Allows for invoking `myEitherT.futureValue` when `myEitherT: EitherT[Future, _, _]`.
     */
@@ -159,84 +125,26 @@ trait BaseTest
   ): FutureConcept[B] =
     eitherTFuture.valueOr(err => fail(s"Unexpected left value $err"))
 
-  def clue[T](message: String)(expr: => T): T = TraceContext.withNewTraceContext { tc =>
-    logger.debug(s"Running clue: $message")(tc)
-    Try(expr) match {
-      case Success(value) =>
-        logger.debug(s"Finished clue: $message")(tc)
-        value
-      case Failure(ex) =>
-        logger.error(s"Failed clue: $message", ex)(tc)
-        throw ex
-    }
-  }
-  def clueF[T](message: String)(expr: => Future[T])(implicit ec: ExecutionContext): Future[T] =
-    TraceContext.withNewTraceContext { tc =>
-      logger.debug(s"Running clue: $message")(tc)
-      Try(expr) match {
-        case Success(value) =>
-          value.onComplete {
-            case Success(_) =>
-              logger.debug(s"Finished clue: $message")(tc)
-            case Failure(ex) =>
-              logger.error(s"Failed clue: $message", ex)(tc)
-          }
-          value
-        case Failure(ex) =>
-          throw ex
-      }
-    }
-
-  /** Suppressed failed clue messages to make our log-checker happy when using clues within an eventually. */
-  def suppressFailedClues[T](loggerFactory: SuppressingLogger)(expr: => T): T =
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
-      expr,
-      logEntries =>
-        forAll(logEntries)(logEntry => logEntry.message should startWith("Failed: clue")),
-    )
-
-  /** Allows for returning an `EitherT[Future, _, Assertion]` instead of `Future[Assertion]` in asynchronous
-    * test suites.
+  /** Allows for returning an `EitherT[Future, _, Assertion]` instead of `Future[Assertion]` in
+    * asynchronous test suites.
     */
   implicit def futureAssertionOfEitherTAssertion[A](
       eitherTAssertion: EitherT[Future, A, Assertion]
   )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
     eitherTAssertion.valueOr(left => fail(s"Unexpected left value $left"))
 
-  /** Allows for returning an `OptionT[Future, Assertion]` instead of `Future[Assertion]` in asynchronous test suites.
+  /** Allows for returning an `OptionT[Future, Assertion]` instead of `Future[Assertion]` in
+    * asynchronous test suites.
     */
   implicit def futureAssertionOfOptionTAssertion(
       optionTAssertion: OptionT[Future, Assertion]
   )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
     optionTAssertion.getOrElse(fail(s"Unexpected None value"))
 
-  def eventually[T](
-      timeUntilSuccess: FiniteDuration = BaseTest.DefaultEventuallyTimeUntilSuccess,
-      maxPollInterval: FiniteDuration = 100.millis,
-      retryOnTestFailuresOnly: Boolean = true,
-  )(testCode: => T): T =
-    BaseTest.eventually(
-      timeUntilSuccess,
-      maxPollInterval,
-      retryOnTestFailuresOnly = retryOnTestFailuresOnly,
-    )(testCode)
-
-  /** Keeps evaluating `testCode` until it fails or a timeout occurs.
-    * @return the result the last evaluation of `testCode`
-    * @throws java.lang.Throwable if `testCode` terminates with a throwable
-    * @throws java.lang.IllegalArgumentException if `timeout` or `pollIntervalMs` is negative
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.While"))
-  def always[T](durationOfSuccess: FiniteDuration = 2.seconds, pollIntervalMs: Long = 10)(
-      testCode: => T
-  ): T = BaseTest.always(durationOfSuccess, pollIntervalMs)(testCode)
-
-  def eventuallyForever[T](
-      timeUntilSuccess: FiniteDuration = 2.seconds,
-      durationOfSuccess: FiniteDuration = 2.seconds,
-      pollIntervalMs: Long = 10,
-  )(testCode: => T): T =
-    BaseTest.eventuallyForever(timeUntilSuccess, durationOfSuccess, pollIntervalMs)(testCode)
+  implicit def futureUnlessShutdownAssertionOfOptionTAssertion(
+      optionTAssertion: OptionT[FutureUnlessShutdown, Assertion]
+  )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
+    optionTAssertion.getOrElse(fail(s"Unexpected None value")).failOnShutdown("shutdown")
 
   /** Converts an EitherT into a Future, failing in case of a [[scala.Left$]]. */
   def valueOrFail[F[_], A, B](e: EitherT[F, A, B])(
@@ -245,9 +153,9 @@ trait BaseTest
     e.fold(x => fail(s"$clue: ${x.toString}"), Predef.identity)
 
   /** Converts a CheckedT into a Future, failing in case of aborts or non-aborts. */
-  def valueOrFail[A, N, R](
-      c: CheckedT[Future, A, N, R]
-  )(clue: String)(implicit ec: ExecutionContext, position: Position): Future[R] =
+  def valueOrFail[F[_], A, N, R](
+      c: CheckedT[F, A, N, R]
+  )(clue: String)(implicit position: Position, F: Functor[F]): F[R] =
     c.fold(
       (a, ns) => fail(s"$clue: ${a.toString}, ${ns.toString}"),
       (ns, x) => if (ns.isEmpty) x else fail(s"$clue: ${ns.toString}, ${x.toString}"),
@@ -301,10 +209,6 @@ trait BaseTest
   def leftOrFail[A, B](e: Either[A, B])(clue: String)(implicit position: Position): A =
     valueOrFail(e.swap)(clue)
 
-  @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
-  def withClueF[A](clue: String)(sut: => Future[A])(implicit ec: ExecutionContext): Future[A] =
-    withClue(clue)(sut.transform(outcome => Try(withClue(clue)(outcome.get))))
-
   // Syntax extensions for valueOrFail
   implicit class OptionTestSyntax[A](option: Option[A]) {
     def valueOrFail(clue: String)(implicit pos: Position): A = self.valueOrFail(option)(clue)
@@ -327,6 +231,11 @@ trait BaseTest
   implicit class EitherTFutureUnlessShutdownSyntax[E, A](
       eitherT: EitherT[FutureUnlessShutdown, E, A]
   ) {
+    def valueOrFail(
+        clue: String
+    )(implicit ec: ExecutionContext, pos: Position): FutureUnlessShutdown[A] =
+      self.valueOrFail(eitherT)(clue)
+
     def valueOrFailShutdown(clue: String)(implicit ec: ExecutionContext, pos: Position): Future[A] =
       self.valueOrFail(eitherT)(clue).onShutdown(fail(s"Shutdown during $clue"))
 
@@ -338,6 +247,13 @@ trait BaseTest
 
     def futureValueUS(implicit pos: Position): Either[E, A] =
       eitherT.value.futureValueUS
+  }
+
+  implicit class CheckedTFutureUnlessShutdownSyntax[A, N, R](
+      checkedT: CheckedT[FutureUnlessShutdown, A, N, R]
+  ) {
+    def failOnShutdown(implicit ec: ExecutionContext, pos: Position): CheckedT[Future, A, N, R] =
+      CheckedT(checkedT.value.onShutdown(fail("Unexpected shutdown")))
   }
 
   implicit class EitherTUnlessShutdownSyntax[E, A](
@@ -366,11 +282,153 @@ trait BaseTest
       us.onShutdown(fail(s"Unexpected shutdown"))
   }
 
+}
+
+/** Base traits for tests. Makes syntactic sugar and logging available.
+  */
+trait BaseTest
+    extends TestEssentials
+    with Matchers
+    with Inspectors
+    with LoneElement
+    with TableDrivenPropertyChecks
+    with Inside
+    with EitherValues
+    with OptionValues
+    with TryValues
+    with AppendedClues
+    with FutureHelpers { self =>
+
+  /** A metrics factory constructed from an OpenTelemetryOnDemandMetricsReader which allows to make
+    * assertion on the content of the metrics registry.
+    */
+  def testableMetricsFactory(
+      testName: String,
+      onDemandMetricsReader: OpenTelemetryOnDemandMetricsReader,
+      histograms: Set[String],
+  ): OpenTelemetryMetricsFactory = {
+    val sdkBuilder = OpenTelemetrySdk.builder()
+    val meterProvider = SdkMeterProvider.builder()
+    meterProvider.registerMetricReader(onDemandMetricsReader)
+    sdkBuilder.setMeterProvider(meterProvider.build())
+    val openTelemetry = ConfiguredOpenTelemetry(
+      sdkBuilder.build(),
+      SdkTracerProvider.builder(),
+      onDemandMetricsReader,
+    )
+    new OpenTelemetryMetricsFactory(
+      openTelemetry.openTelemetry.meterBuilder(testName).build(),
+      histograms,
+      None,
+      MetricsContext.Empty,
+    )
+  }
+
+  def clue[T](message: String)(expr: => T): T = {
+    logger.debug(s"Running clue: $message")
+    Try(expr) match {
+      case Success(value) =>
+        logger.debug(s"Finished clue: $message")
+        value
+      case Failure(ex) =>
+        logger.error(s"Failed clue: $message", ex)
+        throw ex
+    }
+  }
+  def clueF[T](message: String)(expr: => Future[T])(implicit ec: ExecutionContext): Future[T] = {
+    logger.debug(s"Running clue: $message")
+    Try(expr) match {
+      case Success(value) =>
+        value.onComplete {
+          case Success(_) =>
+            logger.debug(s"Finished clue: $message")
+          case Failure(ex) =>
+            logger.error(s"Failed clue: $message", ex)
+        }
+        value
+      case Failure(ex) =>
+        throw ex
+    }
+  }
+
+  /** Suppressed failed clue messages to make our log-checker happy when using clues within an eventually. */
+  def suppressFailedClues[T](loggerFactory: SuppressingLogger)(expr: => T): T =
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
+      expr,
+      logEntries =>
+        forAll(logEntries)(logEntry => logEntry.message should startWith("Failed: clue")),
+    )
+
+  def clueFUS[T](
+      message: String
+  )(expr: => FutureUnlessShutdown[T])(implicit ec: ExecutionContext): FutureUnlessShutdown[T] = {
+    logger.debug(s"Running clue: $message")
+    Try(expr) match {
+      case Success(value) =>
+        value.onComplete {
+          case Success(_) =>
+            logger.debug(s"Finished clue: $message")
+          case Failure(ex) =>
+            logger.error(s"Failed clue: $message", ex)
+        }
+        value
+      case Failure(ex) =>
+        throw ex
+    }
+  }
+
+  private val scalaTestEventually = new Eventually {}
+  def eventuallyAsync[T](
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
+  )(testCode: => T)(implicit ec: ExecutionContext): FutureUnlessShutdown[T] =
+    FutureUnlessShutdown.outcomeF(
+      scalaTestEventually.eventually(
+        PatienceConfiguration.Timeout(timeUntilSuccess),
+        PatienceConfiguration.Interval(maxPollInterval),
+      )(Future(testCode))
+    )
+
+  def eventually[T](
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
+      retryOnTestFailuresOnly: Boolean = true,
+  )(testCode: => T): T =
+    BaseTest.eventually(
+      timeUntilSuccess,
+      maxPollInterval,
+      retryOnTestFailuresOnly = retryOnTestFailuresOnly,
+    )(testCode)
+
+  /** Keeps evaluating `testCode` until it fails or a timeout occurs.
+    * @return
+    *   the result the last evaluation of `testCode`
+    * @throws java.lang.Throwable
+    *   if `testCode` terminates with a throwable
+    * @throws java.lang.IllegalArgumentException
+    *   if `timeout` or `pollIntervalMs` is negative
+    */
+  @SuppressWarnings(Array("org.wartremover.warts.While"))
+  def always[T](durationOfSuccess: FiniteDuration = 2.seconds, pollIntervalMs: Long = 10)(
+      testCode: => T
+  ): T = BaseTest.always(durationOfSuccess, pollIntervalMs)(testCode)
+
+  def eventuallyForever[T](
+      timeUntilSuccess: FiniteDuration = 2.seconds,
+      durationOfSuccess: FiniteDuration = 2.seconds,
+      pollIntervalMs: Long = 10,
+  )(testCode: => T): T =
+    BaseTest.eventuallyForever(timeUntilSuccess, durationOfSuccess, pollIntervalMs)(testCode)
+
+  @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
+  def withClueF[A](clue: String)(sut: => Future[A])(implicit ec: ExecutionContext): Future[A] =
+    withClue(clue)(sut.transform(outcome => Try(withClue(clue)(outcome.get))))
+
   def forEveryParallel[A](inputs: Seq[A])(
       body: A => Assertion
   )(implicit executionContext: ExecutionContext): Assertion = forEvery(inputs.parTraverse { input =>
     Future(Try(body(input)))
-  }.futureValue)(_.get)
+  }.futureValue)(_.success.value)
 
   lazy val CantonExamplesPath: String = BaseTest.CantonExamplesPath
   lazy val CantonTestsPath: String = BaseTest.CantonTestsPath
@@ -382,10 +440,15 @@ trait BaseTest
 
 object BaseTest {
 
+  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
+
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
-    * @return the result the last evaluation of `testCode`
-    * @throws java.lang.Throwable if `testCode` terminates with a throwable
-    * @throws java.lang.IllegalArgumentException if `timeout` or `pollIntervalMs` is negative
+    * @return
+    *   the result the last evaluation of `testCode`
+    * @throws java.lang.Throwable
+    *   if `testCode` terminates with a throwable
+    * @throws java.lang.IllegalArgumentException
+    *   if `timeout` or `pollIntervalMs` is negative
     */
   @SuppressWarnings(Array("org.wartremover.warts.While"))
   def always[T](durationOfSuccess: FiniteDuration = 2.seconds, pollIntervalMs: Long = 10)(
@@ -414,9 +477,12 @@ object BaseTest {
   }
 
   /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
-    * @throws org.scalatest.exceptions.TestFailedException if `testCode` keeps throwing such an exception even after `timeout`
-    * @throws java.lang.Throwable if `testCode` throws any other throwable
-    * @throws java.lang.IllegalArgumentException if `timeUntilSuccess` is negative
+    * @throws org.scalatest.exceptions.TestFailedException
+    *   if `testCode` keeps throwing such an exception even after `timeout`
+    * @throws java.lang.Throwable
+    *   if `testCode` throws any other throwable
+    * @throws java.lang.IllegalArgumentException
+    *   if `timeUntilSuccess` is negative
     */
   @SuppressWarnings(
     Array(
@@ -454,29 +520,26 @@ object BaseTest {
     testCode // try one last time and throw exception, if assertion keeps failing
   }
 
-  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
-
   // Uses SymbolicCrypto for the configured crypto schemes
-  lazy val defaultStaticDomainParameters: StaticDomainParameters =
-    defaultStaticDomainParametersWith()
+  lazy val defaultStaticSynchronizerParameters: StaticSynchronizerParameters =
+    defaultStaticSynchronizerParametersWith()
 
-  def defaultStaticDomainParametersWith(
-      protocolVersion: ProtocolVersion = testedProtocolVersion,
-      acsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpConfig] = None,
-  ): StaticDomainParameters = StaticDomainParameters(
+  def defaultStaticSynchronizerParametersWith(
+      protocolVersion: ProtocolVersion = testedProtocolVersion
+  ): StaticSynchronizerParameters = StaticSynchronizerParameters(
     requiredSigningSpecs = SymbolicCryptoProvider.supportedSigningSpecs,
     requiredEncryptionSpecs = SymbolicCryptoProvider.supportedEncryptionSpecs,
     requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
     requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
     requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
+    requiredSignatureFormats = SymbolicCryptoProvider.supportedSignatureFormats,
     protocolVersion = protocolVersion,
   )
 
-  lazy val testedProtocolVersion: ProtocolVersion =
-    tryGetProtocolVersionFromEnv.getOrElse(ProtocolVersion.latest)
+  lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.forSynchronizer
 
-  lazy val testedStaticDomainParameters: StaticDomainParameters =
-    defaultStaticDomainParametersWith(testedProtocolVersion)
+  lazy val testedStaticSynchronizerParameters: StaticSynchronizerParameters =
+    defaultStaticSynchronizerParametersWith(testedProtocolVersion)
 
   lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
     ProtocolVersionValidation(testedProtocolVersion)
@@ -485,29 +548,21 @@ object BaseTest {
     testedProtocolVersion
   )
 
-  // There are two CantonExamples dars, one generated by the daml plugin and the other stored in git.
-  // We want to use the one stored in git to avoid problems with package id versioning across daml updates.
-  lazy val CantonExamplesPath: String = getResourcePath("dar/CantonExamples.dar")
-  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.2.0.dar")
-  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.2.0.dar")
-  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.2.0.dar")
-  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.2.0.dar")
+  lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
+  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.3.0.dar")
+  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.3.0.dar")
+  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.3.0.dar")
+  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.3.0.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
-  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.2.0.dar")
-  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.2.0.dar")
-  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.2.0.dar")
+  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.3.0.dar")
+  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.3.0.dar")
+  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.3.0.dar")
 
   def getResourcePath(name: String): String =
     Option(getClass.getClassLoader.getResource(name))
       .map(_.getPath)
       .getOrElse(throw new IllegalArgumentException(s"Cannot find resource $name"))
 
-  /** @return Parsed protocol version if found in environment variable `CANTON_PROTOCOL_VERSION`
-    * @throws java.lang.RuntimeException if the given parameter cannot be parsed to a protocol version
-    */
-  protected def tryGetProtocolVersionFromEnv: Option[ProtocolVersion] = sys.env
-    .get("CANTON_PROTOCOL_VERSION")
-    .map(ProtocolVersion.tryCreate)
 }
 
 trait BaseTestWordSpec extends BaseTest with AnyWordSpecLike {

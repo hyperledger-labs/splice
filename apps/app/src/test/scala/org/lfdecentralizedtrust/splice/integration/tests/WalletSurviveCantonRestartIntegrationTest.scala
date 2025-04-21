@@ -2,15 +2,10 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration.*
 
@@ -38,8 +33,7 @@ class WalletSurviveCantonRestartIntegrationTest
     ("ParticipantAdminApi", 7502),
   )
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] = {
+  override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withPreSetup(_ => ())

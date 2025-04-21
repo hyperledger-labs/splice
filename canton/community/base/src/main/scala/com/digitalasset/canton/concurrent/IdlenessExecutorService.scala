@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
@@ -12,14 +12,15 @@ import scala.concurrent.duration.FiniteDuration
 
 trait IdlenessExecutorService extends ExecutorService {
 
-  /** Waits until all threads in the executor service are idle.
-    * The current thread may help in processing submitted tasks.
-    * The method may be conservative: it can return false even
-    * if all threads are idle at the end of the `duration`.
+  /** Waits until all threads in the executor service are idle. The current thread may help in
+    * processing submitted tasks. The method may be conservative: it can return false even if all
+    * threads are idle at the end of the `duration`.
     *
-    * @param timeout The maximum time to wait.
-    *                This time may be exceeded up to the run-time of the longest running task in the pool.
-    * @return true if all threads are idle; false if the timeout elapsed
+    * @param timeout
+    *   The maximum time to wait. This time may be exceeded up to the run-time of the longest
+    *   running task in the pool.
+    * @return
+    *   true if all threads are idle; false if the timeout elapsed
     */
   @SuppressWarnings(
     Array(

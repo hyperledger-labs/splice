@@ -51,7 +51,12 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationI
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
+import com.digitalasset.canton.lifecycle.{
+  AsyncOrSyncCloseable,
+  FlagCloseableAsync,
+  FutureUnlessShutdown,
+  SyncCloseable,
+}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
@@ -59,7 +64,7 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
@@ -111,21 +116,23 @@ class BftScanConnection(
           "refresh_scan_list",
         )({ tc =>
           // This retry makes sure any partial or complete failures are immediately retried with a backoff.
-          retryProvider.retry(
-            RetryFor.LongRunningAutomation,
-            "refresh_scan_list",
-            "refresh_scan_list",
-            bft.refresh(this)(tc).flatMap { connections =>
-              if (connections.failed > 0)
-                Future.failed(
-                  io.grpc.Status.UNAVAILABLE
-                    .withDescription("Deliberately enforcing a retry on failed scans.")
-                    .asRuntimeException()
-                )
-              else Future.unit
-            },
-            logger,
-          )(implicitly, TraceContext.empty, implicitly)
+          FutureUnlessShutdown.outcomeF(
+            retryProvider.retry(
+              RetryFor.LongRunningAutomation,
+              "refresh_scan_list",
+              "refresh_scan_list",
+              bft.refresh(this)(tc).flatMap { connections =>
+                if (connections.failed > 0)
+                  Future.failed(
+                    io.grpc.Status.UNAVAILABLE
+                      .withDescription("Deliberately enforcing a retry on failed scans.")
+                      .asRuntimeException()
+                  )
+                else Future.unit
+              },
+              logger,
+            )(implicitly, TraceContext.empty, implicitly)
+          )
         })
       )
   }
@@ -373,7 +380,7 @@ class BftScanConnection(
 
   override def getUpdatesBefore(
       migrationId: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       before: CantonTimestamp,
       atOrAfter: Option[CantonTimestamp],
       count: Int,
@@ -385,16 +392,17 @@ class BftScanConnection(
       responses <- getMigrationInfoResponses(connections, migrationId)
       // Filter out connections that don't have any data
       withData = responses.withData.toList.filter { case (_, info) =>
-        info.recordTimeRange.get(domainId).exists(_.min < before)
+        info.recordTimeRange.get(synchronizerId).exists(_.min < before)
       }
       connectionsWithData = withData.map(_._1)
       // Find the record time range for which all remaining connections have the data
       atOrAfter = withData.flatMap { case (_, info) =>
-        info.recordTimeRange.get(domainId).map(_.min)
+        info.recordTimeRange.get(synchronizerId).map(_.min)
       }.maxOption
       // Make a BFT call to connections that have the data
       result <- bftCall(
-        connection => connection.getUpdatesBefore(migrationId, domainId, before, atOrAfter, count),
+        connection =>
+          connection.getUpdatesBefore(migrationId, synchronizerId, before, atOrAfter, count),
         BftCallConfig.forAvailableData(connections, connectionsWithData.contains),
         // This method is very sensitive to unavailable SVs.
         // Do not log warnings for failures to reach consensus, as this would be too noisy,
@@ -795,7 +803,7 @@ object BftScanConnection {
         decentralizedSynchronizerId <- connection.getAmuletRulesDomain()(tc)
         scans <- connection.listDsoScans()
         domainScans <- scans
-          .find(_.domainId == decentralizedSynchronizerId)
+          .find(_.synchronizerId == decentralizedSynchronizerId)
           .map(e => Future.successful(e.scans))
           .getOrElse(
             Future.failed(
@@ -1006,21 +1014,28 @@ object BftScanConnection {
           retryConnectionOnInitialFailure = false,
         )
 
-  sealed trait BftScanClientConfig
+  sealed trait BftScanClientConfig {
+    def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): BftScanClientConfig
+  }
   object BftScanClientConfig {
     case class TrustSingle(
         url: Uri,
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
-    ) extends BftScanClientConfig
+    ) extends BftScanClientConfig {
+      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): TrustSingle =
+        copy(amuletRulesCacheTimeToLive = ttl)
+    }
     case class Bft(
         seedUrls: NonEmptyList[Uri],
         scansRefreshInterval: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultScansRefreshInterval,
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
-    ) extends BftScanClientConfig
-
+    ) extends BftScanClientConfig {
+      def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): Bft =
+        copy(amuletRulesCacheTimeToLive = ttl)
+    }
   }
 
   private sealed trait ScanResponse[+T]

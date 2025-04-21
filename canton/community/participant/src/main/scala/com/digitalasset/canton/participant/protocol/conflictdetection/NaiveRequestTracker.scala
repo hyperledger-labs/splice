@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
@@ -15,7 +15,7 @@ import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.ActiveContractStore.ContractState
-import com.digitalasset.canton.participant.util.TimeOfChange
+import com.digitalasset.canton.participant.util.TimeOfRequest
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -29,19 +29,24 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.*
 import scala.util.{Failure, Success, Try}
 
-/** The naive request tracker performs all its tasks (activeness check/timeout/finalization) sequentially.
-  * It accumulates all pending tasks in a priority queue and executes them as soon as the request tracker can
-  * progress to their associated timestamp. The execution happens asynchronously in the execution context `ecForConflictDetection`.
+/** The naive request tracker performs all its tasks (activeness check/timeout/finalization)
+  * sequentially. It accumulates all pending tasks in a priority queue and executes them as soon as
+  * the request tracker can progress to their associated timestamp. The execution happens
+  * asynchronously in the execution context `ecForConflictDetection`.
   *
-  * Requests are kept in memory from the call to [[NaiveRequestTracker!.addRequest]] until the finalization time or the timeout.
+  * Requests are kept in memory from the call to [[NaiveRequestTracker!.addRequest]] until the
+  * finalization time or the timeout.
   *
-  * @param initSc The first sequencer counter to be processed
-  * @param initTimestamp Only timestamps after this timestamp are allowed
+  * @param initSc
+  *   The first sequencer counter to be processed
+  * @param initTimestamp
+  *   Only timestamps after this timestamp are allowed
   */
 private[participant] class NaiveRequestTracker(
     initSc: SequencerCounter,
     initTimestamp: CantonTimestamp,
     conflictDetector: ConflictDetector,
+    promiseUSFactory: PromiseUnlessShutdownFactory,
     taskSchedulerMetrics: TaskSchedulerMetrics,
     exitOnFatalFailures: Boolean,
     override protected val timeouts: ProcessingTimeout,
@@ -51,8 +56,7 @@ private[participant] class NaiveRequestTracker(
 )(implicit executionContext: ExecutionContext)
     extends RequestTracker
     with NamedLogging
-    with FlagCloseableAsync
-    with HasCloseContext { self =>
+    with FlagCloseableAsync { self =>
   import NaiveRequestTracker.*
   import RequestTracker.*
 
@@ -69,22 +73,13 @@ private[participant] class NaiveRequestTracker(
       clock,
     )
 
-  // The task scheduler can decide to close itself if a task fails to execute
-  // If that happens, close the tracker as well since we won't be able to make progress without a scheduler
-  taskScheduler.runOnShutdown_(
-    new RunOnShutdown {
-      override def name: String = "close-request-tracker-due-to-scheduler-shutdown"
-      override def done: Boolean = isClosing
-      override def run(): Unit = self.close()
-    }
-  )(TraceContext.empty)
-
   /** Maps request counters to the data associated with a request.
     *
-    * A request resides in the map from the call to [[RequestTracker!.addRequest]] until some time after
-    * it times out or its commit set has been processed by the [[ConflictDetector]].
+    * A request resides in the map from the call to [[RequestTracker!.addRequest]] until some time
+    * after it times out or its commit set has been processed by the [[ConflictDetector]].
     *
-    * @see NaiveRequestTracker.RequestData for the invariants
+    * @see
+    *   NaiveRequestTracker.RequestData for the invariants
     */
   private[this] val requests: concurrent.Map[RequestCounter, RequestData] =
     new TrieMap[RequestCounter, RequestData]()
@@ -126,7 +121,7 @@ private[participant] class NaiveRequestTracker(
       requestTimestamp,
       decisionTime,
       activenessSet,
-      this,
+      promiseUSFactory,
       futureSupervisor,
     )
 
@@ -238,7 +233,7 @@ private[participant] class NaiveRequestTracker(
     }
   }
 
-  override def addCommitSet(rc: RequestCounter, commitSet: Try[CommitSet])(implicit
+  override def addCommitSet(rc: RequestCounter, commitSet: Try[UnlessShutdown[CommitSet]])(implicit
       traceContext: TraceContext
   ): Either[CommitSetError, EitherT[FutureUnlessShutdown, NonEmptyChain[
     RequestTrackerStoreError
@@ -254,7 +249,7 @@ private[participant] class NaiveRequestTracker(
     ], Unit]] =
       // Complete the promise only if we're not shutting down.
       performUnlessClosing(functionFullName) {
-        commitSetPromise.tryComplete(commitSet.map(UnlessShutdown.Outcome(_)))
+        commitSetPromise.tryComplete(commitSet)
       } match {
         case UnlessShutdown.AbortedDueToShutdown =>
           // Try to clean up as good as possible even though recovery of the ephemeral state will ultimately
@@ -271,17 +266,12 @@ private[participant] class NaiveRequestTracker(
                 withRC(rc, s"Completed commit set promise does not contain a value")
               )
             )
-          if (oldCommitSet == commitSet.map(UnlessShutdown.Outcome(_))) {
+          if (oldCommitSet == commitSet) {
             logger.debug(withRC(rc, s"Commit set added a second time."))
             Right(EitherT(finalizationResult))
           } else if (oldCommitSet.toEither.contains(AbortedDueToShutdown)) {
-            logger.debug(
-              withRC(
-                rc,
-                s"Old commit set was aborted due to shutdown. New commit set will be ignored.",
-              )
-            )
-            Left(CommitSetAlreadyExists(rc))
+            logger.info(withRC(rc, s"Not adding commit set as a shutdown has been initiated."))
+            Either.right(EitherT.right(FutureUnlessShutdown.abortedDueToShutdown))
           } else {
             logger.warn(withRC(rc, s"Commit set with different parameters added a second time."))
             Left(CommitSetAlreadyExists(rc))
@@ -297,7 +287,7 @@ private[participant] class NaiveRequestTracker(
 
   override def getApproximateStates(coids: Seq[LfContractId])(implicit
       traceContext: TraceContext
-  ): Future[Map[LfContractId, ContractState]] =
+  ): FutureUnlessShutdown[Map[LfContractId, ContractState]] =
     conflictDetector.getApproximateStates(coids)
 
   /** Returns whether the request is in-flight, i.e., in the requests map. */
@@ -327,7 +317,7 @@ private[participant] class NaiveRequestTracker(
     if (!requests.contains(rc))
       throw new FatalRequestTrackerException(withRC(rc, s"No entry found in request table"))
     conflictDetector
-      .finalizeRequest(CommitSet.empty, TimeOfChange(rc, requestTimestamp))
+      .finalizeRequest(CommitSet.empty, TimeOfRequest(rc, requestTimestamp))
       .map { acsFuture =>
         FutureUtil.doNotAwait(
           acsFuture.onShutdown(logger.debug(s"Rollback of request $rc aborted due to shutdown")),
@@ -340,8 +330,10 @@ private[participant] class NaiveRequestTracker(
 
   /** The action for checking activeness and locking the contracts
     *
-    * @param rc The request counter
-    * @param activenessResult The promise to be fulfilled with the result of the activeness check
+    * @param rc
+    *   The request counter
+    * @param activenessResult
+    *   The promise to be fulfilled with the result of the activeness check
     */
   private[this] class CheckActivenessAndLock(
       val rc: RequestCounter,
@@ -351,22 +343,19 @@ private[participant] class NaiveRequestTracker(
   )(override implicit val traceContext: TraceContext)
       extends TimedTask(timestamp, sequencerCounter, Kind.Activeness) {
 
-    /** Performs the activeness check consisting of the following:
-      * <ul>
-      *   <li>Check the activeness of the contracts in [[ActivenessSet.deactivations]] and [[ActivenessSet.usageOnly]].</li>
-      *   <li>Check the non-existence of the contracts in [[ActivenessSet.creations]].</li>
-      *   <li>Check the inactivity of the contracts in [[ActivenessSet.assignments]].</li>
-      *   <li>Lock all contracts to be deactivated.</li>
-      *   <li>Lock all contracts to be activated (created or assigned).</li>
-      *   <li>Fulfill the `activenessResult` promise with the result</li>
-      * </ul>
+    /** Performs the activeness check consisting of the following: <ul> <li>Check the activeness of
+      * the contracts in [[ActivenessSet.deactivations]] and [[ActivenessSet.usageOnly]].</li>
+      * <li>Check the non-existence of the contracts in [[ActivenessSet.creations]].</li> <li>Check
+      * the inactivity of the contracts in [[ActivenessSet.assignments]].</li> <li>Lock all
+      * contracts to be deactivated.</li> <li>Lock all contracts to be activated (created or
+      * assigned).</li> <li>Fulfill the `activenessResult` promise with the result</li> </ul>
       */
     override def perform(): FutureUnlessShutdown[Unit] =
       performUnlessClosingUSF("check-activeness-result") {
         logger.debug(withRC(rc, "Performing the activeness check"))
 
         val result = conflictDetector.checkActivenessAndLock(rc)
-        activenessResult.completeWith(result)
+        activenessResult.completeWithUS(result).discard
         result.map { actRes =>
           logger.trace(withRC(rc, s"Activeness result $actRes"))
         }
@@ -383,10 +372,12 @@ private[participant] class NaiveRequestTracker(
 
   /** The action for triggering a timeout.
     *
-    * @param rc The request counter
-    * @param timeoutPromise The promise to be fulfilled with the timeout result.
-    *                       This promise is also used to synchronize between results and timeouts:
-    *                       An actual timeout occurs only if the promise is incomplete when the action is processed.
+    * @param rc
+    *   The request counter
+    * @param timeoutPromise
+    *   The promise to be fulfilled with the timeout result. This promise is also used to
+    *   synchronize between results and timeouts: An actual timeout occurs only if the promise is
+    *   incomplete when the action is processed.
     */
   private[this] class TriggerTimeout(
       val rc: RequestCounter,
@@ -437,10 +428,14 @@ private[participant] class NaiveRequestTracker(
 
   /** The action for finalizing a request by committing and rolling back contract changes.
     *
-    * @param rc The request counter
-    * @param sequencerCounter The sequencer counter on the result message
-    * @param requestTimestamp The timestamp on the request
-    * @param commitSetFuture The promise which contracts should be activated and deactivated.
+    * @param rc
+    *   The request counter
+    * @param sequencerCounter
+    *   The sequencer counter on the result message
+    * @param requestTimestamp
+    *   The timestamp on the request
+    * @param commitSetFuture
+    *   The promise which contracts should be activated and deactivated.
     */
   private[this] case class FinalizeRequest(
       rc: RequestCounter,
@@ -456,15 +451,16 @@ private[participant] class NaiveRequestTracker(
       */
     val finalizationResult: PromiseUnlessShutdown[
       Either[NonEmptyChain[RequestTrackerStoreError], Unit]
-    ] = mkPromise[Either[NonEmptyChain[RequestTrackerStoreError], Unit]](
+    ] = promiseUSFactory.mkPromise[Either[NonEmptyChain[RequestTrackerStoreError], Unit]](
       "finalization-result",
       futureSupervisor,
     )
 
     /** Tries to finalize the request with the data given in this class.
       *
-      * @throws InvalidCommitSet if the commit set tries to archive or create a contract that was not locked
-      *                          during the activeness check
+      * @throws InvalidCommitSet
+      *   if the commit set tries to archive or create a contract that was not locked during the
+      *   activeness check
       */
     override def perform(): FutureUnlessShutdown[Unit] =
       performUnlessClosingUSF("finalize-request") {
@@ -472,11 +468,11 @@ private[participant] class NaiveRequestTracker(
           case Success(UnlessShutdown.Outcome(commitSet)) =>
             logger.debug(withRC(rc, s"Finalizing at $commitTime"))
             conflictDetector
-              .finalizeRequest(commitSet, TimeOfChange(rc, requestTimestamp))
+              .finalizeRequest(commitSet, TimeOfRequest(rc, requestTimestamp))
               .transform {
                 case Success(UnlessShutdown.Outcome(storeFuture)) =>
                   // The finalization is complete when the conflict detection stores have been updated
-                  finalizationResult.completeWith(storeFuture)
+                  finalizationResult.completeWithUS(storeFuture).discard
                   // Immediately evict the request
                   Success(UnlessShutdown.Outcome(evictRequest(rc)))
                 case Success(UnlessShutdown.AbortedDueToShutdown) =>
@@ -519,27 +515,25 @@ private[conflictdetection] object NaiveRequestTracker {
 
   /** Abstract class for tasks that the [[data.TaskScheduler]] accumulates in its `taskQueue`
     *
-    * @param kind The kind of the task, which is used for ordering the tasks
+    * @param kind
+    *   The kind of the task, which is used for ordering the tasks
     */
   sealed abstract class TimedTask(
       override val timestamp: CantonTimestamp,
       override val sequencerCounter: SequencerCounter,
       val kind: Kind,
   )(implicit val traceContext: TraceContext)
-      extends TaskScheduler.TimedTask
+      extends TaskScheduler.TimedTaskWithSequencerCounter
 
   object TimedTask {
     def unapply(timedTask: TimedTask): Option[(CantonTimestamp, SequencerCounter, Kind)] =
       Some((timedTask.timestamp, timedTask.sequencerCounter, timedTask.kind))
 
-    /** The order of tasks with the same timestamp is lexicographic by
-      * <ol>
-      *   <li>the `kind` of the task, and</li>
-      *   <li>the sequencer counter `kind`</li>
-      * <ol>
-      * So if two tasks have the same timestamp, finalization comes first, then timeouts, and then activeness
-      * checks for confirmation requests. The sequencer counter is used to resolve ties between requests
-      * such that the earlier request gets priority (in case of logical reordering).
+    /** The order of tasks with the same timestamp is lexicographic by <ol> <li>the `kind` of the
+      * task, and</li> <li>the sequencer counter `kind`</li> <ol> So if two tasks have the same
+      * timestamp, finalization comes first, then timeouts, and then activeness checks for
+      * confirmation requests. The sequencer counter is used to resolve ties between requests such
+      * that the earlier request gets priority (in case of logical reordering).
       */
     @nowarn("msg=match may not be exhaustive")
     val TimedTaskOrdering: Ordering[TimedTask] =
@@ -549,10 +543,11 @@ private[conflictdetection] object NaiveRequestTracker {
         }
   }
 
-  /** Describes the kind of a task ordered by
-    * [[Kind.Finalization]] < [[Kind.Timeout]] < [[Kind.Activeness]]
+  /** Describes the kind of a task ordered by [[Kind.Finalization]] < [[Kind.Timeout]] <
+    * [[Kind.Activeness]]
     *
-    * @param id an internal [[Kind]] identifier used for comparisons.
+    * @param id
+    *   an internal [[Kind]] identifier used for comparisons.
     */
   sealed abstract class Kind(private val id: Int)
       extends Product
@@ -567,35 +562,42 @@ private[conflictdetection] object NaiveRequestTracker {
     case object Activeness extends Kind(2)
   }
 
-  /** Exception for fatal errors in the request tracker.
-    * When this exception occurs, the state of the request tracker is inconsistent and should not be used any further.
+  /** Exception for fatal errors in the request tracker. When this exception occurs, the state of
+    * the request tracker is inconsistent and should not be used any further.
     */
   class FatalRequestTrackerException(msg: String) extends RuntimeException(msg)
 
-  /** Record for storing all the data that is needed for processing a request in the request tracker.
-    * The mutable cells and promises are created when the request is added
-    * so that the later tasks can fill in the data without having to update the [[NaiveRequestTracker!.requests]] map.
-    * We use [[com.digitalasset.canton.util.SingleUseCell]]s rather than [[scala.concurrent.Promise]]s
-    * when there is no need for synchronization.
+  /** Record for storing all the data that is needed for processing a request in the request
+    * tracker. The mutable cells and promises are created when the request is added so that the
+    * later tasks can fill in the data without having to update the
+    * [[NaiveRequestTracker!.requests]] map. We use [[com.digitalasset.canton.util.SingleUseCell]]s
+    * rather than [[scala.concurrent.Promise]]s when there is no need for synchronization.
     *
-    * @param sequencerCounter     The sequencer counter of the request message
-    * @param requestTimestamp     The timestamp on the request message
-    * @param decisionTime         The decision time for the request, i.e., when it times out.
-    * @param activenessSet        The activeness set used by the [[ConflictDetector]] in the activeness check
-    *                             at the [[requestTimestamp]].
-    * @param activenessResult     The promise for the [[ActivenessResult]] whose [[scala.concurrent.Future]]
-    *                             [[NaiveRequestTracker.addRequest]] returned to the transaction processor.
-    *                             The activeness check fulfills the promise.
-    * @param timeoutResult        The promise for the timeout whose [[scala.concurrent.Future]]
-    *                             [[NaiveRequestTracker.addRequest]] returned to the transaction processor.
-    *                             When a result is added up to the [[decisionTime]], it is immediately fulfilled with [[NoTimeout]].
-    *                             Otherwise, it will be fulfilled with [[Timeout]] at the [[decisionTime]].
-    * @param finalizationDataCell Memory cell for storing the data needed to finalize the request.
-    *                             This cell is filled by [[NaiveRequestTracker.addResult]].
-    * @param commitSetPromise     Promise for storing the [[CommitSet]].
-    *                             This promise is completed by [[NaiveRequestTracker.addCommitSet]].
-    *                             As long as this cell is not filled, the request tracker will not progress beyond the request's
-    *                             commit time.
+    * @param sequencerCounter
+    *   The sequencer counter of the request message
+    * @param requestTimestamp
+    *   The timestamp on the request message
+    * @param decisionTime
+    *   The decision time for the request, i.e., when it times out.
+    * @param activenessSet
+    *   The activeness set used by the [[ConflictDetector]] in the activeness check at the
+    *   [[requestTimestamp]].
+    * @param activenessResult
+    *   The promise for the [[ActivenessResult]] whose [[scala.concurrent.Future]]
+    *   [[NaiveRequestTracker.addRequest]] returned to the transaction processor. The activeness
+    *   check fulfills the promise.
+    * @param timeoutResult
+    *   The promise for the timeout whose [[scala.concurrent.Future]]
+    *   [[NaiveRequestTracker.addRequest]] returned to the transaction processor. When a result is
+    *   added up to the [[decisionTime]], it is immediately fulfilled with [[NoTimeout]]. Otherwise,
+    *   it will be fulfilled with [[Timeout]] at the [[decisionTime]].
+    * @param finalizationDataCell
+    *   Memory cell for storing the data needed to finalize the request. This cell is filled by
+    *   [[NaiveRequestTracker.addResult]].
+    * @param commitSetPromise
+    *   Promise for storing the [[CommitSet]]. This promise is completed by
+    *   [[NaiveRequestTracker.addCommitSet]]. As long as this cell is not filled, the request
+    *   tracker will not progress beyond the request's commit time.
     */
   private[NaiveRequestTracker] final case class RequestData private (
       sequencerCounter: SequencerCounter,
@@ -617,7 +619,7 @@ private[conflictdetection] object NaiveRequestTracker {
         activenessSet: ActivenessSet,
         promiseUSFactory: PromiseUnlessShutdownFactory,
         futureSupervisor: FutureSupervisor,
-    )(implicit elc: ErrorLoggingContext, executionContext: ExecutionContext): RequestData =
+    )(implicit elc: ErrorLoggingContext): RequestData =
       new RequestData(
         sequencerCounter = sc,
         requestTimestamp = requestTimestamp,
@@ -634,10 +636,13 @@ private[conflictdetection] object NaiveRequestTracker {
   /** Data for finalization that is stored for the request when the result is added such that
     * [[NaiveRequestTracker!.addResult]] can be idempotent.
     *
-    * @param resultTimestamp The timestamp on the result.
-    * @param commitTime The commit time
-    * @param result The promise to fulfill once the request has been finalized
-    *               and all changes have been persisted to the ACS.
+    * @param resultTimestamp
+    *   The timestamp on the result.
+    * @param commitTime
+    *   The commit time
+    * @param result
+    *   The promise to fulfill once the request has been finalized and all changes have been
+    *   persisted to the ACS.
     */
   private final case class FinalizationData(
       resultTimestamp: CantonTimestamp,

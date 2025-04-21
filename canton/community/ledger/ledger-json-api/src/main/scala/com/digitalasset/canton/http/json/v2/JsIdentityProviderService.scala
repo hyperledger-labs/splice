@@ -1,21 +1,22 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.ledger.api.v2.admin.identity_provider_config_service
+import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
-import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.JsCantonError
+import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidArgument
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
 import sttp.tapir.*
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.jsonBody
+import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
@@ -25,7 +26,7 @@ class JsIdentityProviderService(
 ) extends Endpoints
     with NamedLogging {
 
-  def endpoints() =
+  def endpoints(): List[ServerEndpoint[Any, Future]] =
     List(
       withServerLogic(
         JsIdentityProviderService.createIdpsEndpoint,
@@ -126,7 +127,7 @@ class JsIdentityProviderService(
 
 }
 
-object JsIdentityProviderService {
+object JsIdentityProviderService extends DocumentationEndpoints {
   import Endpoints.*
   import JsIdentityProviderCodecs.*
 
@@ -162,49 +163,59 @@ object JsIdentityProviderService {
       .in(path[String](identityProviderPath))
       .out(jsonBody[identity_provider_config_service.DeleteIdentityProviderConfigResponse])
       .description("Delete identity provider config")
+
+  override def documentation: Seq[AnyEndpoint] = List(
+    createIdpsEndpoint,
+    updateIdpEndpoint,
+    getIdpEndpoint,
+    deleteIdpEndpoint,
+    listIdpsEndpoint,
+  )
 }
 
 object JsIdentityProviderCodecs {
+  import JsSchema.config
+
   implicit val identityProviderConfig
       : Codec[identity_provider_config_service.IdentityProviderConfig] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val listIdentityProviderConfigsRequest
       : Codec[identity_provider_config_service.ListIdentityProviderConfigsRequest] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val listIdentityProviderConfigsResponse
       : Codec[identity_provider_config_service.ListIdentityProviderConfigsResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val createIdentityProviderConfigRequest
       : Codec[identity_provider_config_service.CreateIdentityProviderConfigRequest] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val createIdentityProviderConfigResponse
       : Codec[identity_provider_config_service.CreateIdentityProviderConfigResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val updateIdentityProviderConfigRequest
       : Codec[identity_provider_config_service.UpdateIdentityProviderConfigRequest] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val updateIdentityProviderConfigResponse
       : Codec[identity_provider_config_service.UpdateIdentityProviderConfigResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val getIdentityProviderConfigRequest
       : Codec[identity_provider_config_service.GetIdentityProviderConfigRequest] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val getIdentityProviderConfigResponse
       : Codec[identity_provider_config_service.GetIdentityProviderConfigResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val deleteIdentityProviderConfigRequest
       : Codec[identity_provider_config_service.DeleteIdentityProviderConfigRequest] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val deleteIdentityProviderConfigResponse
       : Codec[identity_provider_config_service.DeleteIdentityProviderConfigResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
 }

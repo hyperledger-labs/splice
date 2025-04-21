@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.memory
@@ -6,24 +6,25 @@ package com.digitalasset.canton.participant.store.memory
 import cats.Monoid
 import cats.data.OptionT
 import com.digitalasset.canton.LfPackageId
-import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.ledger.participant.state.PackageDescription
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.PackageService
-import com.digitalasset.canton.participant.admin.PackageService.{Dar, DarDescriptor}
-import com.digitalasset.canton.participant.store.DamlPackageStore
-import com.digitalasset.canton.participant.store.memory.InMemoryDamlPackageStore.defaultPackageDescription
-import com.digitalasset.canton.protocol.PackageDescription
+import com.digitalasset.canton.participant.admin.PackageService.{
+  Dar,
+  DarDescription,
+  DarMainPackageId,
+}
+import com.digitalasset.canton.participant.store.{DamlPackageStore, PackageInfo}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.archive.DamlLf
 import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 
 class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLoggerFactory)(implicit
@@ -33,44 +34,31 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
   import DamlPackageStore.*
 
   private val pkgData
-      : concurrent.Map[LfPackageId, (DamlLf.Archive, String255, CantonTimestamp, Int)] =
-    new ConcurrentHashMap[LfPackageId, (DamlLf.Archive, String255, CantonTimestamp, Int)].asScala
+      : concurrent.Map[LfPackageId, (DamlLf.Archive, PackageInfo, CantonTimestamp, Int)] =
+    new ConcurrentHashMap[LfPackageId, (DamlLf.Archive, PackageInfo, CantonTimestamp, Int)].asScala
 
-  private val darData: concurrent.Map[Hash, (Array[Byte], String255)] =
-    new ConcurrentHashMap[Hash, (Array[Byte], String255)].asScala
+  private val darData: concurrent.Map[DarMainPackageId, (Array[Byte], DarDescription)] =
+    new ConcurrentHashMap[DarMainPackageId, (Array[Byte], DarDescription)].asScala
 
-  private val darPackages: concurrent.Map[Hash, Set[LfPackageId]] =
-    new ConcurrentHashMap[Hash, Set[LfPackageId]].asScala
+  private val darPackages: concurrent.Map[DarMainPackageId, Set[LfPackageId]] =
+    new ConcurrentHashMap[DarMainPackageId, Set[LfPackageId]].asScala
 
   override def append(
-      pkgs: List[DamlLf.Archive],
+      pkgs: List[(PackageInfo, DamlLf.Archive)],
       uploadedAt: CantonTimestamp,
-      sourceDescription: String255,
       dar: PackageService.Dar,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
-    pkgs.foreach { pkgArchive =>
+    pkgs.foreach { case (pkgInfo, pkgArchive) =>
       val packageId = readPackageId(pkgArchive)
       val packageSize = pkgArchive.getPayload.size()
-      // only update the description if the given one is not empty
-      if (sourceDescription.nonEmpty)
-        pkgData
-          .put(packageId, (pkgArchive, sourceDescription, uploadedAt, packageSize))
-          .discard
-      else
-        pkgData
-          .updateWith(packageId) {
-            case None => Some((pkgArchive, defaultPackageDescription, uploadedAt, packageSize))
-            case Some((_, oldDescription, _, _)) =>
-              Some((pkgArchive, oldDescription, uploadedAt, packageSize))
-          }
-          .discard
+      pkgData.putIfAbsent(packageId, (pkgArchive, pkgInfo, uploadedAt, packageSize)).discard
     }
 
-    darData.put(dar.descriptor.hash, (dar.bytes.clone(), dar.descriptor.name)).discard
-    val hash = dar.descriptor.hash
-    val pkgS = pkgs.view.map(readPackageId).toSet
+    darData.put(dar.descriptor.mainPackageId, (dar.bytes.clone(), dar.descriptor)).discard
+    val hash = dar.descriptor.mainPackageId
+    val pkgS = pkgs.view.map { case (_, archive) => readPackageId(archive) }.toSet
     darPackages.updateWith(hash)(optSet => Some(optSet.fold(pkgS)(_.union(pkgS)))).discard
 
     FutureUnlessShutdown.unit
@@ -78,26 +66,58 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
 
   override def getPackage(packageId: LfPackageId)(implicit
       traceContext: TraceContext
-  ): Future[Option[DamlLf.Archive]] =
-    Future.successful(pkgData.get(packageId).map(_._1))
+  ): FutureUnlessShutdown[Option[DamlLf.Archive]] =
+    FutureUnlessShutdown.pure(pkgData.get(packageId).map(_._1))
 
   override def getPackageDescription(
       packageId: LfPackageId
-  )(implicit traceContext: TraceContext): Future[Option[PackageDescription]] =
-    Future.successful(
-      pkgData.get(packageId).map { case (_, sourceDescription, uploadedAt, packageSize) =>
-        PackageDescription(packageId, sourceDescription, uploadedAt, packageSize)
+  )(implicit traceContext: TraceContext): OptionT[FutureUnlessShutdown, PackageDescription] =
+    OptionT.fromOption[FutureUnlessShutdown](
+      pkgData.get(packageId).map { case (_, info, uploadedAt, packageSize) =>
+        PackageDescription(
+          packageId = packageId,
+          name = info.name,
+          version = info.version,
+          uploadedAt,
+          packageSize,
+        )
       }
+    )
+
+  override def getPackageReferences(
+      packageId: LfPackageId
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[DarDescription]] =
+    FutureUnlessShutdown.pure(
+      darPackages
+        .filter { case (_, pkgs) => pkgs.contains(packageId) }
+        .flatMap { case (k, _) =>
+          darData.get(k).map(_._2)
+        }
+        .toSeq
+    )
+
+  private def toPackageDescription(
+      packageId: LfPackageId,
+      info: PackageInfo,
+      uploadedAt: CantonTimestamp,
+      packageSize: Int,
+  ): PackageDescription =
+    PackageDescription(
+      packageId = packageId,
+      name = info.name,
+      version = info.version,
+      uploadedAt,
+      packageSize,
     )
 
   override def listPackages(
       limit: Option[Int]
-  )(implicit traceContext: TraceContext): Future[Seq[PackageDescription]] =
-    Future.successful(
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[PackageDescription]] =
+    FutureUnlessShutdown.pure(
       pkgData
         .take(limit.getOrElse(Int.MaxValue))
-        .map { case (pid, (_, sourceDescription, uploadedAt, packageSize)) =>
-          PackageDescription(pid, sourceDescription, uploadedAt, packageSize)
+        .map { case (pid, (_, info, uploadedAt, packageSize)) =>
+          toPackageDescription(pid, info, uploadedAt, packageSize)
         }
         .to(Seq)
     )
@@ -116,53 +136,66 @@ class InMemoryDamlPackageStore(override protected val loggerFactory: NamedLogger
   }
 
   override def getDar(
-      hash: Hash
-  )(implicit traceContext: TraceContext): Future[Option[Dar]] =
-    Future.successful(darData.get(hash).map { case (bytes, name) =>
-      Dar(DarDescriptor(hash, name), bytes.clone())
-    })
+      mainPackageId: DarMainPackageId
+  )(implicit traceContext: TraceContext): OptionT[FutureUnlessShutdown, Dar] =
+    OptionT(FutureUnlessShutdown.pure(darData.get(mainPackageId).map { case (bytes, descriptor) =>
+      Dar(descriptor, bytes.clone())
+    }))
+
+  override def getPackageDescriptionsOfDar(
+      mainPackageId: DarMainPackageId
+  )(implicit traceContext: TraceContext): OptionT[FutureUnlessShutdown, Seq[PackageDescription]] =
+    OptionT.fromOption[FutureUnlessShutdown](
+      darPackages
+        .get(mainPackageId)
+        .map(
+          _.flatMap(packageId =>
+            pkgData.get(packageId).map { case (_, info, timestamp, size) =>
+              toPackageDescription(packageId, info, timestamp, size)
+            }
+          ).toSeq
+        )
+    )
 
   override def listDars(
       limit: Option[Int]
-  )(implicit traceContext: TraceContext): Future[Seq[DarDescriptor]] =
-    Future.successful(
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[DarDescription]] =
+    FutureUnlessShutdown.pure(
       darData
         .take(limit.getOrElse(Int.MaxValue))
-        .map { case (hash, (_, name)) =>
-          DarDescriptor(hash, name)
+        .map { case (_, (_, descriptor)) =>
+          descriptor
         }
         .to(Seq)
     )
 
-  override def anyPackagePreventsDarRemoval(packages: Seq[PackageId], removeDar: DarDescriptor)(
+  override def anyPackagePreventsDarRemoval(packages: Seq[PackageId], removeDar: DarDescription)(
       implicit tc: TraceContext
-  ): OptionT[Future, PackageId] = {
+  ): OptionT[FutureUnlessShutdown, PackageId] = {
     val known = packages.toSet.intersect(Monoid.combineAll(darPackages.toMap.values))
-    val fromAllOtherDars = Monoid.combineAll(darPackages.toMap.removed(removeDar.hash).values)
+    val fromAllOtherDars =
+      Monoid.combineAll(darPackages.toMap.removed(removeDar.mainPackageId).values)
     val withoutDar = known.diff(fromAllOtherDars).headOption
     OptionT.fromOption(withoutDar)
   }
 
   override def determinePackagesExclusivelyInDar(
       packages: Seq[PackageId],
-      removeDar: DarDescriptor,
-  )(implicit tc: TraceContext): Future[Seq[PackageId]] = {
-    val packagesInOtherDars = Monoid.combineAll(darPackages.toMap.removed(removeDar.hash).values)
+      removeDar: DarDescription,
+  )(implicit tc: TraceContext): FutureUnlessShutdown[Seq[PackageId]] = {
+    val packagesInOtherDars =
+      Monoid.combineAll(darPackages.toMap.removed(removeDar.mainPackageId).values)
     val packagesNotInAnyOtherDars = packages.toSet.diff(packagesInOtherDars)
-    Future.successful(packagesNotInAnyOtherDars.toSeq)
+    FutureUnlessShutdown.pure(packagesNotInAnyOtherDars.toSeq)
   }
 
   override def removeDar(
-      hash: Hash
+      mainPackageId: DarMainPackageId
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    darPackages.remove(hash).discard
-    darData.remove(hash).discard
+    darPackages.remove(mainPackageId).discard
+    darData.remove(mainPackageId).discard
     FutureUnlessShutdown.unit
   }
 
   override def close(): Unit = ()
-}
-
-object InMemoryDamlPackageStore {
-  val defaultPackageDescription = String255.tryCreate("default")
 }

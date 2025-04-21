@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -7,24 +7,27 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{
   LfContractId,
   LfTemplateId,
-  ReassignmentId,
   RootHash,
   SerializableContract,
   Stakeholders,
   ViewHash,
 }
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.{LfPartyId, LfWorkflowId, ReassignmentCounter}
 
-/** Common supertype of all view trees that are sent as [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]]s */
+/** Common supertype of all view trees that are sent as
+  * [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]]s
+  */
 trait ViewTree extends PrettyPrinting {
 
   /** The informees of the view in the tree */
   def informees: Set[LfPartyId]
 
-  /** Return the hash whose signature is to be included in the [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]] */
+  /** Return the hash whose signature is to be included in the
+    * [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]]
+    */
   def toBeSigned: Option[RootHash]
 
   /** The hash of the view */
@@ -34,13 +37,15 @@ trait ViewTree extends PrettyPrinting {
 
   /** The root hash of the view tree.
     *
-    * Two view trees with the same [[rootHash]] must also have the same [[domainId]] and [[mediator]]
-    * (except for hash collisions).
+    * Two view trees with the same [[rootHash]] must also have the same [[synchronizerId]] and
+    * [[mediator]] (except for hash collisions).
     */
   def rootHash: RootHash
 
-  /** The domain to which the [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]] should be sent to */
-  def domainId: DomainId
+  /** The synchronizer to which the
+    * [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]] should be sent to
+    */
+  def synchronizerId: SynchronizerId
 
   /** The mediator group that is responsible for coordinating this request */
   def mediator: MediatorGroupRecipient
@@ -55,13 +60,13 @@ trait FullReassignmentViewTree extends ViewTree {
   protected[this] def commonData: ReassignmentCommonData
   protected[this] def view: ReassignmentView
 
-  def reassignmentId: Option[ReassignmentId]
+  def reassignmentRef: ReassignmentRef
 
   val viewPosition: ViewPosition =
     ViewPosition.root // Use a dummy value, as there is only one view.
 
-  def sourceDomain: Source[DomainId]
-  def targetDomain: Target[DomainId]
+  def sourceSynchronizer: Source[SynchronizerId]
+  def targetSynchronizer: Target[SynchronizerId]
 
   // Submissions
   def submitterMetadata: ReassignmentSubmitterMetadata = commonData.submitterMetadata
@@ -69,15 +74,14 @@ trait FullReassignmentViewTree extends ViewTree {
   def workflowId: Option[LfWorkflowId] = submitterMetadata.workflowId
 
   // Parties and participants
-  // TODO(#22048) Check informees and stakeholders are compatible
-  override def informees: Set[LfPartyId] = view.contract.metadata.stakeholders
+  override def informees: Set[LfPartyId] =
+    view.contract.metadata.stakeholders + commonData.submitterMetadata.submittingAdminParty
   def stakeholders: Stakeholders = commonData.stakeholders
+  def confirmingParties: Set[LfPartyId] = commonData.confirmingParties
 
-  def reassigningParticipants: ReassigningParticipants = commonData.reassigningParticipants
-  def isConfirmingReassigningParticipant(participantId: ParticipantId): Boolean =
-    reassigningParticipants.confirming.contains(participantId)
-  def isObservingReassigningParticipant(participantId: ParticipantId): Boolean =
-    reassigningParticipants.observing.contains(participantId)
+  def reassigningParticipants: Set[ParticipantId] = commonData.reassigningParticipants
+  def isReassigningParticipant(participantId: ParticipantId): Boolean =
+    reassigningParticipants.contains(participantId)
 
   // Contract
   def contract: SerializableContract = view.contract

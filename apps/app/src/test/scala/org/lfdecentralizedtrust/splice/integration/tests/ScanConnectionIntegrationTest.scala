@@ -1,14 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, WalletTestUtil}
+import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.DurationInt
@@ -18,8 +13,7 @@ class ScanConnectionIntegrationTest
     with AmuletConfigUtil
     with WalletTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed

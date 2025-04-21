@@ -75,7 +75,7 @@ trait SoftMigrationTrigger extends Trigger {
       .toList
       .traverse { namespace =>
         connection.listAllTransactions(
-          TopologyStoreId.DomainStore(decentralizedSynchronizerId),
+          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId),
           TimeQuery.Range(None, None),
           includeMappings = Set(
             TopologyMapping.Code.OwnerToKeyMapping,
@@ -86,7 +86,7 @@ trait SoftMigrationTrigger extends Trigger {
       }
       .map(_.flatten)
     decentralizedNamespaceDefinition <- connection.listAllTransactions(
-      TopologyStoreId.DomainStore(decentralizedSynchronizerId),
+      TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId),
       TimeQuery.Range(None, None),
       includeMappings = Set(TopologyMapping.Code.DecentralizedNamespaceDefinition),
     )

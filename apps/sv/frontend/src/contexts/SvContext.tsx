@@ -43,3 +43,18 @@ export const useElectionContext = ():
     },
   });
 };
+
+export const useFeatureSupport = (): UseQueryResult<{
+  newGovernanceFlow: boolean;
+}> => {
+  const { featureSupport } = useSvAdminClient();
+  return useQuery({
+    queryKey: ['featureSupport'],
+    queryFn: async () => {
+      const resp = await featureSupport();
+      return {
+        newGovernanceFlow: resp.new_governance_flow,
+      };
+    },
+  });
+};

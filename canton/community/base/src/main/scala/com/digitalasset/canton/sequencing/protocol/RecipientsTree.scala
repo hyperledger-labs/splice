@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -13,10 +13,9 @@ import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.Member
 
-/** A tree representation of the recipients for a batch.
-  * Each member receiving the batch should see only subtrees of recipients from a node containing
-  * the member. If a member is present in a subtree A and a sub-subtree of A then it should only see
-  * the top-level subtree A.
+/** A tree representation of the recipients for a batch. Each member receiving the batch should see
+  * only subtrees of recipients from a node containing the member. If a member is present in a
+  * subtree A and a sub-subtree of A then it should only see the top-level subtree A.
   */
 final case class RecipientsTree(
     recipientGroup: NonEmpty[Set[Recipient]],

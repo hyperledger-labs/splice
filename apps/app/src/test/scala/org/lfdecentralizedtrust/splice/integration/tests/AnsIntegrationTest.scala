@@ -4,14 +4,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as codegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as subCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,8 +38,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
   import WalletTestUtil.*
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       // TODO(#11927): make AnsIntegrationTest use simpleTopology4Svs
       .simpleTopology1Sv(this.getClass.getSimpleName)
@@ -132,7 +129,6 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
                 testEntryDescription,
                 Instant.now().plus(1, ChronoUnit.SECONDS),
               ).create.commands.asScala.toSeq,
-              optTimeout = None,
             )
           clue("Created entry is expired") {
             eventually() {

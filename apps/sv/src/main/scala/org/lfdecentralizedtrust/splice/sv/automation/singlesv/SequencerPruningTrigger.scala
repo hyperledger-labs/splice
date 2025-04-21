@@ -13,9 +13,9 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.synchronizer.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.Member
@@ -48,8 +48,10 @@ class SequencerPruningTrigger(
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      domainId <- sequencerAdminConnection.getStatus.map(_.trySuccess.domainId)
-      recordTimeRangeO <- store.updateHistory.getRecordTimeRange(migrationId).map(_.get(domainId))
+      synchronizerId <- sequencerAdminConnection.getStatus.map(_.trySuccess.synchronizerId)
+      recordTimeRangeO <- store.updateHistory
+        .getRecordTimeRange(migrationId)
+        .map(_.get(synchronizerId))
       _ <- recordTimeRangeO match {
         case Some(DomainRecordTimeRange(earliest, latest))
             if (latest - earliest).compareTo(retentionPeriod.asJava) > 0 =>
