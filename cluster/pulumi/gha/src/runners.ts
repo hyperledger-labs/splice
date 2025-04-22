@@ -108,12 +108,12 @@ const runnerSpecs = [
     docker: false,
     resources: {
       requests: {
-        cpu: '6',
-        memory: '40Gi',
+        cpu: '8',
+        memory: '52Gi',
       },
       limits: {
-        cpu: '6',
-        memory: '40Gi',
+        cpu: '8',
+        memory: '52Gi',
       },
     },
   },
