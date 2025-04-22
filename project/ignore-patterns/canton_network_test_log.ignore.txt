@@ -29,12 +29,10 @@ Could not verify JWT token: The provided Algorithm doesn't match the one defined
 # Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
 .*GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 
-# TODO(#2196) Figure out why we get that error
-ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when attempting to fetch resource.
-
 ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted
 ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
 AbortError: The operation was aborted
+TypeError: NetworkError when attempting to fetch resource
 
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:
@@ -118,7 +116,7 @@ BootstrapPackageConfigIntegrationTest.*ValidatorLicense_ReceiveFaucetCoupon is d
 # Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
 .*No data has been made available yet.*
 
-# Make sure to have a trailing newline
-
 # TODO(#19139): Remove it once BoostrapPackageConfigIntegrationTest is fixed
 .*INVALID_ARGUMENT: COMMAND_PREPROCESSING_FAILED.*unknown constructor SRARC_CreateExternalPartyAmuletRules.*
+
+# Make sure to have a trailing newline
