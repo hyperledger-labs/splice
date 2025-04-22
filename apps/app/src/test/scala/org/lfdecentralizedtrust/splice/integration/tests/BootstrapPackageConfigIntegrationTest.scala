@@ -290,10 +290,10 @@ class BootstrapPackageConfigIntegrationTest
       alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
-    sv2PackageVettingTrigger.runOnce().futureValue
-    sv2ValidatorPackageVettingTrigger.runOnce().futureValue
     val amuletCreateTime =
       CantonTimestamp.tryFromInstant(sv2ScanBackend.getAmuletRules().contract.createdAt)
+    sv2PackageVettingTrigger.resume()
+    sv2ValidatorPackageVettingTrigger.resume()
 
     clue(s"Vetting state for slow sv is updated after the trigger runs") {
       eventually() {

@@ -64,6 +64,7 @@ class PackageVetting(
     // sort them and vet in the order of earliest first to ensure that dependencies are vetted at the earliest time as well
     // also it doesn't really make sense to run multiple vettings in parallel as they will just race to update the topology state
     val vettingTimeSortedDars = vettingSchedule.toSeq.sortBy(_._1)
+    logger.info(s"Vetting for schedule $vettingTimeSortedDars from amulet rules $schedule")
     MonadUtil
       .sequentialTraverse(vettingTimeSortedDars) { case (validFrom, packages) =>
         vetPackages(domainId, packages.toSeq, Some(validFrom))
